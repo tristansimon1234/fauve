@@ -45,7 +45,7 @@ def load(path, gpu=True):
         if "CUDAExecutionProvider" not in session.get_providers():
             # On a CPU it would take an hour: the app falls back to its own cut-out sandbox instead.
             raise RuntimeError("pas de carte graphique pour le modèle")
-        log(f"model loaded on the card in {time.time() - started:.1f} s")
+        log(f"model {os.path.basename(path)} loaded on the card in {time.time() - started:.1f} s")
         return session
     options = ort.SessionOptions()
     options.intra_op_num_threads = os.cpu_count() or 4

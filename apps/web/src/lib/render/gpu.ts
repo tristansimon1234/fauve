@@ -29,12 +29,20 @@ const IMAGE_COMMANDS = [
   "RUN pip install --no-cache-dir 'onnxruntime-gpu[cuda,cudnn]==1.26.0' 'numpy==1.26.4' 'opencv-python-headless==4.10.0.84'",
   `RUN mkdir -p /models && curl -fsSL -o /models/portrait.onnx ${MODEL_URL} && echo '${MODEL_SHA256}  /models/portrait.onnx' | sha256sum -c -`,
 ];
+/**
+ * The same model in half precision (its weights and its sums in 16 bits, its input and output kept in 32), made once
+ * on Modal from the file checked above by onnxruntime's own converter: half the file, and the card's 16-bit units.
+ * Measured here on one image: the cut-out identical to 0.99994 (no pixel off by more than 0.1).
+ */
+const FP16_COMMANDS = [
+  `RUN pip install --no-cache-dir 'onnx==1.17.0' && python -c "import onnx; from onnxruntime.transformers.float16 import convert_float_to_float16 as half; onnx.save(half(onnx.load('/models/portrait.onnx'), keep_io_types=True), '/models/portrait-fp16.onnx')"`,
+];
 const APP = "fauve";
 /**
  * Its size: an A10G (24 GB), and the CPUs and memory for the edge made at full size and the clip's images (an 8 s
  * passage is 1.5 GB). Not an L4, cheaper: none was ever allotted to this account (three tries, 90 s to 13 min), while an
  * A10G came in 1.7 s. Measured on 3 s of a fashion shoot: model loaded in 7 s, 0.53 s an image, edges in 7 s, 70 s and
- * 0.021 € in all.
+ * about 0.027 € in all.
  */
 export const GPU = "A10G";
 const CORES = 2;
@@ -100,11 +108,12 @@ async function echo(stream: ReadableStream<string>, say: (line: string) => void)
 export async function subjectsOnGpu(
   passages: GpuPassage[],
   deadlineMs: number,
-  // Another card for a test from the admin route (« A10G », « T4 »…), or none (a machine without a card: it shows
-  // whether Modal starts a machine at all when no card comes).
-  options: { gpu?: string | null } = {},
+  // For a test from the admin route: another card (« T4 »…) or none (a machine without a card: it shows whether Modal
+  // starts a machine at all when no card comes), the model in half precision, a longer start (an image to build).
+  options: { gpu?: string | null; fp16?: boolean; startMs?: number } = {},
 ): Promise<{ results: Record<string, GpuCut | Error>; seconds: number }> {
   const gpu = options.gpu === undefined ? GPU : options.gpu;
+  const startMs = options.startMs ?? GPU_START_MS;
   if (!passages.length) return { results: {}, seconds: 0 };
   const started = Date.now();
   const at = () => `${((Date.now() - started) / 1000).toFixed(1)} s`;
@@ -116,7 +125,7 @@ export async function subjectsOnGpu(
 
   const client = new ModalClient({ tokenId: env("MODAL_TOKEN_ID"), tokenSecret: env("MODAL_TOKEN_SECRET") });
   const deadline = started + deadlineMs;
-  const upBy = Math.min(deadline, started + GPU_START_MS);
+  const upBy = Math.min(deadline, started + startMs);
   // A name of its own, to end the card asked for when it is allotted after we stopped waiting for it.
   const name = `cut-${randomUUID().slice(0, 13)}`;
   let sandbox: Sandbox | undefined;
@@ -125,7 +134,8 @@ export async function subjectsOnGpu(
 
   const work = async (): Promise<Record<string, GpuCut | Error>> => {
     const app = await before(upBy, client.apps.fromName(APP, { createIfMissing: true }), "Modal did not answer");
-    const image = await before(upBy, client.images.fromRegistry(BASE_IMAGE).dockerfileCommands(IMAGE_COMMANDS).build(app), `its image was not ready after ${GPU_START_MS / 1000} s`);
+    const base = client.images.fromRegistry(BASE_IMAGE).dockerfileCommands(IMAGE_COMMANDS);
+    const image = await before(upBy, (options.fp16 ? base.dockerfileCommands(FP16_COMMANDS) : base).build(app), `its image was not ready after ${startMs / 1000} s`);
     say(`image ready (${image.imageId})`);
     const created = await before(
       upBy,
@@ -137,7 +147,7 @@ export async function subjectsOnGpu(
         idleTimeoutMs: IDLE_MS,
         name,
       }),
-      gpu ? `no ${gpu} card free after ${GPU_START_MS / 1000} s` : `no machine started after ${GPU_START_MS / 1000} s`,
+      gpu ? `no ${gpu} card free after ${startMs / 1000} s` : `no machine started after ${startMs / 1000} s`,
     );
     if (over) {
       await created.terminate().catch(() => undefined);
@@ -157,7 +167,7 @@ export async function subjectsOnGpu(
       workdir: "/work",
       timeoutMs: wholeSeconds(left),
       // PORTRAIT_SECONDS: the script stops on its own (and says why) when its pace would not finish in time.
-      env: { PORTRAIT_MODEL: "/models/portrait.onnx", PORTRAIT_WORK: "/work", PORTRAIT_SECONDS: String(Math.floor(left / 1000) - 10), HDR_FILTER: HDR_TO_SDR },
+      env: { PORTRAIT_MODEL: options.fp16 ? "/models/portrait-fp16.onnx" : "/models/portrait.onnx", PORTRAIT_WORK: "/work", PORTRAIT_SECONDS: String(Math.floor(left / 1000) - 10), HDR_FILTER: HDR_TO_SDR },
     });
     const [stdout, stderr, code] = await Promise.all([run.stdout.readText(), echo(run.stderr, (line) => say(line)), run.wait()]);
     say(`script ended (${code})`);

@@ -57,6 +57,7 @@ export default function PrivacyPage() {
         <li>ElevenLabs : voix off, clonage de ta voix si tu le demandes, lecture des messages vocaux, musique des Reels.</li>
         <li>TypeSafe : choix de la réaction d’Edith aux messages écrits dans l’application.</li>
         <li>Treg : récupération de la vidéo d’un Reel Instagram que tu envoies en exemple, par son lien.</li>
+        <li>Modal : détourage des personnes dans tes vidéos, sur une carte graphique louée le temps du travail ; rien n’y est gardé, la machine est supprimée juste après.</li>
         <li>Meta Platforms (Instagram) et TikTok : publication sur tes comptes et lecture de leurs statistiques, à ta demande.</li>
         <li>Stripe : paiement de l’abonnement.</li>
       </ul>

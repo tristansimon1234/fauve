@@ -45,8 +45,10 @@ export async function POST(request: NextRequest) {
     const media = request.nextUrl.searchParams.get("media") ?? "";
     const from = Number(request.nextUrl.searchParams.get("from") ?? "0");
     const to = Number(request.nextUrl.searchParams.get("to") ?? "0");
-    // &gpu=A10G|T4|L40S|A100…: another card; &gpu=none: a machine without one (to see whether Modal starts one at all).
+    // &gpu=A10G|T4|L40S|A100…: another card; &gpu=none: a machine without one (to see whether Modal starts one at all);
+    // &fp16=1: the model in half precision (its image built on the first call, 10 min allowed for it), its file apart.
     const gpuParam = request.nextUrl.searchParams.get("gpu");
+    const fp16 = request.nextUrl.searchParams.get("fp16") === "1";
     const gpu = gpuParam === "none" ? null : gpuParam && /^[A-Z0-9-]{2,12}$/i.test(gpuParam) ? gpuParam.toUpperCase() : undefined;
     if (!/^[0-9a-f-]{36}$/.test(media) || !(to > from) || to - from > 8) return Response.json({ error: "media=<uuid>&from=<s>&to=<s> (8 s at most)" }, { status: 400 });
     if (!gpuReady()) return Response.json({ error: "MODAL_TOKEN_ID / MODAL_TOKEN_SECRET not set" }, { status: 400 });
@@ -54,7 +56,7 @@ export async function POST(request: NextRequest) {
       const db = supabaseAdmin();
       const { data: row } = await db.from("media_assets").select("studio_id, storage_path").eq("id", media).maybeSingle();
       if (!row?.storage_path) return console.error("gpu subject: no such media", media);
-      const base = `${row.studio_id}/lab-gpu/${media}-${from}-${to}`;
+      const base = `${row.studio_id}/lab-gpu/${media}-${from}-${to}${fp16 ? "-fp16" : ""}`;
       const [clip, webm, png] = await Promise.all([
         db.storage.from("media").createSignedUrl(row.storage_path, 3600),
         db.storage.from("media").createSignedUploadUrl(`${base}.webm`, { upsert: true }),
@@ -62,7 +64,7 @@ export async function POST(request: NextRequest) {
       ]);
       if (!clip.data?.signedUrl || !webm.data?.signedUrl || !png.data?.signedUrl) return console.error("gpu subject: links refused");
       // Its steps are in the logs as they happen (« gpu … »), then its result (« gpu subject »).
-      const { results, seconds } = await subjectsOnGpu([{ key: "lab", url: clip.data.signedUrl, from, to, upload: { webm: webm.data.signedUrl, png: png.data.signedUrl } }], 700_000, { gpu });
+      const { results, seconds } = await subjectsOnGpu([{ key: "lab", url: clip.data.signedUrl, from, to, upload: { webm: webm.data.signedUrl, png: png.data.signedUrl } }], 700_000, { gpu, fp16, ...(fp16 ? { startMs: 600_000 } : {}) });
       const result = results.lab;
       const card = gpu === undefined ? GPU : gpu;
       const cost = gpuCostEur(seconds, card);
@@ -71,7 +73,7 @@ export async function POST(request: NextRequest) {
       const link = result && !(result instanceof Error) ? (await db.storage.from("media").createSignedUrl(`${base}.${still ? "png" : "webm"}`, 86_400)).data?.signedUrl : null;
       // Its link first (a log line is cut after a few hundred characters), its boxes counted, not listed.
       const summary = result instanceof Error || !result ? (result?.message ?? "nothing") : { ...result, boxes: result.boxes?.length ?? 0 };
-      console.log("gpu subject", JSON.stringify({ link, media, from, to, gpu: card ?? "none", seconds: Math.round(seconds), cost_eur: Math.round(cost * 1000) / 1000, result: summary }));
+      console.log("gpu subject", JSON.stringify({ link, media, from, to, gpu: card ?? "none", fp16, seconds: Math.round(seconds), cost_eur: Math.round(cost * 1000) / 1000, result: summary }));
     });
     return Response.json({ ok: true, started: true }, { status: 202 });
   }
