@@ -932,7 +932,8 @@ test("what a composition's code cuts out: her, or the objects it names, shot by 
   assert.deepEqual(objectsDrawn(`<Subject shot={3} style={{ left: 0 }} object="vase" />`), [{ shot: 3, name: "vase" }]);
   assert.equal(drawsSubject(`${objectsOnly} React.createElement(Subject, { shot: 0, rim: 8,} )`), true);
   assert.equal(drawsSubject(undefined), false);
-  assert.deepEqual(objectsDrawn(`<Subject shot={i} object="cup" />`), []);
+  // A shot written as a variable: any shot under the animation (the photo test's code switched shots by the frame).
+  assert.deepEqual(objectsDrawn(`<Subject shot={i} object="cup" />`), [{ shot: -1, name: "cup" }]);
   // A nested call among its arguments (the Text Brush test's code) is still read as a call for the cup, not for her.
   const nested = `const b = SubjectBox(shots[0], Math.min(frame, 116), laid, "espresso cup"); React.createElement(Subject, { shot: 0, object: "espresso cup", style: { left: 0 },} )`;
   assert.equal(drawsSubject(nested), false);
@@ -1151,4 +1152,43 @@ test("text around something of her photos: her subject, an object found on a pho
   assert.deepEqual(shots[1]?.subjectBoxes, [[0.3, 0.2, 0.4, 0.6]]);
   assert.deepEqual(shots[1]?.subjectContours, [contour]);
   assert.deepEqual(shots[1]?.edit, { source: { width: 1080, height: 1920 } });
+});
+
+test("an object named on a shot written as a variable is looked for on every shot under the animation", async () => {
+  const { objectPassages, objectsDrawn, photoObjectsDrawn, photosDrawnOver, ANY_SHOT } = await import("./subject.ts");
+  // The photo test's code: the same photo on two shots, switched by the frame (shotIdx), as compiled.
+  const code = `const shotIdx = frame < 150 ? 0 : 1; SubjectBox(shots[shotIdx], frame, laid, "coffee cup"); React.createElement(Subject, { key: shotIdx, shot: shotIdx, object: "coffee cup", style: laid })`;
+  assert.deepEqual(objectsDrawn(code), [{ shot: ANY_SHOT, name: "coffee cup" }]);
+  assert.deepEqual(photoObjectsDrawn(`photos.map((p, i) => <Subject photo={photos[i]} object="wine glass" />)`), [{ photo: ANY_SHOT, name: "wine glass" }]);
+  const plan: EditPlan = editPlanSchema.parse({
+    format: "9:16",
+    duration: 9,
+    template: "libre",
+    segments: [
+      { clip_id: "p1", in: 0, out: 5, zoom: "none", move: "in", photo: { source: { width: 800, height: 1000 } } },
+      { clip_id: "p1", in: 0, out: 4, zoom: "none", move: "punch", photo: { source: { width: 800, height: 1000 } } },
+      { clip_id: "v1", in: 1, out: 3, zoom: "none" },
+    ],
+    texts: [],
+    images: [],
+    transitions: "cut",
+    subtitles: false,
+    music: null,
+    layers: [{ from: 0, to: 9, motion: { brief: "ring", js: code } }],
+  });
+  // The photo once (its two shots are the same image), not the video after the animation.
+  assert.deepEqual(
+    objectPassages(plan, (id) => id === "v1").map((p) => [p.clip_id, p.photo ?? false]),
+    [["p1", true]],
+  );
+  assert.deepEqual(photosDrawnOver(plan), ["p1"]);
+  // Over the whole Reel, the video too; over its last shot only, the video alone.
+  assert.deepEqual(
+    objectPassages({ ...plan, layers: [{ ...plan.layers![0]!, to: 11 }] }, (id) => id === "v1").map((p) => p.clip_id),
+    ["p1", "v1"],
+  );
+  assert.deepEqual(
+    objectPassages({ ...plan, layers: [{ ...plan.layers![0]!, from: 9.2, to: 11 }] }, (id) => id === "v1").map((p) => p.clip_id),
+    ["v1"],
+  );
 });

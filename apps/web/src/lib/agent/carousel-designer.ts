@@ -8,6 +8,7 @@ import {
   carouselOutputSchema,
   checkCarouselCode,
   CLAUDE_MODEL,
+  ANY_SHOT,
   drawsOutline,
   photoObjectsDrawn,
   CRITIC_MODEL,
@@ -339,7 +340,10 @@ export async function carouselRound(
   const made: CarouselDesign = { ...built.design, code: output.code };
   // The objects its code finds on her photos (a glass, the bottle she holds) and its photos' outlines, made before its
   // test render (the one delivered): found on the card, read on the cut-outs, then the photos read again with them.
-  const objects = photoObjectsDrawn(output.code).flatMap(({ photo, name }) => (made.photos[photo] ? [{ mediaId: made.photos[photo]!, name }] : []));
+  // A photo written as a variable (photos[i] in a loop) is any photo of the carousel.
+  const objects = photoObjectsDrawn(output.code).flatMap(({ photo, name }) =>
+    photo === ANY_SHOT ? made.photos.map((mediaId) => ({ mediaId, name })) : made.photos[photo] ? [{ mediaId: made.photos[photo]!, name }] : [],
+  );
   const outlines = drawsOutline(output.code);
   if (objects.length || outlines)
     await Promise.all([

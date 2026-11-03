@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { captionStyle, isClipSegment, type EditPlan } from "./schemas.ts";
+import { captionStyle, isClipSegment, segmentSeconds, type EditPlan } from "./schemas.ts";
 
 // Her subject cut out at every image of a passage of her video (apps/render/matte.py, in the cut-out sandbox), so
 // a composition lays a text behind her as she walks, a title behind a hill, or her alone on a colour or on paper
@@ -115,18 +115,24 @@ export const objectName = (name: string) => name.trim().toLowerCase().replace(/\
 /** The name of an object's passage: the passage's, then the object's. */
 export const objectKey = (clipId: string, from: number, to: number, name: string) => `${subjectKey(clipId, from, to)}#${objectName(name)}`;
 
+/** A shot written as a variable in an animation's code (shots[i], shotIdx): every shot under the animation is looked at. */
+export const ANY_SHOT = -1;
+
 /**
  * The objects a composition's code follows (a cup she lifts, a product she shows, a ball): by shot (its index in
  * shots, written as a number or shots[n]) and name, from Subject or Outline given `object` (compiled or as JSX), and
- * SubjectBox or SubjectOutline given a name last. A shot written as a variable is not read.
+ * SubjectBox or SubjectOutline given a name last. A shot written as a variable (the same photo on two shots, switched
+ * by the frame) is ANY_SHOT: the object is looked for on every shot under the animation.
  */
 export function objectsDrawn(js: string | undefined): { shot: number; name: string }[] {
   if (!js) return [];
   const found = new Map<string, { shot: number; name: string }>();
   const add = (shot: string | undefined, name: string | undefined) => {
-    const n = /^(?:shots\s*\[\s*)?(\d+)\s*\]?$/.exec((shot ?? "").trim());
     const named = name ? objectName(name) : "";
-    if (n && named) found.set(`${n[1]}#${named}`, { shot: Number(n[1]), name: named });
+    if (!named) return;
+    const n = /^(?:shots\s*\[\s*)?(\d+)\s*\]?$/.exec((shot ?? "").trim());
+    const at = n ? Number(n[1]) : ANY_SHOT;
+    found.set(`${at}#${named}`, { shot: at, name: named });
   };
   for (const props of toolProps(js)) add(SHOT_PROP.exec(props)?.[1], OBJECT_PROP.exec(props)?.[1]);
   for (const c of subjectCalls(js)) add(c.shot, c.name);
@@ -142,9 +148,12 @@ export function photoObjectsDrawn(js: string | undefined): { photo: number; name
   if (!js) return [];
   const found = new Map<string, { photo: number; name: string }>();
   const add = (photo: string | undefined, name: string | undefined) => {
-    const n = /^photos\s*\[\s*(\d+)\s*\]$/.exec((photo ?? "").trim());
     const named = name ? objectName(name) : "";
-    if (n && named) found.set(`${n[1]}#${named}`, { photo: Number(n[1]), name: named });
+    if (!named) return;
+    // A photo written as a variable (photos[i] in a loop): every photo of the carousel is looked at.
+    const n = /^photos\s*\[\s*(\d+)\s*\]$/.exec((photo ?? "").trim());
+    const at = n ? Number(n[1]) : ANY_SHOT;
+    found.set(`${at}#${named}`, { photo: at, name: named });
   };
   for (const props of toolProps(js)) add(/\bphoto\s*[:=]\s*\{?\s*(photos\s*\[\s*\d+\s*\])/.exec(props)?.[1], OBJECT_PROP.exec(props)?.[1]);
   for (const c of subjectCalls(js)) add(c.shot, c.name);
@@ -241,11 +250,19 @@ export const photoKey = (mediaId: string) => subjectKey(mediaId, 0, 0);
  */
 export function objectPassages(plan: Pick<EditPlan, "segments" | "layers">, isVideo: (clipId: string) => boolean): ObjectPassage[] {
   const shots = plan.segments.filter(isClipSegment);
+  // When each shot is on screen (seconds; a fade's overlap, a few tenths, left aside): a shot written as a variable is any shot under the animation.
+  let at = 0;
+  const spans = plan.segments.flatMap((s) => {
+    const from = at;
+    at += segmentSeconds(s);
+    return isClipSegment(s) ? [{ from, to: at }] : [];
+  });
   const out: ObjectPassage[] = [];
   let seconds = 0;
   let photos = 0;
   for (const layer of plan.layers ?? []) {
-    for (const { shot, name } of objectsDrawn(layer.motion?.js)) {
+    const under = shots.flatMap((_, i) => (spans[i]!.to > layer.from + 0.05 && spans[i]!.from < layer.to - 0.05 ? [i] : []));
+    for (const { shot, name } of objectsDrawn(layer.motion?.js).flatMap((o) => (o.shot === ANY_SHOT ? under.map((i) => ({ shot: i, name: o.name })) : [o]))) {
       const s = shots[shot];
       // A photo: the object found once on it (a glass on a table, the cup she holds), whatever its move.
       if (s?.photo) {
