@@ -56,6 +56,9 @@ export type GpuCut = { still: boolean; frames: number; keys: number; people: boo
 /** What `seconds` of the card's sandbox cost, in euros (logged in cost_events). */
 export const gpuCostEur = (seconds: number) => usdToEur(modalCostUsd(seconds, CORES, MEMORY_GIB), env("USD_TO_EUR"));
 
+/** A time limit for Modal, which takes whole seconds only (« timeoutMs must be a multiple of 1000ms »). */
+const wholeSeconds = (ms: number) => Math.max(1000, Math.floor(ms / 1000) * 1000);
+
 /** `promise`, or a rejection with `message` once `by` (a time in ms) has passed. */
 function before<T>(by: number, promise: Promise<T>, message: string): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -114,7 +117,7 @@ export async function subjectsOnGpu(passages: GpuPassage[], deadlineMs: number):
     say(`image ready (${image.imageId})`);
     const created = await before(
       upBy,
-      client.sandboxes.create(app, image, { gpu: GPU, cpu: CORES, memoryMiB: MEMORY_GIB * 1024, timeoutMs: Math.max(60_000, deadline - Date.now() + 30_000), idleTimeoutMs: IDLE_MS, name }),
+      client.sandboxes.create(app, image, { gpu: GPU, cpu: CORES, memoryMiB: MEMORY_GIB * 1024, timeoutMs: wholeSeconds(Math.max(60_000, deadline - Date.now() + 30_000)), idleTimeoutMs: IDLE_MS, name }),
       `no ${GPU} card free after ${GPU_START_MS / 1000} s`,
     );
     if (over) {
@@ -133,7 +136,7 @@ export async function subjectsOnGpu(passages: GpuPassage[], deadlineMs: number):
     if (left < 30_000) throw new Error("no time left to cut out");
     const run = await created.exec(["python", "-I", "/work/portrait.py", "/work/jobs.json"], {
       workdir: "/work",
-      timeoutMs: left,
+      timeoutMs: wholeSeconds(left),
       // PORTRAIT_SECONDS: the script stops on its own (and says why) when its pace would not finish in time.
       env: { PORTRAIT_MODEL: "/models/portrait.onnx", PORTRAIT_WORK: "/work", PORTRAIT_SECONDS: String(Math.floor(left / 1000) - 10), HDR_FILTER: HDR_TO_SDR },
     });
