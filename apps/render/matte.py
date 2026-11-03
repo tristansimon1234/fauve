@@ -274,6 +274,58 @@ def person_masks(frames, ww, wh):
     return [masks[0]] + [0.5 * masks[i] + 0.25 * masks[i - 1] + 0.25 * masks[min(len(masks) - 1, i + 1)] for i in range(1, len(masks))]
 
 
+# The subject's outline at each image, for a line that follows its edge (Outline in the animations): this many points,
+# equally spaced along its largest piece, in shares of the picture.
+CONTOUR_POINTS = 64
+
+
+def contour_of(m):
+    """The outline of a cut-out's largest piece: CONTOUR_POINTS points (x, y shares) clockwise from its top, or None."""
+    import cv2
+    import numpy as np
+
+    h, w = m.shape
+    found, _ = cv2.findContours((m > 0.5).astype(np.uint8), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+    if not found:
+        return None
+    c = max(found, key=cv2.contourArea)
+    if cv2.contourArea(c) < 0.002 * w * h:
+        return None
+    p = c[:, 0, :].astype(np.float32)
+    x, y = p[:, 0], p[:, 1]
+    # Clockwise on the screen (y goes down): the shoelace sum is then positive.
+    if np.sum(x * np.roll(y, -1) - np.roll(x, -1) * y) < 0:
+        p = p[::-1]
+    p = np.roll(p, -int(np.lexsort((p[:, 0], p[:, 1]))[0]), axis=0)
+    ring = np.vstack([p, p[:1]])
+    along = np.concatenate([[0.0], np.cumsum(np.linalg.norm(np.diff(ring, axis=0), axis=1))])
+    t = np.linspace(0, along[-1], CONTOUR_POINTS, endpoint=False)
+    return np.stack([np.interp(t, along, ring[:, 0]) / w, np.interp(t, along, ring[:, 1]) / h], axis=1)
+
+
+def contours_of(masks):
+    """Each image's outline, its points turned to follow the image before (a line drawn along it does not slide round
+    her), then smoothed over three images; flat [x0, y0, x1, y1…] rounded to the thousandth, or None."""
+    import numpy as np
+
+    raw = [contour_of(m) for m in masks]
+    for i in range(1, len(raw)):
+        a, b = raw[i - 1], raw[i]
+        if a is None or b is None:
+            continue
+        shift = min(range(CONTOUR_POINTS), key=lambda k: float(np.sum((np.roll(b, -k, axis=0) - a) ** 2)))
+        raw[i] = np.roll(b, -shift, axis=0)
+    out = []
+    for i, c in enumerate(raw):
+        if c is None:
+            out.append(None)
+            continue
+        near = [raw[j] for j in (i - 1, i + 1) if 0 <= j < len(raw) and raw[j] is not None]
+        smooth = c if not near else (2 * c + sum(near)) / (2 + len(near))
+        out.append([round(float(v), 3) for v in smooth.reshape(-1)])
+    return out
+
+
 def finish(job, frames, masks, still, keys, people, started, ow, oh, still_at=0):
     """The cut-out of every image written out (its edge made at full size), with where its top sits."""
     import cv2
@@ -335,7 +387,7 @@ def finish(job, frames, masks, still, keys, people, started, ow, oh, still_at=0)
         enc.stdin.close()
         if enc.wait() != 0:
             raise RuntimeError("encodage du détourage impossible")
-    return {"file": out, "still": still, "frames": len(frames), "keys": keys, "people": people, "top": top, "boxes": boxes, "seconds": round(time.time() - started, 1)}
+    return {"file": out, "still": still, "frames": len(frames), "keys": keys, "people": people, "top": top, "boxes": boxes, "contours": contours_of(masks), "seconds": round(time.time() - started, 1)}
 
 
 if __name__ == "__main__":

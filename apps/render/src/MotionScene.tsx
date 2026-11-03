@@ -16,7 +16,7 @@ import { Fit } from "./Fit";
 import { makeKit } from "./Kit";
 import { makeType } from "./Type";
 import { makeGraphic } from "./Graphic";
-import { makeEffects, SubjectBox } from "./Effects";
+import { makeEffects, SubjectBox, SubjectOutline } from "./Effects";
 import { Marker } from "./Marker";
 import { Captions } from "./Captions";
 import { PaperCutout, type RimSpec } from "./PaperCutout";
@@ -205,7 +205,7 @@ const type = makeType({ useCurrentFrame, useVideoConfig });
 // Cursor, Toggle, Button, ProfileCard, WordList, Timeline, Grid, Fan, Turn, Whip, ZoomThrough, Through, Flash, Tint: the
 // interface, graphics and transitions kit (Graphic.tsx).
 const graphic = makeGraphic({ useCurrentFrame, useVideoConfig });
-// Letterbox, ColorPop, MaskReveal, Glitch, Callout, Brackets: the effects kit (Effects.tsx, lot 7).
+// Letterbox, ColorPop, MaskReveal, Glitch, Callout, Brackets, Outline: the effects kit (Effects.tsx, lot 7).
 const effects = makeEffects({ useCurrentFrame, useVideoConfig });
 export const SCOPE = {
   AbsoluteFill,
@@ -263,7 +263,9 @@ export const SCOPE = {
   Glitch: effects.Glitch,
   Callout: effects.Callout,
   Brackets: effects.Brackets,
+  Outline: effects.Outline,
   SubjectBox,
+  SubjectOutline,
 };
 
 export type SceneComponent = (props: {

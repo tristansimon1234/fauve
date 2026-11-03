@@ -28,6 +28,21 @@ const RETRY_MS = 6 * 3600_000;
 export const subjectPath = (studioId: string, mediaId: string, key: string, still: boolean) =>
   `${studioId}/subjects/${mediaId}-${createHash("sha1").update(key).digest("hex").slice(0, 12)}.${still ? "png" : "webm"}`;
 
+/**
+ * Keeps a passage's outline at each image beside its cut-out ({path}.contour.json), for a line along its edge
+ * (Outline); its path, or nothing when there is none or it could not be kept (the line is then simply not drawn).
+ */
+async function keepContour(studioId: string, mediaId: string, key: string, contours: (number[] | null)[] | undefined): Promise<string | undefined> {
+  if (!contours?.some(Boolean)) return undefined;
+  const path = `${subjectPath(studioId, mediaId, key, false).replace(/\.webm$/, "")}.contour.json`;
+  const saved = await supabaseAdmin().storage.from("media").upload(path, JSON.stringify(contours), { contentType: "application/json", upsert: true });
+  if (saved.error) {
+    console.warn("subject outline not kept", key, saved.error.message);
+    return undefined;
+  }
+  return path;
+}
+
 /** The passages to cut out for this plan, with their clips' rows (her own steadied video plays: an unsteadied original is left out). */
 async function planned(studioId: string, plan: Plan, anticipate = false) {
   const ids = [...new Set(plan.segments.flatMap((s) => (isClipSegment(s) ? [s.clip_id] : [])))];
@@ -126,6 +141,7 @@ async function cutOnGpu(studioId: string, postId: string, chosen: SubjectPassage
       continue;
     }
     done.add(p.key);
+    const contour = await keepContour(studioId, p.clip_id, p.key, result.contours);
     record(p, {
       path: subjectPath(studioId, p.clip_id, p.key, result.still),
       still: result.still,
@@ -135,6 +151,7 @@ async function cutOnGpu(studioId: string, postId: string, chosen: SubjectPassage
       people: result.people,
       ...(result.top !== undefined ? { top: result.top } : {}),
       ...(result.boxes?.length ? { boxes: result.boxes } : {}),
+      ...(contour ? { contour } : {}),
     });
   }
   // The card's time, billed whether or not it cut out (none when no card was allotted).
@@ -198,6 +215,7 @@ async function cutInSandbox(studioId: string, postId: string, missing: SubjectPa
         console.warn("subject cut-out not kept", p.key, uploaded.error.message);
         continue;
       }
+      const contour = await keepContour(studioId, p.clip_id, p.key, result.contours);
       record(p, {
         path,
         still: result.still,
@@ -207,6 +225,7 @@ async function cutInSandbox(studioId: string, postId: string, missing: SubjectPa
         people: result.people,
         ...(result.top !== undefined ? { top: result.top } : {}),
         ...(result.boxes?.length ? { boxes: result.boxes } : {}),
+        ...(contour ? { contour } : {}),
       });
     }
     await db.from("cost_events").insert({
@@ -222,18 +241,51 @@ async function cutInSandbox(studioId: string, postId: string, missing: SubjectPa
   }
 }
 
-/** The cut-outs this plan can draw, signed for the render and the live preview (by passage, subjectKey). */
-export async function subjectInputs(studioId: string, plan: Plan): Promise<Record<string, { src: string; still?: boolean; top?: number; boxes?: (number[] | null)[] }>> {
+/** A passage's outline at each image, read from its file (nothing when it is missing or unreadable). */
+async function readContour(path: string): Promise<(number[] | null)[] | undefined> {
+  const { data } = await supabaseAdmin().storage.from("media").download(path);
+  if (!data) return undefined;
+  try {
+    const parsed: unknown = JSON.parse(await data.text());
+    return Array.isArray(parsed) ? (parsed.map((c) => (Array.isArray(c) && c.every((v) => typeof v === "number") ? (c as number[]) : null)) as (number[] | null)[]) : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/** The cut-outs this plan can draw, signed for the render and the live preview (by passage, subjectKey), with their outlines. */
+export async function subjectInputs(
+  studioId: string,
+  plan: Plan,
+): Promise<Record<string, { src: string; still?: boolean; top?: number; boxes?: (number[] | null)[]; contours?: (number[] | null)[] }>> {
   const { passages, rows } = await planned(studioId, plan);
   const found = passages.flatMap((p) => {
     const k = kept(rows.get(p.clip_id))[p.key];
-    return k && "path" in k && k.path.startsWith(`${studioId}/`) ? [{ key: p.key, path: k.path, still: k.still, top: k.top, boxes: k.boxes }] : [];
+    return k && "path" in k && k.path.startsWith(`${studioId}/`)
+      ? [{ key: p.key, path: k.path, still: k.still, top: k.top, boxes: k.boxes, contour: k.contour?.startsWith(`${studioId}/`) ? k.contour : undefined }]
+      : [];
   });
   if (!found.length) return {};
-  const signed = (await supabaseAdmin().storage.from("media").createSignedUrls(found.map((f) => f.path), 7200)).data ?? [];
+  const [signed, contours] = await Promise.all([
+    supabaseAdmin().storage.from("media").createSignedUrls(found.map((f) => f.path), 7200).then((r) => r.data ?? []),
+    Promise.all(found.map((f) => (f.contour ? readContour(f.contour).catch(() => undefined) : undefined))),
+  ]);
   return Object.fromEntries(
     found.flatMap((f, i) =>
-      signed[i]?.signedUrl ? [[f.key, { src: signed[i]!.signedUrl, ...(f.still ? { still: true } : {}), ...(f.top !== undefined ? { top: f.top } : {}), ...(f.boxes?.length ? { boxes: f.boxes } : {}) }]] : [],
+      signed[i]?.signedUrl
+        ? [
+            [
+              f.key,
+              {
+                src: signed[i]!.signedUrl,
+                ...(f.still ? { still: true } : {}),
+                ...(f.top !== undefined ? { top: f.top } : {}),
+                ...(f.boxes?.length ? { boxes: f.boxes } : {}),
+                ...(contours[i]?.length ? { contours: contours[i] } : {}),
+              },
+            ],
+          ]
+        : [],
     ),
   );
 }

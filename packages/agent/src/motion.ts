@@ -167,6 +167,8 @@ export type ComposeShot = ScenePhoto & {
   track?: ShotTrack;
   /** Where its subject is at each image (shares of the picture), from its cut-out: SubjectBox places it in the box it is laid in. */
   subjectBoxes?: (number[] | null)[];
+  /** Its subject's outline at each image (64 points, x y shares, flat), from its cut-out: Outline and SubjectOutline draw it. */
+  subjectContours?: (number[] | null)[];
 };
 
 /**
@@ -450,7 +452,7 @@ export type ReelInputs = {
   /** The moving photos whose subject cuts out cleanly (depthPhotoIds): signed cut-out and the subject's box, played in relief. */
   depth?: Record<string, { src: string; box: { x: number; y: number; w: number; h: number } }>;
   /** The passages of her clips cut out at every image (subjectKey: clip, in, out), signed: what a composition's Subject draws. */
-  subjects?: Record<string, { src: string; still?: boolean; top?: number; boxes?: (number[] | null)[] }>;
+  subjects?: Record<string, { src: string; still?: boolean; top?: number; boxes?: (number[] | null)[]; contours?: (number[] | null)[] }>;
 };
 
 /** A clip's width / height as the Reel frames it, from its analysis (phones film 16:9 or 9:16). */
@@ -797,6 +799,7 @@ export function buildReelProps(plan: EditPlan, inputs: ReelInputs): ReelProps {
           ...(face ? { face } : {}),
           ...(track ? { track: face ? { ...track, look: { ...track.look, face } } : track } : {}),
           ...(inputs.subjects?.[subjectKey(s.clip_id, s.in, s.out)]?.boxes?.length ? { subjectBoxes: inputs.subjects[subjectKey(s.clip_id, s.in, s.out)]!.boxes } : {}),
+          ...(inputs.subjects?.[subjectKey(s.clip_id, s.in, s.out)]?.contours?.length ? { subjectContours: inputs.subjects[subjectKey(s.clip_id, s.in, s.out)]!.contours } : {}),
         },
       ];
     });

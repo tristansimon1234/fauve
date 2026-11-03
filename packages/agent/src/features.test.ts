@@ -762,6 +762,25 @@ test("a word behind her: her silhouette from what was tracked hides it on a clos
   assert.equal(onlyProbe("-20 % sur tout"), false);
 });
 
+test("her outline: a smooth closed path, open where the frame cuts her", async () => {
+  const { outlinePath } = await import("../../../apps/render/src/outline.ts");
+  const ring = (pts: number[][]) => pts.flat();
+  const full = (x: number, y: number) => [x * 1080, y * 1920] as const;
+  // A diamond in the middle: closed, its corners rounded by curves, from its first point.
+  const diamond = ring([[0.5, 0.3], [0.7, 0.5], [0.5, 0.7], [0.3, 0.5], [0.4, 0.4], [0.6, 0.4]]);
+  const d = outlinePath(diamond, full)!;
+  assert.match(d, /^M 540\.0 576\.0 C /);
+  assert.ok(d.endsWith(" Z"));
+  assert.equal((d.match(/ C /g) ?? []).length, 6);
+  // Cut by the bottom of the picture: no line along the frame's edge (two edge points in a row), the path left open.
+  const bust = ring([[0.5, 0.2], [0.8, 0.6], [0.9, 1], [0.6, 1], [0.3, 1], [0.2, 0.6]]);
+  const open = outlinePath(bust, full)!;
+  assert.ok(!open.endsWith("Z"));
+  assert.equal((open.match(/ C /g) ?? []).length, 4);
+  // Too few points: nothing to draw.
+  assert.equal(outlinePath([0.5, 0.5, 0.6, 0.6], full), null);
+});
+
 test("a photo's cut-out from the card or the sandbox is kept, an older one is cut again", async () => {
   const { currentCutout, CARD_CUTOUT_MODEL, CUTOUT_MODEL } = await import("./cutout.ts");
   assert.equal(currentCutout(CARD_CUTOUT_MODEL), true);

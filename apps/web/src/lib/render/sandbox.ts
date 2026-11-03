@@ -1404,7 +1404,7 @@ export async function stabilizeInSandbox(id: string, url: string): Promise<{ vid
 }
 
 /** A passage of a clip cut out: its file (a transparent WebM, or a PNG when nothing moved) and how it was made. */
-export type SubjectCut = { file: Buffer; still: boolean; frames: number; keys: number; people: boolean; top?: number; boxes?: (number[] | null)[] };
+export type SubjectCut = { file: Buffer; still: boolean; frames: number; keys: number; people: boolean; top?: number; boxes?: (number[] | null)[]; contours?: (number[] | null)[] };
 
 /**
  * Cuts out the subject of each passage at every image (apps/render/matte.py: the photo model on key images where
@@ -1449,7 +1449,7 @@ export async function subjectsInSandbox(
         ],
       });
       const lastLine = (await run.stdout()).trim().split("\n").at(-1) ?? "";
-      let readings: Record<string, { file: string; still: boolean; frames: number; keys: number; people: boolean; top?: number; boxes?: (number[] | null)[] } | { error: string }>;
+      let readings: Record<string, { file: string; still: boolean; frames: number; keys: number; people: boolean; top?: number; boxes?: (number[] | null)[]; contours?: (number[] | null)[] } | { error: string }>;
       try {
         readings = JSON.parse(lastLine);
       } catch {
@@ -1465,7 +1465,7 @@ export async function subjectsInSandbox(
         }
         const file = await sandbox.readFileToBuffer({ path: r.file }).catch(() => null);
         results[p.key] = file?.length
-          ? { file, still: r.still, frames: r.frames, keys: r.keys, people: r.people, ...(typeof r.top === "number" ? { top: r.top } : {}), ...(Array.isArray(r.boxes) ? { boxes: r.boxes } : {}) }
+          ? { file, still: r.still, frames: r.frames, keys: r.keys, people: r.people, ...(typeof r.top === "number" ? { top: r.top } : {}), ...(Array.isArray(r.boxes) ? { boxes: r.boxes } : {}), ...(Array.isArray(r.contours) ? { contours: r.contours } : {}) }
           : new Error("cut-out file missing");
       }
       return { results, seconds: (Date.now() - started) / 1000 };

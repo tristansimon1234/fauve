@@ -78,6 +78,8 @@ export const mediaSubjectsSchema = z.record(
       top: z.number().optional(),
       /** Where the subject is at each image of the passage (shares: left, top, width, height; null when nothing is cut out). */
       boxes: z.array(z.array(z.number()).length(4).nullable()).optional(),
+      /** Its outline at each image ({path}.contour.json: 64 points, x y shares, flat), for a line along its edge (Outline). */
+      contour: z.string().optional(),
     }),
     z.object({ failed_at: z.string(), error: z.string() }),
   ]),
@@ -87,5 +89,5 @@ export type MediaSubjects = z.infer<typeof mediaSubjectsSchema>;
 /** The files of a video's cut-outs (the retention removes them with it). */
 export function subjectFiles(subjects: unknown): string[] {
   const parsed = mediaSubjectsSchema.safeParse(subjects ?? {});
-  return parsed.success ? Object.values(parsed.data).flatMap((s) => ("path" in s ? [s.path] : [])) : [];
+  return parsed.success ? Object.values(parsed.data).flatMap((s) => ("path" in s ? [s.path, ...(s.contour ? [s.contour] : [])] : [])) : [];
 }

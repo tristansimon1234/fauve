@@ -1,6 +1,7 @@
 import { useId, type CSSProperties, type ReactNode } from "react";
 import { Easing, interpolate, random } from "remotion";
 import type { Box, KitHooks } from "./Kit";
+import { outlinePath } from "./outline";
 import { faceFocus, framingPercent } from "./track";
 import type { ComposeShot } from "./types";
 
@@ -333,30 +334,99 @@ function BracketsOf(hooks: KitHooks) {
 
 // ——— SubjectBox: where her subject is, image by image ———————————————————————————————————
 
+type Laid = { left: number; top: number; width: number; height: number };
+
+/** Where a shot's picture lies in the box it was laid in, as Footage covers the box with it (anchored on its subject, its faces kept whole): a point in shares of the picture → px. */
+function placer(shot: ComposeShot, laid?: Laid) {
+  const L = laid ?? { left: 0, top: 0, width: 1080, height: 1920 };
+  const frameAspect = L.width / L.height;
+  const A = shot.aspect || frameAspect;
+  const dw = A > frameAspect ? L.height * A : L.width;
+  const dh = A > frameAspect ? L.height : L.width / A;
+  const [px, py] = framingPercent(faceFocus(shot.focus, shot.face, A, frameAspect), A, frameAspect) ?? [50, 50];
+  const ox = ((dw - L.width) * px) / 100;
+  const oy = ((dh - L.height) * py) / 100;
+  return { at: (x: number, y: number) => [L.left - ox + x * dw, L.top - oy + y * dh] as const, dw, dh };
+}
+
+/** A shot's reading at a frame of the composition: the nearest image that has one (a frame or two without does not make it jump), within 6. */
+function nearest<T>(list: (T | null)[] | undefined, shot: ComposeShot, frame: number): T | null {
+  if (!list?.length) return null;
+  const t = Math.max(0, Math.min(list.length - 1, Math.round(frame - shot.from)));
+  for (let d = 0; d <= 6; d++) {
+    const v = list[t - d] ?? list[t + d] ?? null;
+    if (v) return v;
+  }
+  return null;
+}
+
 /**
  * Where a shot's subject (a person, a product, a ball: what its cut-out keeps) is at a frame of the composition, in the
  * box the shot was laid in with Footage ({ left, top, width, height }, the whole frame by default), as Footage frames
  * it (cover, on its subject, its faces kept whole): { x, y, w, h } in px, or null when nothing is cut out there. Labels,
  * brackets and words follow it; a shot whose cut-out is missing gives null (the animation keeps its default place).
  */
-export function SubjectBox(shot: ComposeShot | undefined, frame: number, laid?: { left: number; top: number; width: number; height: number }): Box | null {
-  const boxes = shot?.subjectBoxes;
-  if (!shot || !boxes?.length) return null;
-  const t = Math.max(0, Math.min(boxes.length - 1, Math.round(frame - shot.from)));
-  // The nearest image where something was cut out (a frame or two without it does not make the label jump away).
-  let b: number[] | null = null;
-  for (let d = 0; d <= 6 && !b; d++) b = boxes[t - d] ?? boxes[t + d] ?? null;
+export function SubjectBox(shot: ComposeShot | undefined, frame: number, laid?: Laid): Box | null {
+  if (!shot) return null;
+  const b = nearest(shot.subjectBoxes, shot, frame);
   if (!b) return null;
-  const L = laid ?? { left: 0, top: 0, width: 1080, height: 1920 };
-  const frameAspect = L.width / L.height;
-  const A = shot.aspect || frameAspect;
-  // The picture as Footage covers the box with it, and where it is anchored (its subject, its faces kept whole).
-  const dw = A > frameAspect ? L.height * A : L.width;
-  const dh = A > frameAspect ? L.height : L.width / A;
-  const [px, py] = framingPercent(faceFocus(shot.focus, shot.face, A, frameAspect), A, frameAspect) ?? [50, 50];
-  const ox = ((dw - L.width) * px) / 100;
-  const oy = ((dh - L.height) * py) / 100;
-  return { x: L.left - ox + b[0]! * dw, y: L.top - oy + b[1]! * dh, w: b[2]! * dw, h: b[3]! * dh };
+  const { at, dw, dh } = placer(shot, laid);
+  const [x, y] = at(b[0]!, b[1]!);
+  return { x, y, w: b[2]! * dw, h: b[3]! * dh };
+}
+
+// ——— Outline: a line along her edge ——————————————————————————————————————————————————————
+
+/**
+ * Her subject's outline at a frame (a person, a product she holds: what its cut-out keeps), in the box its shot was
+ * laid in, as an SVG path (px), smooth through its points, open where the picture's edge cuts her; null when it was not
+ * cut out there. Draw it yourself (a glow, a double line, a fill) or with Outline.
+ */
+export function SubjectOutline(shot: ComposeShot | undefined, frame: number, laid?: Laid): string | null {
+  if (!shot) return null;
+  const c = nearest(shot.subjectContours, shot, frame);
+  return c ? outlinePath(c, placer(shot, laid).at) : null;
+}
+
+type OutlineProps = {
+  /** The shot (shots[i]) and the box it was laid in with Footage (the whole frame by default). */
+  shot: ComposeShot | undefined;
+  box?: Laid;
+  /** Frame it starts to draw itself along her edge (from the top of her head, clockwise), frames to go round (18; 0: there at once). */
+  at?: number;
+  frames?: number;
+  /** Frame it fades out. */
+  out?: number;
+  color?: string;
+  /** Its thickness (px, 6). Laid before Subject, only its outer half shows: a line just outside her. */
+  width?: number;
+  /** A dashed line that runs round her, a soft glow of the same colour around it. */
+  dash?: boolean;
+  glow?: boolean;
+};
+
+function OutlineOf(hooks: KitHooks) {
+  return function Outline({ shot, box, at = 0, frames = 18, out, color = "#FFFFFF", width = 6, dash, glow }: OutlineProps) {
+    const frame = hooks.useCurrentFrame();
+    const { width: W, height: H } = hooks.useVideoConfig();
+    const d = SubjectOutline(shot, frame, box);
+    if (!d) return null;
+    const drawn = frames > 0 ? interpolate(frame, [at, at + frames], [0, 1], { ...clamp, easing: settle }) : frame >= at ? 1 : 0;
+    const gone = out === undefined ? 1 : 1 - interpolate(frame, [out, out + 10], [0, 1], clamp);
+    if (drawn <= 0 || gone <= 0) return null;
+    // pathLength 1: the drawn share of the way round, then dashes measured on it.
+    const dashes = dash ? { strokeDasharray: "0.018 0.012", strokeDashoffset: -((frame * 0.004) % 0.03) } : { strokeDasharray: `${drawn} 1`, strokeDashoffset: 0 };
+    // Nothing outside the box its shot was laid in (its Footage shows nothing there either).
+    const clipPath = box ? `inset(${Math.round(box.top)}px ${Math.round(W - box.left - box.width)}px ${Math.round(H - box.top - box.height)}px ${Math.round(box.left)}px)` : undefined;
+    return (
+      <div data-fauve-decor="" style={{ position: "absolute", inset: 0, pointerEvents: "none", opacity: gone * (dash ? drawn : 1), clipPath }}>
+        <svg width="100%" height="100%" style={{ position: "absolute", left: 0, top: 0, overflow: "visible" }} aria-hidden="true">
+          {glow ? <path d={d} pathLength={1} fill="none" stroke={color} strokeWidth={width * 3} strokeLinejoin="round" strokeLinecap="round" opacity={0.35} style={{ filter: `blur(${Math.round(width * 1.5)}px)` }} {...dashes} /> : null}
+          <path d={d} pathLength={1} fill="none" stroke={color} strokeWidth={width} strokeLinejoin="round" strokeLinecap="round" {...dashes} />
+        </svg>
+      </div>
+    );
+  };
 }
 
 /** The effects kit, bound to a clock (the render's, or the scene check's own for each copy). */
@@ -368,5 +438,6 @@ export function makeEffects(hooks: KitHooks) {
     Glitch: GlitchOf(hooks),
     Callout: CalloutOf(hooks),
     Brackets: BracketsOf(hooks),
+    Outline: OutlineOf(hooks),
   };
 }
