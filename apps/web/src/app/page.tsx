@@ -20,7 +20,7 @@ import { whatsappLink } from "@/lib/public-env";
 import { SITE_URL } from "@/lib/site";
 import "./landing.css";
 
-const description = `Edith invente pour chacune de tes vidéos sa forme, sa typo et son rythme, écrit la légende et te fait signe au bon moment pour poster. Sur WhatsApp, dès ${PLANS.decouverte.priceEur} € par mois.`;
+const description = `En 5 minutes, sans app, directement sur WhatsApp : Edith invente pour chacune de tes vidéos sa forme, sa typo et son rythme, et écrit la légende. Pas d’IA slop. Dès ${PLANS.decouverte.priceEur} € par mois.`;
 
 export const metadata: Metadata = {
   title: { absolute: "Edith · community manager IA pour commerces et indépendants" },
@@ -79,11 +79,12 @@ const offers = [
 ] as const;
 
 const faq: [string, string][] = [
-  ["Ça ne va pas faire « contenu IA » ?", "C’est tout le travail d’Edith : ta meilleure image en premier, des coupes sur le temps, des mots de créateur, ta charte. Et si quelque chose ne te ressemble pas, tu le lui dis d’un mot."],
+  ["Ça ne va pas faire « IA slop » ?", "C’est tout le travail d’Edith : ta meilleure image en premier, des coupes sur le temps, des mots de créateur, ta charte. Et si quelque chose ne te ressemble pas, tu le lui dis d’un mot."],
   ["Tous mes Reels vont se ressembler ?", "Non. Edith n’a pas de modèle tout fait : il part de tes images, de ton style et de ce que tu demandes, et invente la forme de chaque Reel. Tu peux aussi lui montrer un Reel que tu aimes, il le refait avec tes images."],
   ["C’est pour qui ?", "Les commerces de quartier comme les indépendants : studio, salon, resto, boutique, prof de yoga, coach, photographe, céramiste… Tous ceux qui vivent de leurs clients, avec ou sans site."],
+  ["Il faut télécharger une app ?", "Non. Tout se passe sur WhatsApp, en 5 minutes pour commencer. Une app web existe pour voir tes Reels en grand sur ordinateur, si tu veux, sans rien installer."],
   ["Edith, c’est une vraie personne ?", "Non, c’est un assistant IA, et il le dit. Tu gardes toujours la main."],
-  ["Qui publie sur Instagram ?", "Toi, d’un toucher : ton Reel s’ouvre dans Instagram, sa légende déjà copiée, et tu peux y ajouter un son tendance. Edith suit ensuite ses chiffres depuis ton @."],
+  ["Qui publie sur Instagram ?", "Toi. Edith te prépare la vidéo et sa légende, et te fait signe au bon moment : tu la télécharges, tu la postes, et tu peux y ajouter un son tendance. Il suit ensuite ses chiffres depuis ton @."],
   ["Je n’ai pas de vidéo, ça marche quand même ?", "Oui : il part de tes photos, ou fait un Reel tout en animation. Quand tu filmes, il te dit quoi."],
   ["Il y a un essai ?", `Edith découvre ton activité, trouve ton style et te propose le plan de ton premier Reel, sans rien payer. Pour le fabriquer, tu t’abonnes, dès ${PLANS.decouverte.priceEur} € par mois pour ${reelsPerMonth("decouverte")} Reels, sans engagement.`],
   ["Où vont mes photos et mes données ?", "En Europe. Tes fichiers sont supprimés peu après la publication, et tout disparaît si tu pars."],
@@ -102,7 +103,7 @@ const ideas: [string, string][] = [
 ];
 
 /** The manifesto passing under the hero. */
-const NOT = ["pas de modèle tout fait", "pas de voix de robot", "pas de « offre exceptionnelle »", "pas deux Reels pareils", "une infinité de façons"];
+const NOT = ["pas d’IA slop", "pas d’app à installer", "pas de modèle tout fait", "pas de voix de robot", "pas deux Reels pareils", "une infinité de façons"];
 
 /** What search engines and AI assistants read about Edith: the product, its offers and the FAQ. */
 const structuredData = () => ({
@@ -232,7 +233,7 @@ export default function LandingPage() {
         <div className="mx-auto flex w-full max-w-[1360px] flex-col gap-8 px-4 sm:px-8">
           <span className="land-intro mono-label flex items-center justify-between gap-4 text-ink" style={vars({ "--i": 0 })}>
             <span>Edith · community manager IA</span>
-            <span className="hidden sm:inline">Sur WhatsApp et dans l’app</span>
+            <span className="hidden sm:inline">Sans app · directement sur WhatsApp</span>
           </span>
           <h1 className="land-intro text-[clamp(60px,11.5vw,184px)] leading-[0.86] font-semibold tracking-[-0.065em]" style={vars({ "--i": 1 })}>
             Tes Reels,
@@ -241,9 +242,15 @@ export default function LandingPage() {
             </span>
           </h1>
           <div className="land-intro grid gap-6 border-t border-ink pt-6 lg:grid-cols-[1fr_auto] lg:items-end" style={vars({ "--i": 2 })}>
-            <p className="max-w-[640px] text-[19px] leading-[1.5] sm:text-[22px]">
-              Tu envoies tes vidéos sur WhatsApp. Edith invente pour chacune sa forme, sa typo et son rythme, écrit la légende, et tu postes d’un toucher. Une infinité de façons de raconter ton commerce.
-            </p>
+            <div className="flex max-w-[680px] flex-col gap-4">
+              {/* Tristan: « en 5 minutes SANS APP, directement sur WhatsApp », and « pas d'IA slop ». */}
+              <p className="text-[clamp(28px,3.4vw,46px)] leading-[1.02] font-semibold tracking-[-0.045em]">
+                En 5 minutes, <span className="font-[family-name:var(--font-serif)] font-normal italic">sans app</span>, directement sur WhatsApp.
+              </p>
+              <p className="text-[18px] leading-[1.5] text-muted sm:text-[20px]">
+                Tu lui envoies tes vidéos. Edith invente pour chacune sa forme, sa typo et son rythme, écrit la légende et te fait signe au bon moment pour poster. Pas d’IA slop.
+              </p>
+            </div>
             <div className="flex flex-col gap-3 lg:items-end">
               <div className="flex flex-wrap items-center gap-3">
                 <Start waUrl={waUrl} size="lg" />
@@ -252,7 +259,7 @@ export default function LandingPage() {
                 </a>
               </div>
               <ul className="mono-label flex flex-wrap gap-x-5 gap-y-1.5 text-muted">
-                {["Rien ne part sans ton oui", "En place en 5 minutes", `Dès ${PLANS.decouverte.priceEur} € par mois`].map((t) => (
+                {["Pas d’IA slop", "Sans engagement", `Dès ${PLANS.decouverte.priceEur} € par mois`].map((t) => (
                   <li key={t} className="flex items-center gap-1.5">
                     <CheckIcon size={13} className="text-ink" />
                     {t}
@@ -332,7 +339,7 @@ export default function LandingPage() {
       <section id="cringe" className="mx-auto max-w-[1360px] scroll-mt-6 px-4 pb-28 sm:px-8">
         <div className="land-reveal mb-12">
           <SectionTitle n={5} kicker="Zéro cringe">
-            Edith est une IA. <span className="accent">Tes Reels n’en ont pas l’air.</span>
+            Pas d’IA slop. <span className="accent">Tes Reels n’en ont pas l’air.</span>
           </SectionTitle>
         </div>
         <Play threshold={0.2}>
@@ -357,7 +364,7 @@ export default function LandingPage() {
       <section id="comment" className="mx-auto flex max-w-[1360px] scroll-mt-6 flex-col gap-12 px-4 pb-28 sm:px-8">
         <div className="land-reveal">
           <SectionTitle n={6} kicker="Comment ça marche">
-            Tu envoies. <span className="accent">Il monte.</span> Tu dis oui.
+            Tu envoies. <span className="accent">Il monte.</span> Tu postes.
           </SectionTitle>
         </div>
         <div className="grid items-center gap-12 lg:grid-cols-[1fr_1.05fr] lg:gap-16">
@@ -423,7 +430,7 @@ export default function LandingPage() {
             Dans ton ton, avec ton lien de réservation.
           </Card>
           <Card i={6} icon={ClockIcon} title="Un signe au bon moment" visual={<ReminderVisual />}>
-            Il te prévient quand poster, tout est prêt en un toucher.
+            Il te prévient quand poster : la vidéo et sa légende sont prêtes.
           </Card>
           <Card i={7} icon={ChartIcon} title="Ce qui marche, chaque dimanche" visual={<ReportVisual />}>
             Ce qui a marché, et ce qu’on ajuste.
@@ -490,7 +497,7 @@ export default function LandingPage() {
         </div>
       </section>
 
-      <LastCall waUrl={waUrl} line="Dis-lui ce que tu fais : dans cinq minutes, il te montre ce qu’il ferait pour toi.">
+      <LastCall waUrl={waUrl} line="Sans app, directement sur WhatsApp : dis-lui ce que tu fais, dans cinq minutes il te montre ce qu’il ferait pour toi.">
         Ton prochain Reel ne ressemblera à <MorphWord items={AUCUN} label="aucun autre." />
       </LastCall>
 

@@ -12,7 +12,7 @@ import { cutoutCostEur, subjectsInSandbox } from "./sandbox";
 // removed with the clip by the retention): the next version of the Reel finds them made. Never fails a render:
 // a passage without its cut-out simply has the composition's text in front of her.
 
-type Plan = Pick<EditPlan, "segments" | "layers"> & { finish?: EditPlan["finish"] };
+type Plan = Pick<EditPlan, "segments" | "layers"> & { subtitles?: boolean; captions?: EditPlan["captions"]; finish?: EditPlan["finish"] };
 
 /** Seconds of the sandbox's work a second of moving video takes, at most (a fast walk: about a minute on its 8 CPUs). */
 const WORK_PER_SECOND = 60;
@@ -93,7 +93,7 @@ export async function ensureSubjects(studioId: string, postId: string, plan: Pla
           console.warn("subject cut-out not kept", p.key, uploaded.error.message);
           continue;
         }
-        next[p.key] = { path, still: result.still, at, frames: result.frames, keys: result.keys, people: result.people };
+        next[p.key] = { path, still: result.still, at, frames: result.frames, keys: result.keys, people: result.people, ...(result.top !== undefined ? { top: result.top } : {}) };
       }
       updates.set(p.clip_id, next);
     }
@@ -112,13 +112,15 @@ export async function ensureSubjects(studioId: string, postId: string, plan: Pla
 }
 
 /** The cut-outs this plan can draw, signed for the render and the live preview (by passage, subjectKey). */
-export async function subjectInputs(studioId: string, plan: Plan): Promise<Record<string, { src: string; still?: boolean }>> {
+export async function subjectInputs(studioId: string, plan: Plan): Promise<Record<string, { src: string; still?: boolean; top?: number }>> {
   const { passages, rows } = await planned(studioId, plan);
   const found = passages.flatMap((p) => {
     const k = kept(rows.get(p.clip_id))[p.key];
-    return k && "path" in k && k.path.startsWith(`${studioId}/`) ? [{ key: p.key, path: k.path, still: k.still }] : [];
+    return k && "path" in k && k.path.startsWith(`${studioId}/`) ? [{ key: p.key, path: k.path, still: k.still, top: k.top }] : [];
   });
   if (!found.length) return {};
   const signed = (await supabaseAdmin().storage.from("media").createSignedUrls(found.map((f) => f.path), 7200)).data ?? [];
-  return Object.fromEntries(found.flatMap((f, i) => (signed[i]?.signedUrl ? [[f.key, { src: signed[i]!.signedUrl, ...(f.still ? { still: true } : {}) }]] : [])));
+  return Object.fromEntries(
+    found.flatMap((f, i) => (signed[i]?.signedUrl ? [[f.key, { src: signed[i]!.signedUrl, ...(f.still ? { still: true } : {}), ...(f.top !== undefined ? { top: f.top } : {}) }]] : [])),
+  );
 }

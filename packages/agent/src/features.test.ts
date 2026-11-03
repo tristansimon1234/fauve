@@ -648,3 +648,49 @@ test("finish: an ambience under the music, and the sound cleaned on demand", () 
   assert.equal(forced.denoised, true);
   assert.match(forced.filter, /mix=0\.6/);
 });
+
+test("captions: what is said written like a creator, phrase by phrase, its strong word big, behind her at the start", async () => {
+  const { captionCards, strongIndex, strongSize, cardTop } = await import("../../../apps/render/src/captions.ts");
+  const { fromEditorPlan } = await import("./editor.ts");
+  const { subjectPassages, wantsSubjects, CAPTION_SUBJECT_SECONDS } = await import("./subject.ts");
+  const said = (text: string, from = 0, step = 9) => text.split(" ").map((w, i) => ({ w, from: from + i * step, to: from + i * step + 7 }));
+  // A phrase is cut on its punctuation, a pause, or five words; its strong word carries meaning, a number first.
+  const cards = captionCards([...said("quand tu n'en as plus,"), ...said("trouver de l'inspiration", 80), ...said("en 1 favori", 140)], 30, 300);
+  assert.deepEqual(
+    cards.map((c) => c.words.map((w) => w.w).join(" ")),
+    ["quand tu n'en as plus,", "trouver de l'inspiration", "en 1 favori"],
+  );
+  // Only small words: the last one, long enough, carries the phrase (« quand tu n'en as PLUS »).
+  assert.equal(cards[0]!.words.findIndex((w) => w.strong), 4);
+  assert.equal(cards[1]!.words.find((w) => w.strong)?.w, "l'inspiration");
+  assert.equal(cards[2]!.words.find((w) => w.strong)?.w, "1");
+  // A phrase holds a little after its last word (0.6 s), never into the next one; the faces change from phrase to phrase.
+  assert.equal(cards[0]!.to, 43 + 18);
+  assert.equal(captionCards([...said("deux mots"), ...said("puis trois autres", 30)], 30, 100)[0]!.to, 30);
+  assert.notEqual(cards[0]!.face, cards[1]!.face);
+  // « et » alone never holds the screen: it joins the next phrase.
+  assert.equal(captionCards([{ w: "et", from: 0, to: 5 }, ...said("un café offert", 8)], 30, 100).length, 1);
+  assert.equal(strongIndex([{ w: "et" }]), -1);
+  // The strong word fills its width, never more than its size cap; a long one is smaller.
+  assert.ok(strongSize("PLUS", "display", 850, 300) === 300);
+  assert.ok(strongSize("INSPIRATION", "display", 850, 300) < 150);
+  // Its block sits in the free band above a low row, never under the apps' own caption; from a high row down.
+  assert.ok(cardTop(0.64, 0.2) + 0.2 <= 0.74 + 1e-9);
+  assert.equal(cardTop(0.2, 0.2), 0.2);
+  // The editor's choice is kept when it is one of the styles, and a correction keeps it; an unknown one leaves the default.
+  const base = { format: "9:16", duration: 6, template: "libre", segments: [{ clip_id: "c1", in: 0, out: 3, zoom: "none" }, { clip_id: "c2", in: 0, out: 3, zoom: "none" }], texts: [], transitions: "cut", subtitles: true };
+  assert.equal(fromEditorPlan({ ...base, captions: "kinetic" } as never).captions, "kinetic");
+  assert.equal(fromEditorPlan({ ...base, captions: "glitter" } as never).captions, undefined);
+  // Her finish comes first; kinetic captions cut her out over the opening seconds only.
+  const plan = editPlanSchema.parse({ ...fromEditorPlan({ ...base, captions: "stickers" } as never), finish: { captions: "kinetic" } });
+  assert.equal(wantsSubjects(plan), true);
+  assert.equal(wantsSubjects({ ...plan, subtitles: false }), false);
+  const passages = subjectPassages(plan, () => true);
+  assert.equal(passages.length, 1);
+  assert.ok(passages.reduce((n, p) => n + p.to - p.from, 0) <= CAPTION_SUBJECT_SECONDS);
+  assert.deepEqual(subjectPassages({ ...plan, finish: { captions: "native" } }, () => true), []);
+  // The render gets the style only when words are said.
+  const props = buildReelProps(plan, { template: "libre", clipUrls: { c1: "https://x/c1.mp4", c2: "https://x/c2.mp4" }, brand: { name: "Studio" }, words: { c1: [{ w: "bonjour", start: 0.2, end: 0.6 }] } });
+  assert.equal(props.captions, "kinetic");
+  assert.equal(buildReelProps({ ...plan, subtitles: false }, { template: "libre", clipUrls: { c1: "https://x/c1.mp4", c2: "https://x/c2.mp4" }, brand: { name: "Studio" } }).captions, undefined);
+});

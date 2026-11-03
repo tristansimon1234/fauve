@@ -3627,7 +3627,7 @@ test("what moves: the tracks under each animation, placed as the Reel draws the 
 
   // The contract says how to read it, without naming any effect; the editor knows the gestures.
   assert.match(MOTION_DESIGNER_PROMPT, /track\(frame\)/);
-  assert.match(MOTION_DESIGNER_PROMPT, /function Scene\(\{[^}]*track \}\)/);
+  assert.match(MOTION_DESIGNER_PROMPT, /function Scene\(\{[^}]*track, spoken \}\)/);
   assert.match(EDITOR_SYSTEM_PROMPT, /« actions »/);
 });
 

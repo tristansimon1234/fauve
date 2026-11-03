@@ -21,6 +21,8 @@ import {
   motionTemplateSchema,
   sceneSchema,
   SLOT_NAME,
+  CAPTION_STYLES,
+  type CaptionStyle,
   type EditPlan,
   type MotionTemplate,
   type PlanSegment,
@@ -181,6 +183,12 @@ export const editorOutputSchema = z.object({
     texts: z.array(editorTextSchema),
     transitions: z.enum(["cut", "fade", "light_zoom"]),
     subtitles: z.boolean(),
+    captions: z
+      .enum(["native", "kinetic", "stickers"])
+      .optional()
+      .describe(
+        "How what is said is written, when there are subtitles: native (the apps' own captions, the default, right for a voice telling a story over her images), kinetic (each phrase placed around the person, its strong word big in another face, sometimes behind them: a creator talking to camera with energy; the words become the design, so fewer other texts), stickers (each word on a small label near the person: a playful tone). Her request or the Reel she copies decides first. A correction keeps the previous one unless you write another",
+      ),
     fonts: z.object({ display: z.string().optional(), body: z.string().optional() }).optional(),
     colors: z
       .array(z.string())
@@ -410,7 +418,9 @@ export function fromEditorPlan(input: EditorPlanIn, looks: SavedLook[] = []): Ed
   // Its own colours as the render takes them: a malformed one is dropped, her charter's are used.
   const ownColors = (plan as { colors?: unknown }).colors;
   const colors = Array.isArray(ownColors) ? [...new Set(ownColors.flatMap((c) => (typeof c === "string" && HEX_COLOR.test(c.trim().toLowerCase()) ? [c.trim().toLowerCase()] : [])))].slice(0, 3) : [];
-  const { end_card: _endCard, fonts: _fonts, colors: _colors, ...rest } = plan as typeof plan & { colors?: unknown };
+  // How what is said is written: a known style only (an unknown one leaves the apps' own captions).
+  const captions = (CAPTION_STYLES as readonly string[]).includes(String((plan as { captions?: unknown }).captions)) ? ((plan as { captions?: unknown }).captions as CaptionStyle) : undefined;
+  const { end_card: _endCard, fonts: _fonts, colors: _colors, captions: _captions, ...rest } = plan as typeof plan & { colors?: unknown; captions?: unknown };
   const { effect: _effect, look: _look, layers: asked, sounds: heard, ...kept } = rest as typeof rest & {
     effect?: string;
     look?: unknown;
@@ -448,6 +458,7 @@ export function fromEditorPlan(input: EditorPlanIn, looks: SavedLook[] = []): Ed
     ...(colors.length ? { colors } : {}),
     ...(endCard ? { end_card: endCard } : {}),
     ...(sounds.length ? { sounds } : {}),
+    ...(captions ? { captions } : {}),
     // A named look brings its style back (and, for a list, its details and bullets).
     texts: plan.texts.map(({ look_name, ...t }) => {
       const saved = look_name ? byName.get(look_name.trim().toLowerCase()) : undefined;

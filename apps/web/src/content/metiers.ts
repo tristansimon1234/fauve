@@ -33,7 +33,7 @@ const Price = `Dès ${PLANS.decouverte.priceEur} € par mois`;
 
 /** Questions every trade asks, after its own. */
 export const COMMON_FAQ: [string, string][] = [
-  ["Qui publie sur Instagram ?", "Toi, d’un toucher : ta publication s’ouvre dans Instagram avec sa légende déjà copiée. Tu peux aussi la télécharger."],
+  ["Qui publie sur Instagram ?", "Toi. Edith te prépare la publication et sa légende, et te fait signe au bon moment : tu la télécharges et tu la postes."],
   [
     "Combien ça coûte ?",
     `Trois offres sans engagement : ${PLANS.decouverte.label} à ${PLANS.decouverte.priceEur} € par mois (${reelsPerMonth("decouverte")} Reels soignés), ${PLANS.essentiel.label} à ${PLANS.essentiel.priceEur} € (${reelsPerMonth("essentiel")} Reels) et ${PLANS.pro.label} à ${PLANS.pro.priceEur} € (${reelsPerMonth("pro")} Reels). Les photos avec leurs textes ne comptent pas.`,

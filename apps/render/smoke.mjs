@@ -87,6 +87,8 @@ const scope = {
   // Nobody is seen here: no box; a sketch draws what it wraps.
   Detect: () => null,
   Sketch: ({ children }) => React.createElement("div", null, children),
+  // What is said, written: the words themselves are what the check reads.
+  Captions: ({ words = [] }) => React.createElement("div", null, (Array.isArray(words) ? words : []).map((w) => String(w?.w ?? "")).join(" ")),
 };
 
 const defaultBrand = {
@@ -132,6 +134,7 @@ for (const scene of scenes) {
           track: () => ({ hands: [], faces: [], bodies: [] }),
           reelTexts: scene.reelTexts ?? [],
           end: scene.end ?? null,
+          spoken: [],
         }),
       );
       if (html.length < 20) throw new Error(`empty output at frame ${f}`);

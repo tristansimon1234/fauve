@@ -121,13 +121,23 @@ export const editPlanSegmentSchema = z.object({
 });
 
 /**
+ * How what is said is written on the Reel (lot 7, Tristan's references of creators talking to camera): native (the apps'
+ * own captions, two or three words in one place), kinetic (each phrase placed around the person, its strong word big in
+ * another face, the faces changing), stickers (each word on a small paper label near the person).
+ */
+export const CAPTION_STYLES = ["native", "kinetic", "stickers"] as const;
+export type CaptionStyle = (typeof CAPTION_STYLES)[number];
+
+/**
  * The finishing touches the engine adds to a Reel by itself, each one hers to change (Edith's
  * set_finish; her defaults for every Reel in her profile): the sound of what is said (cleaned when
  * noisy, always, or as recorded), the sound of her videos (only where someone speaks, all along, or
- * none), the « euh » and silences cut, the speed ramps, the photos in relief, the steadied videos.
+ * none), the « euh » and silences cut, the speed ramps, the photos in relief, the steadied videos, how what is said is written.
  * Absent: « auto » (and « speech » for the sound of her videos).
  */
 export const reelFinishSchema = z.object({
+  /** How what is said is written (CAPTION_STYLES), set by her for this Reel or all of them; over the editor's choice. */
+  captions: z.enum(CAPTION_STYLES).optional(),
   sound: z.enum(["auto", "clean", "original"]).optional(),
   video_sound: z.enum(["speech", "all", "none"]).optional(),
   cuts: z.enum(["auto", "off"]).optional(),
@@ -136,6 +146,12 @@ export const reelFinishSchema = z.object({
   steady: z.enum(["auto", "off"]).optional(),
 });
 export type ReelFinish = z.infer<typeof reelFinishSchema>;
+
+/** How what is said is written on a Reel: her finish first, then the editor's choice; the apps' own captions are the default (undefined). */
+export function captionStyle(plan: { captions?: CaptionStyle; finish?: ReelFinish }): Exclude<CaptionStyle, "native"> | undefined {
+  const style = plan.finish?.captions ?? plan.captions;
+  return style === "kinetic" || style === "stickers" ? style : undefined;
+}
 
 /** Full motion-design screen (animated typography in the studio's colours, no video). */
 export const sceneSchema = z.object({
@@ -422,6 +438,8 @@ export const editPlanObjectSchema = z.object({
   images: z.array(editPlanImageSchema),
   transitions: z.enum(["cut", "fade", "light_zoom"]),
   subtitles: z.boolean(),
+  /** How what is said is written (CAPTION_STYLES), chosen by the editor; her finish (finish.captions) comes first. */
+  captions: z.enum(CAPTION_STYLES).optional(),
   music: z.null(),
   /** Google Fonts families: display for hooks and titles, body for the rest (default: template or brand fonts). */
   fonts: z

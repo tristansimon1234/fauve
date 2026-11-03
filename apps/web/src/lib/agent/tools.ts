@@ -1036,7 +1036,7 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
 
     async set_finish({ post_id, ...asked }) {
       const change = Object.fromEntries(Object.entries(asked).filter(([, v]) => v !== undefined)) as ReelFinish;
-      if (!Object.keys(change).length) return json({ error: "Dis ce qui change : sound, video_sound, cuts, ramp, relief ou steady." });
+      if (!Object.keys(change).length) return json({ error: "Dis ce qui change : sound, video_sound, cuts, ramp, relief, steady ou captions." });
       // Her defaults, for all her next Reels.
       if (!post_id) {
         await insertProfileVersion(studioId, (profile) => ({ ...profile, finish: { ...reelFinishSchema.catch({}).parse(profile.finish ?? {}), ...change } }));

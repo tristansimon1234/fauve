@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { isClipSegment, type EditPlan } from "./schemas.ts";
+import { captionStyle, isClipSegment, type EditPlan } from "./schemas.ts";
 
 // Her subject cut out at every image of a passage of her video (apps/render/matte.py, in the cut-out sandbox), so
 // a composition lays a text behind her as she walks, a title behind a hill, or her alone on a colour or on paper
@@ -8,12 +8,21 @@ import { isClipSegment, type EditPlan } from "./schemas.ts";
 
 /** The most seconds of video cut out for one Reel. */
 export const SUBJECT_MAX_SECONDS = 12;
+/**
+ * The most seconds cut out so the words said go behind her (kinetic captions, lot 7): its first passages, where the
+ * hook is said; the phrases said over the others stay in front.
+ */
+export const CAPTION_SUBJECT_SECONDS = 4;
 
 /** The name of a passage's cut-out: its clip and its seconds, to the hundredth (the same passage keeps it from one version to the next). */
 export const subjectKey = (clipId: string, from: number, to: number) => `${clipId}@${from.toFixed(2)}-${to.toFixed(2)}`;
 
 /** A composition's code that draws her subject. */
 export const drawsSubject = (js: string | undefined) => Boolean(js && /\bSubject\b/.test(js));
+
+/** A plan that draws her cut out: a composition that uses Subject, or what is said written around her (its strong words behind her). */
+export const wantsSubjects = (plan: Pick<EditPlan, "layers"> & { subtitles?: boolean; captions?: EditPlan["captions"]; finish?: EditPlan["finish"] }) =>
+  (plan.layers ?? []).some((l) => l.compose && drawsSubject(l.motion?.js)) || Boolean(plan.subtitles && captionStyle(plan) === "kinetic");
 
 /** A passage to cut out: its clip, its seconds, its name. */
 export type SubjectPassage = { clip_id: string; from: number; to: number; key: string };
@@ -24,16 +33,20 @@ export type SubjectPassage = { clip_id: string; from: number; to: number; key: s
  * left out: their subject is the photo's cut-out (Cutout).
  */
 export function subjectPassages(
-  plan: Pick<EditPlan, "segments" | "layers">,
+  plan: Pick<EditPlan, "segments" | "layers"> & { subtitles?: boolean; captions?: EditPlan["captions"]; finish?: EditPlan["finish"] },
   isVideo: (clipId: string) => boolean,
 ): SubjectPassage[] {
-  if (!(plan.layers ?? []).some((l) => l.compose && drawsSubject(l.motion?.js))) return [];
+  if (!wantsSubjects(plan)) return [];
+  // Only the opening passages for the captions alone; a composition that draws her, as many as the budget holds.
+  const composed = (plan.layers ?? []).some((l) => l.compose && drawsSubject(l.motion?.js));
+  const budget = composed ? SUBJECT_MAX_SECONDS : CAPTION_SUBJECT_SECONDS;
   const out: SubjectPassage[] = [];
   let seconds = 0;
   for (const s of plan.segments) {
+    if (!composed && seconds >= budget) break;
     if (!isClipSegment(s) || !isVideo(s.clip_id) || s.ramp || (s.speed && Math.abs(s.speed - 1) > 0.01)) continue;
     const length = Math.max(0, s.out - s.in);
-    if (!length || seconds + length > SUBJECT_MAX_SECONDS) continue;
+    if (!length || seconds + length > budget) continue;
     const key = subjectKey(s.clip_id, s.in, s.out);
     if (out.some((p) => p.key === key)) continue;
     out.push({ clip_id: s.clip_id, from: s.in, to: s.out, key });
@@ -46,7 +59,16 @@ export function subjectPassages(
 export const mediaSubjectsSchema = z.record(
   z.string(),
   z.union([
-    z.object({ path: z.string(), still: z.boolean(), at: z.string(), frames: z.number().optional(), keys: z.number().optional(), people: z.boolean().optional() }),
+    z.object({
+      path: z.string(),
+      still: z.boolean(),
+      at: z.string(),
+      frames: z.number().optional(),
+      keys: z.number().optional(),
+      people: z.boolean().optional(),
+      /** The top of the subject (its head) along the passage, as a share of the height: a word behind her goes above it. */
+      top: z.number().optional(),
+    }),
     z.object({ failed_at: z.string(), error: z.string() }),
   ]),
 );

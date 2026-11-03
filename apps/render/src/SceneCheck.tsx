@@ -638,7 +638,7 @@ export function SceneCheck({ js, texts, durationInFrames, brand, photos = [], cu
         <div key={f} data-check-frame={f} style={{ position: "absolute", left: 0, top: 0, width, height }}>
           <Catch onError={(error) => cancelRender(new Error(`erreur à l'image ${f} : ${error instanceof Error ? error.message : String(error)}`))}>
             <FrameContext.Provider value={f}>
-              <Scene width={width} height={height} fps={30} durationInFrames={durationInFrames} brand={brand} texts={texts} photos={photos} cuts={cuts} shots={shots} track={track} reelTexts={reelTexts} end={end} />
+              <Scene width={width} height={height} fps={30} durationInFrames={durationInFrames} brand={brand} texts={texts} photos={photos} cuts={cuts} shots={shots} track={track} reelTexts={reelTexts} end={end} spoken={[]} />
             </FrameContext.Provider>
           </Catch>
         </div>

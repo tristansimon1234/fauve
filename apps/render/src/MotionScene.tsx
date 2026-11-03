@@ -17,6 +17,7 @@ import { makeKit } from "./Kit";
 import { makeType } from "./Type";
 import { makeGraphic } from "./Graphic";
 import { Marker } from "./Marker";
+import { Captions } from "./Captions";
 import { PaperCutout, type RimSpec } from "./PaperCutout";
 import { SceneView } from "./Scene";
 import type { Theme } from "./theme";
@@ -252,6 +253,7 @@ export const SCOPE = {
   Tint: graphic.Tint,
   Detect: graphic.Detect,
   Sketch: graphic.Sketch,
+  Captions,
 };
 
 export type SceneComponent = (props: {
@@ -273,6 +275,8 @@ export type SceneComponent = (props: {
   /** For a collage's composition that draws the whole picture: the Reel's texts, each at its moment (frames from its start), and its end. */
   reelTexts: ComposeText[];
   end: ComposeEnd | null;
+  /** The words said under it, each { w, from, to } in frames from its start (empty when nobody speaks): what its Captions writes. */
+  spoken: { w: string; from: number; to: number }[];
 }) => ReactNode;
 
 /**
@@ -332,6 +336,8 @@ export function MotionScene(p: {
   /** A composition that draws the whole picture: the Reel's texts and its end. */
   reelTexts?: ComposeText[];
   end?: ComposeEnd | null;
+  /** The words said under it, when its code writes them itself (`spoken`). */
+  spoken?: { w: string; from: number; to: number }[];
 }) {
   const { fps } = useVideoConfig();
   const Generated = useMemo(() => compileScene(p.js), [p.js]);
@@ -356,6 +362,7 @@ export function MotionScene(p: {
       track={track}
       reelTexts={p.reelTexts ?? []}
       end={p.end ?? null}
+      spoken={p.spoken ?? []}
     />
   );
   return (

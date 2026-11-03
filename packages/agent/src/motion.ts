@@ -1,4 +1,4 @@
-import { isClipSegment, isMotionSegment, screenTime, segmentSeconds, speedPieces, type CameraMove, type ClipAnalysis, type ClipSegment, type CopyLayer, type EditPlan, type MotionTemplate, type Scene } from "./schemas.ts";
+import { captionStyle, isClipSegment, isMotionSegment, screenTime, segmentSeconds, speedPieces, type CameraMove, type ClipAnalysis, type ClipSegment, type CopyLayer, type EditPlan, type MotionTemplate, type Scene } from "./schemas.ts";
 import type { Adjust, ClipBlur, PhotoEdit } from "./retouch.ts";
 import { brandPalette, resolveBrandLook, type BrandPalette, type Bullet, type ListItem, type TextLook } from "./text-look.ts";
 import type { LogoOnDark } from "./logo.ts";
@@ -100,7 +100,7 @@ export type ReelSegment =
        * Its subject cut out at every image of the passage (matte.py: a transparent video, or one image when nothing moves),
        * drawn exactly over the shot by a composition's Subject, so a text can pass between the shot and her.
        */
-      subject?: { src: string; still?: boolean };
+      subject?: { src: string; still?: boolean; top?: number };
     }
   /**
    * A photo: a carousel slide (with its retouch and blurred zones), or a photo in a Reel (zoom: a slow Ken Burns move).
@@ -229,6 +229,9 @@ export type ReelText = {
 };
 export type ReelWord = { w: string; from: number; to: number };
 
+/** An animation's code that writes what is said itself (the words under it, `spoken`). */
+export const writesSpoken = (js: string | undefined) => Boolean(js && /\bspoken\b/.test(js));
+
 type CopyBox = { x: number; y: number; w: number; h: number };
 /** A copied Reel's layer as the render draws it: its cut-outs, its title and its ending, in frames. */
 export type ReelCopy = {
@@ -306,6 +309,8 @@ export type ReelProps = {
   logo?: "top" | "bottom" | null;
   /** Where a voice's subtitles sit for the whole Reel (top, share of the height): off the faces, never moving. */
   subtitleY?: number;
+  /** What is said written like a creator (plan.captions, her finish first): each phrase around the person, or on labels; absent, the apps' own captions. */
+  captions?: "kinetic" | "stickers";
   /**
    * Animations over several shots, above the montage and under its texts: from `from`
    * (frames) for `durationInFrames`, with the frames where the shot changes under them (`cuts`, from their start).
@@ -331,6 +336,8 @@ export type ReelProps = {
     drawsEnd?: boolean;
     reelTexts?: ComposeText[];
     end?: ComposeEnd | null;
+    /** The words said under it (frames from its start), when its code writes them (`spoken`): the engine's captions step aside. */
+    spoken?: ReelWord[];
   }[];
   /** Components of the studio's bank placed on a still: drawn at their design width (base), then scaled into their box (shares of the frame). */
   /** A simple copied Reel remade by code (copy.ts), in frames (mirror of the render's). */
@@ -422,7 +429,7 @@ export type ReelInputs = {
   /** The moving photos whose subject cuts out cleanly (depthPhotoIds): signed cut-out and the subject's box, played in relief. */
   depth?: Record<string, { src: string; box: { x: number; y: number; w: number; h: number } }>;
   /** The passages of her clips cut out at every image (subjectKey: clip, in, out), signed: what a composition's Subject draws. */
-  subjects?: Record<string, { src: string; still?: boolean }>;
+  subjects?: Record<string, { src: string; still?: boolean; top?: number }>;
 };
 
 /** A clip's width / height as the Reel frames it, from its analysis (phones film 16:9 or 9:16). */
@@ -811,6 +818,10 @@ export function buildReelProps(plan: EditPlan, inputs: ReelInputs): ReelProps {
           : {}),
         ...(track.length ? { track } : {}),
         ...(l.motion.fonts?.length ? { fonts: l.motion.fonts } : {}),
+        // An animation that writes what is said itself (Captions, around her or behind her): the words under it.
+        ...(writesSpoken(l.motion.js) && words.some((w) => w.from >= from && w.from < from + length)
+          ? { spoken: words.filter((w) => w.from >= from && w.from < from + length).map((w) => ({ w: w.w, from: w.from - from, to: w.to - from })) }
+          : {}),
       },
     ];
   });
@@ -855,6 +866,7 @@ export function buildReelProps(plan: EditPlan, inputs: ReelInputs): ReelProps {
     ...(look ? { look: { ...look, matrix: lookMatrix(look) } } : {}),
     ...(lookStamp(look, inputs.today) ? { stamp: lookStamp(look, inputs.today)! } : {}),
     ...(subtitleRow(plan) !== undefined ? { subtitleY: subtitleRow(plan) } : {}),
+    ...(words.length && captionStyle(plan) ? { captions: captionStyle(plan)! } : {}),
     ...(layers.length ? { layers } : {}),
     ...(copy ? { copy } : {}),
     ...(overlays.length ? { overlays } : {}),

@@ -1387,7 +1387,7 @@ export async function stabilizeInSandbox(id: string, url: string): Promise<{ vid
 }
 
 /** A passage of a clip cut out: its file (a transparent WebM, or a PNG when nothing moved) and how it was made. */
-export type SubjectCut = { file: Buffer; still: boolean; frames: number; keys: number; people: boolean };
+export type SubjectCut = { file: Buffer; still: boolean; frames: number; keys: number; people: boolean; top?: number };
 
 /**
  * Cuts out the subject of each passage at every image (apps/render/matte.py: the photo model on key images where
@@ -1432,7 +1432,7 @@ export async function subjectsInSandbox(
         ],
       });
       const lastLine = (await run.stdout()).trim().split("\n").at(-1) ?? "";
-      let readings: Record<string, { file: string; still: boolean; frames: number; keys: number; people: boolean } | { error: string }>;
+      let readings: Record<string, { file: string; still: boolean; frames: number; keys: number; people: boolean; top?: number } | { error: string }>;
       try {
         readings = JSON.parse(lastLine);
       } catch {
@@ -1447,7 +1447,9 @@ export async function subjectsInSandbox(
           continue;
         }
         const file = await sandbox.readFileToBuffer({ path: r.file }).catch(() => null);
-        results[p.key] = file?.length ? { file, still: r.still, frames: r.frames, keys: r.keys, people: r.people } : new Error("cut-out file missing");
+        results[p.key] = file?.length
+          ? { file, still: r.still, frames: r.frames, keys: r.keys, people: r.people, ...(typeof r.top === "number" ? { top: r.top } : {}) }
+          : new Error("cut-out file missing");
       }
       return { results, seconds: (Date.now() - started) / 1000 };
     } finally {

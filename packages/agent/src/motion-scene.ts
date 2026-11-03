@@ -58,6 +58,7 @@ export const MOTION_SCOPE = [
   "Tint",
   "Detect",
   "Sketch",
+  "Captions",
 ] as const;
 
 // The motion designer's prompt: a base every animation gets (cached), then only the parts its call needs
@@ -96,7 +97,8 @@ Checked automatically
 - On-screen text is in French, exactly the brief's words, always spelled right: her words keep their order, never her typos (accents, apostrophes, hyphens, « WhatsApp »). Nothing invented: a number, price, counter, rating or client count appears only if the brief, the Reel's texts or her words give it (a copied Reel's metrics or app screens keep their form, with her real words).
 
 Code contract (strict)
-- Write only: function Scene({ width, height, fps, durationInFrames, brand, texts, photos, cuts, shots, track }) { … return (<AbsoluteFill …>…</AbsoluteFill>); }, usually 1080 × 1920 at 30 fps, lasting durationInFrames frames. photos, cuts, shots and track are explained below when your animation has them; otherwise they are empty.
+- Write only: function Scene({ width, height, fps, durationInFrames, brand, texts, photos, cuts, shots, track, spoken }) { … return (<AbsoluteFill …>…</AbsoluteFill>); }, usually 1080 × 1920 at 30 fps, lasting durationInFrames frames. photos, cuts, shots and track are explained below when your animation has them; otherwise they are empty.
+- spoken: the words said under you, each { w, from, to } in frames from your start (empty when nobody speaks). The engine writes them as subtitles in their row, and you keep off it. Only when the brief or her request wants what is said to be part of your animation (words flying around her, behind her, on labels) do you write them yourself: <Captions words={spoken} style="kinetic" | "stickers" /> sets each phrase on the frame it is said, its strong word big (kinetic: around her, the faces changing; stickers: on small labels), or your own way with every word at its moment; the engine's subtitles then step aside under you. In a composition, <Subject …/> laid after Captions puts the words behind her.
 - Words come from slots she can edit: texts.slot_name (lowercase, digits, _) with the brief's text as default (texts.title ?? "…"); texts is always an object, maybe empty. Declare each slot in "slots" with the length your layout holds.
 - No import or export. Only these identifiers exist: ${MOTION_SCOPE.join(", ")} (standard Remotion API: useCurrentFrame() is the scene's frame, from 0; interpolate(frame, [a, b], [x, y], { extrapolateLeft: "clamp", extrapolateRight: "clamp", easing }); spring({ frame, fps, config }); random("seed") for deterministic randomness).
 - FitText, when you need it: a box whose text shrinks until it fits, never breaking a word — <FitText style={{ position: "absolute", left, top, width, height }} innerStyle={{ fontFamily, fontSize, lineHeight, color }}>{title}</FitText> (style places the box; innerStyle sets its content's type and layout, centred in a flex column by default). Text you set by hand (a bubble, an interface line, a label) does not need it.

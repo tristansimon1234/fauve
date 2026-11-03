@@ -191,6 +191,15 @@ def cut(job, session):
         # A light smoothing over time, against a shimmer of the edges.
         masks = [masks[0]] + [0.5 * masks[i] + 0.25 * masks[i - 1] + 0.25 * masks[min(n - 1, i + 1)] for i in range(1, n)]
 
+    def head_top(m):
+        # The top of the subject (its head, its hair): the first row where it covers 2 % of the width, as a share of the height.
+        rows = np.nonzero((m > 0.5).mean(axis=1) > 0.02)[0]
+        return rows[0] / m.shape[0] if len(rows) else 1.0
+
+    # Where its top sits along the passage (the highest a fifth of the time: a head that rises counts), so a word laid
+    # behind her is placed where her head covers only its bottom.
+    top = round(float(np.percentile([head_top(m) for m in masks], 20)), 3)
+
     def alpha(m):
         # Solid where the model is fairly sure (a body blurred by its own move read at 0.5 stays solid), soft at the edge.
         a = np.clip((cv2.resize(m, (ow, oh), interpolation=cv2.INTER_LINEAR) - 0.15) / 0.4, 0, 1)
@@ -212,7 +221,7 @@ def cut(job, session):
         enc.stdin.close()
         if enc.wait() != 0:
             raise RuntimeError("encodage du détourage impossible")
-    return {"file": out, "still": still, "frames": n, "keys": len(keys), "people": people, "seconds": round(time.time() - started, 1)}
+    return {"file": out, "still": still, "frames": n, "keys": len(keys), "people": people, "top": top, "seconds": round(time.time() - started, 1)}
 
 
 if __name__ == "__main__":

@@ -125,7 +125,7 @@ export type ReelProps = {
         /** Where the subtitles sit over this shot (top, share of the frame), off its faces. */
         subtitleY?: number;
         /** Its subject cut out at every image of the passage (a transparent video, or one image when nothing moves), for a composition's Subject. */
-        subject?: { src: string; still?: boolean };
+        subject?: { src: string; still?: boolean; top?: number };
       }
     | {
         type: "image";
@@ -181,6 +181,8 @@ export type ReelProps = {
     message?: boolean;
   }[];
   words: { w: string; from: number; to: number }[];
+  /** What is said written like a creator: each phrase around the person (kinetic), or on labels (stickers); absent, the apps' own captions. */
+  captions?: "kinetic" | "stickers";
   brand: {
     name: string;
     accent: string;
@@ -239,6 +241,8 @@ export type ReelProps = {
     drawsEnd?: boolean;
     reelTexts?: ComposeText[];
     end?: ComposeEnd | null;
+    /** The words said under it (frames from its start), when its code writes them (`spoken`): the engine's captions step aside. */
+    spoken?: { w: string; from: number; to: number }[];
   }[];
   /** What she added on her Reel (a text, one of her photos or its cut-out), drawn over everything, in frames. */
   overlays?: {

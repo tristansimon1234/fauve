@@ -436,7 +436,7 @@ export const toolSpecs = {
   },
   set_finish: {
     description:
-      "Les finitions que le moteur ajoute tout seul à un Reel, chacune à régler à sa demande. sound : auto (nettoyé quand c'est bruyant), clean (toujours nettoyé : « enlève le bruit de fond »), original (le son tel qu'enregistré). video_sound : speech (le son de ses vidéos seulement quand quelqu'un parle, par défaut), all (le son de ses vidéos tout du long sous la musique : « garde le son d'ambiance »), none (jamais : juste la musique ou la voix). cuts : auto (les « euh », faux départs et blancs coupés quand quelqu'un parle), off (ses mots tels qu'elle les a dits, hésitations comprises). ramp : auto (un ralenti part en rampe sur le geste), off (ralenti simple). relief : auto (une photo qui bouge passe en relief), off (à plat). steady : auto (une vidéo qui tremble est stabilisée), off (telle que filmée). Avec post_id : ce Reel seulement, la vidéo se refait sans nouveau montage, gratuit. Sans post_id : ses prochains Reels (réglage gardé). Seulement ce qu'elle demande.",
+      "Les finitions que le moteur ajoute tout seul à un Reel, chacune à régler à sa demande. sound : auto (nettoyé quand c'est bruyant), clean (toujours nettoyé : « enlève le bruit de fond »), original (le son tel qu'enregistré). video_sound : speech (le son de ses vidéos seulement quand quelqu'un parle, par défaut), all (le son de ses vidéos tout du long sous la musique : « garde le son d'ambiance »), none (jamais : juste la musique ou la voix). cuts : auto (les « euh », faux départs et blancs coupés quand quelqu'un parle), off (ses mots tels qu'elle les a dits, hésitations comprises). ramp : auto (un ralenti part en rampe sur le geste), off (ralenti simple). relief : auto (une photo qui bouge passe en relief), off (à plat). steady : auto (une vidéo qui tremble est stabilisée), off (telle que filmée). captions : comment ce qui est dit s'écrit, native (les sous-titres simples des applis, 2 ou 3 mots en bas), kinetic (chaque phrase autour de la personne, son mot fort en grand dans une autre police, parfois derrière elle, comme les créateurs face caméra : « des sous-titres stylés », « les mots autour de moi »), stickers (chaque mot sur une petite étiquette à sa couleur). Avec post_id : ce Reel seulement, la vidéo se refait sans nouveau montage, gratuit. Sans post_id : ses prochains Reels (réglage gardé). Seulement ce qu'elle demande.",
     input: z.object({
       post_id: z.string().uuid().optional(),
       sound: z.enum(["auto", "clean", "original"]).optional(),
@@ -445,6 +445,7 @@ export const toolSpecs = {
       ramp: z.enum(["auto", "off"]).optional(),
       relief: z.enum(["auto", "off"]).optional(),
       steady: z.enum(["auto", "off"]).optional(),
+      captions: z.enum(["native", "kinetic", "stickers"]).optional(),
     }),
   },
   set_look: {

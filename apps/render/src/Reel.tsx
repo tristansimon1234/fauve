@@ -12,6 +12,8 @@ import {
   useVideoConfig,
 } from "remotion";
 import { CarouselDesign } from "./Carousel";
+import { CaptionLookContext, Captions, type CaptionLook } from "./Captions";
+import type { CaptionCard } from "./captions";
 import { CopyLayer } from "./Copy";
 import { Overlays } from "./Overlays";
 import { COLLAGE_OVERLAP, COLLAGE_SERIF, CollageBackdrop, CollageBand, CollageCaption, CollageCard, CollageEndCard, CollageHook, CollageMessage, Grain, printSize, stickerTop, type Sticker } from "./Collage";
@@ -72,6 +74,8 @@ export function Reel(props: ReelProps) {
     ...(props.layers ?? []).flatMap((l) => l.fonts ?? []),
     // A copied Reel's title, in the model's font.
     ...(props.copy?.title?.font ? [props.copy.title.font] : []),
+    // What is said written like a creator, and an animation that writes it: a serif italic among its faces.
+    ...(props.captions === "kinetic" || (props.layers ?? []).some((l) => l.spoken) ? [COLLAGE_SERIF] : []),
   ]);
   const k = props.width / 1080;
   // A look on the whole Reel (on her request): a grade over her footage and its animations, its texture under the texts.
@@ -90,6 +94,33 @@ export function Reel(props: ReelProps) {
   // engine draws the card. Drawn by no one, her calendar Reel's end card never showed.
   const engineEnd = Boolean(props.endCard) && (!whole || compose?.drawsEnd === false);
   const composeLength = compose && whole && engineEnd && props.endCard ? Math.max(1, Math.min(compose.durationInFrames, props.endCard.from - compose.from)) : compose?.durationInFrames;
+  // What is said, as the engine writes it: an animation that writes it itself (its `spoken`) has its own words.
+  const writing = (props.layers ?? []).filter((l) => l.spoken?.length);
+  const captionWords = writing.length ? props.words.filter((w) => !writing.some((l) => w.from >= l.from && w.from < l.from + l.durationInFrames)) : props.words;
+  const captionLook: CaptionLook = {
+    fonts: { display: props.brand.displayFont, body: MONOSPACE.test(props.brand.bodyFont) ? props.brand.displayFont : props.brand.bodyFont, serif: COLLAGE_SERIF },
+    accent: props.brand.accent,
+    accentInk: props.brand.accentInk,
+    onFootage: legible(props.brand.accent, "footage"),
+    row: props.subtitleY ?? SUBTITLE_Y,
+  };
+  // A phrase said over one of her shots cut out at every image (no animation over it, no accent on its cut): its strong word goes behind her.
+  const behindHer = (card: CaptionCard) => {
+    if (props.frame === "letterbox" || compose) return null;
+    const segment = props.segments.find((s) => card.from >= s.startAt && card.to <= s.startAt + s.durationInFrames);
+    if (!segment || segment.type !== "clip" || !segment.subject || segment.subject.top === undefined || segment.accent) return null;
+    if ((props.layers ?? []).some((l) => l.from < card.to && l.from + l.durationInFrames > card.from)) return null;
+    return {
+      top: segment.subject.top,
+      node: (
+        <Sequence from={segment.startAt} durationInFrames={segment.durationInFrames} layout="none">
+          <AbsoluteFill style={look && gradesFootage(look) ? { filter: lookFilter(look, k) } : undefined}>
+            <Shot segment={segment} theme={theme} layer="subject" />
+          </AbsoluteFill>
+        </Sequence>
+      ),
+    };
+  };
   // A shot she added after the composition ends is the engine's to play.
   const laidByComposition = (segment: ReelProps["segments"][number]) => Boolean(compose) && segment.startAt < compose!.from + compose!.durationInFrames;
   const isShot = (segment: ReelProps["segments"][number]) => segment.type === "clip" || segment.type === "image";
@@ -215,6 +246,7 @@ export function Reel(props: ReelProps) {
             }}
             reelTexts={compose.reelTexts}
             end={compose.end}
+            spoken={compose.spoken}
             fallbackNode={
               !collage ? (
                 // The plain montage: her shots full frame, the engine's screens it covered, the Reel's texts and end card.
@@ -258,6 +290,7 @@ export function Reel(props: ReelProps) {
               photos={layer.photos}
               cuts={layer.cuts}
               track={layer.track}
+              spoken={layer.spoken}
               {...(layer.drawsTexts ? { reelTexts: layer.reelTexts } : {})}
             />
           </Sequence>
@@ -267,6 +300,7 @@ export function Reel(props: ReelProps) {
   );
 
   return (
+    <CaptionLookContext.Provider value={captionLook}>
     <AbsoluteFill style={{ backgroundColor: "#000" }}>
       <ExposureFilters />
       {look && gradesFootage(look) ? <LookDefs look={look} k={k} /> : null}
@@ -277,7 +311,12 @@ export function Reel(props: ReelProps) {
 
       {whole || wordsLayer ? null : engineTexts}
 
-      {props.words.length > 0 && <Subtitles props={props} theme={theme} k={k} />}
+      {captionWords.length > 0 &&
+        (props.captions ? (
+          <Captions words={captionWords} style={props.captions} look={captionLook} subjectFor={props.captions === "kinetic" ? behindHer : undefined} />
+        ) : (
+          <Subtitles props={props} words={captionWords} theme={theme} k={k} />
+        ))}
       {props.layer ? <TextLayer props={props} /> : null}
       {props.elements?.length ? <Elements props={props} /> : null}
       <Logo props={props} k={k} />
@@ -300,6 +339,7 @@ export function Reel(props: ReelProps) {
         </Sequence>
       ) : null}
     </AbsoluteFill>
+    </CaptionLookContext.Provider>
   );
 }
 
@@ -1214,10 +1254,10 @@ const subtitleEdge = (k: number): CSSProperties => ({
 const PHRASE_END = /[.,!?;:…]$/;
 
 /** Word-by-word subtitles: short phrases, the spoken word lit up. */
-function Subtitles({ props, theme, k }: { props: ReelProps; theme: Theme; k: number }) {
+function Subtitles({ props, words, theme, k }: { props: ReelProps; words: ReelProps["words"]; theme: Theme; k: number }) {
   const frame = useCurrentFrame();
   const chunks: ReelProps["words"][] = [];
-  for (const word of props.words) {
+  for (const word of words) {
     const current = chunks.at(-1);
     const last = current?.at(-1);
     // Two or three words at a time, never across a phrase's end: read at a glance, in time with the voice.

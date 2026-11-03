@@ -39,7 +39,7 @@ import {
   type ReelProps,
   type TracksByClip,
   voiceTranscriptSchema,
-  drawsSubject,
+  wantsSubjects,
 } from "@fauve/agent";
 import { z } from "zod";
 import { supabaseAdmin } from "@/lib/supabase/admin";
@@ -91,7 +91,7 @@ export function towardsDraft(status: PostStatus): PostStatus[] {
  */
 export async function loadMontageInputs(
   studioId: string,
-  plan: Pick<EditPlan, "segments"> & { voice?: EditPlan["voice"]; template?: EditPlan["template"]; layers?: EditPlan["layers"]; copy?: EditPlan["copy"]; overlays?: EditPlan["overlays"]; finish?: EditPlan["finish"] },
+  plan: Pick<EditPlan, "segments"> & { voice?: EditPlan["voice"]; template?: EditPlan["template"]; layers?: EditPlan["layers"]; copy?: EditPlan["copy"]; overlays?: EditPlan["overlays"]; finish?: EditPlan["finish"]; subtitles?: boolean; captions?: EditPlan["captions"] },
   options: { postId?: string } = {},
 ) {
   const db = supabaseAdmin();
@@ -176,7 +176,7 @@ export async function loadMontageInputs(
   const moving = depthPhotoIds(plan);
   const depth = moving.length ? await sceneCutoutInputs(studioId, moving).catch(() => ({})) : undefined;
   // Her subject cut out at every image, for the compositions that draw it (Subject).
-  const subjects = (plan.layers ?? []).some((l) => l.compose && drawsSubject(l.motion.js)) ? await subjectInputs(studioId, plan).catch(() => ({})) : undefined;
+  const subjects = wantsSubjects(plan) ? await subjectInputs(studioId, plan).catch(() => ({})) : undefined;
   // Each photo's shape, from its reading.
   const photoAspects = Object.fromEntries(
     assets.flatMap((a) => {
@@ -374,7 +374,7 @@ export async function renderPost(studioId: string, postId: string, options: { ed
   if (toCut.length) await ensureCutouts(studioId, toCut);
   // A composition that draws her subject over her shots (Subject): its passages cut out at every image, as many as
   // the step has time for before its render.
-  if ((plan.layers ?? []).some((l) => l.compose && drawsSubject(l.motion.js))) await ensureSubjects(studioId, postId, plan);
+  if (wantsSubjects(plan)) await ensureSubjects(studioId, postId, plan);
   // She wants the sound cleaned, even where it was not noisy: the cleaned copies are made first.
   if (plan.finish?.sound === "clean") await ensureCleanCopies(studioId, planMediaIds(plan), plan.voice?.media_id);
   const { clipIds, clipFiles, clips, clipUrls, photoIds, words, aspects, accent, logoUrl, logoOnDark, studioName, fonts, colors, customFonts, reelSignature: signature, voice, cutouts, sceneCutouts, copyCutouts, overlayPhotos, depth, subjects, photoAspects, tracks, facts } =

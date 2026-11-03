@@ -144,7 +144,7 @@ export default async function ComparisonPage({ params }: PageProps<"/comparatif/
         </div>
       </section>
 
-      <LastCall waUrl={whatsappLink()} line="Dis-lui ce que tu fais : dans cinq minutes, il te montre ce qu’il ferait pour toi.">
+      <LastCall waUrl={whatsappLink()} line="Sans app, directement sur WhatsApp : dis-lui ce que tu fais, dans cinq minutes il te montre ce qu’il ferait pour toi.">
         Tes vidéos sont déjà là. <span className="font-[family-name:var(--font-serif)] font-normal tracking-[-0.01em] text-lilac italic">Edith en fait des Reels.</span>
       </LastCall>
     </main>

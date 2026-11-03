@@ -16,6 +16,7 @@ import {
   signatureOf,
   editorOutputSchemaLegacy,
   finishPlan,
+  captionStyle,
   type EditorOutput,
   type EditorOutputLegacy,
   type MediaFacts,
@@ -490,8 +491,11 @@ export async function designEdit(params: {
   const finish = { ...profile.finish, ...base?.finish };
   // Its animations whose brief did not change keep their code before the new ones are counted;
   // one rewritten (its shots changed, or the request touched it) takes the place of the one it replaces.
+  // What is said written like a creator, her choice for all her Reels or this one: written whenever someone speaks.
+  const writeSpoken = captionStyle({ finish }) && (Boolean(spoken) || clips.some((c) => c.analysis.words?.length));
   const toPlan = (answer: EditorOutput | EditorOutputLegacy) => {
-    const written = fromEditorPlan(answer.plan, profile.text_looks ?? []);
+    const read = fromEditorPlan(answer.plan, profile.text_looks ?? []);
+    const written = writeSpoken ? { ...read, subtitles: true } : read;
     const withWritten = keepWrittenAnimations(Object.keys(finish).length ? { ...written, finish } : written, params.fresh ? null : base);
     // A correction that redraws nothing keeps the composition's code as it is: never written again for a voice or a subtitle.
     const drafted = correction && !params.fresh && params.contract?.redraw === false ? keepComposition(withWritten, base) : withWritten;
@@ -548,6 +552,8 @@ export async function designEdit(params: {
   }
   // A correction keeps this Reel's own colours when the editor wrote none: only what she asked changes.
   if (!plan.colors && base?.colors && !params.fresh) plan.colors = base.colors;
+  // And how what is said is written, when the editor didn't write another style.
+  if (!plan.captions && base?.captions && !params.fresh) plan.captions = base.captions;
   // The Reel she copies takes its own font over her charter's when it makes its style (the animations get it too); its colours were offered to the editor.
   Object.assign(plan, followedLook(plan, followed));
   // Its look: a preset is already on the plan; one in her words is designed now (named again in a correction, it is

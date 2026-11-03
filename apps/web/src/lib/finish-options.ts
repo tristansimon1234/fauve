@@ -37,6 +37,8 @@ export async function refinishPost(studioId: string, postId: string, change: Ree
   const finish = { ...plan.finish, ...change };
   if (JSON.stringify(finish) === JSON.stringify(plan.finish ?? {})) return false;
   let next: EditPlan = { ...plan, finish };
+  // What is said written like a creator: written at all (the subtitles were off on this Reel).
+  if (change.captions && change.captions !== "native") next.subtitles = true;
   if (changesCut(plan, change)) {
     const inputs = await loadMontageInputs(studioId, next, { postId });
     const durations = Object.fromEntries(Object.entries(inputs.clipDurations).map(([id, d]) => [id, d ?? inputs.facts.clips[id]?.duration ?? 0]));
