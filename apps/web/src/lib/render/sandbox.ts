@@ -1285,6 +1285,13 @@ export const TRACK_MODELS: { file: string; url: string; sha256: string }[] = [
     url: "https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float16/1/blaze_face_short_range.tflite",
     sha256: "b4578f35940bf5a1a655214a1cce5cab13eba73c1297cd78e1a04c2380b0152f",
   },
+  // A person cut out at every image (matte.py's person mode): about six times faster than the photo model on a
+  // passage where the tracker followed someone, and only the person (a chair behind her goes).
+  {
+    file: "selfie_multiclass_256x256.tflite",
+    url: "https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_multiclass_256x256/float32/latest/selfie_multiclass_256x256.tflite",
+    sha256: "c6748b1253a99067ef71f7e26ca71096cd449baefa8f101900ea23016507e0e0",
+  },
 ];
 /** uv, pinned (a single binary, taken from its wheel on PyPI): it brings its own Python, whatever the image has. */
 const UV_WHEEL = {
@@ -1426,7 +1433,7 @@ export async function subjectsInSandbox(
         cmd: "bash",
         args: [
           "-c",
-          `cd ${TRACK_ROOT} && MATTE_MODEL=${CUTOUT_ROOT}/model.onnx FFMPEG=${CUTOUT_ROOT}/ffmpeg HDR_FILTER='${HDR_TO_SDR}' timeout 600 py/bin/python -I matte.py "$1/jobs.json"`,
+          `cd ${TRACK_ROOT} && MATTE_MODEL=${CUTOUT_ROOT}/model.onnx PERSON_MODEL=${TRACK_ROOT}/models/selfie_multiclass_256x256.tflite FFMPEG=${CUTOUT_ROOT}/ffmpeg HDR_FILTER='${HDR_TO_SDR}' timeout 600 py/bin/python -I matte.py "$1/jobs.json"`,
           "bash",
           dir,
         ],

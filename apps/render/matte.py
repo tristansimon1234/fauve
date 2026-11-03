@@ -39,6 +39,11 @@ MAX_SECONDS = 8.0
 BONES = [(11, 13), (13, 15), (12, 14), (14, 16), (15, 17), (15, 19), (16, 18), (16, 20), (23, 25), (25, 27), (27, 29), (27, 31), (24, 26), (26, 28), (28, 30), (28, 32), (11, 23), (12, 24)]
 
 MODEL = os.environ.get("MATTE_MODEL", "model.onnx")
+# A person's own model (MediaPipe's selfie segmenter, Apache 2.0): every image read in a few hundredths of a second,
+# only the person; used where the tracker followed a body, the photo model elsewhere (an object, a dish, a hill).
+# Measured on a woman talking to camera, 2.6 s: 20 s of work against 317 s for the photo model, her whole body kept,
+# her hair a little less fine.
+PERSON_MODEL = os.environ.get("PERSON_MODEL", "")
 FFMPEG = os.environ.get("FFMPEG", "ffmpeg")
 HDR_FILTER = os.environ.get("HDR_FILTER", "")
 
@@ -175,6 +180,11 @@ def cut(job, session):
     first = int(round(start * FPS))
     people = sum(1 for k in keys if bodies_at(track, first + k)) * 2 >= len(keys) if track else False
 
+    # A person, followed by the tracker: her own model at every image (no key images to carry along the moves). The
+    # photo model elsewhere, or when it is missing. A hand blurred by a fast gesture may come out thinner.
+    if people and not still and PERSON_MODEL and os.path.exists(PERSON_MODEL):
+        return finish(job, frames, person_masks(frames, ww, wh), still, 0, people, started, ow, oh)
+
     inp = session.get_inputs()[0].name
     mean = np.array([0.485, 0.456, 0.406], np.float32)
     std = np.array([0.229, 0.224, 0.225], np.float32)
@@ -225,6 +235,39 @@ def cut(job, session):
         # A light smoothing over time, against a shimmer of the edges.
         masks = [masks[0]] + [0.5 * masks[i] + 0.25 * masks[i - 1] + 0.25 * masks[min(n - 1, i + 1)] for i in range(1, n)]
 
+    return finish(job, frames, masks, still, len(keys), people, started, ow, oh, keys[0] if still else 0)
+
+
+def person_masks(frames, ww, wh):
+    """A person at every image, read by her own model (in the order of the images: it keeps the person from one to the next)."""
+    import cv2
+    import mediapipe as mp
+    import numpy as np
+    from mediapipe.tasks import python as mpp
+    from mediapipe.tasks.python import vision
+
+    options = vision.ImageSegmenterOptions(
+        base_options=mpp.BaseOptions(model_asset_path=PERSON_MODEL), running_mode=vision.RunningMode.VIDEO, output_confidence_masks=True
+    )
+    masks = []
+    with vision.ImageSegmenter.create_from_options(options) as segmenter:
+        for i, f in enumerate(frames):
+            found = segmenter.segment_for_video(mp.Image(image_format=mp.ImageFormat.SRGB, data=np.ascontiguousarray(f)), int(i * 1000 / FPS))
+            conf = found.confidence_masks
+            # Its first class is the background: the person is all the rest (hair, body, face, clothes).
+            person = 1.0 - conf[0].numpy_view() if len(conf) > 1 else conf[0].numpy_view()
+            # The main person and those nearly as big (someone small at the back goes); never cut by the skeleton's
+            # outline, which took the hem of a crop top and a bare waist away.
+            masks.append(main_subject(cv2.resize(np.ascontiguousarray(person, dtype=np.float32), (ww, wh), interpolation=cv2.INTER_LINEAR)))
+    # A light smoothing over time, against a shimmer of the edges.
+    return [masks[0]] + [0.5 * masks[i] + 0.25 * masks[i - 1] + 0.25 * masks[min(len(masks) - 1, i + 1)] for i in range(1, len(masks))]
+
+
+def finish(job, frames, masks, still, keys, people, started, ow, oh, still_at=0):
+    """The cut-out of every image written out (its edge made at full size), with where its top sits."""
+    import cv2
+    import numpy as np
+
     def head_top(m):
         # The top of the subject (its head, its hair): the first row where it covers 2 % of the width, as a share of the height.
         rows = np.nonzero((m > 0.5).mean(axis=1) > 0.02)[0]
@@ -257,7 +300,7 @@ def cut(job, session):
 
     if still:
         out = f"{job['out']}.png"
-        cv2.imwrite(out, cv2.cvtColor(rgba(frames[keys[0]], masks[0]), cv2.COLOR_RGBA2BGRA))
+        cv2.imwrite(out, cv2.cvtColor(rgba(frames[still_at], masks[0]), cv2.COLOR_RGBA2BGRA))
     else:
         out = f"{job['out']}.webm"
         enc = subprocess.Popen(
@@ -271,7 +314,7 @@ def cut(job, session):
         enc.stdin.close()
         if enc.wait() != 0:
             raise RuntimeError("encodage du détourage impossible")
-    return {"file": out, "still": still, "frames": n, "keys": len(keys), "people": people, "top": top, "seconds": round(time.time() - started, 1)}
+    return {"file": out, "still": still, "frames": len(frames), "keys": keys, "people": people, "top": top, "seconds": round(time.time() - started, 1)}
 
 
 if __name__ == "__main__":

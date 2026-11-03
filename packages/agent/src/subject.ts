@@ -13,9 +13,10 @@ import { captionStyle, isClipSegment, type EditPlan } from "./schemas.ts";
 export const SUBJECT_MAX_SECONDS = 30;
 /**
  * The most seconds cut out so the words said go behind her (kinetic captions, lot 7): its first passages, where the
- * hook is said; the phrases said over the others stay in front.
+ * hook is said; the phrases said over the others stay in front. A person is cut out by her own model (matte.py's
+ * person mode, about fifteen times faster than the photo model).
  */
-export const CAPTION_SUBJECT_SECONDS = 4;
+export const CAPTION_SUBJECT_SECONDS = 12;
 
 /** The name of a passage's cut-out: its clip and its seconds, to the hundredth (the same passage keeps it from one version to the next). */
 export const subjectKey = (clipId: string, from: number, to: number) => `${clipId}@${from.toFixed(2)}-${to.toFixed(2)}`;

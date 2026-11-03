@@ -16,6 +16,8 @@ type Plan = Pick<EditPlan, "segments" | "layers"> & { subtitles?: boolean; capti
 
 /** Seconds of the sandbox's work a second of moving video takes, at most (a fast walk: about a minute on its 8 CPUs). */
 const WORK_PER_SECOND = 60;
+/** The same for a person the tracker followed, cut out by her own model at every image (about 7 s locally on 4 CPUs). */
+const PERSON_WORK_PER_SECOND = 10;
 /** What the step keeps for the render after the cut-outs (a Reel renders at 4 to 7 s a second of video). */
 const RENDER_MARGIN_MS = 330_000;
 /** A passage whose cut-out failed is tried again after this long. */
@@ -52,8 +54,13 @@ export async function ensureSubjects(studioId: string, postId: string, plan: Pla
   // Outside a step (no deadline known), as if a step of Vercel's 800 s had just begun.
   const left = timeLeft();
   let budget = (Number.isFinite(left) ? left : 800_000) - RENDER_MARGIN_MS;
+  // A clip where the tracker followed someone is cut out by the person's own model, much faster.
+  const followed = (id: string) => {
+    const t = mediaTracksSchema.safeParse(rows.get(id)?.tracks).data;
+    return Boolean(t && "path" in t && t.bodies);
+  };
   const chosen = missing.filter((p) => {
-    const need = (p.to - p.from) * WORK_PER_SECOND * 1000;
+    const need = (p.to - p.from) * (followed(p.clip_id) ? PERSON_WORK_PER_SECOND : WORK_PER_SECOND) * 1000;
     if (need > budget) return false;
     budget -= need;
     return true;

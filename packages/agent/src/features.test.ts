@@ -686,7 +686,7 @@ test("captions: what is said written like a creator, phrase by phrase, its stron
   assert.equal(wantsSubjects(plan), true);
   assert.equal(wantsSubjects({ ...plan, subtitles: false }), false);
   const passages = subjectPassages(plan, () => true);
-  assert.equal(passages.length, 1);
+  assert.equal(passages.length, 2);
   assert.ok(passages.reduce((n, p) => n + p.to - p.from, 0) <= CAPTION_SUBJECT_SECONDS);
   assert.deepEqual(subjectPassages({ ...plan, finish: { captions: "native" } }, () => true), []);
   // The render gets the style only when words are said.
