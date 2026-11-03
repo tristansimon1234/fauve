@@ -254,14 +254,15 @@ async function onCard(
           );
         }),
       );
-    const first = await before(upBy, Promise.any(asked), gpu ? `no ${cards.join(" nor ")} card free after ${startMs / 1000} s` : `no machine started after ${startMs / 1000} s`).finally(
-      () => {
-        won = true;
-        clearTimeout(hedge);
-      },
-    );
-    // The other card, if it comes after all: ended at once.
-    for (const other of asked) void other.then(({ s }) => (s === first.s ? undefined : s.terminate())).catch(() => undefined);
+    let first: { s: Sandbox; card: string | null } | undefined;
+    try {
+      first = await before(upBy, Promise.any(asked), gpu ? `no ${cards.join(" nor ")} card free after ${startMs / 1000} s` : `no machine started after ${startMs / 1000} s`);
+    } finally {
+      won = true;
+      clearTimeout(hedge);
+      // Every card asked for and not used (the other kind, or all of them when none came in time): ended as soon as it comes.
+      for (const other of asked) void other.then(({ s }) => (first && s === first.s ? undefined : s.terminate())).catch(() => undefined);
+    }
     const created = first.s;
     if (over) {
       await created.terminate().catch(() => undefined);
