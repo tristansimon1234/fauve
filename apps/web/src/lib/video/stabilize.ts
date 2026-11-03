@@ -15,7 +15,7 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 export const stabilizedPath = (studioId: string, mediaId: string) => `${studioId}/stabilized/${mediaId}.mp4`;
 
 /** Steadies the video when Gemini saw it shake; never fails its analysis (the shaky file stays). */
-export async function stabilizeIfShaky(asset: { id: string; studio_id: string; storage_path: string }, analysis: ClipAnalysis): Promise<void> {
+export async function stabilizeIfShaky(asset: { id: string; studio_id: string; storage_path: string; original_path?: string | null }, analysis: ClipAnalysis): Promise<void> {
   if (!needsStabilizing(analysis)) return;
   const db = supabaseAdmin();
   try {
@@ -29,7 +29,8 @@ export async function stabilizeIfShaky(asset: { id: string; studio_id: string; s
       .from("media_assets")
       .update({
         storage_path: path,
-        original_path: asset.storage_path,
+        // The file as she sent it stays the original (an enlarged copy steadied in turn is only a step).
+        original_path: asset.original_path ?? asset.storage_path,
         mime_type: "video/mp4",
         stabilized: { at: new Date().toISOString(), shaky_share: Math.round(shakyShare(analysis) * 100) / 100 },
         tracks: null,
@@ -38,6 +39,8 @@ export async function stabilizeIfShaky(asset: { id: string; studio_id: string; s
       .eq("id", asset.id)
       .eq("studio_id", asset.studio_id);
     if (swapped.error) throw new Error(swapped.error.message);
+    // The enlarged copy it was steadied from is no longer used.
+    if (asset.original_path && asset.storage_path !== asset.original_path) await db.storage.from("media").remove([asset.storage_path]).catch(() => undefined);
     await db.from("cost_events").insert({
       studio_id: asset.studio_id,
       kind: "stabilize",

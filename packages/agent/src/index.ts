@@ -33,6 +33,7 @@ export * from "./stabilize.ts";
 export * from "./speech.ts";
 export * from "./depth.ts";
 export * from "./slowmo.ts";
+export * from "./upscale.ts";
 export * from "./subject.ts";
 export * from "./looks.ts";
 export * from "./story.ts";

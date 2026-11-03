@@ -1,6 +1,6 @@
 import "server-only";
 import { FileState, GoogleGenAI } from "@google/genai";
-import { accessMessage, bankWorthy, CLIP_ANALYSIS_PROMPT, clipAnalysisRequestSchema, clipAnalysisSchema, type ClipAnalysis } from "@fauve/agent";
+import { accessMessage, bankWorthy, CLIP_ANALYSIS_PROMPT, clipAnalysisRequestSchema, clipAnalysisSchema, mp4Size, type ClipAnalysis } from "@fauve/agent";
 import { readAnswer } from "@fauve/agent/answer";
 import { z } from "zod";
 import { env } from "@/lib/env";
@@ -9,6 +9,7 @@ import { toGeminiSchema } from "@/lib/gemini-schema";
 import { studioAccess } from "@/lib/billing/access";
 import { sortClip } from "@/lib/clip-sort";
 import { stabilizeIfShaky } from "@/lib/video/stabilize";
+import { upscaleIfSmall } from "@/lib/video/upscale";
 import { polishSpeech } from "@/lib/video/speech";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
@@ -62,10 +63,26 @@ async function claim(mediaId: string): Promise<boolean> {
   return data.length > 0;
 }
 
-async function runAnalysis(asset: { id: string; studio_id: string; storage_path: string; mime_type: string | null }) {
+async function runAnalysis(asset: {
+  id: string;
+  studio_id: string;
+  storage_path: string;
+  mime_type: string | null;
+  width?: number | null;
+  height?: number | null;
+  original_path?: string | null;
+}) {
   const db = supabaseAdmin();
   const download = await db.storage.from("media").download(asset.storage_path);
   if (download.error) throw new Error(download.error.message);
+  // Its size (WhatsApp gives it, else the MP4's own header, which a phone often writes at the end): a video too small
+  // for a Reel is enlarged below.
+  const size =
+    asset.width && asset.height
+      ? { width: asset.width, height: asset.height }
+      : download.data.size <= 300 * 1024 * 1024
+        ? mp4Size(new Uint8Array(await download.data.arrayBuffer()))
+        : null;
   const mimeType = asset.mime_type ?? "video/mp4";
 
   const ai = gemini();
@@ -109,8 +126,11 @@ async function runAnalysis(asset: { id: string; studio_id: string; storage_path:
     // Words are a bonus for subtitles: keep only a clean, bounded list.
     const words = wordsSchema.safeParse(raw.words);
     const read = readAnswer(clipAnalysisSchema, { ...raw, words: words.success ? words.data.slice(0, 400) : undefined });
+    // Too small for a Reel (WhatsApp's 480p): enlarged on the card first, the larger copy in its place.
+    const enlarged = await upscaleIfSmall(asset, "video", size, read.duration);
+    const current = enlarged ? { ...asset, ...enlarged } : asset;
     // Steadied before the analysis is stored: whoever waits for it (a montage) tracks and cuts the steady file.
-    await stabilizeIfShaky(asset, read);
+    await stabilizeIfShaky(current, read);
     // Someone speaks: its sound cleaned when noisy, its words timed exactly, its « euh » and pauses measured.
     const analysis = await polishSpeech(asset, read);
     const insert = await db
@@ -141,7 +161,7 @@ export async function ensureClipAnalysis(
   const db = supabaseAdmin();
   const asset = await db
     .from("media_assets")
-    .select("id, studio_id, storage_path, mime_type, kind")
+    .select("id, studio_id, storage_path, mime_type, kind, width, height, original_path")
     .eq("id", mediaId)
     .eq("studio_id", studioId)
     .single();

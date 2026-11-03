@@ -15,6 +15,7 @@ import { env } from "@/lib/env";
 import { logGeminiCost, type GeminiUsage } from "@/lib/gemini-cost";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { geminiSchema } from "./gemini-schema";
+import { upscaleIfSmall } from "./upscale";
 
 // What Gemini sees in a photo or a clip for retouching and blurring: sensitive
 // zones (faces, plates, screens) with their boxes, a suggested light and
@@ -36,7 +37,7 @@ export type StoredRegions = z.infer<typeof storedSchema>;
 async function loadAsset(studioId: string, mediaId: string) {
   const { data, error } = await supabaseAdmin()
     .from("media_assets")
-    .select("id, kind, storage_path, mime_type, regions")
+    .select("id, kind, storage_path, mime_type, regions, original_path")
     .eq("id", mediaId)
     .eq("studio_id", studioId)
     .single();
@@ -55,15 +56,30 @@ export async function photoRegions(studioId: string, mediaId: string): Promise<E
   if (cached.success && cached.data.kind === "photo") return cached.data;
   if (asset.kind !== "image") throw new Error("Ce média n'est pas une photo");
 
-  const download = await supabaseAdmin().storage.from("media").download(asset.storage_path as string);
+  let download = await supabaseAdmin().storage.from("media").download(asset.storage_path as string);
   if (download.error) throw new Error("Photo illisible");
-  const oriented = sharp(Buffer.from(await download.data.arrayBuffer())).rotate();
-  const meta = await oriented.metadata();
+  let oriented = sharp(Buffer.from(await download.data.arrayBuffer())).rotate();
+  let meta = await oriented.metadata();
   // .rotate() applies the EXIF orientation: a quarter turn swaps width and height.
-  const swap = (meta.orientation ?? 1) >= 5;
-  const width = (swap ? meta.height : meta.width) ?? 0;
-  const height = (swap ? meta.width : meta.height) ?? 0;
+  let swap = (meta.orientation ?? 1) >= 5;
+  let width = (swap ? meta.height : meta.width) ?? 0;
+  let height = (swap ? meta.width : meta.height) ?? 0;
   if (!width || !height) throw new Error("Taille de la photo inconnue");
+  // Too small for a Reel (a small photo from a website): enlarged on the card first, then read on its larger copy.
+  const enlarged = await upscaleIfSmall(
+    { id: mediaId, studio_id: studioId, storage_path: asset.storage_path as string, original_path: (asset.original_path as string | null) ?? null },
+    "image",
+    { width, height },
+  );
+  if (enlarged) {
+    download = await supabaseAdmin().storage.from("media").download(enlarged.storage_path);
+    if (download.error) throw new Error("Photo illisible");
+    oriented = sharp(Buffer.from(await download.data.arrayBuffer())).rotate();
+    meta = await oriented.metadata();
+    swap = (meta.orientation ?? 1) >= 5;
+    width = (swap ? meta.height : meta.width) ?? width;
+    height = (swap ? meta.width : meta.height) ?? height;
+  }
   const jpeg = await oriented.resize({ width: DETECT_EDGE, height: DETECT_EDGE, fit: "inside", withoutEnlargement: true }).jpeg({ quality: 85 }).toBuffer();
 
   const model = env("GEMINI_MODEL");

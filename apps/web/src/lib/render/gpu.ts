@@ -94,6 +94,15 @@ const RIFE_COMMANDS = [
     `python -c "import zipfile; open('/models/rife/flownet.pkl', 'wb').write(zipfile.ZipFile('/tmp/rife.zip').read('RIFEv4.26_0921/flownet.pkl'))" && ` +
     `echo '${RIFE_WEIGHTS_SHA}  /models/rife/flownet.pkl' | sha256sum -c - && rm /tmp/rife.zip`,
 ];
+/**
+ * Real-ESRGAN (upscale.py, photos and videos too small for a Reel), a layer of its own on the PyTorch machine:
+ * realesr-general-x4v3 from the project's own release (Xintao Wang, BSD 3-Clause), checked by its digest.
+ */
+const ESRGAN = {
+  url: "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.5.0/realesr-general-x4v3.pth",
+  sha: "8dc7edb9ac80ccdc30c3a5dca6616509367f05fbc184ad95b731f05bece96292",
+};
+const UPSCALE_COMMANDS = [`RUN mkdir -p /models/esrgan && curl -fsSL -o /models/esrgan/realesr-general-x4v3.pth ${ESRGAN.url} && echo '${ESRGAN.sha}  /models/esrgan/realesr-general-x4v3.pth' | sha256sum -c -`];
 const DEPTH_COMMANDS = [
   `RUN mkdir -p /models/${DEPTH_MODEL.dir} && cd /models/${DEPTH_MODEL.dir} && ` +
     [...DEPTH_MODEL.configs, "model.safetensors"].map((f) => `curl -fsSL -o ${f} ${HF}/${DEPTH_MODEL.repo}/resolve/${DEPTH_MODEL.rev}/${f}`).join(" && ") +
@@ -188,7 +197,7 @@ type Machine = "cut" | "torch";
  * its readings by job id, or why there are none. `seconds`: the time the card ran (what Modal bills), 0 when none came.
  */
 async function onCard(
-  script: "portrait.py" | "photo_cut.py" | "track_objects.py" | "relief.py" | "rife.py",
+  script: "portrait.py" | "photo_cut.py" | "track_objects.py" | "relief.py" | "rife.py" | "upscale.py",
   machine: Machine,
   jobs: { id: string }[],
   envFor: (secondsLeft: number) => Record<string, string>,
@@ -202,7 +211,7 @@ async function onCard(
   const started = Date.now();
   const at = () => `${((Date.now() - started) / 1000).toFixed(1)} s`;
   const say = (what: string) => console.log(`gpu ${at()}: ${what}`);
-  const files = ["portrait.py", "matte.py", "photo_cut.py", "track_objects.py", "relief.py", "rife.py"].map((name) => ({ name, text: REMOTION_SOURCE_FILES[name] }));
+  const files = ["portrait.py", "matte.py", "photo_cut.py", "track_objects.py", "relief.py", "rife.py", "upscale.py"].map((name) => ({ name, text: REMOTION_SOURCE_FILES[name] }));
   const missing = files.find((f) => !f.text);
   if (missing) return { readings: new Error(`${missing.name} is missing from the render source`), seconds: 0, gpu };
 
@@ -222,7 +231,12 @@ async function onCard(
     // One image for both jobs: the portrait model (full and half precision) and the general one (half).
     const base =
       machine === "torch"
-        ? client.images.fromRegistry(BASE_IMAGE).dockerfileCommands(TORCH_COMMANDS).dockerfileCommands(DEPTH_COMMANDS).dockerfileCommands(RIFE_COMMANDS)
+        ? client.images
+            .fromRegistry(BASE_IMAGE)
+            .dockerfileCommands(TORCH_COMMANDS)
+            .dockerfileCommands(DEPTH_COMMANDS)
+            .dockerfileCommands(RIFE_COMMANDS)
+            .dockerfileCommands(UPSCALE_COMMANDS)
         : client.images.fromRegistry(BASE_IMAGE).dockerfileCommands(IMAGE_COMMANDS).dockerfileCommands(FP16_COMMANDS).dockerfileCommands(PHOTO_COMMANDS);
     const image = await before(upBy, base.build(app), `its image was not ready after ${startMs / 1000} s`);
     say(`image ready (${image.imageId})`);
@@ -455,6 +469,44 @@ export async function smoothOnGpu(passages: GpuSlow[], deadlineMs: number, optio
     }
     const n = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : 0);
     results[p.key] = r.uploaded && n(r.frames) > 0 ? { frames: n(r.frames), fps: n(r.fps), made: n(r.made), cuts: n(r.cuts) } : new Error("slow motion not sent");
+  }
+  return { results, seconds, gpu };
+}
+
+/** A photo or a video too small for a Reel, to enlarge (upscale.py): the file (signed), its kind, where the larger copy is sent. */
+export type GpuUpscale = { key: string; url: string; kind: "video" | "image"; upload: { mp4: string } | { jpg: string } };
+/** The larger copy made (already sent): its size, and for a video its images and pace. */
+export type GpuUpscaled = { w: number; h: number; from: [number, number]; frames?: number; fps?: number };
+
+/**
+ * Enlarges each photo or video on the card (upscale.py: Real-ESRGAN ×4 brought to a short side of 1080, blended a
+ * little with the plain enlargement): a second or so for a photo, about a second of the card a second of 480p video.
+ * Never throws.
+ */
+export async function upscaleOnGpu(items: GpuUpscale[], deadlineMs: number, options: CardOptions = {}): Promise<{ results: Record<string, GpuUpscaled | Error>; seconds: number; gpu: string | null }> {
+  if (!items.length) return { results: {}, seconds: 0, gpu: null };
+  const jobs = items.map((i) => ({ id: i.key, url: i.url, kind: i.kind, upload: i.upload }));
+  const { readings, seconds, gpu } = await onCard(
+    "upscale.py",
+    "torch",
+    jobs,
+    () => ({ UPSCALE_MODEL: "/models/esrgan/realesr-general-x4v3.pth", UPSCALE_WORK: "/work", HDR_FILTER: HDR_TO_SDR }),
+    deadlineMs,
+    options,
+  );
+  const results: Record<string, GpuUpscaled | Error> = {};
+  for (const i of items) {
+    const r = readingOf(readings, i.key);
+    if (r instanceof Error) {
+      results[i.key] = r;
+      continue;
+    }
+    const n = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : 0);
+    const from = Array.isArray(r.from) ? ([n(r.from[0]), n(r.from[1])] as [number, number]) : ([0, 0] as [number, number]);
+    results[i.key] =
+      r.uploaded && n(r.w) > 0 && n(r.h) > 0
+        ? { w: n(r.w), h: n(r.h), from, ...(n(r.frames) ? { frames: n(r.frames), fps: n(r.fps) } : {}) }
+        : new Error("enlarged copy not sent");
   }
   return { results, seconds, gpu };
 }

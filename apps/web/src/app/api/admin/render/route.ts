@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { after, type NextRequest } from "next/server";
 import { cronAuthorized } from "@/lib/cron-auth";
 import { designEdit } from "@/lib/agent/editor";
-import { gpuCostEur, gpuReady, objectsOnGpu, photosOnGpu, reliefsOnGpu, smoothOnGpu, subjectsOnGpu } from "@/lib/render/gpu";
+import { gpuCostEur, gpuReady, objectsOnGpu, photosOnGpu, reliefsOnGpu, smoothOnGpu, subjectsOnGpu, upscaleOnGpu } from "@/lib/render/gpu";
 import { reliefOf } from "@fauve/agent";
 import { renderPost } from "@/lib/render/render-post";
 import { cleanSpeechInSandbox, dropSandbox, pruneSnapshots, trackSandbox, warmRemotionPool } from "@/lib/render/sandbox";
@@ -189,6 +189,37 @@ export async function POST(request: NextRequest) {
   // ?action=isolate&media=<video id>: her voice isolated from the music and noise behind it (ElevenLabs' voice
   // isolator, put back under the picture in the sandbox), its file in {studio}/lab-gpu/ (« voice isolated »), the
   // clip's own files untouched.
+  // ?action=gpu-upscale&media=<photo or video id>: the file enlarged on the card (Real-ESRGAN, upscale.py) to a short
+  // side of 1080 whatever its size, its copy in {studio}/lab-gpu/ (« gpu upscale »), its own file untouched; its first
+  // call adds Real-ESRGAN to the card's PyTorch machine.
+  if (action === "gpu-upscale") {
+    const media = request.nextUrl.searchParams.get("media") ?? "";
+    if (!/^[0-9a-f-]{36}$/.test(media)) return Response.json({ error: "media=<uuid>" }, { status: 400 });
+    if (!gpuReady()) return Response.json({ error: "MODAL_TOKEN_ID / MODAL_TOKEN_SECRET not set" }, { status: 400 });
+    after(async () => {
+      const db = supabaseAdmin();
+      const { data: row } = await db.from("media_assets").select("studio_id, storage_path, kind").eq("id", media).maybeSingle();
+      if (!row?.storage_path || (row.kind !== "video" && row.kind !== "image")) return console.error("gpu upscale: no such photo or video", media);
+      const video = row.kind === "video";
+      const path = `${row.studio_id}/lab-gpu/upscaled-${media}.${video ? "mp4" : "jpg"}`;
+      const [file, upload] = await Promise.all([db.storage.from("media").createSignedUrl(row.storage_path, 3600), db.storage.from("media").createSignedUploadUrl(path, { upsert: true })]);
+      if (!file.data?.signedUrl || !upload.data?.signedUrl) return console.error("gpu upscale: links refused");
+      const { results, seconds, gpu: used } = await upscaleOnGpu(
+        [{ key: "lab", url: file.data.signedUrl, kind: video ? "video" : "image", upload: video ? { mp4: upload.data.signedUrl } : { jpg: upload.data.signedUrl } }],
+        700_000,
+        { startMs: 600_000 },
+      );
+      const result = results.lab;
+      const cost = gpuCostEur(seconds, used);
+      if (seconds > 0) await db.from("cost_events").insert({ studio_id: row.studio_id, kind: "upscale", provider: "modal", units: Math.round(seconds), cost_eur: cost, meta: { lab: true, media, gpu: used } });
+      const [link, before] = await Promise.all([db.storage.from("media").createSignedUrl(path, 86_400), db.storage.from("media").createSignedUrl(row.storage_path, 86_400)]);
+      console.log(
+        "gpu upscale",
+        JSON.stringify({ link: result && !(result instanceof Error) ? link.data?.signedUrl : null, before: before.data?.signedUrl, media, gpu: used, card_seconds: Math.round(seconds), cost_eur: Math.round(cost * 1000) / 1000, result: result instanceof Error ? result.message : result }),
+      );
+    });
+    return Response.json({ ok: true, started: true }, { status: 202 });
+  }
   if (action === "isolate") {
     const media = request.nextUrl.searchParams.get("media") ?? "";
     if (!/^[0-9a-f-]{36}$/.test(media)) return Response.json({ error: "media=<uuid>" }, { status: 400 });

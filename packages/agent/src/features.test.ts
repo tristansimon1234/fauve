@@ -22,6 +22,7 @@ import {
   wantsIsolation,
 } from "./speech.ts";
 import { isolationCostUsd } from "./pricing.ts";
+import { mp4Size, needsUpscale } from "./upscale.ts";
 import { mixFilter, mixGains } from "./mix.ts";
 import { fromEditorPlan, normalizeEditPlan } from "./editor.ts";
 import { depthPhotoIds, reliefFiles, reliefJobs, reliefOf, RELIEF_VERSION } from "./depth.ts";
@@ -415,6 +416,34 @@ test("voice isolation: music heard behind her or a loud room isolates her voice,
   assert.equal(wantsIsolation(null, { music_under_speech: false }), false);
   // $0.12 a minute of her clip.
   assert.equal(Math.round(isolationCostUsd(30) * 1000) / 1000, 0.06);
+});
+
+test("upscale: only what a Reel would show too large, and an MP4's size read from its header, turned when it says so", () => {
+  assert.equal(needsUpscale(480, 854), true);
+  assert.equal(needsUpscale(1080, 1920), false);
+  assert.equal(needsUpscale(720, 1280), false);
+  assert.equal(needsUpscale(120, 120), false);
+  /** A minimal MP4: ftyp, then moov › trak › tkhd (version 0) with its matrix and its size. */
+  const mp4 = (width: number, height: number, turned: boolean) => {
+    const box = (kind: string, body: Uint8Array) => {
+      const out = new Uint8Array(8 + body.length);
+      new DataView(out.buffer).setUint32(0, out.length);
+      out.set([...kind].map((c) => c.charCodeAt(0)), 4);
+      out.set(body, 8);
+      return out;
+    };
+    const tkhd = new Uint8Array(84);
+    const v = new DataView(tkhd.buffer);
+    // version/flags 4, times 8, id 4, reserved 4, duration 4, reserved 8, layer/group/volume/reserved 8: matrix at 40.
+    const m = turned ? [0, 0x10000, 0, -0x10000, 0, 0, 0, 0, 0x40000000] : [0x10000, 0, 0, 0, 0x10000, 0, 0, 0, 0x40000000];
+    m.forEach((x, i) => v.setInt32(40 + i * 4, x));
+    v.setUint32(76, width * 65536);
+    v.setUint32(80, height * 65536);
+    return new Uint8Array([...box("ftyp", new Uint8Array(8)), ...box("moov", box("trak", box("tkhd", tkhd)))]);
+  };
+  assert.deepEqual(mp4Size(mp4(854, 480, false)), { width: 854, height: 480 });
+  assert.deepEqual(mp4Size(mp4(854, 480, true)), { width: 480, height: 854 });
+  assert.equal(mp4Size(new Uint8Array(16)), null);
 });
 
 test("relief: the videos a photo keeps go with it", () => {
