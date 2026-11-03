@@ -84,8 +84,12 @@ function subjectCalls(js: string): { shot: string; name?: string }[] {
       }
       arg += c;
     }
-    const last = args.length >= 2 ? args[args.length - 1]!.trim() : "";
-    const name = /^["'`]([^"'`]+)["'`]$/.exec(last)?.[1];
+    // The object's name: its last argument written as a string (a carousel's may be followed by its reframing, { zoom }).
+    const name = args
+      .slice(1)
+      .map((a) => /^["'`]([^"'`]+)["'`]$/.exec(a.trim())?.[1])
+      .filter(Boolean)
+      .pop();
     out.push({ shot: (args[0] ?? "").trim(), ...(name ? { name } : {}) });
   }
   return out;
@@ -130,6 +134,27 @@ export function objectsDrawn(js: string | undefined): { shot: number; name: stri
 }
 
 /**
+ * The objects a carousel's code finds on its photos (a glass, the bottle she holds): by photo (its index in photos,
+ * written photos[n]) and name, from Subject or Outline given `photo={photos[n]}` and `object`, and SubjectBox or
+ * SubjectOutline called on photos[n] with a name. A photo written as a variable is not read.
+ */
+export function photoObjectsDrawn(js: string | undefined): { photo: number; name: string }[] {
+  if (!js) return [];
+  const found = new Map<string, { photo: number; name: string }>();
+  const add = (photo: string | undefined, name: string | undefined) => {
+    const n = /^photos\s*\[\s*(\d+)\s*\]$/.exec((photo ?? "").trim());
+    const named = name ? objectName(name) : "";
+    if (n && named) found.set(`${n[1]}#${named}`, { photo: Number(n[1]), name: named });
+  };
+  for (const props of toolProps(js)) add(/\bphoto\s*[:=]\s*\{?\s*(photos\s*\[\s*\d+\s*\])/.exec(props)?.[1], OBJECT_PROP.exec(props)?.[1]);
+  for (const c of subjectCalls(js)) add(c.shot, c.name);
+  return [...found.values()];
+}
+
+/** A carousel's code that draws an outline (SubjectOutline, Outline): its photos' cut-outs need theirs read. */
+export const drawsOutline = (js: string | undefined) => Boolean(js && /\b(?:SubjectOutline|Outline)\b/.test(js));
+
+/**
  * A plan that draws her cut out: an animation that uses Subject (a composition, or one laid over the montage: a word
  * behind her as she walks on a shot played full frame), a composition about to be written (anticipate), or what is said
  * written around her (its strong words behind her).
@@ -140,13 +165,16 @@ export const wantsSubjects = (plan: Pick<EditPlan, "layers"> & { subtitles?: boo
 /** What asks for her cut out before any code is written: her background replaced, a word behind her, her silhouette. */
 export const CUT_OUT_WORDS = /\bfond\b|d[ée]tour|derri[eè]re (moi|elle|lui|la personne)|silhouette|d[ée]coup[ée]e?\b|background|behind (me|her|him)|cut.?out/i;
 
+/** What asks for a word around something or behind it (« le mot qui tourne autour du verre », « derrière la tasse »): her photos' cut-outs made before the animations are written. */
+export const AROUND_WORDS = /autour d|derri[eè]re (l[ae']|les|son|sa|ses|un|une|ce|cette)|le long d|\baround\b|\bbehind\b|along (its|the) (edge|outline)/i;
+
 /** A passage to cut out: its clip, its seconds, its name. */
 export type SubjectPassage = { clip_id: string; from: number; to: number; key: string };
 
 /**
  * The passages a Reel needs cut out: the video shots of a plan whose composition draws Subject, played at their own
  * pace (a speed or a ramp changes which images show), the first ones up to SUBJECT_MAX_SECONDS in all. Photos are
- * left out: their subject is the photo's cut-out (Cutout).
+ * left out: their subject is the photo's own cut-out, made once (subjectPhotoIds), which Subject draws on them too.
  */
 export function subjectPassages(
   plan: Pick<EditPlan, "segments" | "layers"> & { subtitles?: boolean; captions?: EditPlan["captions"]; finish?: EditPlan["finish"] },
@@ -172,6 +200,24 @@ export function subjectPassages(
   return out;
 }
 
+/** The most photos of a Reel cut out for its animations' Subject (ensureCutouts does ten at a time). */
+export const SUBJECT_PHOTO_MAX = 10;
+
+/**
+ * The photos of a Reel whose subject an animation draws (Subject, SubjectBox, SubjectOutline or Outline without an
+ * object, on a photo shot as on a video one): each one's own cut-out, made once (lib/render/cutout.ts), with its outline.
+ * Every photo shot of the Reel when one of its animations draws her (a shot written as a variable is not read).
+ */
+export function subjectPhotoIds(plan: Pick<EditPlan, "segments" | "layers">): string[] {
+  if (!(plan.layers ?? []).some((l) => drawsSubject(l.motion?.js))) return [];
+  return [...new Set(plan.segments.flatMap((s) => (isClipSegment(s) && s.photo ? [s.clip_id] : [])))].slice(0, SUBJECT_PHOTO_MAX);
+}
+
+/** The photos of a Reel its animations draw something of (her subject, an object), so the montage plays them flat (no relief): a cut-out laid over them falls exactly on them. */
+export function photosDrawnOver(plan: Pick<EditPlan, "segments" | "layers">): string[] {
+  return [...new Set([...subjectPhotoIds(plan), ...objectPassages(plan, () => false).flatMap((p) => (p.photo ? [p.clip_id] : []))])];
+}
+
 /** The most objects followed for one Reel, and the most seconds of video they take (each one is read on its whole passage). */
 export const OBJECT_MAX = 4;
 export const OBJECT_MAX_SECONDS = 20;
@@ -179,8 +225,14 @@ export const OBJECT_MAX_SECONDS = 20;
 /** A plan whose animations follow an object (Subject, SubjectBox, SubjectOutline or Outline given its name): a composition, or one laid over the montage. */
 export const wantsObjects = (plan: Pick<EditPlan, "layers">) => (plan.layers ?? []).some((l) => objectsDrawn(l.motion?.js).length > 0);
 
-/** An object to follow through a passage of her video: the passage, and the object's name. */
-export type ObjectPassage = SubjectPassage & { name: string };
+/** An object to follow through a passage of her video, or to find on one of her photos (`photo`: one image, from 0 to 0): the passage, and the object's name. */
+export type ObjectPassage = SubjectPassage & { name: string; photo?: true };
+
+/** The most photos an object is looked for on in one Reel (one image each: a second of the card's time or so). */
+export const PHOTO_OBJECT_MAX = 6;
+
+/** The name of a photo's cut-outs among its own (media_assets.subjects): the photo is one image, from 0 to 0. */
+export const photoKey = (mediaId: string) => subjectKey(mediaId, 0, 0);
 
 /**
  * The objects a Reel's compositions follow, each through the passage of the shot its code names: her shot n is the
@@ -191,9 +243,18 @@ export function objectPassages(plan: Pick<EditPlan, "segments" | "layers">, isVi
   const shots = plan.segments.filter(isClipSegment);
   const out: ObjectPassage[] = [];
   let seconds = 0;
+  let photos = 0;
   for (const layer of plan.layers ?? []) {
     for (const { shot, name } of objectsDrawn(layer.motion?.js)) {
       const s = shots[shot];
+      // A photo: the object found once on it (a glass on a table, the cup she holds), whatever its move.
+      if (s?.photo) {
+        const key = objectKey(s.clip_id, 0, 0, name);
+        if (out.some((p) => p.key === key) || photos >= PHOTO_OBJECT_MAX) continue;
+        out.push({ clip_id: s.clip_id, from: 0, to: 0, key, name, photo: true });
+        photos++;
+        continue;
+      }
       if (!s || !isVideo(s.clip_id) || s.ramp || (s.speed && Math.abs(s.speed - 1) > 0.01)) continue;
       const key = objectKey(s.clip_id, s.in, s.out, name);
       const length = Math.max(0, s.out - s.in);

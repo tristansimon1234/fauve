@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { coverLayout } from "./retouch.ts";
 import { isClipSegment, segmentSeconds, type CameraMove, type EditPlan } from "./schemas.ts";
+import { photosDrawnOver } from "./subject.ts";
 
 // A moving photo in relief (Prequel's 3D photo, CapCut's 3D zoom), the engine's way: when a photo of
 // a Reel moves (its one slow push, a pan over a wide photo: photoMoves) and its subject cuts out
@@ -11,11 +12,18 @@ import { isClipSegment, segmentSeconds, type CameraMove, type EditPlan } from ".
 /** The moves a photo plays in relief: a slow push in or out, a slow pan. */
 export const DEPTH_MOVES: CameraMove[] = ["in", "out", "left", "right"];
 
-/** The photos of a plan that move (and are not blurred): their subject is cut out before the render, to play them in relief. */
-export function depthPhotoIds(plan: Pick<EditPlan, "segments"> & { template?: EditPlan["template"]; finish?: EditPlan["finish"] }): string[] {
+/**
+ * The photos of a plan that move (and are not blurred): their subject is cut out before the render, to play them in
+ * relief. Not one its animations draw something of (her subject, an object: photosDrawnOver): what they lay over it
+ * falls exactly on the photo only when it moves flat.
+ */
+export function depthPhotoIds(plan: Pick<EditPlan, "segments"> & { template?: EditPlan["template"]; finish?: EditPlan["finish"]; layers?: EditPlan["layers"] }): string[] {
   if (plan.template === "collage" || plan.finish?.relief === "off") return [];
+  const drawnOver = new Set(photosDrawnOver({ segments: plan.segments, layers: plan.layers }));
   return [
-    ...new Set(plan.segments.flatMap((s) => (isClipSegment(s) && s.photo && !s.photo.blur?.length && s.move && DEPTH_MOVES.includes(s.move) ? [s.clip_id] : []))),
+    ...new Set(
+      plan.segments.flatMap((s) => (isClipSegment(s) && s.photo && !s.photo.blur?.length && s.move && DEPTH_MOVES.includes(s.move) && !drawnOver.has(s.clip_id) ? [s.clip_id] : [])),
+    ),
   ];
 }
 
@@ -63,7 +71,7 @@ export function reliefOf(segment: EditPlan["segments"][number], frames: number):
 }
 
 /** The photo shots of a plan to play in relief (depthPhotoIds), each with its key: what the card makes before the render. */
-export function reliefJobs(plan: Pick<EditPlan, "segments"> & { template?: EditPlan["template"]; finish?: EditPlan["finish"] }): ReliefJob[] {
+export function reliefJobs(plan: Pick<EditPlan, "segments"> & { template?: EditPlan["template"]; finish?: EditPlan["finish"]; layers?: EditPlan["layers"] }): ReliefJob[] {
   const ids = new Set(depthPhotoIds(plan));
   const seen = new Set<string>();
   return plan.segments.flatMap((s) => {

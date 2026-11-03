@@ -8,6 +8,8 @@ import {
   carouselOutputSchema,
   checkCarouselCode,
   CLAUDE_MODEL,
+  drawsOutline,
+  photoObjectsDrawn,
   CRITIC_MODEL,
   boundReview,
   layerReviewSchema,
@@ -25,7 +27,8 @@ import { outputFormat } from "@fauve/agent/answer";
 import sharp from "sharp";
 import { transform } from "sucrase";
 import { carouselPhotos, type CarouselSource } from "@/lib/render/carousel";
-import { ensureCutouts } from "@/lib/render/cutout";
+import { ensureCutoutContours, ensureCutouts } from "@/lib/render/cutout";
+import { ensurePhotoObjects } from "@/lib/render/subjects";
 import { loadMontageInputs } from "@/lib/render/render-post";
 import { RECORDING_FRAMES, refFramePath } from "@/lib/render/ref-frames";
 import { renderStillsInSandbox, sandboxCostEur, videoFramesInSandbox } from "@/lib/render/sandbox";
@@ -113,6 +116,7 @@ async function loadContext(input: CarouselRequest) {
     post: post.data,
     plan: plan.success ? plan.data : null,
     photos: photos.filter((p) => p.found),
+    blur,
     template,
     brandIn,
     brand,
@@ -333,7 +337,19 @@ export async function carouselRound(
   if (built.problems.length) return next(built.problems.join(" ; "));
   // Its source is kept with it: a later correction starts from what was written, not from the compiled code.
   const made: CarouselDesign = { ...built.design, code: output.code };
-  const photos = made.photos.map((id) => ctx.photos.find((p) => p.id === id)!.photo);
+  // The objects its code finds on her photos (a glass, the bottle she holds) and its photos' outlines, made before its
+  // test render (the one delivered): found on the card, read on the cut-outs, then the photos read again with them.
+  const objects = photoObjectsDrawn(output.code).flatMap(({ photo, name }) => (made.photos[photo] ? [{ mediaId: made.photos[photo]!, name }] : []));
+  const outlines = drawsOutline(output.code);
+  if (objects.length || outlines)
+    await Promise.all([
+      objects.length ? ensurePhotoObjects(input.studioId, input.postId, objects).catch((e: unknown) => console.warn("carousel objects not found", e instanceof Error ? e.message : e)) : null,
+      outlines ? ensureCutoutContours(input.studioId, made.photos).catch((e: unknown) => console.warn("carousel outlines not read", e instanceof Error ? e.message : e)) : null,
+    ]);
+  const photos =
+    objects.length || outlines
+      ? (await carouselPhotos(input.studioId, made.photos, ctx.blur)).map((p) => p.photo)
+      : made.photos.map((id) => ctx.photos.find((p) => p.id === id)!.photo);
 
   // Test render of every slide, in check mode (errors, texts cut or too small, missing fonts or photos fail it).
   const jobs = Array.from({ length: made.count }, (_, i) => ({ id: `s${i}`, frame: SLIDE_FRAME, props: buildCarouselProps(made, i, { template: ctx.template, brand: ctx.brandIn, photos, check: true }) }));

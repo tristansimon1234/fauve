@@ -35,6 +35,7 @@ export * from "./depth.ts";
 export * from "./slowmo.ts";
 export * from "./upscale.ts";
 export * from "./subject.ts";
+export * from "./contour.ts";
 export * from "./looks.ts";
 export * from "./story.ts";
 export * from "./nudge.ts";

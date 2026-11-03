@@ -53,6 +53,21 @@ export type ComposeShot = ScenePhoto & {
   subjectContours?: (number[] | null)[];
   /** The objects followed through it, by name: where each one is and its outline, image by image (SubjectBox, SubjectOutline, Outline given its name). */
   objects?: Record<string, { boxes?: (number[] | null)[]; contours?: (number[] | null)[] }>;
+  /** A photo's framing and retouch, as the Reel draws it (Photo): what SubjectBox and SubjectOutline place its subject by. */
+  edit?: PhotoEdit;
+  /** How the Reel moves it as it draws it (set by the render: its camera move, a photo's slow zoom, the punch), so a box read on it lands where it is at each frame. */
+  camera?: ShotCamera;
+};
+/** How the Reel moves a shot as it draws it, so what is read on its picture follows it (mirror of packages/agent/src/motion.ts). */
+export type ShotCamera = {
+  move?: CameraMove;
+  zoomTo: number;
+  punch: number;
+  /** A photo's slow zoom when the editor chose no move (KenBurns): its way and its drift. */
+  burns?: { zoomIn: boolean; drift: number };
+  accent?: "punch";
+  /** A video's straightening (degrees), turned about the box's centre and enlarged so no corner shows. */
+  straighten?: number;
 };
 /** A text of the Reel that a collage's composition draws itself (frames from its start): its words, its role, the words to stress, a message's lines. */
 export type ComposeText = { text: string; role: "hook" | "band" | "caption"; from: number; to: number; emphasis: string[]; items?: { title: string; detail?: string }[] };
@@ -60,8 +75,15 @@ export type ComposeText = { text: string; role: "hook" | "band" | "caption"; fro
 export type ComposeEnd = { title: string; subtitle: string | null; from: number };
 export type RegionKind = "face" | "plate" | "screen" | "document" | "other";
 export type PhotoEdit = { source: { width: number; height: number }; adjust?: Adjust; blur?: (Box & { kind: RegionKind; shape: "ellipse" | "rect" })[] };
-/** One of her photos in a designed carousel: as a scene gets it, with its retouch (light, framing on its subject, blurred zones). */
-export type CarouselPhoto = ScenePhoto & { edit?: PhotoEdit };
+/**
+ * One of her photos in a designed carousel: as a scene gets it, with its retouch (light, framing on its subject, blurred zones),
+ * its subject's outline (64 points, shares of the photo) and the objects found on it by name (a cut-out framed like the photo, its box, its outline).
+ */
+export type CarouselPhoto = ScenePhoto & {
+  edit?: PhotoEdit;
+  contour?: number[];
+  objects?: Record<string, { cutout: string; box: Box; contour?: number[] }>;
+};
 export type ClipBlur = { aspect: number; tracks: { kind: RegionKind; keys: (Box & { t: number })[] }[] };
 
 export type Scene = {
@@ -149,6 +171,10 @@ export type ReelProps = {
         subtitleY?: number;
         /** In a collage, its subject cut out (an image with transparency; its box in shares of the photo), laid as a sticker. */
         cutout?: { src: string; box: Box };
+        /** Its subject cut out (the photo's own cut-out, framed like it), drawn exactly over the photo by an animation's Subject. */
+        subject?: { src: string };
+        /** Objects found on it by name (a glass, the cup she holds), cut out the same way: Subject with `object`. */
+        objects?: Record<string, { src: string }>;
         /** A moving photo in relief: its subject cut out (framed like the photo), moving a little more than the room behind it. */
         depth?: { src: string; box: Box };
         /** A moving photo whose depth the card read (relief.py): the video of every pixel moved by its depth, drawn in its place. */

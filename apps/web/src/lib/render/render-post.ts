@@ -17,6 +17,7 @@ import {
   planTimeline,
   PHOTO_MAX_SECONDS,
   scenePhotoIds,
+  subjectPhotoIds,
   depthPhotoIds,
   dayIn,
   withoutScenes,
@@ -51,7 +52,7 @@ import { soundLevel, withMusic } from "./music";
 import { ensureSounds, soundFiles, type LibrarySound } from "./sfx";
 import { usableFonts } from "@/lib/fonts";
 import { makeSceneSprite } from "./scene-sprite";
-import { copyCutoutInputs, ensureCutouts, overlayPhotoInputs, sceneCutoutInputs, stickerInputs } from "./cutout";
+import { copyCutoutInputs, ensureCutoutContours, ensureCutouts, overlayPhotoInputs, sceneCutoutInputs, stickerInputs } from "./cutout";
 import { ensureDepths, ensureObjects, ensureSubjects, subjectInputs } from "./subjects";
 import { ensureReliefs, reliefInputs } from "./relief";
 import { smoothSlowMotion } from "./smooth";
@@ -167,7 +168,7 @@ export async function loadMontageInputs(
   const voice = plan.voice ? await voiceInput(studioId, plan.voice.media_id, plan.finish?.sound !== "original") : undefined;
   // A collage lays the subject of a photo as a sticker when its cut-out is clean; in any Reel, an
   // animation composes with the photos it names, and their clean cut-outs.
-  const withPhotos = scenePhotoIds(plan);
+  const withPhotos = [...new Set([...scenePhotoIds(plan), ...subjectPhotoIds(plan)])];
   const cutouts = (template === "collage" && plan.template === "collage") || isComposed(plan) ? await stickerInputs(studioId, photoIds).catch(() => ({})) : undefined;
   // A copied Reel remade by code lays the subjects of her photos over its shots.
   const copyCutouts = plan.copy?.cutouts.length ? await copyCutoutInputs(studioId, copyPhotos(plan)).catch(() => ({})) : undefined;
@@ -373,12 +374,14 @@ export async function renderPost(studioId: string, postId: string, options: { ed
   // Photos have their subject cut out once (an open model in its own sandbox): a collage's, laid as stickers, a
   // composed Reel's, and those an animation composes with (the design step has usually made them already).
   const toCut = [
-    ...(plan.template === "collage" || isComposed(plan) ? planMediaIds(plan) : [...new Set([...scenePhotoIds(plan), ...depthPhotoIds(plan)])]),
+    ...(plan.template === "collage" || isComposed(plan) ? planMediaIds(plan) : [...new Set([...scenePhotoIds(plan), ...depthPhotoIds(plan), ...subjectPhotoIds(plan)])]),
     ...copyPhotos(plan),
     // The photos she added cut out (unless she wants them whole).
     ...(plan.overlays ?? []).flatMap((o) => (o.kind === "photo" && o.media_id && o.cutout !== false ? [o.media_id] : [])),
   ];
   if (toCut.length) await ensureCutouts(studioId, toCut);
+  // The photos whose subject an animation draws: their cut-out's outline, read once (a word runs along it).
+  if (subjectPhotoIds(plan).length) await ensureCutoutContours(studioId, subjectPhotoIds(plan));
   // A composition that draws her subject over her shots (Subject): its passages cut out at every image, as many as
   // the step has time for before its render.
   // The objects its compositions follow by name (a cup she lifts), on the rented card, at the same time, the shots

@@ -17,6 +17,7 @@ import {
   editorOutputSchemaLegacy,
   finishPlan,
   captionStyle,
+  AROUND_WORDS,
   CUT_OUT_WORDS,
   type EditorOutput,
   type EditorOutputLegacy,
@@ -318,8 +319,10 @@ export async function designEdit(params: {
   // A collage composes with her photos' cut-outs: for one she chose for this post or asks for now (« en collage »), they are
   // made while the editor works (their own sandbox); one the editor chooses itself has them made after it.
   const askedCollage = (chosenTemplate.success && chosenTemplate.data === "collage") || /\bcollage\b/i.test(params.brief ?? "");
+  // A word around something of her photos or behind it (a glass, her): their cut-outs too, so each animation knows which ones it can draw behind.
+  const askedAround = AROUND_WORDS.test(params.brief ?? "") || CUT_OUT_WORDS.test(params.brief ?? "");
   const earlyCutouts =
-    askedCollage && photoIds.length
+    (askedCollage || askedAround) && photoIds.length
       ? ensureCutouts(params.studioId, photoIds.slice(0, MAX_OFFERED_PHOTOS)).catch((e: unknown) => console.warn("cut-outs: not ready", e))
       : null;
   const profile = brandProfileSchema.partial().catch({}).parse(brand.data?.[0]?.profile ?? {});
@@ -669,8 +672,10 @@ export async function designEdit(params: {
   // the others in the Reel's order. In the Reel's order alone, Promo Edith 2's five new photos came last, were left
   // out, and the détourages she asked for of them were never drawn.
   const earlierFiles = correction && previousPlan.success ? new Set(planMediaIds(previousPlan.data)) : null;
+  // A word asked around or behind something of her photos: every photo under the animations is cut out and shown to them with it (cut_out).
+  const around = askedAround || toWrite.some((w) => AROUND_WORDS.test(w.brief) || CUT_OUT_WORDS.test(w.brief));
   const wanted = [
-    ...new Set([...toWrite.flatMap((w) => named(w.brief)), ...(earlierFiles ? photoIds.filter((id) => !earlierFiles.has(id)) : []), ...(collage ? photoIds : [])]),
+    ...new Set([...toWrite.flatMap((w) => named(w.brief)), ...(earlierFiles ? photoIds.filter((id) => !earlierFiles.has(id)) : []), ...(collage || around ? photoIds : [])]),
   ].slice(0, MAX_OFFERED_PHOTOS);
   await earlyCutouts;
   if (wanted.length) await ensureCutouts(params.studioId, wanted);
@@ -707,6 +712,8 @@ export async function designEdit(params: {
       const at = timeline.segments[i]!;
       const offer = offers.find((o) => o.id === s.clip_id);
       const track = reel ? shotTrack(plan, reel.segments, i, tracks) : undefined;
+      // A photo with its framing and its subject's box, as the Reel places them: SubjectBox finds it in the test render too.
+      const subject = facts.photos[s.clip_id] ? offer?.photo.subject : undefined;
       return [
         {
           ...(offer?.photo ?? { src: "", aspect: 9 / 16 }),
@@ -715,6 +722,8 @@ export async function designEdit(params: {
           durationInFrames: Math.round(at.length * 30),
           kind: facts.photos[s.clip_id] ? ("photo" as const) : ("video" as const),
           ...(track ? { track } : {}),
+          ...(facts.photos[s.clip_id] && s.photo ? { edit: s.photo } : {}),
+          ...(subject ? { subjectBoxes: [[subject.x, subject.y, subject.w, subject.h]] } : {}),
         },
       ];
     }),

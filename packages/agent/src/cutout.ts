@@ -37,6 +37,8 @@ export const cutoutSchema = z.object({
   sticker: z.boolean(),
   model: z.string(),
   at: z.string(),
+  /** Its subject's outline (contour.ts: 64 points, x y shares of the photo, flat), read once on its transparency: a word runs along it, a line goes round it. */
+  contour: z.array(z.number()).optional(),
 });
 export type Cutout = z.infer<typeof cutoutSchema>;
 

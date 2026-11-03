@@ -9,7 +9,7 @@ import { placeSounds, planCues, type SoundFacts, type SoundPlacement } from "./s
 import type { SfxLevel } from "./schemas.ts";
 import { faceZone, layerTrack, sceneTrack, shotTrack, type FaceZone, type ShotTrack, type TrackPiece, type TracksByClip } from "./tracking.ts";
 import { DEPTH_MOVES, reliefOf } from "./depth.ts";
-import { depthKey, subjectKey } from "./subject.ts";
+import { depthKey, photoKey, subjectKey } from "./subject.ts";
 import { lookMatrix, lookStamp, planLook, type ReelLook } from "./looks.ts";
 
 // Edit plan → props of the Remotion "Reel" composition (apps/render). Everything
@@ -121,6 +121,10 @@ export type ReelSegment =
       accent?: "punch" | "wipe";
       subtitleY?: number;
       cutout?: { src: string; box: { x: number; y: number; w: number; h: number } };
+      /** Its subject cut out (the photo's own cut-out, framed like it), drawn exactly over the photo by an animation's Subject. */
+      subject?: { src: string };
+      /** Objects found on it by name (a glass, the cup she holds), cut out the same way: Subject with `object`. */
+      objects?: Record<string, { src: string }>;
       /** A moving photo in relief (depth.ts): its subject cut out (framed like the photo), moving a little more than the room. */
       depth?: { src: string; box: { x: number; y: number; w: number; h: number } };
       /** A moving photo with its depth read on the card: the video of every pixel moved by its depth (relief.py), as long as the shot. */
@@ -177,6 +181,22 @@ export type ComposeShot = ScenePhoto & {
   subjectContours?: (number[] | null)[];
   /** The objects followed through it, by name: where each one is and its outline, image by image (SubjectBox, SubjectOutline, Outline given its name). */
   objects?: Record<string, { boxes?: (number[] | null)[]; contours?: (number[] | null)[] }>;
+  /** A photo's framing and retouch, as the Reel draws it (Photo): what SubjectBox and SubjectOutline place its subject by. */
+  edit?: PhotoEdit;
+  /** How the Reel moves it as it draws it (set by the render: its camera move, a photo's slow zoom, the punch), so a box read on it lands where it is at each frame. */
+  camera?: ShotCamera;
+};
+
+/** How the Reel moves a shot as it draws it, so what is read on its picture follows it: mirror of apps/render/src/types.ts. */
+export type ShotCamera = {
+  move?: CameraMove;
+  zoomTo: number;
+  punch: number;
+  /** A photo's slow zoom when the editor chose no move (KenBurns): its way and its drift. */
+  burns?: { zoomIn: boolean; drift: number };
+  accent?: "punch";
+  /** A video's straightening (degrees), turned about the box's centre and enlarged so no corner shows. */
+  straighten?: number;
 };
 
 /** An animation's code that draws one of her shots or what is cut out of it (her, an object, its depth). */
@@ -226,8 +246,15 @@ export type ScenePhoto = {
   /** The edges of the photo that cut the subject (a bust at the bottom, a shoulder on the left): it comes in from there. */
   cutEdges?: ("top" | "bottom" | "left" | "right")[];
 };
-/** One of her photos in a designed carousel: as a scene gets it, with its retouch (light, framing on its subject, blurred zones). */
-export type CarouselPhoto = ScenePhoto & { edit?: PhotoEdit };
+/**
+ * One of her photos in a designed carousel: as a scene gets it, with its retouch (light, framing on its subject, blurred zones),
+ * its subject's outline (64 points, shares of the photo) and the objects found on it by name (a cut-out framed like the photo, its box, its outline).
+ */
+export type CarouselPhoto = ScenePhoto & {
+  edit?: PhotoEdit;
+  contour?: number[];
+  objects?: Record<string, { cutout: string; box: { x: number; y: number; w: number; h: number }; contour?: number[] }>;
+};
 export type ReelText = {
   text: string;
   style: "hook" | "band" | "caption";
@@ -456,8 +483,8 @@ export type ReelInputs = {
   cutouts?: Record<string, { src: string; box: { x: number; y: number; w: number; h: number } }>;
   /** Each photo's width / height (from its reading), for the free scenes that compose with it. */
   photoAspects?: Record<string, number>;
-  /** The cut-outs an animation can use (clean edge, even cut by the photo's frame), with the edges that cut them. */
-  sceneCutouts?: Record<string, { src: string; box: { x: number; y: number; w: number; h: number }; edges?: ("top" | "bottom" | "left" | "right")[] }>;
+  /** The cut-outs an animation can use (clean edge, even cut by the photo's frame), with the edges that cut them and the subject's outline. */
+  sceneCutouts?: Record<string, { src: string; box: { x: number; y: number; w: number; h: number }; edges?: ("top" | "bottom" | "left" | "right")[]; contour?: number[] }>;
   /** What was tracked in her clips (hands, faces, bodies), by clip_id: the animations over them can follow it. */
   tracks?: TracksByClip;
   /** A copied Reel's laid subjects, by photo: the cut-out's signed link, the subject's box (shares of the photo), the photo's width over height. */
@@ -686,6 +713,11 @@ export function buildReelProps(plan: EditPlan, inputs: ReelInputs): ReelProps {
           ? { depth: inputs.depth[s.clip_id] }
           : {}),
         ...(relief && relief.frames === lengths[i] ? { relief } : {}),
+        // Its own cut-out and the objects found on it, for an animation's Subject: drawn exactly over the photo.
+        ...(inputs.sceneCutouts?.[s.clip_id] ? { subject: { src: inputs.sceneCutouts[s.clip_id]!.src } } : {}),
+        ...(passageObjects(inputs.subjects, photoKey(s.clip_id)).length
+          ? { objects: Object.fromEntries(passageObjects(inputs.subjects, photoKey(s.clip_id)).map(([name, o]) => [name, { src: o.src }])) }
+          : {}),
       };
     }
     const ramp = rampFrames(s, lengths[i]!);
@@ -811,7 +843,24 @@ export function buildReelProps(plan: EditPlan, inputs: ReelInputs): ReelProps {
         const photo = scenePhotos([s.clip_id], inputs)[0];
         const aspect = segment.edit ? segment.edit.source.width / segment.edit.source.height : (photo?.aspect ?? 3 / 4);
         const focus = s.photo?.adjust?.focus;
-        return [{ ...(photo ?? { src: segment.src }), aspect, ...span, kind: "photo" as const, ...(focus ? { focus } : {}) }];
+        // Its subject and the objects found on it, one image for the whole shot: SubjectBox, SubjectOutline and Outline place them as Photo draws it.
+        const cut = inputs.sceneCutouts?.[s.clip_id];
+        const found = passageObjects(inputs.subjects, photoKey(s.clip_id));
+        return [
+          {
+            ...(photo ?? { src: segment.src }),
+            aspect,
+            ...span,
+            kind: "photo" as const,
+            ...(focus ? { focus } : {}),
+            ...(segment.edit ? { edit: segment.edit } : {}),
+            ...(cut ? { subjectBoxes: [[cut.box.x, cut.box.y, cut.box.w, cut.box.h]] } : {}),
+            ...(cut?.contour?.length ? { subjectContours: [cut.contour] } : {}),
+            ...(found.length
+              ? { objects: Object.fromEntries(found.map(([name, o]) => [name, { ...(o.boxes?.length ? { boxes: o.boxes } : {}), ...(o.contours?.length ? { contours: o.contours } : {}) }])) }
+              : {}),
+          },
+        ];
       }
       // Its faces, kept whole in the box the composition lays it in (and its tracks placed the same way).
       const file = tracks?.[s.clip_id];

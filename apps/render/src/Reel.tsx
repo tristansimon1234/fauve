@@ -28,7 +28,7 @@ import { ClipBlurLayer, cssFilter, ExposureFilters, Photo } from "./Retouch";
 import { Elements } from "./Elements";
 import { TextLayer } from "./TextLayer";
 import { TEXT_Y, themeFor, type Theme } from "./theme";
-import { cameraMotion, faceFocus, framingPercent, punchScale, straightening, type FaceZone } from "./track";
+import { burnsMotion, burnsOf, cameraMotion, faceFocus, framingPercent, punchScale, straightening, type FaceZone } from "./track";
 import type { CameraMove, ComposeShot, ReelProps, ReelUnder, SpeedPiece, TextLook } from "./types";
 
 const clamp = { extrapolateLeft: "clamp", extrapolateRight: "clamp" } as const;
@@ -243,7 +243,7 @@ export function Reel(props: ReelProps) {
             photos={compose.photos}
             cuts={compose.cuts}
             footage={{
-              shots: compose.shots ?? [],
+              shots: (compose.shots ?? []).map((shot) => placedShot(shot, props.segments[shot.segment], theme, false)),
               draw: (shot, size) => drawShot(props.segments[shot.segment], theme, size, shot.face),
               subject: (shot, size) => drawShot(props.segments[shot.segment], theme, size, shot.face, "subject"),
               object: (shot, name, size) => drawShot(props.segments[shot.segment], theme, size, shot.face, { object: name }),
@@ -300,11 +300,12 @@ export function Reel(props: ReelProps) {
               {...(layer.shots?.length
                 ? {
                     footage: {
-                      shots: layer.shots,
-                      draw: (shot: ComposeShot, size: { width: number; height: number }) => drawShot(props.segments[shot.segment], theme, size, shot.face),
-                      subject: (shot: ComposeShot, size: { width: number; height: number }) => drawShot(props.segments[shot.segment], theme, size, shot.face, "subject"),
-                      object: (shot: ComposeShot, name: string, size: { width: number; height: number }) => drawShot(props.segments[shot.segment], theme, size, shot.face, { object: name }),
-                      depth: (shot: ComposeShot, size: { width: number; height: number }) => drawShot(props.segments[shot.segment], theme, size, shot.face, "depth"),
+                      shots: layer.shots.map((shot) => placedShot(shot, props.segments[shot.segment], theme, true)),
+                      draw: (shot: ComposeShot, size: { width: number; height: number }) => drawShot(props.segments[shot.segment], theme, size, shot.face, undefined, shot.segment),
+                      subject: (shot: ComposeShot, size: { width: number; height: number }) => drawShot(props.segments[shot.segment], theme, size, shot.face, "subject", shot.segment),
+                      object: (shot: ComposeShot, name: string, size: { width: number; height: number }) =>
+                        drawShot(props.segments[shot.segment], theme, size, shot.face, { object: name }, shot.segment),
+                      depth: (shot: ComposeShot, size: { width: number; height: number }) => drawShot(props.segments[shot.segment], theme, size, shot.face, "depth", shot.segment),
                     },
                   }
                 : {})}
@@ -360,14 +361,81 @@ export function Reel(props: ReelProps) {
   );
 }
 
-/** One of her shots in a box of that size, as the Reel draws it (its retouch, its camera move, its light), its faces whole: for a composition. */
-function drawShot(segment: ReelProps["segments"][number] | undefined, theme: Theme, size: { width: number; height: number }, face?: FaceZone, layer?: "subject" | "depth" | { object: string }): ReactNode {
-  if (layer === "subject") return segment?.type === "clip" && segment.subject ? <Shot segment={segment} theme={theme} frame={size} face={face} layer="subject" /> : null;
-  if (layer === "depth") return segment?.type === "clip" && segment.depthMap ? <Shot segment={segment} theme={theme} frame={size} face={face} layer="depth" /> : null;
-  if (layer) return segment?.type === "clip" && segment.objects?.[layer.object] ? <Shot segment={segment} theme={theme} frame={size} face={face} layer={layer} /> : null;
-  if (segment?.type === "clip") return <Shot segment={segment} theme={theme} frame={size} face={face} />;
-  if (segment?.type === "image") return <Photo src={segment.src} edit={segment.edit} grade={theme.grade} frame={size} />;
-  return null;
+/**
+ * One of her shots in a box of that size, as the Reel draws it (its retouch, its camera move, its light), its faces
+ * whole: for a composition; or what is cut out of it (her subject, an object found on it, its depth), drawn exactly the
+ * same way so it falls on the shot. `montage`: the shot's place among the Reel's segments, when it is drawn under an
+ * animation laid over the montage (full frame): a photo with the montage's own slow zoom, a shot with its punch, so the
+ * cut-out stays on the picture the montage plays under it.
+ */
+function drawShot(
+  segment: ReelProps["segments"][number] | undefined,
+  theme: Theme,
+  size: { width: number; height: number },
+  face?: FaceZone,
+  layer?: "subject" | "depth" | { object: string },
+  montage?: number,
+): ReactNode {
+  if (segment?.type === "image") {
+    // A photo's subject is its own cut-out, an object the one found on it by name; a photo has no depth video.
+    const src = layer === "subject" ? segment.subject?.src : layer === "depth" ? undefined : layer ? segment.objects?.[layer.object]?.src : segment.src;
+    if (!src) return null;
+    const photo = <Photo src={src} edit={segment.edit} grade={theme.grade} frame={size} />;
+    if (montage === undefined) return photo;
+    return (
+      <Accent kind={segment.accent === "punch" ? "punch" : undefined} color="">
+        <KenBurns on={Boolean(segment.zoom)} move={segment.move} index={montage} durationInFrames={segment.durationInFrames} theme={theme}>
+          {photo}
+        </KenBurns>
+      </Accent>
+    );
+  }
+  if (segment?.type !== "clip") return null;
+  if (layer === "subject" && !segment.subject) return null;
+  if (layer === "depth" && !segment.depthMap) return null;
+  if (layer && layer !== "subject" && layer !== "depth" && !segment.objects?.[layer.object]) return null;
+  const shot = <Shot segment={segment} theme={theme} frame={size} face={face} {...(layer ? { layer } : {})} />;
+  return montage !== undefined && segment.accent === "punch" ? (
+    <Accent kind="punch" color="">
+      {shot}
+    </Accent>
+  ) : (
+    shot
+  );
+}
+
+/**
+ * A shot as an animation reads it (SubjectBox, SubjectOutline, Outline), with how the Reel moves it as it draws it: a
+ * video's camera move and straightening (in a composition's box as over the montage), and over the montage a photo's
+ * own move or slow zoom and the punch on its cut. A photo a composition lays stays still, as Footage draws it.
+ */
+function placedShot(shot: ComposeShot, segment: ReelProps["segments"][number] | undefined, theme: Theme, montage: boolean): ComposeShot {
+  const base = { zoomTo: theme.zoomTo, punch: theme.punch };
+  if (segment?.type === "clip") {
+    const move = segment.move ?? (segment.zoom ? "in" : "none");
+    return {
+      ...shot,
+      camera: {
+        ...base,
+        ...(move !== "none" ? { move } : {}),
+        ...(segment.adjust?.straighten ? { straighten: segment.adjust.straighten } : {}),
+        ...(montage && segment.accent === "punch" ? { accent: "punch" as const } : {}),
+      },
+    };
+  }
+  if (segment?.type === "image" && montage) {
+    const moving = Boolean(segment.move && segment.move !== "none");
+    return {
+      ...shot,
+      camera: {
+        ...base,
+        ...(moving ? { move: segment.move } : {}),
+        ...(!moving && segment.zoom ? { burns: burnsOf(shot.segment) } : {}),
+        ...(segment.accent === "punch" ? { accent: "punch" as const } : {}),
+      },
+    };
+  }
+  return shot;
 }
 
 /** A collage photo's sticker: its cut-out with the photo's framing and the Reel's light (none without a clean cut-out). */
@@ -500,11 +568,9 @@ function KenBurns({
   const frame = useCurrentFrame();
   if (move && move !== "none") return <AbsoluteFill style={{ transform: cameraTransform(move, frame, durationInFrames, theme) }}>{children}</AbsoluteFill>;
   if (!on) return <>{children}</>;
-  const p = interpolate(frame, [0, durationInFrames], [0, 1], { ...clamp, easing: Easing.inOut(Easing.sin) });
-  const zoomIn = index % 2 === 0;
-  const scale = zoomIn ? 1.04 + 0.12 * p : 1.16 - 0.12 * p;
-  const drift = (index % 4 < 2 ? 1 : -1) * 1.6 * p;
-  return <AbsoluteFill style={{ transform: `scale(${scale}) translateX(${drift}%)` }}>{children}</AbsoluteFill>;
+  // The same zoom places what an animation reads on the photo (burnsMotion): its subject's box follows it.
+  const { scale, shift } = burnsMotion(burnsOf(index), frame, durationInFrames);
+  return <AbsoluteFill style={{ transform: `scale(${scale}) translateX(${shift}%)` }}>{children}</AbsoluteFill>;
 }
 
 type ClipSegment = Extract<ReelProps["segments"][number], { type: "clip" }>;

@@ -4,9 +4,11 @@ import { fitsPending } from "./Fit";
 import { fontsLoaded } from "./fonts";
 import { compileComponent, Fallback, SCOPE, scissorRim } from "./MotionScene";
 import { PaperCutout } from "./PaperCutout";
+import { objectName, outlinePath } from "./outline";
 import { coverLayout, cssFilter, Photo as RetouchPhoto } from "./Retouch";
 import type { Theme } from "./theme";
-import type { CarouselPhoto, PhotoEdit, ReelProps } from "./types";
+import { about } from "./track";
+import type { Box, CarouselPhoto, PhotoEdit, ReelProps } from "./types";
 
 // A whole carousel designed as code by the carousel designer: one component draws
 // every slide (`slide` of `count`), so the slides hold together like a graphic
@@ -89,11 +91,30 @@ const geometry = (style?: CSSProperties): CSSProperties => Object.fromEntries(Ob
  * title passes behind the person; and it is not held by the box, so a head can break out of its
  * frame. Same `style`, `focus` and `zoom` as its Photo. No rim or shadow unless asked.
  */
-function Subject({ photo, style, focus, zoom, rim = 0, shadow = false }: { photo?: CarouselPhoto; style?: CSSProperties; focus?: { x: number; y: number }; zoom?: number; rim?: number; shadow?: boolean }) {
+function Subject({
+  photo,
+  style,
+  focus,
+  zoom,
+  rim = 0,
+  shadow = false,
+  object,
+}: {
+  photo?: CarouselPhoto;
+  style?: CSSProperties;
+  focus?: { x: number; y: number };
+  zoom?: number;
+  rim?: number;
+  shadow?: boolean;
+  /** An object of the photo instead of its subject (a glass, the bottle she holds), by the name the code gives it: found on the photo before the render. */
+  object?: string;
+}) {
   const frame = useFrame();
   if (!photo) return absent(frame, "Subject");
-  if (!photo.cutout) {
-    if (frame.check) throw new Error(`<Subject> sur photos[${frame.photos.indexOf(photo)}], qui n'a pas de détourage net : vérifie photo.cutout avant`);
+  // An object not found on the photo draws nothing: the slide must hold without it.
+  const src = object ? photo.objects?.[objectName(object)]?.cutout : photo.cutout;
+  if (!src) {
+    if (frame.check && !object) throw new Error(`<Subject> sur photos[${frame.photos.indexOf(photo)}], qui n'a pas de détourage net : vérifie photo.cutout avant`);
     return null;
   }
   const edit = photoEdit(photo, focus, zoom);
@@ -104,9 +125,9 @@ function Subject({ photo, style, focus, zoom, rim = 0, shadow = false }: { photo
     <div style={{ position: "absolute", ...geometry(style) }}>
       <AbsoluteFill style={{ transform: straighten ? `rotate(${straighten}deg)` : undefined }}>
         {rim > 0 || shadow ? (
-          <PaperCutout src={photo.cutout} width={layout.width} height={layout.height} spec={scissorRim(rim, shadow)} filter={filter} style={{ left: layout.left, top: layout.top }} />
+          <PaperCutout src={src} width={layout.width} height={layout.height} spec={scissorRim(rim, shadow)} filter={filter} style={{ left: layout.left, top: layout.top }} />
         ) : (
-          <Img src={photo.cutout} style={{ position: "absolute", left: layout.left, top: layout.top, width: layout.width, height: layout.height, filter }} />
+          <Img src={src} style={{ position: "absolute", left: layout.left, top: layout.top, width: layout.width, height: layout.height, filter }} />
         )}
       </AbsoluteFill>
     </div>
@@ -139,6 +160,65 @@ function Cutout({ photo, x, y, height, rim = 10, shadow = true, style }: { photo
   );
 }
 
+/** A slide's size (SLIDE_FRAME in stills.mjs: the feed's 4:5), for a box given no size. */
+const SLIDE = { width: 1080, height: 1350 };
+type Reframe = { focus?: { x: number; y: number }; zoom?: number };
+const at0 = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : 0);
+
+/** Where a point of a photo (shares of it) is on the slide, for the photo laid in `style` (its left, top, width, height in px) as its Photo draws it: framed, zoomed, straightened. */
+function placeOn(photo: CarouselPhoto, style?: CSSProperties, reframe?: Reframe) {
+  const edit = photoEdit(photo, reframe?.focus, reframe?.zoom);
+  const box = { width: px(style?.width) ?? SLIDE.width, height: px(style?.height) ?? SLIDE.height };
+  const layout = coverLayout(box, edit.source, edit.adjust);
+  const degrees = edit.adjust?.straighten ?? 0;
+  const left = at0(style?.left);
+  const top = at0(style?.top);
+  return (x: number, y: number) => {
+    const p = about({ x: layout.left + x * layout.width, y: layout.top + y * layout.height }, box.width, box.height, 1, degrees);
+    return [left + p.x, top + p.y] as const;
+  };
+}
+
+/**
+ * Where a photo's subject (or an object found on it by name: SubjectBox(photos[1], box, "wine glass")) is on the slide,
+ * for the photo laid in `style` as its Photo (the same box, focus and zoom): { x, y, w, h } px, or null when it has none.
+ * Words, brackets, a circle follow it; a word that runs round it centres on it.
+ */
+function SubjectBox(photo?: CarouselPhoto, style?: CSSProperties, object?: string, reframe?: Reframe): Box | null {
+  if (!photo) return null;
+  const b = object ? photo.objects?.[objectName(object)]?.box : photo.subject;
+  if (!b) return null;
+  const at = placeOn(photo, style, reframe);
+  const corners = [at(b.x, b.y), at(b.x + b.w, b.y), at(b.x, b.y + b.h), at(b.x + b.w, b.y + b.h)];
+  const xs = corners.map((c) => c[0]);
+  const ys = corners.map((c) => c[1]);
+  const x = Math.min(...xs);
+  const y = Math.min(...ys);
+  return { x, y, w: Math.max(...xs) - x, h: Math.max(...ys) - y };
+}
+
+/** The outline of a photo's subject (or of an object found on it) on the slide, as an SVG path (px, smooth), for the photo laid in `style`: a word runs along it (an SVG textPath), a line goes round it; null when it has none. */
+function SubjectOutline(photo?: CarouselPhoto, style?: CSSProperties, object?: string, reframe?: Reframe): string | null {
+  if (!photo) return null;
+  const c = object ? photo.objects?.[objectName(object)]?.contour : photo.contour;
+  return c?.length ? outlinePath(c, placeOn(photo, style, reframe)) : null;
+}
+
+/** A line round a photo's subject (or an object found on it), for the photo laid in `style`: laid before Subject, only its outer half shows. Nothing when it has no outline. */
+function Outline({ photo, style, object, focus, zoom, color = "#FFFFFF", width = 6, dash, glow }: { photo?: CarouselPhoto; style?: CSSProperties; object?: string; focus?: { x: number; y: number }; zoom?: number; color?: string; width?: number; dash?: boolean; glow?: boolean }) {
+  const d = SubjectOutline(photo, style, object, { focus, zoom });
+  if (!d) return null;
+  const dashes = dash ? { strokeDasharray: `${width * 3} ${width * 2}` } : {};
+  return (
+    <div data-fauve-decor="" style={{ position: "absolute", inset: 0, pointerEvents: "none" }}>
+      <svg width="100%" height="100%" style={{ position: "absolute", left: 0, top: 0, overflow: "visible" }} aria-hidden="true">
+        {glow ? <path d={d} fill="none" stroke={color} strokeWidth={width * 3} strokeLinejoin="round" strokeLinecap="round" opacity={0.35} style={{ filter: `blur(${Math.round(width * 1.5)}px)` }} /> : null}
+        <path d={d} fill="none" stroke={color} strokeWidth={width} strokeLinejoin="round" strokeLinecap="round" {...dashes} />
+      </svg>
+    </div>
+  );
+}
+
 /**
  * The whole carousel side by side (count × width px wide, the slides' height): what is laid in it
  * runs from one slide to the next, seamless when she swipes; each slide shows its own part.
@@ -148,9 +228,19 @@ function Strip({ children, style }: { children?: ReactNode; style?: CSSPropertie
   return <div style={{ ...style, position: "absolute", top: 0, left: -frame.slide * frame.width, width: frame.count * frame.width, height: frame.height }}>{children}</div>;
 }
 
-// Photo: her photo in a box. Subject: its subject cut out over it. Cutout: a subject as a sticker.
-// Strip: the slides side by side. No Footage: a carousel has no shots.
-const CAROUSEL_SCOPE = { ...Object.fromEntries(Object.entries(SCOPE).filter(([name]) => name !== "Footage")), Cutout, Photo: BoxPhoto, Subject, Strip };
+// Photo: her photo in a box. Subject: its subject (or an object found on it) cut out over it. Cutout: a subject as a
+// sticker. SubjectBox, SubjectOutline, Outline: where it is, its outline, a line round it. Strip: the slides side by
+// side. No Footage nor Depth: a carousel has no shots.
+const CAROUSEL_SCOPE = {
+  ...Object.fromEntries(Object.entries(SCOPE).filter(([name]) => name !== "Footage" && name !== "Depth")),
+  Cutout,
+  Photo: BoxPhoto,
+  Subject,
+  SubjectBox,
+  SubjectOutline,
+  Outline,
+  Strip,
+};
 
 /** Every text this far from the edges (px on a 1080-wide slide). */
 export const CAROUSEL_MARGIN = 40;
@@ -233,6 +323,8 @@ function useSettled(root: React.RefObject<HTMLDivElement | null>, props: ReelPro
         for (let node = walker.nextNode(); node; node = walker.nextNode()) {
           const text = node.textContent?.trim();
           if (!text || !node.parentElement) continue;
+          // Letters that decorate (a word repeated round a glass, along its edge, behind it): no margins nor minimum size.
+          if (node.parentElement.closest("[data-fauve-decor]")) continue;
           const style = getComputedStyle(node.parentElement);
           if (style.visibility === "hidden" || style.display === "none") continue;
           if (CODE_IN_TEXT.test(text)) codes.push(`« ${text.slice(0, 40)} »`);

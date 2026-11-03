@@ -173,7 +173,7 @@ export function straightening(degrees: number | undefined, frameAspect: number):
  * a slow push-in or pull-out, a slow pan (enlarged a little, it slides by a few percent of the
  * width), or a tighter crop held (a jump cut on the beat). `shift`: in percent of the width.
  */
-export function cameraMotion(move: CameraMove, frame: number, durationInFrames: number, theme: Theme): { scale: number; shift?: number } | undefined {
+export function cameraMotion(move: CameraMove, frame: number, durationInFrames: number, theme: Pick<Theme, "zoomTo" | "punch">): { scale: number; shift?: number } | undefined {
   const p = interpolate(frame, [0, Math.max(1, durationInFrames)], [0, 1], { ...clamp, easing: Easing.inOut(Easing.sin) });
   const z = theme.zoomTo - 1;
   if (move === "in") return { scale: 1 + z * p };
@@ -186,11 +186,24 @@ export function cameraMotion(move: CameraMove, frame: number, durationInFrames: 
   return undefined;
 }
 
+/**
+ * A photo's slow zoom when the editor chose no move (KenBurns in Reel.tsx): in or out, one way then the other from a
+ * photo to the next, with a slight drift (shift: % of the frame's width). The same move places what an animation reads
+ * on the photo (SubjectBox, SubjectOutline), so its subject's box follows the photo as it zooms.
+ */
+export function burnsMotion(burns: { zoomIn: boolean; drift: number }, frame: number, durationInFrames: number): { scale: number; shift: number } {
+  const p = interpolate(frame, [0, Math.max(1, durationInFrames)], [0, 1], { ...clamp, easing: Easing.inOut(Easing.sin) });
+  return { scale: burns.zoomIn ? 1.04 + 0.12 * p : 1.16 - 0.12 * p, shift: burns.drift * 1.6 * p };
+}
+
+/** The way a photo's slow zoom goes, by its place among the Reel's segments (one way then the other). */
+export const burnsOf = (index: number) => ({ zoomIn: index % 2 === 0, drift: index % 4 < 2 ? 1 : -1 });
+
 /** The signature « punch » into a shot: a short zoom that settles over its first 8 frames, no bounce. */
 export const punchScale = (frame: number) => interpolate(frame, [0, 8], [1.12, 1], { ...clamp, easing: Easing.out(Easing.cubic) });
 
 /** A point moved by a transform about the centre of a width × height box: shifted (share of the width), scaled, rotated. */
-function about(p: Point, width: number, height: number, scale: number, degrees = 0, shift = 0): Point {
+export function about(p: Point, width: number, height: number, scale: number, degrees = 0, shift = 0): Point {
   const cx = width / 2;
   const cy = height / 2;
   let x = p.x - cx + shift * width;

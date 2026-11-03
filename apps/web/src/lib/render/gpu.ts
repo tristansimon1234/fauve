@@ -384,8 +384,8 @@ export async function photosOnGpu(photos: GpuPhoto[], deadlineMs: number, option
   return { results, seconds, gpu };
 }
 
-/** A passage where an object is followed: the passage's, and the object's name (as its animation gives it). */
-export type GpuObjectPassage = GpuPassage & { name: string };
+/** A passage where an object is followed: the passage's, and the object's name (as its animation gives it); `photo`: one of her photos, the object found on it once. */
+export type GpuObjectPassage = GpuPassage & { name: string; photo?: true };
 
 /**
  * Follows each object through its passage on the card (the PyTorch machine: the detector finds it by its name, SAM 2
@@ -393,7 +393,7 @@ export type GpuObjectPassage = GpuPassage & { name: string };
  */
 export async function objectsOnGpu(passages: GpuObjectPassage[], deadlineMs: number, options: CardOptions = {}): Promise<{ results: Record<string, GpuCut | Error>; seconds: number; gpu: string | null }> {
   if (!passages.length) return { results: {}, seconds: 0, gpu: null };
-  const jobs = passages.map((p) => ({ id: p.key, url: p.url, from: p.from, to: p.to, name: p.name, upload: p.upload }));
+  const jobs = passages.map((p) => ({ id: p.key, url: p.url, from: p.from, to: p.to, name: p.name, ...(p.photo ? { photo: true } : {}), upload: p.upload }));
   const { readings, seconds, gpu } = await onCard(
     "track_objects.py",
     "torch",

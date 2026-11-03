@@ -1,6 +1,7 @@
 import "server-only";
 import { randomUUID } from "node:crypto";
-import { CARD_CUTOUT_MODEL, CUTOUT_MODEL, currentCutout, cutEdges, cutoutSchema, sceneWorthy, stickerWorthy, type Cutout, type ReelInputs, type ScenePhoto } from "@fauve/agent";
+import sharp from "sharp";
+import { CARD_CUTOUT_MODEL, CUTOUT_MODEL, contourOfAlpha, currentCutout, cutEdges, cutoutSchema, sceneWorthy, stickerWorthy, type Cutout, type ReelInputs, type ScenePhoto } from "@fauve/agent";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { cutoutCostEur, cutoutsInSandbox } from "./sandbox";
 import { GPU_START_MS, gpuCostEur, gpuReady, photosOnGpu } from "./gpu";
@@ -117,6 +118,45 @@ async function cutOnCard(studioId: string, photos: { id: string; url: string }[]
   return done;
 }
 
+/** The size of the copy of a cut-out's transparency its outline is read on (its long side, px). */
+const CONTOUR_SIDE = 320;
+
+/**
+ * Reads once the outline of each photo's cut-out (contour.ts: 64 points round its subject, on a small copy of its
+ * transparency) and keeps it on the cut-out (media_assets.cutout.contour): a word runs along a photo's subject, a line
+ * goes round it, as on a video (SubjectOutline, Outline). Never fails a render: a photo without it has no outline.
+ */
+export async function ensureCutoutContours(studioId: string, mediaIds: string[]): Promise<void> {
+  if (!mediaIds.length) return;
+  const db = supabaseAdmin();
+  const { data: assets } = await db.from("media_assets").select("id, cutout").eq("studio_id", studioId).in("id", [...new Set(mediaIds)]);
+  const todo = (assets ?? []).flatMap((a) => {
+    const cutout = cutoutSchema.safeParse(a.cutout);
+    return cutout.success && !cutout.data.contour && cutout.data.path.startsWith(`${studioId}/`) ? [{ id: a.id as string, cutout: cutout.data }] : [];
+  });
+  await Promise.all(
+    todo.map(async ({ id, cutout }) => {
+      try {
+        const file = await db.storage.from("media").download(cutout.path);
+        if (file.error || !file.data) return;
+        const { data, info } = await sharp(Buffer.from(await file.data.arrayBuffer()))
+          .resize({ width: CONTOUR_SIDE, height: CONTOUR_SIDE, fit: "inside" })
+          .ensureAlpha()
+          .raw()
+          .toBuffer({ resolveWithObject: true });
+        const alpha = new Uint8Array(info.width * info.height);
+        for (let i = 0; i < alpha.length; i++) alpha[i] = data[i * info.channels + info.channels - 1]!;
+        const contour = contourOfAlpha(alpha, info.width, info.height);
+        if (!contour) return;
+        const saved = await db.from("media_assets").update({ cutout: { ...cutout, contour } }).eq("id", id).eq("studio_id", studioId);
+        if (saved.error) console.warn("cut-out outline not kept", id, saved.error.message);
+      } catch (error) {
+        console.warn("cut-out outline unavailable", id, error instanceof Error ? error.message.slice(0, 200) : error);
+      }
+    }),
+  );
+}
+
 /** A cut-out an animation can use (sceneWorthy: a clean edge, even cut by the photo's frame), kept for this studio. */
 function sceneCutout(studioId: string, raw: unknown): Cutout | null {
   const cutout = cutoutSchema.safeParse(raw);
@@ -174,7 +214,7 @@ export async function sceneCutoutInputs(studioId: string, photoIds: string[]): P
     usable.flatMap((s, i) => {
       const src = signed.data?.[i]?.signedUrl;
       const edges = cutEdges(s.cutout.touches);
-      return src ? [[s.id, { src, box: s.cutout.box, ...(edges.length ? { edges } : {}) }]] : [];
+      return src ? [[s.id, { src, box: s.cutout.box, ...(edges.length ? { edges } : {}), ...(s.cutout.contour?.length ? { contour: s.cutout.contour } : {}) }]] : [];
     }),
   );
 }

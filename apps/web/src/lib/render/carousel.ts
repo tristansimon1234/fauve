@@ -3,6 +3,7 @@ import { cutEdges, cutoutSchema, photoEditFrom, sceneWorthy, type CarouselPhoto,
 import { jpegPath } from "@/lib/social/media-urls";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { photoRegions, type StoredRegions } from "@/lib/video/regions";
+import { photoObjectInputs } from "./subjects";
 
 // Her photos as a designed carousel lays them (apps/render/src/Carousel.tsx): signed,
 // their light corrected and framed on their subject from their reading (never a filter
@@ -32,6 +33,8 @@ export async function carouselPhotos(studioId: string, ids: string[], blur: Reco
   const db = supabaseAdmin();
   const { data: assets } = await db.from("media_assets").select("id, kind, storage_path, mime_type, regions, cutout").eq("studio_id", studioId).in("id", ids);
   const byId = new Map((assets ?? []).map((a) => [a.id as string, a]));
+  // The objects found on them by name (a glass, the bottle she holds), when the design's code names some: Subject draws them.
+  const objects = await photoObjectInputs(studioId, ids).catch(() => ({}) as Awaited<ReturnType<typeof photoObjectInputs>>);
   return Promise.all(
     ids.map(async (id): Promise<CarouselSource> => {
       const asset = byId.get(id);
@@ -63,7 +66,14 @@ export async function carouselPhotos(studioId: string, ids: string[], blur: Reco
         found: true,
         shows: regions?.detection.notes ?? "",
         faces: regions?.detection.regions.filter((r) => r.kind === "face").length ?? 0,
-        photo: { src, aspect, ...(edit ? { edit } : {}), ...(cutout && clean ? { cutout, subject: clean.box, ...(edges.length ? { cutEdges: edges } : {}) } : {}) },
+        photo: {
+          src,
+          aspect,
+          ...(edit ? { edit } : {}),
+          ...(cutout && clean ? { cutout, subject: clean.box, ...(edges.length ? { cutEdges: edges } : {}), ...(clean.contour?.length ? { contour: clean.contour } : {}) } : {}),
+          // An object found on a photo with blurred faces is still only that object (it shows no face).
+          ...(objects[id] ? { objects: objects[id] } : {}),
+        },
       };
     }),
   );

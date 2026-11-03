@@ -64,8 +64,9 @@ import { photoRegions } from "@/lib/video/regions";
 //                        uploaded to the lab studio, read as a video she sent in the chat (it leaves
 //                        the library once read); with steal_only=1, nothing more (no montage):
 //                        step=result shows what was read;
-//                        own=<file>,… videos of hers uploaded to the lab studio, instead of the stock clips.
-//   ?case=…&step=upload&file=<name>.mp4|mov  a signed upload URL (2 h) for a file of hers into the
+//                        own=<file>,… videos of hers uploaded to the lab studio, instead of the stock clips
+//                        (a .jpg, .png or .webp is one of her photos, beside the case's).
+//   ?case=…&step=upload&file=<name>.mp4|mov|jpg  a signed upload URL (2 h) for a file of hers into the
 //                        lab studio ({studio}/lab/<name>), for own= and steal=lab:.
 //   ?case=…&step=result  every version: its render (signed link, 24 h), the plan kept
 //                        (without the scenes' code), the delivered message, what this Reel cost
@@ -312,15 +313,13 @@ async function labMedia(studioId: string, c: LabCase): Promise<{ videos: string[
     return inserted.data.id as string;
   };
 
-  // Her own videos, uploaded with step=upload.
-  const own = await Promise.all(
-    (c.own ?? []).map((file) =>
-      add(`${studioId}/lab/${file}`, { kind: "video", mime_type: videoMime(file) }, async () => {
-        const found = await db.storage.from("media").createSignedUrl(`${studioId}/lab/${file}`, 60);
-        return { error: found.error ? { message: `not uploaded (step=upload&file=${file})` } : null };
-      }),
-    ),
-  );
+  // Her own videos and photos, uploaded with step=upload.
+  const uploaded = (file: string) => async () => {
+    const found = await db.storage.from("media").createSignedUrl(`${studioId}/lab/${file}`, 60);
+    return { error: found.error ? { message: `not uploaded (step=upload&file=${file})` } : null };
+  };
+  const own = await Promise.all((c.own ?? []).filter((f) => !LAB_PHOTO.test(f)).map((file) => add(`${studioId}/lab/${file}`, { kind: "video", mime_type: videoMime(file) }, uploaded(file))));
+  const ownPhotos = await Promise.all((c.own ?? []).filter((f) => LAB_PHOTO.test(f)).map((file) => add(`${studioId}/lab/${file}`, { kind: "image", mime_type: photoMime(file) }, uploaded(file))));
   const stock = await Promise.all(
     (c.clips ?? []).map((clip) =>
       add(`${studioId}/lab/${clip}.mp4`, { kind: "video", mime_type: "video/mp4" }, async () => {
@@ -333,7 +332,7 @@ async function labMedia(studioId: string, c: LabCase): Promise<{ videos: string[
   );
   const videos = [...own, ...stock];
 
-  let photos: string[] = [];
+  let photos: string[] = [...ownPhotos];
   if (c.photosOf) {
     const demo = await db.from("studios").select("id").eq("name", c.photosOf.studio).is("website_url", null).limit(1).single();
     if (demo.error) throw new Error(`demo studio ${c.photosOf.studio}: ${demo.error.message}`);
@@ -345,14 +344,17 @@ async function labMedia(studioId: string, c: LabCase): Promise<{ videos: string[
       .gt("height", 1600)
       .order("created_at")
       .limit(c.photosOf.max);
-    photos = await Promise.all(
-      (source.data ?? []).map((p) => {
-        const file = (p.storage_path as string).split("/").pop()!;
-        return add(`${studioId}/lab/${file}`, { kind: "image", mime_type: p.mime_type ?? "image/jpeg", width: p.width, height: p.height }, () =>
-          db.storage.from("media").copy(p.storage_path as string, `${studioId}/lab/${file}`),
-        );
-      }),
-    );
+    photos = [
+      ...ownPhotos,
+      ...(await Promise.all(
+        (source.data ?? []).map((p) => {
+          const file = (p.storage_path as string).split("/").pop()!;
+          return add(`${studioId}/lab/${file}`, { kind: "image", mime_type: p.mime_type ?? "image/jpeg", width: p.width, height: p.height }, () =>
+            db.storage.from("media").copy(p.storage_path as string, `${studioId}/lab/${file}`),
+          );
+        }),
+      )),
+    ];
   }
   return { videos, photos };
 }
@@ -557,8 +559,11 @@ async function labVoiceNote(studioId: string, postId: string, words?: string, br
 const voiceOf = (params: URLSearchParams): LabVoice => ({ simone: params.get("voice"), hers: params.get("own_voice") });
 
 /** A file of hers uploaded to the lab studio: a plain name, a video. */
-const LAB_FILE = /^[\w-][\w.-]{0,79}\.(mp4|mov|m4v|webm)$/i;
+const LAB_FILE = /^[\w-][\w.-]{0,79}\.(mp4|mov|m4v|webm|jpe?g|png|webp)$/i;
 const videoMime = (file: string) => (/\.mov$/i.test(file) ? "video/quicktime" : /\.webm$/i.test(file) ? "video/webm" : "video/mp4");
+/** A photo of hers uploaded to the lab studio (own=<name>.jpg): a photo of the Reel, not a video. */
+const LAB_PHOTO = /\.(jpe?g|png|webp)$/i;
+const photoMime = (file: string) => (/\.png$/i.test(file) ? "image/png" : /\.webp$/i.test(file) ? "image/webp" : "image/jpeg");
 
 /** What she writes in « Ce que tu imagines » (500 characters at most, as on the screen). */
 const ideaOf = (params: URLSearchParams) => params.get("idea")?.trim().slice(0, 500) || null;
@@ -770,7 +775,7 @@ export async function POST(request: Request) {
     // A video of hers, as for a case: uploaded to the lab studio (step=upload), then used with own=.
     if (params.get("step") === "upload") {
       const file = params.get("file") ?? "";
-      if (!LAB_FILE.test(file)) return Response.json({ error: "file=<name>.mp4|mov" }, { status: 400 });
+      if (!LAB_FILE.test(file)) return Response.json({ error: "file=<name>.mp4|mov|jpg|png" }, { status: 400 });
       const studioId = await siteStudio(url.href, KINDS[kind] ?? ANY_KIND);
       const signed = await supabaseAdmin().storage.from("media").createSignedUploadUrl(`${studioId}/lab/${file}`, { upsert: true });
       if (signed.error) return Response.json({ error: signed.error.message }, { status: 500 });
@@ -808,7 +813,7 @@ export async function POST(request: Request) {
   // A file of hers (a video she filmed, a Reel to copy) uploaded straight to the lab studio's storage.
   if (params.get("step") === "upload") {
     const file = params.get("file") ?? "";
-    if (!LAB_FILE.test(file)) return Response.json({ error: "file=<name>.mp4|mov" }, { status: 400 });
+    if (!LAB_FILE.test(file)) return Response.json({ error: "file=<name>.mp4|mov|jpg|png" }, { status: 400 });
     const studioId = await labStudio(name, c);
     const signed = await supabaseAdmin().storage.from("media").createSignedUploadUrl(`${studioId}/lab/${file}`, { upsert: true });
     if (signed.error) return Response.json({ error: signed.error.message }, { status: 500 });

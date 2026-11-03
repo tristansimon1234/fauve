@@ -1062,3 +1062,93 @@ test("the rented card's price: its card and a sandbox's CPU and memory by the se
   assert.ok(Math.abs(modalCostUsd(100, 2, 8, "B300") - 0.07152) < 1e-6);
   assert.equal(modalCostUsd(-5, 2, 8), 0);
 });
+
+test("a photo's outline: read on its cut-out's transparency, clockwise from its top, nothing for a speck", async () => {
+  const { contourOfAlpha, CONTOUR_POINTS } = await import("./contour.ts");
+  // A rectangle x 10..29, y 5..14 in a 40 × 20 mask: 64 points, from its top left corner, along the top first (clockwise on the screen).
+  const w = 40;
+  const h = 20;
+  const rect = new Uint8Array(w * h);
+  for (let y = 5; y < 15; y++) for (let x = 10; x < 30; x++) rect[y * w + x] = 255;
+  const c = contourOfAlpha(rect, w, h)!;
+  assert.equal(c.length, CONTOUR_POINTS * 2);
+  assert.deepEqual(c.slice(0, 2), [0.263, 0.275]);
+  assert.ok(c[2]! > c[0]! && c[3] === c[1]);
+  const xs = c.filter((_, i) => i % 2 === 0);
+  assert.deepEqual([Math.min(...xs), Math.max(...xs)], [0.263, 0.738]);
+  // A disc of radius 30, and a speck far from it (only the largest piece has an outline): within a pixel of its edge.
+  const W = 100;
+  const H = 80;
+  const disc = new Uint8Array(W * H);
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if ((x - 50) ** 2 + (y - 40) ** 2 <= 900) disc[y * W + x] = 255;
+  disc[2 * W + 2] = 255;
+  const d = contourOfAlpha(disc, W, H)!;
+  for (let i = 0; i < d.length; i += 2) assert.ok(Math.abs(Math.hypot(d[i]! * W - 50.5, d[i + 1]! * H - 40.5) - 30) < 1.2);
+  // Nothing worth an outline: a speck alone, an empty mask.
+  const speck = new Uint8Array(W * H);
+  speck[5 * W + 5] = 255;
+  assert.equal(contourOfAlpha(speck, W, H), null);
+  assert.equal(contourOfAlpha(new Uint8Array(W * H), W, H), null);
+});
+
+test("text around something of her photos: her subject, an object found on a photo, kept flat, given to the render", async () => {
+  const { objectPassages, objectKey, photoKey, photoObjectsDrawn, photosDrawnOver, subjectPhotoIds, AROUND_WORDS, PHOTO_OBJECT_MAX } = await import("./subject.ts");
+  const ring = `React.createElement(Subject, { shot: 0, object: "wine glass", style: laid }); SubjectBox(shots[0], frame, laid, "wine glass")`;
+  const her = `<Subject shot={1} style={{ position: "absolute", ...laid }} />`;
+  const plan: EditPlan = editPlanSchema.parse({
+    format: "9:16",
+    duration: 5,
+    template: "libre",
+    segments: [
+      { clip_id: "p1", in: 0, out: 2.5, zoom: "none", move: "in", photo: { source: { width: 1080, height: 1920 } } },
+      { clip_id: "p2", in: 0, out: 2.5, zoom: "none", move: "in", photo: { source: { width: 1080, height: 1920 } } },
+    ],
+    texts: [],
+    images: [],
+    transitions: "cut",
+    subtitles: false,
+    music: null,
+    layers: [{ from: 0, to: 5, motion: { brief: "le mot tourne autour du verre", js: `${ring} ${her}` } }],
+  });
+  // The glass is found once on the photo itself (one image, from 0 to 0), whatever the photo's move; never as a video passage.
+  assert.deepEqual(objectPassages(plan, () => false), [{ clip_id: "p1", from: 0, to: 0, key: objectKey("p1", 0, 0, "wine glass"), name: "wine glass", photo: true }]);
+  assert.equal(objectKey("p1", 0, 0, "wine glass"), `${photoKey("p1")}#wine glass`);
+  assert.ok(PHOTO_OBJECT_MAX >= 4);
+  // Her subject drawn by an animation: every photo of the Reel has its own cut-out made (none when nothing draws her).
+  assert.deepEqual(subjectPhotoIds(plan), ["p1", "p2"]);
+  assert.deepEqual(subjectPhotoIds({ ...plan, layers: [{ ...plan.layers![0]!, motion: { ...plan.layers![0]!.motion, js: ring } }] }), []);
+  // Photos drawn over move flat: a relief would move her subject away from its cut-out laid over it.
+  assert.deepEqual(photosDrawnOver(plan).sort(), ["p1", "p2"]);
+  assert.deepEqual(depthPhotoIds(plan), []);
+  assert.deepEqual(depthPhotoIds({ ...plan, layers: [] }).sort(), ["p1", "p2"]);
+  // A carousel's code names its objects on photos[n], a reframing after the name.
+  assert.deepEqual(photoObjectsDrawn(`<Subject photo={photos[1]} style={box} object="Wine Glass" /> SubjectOutline(photos[0], box, "bottle", { zoom: 1.2 })`), [
+    { photo: 1, name: "wine glass" },
+    { photo: 0, name: "bottle" },
+  ]);
+  // What asks for it before any code is written.
+  assert.ok(AROUND_WORDS.test("Le mot « CHEERS » qui tourne autour du verre"));
+  assert.ok(AROUND_WORDS.test("un texte derrière la bouteille"));
+  assert.ok(!AROUND_WORDS.test("un Reel de mes plats du jour"));
+
+  // The render: each photo segment gets its cut-out and the objects found on it; each shot under the animation its box and outline, placed by its framing.
+  const contour = Array.from({ length: 128 }, (_, i) => (i % 2 ? 0.4 : 0.5));
+  const props = buildReelProps(plan, {
+    template: "libre",
+    clipUrls: { p1: "https://x/p1.jpg", p2: "https://x/p2.jpg" },
+    photoIds: ["p1", "p2"],
+    brand: { name: "Studio" },
+    sceneCutouts: { p2: { src: "https://x/p2-cut.webp", box: { x: 0.3, y: 0.2, w: 0.4, h: 0.6 }, contour } },
+    subjects: { [objectKey("p1", 0, 0, "wine glass")]: { src: "https://x/p1-glass.png", still: true, boxes: [[0.4, 0.5, 0.2, 0.3]], contours: [contour] } },
+  });
+  const [first, second] = props.segments;
+  assert.deepEqual(first?.type === "image" && first.objects, { "wine glass": { src: "https://x/p1-glass.png" } });
+  assert.equal(first?.type === "image" && first.subject, undefined);
+  assert.deepEqual(second?.type === "image" && second.subject, { src: "https://x/p2-cut.webp" });
+  const shots = props.layers?.[0]?.shots ?? [];
+  assert.equal(shots.length, 2);
+  assert.deepEqual(shots[0]?.objects, { "wine glass": { boxes: [[0.4, 0.5, 0.2, 0.3]], contours: [contour] } });
+  assert.deepEqual(shots[1]?.subjectBoxes, [[0.3, 0.2, 0.4, 0.6]]);
+  assert.deepEqual(shots[1]?.subjectContours, [contour]);
+  assert.deepEqual(shots[1]?.edit, { source: { width: 1080, height: 1920 } });
+});

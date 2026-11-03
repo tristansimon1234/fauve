@@ -5,7 +5,10 @@ import {
   isClipSegment,
   mediaSubjectsSchema,
   mediaTracksSchema,
+  objectKey,
   objectPassages,
+  PHOTO_OBJECT_MAX,
+  photoKey,
   subjectPassages,
   wantsDepth,
   wantsObjects,
@@ -59,10 +62,12 @@ async function keepContour(studioId: string, mediaId: string, key: string, conto
 /** The passages to cut out for this plan, with their clips' rows (her own steadied video plays: an unsteadied original is left out). */
 async function planned(studioId: string, plan: Plan, anticipate = false) {
   const ids = [...new Set(plan.segments.flatMap((s) => (isClipSegment(s) ? [s.clip_id] : [])))];
-  if (!ids.length || plan.finish?.steady === "off") return { passages: [] as SubjectPassage[], rows: new Map<string, Row>() };
+  if (!ids.length) return { passages: [] as SubjectPassage[], rows: new Map<string, Row>(), isVideo: () => false };
   const { data } = await supabaseAdmin().from("media_assets").select("id, kind, storage_path, subjects, tracks").eq("studio_id", studioId).in("id", ids);
   const rows = new Map(((data ?? []) as Row[]).map((r) => [r.id, r]));
-  return { passages: subjectPassages(plan, (id) => rows.get(id)?.kind === "video", anticipate), rows };
+  // Her videos held as filmed (steady off): their cut-outs, read on the steadied copy, would not fall on them. Her photos still have theirs.
+  const isVideo = (id: string) => plan.finish?.steady !== "off" && rows.get(id)?.kind === "video";
+  return { passages: subjectPassages(plan, isVideo, anticipate), rows, isVideo };
 }
 
 type Row = { id: string; kind: string; storage_path: string | null; subjects: unknown; tracks: unknown };
@@ -285,9 +290,8 @@ export async function subjectInputs(
   studioId: string,
   plan: Plan,
 ): Promise<Record<string, { src: string; still?: boolean; top?: number; boxes?: (number[] | null)[]; contours?: (number[] | null)[] }>> {
-  const { passages: herPassages, rows } = await planned(studioId, plan);
-  // The objects its compositions follow too (a cup, a product), kept the same way under their own keys, and the shots they show in depth.
-  const isVideo = (id: string) => rows.get(id)?.kind === "video";
+  const { passages: herPassages, rows, isVideo } = await planned(studioId, plan);
+  // The objects its compositions follow too (a cup, a product, one found on a photo), kept the same way under their own keys, and the shots they show in depth.
   const passages = [...herPassages, ...objectPassages(plan, isVideo), ...depthPassages(plan, isVideo)];
   const found = passages.flatMap((p) => {
     const k = kept(rows.get(p.clip_id))[p.key];
@@ -325,6 +329,8 @@ export async function subjectInputs(
 /** On the card: the object found on one image and followed both ways through its passage (SAM 2), then its edge made, a second of video. */
 const OBJECT_LOAD_MS = 60_000;
 const OBJECT_WORK_PER_SECOND = 12;
+/** An object found on a photo: one image read, its edge made at full size (a few seconds with its fetch and its send). */
+const PHOTO_OBJECT_MS = 8_000;
 
 /**
  * Follows the objects a Reel's compositions name (Subject, SubjectBox, SubjectOutline or Outline given its name)
@@ -333,19 +339,48 @@ const OBJECT_WORK_PER_SECOND = 12;
  * under `subjectKey#name`). Never fails a render: an object not followed is simply not drawn.
  */
 export async function ensureObjects(studioId: string, postId: string, plan: Plan): Promise<void> {
-  if (!gpuReady() || !wantsObjects(plan) || plan.finish?.steady === "off") return;
+  if (!gpuReady() || !wantsObjects(plan)) return;
   const db = supabaseAdmin();
   const ids = [...new Set(plan.segments.flatMap((s) => (isClipSegment(s) ? [s.clip_id] : [])))];
   const { data } = await db.from("media_assets").select("id, kind, storage_path, subjects, tracks").eq("studio_id", studioId).in("id", ids);
   const rows = new Map(((data ?? []) as Row[]).map((r) => [r.id, r]));
-  const missing = objectPassages(plan, (id) => rows.get(id)?.kind === "video").filter((p) => {
+  // A video held as filmed (steady off) is followed on its steadied copy: not followed then. A photo is found on itself.
+  const missing = objectPassages(plan, (id) => plan.finish?.steady !== "off" && rows.get(id)?.kind === "video").filter((p) => {
+    if (p.photo && rows.get(p.clip_id)?.kind !== "image") return false;
     const k = kept(rows.get(p.clip_id))[p.key];
     return !k || ("failed_at" in k && Date.now() - Date.parse(k.failed_at) > RETRY_MS);
   });
+  await followObjects(studioId, postId, missing, rows);
+}
+
+/**
+ * Finds the objects a carousel's code names on her photos (a glass, the bottle she holds: Subject, SubjectBox,
+ * SubjectOutline or Outline given its name), on the rented card, and keeps each one on its photo
+ * (media_assets.subjects, under `photoKey#name`), where carouselPhotos reads it. Never fails a carousel: an object
+ * not found is simply not drawn.
+ */
+export async function ensurePhotoObjects(studioId: string, postId: string, items: { mediaId: string; name: string }[]): Promise<void> {
+  if (!gpuReady() || !items.length) return;
+  const { data } = await supabaseAdmin().from("media_assets").select("id, kind, storage_path, subjects, tracks").eq("studio_id", studioId).in("id", [...new Set(items.map((i) => i.mediaId))]);
+  const rows = new Map(((data ?? []) as Row[]).map((r) => [r.id, r]));
+  const passages: ObjectPassage[] = [];
+  for (const { mediaId, name } of items) {
+    const key = objectKey(mediaId, 0, 0, name);
+    if (rows.get(mediaId)?.kind !== "image" || passages.some((p) => p.key === key) || passages.length >= PHOTO_OBJECT_MAX) continue;
+    const k = kept(rows.get(mediaId))[key];
+    if (k && !("failed_at" in k && Date.now() - Date.parse(k.failed_at) > RETRY_MS)) continue;
+    passages.push({ clip_id: mediaId, from: 0, to: 0, key, name, photo: true });
+  }
+  await followObjects(studioId, postId, passages, rows);
+}
+
+/** The objects of these passages followed (or found on her photos) on the card, kept on their media, the card's time billed. */
+async function followObjects(studioId: string, postId: string, missing: ObjectPassage[], rows: Map<string, Row>): Promise<void> {
   if (!missing.length) return;
+  const db = supabaseAdmin();
   const left = timeLeft();
   const budget = (Number.isFinite(left) ? left : 800_000) - RENDER_MARGIN_MS;
-  const work = missing.reduce((n, p) => n + (p.to - p.from) * OBJECT_WORK_PER_SECOND * 1000, 0);
+  const work = missing.reduce((n, p) => n + (p.photo ? PHOTO_OBJECT_MS : (p.to - p.from) * OBJECT_WORK_PER_SECOND * 1000), 0);
   const deadline = Math.min(budget, GPU_START_MS + OBJECT_LOAD_MS + 2 * work);
   if (deadline < GPU_START_MS) return;
   const clips = [...new Set(missing.map((p) => p.clip_id))];
@@ -358,7 +393,9 @@ export async function ensureObjects(studioId: string, postId: string, plan: Plan
         const [webm, png] = await Promise.all(
           [false, true].map((still) => db.storage.from("media").createSignedUploadUrl(subjectPath(studioId, p.clip_id, p.key, still), { upsert: true })),
         );
-        return url && webm?.data?.signedUrl && png?.data?.signedUrl ? [{ key: p.key, url, from: p.from, to: p.to, name: p.name, upload: { webm: webm.data.signedUrl, png: png.data.signedUrl } }] : [];
+        return url && webm?.data?.signedUrl && png?.data?.signedUrl
+          ? [{ key: p.key, url, from: p.from, to: p.to, name: p.name, ...(p.photo ? { photo: true as const } : {}), upload: { webm: webm.data.signedUrl, png: png.data.signedUrl } }]
+          : [];
       }),
     )
   ).flat();
@@ -404,8 +441,46 @@ export async function ensureObjects(studioId: string, postId: string, plan: Plan
       provider: "modal",
       units: Math.round(seconds),
       cost_eur: gpuCostEur(seconds, gpu),
-      meta: costMeta({ post_id: postId, objects: jobs.length, done, gpu, seconds_of_video: Math.round(missing.reduce((n, p) => n + p.to - p.from, 0) * 10) / 10 }),
+      meta: costMeta({
+        post_id: postId,
+        objects: jobs.length,
+        done,
+        gpu,
+        photos: missing.filter((p) => p.photo).length,
+        seconds_of_video: Math.round(missing.reduce((n, p) => n + p.to - p.from, 0) * 10) / 10,
+      }),
     });
+}
+
+/**
+ * The objects found on her photos (ensurePhotoObjects, or a Reel's), signed for the render and the live preview: by
+ * photo, then by name, each one's cut-out (a still image framed like the photo), its box and its outline (shares).
+ */
+export async function photoObjectInputs(studioId: string, mediaIds: string[]): Promise<Record<string, Record<string, { cutout: string; box: { x: number; y: number; w: number; h: number }; contour?: number[] }>>> {
+  if (!mediaIds.length) return {};
+  const db = supabaseAdmin();
+  const { data } = await db.from("media_assets").select("id, kind, storage_path, subjects, tracks").eq("studio_id", studioId).in("id", [...new Set(mediaIds)]);
+  const found = ((data ?? []) as Row[]).flatMap((row) =>
+    Object.entries(kept(row)).flatMap(([key, k]) => {
+      const prefix = `${photoKey(row.id)}#`;
+      if (!key.startsWith(prefix) || !("path" in k) || !k.path.startsWith(`${studioId}/`) || !k.boxes?.[0]) return [];
+      return [{ media: row.id, name: key.slice(prefix.length), path: k.path, box: k.boxes[0]!, contour: k.contour?.startsWith(`${studioId}/`) ? k.contour : undefined }];
+    }),
+  );
+  if (!found.length) return {};
+  const [signed, contours] = await Promise.all([
+    db.storage.from("media").createSignedUrls(found.map((f) => f.path), 7200).then((r) => r.data ?? []),
+    Promise.all(found.map((f) => (f.contour ? readContour(f.contour).catch(() => undefined) : undefined))),
+  ]);
+  const out: Record<string, Record<string, { cutout: string; box: { x: number; y: number; w: number; h: number }; contour?: number[] }>> = {};
+  found.forEach((f, i) => {
+    const src = signed[i]?.signedUrl;
+    if (!src) return;
+    const [x, y, w, h] = f.box as [number, number, number, number];
+    const contour = contours[i]?.[0] ?? undefined;
+    (out[f.media] ??= {})[f.name] = { cutout: src, box: { x, y, w, h }, ...(contour?.length ? { contour } : {}) };
+  });
+  return out;
 }
 
 // ——— Her video's depth at every image (Depth): read on the card ———————————————————————————————————————————————

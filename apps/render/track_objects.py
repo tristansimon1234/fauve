@@ -4,12 +4,16 @@
 # SAM 2.1 (tiny, Apache 2.0), both run by transformers' own classes from safetensors pinned by their digests (no code
 # from a model hub), and its edge made like hers (matte.py's finish: snapped to the picture's own edges, its colours
 # freed of the background, its box and its outline at every image). An animation names it in its code (Subject,
-# SubjectBox, SubjectOutline or Outline given `object`); the engine reads the name there (objectsDrawn).
+# SubjectBox, SubjectOutline or Outline given `object`); the engine reads the name there (objectsDrawn). On one of her
+# photos (`photo`), the object is found on the photo itself and cut out once (a glass on a table, the cup she holds),
+# as one still image the size of the photo: a word then runs round it or behind it on a photo as on a video.
 # Usage: python -I track_objects.py jobs.json → prints {"<id>": { still, frames, keys, people, top, boxes, contours,
-# found, uploaded } | { error }}. jobs.json: [{ id, url (the clip, signed) or src (a local video), from, to, name,
-# upload?: { webm, png }, out? }]. DETECTOR_MODEL and TRACKER_MODEL: the models' folders; OBJECTS_CPU=1 runs on a CPU.
+# found, uploaded } | { error }}. jobs.json: [{ id, url (the clip or the photo, signed) or src (a local file), from, to,
+# name, photo?, upload?: { webm, png }, out? }]. DETECTOR_MODEL and TRACKER_MODEL: the models' folders; OBJECTS_CPU=1
+# runs on a CPU.
 import json
 import os
+import subprocess
 import sys
 import time
 
@@ -86,19 +90,35 @@ def track(frames, k, box, tracker, device, dtype, size):
     return [masks.get(i, empty) for i in range(len(frames))]
 
 
+def photo_frames(src, w, h):
+    """A photo as one image at w × h, RGB (read by ffmpeg, as photo_cut.py reads it for her cut-out)."""
+    import numpy as np
+
+    import matte
+
+    raw = subprocess.run([matte.FFMPEG, "-v", "error", "-i", src, "-vf", f"scale={w}:{h}:flags=lanczos,format=rgb24", "-frames:v", "1", "-f", "rawvideo", "-"], capture_output=True, check=True).stdout
+    if len(raw) != w * h * 3:
+        raise RuntimeError("photo illisible")
+    return np.frombuffer(raw, np.uint8).reshape(1, h, w, 3)
+
+
 def follow(job, device, dtype, detector, tracker):
-    """A passage's object found, followed and cut out (matte.py's finish), or an error that says why."""
+    """A passage's object found, followed and cut out (matte.py's finish), or an error that says why; on a photo, found and cut out once."""
     import matte
 
     from portrait import log
 
     started = time.time()
+    photo = bool(job.get("photo"))
     src_w, src_h, hdr = matte.probe(job["src"])
-    start = max(0.0, float(job["from"]))
-    seconds = min(matte.MAX_SECONDS, max(1.0 / matte.FPS, float(job["to"]) - start))
     scale = min(1.0, matte.OUT_LONG / max(src_w, src_h))
     ow, oh = max(2, int(round(src_w * scale / 2)) * 2), max(2, int(round(src_h * scale / 2)) * 2)
-    frames = matte.decode(job["src"], start, seconds, ow, oh, hdr)
+    if photo:
+        frames = photo_frames(job["src"], ow, oh)
+    else:
+        start = max(0.0, float(job["from"]))
+        seconds = min(matte.MAX_SECONDS, max(1.0 / matte.FPS, float(job["to"]) - start))
+        frames = matte.decode(job["src"], start, seconds, ow, oh, hdr)
     n = len(frames)
     log(f"{n} images of {ow}×{oh} decoded in {time.time() - started:.1f} s")
     seen = find(frames, job["name"], detector, device)
@@ -112,7 +132,8 @@ def follow(job, device, dtype, detector, tracker):
     # A light smoothing over time, against a shimmer of the edges (as for her).
     masks = [masks[0]] + [0.6 * masks[i] + 0.2 * masks[i - 1] + 0.2 * masks[min(n - 1, i + 1)] for i in range(1, n)]
     log(f"followed through {n} images in {time.time() - tracked:.1f} s")
-    r = matte.finish(job, frames, masks, False, n, False, started, ow, oh)
+    # A photo's object: one still image (a PNG the size of the photo, laid exactly over it).
+    r = matte.finish(job, frames, masks, photo, n, False, started, ow, oh)
     return r | {"found": round(score, 2)}
 
 

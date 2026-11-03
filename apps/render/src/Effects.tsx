@@ -2,7 +2,8 @@ import { useId, type CSSProperties, type ReactNode } from "react";
 import { Easing, interpolate, random } from "remotion";
 import type { Box, KitHooks } from "./Kit";
 import { objectName, outlinePath } from "./outline";
-import { faceFocus, framingPercent } from "./track";
+import { coverLayout } from "./Retouch";
+import { about, burnsMotion, cameraMotion, faceFocus, framingPercent, punchScale, straightening } from "./track";
 import type { ComposeShot } from "./types";
 
 // The effects kit of the animations (lot 7), from Tristan's reference Reels: cinema bars that open and close (and what
@@ -336,17 +337,55 @@ function BracketsOf(hooks: KitHooks) {
 
 type Laid = { left: number; top: number; width: number; height: number };
 
-/** Where a shot's picture lies in the box it was laid in, as Footage covers the box with it (anchored on its subject, its faces kept whole): a point in shares of the picture → px. */
-function placer(shot: ComposeShot, laid?: Laid) {
+/**
+ * Where a shot's picture lies in the box it was laid in at a frame of the composition, exactly as the Reel draws it
+ * there: a video covering the box (anchored on its subject, its faces kept whole) and straightened, a photo framed and
+ * straightened as Photo draws it (its retouch's zoom and focus), then the camera's move the Reel gives it (`camera`: a
+ * slow push or pan, a photo's slow zoom, the punch on its cut), about the box's centre. A point in shares of the
+ * picture → px.
+ */
+function placer(shot: ComposeShot, laid?: Laid, frame = 0) {
   const L = laid ?? { left: 0, top: 0, width: 1080, height: 1920 };
   const frameAspect = L.width / L.height;
-  const A = shot.aspect || frameAspect;
-  const dw = A > frameAspect ? L.height * A : L.width;
-  const dh = A > frameAspect ? L.height : L.width / A;
-  const [px, py] = framingPercent(faceFocus(shot.focus, shot.face, A, frameAspect), A, frameAspect) ?? [50, 50];
-  const ox = ((dw - L.width) * px) / 100;
-  const oy = ((dh - L.height) * py) / 100;
-  return { at: (x: number, y: number) => [L.left - ox + x * dw, L.top - oy + y * dh] as const, dw, dh };
+  const camera = shot.camera;
+  // The shot's own frame (its camera move runs over its length; before and after, it holds its first or last image).
+  const t = Math.max(0, Math.min(Math.max(0, shot.durationInFrames - 1), Math.round(frame - shot.from)));
+  let base: (x: number, y: number) => { x: number; y: number };
+  let grow = 1;
+  let dw: number;
+  let dh: number;
+  if (shot.kind === "photo" && shot.edit) {
+    // As Photo: the picture laid out to cover the box (its zoom, its focus), turned about the box's centre.
+    const layout = coverLayout({ width: L.width, height: L.height }, shot.edit.source, shot.edit.adjust);
+    const degrees = shot.edit.adjust?.straighten ?? 0;
+    base = (x, y) => about({ x: layout.left + x * layout.width, y: layout.top + y * layout.height }, L.width, L.height, 1, degrees);
+    dw = layout.width;
+    dh = layout.height;
+  } else {
+    const A = shot.aspect || frameAspect;
+    dw = A > frameAspect ? L.height * A : L.width;
+    dh = A > frameAspect ? L.height : L.width / A;
+    const [px, py] = framingPercent(faceFocus(shot.focus, shot.face, A, frameAspect), A, frameAspect) ?? [50, 50];
+    const ox = ((dw - L.width) * px) / 100;
+    const oy = ((dh - L.height) * py) / 100;
+    const straight = straightening(camera?.straighten, frameAspect);
+    base = (x, y) => {
+      const p = { x: -ox + x * dw, y: -oy + y * dh };
+      return straight ? about(p, L.width, L.height, straight.scale, straight.degrees) : p;
+    };
+    if (straight) grow *= straight.scale;
+  }
+  const move = camera?.move && camera.move !== "none" ? cameraMotion(camera.move, t, shot.durationInFrames, camera) : camera?.burns ? burnsMotion(camera.burns, t, shot.durationInFrames) : undefined;
+  const punch = camera?.accent === "punch" ? punchScale(t) : 1;
+  if (move) grow *= move.scale;
+  grow *= punch;
+  const at = (x: number, y: number) => {
+    let p = base(x, y);
+    if (move) p = about(p, L.width, L.height, move.scale, 0, (move.shift ?? 0) / 100);
+    if (punch !== 1) p = about(p, L.width, L.height, punch);
+    return [L.left + p.x, L.top + p.y] as const;
+  };
+  return { at, dw: dw * grow, dh: dh * grow };
 }
 
 /** A shot's reading at a frame of the composition: the nearest image that has one (a frame or two without does not make it jump), within 6. */
@@ -370,9 +409,14 @@ export function SubjectBox(shot: ComposeShot | undefined, frame: number, laid?: 
   if (!shot) return null;
   const b = nearest(object ? shot.objects?.[objectName(object)]?.boxes : shot.subjectBoxes, shot, frame);
   if (!b) return null;
-  const { at, dw, dh } = placer(shot, laid);
-  const [x, y] = at(b[0]!, b[1]!);
-  return { x, y, w: b[2]! * dw, h: b[3]! * dh };
+  // Its four corners where the Reel draws them at this frame (a turned picture: the box around them).
+  const { at } = placer(shot, laid, frame);
+  const corners = [at(b[0]!, b[1]!), at(b[0]! + b[2]!, b[1]!), at(b[0]!, b[1]! + b[3]!), at(b[0]! + b[2]!, b[1]! + b[3]!)];
+  const xs = corners.map((c) => c[0]);
+  const ys = corners.map((c) => c[1]);
+  const x = Math.min(...xs);
+  const y = Math.min(...ys);
+  return { x, y, w: Math.max(...xs) - x, h: Math.max(...ys) - y };
 }
 
 // ——— Outline: a line along her edge ——————————————————————————————————————————————————————
@@ -385,7 +429,7 @@ export function SubjectBox(shot: ComposeShot | undefined, frame: number, laid?: 
 export function SubjectOutline(shot: ComposeShot | undefined, frame: number, laid?: Laid, object?: string): string | null {
   if (!shot) return null;
   const c = nearest(object ? shot.objects?.[objectName(object)]?.contours : shot.subjectContours, shot, frame);
-  return c ? outlinePath(c, placer(shot, laid).at) : null;
+  return c ? outlinePath(c, placer(shot, laid, frame).at) : null;
 }
 
 type OutlineProps = {
