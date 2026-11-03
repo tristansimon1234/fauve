@@ -25,9 +25,9 @@ export const subjectKey = (clipId: string, from: number, to: number) => `${clipI
  * Each use of the scope's cut-out tools with props in a code: `React.createElement(Subject|Outline, {…})` as kept (the
  * motion designer's TSX compiled by sucrase), `h(…)`, or a JSX tag; its props as written, braces matched.
  */
-function toolProps(js: string): string[] {
+function toolProps(js: string, tools = "Subject|Outline"): string[] {
   const out: string[] = [];
-  for (const m of js.matchAll(/\b(?:React\.createElement|h)\(\s*(?:Subject|Outline)\s*,\s*|<(?:Subject|Outline)\b/g)) {
+  for (const m of js.matchAll(new RegExp(`\\b(?:React\\.createElement|h)\\(\\s*(?:${tools})\\s*,\\s*|<(?:${tools})\\b`, "g"))) {
     const jsx = m[0].startsWith("<");
     const from = m.index + m[0].length;
     if (!jsx && js[from] !== "{") continue;
@@ -160,6 +160,53 @@ export function objectPassages(plan: Pick<EditPlan, "segments" | "layers">, isVi
   return out;
 }
 
+// ——— Her video's depth at every image (Depth in the scope: depth_video.py on the rented card) ———————————————————————
+
+/** The most video shots read in depth for one Reel, and the most seconds of video in all. */
+export const DEPTH_MAX = 4;
+export const DEPTH_MAX_SECONDS = 20;
+
+/** The name of a passage's depth among a clip's cut-outs: the passage's, then « ~depth » (never an object's « # »). */
+export const depthKey = (clipId: string, from: number, to: number) => `${subjectKey(clipId, from, to)}~depth`;
+
+/** The shots a composition's code shows in depth (`<Depth shot={2} … />`, compiled or as JSX; a shot written as a variable is not read). */
+export function depthsDrawn(js: string | undefined): number[] {
+  if (!js) return [];
+  const shots = new Set<number>();
+  for (const props of toolProps(js, "Depth")) {
+    const n = /^(?:shots\s*\[\s*)?(\d+)/.exec(SHOT_PROP.exec(props)?.[1] ?? "");
+    if (n) shots.add(Number(n[1]));
+  }
+  return [...shots];
+}
+
+/** A plan whose compositions show a shot's depth. */
+export const wantsDepth = (plan: Pick<EditPlan, "layers">) => (plan.layers ?? []).some((l) => l.compose && depthsDrawn(l.motion?.js).length > 0);
+
+/**
+ * The passages a Reel reads in depth: the shot each composition names (her shot n is the plan's n-th shot, as its
+ * shots list them), a video at its own pace only (a speed or a ramp changes which images show); DEPTH_MAX at most,
+ * DEPTH_MAX_SECONDS in all.
+ */
+export function depthPassages(plan: Pick<EditPlan, "segments" | "layers">, isVideo: (clipId: string) => boolean): SubjectPassage[] {
+  const shots = plan.segments.filter(isClipSegment);
+  const out: SubjectPassage[] = [];
+  let seconds = 0;
+  for (const layer of plan.layers ?? []) {
+    if (!layer.compose) continue;
+    for (const shot of depthsDrawn(layer.motion?.js)) {
+      const s = shots[shot];
+      if (!s || !isVideo(s.clip_id) || s.ramp || (s.speed && Math.abs(s.speed - 1) > 0.01)) continue;
+      const key = depthKey(s.clip_id, s.in, s.out);
+      const length = Math.max(0, s.out - s.in);
+      if (out.some((p) => p.key === key) || out.length >= DEPTH_MAX || !length || seconds + length > DEPTH_MAX_SECONDS) continue;
+      out.push({ clip_id: s.clip_id, from: s.in, to: s.out, key });
+      seconds += length;
+    }
+  }
+  return out;
+}
+
 /** The cut-outs kept on a video (media_assets.subjects), by passage: its file, or why it failed (tried again later). */
 export const mediaSubjectsSchema = z.record(
   z.string(),
@@ -179,6 +226,8 @@ export const mediaSubjectsSchema = z.record(
       contour: z.string().optional(),
       /** The object followed through the passage (a cup she lifts), when it is one and not her. */
       object: z.string().optional(),
+      /** Its depth at every image (a grey video, near white), not a cut-out: Depth draws it. */
+      depth: z.boolean().optional(),
     }),
     z.object({ failed_at: z.string(), error: z.string() }),
   ]),

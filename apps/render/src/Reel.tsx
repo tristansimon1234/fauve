@@ -247,6 +247,7 @@ export function Reel(props: ReelProps) {
               draw: (shot, size) => drawShot(props.segments[shot.segment], theme, size, shot.face),
               subject: (shot, size) => drawShot(props.segments[shot.segment], theme, size, shot.face, "subject"),
               object: (shot, name, size) => drawShot(props.segments[shot.segment], theme, size, shot.face, { object: name }),
+              depth: (shot, size) => drawShot(props.segments[shot.segment], theme, size, shot.face, "depth"),
             }}
             reelTexts={compose.reelTexts}
             end={compose.end}
@@ -348,8 +349,9 @@ export function Reel(props: ReelProps) {
 }
 
 /** One of her shots in a box of that size, as the Reel draws it (its retouch, its camera move, its light), its faces whole: for a composition. */
-function drawShot(segment: ReelProps["segments"][number] | undefined, theme: Theme, size: { width: number; height: number }, face?: FaceZone, layer?: "subject" | { object: string }): ReactNode {
+function drawShot(segment: ReelProps["segments"][number] | undefined, theme: Theme, size: { width: number; height: number }, face?: FaceZone, layer?: "subject" | "depth" | { object: string }): ReactNode {
   if (layer === "subject") return segment?.type === "clip" && segment.subject ? <Shot segment={segment} theme={theme} frame={size} face={face} layer="subject" /> : null;
+  if (layer === "depth") return segment?.type === "clip" && segment.depthMap ? <Shot segment={segment} theme={theme} frame={size} face={face} layer="depth" /> : null;
   if (layer) return segment?.type === "clip" && segment.objects?.[layer.object] ? <Shot segment={segment} theme={theme} frame={size} face={face} layer={layer} /> : null;
   if (segment?.type === "clip") return <Shot segment={segment} theme={theme} frame={size} face={face} />;
   if (segment?.type === "image") return <Photo src={segment.src} edit={segment.edit} grade={theme.grade} frame={size} />;
@@ -532,7 +534,7 @@ function Letterbox({ aspect, children }: { aspect: number | undefined; children:
  * A clip as the Reel frames it; with layer « subject », its subject cut out (matte.py) drawn the same way (the same
  * framing, straightening, camera move, light and blurred faces), so it falls exactly on the shot.
  */
-function Shot({ segment, theme, frame: box, face, layer }: { segment: ClipSegment; theme: Theme; frame?: { width: number; height: number }; face?: FaceZone; layer?: "subject" | { object: string } }) {
+function Shot({ segment, theme, frame: box, face, layer }: { segment: ClipSegment; theme: Theme; frame?: { width: number; height: number }; face?: FaceZone; layer?: "subject" | "depth" | { object: string } }) {
   const frame = useCurrentFrame();
   const video = useVideoConfig();
   const { width, height } = box ?? video;
@@ -546,13 +548,18 @@ function Shot({ segment, theme, frame: box, face, layer }: { segment: ClipSegmen
     objectPosition: framing(focus, segment.aspect, frameAspect),
     filter: [theme.grade, cssFilter(segment.adjust)].filter(Boolean).join(" ") || undefined,
   };
-  // Her subject's cut-out, or an object's (a cup she lifts), drawn exactly where the shot is.
-  const subject = layer === "subject" ? segment.subject : layer ? segment.objects?.[layer.object] : undefined;
-  if (layer && !subject) return null;
+  // Her subject's cut-out, or an object's (a cup she lifts), drawn exactly where the shot is; or its depth, grey and
+  // without the shot's light (it is a machine's view of the room, not her picture).
+  const depth = layer === "depth" ? segment.depthMap : undefined;
+  const subject = layer === "subject" ? segment.subject : layer && layer !== "depth" ? segment.objects?.[layer.object] : undefined;
+  if (layer && !subject && !depth) return null;
   // A passage of the clip at one speed: the file may start later in the clip (a slow motion's own smooth file).
   const passage = (p: SpeedPiece) => (
     <>
-      {subject ? (
+      {depth ? (
+        // Its depth starts at the shot's first image of the clip, image for image.
+        <OffthreadVideo src={depth.src} muted trimBefore={Math.max(0, p.startFrom - segment.startFrom)} playbackRate={p.speed} style={{ ...look, filter: undefined }} />
+      ) : subject ? (
         subject.still ? (
           <Img src={subject.src} style={look} />
         ) : (

@@ -197,7 +197,7 @@ type Machine = "cut" | "torch";
  * its readings by job id, or why there are none. `seconds`: the time the card ran (what Modal bills), 0 when none came.
  */
 async function onCard(
-  script: "portrait.py" | "photo_cut.py" | "track_objects.py" | "relief.py" | "rife.py" | "upscale.py",
+  script: "portrait.py" | "photo_cut.py" | "track_objects.py" | "relief.py" | "rife.py" | "upscale.py" | "depth_video.py",
   machine: Machine,
   jobs: { id: string }[],
   envFor: (secondsLeft: number) => Record<string, string>,
@@ -211,7 +211,7 @@ async function onCard(
   const started = Date.now();
   const at = () => `${((Date.now() - started) / 1000).toFixed(1)} s`;
   const say = (what: string) => console.log(`gpu ${at()}: ${what}`);
-  const files = ["portrait.py", "matte.py", "photo_cut.py", "track_objects.py", "relief.py", "rife.py", "upscale.py"].map((name) => ({ name, text: REMOTION_SOURCE_FILES[name] }));
+  const files = ["portrait.py", "matte.py", "photo_cut.py", "track_objects.py", "relief.py", "rife.py", "upscale.py", "depth_video.py"].map((name) => ({ name, text: REMOTION_SOURCE_FILES[name] }));
   const missing = files.find((f) => !f.text);
   if (missing) return { readings: new Error(`${missing.name} is missing from the render source`), seconds: 0, gpu };
 
@@ -443,6 +443,36 @@ export async function reliefsOnGpu(shots: GpuRelief[], deadlineMs: number, optio
     }
     const n = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : 0);
     results[s.key] = r.uploaded && n(r.frames) > 0 ? { frames: n(r.frames), w: n(r.w), h: n(r.h), ...(typeof r.near === "number" ? { near: r.near } : {}) } : new Error("relief not sent");
+  }
+  return { results, seconds, gpu };
+}
+
+/** A passage of her video to read in depth (depth_video.py): the clip (signed), its seconds in the clip, where its grey video is sent. */
+export type GpuDepthVideo = { key: string; url: string; from: number; to: number; upload: { mp4: string } };
+/** A passage read in depth on the card (its grey video already sent): its images and its size. */
+export type GpuDepthVideoDone = { frames: number; w: number; h: number };
+
+/**
+ * Reads the depth of each passage at every image on the card (depth_video.py, the PyTorch machine and the photos' depth
+ * model: near white, far black, the Reel's own images): a few seconds a passage once the card is up. Never throws.
+ */
+export async function depthVideosOnGpu(
+  passages: GpuDepthVideo[],
+  deadlineMs: number,
+  options: CardOptions = {},
+): Promise<{ results: Record<string, GpuDepthVideoDone | Error>; seconds: number; gpu: string | null }> {
+  if (!passages.length) return { results: {}, seconds: 0, gpu: null };
+  const jobs = passages.map((p) => ({ id: p.key, url: p.url, from: p.from, to: p.to, upload: p.upload }));
+  const { readings, seconds, gpu } = await onCard("depth_video.py", "torch", jobs, () => ({ DEPTH_MODEL: `/models/${DEPTH_MODEL.dir}`, DEPTH_WORK: "/work", HDR_FILTER: HDR_TO_SDR }), deadlineMs, options);
+  const results: Record<string, GpuDepthVideoDone | Error> = {};
+  for (const p of passages) {
+    const r = readingOf(readings, p.key);
+    if (r instanceof Error) {
+      results[p.key] = r;
+      continue;
+    }
+    const n = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : 0);
+    results[p.key] = r.uploaded && n(r.frames) > 0 ? { frames: n(r.frames), w: n(r.w), h: n(r.h) } : new Error("depth not sent");
   }
   return { results, seconds, gpu };
 }

@@ -1,10 +1,23 @@
 import "server-only";
 import { createHash, randomUUID } from "node:crypto";
-import { isClipSegment, mediaSubjectsSchema, mediaTracksSchema, objectPassages, subjectPassages, wantsObjects, type EditPlan, type MediaSubjects, type ObjectPassage, type SubjectPassage } from "@fauve/agent";
+import {
+  depthPassages,
+  isClipSegment,
+  mediaSubjectsSchema,
+  mediaTracksSchema,
+  objectPassages,
+  subjectPassages,
+  wantsDepth,
+  wantsObjects,
+  type EditPlan,
+  type MediaSubjects,
+  type ObjectPassage,
+  type SubjectPassage,
+} from "@fauve/agent";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { costMeta } from "@/lib/cost-scope";
 import { timeLeft } from "@/lib/step-clock";
-import { GPU_START_MS, gpuCostEur, gpuReady, objectsOnGpu, subjectsOnGpu } from "./gpu";
+import { depthVideosOnGpu, GPU_START_MS, gpuCostEur, gpuReady, objectsOnGpu, subjectsOnGpu } from "./gpu";
 import { cutoutCostEur, subjectsInSandbox } from "./sandbox";
 
 // Her subject cut out at every image of the passages a composition draws it on (Subject), made in the cut-out
@@ -259,8 +272,9 @@ export async function subjectInputs(
   plan: Plan,
 ): Promise<Record<string, { src: string; still?: boolean; top?: number; boxes?: (number[] | null)[]; contours?: (number[] | null)[] }>> {
   const { passages: herPassages, rows } = await planned(studioId, plan);
-  // The objects its compositions follow too (a cup, a product), kept the same way under their own keys.
-  const passages = [...herPassages, ...objectPassages(plan, (id) => rows.get(id)?.kind === "video")];
+  // The objects its compositions follow too (a cup, a product), kept the same way under their own keys, and the shots they show in depth.
+  const isVideo = (id: string) => rows.get(id)?.kind === "video";
+  const passages = [...herPassages, ...objectPassages(plan, isVideo), ...depthPassages(plan, isVideo)];
   const found = passages.flatMap((p) => {
     const k = kept(rows.get(p.clip_id))[p.key];
     return k && "path" in k && k.path.startsWith(`${studioId}/`)
@@ -377,5 +391,79 @@ export async function ensureObjects(studioId: string, postId: string, plan: Plan
       units: Math.round(seconds),
       cost_eur: gpuCostEur(seconds, gpu),
       meta: costMeta({ post_id: postId, objects: jobs.length, done, gpu, seconds_of_video: Math.round(missing.reduce((n, p) => n + p.to - p.from, 0) * 10) / 10 }),
+    });
+}
+
+// ——— Her video's depth at every image (Depth): read on the card ———————————————————————————————————————————————
+
+/** Where a passage's depth is kept (beside its cut-outs, removed with the clip by the retention). */
+export const depthPath = (studioId: string, mediaId: string, key: string) => `${studioId}/subjects/${mediaId}-${createHash("sha1").update(key).digest("hex").slice(0, 12)}.mp4`;
+
+/** On the card: the depth model loaded (2 s) and the clip fetched, then a second of video (its 30 images read, about 1 s on an A10G). */
+const DEPTH_LOAD_MS = 30_000;
+const DEPTH_WORK_PER_SECOND = 3;
+
+/**
+ * Reads in depth, at every image, the shots a Reel's compositions show with Depth (the grey pass of a computer-vision
+ * Reel, a fog or a light by distance), on the rented card only (on the sandbox's CPUs it takes about 2 s an image):
+ * kept beside the clip (media_assets.subjects, under `subjectKey~depth`). Never fails a render: a shot without its
+ * depth simply draws nothing there.
+ */
+export async function ensureDepths(studioId: string, postId: string, plan: Plan): Promise<void> {
+  if (!gpuReady() || !wantsDepth(plan) || plan.finish?.steady === "off") return;
+  const db = supabaseAdmin();
+  const ids = [...new Set(plan.segments.flatMap((s) => (isClipSegment(s) ? [s.clip_id] : [])))];
+  const { data } = await db.from("media_assets").select("id, kind, storage_path, subjects, tracks").eq("studio_id", studioId).in("id", ids);
+  const rows = new Map(((data ?? []) as Row[]).map((r) => [r.id, r]));
+  const missing = depthPassages(plan, (id) => rows.get(id)?.kind === "video").filter((p) => {
+    const k = kept(rows.get(p.clip_id))[p.key];
+    return !k || ("failed_at" in k && Date.now() - Date.parse(k.failed_at) > RETRY_MS);
+  });
+  if (!missing.length) return;
+  const left = timeLeft();
+  const budget = (Number.isFinite(left) ? left : 800_000) - RENDER_MARGIN_MS;
+  const work = missing.reduce((n, p) => n + (p.to - p.from) * DEPTH_WORK_PER_SECOND * 1000, 0);
+  const deadline = Math.min(budget, GPU_START_MS + DEPTH_LOAD_MS + 2 * work);
+  if (deadline < GPU_START_MS) return;
+  const clips = [...new Set(missing.map((p) => p.clip_id))];
+  const clipPaths = clips.map((id) => rows.get(id)?.storage_path ?? "");
+  const signed = (await db.storage.from("media").createSignedUrls(clipPaths.filter(Boolean), 3600)).data ?? [];
+  const jobs = (
+    await Promise.all(
+      missing.map(async (p) => {
+        const url = signed.find((x) => x.path === clipPaths[clips.indexOf(p.clip_id)])?.signedUrl;
+        const upload = await db.storage.from("media").createSignedUploadUrl(depthPath(studioId, p.clip_id, p.key), { upsert: true });
+        return url && upload.data?.signedUrl ? [{ key: p.key, url, from: p.from, to: p.to, upload: { mp4: upload.data.signedUrl } }] : [];
+      }),
+    )
+  ).flat();
+  if (!jobs.length) return;
+  const { results, seconds, gpu } = await depthVideosOnGpu(jobs, deadline);
+  const at = new Date().toISOString();
+  const updates = new Map<string, MediaSubjects>();
+  let done = 0;
+  for (const p of missing) {
+    const result = results[p.key];
+    if (!result) continue;
+    const next = updates.get(p.clip_id) ?? { ...kept(rows.get(p.clip_id)) };
+    if (result instanceof Error) {
+      console.warn("depth not read", p.key, result.message);
+      next[p.key] = { failed_at: at, error: result.message.slice(0, 200) };
+    } else {
+      done++;
+      next[p.key] = { path: depthPath(studioId, p.clip_id, p.key), still: false, at, frames: result.frames, depth: true };
+    }
+    updates.set(p.clip_id, next);
+  }
+  await Promise.all([...updates].map(([id, subjects]) => db.from("media_assets").update({ subjects }).eq("id", id).eq("studio_id", studioId)));
+  // The card's time, billed whether or not it read them (none when no card was allotted).
+  if (seconds > 0)
+    await db.from("cost_events").insert({
+      studio_id: studioId,
+      kind: "depth_video",
+      provider: "modal",
+      units: Math.round(seconds),
+      cost_eur: gpuCostEur(seconds, gpu),
+      meta: costMeta({ post_id: postId, passages: jobs.length, done, gpu, seconds_of_video: Math.round(missing.reduce((n, p) => n + p.to - p.from, 0) * 10) / 10 }),
     });
 }

@@ -948,6 +948,49 @@ test("what a composition's code cuts out: her, or the objects it names, shot by 
   assert.ok(OBJECT_MAX >= 2);
 });
 
+test("what a composition shows in depth: the shots its code names, read through their passages, given to the render", async () => {
+  const { depthsDrawn, depthPassages, depthKey, drawsSubject, objectsDrawn, wantsDepth, DEPTH_MAX } = await import("./subject.ts");
+  const { buildReelProps } = await import("./motion.ts");
+  // As kept (compiled by sucrase) and as JSX; a shot written as a variable is not read; never her cut-out nor an object.
+  const code = `React.createElement(Depth, { shot: 1, style: { left: 0, top: 0, width: 1080, height: 1920 }, invert: true,} ) <Depth shot={shots[2]} />`;
+  assert.deepEqual(depthsDrawn(code).sort(), [1, 2]);
+  assert.deepEqual(depthsDrawn(`<Depth shot={i} />`), []);
+  assert.equal(drawsSubject(code), false);
+  assert.deepEqual(objectsDrawn(code), []);
+  const plan = {
+    segments: [
+      { clip_id: "photo1", in: 0, out: 2 },
+      { clip_id: "v1", in: 1, out: 4 },
+      { clip_id: "v2", in: 0, out: 3, speed: 0.5 },
+    ],
+    layers: [{ from: 0, to: 9, brief: "", compose: true, motion: { js: code } }],
+  } as never;
+  assert.equal(wantsDepth(plan), true);
+  // A video at its own pace only (shot 2 plays at half speed), under a key no object takes (« ~ », never « # »).
+  const passages = depthPassages(plan, (id) => id.startsWith("v"));
+  assert.deepEqual(passages, [{ clip_id: "v1", from: 1, to: 4, key: depthKey("v1", 1, 4) }]);
+  assert.match(passages[0]!.key, /^v1@1\.00-4\.00~depth$/);
+  assert.ok(DEPTH_MAX >= 2);
+  // The render gets it on its shot, apart from the objects.
+  const props = buildReelProps(
+    {
+      format: "9:16",
+      duration: 3,
+      template: "libre",
+      segments: [{ clip_id: "v1", in: 1, out: 4, zoom: "none" }],
+      texts: [],
+      images: [],
+      transitions: "cut",
+      subtitles: false,
+      music: null,
+    } as never,
+    { template: "libre", clipUrls: { v1: "https://x/v1.mp4" }, brand: { name: "Studio" }, subjects: { [depthKey("v1", 1, 4)]: { src: "https://x/v1-depth.mp4" } } } as never,
+  );
+  const shot = props.segments[0] as { depthMap?: { src: string }; objects?: unknown };
+  assert.deepEqual(shot.depthMap, { src: "https://x/v1-depth.mp4" });
+  assert.equal(shot.objects, undefined);
+});
+
 test("her outline: a smooth closed path, open where the frame cuts her", async () => {
   const { outlinePath } = await import("../../../apps/render/src/outline.ts");
   const ring = (pts: number[][]) => pts.flat();

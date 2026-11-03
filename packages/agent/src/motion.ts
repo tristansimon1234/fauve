@@ -9,7 +9,7 @@ import { placeSounds, planCues, type SoundFacts, type SoundPlacement } from "./s
 import type { SfxLevel } from "./schemas.ts";
 import { faceZone, layerTrack, sceneTrack, shotTrack, type FaceZone, type ShotTrack, type TrackPiece, type TracksByClip } from "./tracking.ts";
 import { DEPTH_MOVES, reliefOf } from "./depth.ts";
-import { subjectKey } from "./subject.ts";
+import { depthKey, subjectKey } from "./subject.ts";
 import { lookMatrix, lookStamp, planLook, type ReelLook } from "./looks.ts";
 
 // Edit plan → props of the Remotion "Reel" composition (apps/render). Everything
@@ -103,6 +103,8 @@ export type ReelSegment =
       subject?: { src: string; still?: boolean; top?: number };
       /** Objects followed through the passage (a cup, a product), by name, cut out the same way: Subject with `object`. */
       objects?: Record<string, { src: string; still?: boolean }>;
+      /** Its depth at every image of the passage (depth_video.py: a grey video, near white), drawn like the shot by a composition's Depth. */
+      depthMap?: { src: string };
     }
   /**
    * A photo: a carousel slide (with its retouch and blurred zones), or a photo in a Reel (zoom: a slow Ken Burns move).
@@ -705,6 +707,8 @@ export function buildReelProps(plan: EditPlan, inputs: ReelInputs): ReelProps {
       ...(!ramp && !speed && passageObjects(inputs.subjects, subjectKey(s.clip_id, s.in, s.out)).length
         ? { objects: Object.fromEntries(passageObjects(inputs.subjects, subjectKey(s.clip_id, s.in, s.out)).map(([name, o]) => [name, { src: o.src, ...(o.still ? { still: true } : {}) }])) }
         : {}),
+      // Its depth, image for image (as its cut-out): only at its own pace.
+      ...(!ramp && !speed && inputs.subjects?.[depthKey(s.clip_id, s.in, s.out)] ? { depthMap: { src: inputs.subjects[depthKey(s.clip_id, s.in, s.out)]!.src } } : {}),
     };
   });
   const durationInFrames = cursor + fadeFrames;

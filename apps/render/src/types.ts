@@ -134,6 +134,8 @@ export type ReelProps = {
         subject?: { src: string; still?: boolean; top?: number };
         /** Objects followed through the passage (a cup, a product), by name, cut out the same way: Subject with `object`. */
         objects?: Record<string, { src: string; still?: boolean }>;
+        /** Its depth at every image of the passage (a grey video, near white), drawn like the shot by Depth. */
+        depthMap?: { src: string };
       }
     | {
         type: "image";

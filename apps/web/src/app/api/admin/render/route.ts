@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { after, type NextRequest } from "next/server";
 import { cronAuthorized } from "@/lib/cron-auth";
 import { designEdit } from "@/lib/agent/editor";
-import { gpuCostEur, gpuReady, objectsOnGpu, photosOnGpu, reliefsOnGpu, smoothOnGpu, subjectsOnGpu, upscaleOnGpu } from "@/lib/render/gpu";
+import { depthVideosOnGpu, gpuCostEur, gpuReady, objectsOnGpu, photosOnGpu, reliefsOnGpu, smoothOnGpu, subjectsOnGpu, upscaleOnGpu } from "@/lib/render/gpu";
 import { reliefOf } from "@fauve/agent";
 import { renderPost } from "@/lib/render/render-post";
 import { cleanSpeechInSandbox, dropSandbox, pruneSnapshots, trackSandbox, warmRemotionPool } from "@/lib/render/sandbox";
@@ -216,6 +216,34 @@ export async function POST(request: NextRequest) {
       console.log(
         "gpu upscale",
         JSON.stringify({ link: result && !(result instanceof Error) ? link.data?.signedUrl : null, before: before.data?.signedUrl, media, gpu: used, card_seconds: Math.round(seconds), cost_eur: Math.round(cost * 1000) / 1000, result: result instanceof Error ? result.message : result }),
+      );
+    });
+    return Response.json({ ok: true, started: true }, { status: 202 });
+  }
+  // ?action=gpu-depth&media=<video id>&from=0&to=3: the depth of a passage of her video at every image on the card
+  // (depth_video.py), its grey video in {studio}/lab-gpu/ (« gpu depth »); its first call adds nothing to the card's
+  // PyTorch machine (the photos' relief already brought its model).
+  if (action === "gpu-depth") {
+    const media = request.nextUrl.searchParams.get("media") ?? "";
+    const from = Number(request.nextUrl.searchParams.get("from") ?? "0");
+    const to = Number(request.nextUrl.searchParams.get("to") ?? "3");
+    if (!/^[0-9a-f-]{36}$/.test(media) || !(from >= 0) || !(to > from) || to - from > 20) return Response.json({ error: "media=<uuid>&from&to (20 s at most)" }, { status: 400 });
+    if (!gpuReady()) return Response.json({ error: "MODAL_TOKEN_ID / MODAL_TOKEN_SECRET not set" }, { status: 400 });
+    after(async () => {
+      const db = supabaseAdmin();
+      const { data: row } = await db.from("media_assets").select("studio_id, storage_path, kind").eq("id", media).maybeSingle();
+      if (!row?.storage_path || row.kind !== "video") return console.error("gpu depth: no such video", media);
+      const path = `${row.studio_id}/lab-gpu/depth-${media}.mp4`;
+      const [file, upload] = await Promise.all([db.storage.from("media").createSignedUrl(row.storage_path, 3600), db.storage.from("media").createSignedUploadUrl(path, { upsert: true })]);
+      if (!file.data?.signedUrl || !upload.data?.signedUrl) return console.error("gpu depth: links refused");
+      const { results, seconds, gpu: used } = await depthVideosOnGpu([{ key: "lab", url: file.data.signedUrl, from, to, upload: { mp4: upload.data.signedUrl } }], 700_000, { startMs: 600_000 });
+      const result = results.lab;
+      const cost = gpuCostEur(seconds, used);
+      if (seconds > 0) await db.from("cost_events").insert({ studio_id: row.studio_id, kind: "depth_video", provider: "modal", units: Math.round(seconds), cost_eur: cost, meta: { lab: true, media, gpu: used } });
+      const link = await db.storage.from("media").createSignedUrl(path, 86_400);
+      console.log(
+        "gpu depth",
+        JSON.stringify({ link: result && !(result instanceof Error) ? link.data?.signedUrl : null, media, gpu: used, card_seconds: Math.round(seconds), cost_eur: Math.round(cost * 1000) / 1000, result: result instanceof Error ? result.message : result }),
       );
     });
     return Response.json({ ok: true, started: true }, { status: 202 });

@@ -430,7 +430,14 @@ async function localMedia(sandbox: Sandbox, id: string, props: ReelProps, option
         ...(segment.relief ? { relief: { ...segment.relief, src: local(segment.relief.src, false) } } : {}),
       };
     if (slowShots.has(index)) return segment;
-    if (segment.type === "clip" && segment.subject) return { ...segment, src: local(segment.src, true), subject: { ...segment.subject, src: local(segment.subject.src, false) } };
+    // Its cut-out and its depth (an MP4 of grey images, depth_video.py), fetched as they are, image for image.
+    if (segment.type === "clip" && (segment.subject || segment.depthMap))
+      return {
+        ...segment,
+        src: local(segment.src, true),
+        ...(segment.subject ? { subject: { ...segment.subject, src: local(segment.subject.src, false) } } : {}),
+        ...(segment.depthMap ? { depthMap: { src: local(segment.depthMap.src, false) } } : {}),
+      };
     if (segment.type === "clip" || segment.type === "image") return { ...segment, src: local(segment.src, segment.type === "clip") };
     const moved = segment.under ? { ...segment, under: under(segment.under) } : segment;
     return moved.type === "motion" && moved.photos ? { ...moved, photos: photos(moved.photos) } : moved;

@@ -66,6 +66,8 @@ export type FootageSource = {
   subject?: (shot: ComposeShot, size: { width: number; height: number }) => ReactNode;
   /** An object followed through it (by name), cut out the same way; nothing when it was not followed. */
   object?: (shot: ComposeShot, name: string, size: { width: number; height: number }) => ReactNode;
+  /** Its depth at every image (depth_video.py: near white, far black), drawn exactly like the shot; nothing when it has none. */
+  depth?: (shot: ComposeShot, size: { width: number; height: number }) => ReactNode;
 };
 
 /** Given by the Reel to a collage's composition only; none in the scene check (a grey card stands in for each shot). */
@@ -92,6 +94,39 @@ function Footage({ shot, style, hold }: { shot: number; style?: CSSProperties; h
       {local >= 0 && local < info.durationInFrames && hold && hold > 1 ? (
         // Each image held `hold` frames: the jerky, frame-sampled slow motion of the « Nike » edit, or stop motion.
         <Freeze frame={Math.floor(local / Math.round(hold)) * Math.round(hold)}>{media}</Freeze>
+      ) : local >= 0 && local < info.durationInFrames ? (
+        <Sequence from={info.from} durationInFrames={info.durationInFrames} layout="none">
+          {media}
+        </Sequence>
+      ) : (
+        <Freeze frame={Math.max(0, Math.min(info.durationInFrames - 1, local))}>{media}</Freeze>
+      )}
+    </div>
+  );
+}
+
+/**
+ * One of her video shots' depth, read at every image before the render (depth_video.py): near white, far black, as a
+ * machine sees the room, drawn exactly where and how Footage draws the shot in the same box (its framing and its camera
+ * move), without the shot's light. `invert`: the far white. Laid alone it is the grey depth pass of a computer-vision
+ * Reel; over its Footage (mixBlendMode, opacity) a fog or a light that falls with distance. Nothing when the shot has
+ * none (a photo, a passage at another speed, the card unavailable): the composition must still work.
+ */
+function Depth({ shot, style, invert = false, hold }: { shot: number; style?: CSSProperties; invert?: boolean; hold?: number }) {
+  const source = useContext(FootageContext);
+  const frame = useCurrentFrame();
+  const { width, height } = useVideoConfig();
+  const info = source?.shots[shot];
+  if (!info) return null;
+  const media = source?.depth?.(info, { width: px(style?.width) ?? width, height: px(style?.height) ?? height });
+  if (!media) return null;
+  const local = frame - info.from;
+  const step = hold && hold > 1 ? Math.round(hold) : 0;
+  const filter = [style?.filter, invert ? "invert(1)" : ""].filter(Boolean).join(" ") || undefined;
+  return (
+    <div style={{ position: "absolute", overflow: "hidden", ...style, filter }}>
+      {local >= 0 && local < info.durationInFrames && step ? (
+        <Freeze frame={Math.floor(local / step) * step}>{media}</Freeze>
       ) : local >= 0 && local < info.durationInFrames ? (
         <Sequence from={info.from} durationInFrames={info.durationInFrames} layout="none">
           {media}
@@ -230,6 +265,7 @@ export const SCOPE = {
   Cutout,
   Footage,
   Subject,
+  Depth,
   Marker,
   Tiles: kit.Tiles,
   Window: kit.Window,

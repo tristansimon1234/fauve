@@ -126,6 +126,8 @@ function checkScope(width: number, height: number, durationInFrames: number): ty
   // An object followed instead of her (`object`): not her silhouette, nothing to read behind it here.
   const Subject = ({ shot, style, object }: { shot: number; style?: CSSProperties; object?: string }) =>
     object ? null : <div data-fauve-subject={shot} style={{ position: "absolute", left: 0, top: 0, width, height, ...style }} />;
+  // Her shot's depth: nothing read here (the render draws it when the card read it; the composition must work without).
+  const Depth = () => null;
   const useVideoConfig = () => ({ ...SCOPE.useVideoConfig(), width, height, durationInFrames });
   return {
     ...SCOPE,
@@ -142,6 +144,7 @@ function checkScope(width: number, height: number, durationInFrames: number): ty
     Cutout: Cutout as typeof SCOPE.Cutout,
     Footage: Footage as typeof SCOPE.Footage,
     Subject: Subject as unknown as typeof SCOPE.Subject,
+    Depth: Depth as unknown as typeof SCOPE.Depth,
   };
 }
 
