@@ -3,8 +3,8 @@ import { AbsoluteFill, Audio, Composition, continueRender, delayRender, Easing, 
 import { Mascot, type MascotMood } from "../../web/src/components/mascot";
 // The app's own font files (those of its link preview image), not Google's: the render runs offline.
 import instrumentItalic from "../../web/src/app/_og/instrument-italic.ttf";
-import jakarta600 from "../../web/src/app/_og/jakarta-600.ttf";
-import jakarta800 from "../../web/src/app/_og/jakarta-800.ttf";
+import interTight500 from "../../web/src/app/_og/intertight-500.ttf";
+import interTight600 from "../../web/src/app/_og/intertight-600.ttf";
 import take from "./voice.json";
 
 // Edith's introduction (Tristan: « il se connecte, bienvenue, voici tout ce qu'il faut savoir sur
@@ -12,7 +12,11 @@ import take from "./voice.json";
 // ordi », then « il faut un truc plus dynamique », told like a friend: « en gros je t'explique, tu
 // me parles sur WhatsApp comme à une vraie personne, tu m'envoies tes photos, tes notes vocales, on
 // brainstorme et je m'occupe de tout »): her voice in one take, and everything on screen lands on
-// its words (cue). Motion design in the app's colours, her real landing work inside.
+// its words (cue). Motion design in the app's colours, her real landing work inside. Redone in the paper and ink
+// art direction (lot 6, Tristan: « il faudra refaire le reel de l'onboarding aussi pour correspondre à la DA »): black
+// and white, square corners, thin lines, big tight Inter Tight with one word in Instrument Serif italic, the pictures
+// bringing the colour; without « Tu dis oui, je publie… » nor « sur ordi, tout est dans l'app » (cut out of the same
+// take: Tristan, « c'est faux », « en 5 minutes SANS APP, directement sur WhatsApp »).
 //
 // Made by hand, once:
 //   1. Edith's voice reads the script (its charter's narrator, Lucie): POST /api/admin/voices?say=<voice>&text=<script>
@@ -20,17 +24,17 @@ import take from "./voice.json";
 //   2. python3 intro/take.py <the answer.json> <voice.mp3>: ../web/public/landing/intro-voice.mp3 and intro/voice.json
 //      (its words, imported here);
 //   3. from apps/render: npx remotion render intro/index.ts EdithIntro <out.mp4> --public-dir ../web/public/landing --crf 20
-//   4. Edith's music under it, mixed as for any Reel (the voice-over case): the video uploaded to the lab studio of
-//      edith-ai.app (/api/admin/lab?site=edith-ai.app&step=upload), set as a played-as-is post (a « baked » plan,
-//      its voice flagged), then &step=music; its render is apps/web/public/onboarding/edith-intro.mp4, its poster:
+//   4. music under it: one of Edith's compositions mixed under the voice as for a voice-over Reel (MIX_CASES.voice_over:
+//      the voice at -14 LUFS, the music at -20 ducking under it, its last 0.8 s faded); the render is
+//      apps/web/public/onboarding/edith-intro.mp4, its poster:
 //      ffmpeg -ss 3 -i edith-intro.mp4 -frames:v 1 -vf scale=540:-1 -q:v 4 edith-intro.jpg
 
 const FPS = 30;
 const s = (seconds: number) => Math.round(seconds * FPS);
 /** The voice starts this long (s) after the first frame. */
 const LEAD = 0.25;
-/** What stays on screen after its last word (s): « On commence ? » and how to start, to read. */
-const TAIL = 2.7;
+/** What stays on screen after its last word (s): « On commence ? », five minutes without an app, and how to start, to read. */
+const TAIL = 3.6;
 
 type Word = { w: string; start: number; end: number };
 const WORDS: Word[] = take.words;
@@ -77,45 +81,34 @@ const T = {
   reels: cue("reels"),
   carrousels: cue("carrousels"),
   legendes: cue("legendes"),
-  dis: cue("tu", 15),
-  oui: cue("oui"),
-  publie: cue("publie"),
-  instagram: cue("instagram"),
-  tiktok: cue("tiktok"),
-  etOrdi: cue("et", 18),
-  ordi: cue("ordi"),
-  toutApp: cue("tout", 19),
-  app: cue("l'app"),
   allez: cue("allez"),
-  commence: cue("on", 20.5),
+  commence: cue("on", 15.9),
 };
 
+/** The app's paper and ink (globals.css); WhatsApp's own colours inside its screens. */
 const C = {
-  bg: "#FBF7F4",
-  ink: "#1C1530",
-  muted: "#5E5670",
-  violet: "#5B3FD9",
-  lilac: "#EFEBFF",
-  coral: "#F2694E",
-  peach: "#FFE9E1",
-  line: "#ECE6EF",
+  bg: "#F5F2EC",
+  soft: "#ECE8E0",
+  ink: "#121110",
+  muted: "#6B675F",
+  line: "#D4CEC3",
   chat: "#EFEAE2",
   mine: "#D9FDD3",
   green: "#25D366",
 };
-const SANS = "'Plus Jakarta Sans', sans-serif";
+const SANS = "'Inter Tight', sans-serif";
 const SERIF = "'Instrument Serif', serif";
 const clamp = { extrapolateLeft: "clamp", extrapolateRight: "clamp" } as const;
 
 let fontsAsked = false;
-/** Plus Jakarta Sans (600, 800) and Instrument Serif italic, before the first frame. */
+/** Inter Tight (500, 600) and Instrument Serif italic, before the first frame. */
 function loadBrandFonts() {
   if (fontsAsked || typeof document === "undefined") return;
   fontsAsked = true;
   const handle = delayRender("brand fonts");
   const faces = [
-    new FontFace("Plus Jakarta Sans", `url(${jakarta600})`, { weight: "600" }),
-    new FontFace("Plus Jakarta Sans", `url(${jakarta800})`, { weight: "800" }),
+    new FontFace("Inter Tight", `url(${interTight500})`, { weight: "500" }),
+    new FontFace("Inter Tight", `url(${interTight600})`, { weight: "600" }),
     new FontFace("Instrument Serif", `url(${instrumentItalic})`, { style: "italic" }),
   ];
   Promise.all(faces.map((f) => f.load().then((face) => (document.fonts as unknown as { add(face: FontFace): void }).add(face))))
@@ -133,11 +126,11 @@ const px = (n: number) => Math.round(n);
 /** Words that land on the voice's words, an accent in Instrument Serif italic. */
 type Bit = { text: string; at: number; accent?: boolean; br?: boolean };
 
-function Say({ bits, top, size = 80, color = C.ink, accent = C.violet, style }: { bits: Bit[]; top: number; size?: number; color?: string; accent?: string; style?: CSSProperties }) {
+function Say({ bits, top, size = 80, color = C.ink, accent = color, style }: { bits: Bit[]; top: number; size?: number; color?: string; accent?: string; style?: CSSProperties }) {
   const frame = useCurrentFrame();
   return (
     <div
-      style={{ position: "absolute", top, left: 60, right: 60, textAlign: "center", fontFamily: SANS, fontWeight: 800, fontSize: size, lineHeight: 1.1, letterSpacing: "-0.03em", wordSpacing: "0.12em", color, textWrap: "balance", ...style }}
+      style={{ position: "absolute", top, left: 60, right: 60, textAlign: "center", fontFamily: SANS, fontWeight: 600, fontSize: size, lineHeight: 1.02, letterSpacing: "-0.05em", wordSpacing: "0.1em", color, textWrap: "balance", ...style }}
     >
       {bits.map((b, i) => {
         const p = enterAt(frame, b.at, 8);
@@ -151,7 +144,7 @@ function Say({ bits, top, size = 80, color = C.ink, accent = C.violet, style }: 
                 display: "inline-block",
                 opacity: p,
                 transform: `translateY(${px((1 - p) * 40)}px) scale(${pop})`,
-                ...(b.accent ? { fontFamily: SERIF, fontStyle: "italic", fontWeight: 400, fontSize: size * 1.22, letterSpacing: "-0.01em", color: accent } : null),
+                ...(b.accent ? { fontFamily: SERIF, fontStyle: "italic", fontWeight: 400, fontSize: size * 1.18, letterSpacing: "-0.02em", color: accent } : null),
               }}
             >
               {b.text}
@@ -171,16 +164,13 @@ function Until({ until, children }: { until: number; children: ReactNode }) {
   return <AbsoluteFill style={{ opacity: 1 - out, transform: `translateY(${px(-60 * out)}px)` }}>{children}</AbsoluteFill>;
 }
 
-/** The brand's orb, drifting slowly behind everything. */
-function Orb({ tint = 0.16 }: { tint?: number }) {
-  const frame = useCurrentFrame();
-  const x = Math.sin(frame / 70) * 60;
-  const y = Math.cos(frame / 90) * 50;
+/** A mono label between two hairlines, like the site's section heads (« N° 01 — Le principe »). */
+function Label({ top, left, right, color = C.ink }: { top: number; left: string; right: string; color?: string }) {
   return (
-    <AbsoluteFill style={{ overflow: "hidden" }}>
-      <div style={{ position: "absolute", width: 1100, height: 1100, left: 260 + x, top: 900 + y, borderRadius: "50%", background: `radial-gradient(circle at 35% 35%, ${C.violet}, ${C.coral} 70%)`, opacity: tint, filter: "blur(120px)" }} />
-      <div style={{ position: "absolute", width: 700, height: 700, left: -260 - x, top: 120 - y, borderRadius: "50%", background: C.coral, opacity: tint * 0.6, filter: "blur(110px)" }} />
-    </AbsoluteFill>
+    <div style={{ position: "absolute", top, left: 60, right: 60, display: "flex", justifyContent: "space-between", borderTop: `2px solid ${color}`, paddingTop: 14, fontFamily: SANS, fontWeight: 500, fontSize: 24, letterSpacing: "0.14em", textTransform: "uppercase", color }}>
+      <span>{left}</span>
+      <span>{right}</span>
+    </div>
   );
 }
 
@@ -189,7 +179,7 @@ function Phone({ children, top, height, width = 620, at, screen = C.chat }: { ch
   const frame = useCurrentFrame();
   const p = enter(frame, at, 14);
   return (
-    <div style={{ position: "absolute", left: (1080 - width) / 2, top: px(top + (1 - p) * 260), width, height, borderRadius: 82, background: C.ink, padding: 16, boxShadow: "0 50px 90px rgba(28,21,48,.22)" }}>
+    <div style={{ position: "absolute", left: (1080 - width) / 2, top: px(top + (1 - p) * 260), width, height, borderRadius: 82, background: C.ink, padding: 16 }}>
       <div style={{ position: "relative", width: "100%", height: "100%", borderRadius: 66, overflow: "hidden", background: screen }}>{children}</div>
     </div>
   );
@@ -205,7 +195,7 @@ function ChatHeader() {
         <Mascot size={62} still />
       </div>
       <div style={{ fontFamily: SANS }}>
-        <div style={{ fontSize: 34, fontWeight: 800, color: C.ink }}>Edith</div>
+        <div style={{ fontSize: 34, fontWeight: 600, color: C.ink }}>Edith</div>
         <div style={{ fontSize: 24, fontWeight: 600, color: C.muted }}>en ligne</div>
       </div>
     </div>
@@ -350,9 +340,9 @@ function Chat({ messages, bottom, gap = 14 }: { messages: Message[]; bottom: num
 function Album() {
   return (
     <div style={{ display: "flex", gap: 6 }}>
-      {[2, 3, 4].map((n) => (
+      {[1, 2, 3].map((n) => (
         <div key={n} style={{ width: 146, height: 196, borderRadius: 16, overflow: "hidden" }}>
-          <Img src={staticFile(`tile-${n}.webp`)} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+          <Img src={staticFile(`intro-photo-${n}.webp`)} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
         </div>
       ))}
     </div>
@@ -363,11 +353,11 @@ function Album() {
 function Clip() {
   return (
     <div style={{ position: "relative", width: 330, height: 204, borderRadius: 16, overflow: "hidden" }}>
-      <Img src={staticFile("work-cave.webp")} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+      <Img src={staticFile("intro-clip.webp")} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
       <div style={{ position: "absolute", left: "50%", top: "50%", width: 78, height: 78, margin: "-39px 0 0 -39px", borderRadius: "50%", background: "rgba(0,0,0,.45)", display: "flex", alignItems: "center", justifyContent: "center" }}>
         <div style={{ width: 0, height: 0, marginLeft: 6, borderTop: "15px solid transparent", borderBottom: "15px solid transparent", borderLeft: "24px solid #fff" }} />
       </div>
-      <div style={{ position: "absolute", left: 12, bottom: 8, fontFamily: SANS, fontSize: 22, fontWeight: 800, color: "#fff", textShadow: "0 1px 4px rgba(0,0,0,.5)" }}>0:14</div>
+      <div style={{ position: "absolute", left: 12, bottom: 8, fontFamily: SANS, fontSize: 22, fontWeight: 600, color: "#fff", textShadow: "0 1px 4px rgba(0,0,0,.5)" }}>0:14</div>
     </div>
   );
 }
@@ -389,14 +379,15 @@ function HelloScene() {
       </div>
       {/* « En gros, je t'explique : » said by her, in a bubble. */}
       <div style={{ position: "absolute", left: 560, top: 250, opacity: bubble, transform: `translateY(${px((1 - bubble) * 30)}px)` }}>
-        <div style={{ borderRadius: 40, borderBottomLeftRadius: 10, background: "#fff", padding: "26px 34px", boxShadow: "0 24px 50px rgba(28,21,48,.14)", fontFamily: SANS, fontWeight: 800, fontSize: 52, lineHeight: 1.1, letterSpacing: "-0.02em", color: C.ink, whiteSpace: "pre" }}>
+        <div style={{ background: "#fff", border: `2px solid ${C.ink}`, padding: "26px 34px", fontFamily: SANS, fontWeight: 600, fontSize: 52, lineHeight: 1.05, letterSpacing: "-0.045em", color: C.ink, whiteSpace: "pre" }}>
           {"En gros,\nje "}
-          <span style={{ fontFamily: SERIF, fontStyle: "italic", fontWeight: 400, fontSize: 64, color: C.violet }}>t’explique</span>
+          <span style={{ fontFamily: SERIF, fontStyle: "italic", fontWeight: 400, fontSize: 64, letterSpacing: "-0.01em" }}>t’explique</span>
         </div>
       </div>
       <Say top={850} size={96} bits={[{ text: "Salut !", at: 0 }, { text: "Moi c’est", at: T.moi }]} />
       <Say top={950} size={210} bits={[{ text: "Edith", at: T.edith, accent: true }]} style={{ lineHeight: 1 }} />
       <Say top={1250} size={54} color={C.muted} bits={[{ text: "ton", at: T.ton }, { text: "community manager", at: T.community }, { text: "IA", at: T.community + 0.5 }]} />
+      <Label top={1700} left="Edith" right="Sur WhatsApp" />
     </>
   );
 }
@@ -489,7 +480,7 @@ function Gathered({ x, y, at, spin, children }: { x: number; y: number; at: numb
   );
 }
 
-const card: CSSProperties = { borderRadius: 18, overflow: "hidden", border: "7px solid #fff", boxShadow: "0 24px 50px rgba(0,0,0,.35)" };
+const card: CSSProperties = { overflow: "hidden", border: `3px solid ${C.bg}` };
 
 /** « je m'occupe de tout »: everything she sent flies into Edith, who takes it all on. */
 function FlashScene() {
@@ -501,28 +492,27 @@ function FlashScene() {
   const glow = 0.45 + 0.35 * gulp;
   return (
     <>
-      <div style={{ position: "absolute", left: EDITH_AT.x - 520, top: EDITH_AT.y - 520, width: 1040, height: 1040, borderRadius: "50%", background: `radial-gradient(circle, ${C.violet} 0%, ${C.coral} 45%, transparent 70%)`, opacity: glow, filter: "blur(90px)" }} />
       {ring > 0 && ring < 1 && (
-        <div style={{ position: "absolute", left: EDITH_AT.x - (220 + ring * 520), top: EDITH_AT.y - (220 + ring * 520), width: 2 * (220 + ring * 520), height: 2 * (220 + ring * 520), borderRadius: "50%", border: `6px solid ${C.peach}`, opacity: 1 - ring }} />
+        <div style={{ position: "absolute", left: EDITH_AT.x - (220 + ring * 520), top: EDITH_AT.y - (220 + ring * 520), width: 2 * (220 + ring * 520), height: 2 * (220 + ring * 520), borderRadius: "50%", border: `2px solid ${C.bg}`, opacity: (1 - ring) * glow }} />
       )}
       <Gathered x={190} y={300} at={T.ensemble + 0.3} spin={-12}>
         <div style={{ ...card, width: 170, height: 226 }}>
-          <Img src={staticFile("tile-2.webp")} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+          <Img src={staticFile("intro-photo-1.webp")} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
         </div>
       </Gathered>
       <Gathered x={870} y={290} at={T.ensemble + 0.35} spin={8}>
-        <div style={{ borderRadius: 999, background: C.mine, padding: "6px 22px", boxShadow: "0 24px 50px rgba(0,0,0,.35)" }}>
+        <div style={{ borderRadius: 999, background: C.mine, padding: "6px 22px" }}>
           <VoiceNote at={T.ensemble} />
         </div>
       </Gathered>
       <Gathered x={190} y={1560} at={T.ensemble + 0.4} spin={10}>
-        <div style={{ ...card, border: "7px solid #fff" }}>
+        <div style={card}>
           <Clip />
         </div>
       </Gathered>
       <Gathered x={890} y={1520} at={T.ensemble + 0.45} spin={-9}>
         <div style={{ ...card, width: 170, height: 226 }}>
-          <Img src={staticFile("tile-3.webp")} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+          <Img src={staticFile("intro-photo-2.webp")} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
         </div>
       </Gathered>
       <Gathered x={900} y={930} at={T.ensemble + 0.5} spin={6}>
@@ -532,7 +522,7 @@ function FlashScene() {
       </Gathered>
       <Gathered x={170} y={940} at={T.ensemble + 0.55} spin={-7}>
         <div style={{ ...card, width: 150, height: 200 }}>
-          <Img src={staticFile("tile-4.webp")} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+          <Img src={staticFile("intro-photo-3.webp")} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
         </div>
       </Gathered>
       <Gathered x={560} y={1760} at={T.ensemble + 0.6} spin={4}>
@@ -541,10 +531,12 @@ function FlashScene() {
         </BubbleBox>
       </Gathered>
       <div style={{ position: "absolute", left: 0, right: 0, top: EDITH_AT.y - 200, display: "flex", justifyContent: "center", opacity: pop, transform: `translateY(${px((1 - pop) * 60)}px) scale(${(0.6 + 0.4 * pop) * (1 + 0.1 * gulp)})` }}>
-        <Mascot size={400} mood={frame >= F(T.tout) ? "laugh" : "happy"} still />
+        <div style={{ color: C.bg }}>
+          <Mascot size={400} mood={frame >= F(T.tout) ? "laugh" : "happy"} still />
+        </div>
       </div>
-      <Say top={1010} size={104} color="#fff" bits={[{ text: "je m’occupe", at: T.occupe }]} />
-      <Say top={1120} size={220} accent={C.coral} bits={[{ text: "de tout", at: T.tout, accent: true }]} style={{ lineHeight: 1 }} />
+      <Say top={1010} size={104} color={C.bg} bits={[{ text: "je m’occupe", at: T.occupe }]} />
+      <Say top={1120} size={230} color={C.bg} bits={[{ text: "de tout", at: T.tout, accent: true }]} style={{ lineHeight: 1 }} />
     </>
   );
 }
@@ -570,9 +562,9 @@ function WorkScene({ from }: { from: number }) {
         ]}
       />
       {/* The Reel, from the left. */}
-      <div style={{ position: "absolute", left: 70, top: 420, width: 430, height: 764, transform: `translateX(${px((1 - reel) * -620)}px) rotate(-4deg)`, borderRadius: 40, overflow: "hidden", border: "10px solid #fff", boxShadow: "0 40px 80px rgba(28,21,48,.24)", background: C.ink }}>
+      <div style={{ position: "absolute", left: 70, top: 420, width: 430, height: 764, transform: `translateX(${px((1 - reel) * -620)}px) rotate(-2deg)`, overflow: "hidden", border: `2px solid ${C.ink}`, background: C.ink }}>
         <Sequence from={F(from)} layout="none">
-          <OffthreadVideo src={staticFile("work-cafe.mp4")} muted style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+          <OffthreadVideo src={staticFile("reels/cafe.mp4")} muted style={{ width: "100%", height: "100%", objectFit: "cover" }} />
         </Sequence>
       </div>
       {/* The carousel, its slides dealt from the right. */}
@@ -588,168 +580,22 @@ function WorkScene({ from }: { from: number }) {
               top: 470 + k * 40,
               width: 340,
               height: 425,
-              borderRadius: 22,
               overflow: "hidden",
-              border: "8px solid #fff",
-              boxShadow: "0 30px 60px rgba(28,21,48,.22)",
+              border: `2px solid ${C.ink}`,
               opacity: p,
-              transform: `translateX(${px((1 - p) * 520)}px) rotate(${3 + k * 4}deg)`,
+              transform: `translateX(${px((1 - p) * 520)}px) rotate(${2 + k * 3}deg)`,
             }}
           >
-            <Img src={staticFile(`intro-slide-${n}.webp`)} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+            <Img src={staticFile(`carrousels/comptoir-${n}.webp`)} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
           </div>
         );
       })}
       {/* The caption, written as she listens. */}
-      <div style={{ position: "absolute", left: 90, right: 90, top: 1300, height: 300, boxSizing: "border-box", opacity: card, transform: `translateY(${px((1 - card) * 120)}px)`, borderRadius: 32, background: "#fff", padding: "32px 38px", boxShadow: "0 24px 50px rgba(28,21,48,.14)", fontFamily: SANS }}>
-        <div style={{ fontSize: 28, fontWeight: 800, color: C.violet, marginBottom: 12 }}>Ta légende</div>
-        <div style={{ fontSize: 38, lineHeight: 1.35, fontWeight: 600, color: C.ink }}>
+      <div style={{ position: "absolute", left: 90, right: 90, top: 1300, height: 300, boxSizing: "border-box", opacity: card, transform: `translateY(${px((1 - card) * 120)}px)`, background: "#fff", border: `2px solid ${C.ink}`, padding: "28px 38px", fontFamily: SANS }}>
+        <div style={{ fontSize: 22, fontWeight: 500, letterSpacing: "0.14em", textTransform: "uppercase", color: C.muted, marginBottom: 14 }}>Ta légende</div>
+        <div style={{ fontSize: 38, lineHeight: 1.35, fontWeight: 500, letterSpacing: "-0.02em", color: C.ink }}>
           {caption.slice(0, typed)}
-          <span style={{ opacity: Math.floor(frame / 6) % 2 ? 0 : 1, color: C.violet }}>|</span>
-        </div>
-      </div>
-    </>
-  );
-}
-
-/** Instagram's and TikTok's own marks, simplified. */
-function PlatformMark({ name }: { name: "Instagram" | "TikTok" }) {
-  return name === "Instagram" ? (
-    <div style={{ width: 52, height: 52, borderRadius: 15, background: "linear-gradient(45deg, #FEDA75, #FA7E1E 30%, #D62976 60%, #962FBF 85%, #4F5BD5)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-      <div style={{ width: 26, height: 26, borderRadius: "50%", border: "4px solid #fff", boxSizing: "border-box" }} />
-    </div>
-  ) : (
-    <div style={{ width: 52, height: 52, borderRadius: 15, background: "#000", display: "flex", alignItems: "center", justifyContent: "center" }}>
-      <svg width="30" height="32" viewBox="0 0 30 32" aria-hidden>
-        <path d="M17 2v19a5.5 5.5 0 1 1-5.5-5.5" stroke="#25F4EE" strokeWidth="4.5" fill="none" transform="translate(-1.5,-1)" />
-        <path d="M17 2v19a5.5 5.5 0 1 1-5.5-5.5M17 2c1 4.5 4 7 8.5 7.5" stroke="#FE2C55" strokeWidth="4.5" fill="none" transform="translate(1.5,1)" />
-        <path d="M17 2v19a5.5 5.5 0 1 1-5.5-5.5M17 2c1 4.5 4 7 8.5 7.5" stroke="#fff" strokeWidth="4.5" fill="none" />
-      </svg>
-    </div>
-  );
-}
-
-function PublishScene({ from }: { from: number }) {
-  const frame = useCurrentFrame();
-  const tap = F(T.oui);
-  const pressed = frame >= tap && frame < tap + 7;
-  const ring = interpolate(frame, [tap, tap + 14], [0, 1], clamp);
-  const live = enterAt(frame, T.publie, 9);
-  return (
-    <>
-      <Say
-        top={110}
-        size={80}
-        bits={[
-          { text: "Tu dis", at: T.dis },
-          { text: "oui,", at: T.oui, accent: true },
-          { text: "je publie", at: T.publie, br: true },
-        ]}
-      />
-      <Phone top={430} height={1150} at={F(from)}>
-        <ChatHeader />
-        <div style={{ position: "absolute", left: 20, top: HEADER + 30 }}>
-          <BubbleBox height={400 + 12 + 2 * LINE + PAD + 10} padding="10px">
-            <div style={{ position: "relative", width: 300, height: 400, borderRadius: 18, overflow: "hidden" }}>
-              <Img src={staticFile("work-pilates.webp")} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-              {/* Out: a tick on it when she says « je publie ». */}
-              <div style={{ position: "absolute", right: 14, top: 14, display: "flex", alignItems: "center", gap: 8, padding: "8px 16px 8px 10px", borderRadius: 999, background: "#fff", opacity: live, transform: `translateY(${px((1 - live) * -16)}px)`, fontFamily: SANS, fontSize: 22, fontWeight: 800, color: C.ink }}>
-                <span style={{ width: 30, height: 30, borderRadius: "50%", background: C.green, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>✓</span>
-                En ligne
-              </div>
-            </div>
-            <div style={{ ...bubbleText, padding: "12px 10px 0" }}>{"Ton Reel est prêt !\nJe le publie vendredi à 18 h ?"}</div>
-          </BubbleBox>
-        </div>
-        {["Oui, publie-le", "Je regarde d’abord"].map((label, i) => {
-          const hit = i === 0;
-          return (
-            <div
-              key={label}
-              style={{ position: "absolute", left: 20, top: HEADER + 30 + 518 + 14 + i * 84, width: 440, height: 70, borderRadius: 22, background: hit && pressed ? "#DCEBE3" : "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: SANS, fontSize: 30, fontWeight: 800, color: "#0A7C5A", boxShadow: "0 2px 4px rgba(0,0,0,.06)" }}
-            >
-              {label}
-              {hit && ring > 0 && ring < 1 && (
-                <div style={{ position: "absolute", left: "50%", top: "50%", width: 90 + ring * 140, height: 90 + ring * 140, marginLeft: -(45 + ring * 70), marginTop: -(45 + ring * 70), borderRadius: "50%", border: `5px solid ${C.violet}`, opacity: 1 - ring }} />
-              )}
-            </div>
-          );
-        })}
-        <Chat bottom={HEADER + 30 + 518 + 14 + 168 + 14 + 72 + 4} messages={[{ mine: true, at: T.oui + 0.2, lines: ["Oui, publie-le"] }]} />
-      </Phone>
-      <div style={{ position: "absolute", left: 0, right: 0, top: 1650, display: "flex", justifyContent: "center", gap: 26 }}>
-        {(["Instagram", "TikTok"] as const).map((name) => {
-          const p = enterAt(frame, name === "Instagram" ? T.instagram : T.tiktok, 9);
-          return (
-            <div key={name} style={{ display: "flex", alignItems: "center", gap: 16, padding: "16px 30px 16px 16px", borderRadius: 999, background: "#fff", boxShadow: "0 18px 40px rgba(28,21,48,.14)", opacity: p, transform: `translateY(${px((1 - p) * 60)}px)`, fontFamily: SANS, fontSize: 38, fontWeight: 800, color: C.ink }}>
-              <PlatformMark name={name} />
-              {name}
-            </div>
-          );
-        })}
-      </div>
-    </>
-  );
-}
-
-function AppScene({ from }: { from: number }) {
-  const frame = useCurrentFrame();
-  const p = enter(frame, F(from), 14);
-  const site = enterAt(frame, T.app, 9);
-  const tiles = [1, 2, 3, 4, 5, 6];
-  return (
-    <>
-      <Say
-        top={110}
-        size={80}
-        bits={[
-          { text: "Et sur", at: T.etOrdi },
-          { text: "ordi,", at: T.ordi, accent: true },
-          { text: "tout est dans", at: T.toutApp, br: true },
-          { text: "l’app", at: T.app, accent: true },
-        ]}
-      />
-      <div style={{ position: "absolute", left: 60, right: 60, top: px(560 + (1 - p) * 300) }}>
-        {/* The screen */}
-        <div style={{ borderRadius: "34px 34px 10px 10px", background: C.ink, padding: 16, boxShadow: "0 40px 80px rgba(28,21,48,.24)" }}>
-          <div style={{ height: 640, borderRadius: 22, overflow: "hidden", background: "#fff", display: "flex" }}>
-            <div style={{ width: 210, background: C.bg, borderRight: `2px solid ${C.line}`, padding: "26px 20px", display: "flex", flexDirection: "column", gap: 20 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 10, fontFamily: SERIF, fontStyle: "italic", fontSize: 40, color: C.ink }}>
-                <Mascot size={44} still />
-                Edith
-              </div>
-              {["Edith", "Grille", "Tendances", "Résultats", "Ton style", "Réglages"].map((item, i) => (
-                <div key={item} style={{ fontFamily: SANS, fontSize: 21, fontWeight: 700, color: i === 1 ? C.violet : C.muted, background: i === 1 ? C.lilac : "transparent", borderRadius: 999, padding: "8px 14px" }}>
-                  {item}
-                </div>
-              ))}
-            </div>
-            <div style={{ flex: 1, padding: "26px 30px" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 18, marginBottom: 20 }}>
-                <div style={{ width: 84, height: 84, borderRadius: "50%", background: `linear-gradient(135deg, ${C.violet}, ${C.coral})` }} />
-                <div style={{ fontFamily: SANS }}>
-                  <div style={{ fontSize: 26, fontWeight: 800, color: C.ink }}>maisonmaya.paris</div>
-                  <div style={{ fontSize: 19, color: C.muted, fontWeight: 600 }}>84 publications · 1 240 abonnés</div>
-                </div>
-              </div>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6 }}>
-                {tiles.map((n, i) => {
-                  const t = enter(frame, F(from) + 6 + i * 2, 9);
-                  return (
-                    <div key={n} style={{ position: "relative", aspectRatio: "3 / 4", overflow: "hidden", opacity: t }}>
-                      <Img src={staticFile(`tile-${n}.webp`)} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                      {i === 0 && <div style={{ position: "absolute", left: 6, bottom: 6, borderRadius: 999, background: C.violet, color: "#fff", fontFamily: SANS, fontSize: 15, fontWeight: 800, padding: "4px 10px" }}>Vendredi</div>}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-        </div>
-        {/* The base */}
-        <div style={{ margin: "0 -40px", height: 34, borderRadius: "0 0 30px 30px", background: "#D9D3DE" }} />
-        <div style={{ marginTop: 50, display: "flex", justifyContent: "center", opacity: site, transform: `translateY(${px((1 - site) * 40)}px)` }}>
-          <div style={{ padding: "18px 38px", borderRadius: 999, background: C.ink, fontFamily: SANS, fontSize: 40, fontWeight: 800, color: "#fff", boxShadow: "0 14px 30px rgba(28,21,48,.2)" }}>edith-ai.app</div>
+          <span style={{ opacity: Math.floor(frame / 6) % 2 ? 0 : 1 }}>|</span>
         </div>
       </div>
     </>
@@ -759,36 +605,41 @@ function AppScene({ from }: { from: number }) {
 function StartScene({ from }: { from: number }) {
   const frame = useCurrentFrame();
   const pop = spring({ frame: frame - F(from), fps: FPS, durationInFrames: 20, config: { damping: 11, mass: 0.8 } });
-  const lines = enterAt(frame, T.commence + 0.6, 10);
-  const where = enterAt(frame, T.commence + 0.95, 10);
+  const five = enterAt(frame, T.commence + 0.55, 10);
+  const lines = enterAt(frame, T.commence + 1.4, 10);
+  const where = enterAt(frame, T.commence + 1.75, 10);
   return (
     <>
-      <div style={{ position: "absolute", left: 0, right: 0, top: 330, display: "flex", justifyContent: "center", transform: `translateY(${px(Math.sin(frame / 12) * 10)}px) scale(${0.4 + 0.6 * pop})`, opacity: Math.min(1, pop * 2) }}>
-        <Mascot size={420} mood="happy" still />
+      <div style={{ position: "absolute", left: 0, right: 0, top: 240, display: "flex", justifyContent: "center", transform: `translateY(${px(Math.sin(frame / 12) * 10)}px) scale(${0.4 + 0.6 * pop})`, opacity: Math.min(1, pop * 2) }}>
+        <Mascot size={360} mood="happy" still />
       </div>
-      <Say top={840} size={92} bits={[{ text: "Allez,", at: T.allez }]} />
-      <Say top={940} size={130} bits={[{ text: "on commence ?", at: T.commence, accent: true }]} style={{ lineHeight: 1 }} />
-      <div style={{ position: "absolute", top: 1220, left: 80, right: 80, textAlign: "center", opacity: lines, transform: `translateY(${px((1 - lines) * 40)}px)`, fontFamily: SANS, fontWeight: 800, fontSize: 60, lineHeight: 1.15, letterSpacing: "-0.02em", color: C.ink, textWrap: "balance" }}>
+      <Say top={660} size={92} bits={[{ text: "Allez,", at: T.allez }]} />
+      <Say top={760} size={140} bits={[{ text: "on commence ?", at: T.commence, accent: true }]} style={{ lineHeight: 1 }} />
+      {/* Tristan: « en 5 minutes SANS APP, directement sur WhatsApp ». */}
+      <div style={{ position: "absolute", top: 1040, left: 60, right: 60, borderTop: `2px solid ${C.ink}`, paddingTop: 34, textAlign: "center", opacity: five, transform: `translateY(${px((1 - five) * 40)}px)`, fontFamily: SANS, fontWeight: 600, fontSize: 76, lineHeight: 1.04, letterSpacing: "-0.05em", color: C.ink }}>
+        En 5 minutes, <span style={{ fontFamily: SERIF, fontStyle: "italic", fontWeight: 400, fontSize: 88, letterSpacing: "-0.01em" }}>sans app</span>,
+        <br />
+        directement sur WhatsApp.
+      </div>
+      <div style={{ position: "absolute", top: 1330, left: 80, right: 80, textAlign: "center", opacity: lines, transform: `translateY(${px((1 - lines) * 40)}px)`, fontFamily: SANS, fontWeight: 500, fontSize: 48, lineHeight: 1.2, letterSpacing: "-0.03em", color: C.muted, textWrap: "balance" }}>
         Envoie-moi ton site ou ton Instagram
       </div>
-      <div style={{ position: "absolute", top: 1400, left: 0, right: 0, display: "flex", justifyContent: "center", opacity: where, transform: `translateY(${px((1 - where) * 40)}px)` }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 14, padding: "16px 32px", borderRadius: 999, background: "#0A7C5A", color: "#fff", fontFamily: SANS, fontSize: 40, fontWeight: 800 }}>ici, sur WhatsApp</div>
+      <div style={{ position: "absolute", top: 1500, left: 0, right: 0, display: "flex", justifyContent: "center", opacity: where, transform: `translateY(${px((1 - where) * 40)}px)` }}>
+        <div style={{ padding: "20px 40px", background: C.ink, color: C.bg, fontFamily: SANS, fontSize: 40, fontWeight: 600, letterSpacing: "-0.02em" }}>ici, sur WhatsApp</div>
       </div>
     </>
   );
 }
 
 type SceneProps = { from: number };
-type SceneDef = { id: string; from: number; background: string; orb?: number; View: (props: SceneProps) => ReactNode; wipe?: boolean };
+type SceneDef = { id: string; from: number; background: string; View: (props: SceneProps) => ReactNode; wipe?: boolean };
 
 /** The scenes in order, each from a little before its first word: its entrance ends as the word is said. */
 const SCENES: SceneDef[] = [
   { id: "hello", from: -LEAD, background: C.bg, View: HelloScene },
   { id: "chat", from: T.parles - 0.3, background: C.bg, View: ChatScene },
-  { id: "flash", from: T.ensemble + 0.1, background: C.ink, orb: 0, View: FlashScene, wipe: true },
-  { id: "work", from: T.tesReels - 0.25, background: C.lilac, orb: 0.12, View: WorkScene },
-  { id: "publish", from: T.dis - 0.3, background: C.bg, View: PublishScene },
-  { id: "app", from: T.etOrdi - 0.2, background: C.peach, orb: 0.12, View: AppScene },
+  { id: "flash", from: T.ensemble + 0.1, background: C.ink, View: FlashScene, wipe: true },
+  { id: "work", from: T.tesReels - 0.25, background: C.soft, View: WorkScene },
   { id: "start", from: T.allez - 0.2, background: C.bg, View: StartScene },
 ];
 
@@ -799,7 +650,7 @@ export function Intro() {
   loadBrandFonts();
   const frame = useCurrentFrame();
   return (
-    <AbsoluteFill style={{ background: C.bg }}>
+    <AbsoluteFill style={{ background: C.bg, color: C.ink }}>
       {/* The mascot's sizing, from the app's stylesheet (its motion is drawn here, frame by frame). */}
       <style>{".fauve-cat{display:inline-block;flex-shrink:0;width:var(--cat);height:var(--cat)}.fauve-cat svg{display:block;width:100%;height:100%}"}</style>
       {SCENES.map((scene, i) => {
@@ -816,7 +667,6 @@ export function Intro() {
         const { View } = scene;
         return (
           <AbsoluteFill key={scene.id} style={{ background: scene.background, ...style }}>
-            <Orb tint={scene.orb ?? 0.16} />
             <View from={scene.from} />
           </AbsoluteFill>
         );

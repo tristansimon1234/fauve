@@ -180,7 +180,7 @@ function WebsiteStep({ onSend, pending }: { onSend: (text: string) => void; pend
         playsInline
         controls
         preload="metadata"
-        aria-label="Tout ce qu’il faut savoir sur Edith, en 25 secondes"
+        aria-label="Tout ce qu’il faut savoir sur Edith, en 20 secondes"
         className="aspect-[9/16] w-full max-w-[200px] shrink-0 self-center bg-soft object-cover sm:self-start"
       />
       <div className="flex min-w-0 flex-1 flex-col gap-3">
