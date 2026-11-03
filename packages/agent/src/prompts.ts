@@ -191,7 +191,7 @@ export type StudioContextForPrompt = {
 export function finishDefaultWords(finish: Partial<Record<"sound" | "video_sound" | "cuts" | "ramp" | "relief" | "steady" | "captions", string>> | undefined): string[] {
   if (!finish) return [];
   const words: Record<string, Record<string, string>> = {
-    sound: { clean: "son toujours nettoyé", original: "son tel qu'enregistré" },
+    sound: { clean: "son toujours nettoyé", voice: "sa voix seule, la musique derrière retirée", original: "son tel qu'enregistré" },
     video_sound: { all: "son de ses vidéos tout du long", none: "jamais le son de ses vidéos" },
     cuts: { off: "hésitations gardées" },
     ramp: { off: "ralenti simple" },
@@ -314,6 +314,6 @@ Then find the best passages for a Reel: a person looking at the lens or speaking
 
 Also note what the people do (actions): each clear gesture or movement, with its start and end, in a short factual sentence that says the hand or the part of the body and where (« elle pince l'air près de son visage », « il pose l'assiette sur le comptoir »). An editor cuts on a gesture, and an animation can start from a gesture or follow it. Empty if there is nobody.
 
-If someone speaks, also give every word spoken with its start and end in seconds (words), for word-by-word subtitles; otherwise leave words empty. Edith is the assistant who makes her Reels: when you hear it named, write « Edith », never « Simon ».
+If someone speaks, also give every word spoken with its start and end in seconds (words), for word-by-word subtitles; otherwise leave words empty. Say whether music (a speaker, the radio, the place's playlist) can be heard behind someone speaking (music_under_speech): her voice is then isolated from it, so Edith's music does not clash with it. Edith is the assistant who makes her Reels: when you hear it named, write « Edith », never « Simon ».
 
 Answer in French, factually: describe only what you see and hear.`;

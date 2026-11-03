@@ -1,10 +1,12 @@
+import { randomUUID } from "node:crypto";
 import { after, type NextRequest } from "next/server";
 import { cronAuthorized } from "@/lib/cron-auth";
 import { designEdit } from "@/lib/agent/editor";
 import { gpuCostEur, gpuReady, objectsOnGpu, photosOnGpu, reliefsOnGpu, smoothOnGpu, subjectsOnGpu } from "@/lib/render/gpu";
 import { reliefOf } from "@fauve/agent";
 import { renderPost } from "@/lib/render/render-post";
-import { dropSandbox, pruneSnapshots, trackSandbox, warmRemotionPool } from "@/lib/render/sandbox";
+import { cleanSpeechInSandbox, dropSandbox, pruneSnapshots, trackSandbox, warmRemotionPool } from "@/lib/render/sandbox";
+import { isolateVoice } from "@/lib/voice";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { adminKeyAuthorized } from "@/lib/test-studio";
 
@@ -181,6 +183,35 @@ export async function POST(request: NextRequest) {
       if (card > 0) await db.from("cost_events").insert({ studio_id: row.studio_id, kind: "slowmo", provider: "modal", units: Math.round(card), cost_eur: cost, meta: { lab: true, media, from, seconds, gpu: used } });
       const link = result && !(result instanceof Error) ? (await db.storage.from("media").createSignedUrl(path, 86_400)).data?.signedUrl : null;
       console.log("gpu slowmo", JSON.stringify({ link, media, from, seconds, gpu: used, card_seconds: Math.round(card), cost_eur: Math.round(cost * 1000) / 1000, result: result instanceof Error ? result.message : result }));
+    });
+    return Response.json({ ok: true, started: true }, { status: 202 });
+  }
+  // ?action=isolate&media=<video id>: her voice isolated from the music and noise behind it (ElevenLabs' voice
+  // isolator, put back under the picture in the sandbox), its file in {studio}/lab-gpu/ (« voice isolated »), the
+  // clip's own files untouched.
+  if (action === "isolate") {
+    const media = request.nextUrl.searchParams.get("media") ?? "";
+    if (!/^[0-9a-f-]{36}$/.test(media)) return Response.json({ error: "media=<uuid>" }, { status: 400 });
+    after(async () => {
+      const db = supabaseAdmin();
+      const { data: row } = await db.from("media_assets").select("studio_id, storage_path, kind").eq("id", media).maybeSingle();
+      if (!row?.storage_path || row.kind !== "video") return console.error("isolate: no such video", media);
+      const clip = await db.storage.from("media").createSignedUrl(row.storage_path, 3600);
+      if (!clip.data?.signedUrl) return console.error("isolate: link refused");
+      const started = Date.now();
+      const cleaned = await cleanSpeechInSandbox(`isolate-${randomUUID()}`, clip.data.signedUrl, "video", {
+        force: true,
+        isolate: { when: () => true, run: (wav) => isolateVoice(row.studio_id as string, media, wav) },
+      }).catch((e: unknown) => (console.error("isolate failed", e instanceof Error ? e.message : e), null));
+      if (!cleaned?.media) return console.error("isolate: nothing made", media);
+      const path = `${row.studio_id}/lab-gpu/isolated-${media}.mp4`;
+      const up = await db.storage.from("media").upload(path, cleaned.media, { contentType: "video/mp4", upsert: true });
+      if (up.error) return console.error("isolate: not kept", up.error.message);
+      const [link, before] = await Promise.all([db.storage.from("media").createSignedUrl(path, 86_400), db.storage.from("media").createSignedUrl(row.storage_path, 86_400)]);
+      console.log(
+        "voice isolated",
+        JSON.stringify({ link: link.data?.signedUrl, before: before.data?.signedUrl, media, isolated: cleaned.isolated, floor: cleaned.floor, level: cleaned.level, duration: cleaned.duration, ms: Date.now() - started }),
+      );
     });
     return Response.json({ ok: true, started: true }, { status: 202 });
   }

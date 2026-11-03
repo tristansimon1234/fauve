@@ -1,13 +1,14 @@
 import "server-only";
 import { randomUUID } from "node:crypto";
-import { hasSpeech, SPEECH_MAX_SECONDS, splitFillers, voiceTranscriptSchema, type ClipAnalysis, type ClipSpeech } from "@fauve/agent";
+import { hasSpeech, SPEECH_MAX_SECONDS, splitFillers, voiceTranscriptSchema, wantsIsolation, type ClipAnalysis, type ClipSpeech } from "@fauve/agent";
+import { env } from "@/lib/env";
 import { costMeta } from "@/lib/cost-scope";
-import { cleanSpeechInSandbox, sandboxCostEur, type CleanedSpeech } from "@/lib/render/sandbox";
+import { cleanSpeechInSandbox, sandboxCostEur, type CleanedSpeech, type VoiceIsolation } from "@/lib/render/sandbox";
 import { supabaseAdmin } from "@/lib/supabase/admin";
-import { transcribeSpeech } from "@/lib/voice";
+import { isolateVoice, transcribeSpeech } from "@/lib/voice";
 
 // Someone speaking in her video (speech.ts in @fauve/agent): its sound cleaned once, when it was
-// noisy, into a copy beside the video (the video keeps its sound as recorded: a Reel can take either,
+// noisy (the denoiser), or her voice alone when music or a loud room is behind her (ElevenLabs' voice isolator), into a copy beside the video (the video keeps its sound as recorded: a Reel can take either,
 // finish.sound), its words timed exactly by Scribe with its hesitations apart, and its pauses measured;
 // the engine then cuts the « euh » and the long silences out of every Reel. Never fails an analysis:
 // without it, the words stay Gemini's.
@@ -18,11 +19,24 @@ export const cleanedPath = (studioId: string, mediaId: string, ext: "mp4" | "m4a
 /** Both possible cleaned copies of a media: they go with it (retention, deletion). */
 export const cleanedPaths = (studioId: string, mediaId: string) => [cleanedPath(studioId, mediaId, "mp4"), cleanedPath(studioId, mediaId, "m4a")];
 
-/** Its sound cleaned in the sandbox, the cleaned copy kept beside it (when the denoiser ran), the work logged. */
+/**
+ * Her voice isolated rather than denoised (the voice isolator, with ElevenLabs set up): `always` when she asked for her
+ * voice alone (finish.sound « voice »), else when music was heard behind her or the room is loud (wantsIsolation).
+ */
+function isolation(asset: { id: string; studio_id: string }, options: { always?: boolean; music?: boolean }): VoiceIsolation | undefined {
+  if (!env("ELEVENLABS_API_KEY")) return undefined;
+  return {
+    when: (floor) => Boolean(options.always) || wantsIsolation(floor, { music_under_speech: options.music }),
+    run: (wav) => isolateVoice(asset.studio_id, asset.id, wav),
+  };
+}
+
+/** Its sound cleaned in the sandbox, the cleaned copy kept beside it (when the denoiser or the isolator ran), the work logged. */
 async function cleanCopy(
   asset: { id: string; studio_id: string },
   kind: "video" | "audio",
   force: boolean,
+  isolate?: VoiceIsolation,
 ): Promise<{ cleaned: CleanedSpeech; path: string | null } | null> {
   const db = supabaseAdmin();
   // The file as it is now (a shaky video was just steadied: its steady copy is the one cleaned).
@@ -30,7 +44,7 @@ async function cleanCopy(
   if (!row?.storage_path) return null;
   const signed = await db.storage.from("media").createSignedUrl(row.storage_path as string, 3600);
   if (!signed.data?.signedUrl) throw new Error(signed.error?.message ?? "no signed url");
-  const cleaned = await cleanSpeechInSandbox(`speech-${randomUUID()}`, signed.data.signedUrl, kind, { force });
+  const cleaned = await cleanSpeechInSandbox(`speech-${randomUUID()}`, signed.data.signedUrl, kind, { force, ...(isolate ? { isolate } : {}) });
   if (!cleaned) return null;
   let path: string | null = null;
   if (cleaned.media) {
@@ -44,7 +58,7 @@ async function cleanCopy(
     provider: "vercel_sandbox",
     units: Math.round(cleaned.seconds),
     cost_eur: sandboxCostEur(cleaned.seconds),
-    meta: costMeta({ media_id: asset.id, floor: cleaned.floor, denoised: Boolean(path), forced: force, ...(kind === "audio" ? { voice_note: true } : {}) }),
+    meta: costMeta({ media_id: asset.id, floor: cleaned.floor, denoised: Boolean(path), isolated: Boolean(cleaned.isolated), forced: force, ...(kind === "audio" ? { voice_note: true } : {}) }),
   });
   return { cleaned, path };
 }
@@ -54,10 +68,10 @@ async function cleanCopy(
  * unchanged when nobody speaks, when it is too long, or when the reading fails. `force`: the sound
  * cleaned even when it is not noisy (she asked for it).
  */
-export async function polishSpeech(asset: { id: string; studio_id: string }, analysis: ClipAnalysis, options: { force?: boolean } = {}): Promise<ClipAnalysis> {
+export async function polishSpeech(asset: { id: string; studio_id: string }, analysis: ClipAnalysis, options: { force?: boolean; isolate?: boolean } = {}): Promise<ClipAnalysis> {
   if (analysis.speech || !hasSpeech(analysis) || analysis.duration > SPEECH_MAX_SECONDS) return analysis;
   try {
-    const copy = await cleanCopy(asset, "video", Boolean(options.force));
+    const copy = await cleanCopy(asset, "video", Boolean(options.force), isolation(asset, { always: options.isolate, music: analysis.music_under_speech }));
     if (!copy) return analysis;
     // Its words timed exactly, hesitations included, then set apart: the subtitles never show « euh ».
     const scribed = await transcribeSpeech(asset.studio_id, asset.id, copy.cleaned.wav);
@@ -69,6 +83,7 @@ export async function polishSpeech(asset: { id: string; studio_id: string }, ana
       fillers: fillers.slice(0, 200),
       pauses: copy.cleaned.pauses,
       ...(copy.path ? { path: copy.path } : {}),
+      ...(copy.path && copy.cleaned.isolated ? { isolated: true } : {}),
     };
     return { ...analysis, words: words.slice(0, 400), speech };
   } catch (error) {
@@ -102,9 +117,10 @@ export async function ensureSpeech(studioId: string, clips: { media_id: string; 
 
 /**
  * She wants the sound cleaned (finish.sound « clean »): every video of the Reel where someone speaks gets
- * its cleaned copy, even one that was not noisy, and her voice note too. Never fails a render.
+ * its cleaned copy, even one that was not noisy, and her voice note too; her voice alone (« voice »): each one's
+ * voice isolated, even one already denoised. Never fails a render.
  */
-export async function ensureCleanCopies(studioId: string, mediaIds: string[], voiceId?: string | null): Promise<void> {
+export async function ensureCleanCopies(studioId: string, mediaIds: string[], voiceId?: string | null, options: { isolate?: boolean } = {}): Promise<void> {
   const db = supabaseAdmin();
   const { data: rows } = mediaIds.length
     ? await db.from("clip_analyses").select("media_id, analysis").in("media_id", mediaIds).eq("studio_id", studioId).order("created_at", { ascending: false })
@@ -115,21 +131,24 @@ export async function ensureCleanCopies(studioId: string, mediaIds: string[], vo
       if (seen.has(row.media_id as string)) return;
       seen.add(row.media_id as string);
       const analysis = row.analysis as ClipAnalysis;
-      if (!hasSpeech(analysis) || analysis.duration > SPEECH_MAX_SECONDS || analysis.speech?.path) return;
+      if (!hasSpeech(analysis) || analysis.duration > SPEECH_MAX_SECONDS) return;
+      if (analysis.speech?.path && (!options.isolate || analysis.speech.isolated)) return;
+      const asset = { id: row.media_id as string, studio_id: studioId };
       try {
         // Read already: only its cleaned copy is made; never read: read now, cleaned.
         if (!analysis.speech) {
-          const polished = await polishSpeech({ id: row.media_id as string, studio_id: studioId }, analysis, { force: true });
-          if (polished.speech) await keepAnalysis(studioId, row.media_id as string, polished);
+          const polished = await polishSpeech(asset, analysis, { force: true, isolate: options.isolate });
+          if (polished.speech) await keepAnalysis(studioId, asset.id, polished);
           return;
         }
-        const copy = await cleanCopy({ id: row.media_id as string, studio_id: studioId }, "video", true);
-        if (copy?.path) await keepAnalysis(studioId, row.media_id as string, { ...analysis, speech: { ...analysis.speech, cleaned: true, path: copy.path } });
+        const copy = await cleanCopy(asset, "video", true, isolation(asset, { always: options.isolate, music: analysis.music_under_speech }));
+        if (copy?.path)
+          await keepAnalysis(studioId, asset.id, { ...analysis, speech: { ...analysis.speech, cleaned: true, path: copy.path, ...(copy.cleaned.isolated ? { isolated: true } : {}) } });
       } catch (error) {
         console.warn("sound not cleaned on demand", row.media_id, error instanceof Error ? error.message.slice(0, 300) : error);
       }
     }),
-    ...(voiceId ? [ensureCleanVoice(studioId, voiceId, { force: true })] : []),
+    ...(voiceId ? [ensureCleanVoice(studioId, voiceId, { force: true, isolate: options.isolate })] : []),
   ]);
 }
 
@@ -138,7 +157,7 @@ export async function ensureCleanCopies(studioId: string, mediaIds: string[], vo
  * noisy shop) into a copy beside it, kept with its transcript (`clean`); the note stays as recorded,
  * its words keep their timing. Edith's voices are clean. `force`: cleaned even when it was not noisy.
  */
-export async function ensureCleanVoice(studioId: string, mediaId: string, options: { force?: boolean } = {}): Promise<void> {
+export async function ensureCleanVoice(studioId: string, mediaId: string, options: { force?: boolean; isolate?: boolean } = {}): Promise<void> {
   const db = supabaseAdmin();
   const { data: asset } = await db.from("media_assets").select("kind, source, transcript").eq("id", mediaId).eq("studio_id", studioId).maybeSingle();
   if (!asset || asset.kind !== "audio" || asset.source === "ai") return;
@@ -146,13 +165,14 @@ export async function ensureCleanVoice(studioId: string, mediaId: string, option
   // Read first (its words): the copy is noted on its transcript.
   if (!transcript.success) return;
   const done = transcript.data.clean;
-  if (done && (done.path || !options.force)) return;
+  if (done && (done.path || !options.force) && (!options.isolate || done.isolated)) return;
   try {
-    const copy = await cleanCopy({ id: mediaId, studio_id: studioId }, "audio", Boolean(options.force));
+    const asset = { id: mediaId, studio_id: studioId };
+    const copy = await cleanCopy(asset, "audio", Boolean(options.force), isolation(asset, { always: options.isolate }));
     if (!copy) return;
     await db
       .from("media_assets")
-      .update({ transcript: { ...transcript.data, clean: { path: copy.path, floor: copy.cleaned.floor } } })
+      .update({ transcript: { ...transcript.data, clean: { path: copy.path, floor: copy.cleaned.floor, ...(copy.cleaned.isolated ? { isolated: true } : {}) } } })
       .eq("id", mediaId)
       .eq("studio_id", studioId);
   } catch (error) {

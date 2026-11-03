@@ -19,7 +19,9 @@ import {
   spokenShot,
   type SpeechFacts,
   undoSpeechCuts,
+  wantsIsolation,
 } from "./speech.ts";
+import { isolationCostUsd } from "./pricing.ts";
 import { mixFilter, mixGains } from "./mix.ts";
 import { fromEditorPlan, normalizeEditPlan } from "./editor.ts";
 import { depthPhotoIds, reliefFiles, reliefJobs, reliefOf, RELIEF_VERSION } from "./depth.ts";
@@ -404,6 +406,15 @@ test("relief: each moving photo shot gets a key of its own, and the Reel plays i
   // A video made for a shot of another length is never played.
   const stale = buildReelProps(plan, { ...inputs, reliefs: { [`p1#${jobs[0]!.key}`]: { ...video, frames: 80 } } });
   assert.equal(stale.segments[0]?.type === "image" && stale.segments[0].relief, undefined);
+});
+
+test("voice isolation: music heard behind her or a loud room isolates her voice, a quiet room is only denoised", () => {
+  assert.equal(wantsIsolation(-45, { music_under_speech: true }), true);
+  assert.equal(wantsIsolation(-35, {}), true);
+  assert.equal(wantsIsolation(-45, {}), false);
+  assert.equal(wantsIsolation(null, { music_under_speech: false }), false);
+  // $0.12 a minute of her clip.
+  assert.equal(Math.round(isolationCostUsd(30) * 1000) / 1000, 0.06);
 });
 
 test("relief: the videos a photo keeps go with it", () => {

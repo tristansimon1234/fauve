@@ -26,6 +26,16 @@ export const RNNOISE_MODEL = {
 
 /** A recording whose quietest moments stay under this (dBFS) is clean: only its rumble is cut, a denoiser would only dull it. */
 export const CLEAN_FLOOR = -50;
+/**
+ * Above this floor (dBFS, between the words) the background is loud, music or a busy room, which a denoiser only
+ * smears: the voice is isolated instead (ElevenLabs' voice isolator), as when the reading heard music behind her.
+ */
+export const ISOLATE_FLOOR = -40;
+
+/** Whether her speech in a clip gets its voice isolated rather than denoised: music heard behind her, or a loud background. */
+export function wantsIsolation(floor: number | null, analysis: { music_under_speech?: boolean }): boolean {
+  return analysis.music_under_speech === true || (floor !== null && floor > ISOLATE_FLOOR);
+}
 /** Over this, it is noisy: the denoiser takes almost all the noise; between the two, most of it. */
 const NOISY_FLOOR = -40;
 /** RNNoise works on 10 ms frames and gives its sound back 10 ms late: moved back, the lips and the words stay together. */

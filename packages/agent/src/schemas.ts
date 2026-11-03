@@ -138,7 +138,8 @@ export type CaptionStyle = (typeof CAPTION_STYLES)[number];
 export const reelFinishSchema = z.object({
   /** How what is said is written (CAPTION_STYLES), set by her for this Reel or all of them; over the editor's choice. */
   captions: z.enum(CAPTION_STYLES).optional(),
-  sound: z.enum(["auto", "clean", "original"]).optional(),
+  /** voice: only the voice, the music and noise behind it removed (ElevenLabs' voice isolator), even where it was not noisy. */
+  sound: z.enum(["auto", "clean", "voice", "original"]).optional(),
   video_sound: z.enum(["speech", "all", "none"]).optional(),
   cuts: z.enum(["auto", "off"]).optional(),
   ramp: z.enum(["auto", "off"]).optional(),
@@ -635,6 +636,8 @@ export const clipSpeechSchema = z.object({
   pauses: z.array(timedSpan).max(300),
   /** The copy with its sound cleaned, in Storage beside the video (the video keeps its sound as recorded). */
   path: z.string().max(300).optional(),
+  /** That copy keeps only the voice (the music and noise behind removed by ElevenLabs' voice isolator), not just denoised. */
+  isolated: z.boolean().optional(),
 });
 export type ClipSpeech = z.infer<typeof clipSpeechSchema>;
 
@@ -651,6 +654,8 @@ export const clipAnalysisSchema = z.object({
     .max(3)
     .describe("Les meilleurs passages pour un Reel, du meilleur au moins bon"),
   transcript: z.string().describe("Paroles audibles, vide s'il n'y en a pas"),
+  // Came later: older analyses do not have it.
+  music_under_speech: z.boolean().optional().describe("Vrai si une musique (enceinte, radio, playlist du lieu) s'entend derrière quelqu'un qui parle"),
   words: z
     .array(z.object({ w: z.string(), start: seconds, end: seconds }))
     .max(400)

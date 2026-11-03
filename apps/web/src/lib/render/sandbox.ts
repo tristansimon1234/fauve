@@ -955,6 +955,8 @@ export type CleanedSpeech = {
   floor: number | null;
   pauses: { start: number; end: number }[];
   duration: number | null;
+  /** The cleaned copy keeps her voice alone (the voice isolator), not just denoised. */
+  isolated?: boolean;
   seconds: number;
 };
 
@@ -964,7 +966,15 @@ export type CleanedSpeech = {
  * on any, when she asks for it), the picture copied untouched; then its pauses (silencedetect,
  * above the noise left) and its sound as WAV for Scribe. A few seconds of work; null when it has no sound.
  */
-export async function cleanSpeechInSandbox(id: string, url: string, kind: "video" | "audio", options: { force?: boolean } = {}): Promise<CleanedSpeech | null> {
+/** Her voice isolated by a service (ElevenLabs' voice isolator): `when` its measured noise floor calls for it, `run` sends it a WAV and returns the voice. */
+export type VoiceIsolation = { when: (floor: number | null) => boolean; run: (wav: Buffer) => Promise<Buffer> };
+
+export async function cleanSpeechInSandbox(
+  id: string,
+  url: string,
+  kind: "video" | "audio",
+  options: { force?: boolean; isolate?: VoiceIsolation } = {},
+): Promise<CleanedSpeech | null> {
   const started = Date.now();
   const sandbox = await jobSandbox();
   const dir = `${ROOT}/jobs/${id}-speech`;
@@ -989,8 +999,29 @@ export async function cleanSpeechInSandbox(id: string, url: string, kind: "video
     if (/noaudio=1/.test(measured)) return null;
     const { level, floor } = parseAudioStats(measured);
     const duration = printed(measured, "duration");
-    const { filter, denoised } = speechCleanFilter(floor, `${SPEECH_DIR}/${RNNOISE_MODEL.file}`, options.force);
+    const { filter, denoised: denoise } = speechCleanFilter(floor, `${SPEECH_DIR}/${RNNOISE_MODEL.file}`, options.force);
     const out = kind === "video" ? "out.mp4" : "out.m4a";
+    // Music or a loud room behind her (or she asked for her voice alone): the voice isolated by the service, put back
+    // under the picture as it is (padded to the picture's length); if it fails, the denoiser cleans it as before.
+    let isolated = false;
+    if (options.isolate?.when(floor)) {
+      try {
+        await bash(sandbox, `cd "$1" && ${ff} -v error -y -i in.src -vn -map 0:a:0 -ac 1 -ar 44100 -c:a pcm_s16le full.wav`, [dir]);
+        const full = await sandbox.readFileToBuffer({ path: `${dir}/full.wav` });
+        if (!full?.length) throw new Error("no sound to isolate");
+        const voice = await options.isolate.run(full);
+        await sandbox.writeFiles([{ path: `${dir}/voice.audio`, content: voice }]);
+        const mux =
+          kind === "video"
+            ? `${ff} -v error -y -i in.src -i voice.audio -map 0:v:0 -map 1:a:0 -c:v copy ${printed(measured, "hevc") === 1 ? "-tag:v hvc1" : ""} -af apad -shortest -c:a aac -b:a 192k -movflags +faststart ${out}`
+            : `${ff} -v error -y -i voice.audio -c:a aac -b:a 160k -movflags +faststart ${out}`;
+        await bash(sandbox, `cd "$1" && ${mux}`, [dir]);
+        isolated = true;
+      } catch (error) {
+        console.warn("voice not isolated, the denoiser cleans it", id, error instanceof Error ? error.message.slice(0, 300) : error);
+      }
+    }
+    const denoised = isolated || denoise;
     const encode =
       kind === "video"
         ? // The picture copied (an HEVC one tagged so browsers play it), its sound cleaned.
@@ -1002,7 +1033,7 @@ export async function cleanSpeechInSandbox(id: string, url: string, kind: "video
       sandbox,
       [
         'cd "$1"',
-        ...(denoised ? [encode] : []),
+        ...(denoise && !isolated ? [encode] : []),
         `${ff} -v error -y -i ${source} -vn -map 0:a:0 -ac 1 -ar 16000 -c:a pcm_s16le speech.wav`,
         `${ff} -hide_banner -nostats -i speech.wav -af "astats=measure_overall=RMS_level+RMS_trough:measure_perchannel=none" -f null - 2>&1 | grep -E "RMS (level|trough)" || true`,
       ].join("\n"),
@@ -1019,7 +1050,7 @@ export async function cleanSpeechInSandbox(id: string, url: string, kind: "video
       sandbox.readFileToBuffer({ path: `${dir}/speech.wav` }),
     ]);
     if (!wav?.length || (denoised && !media?.length)) throw new Error("speech cleaning produced no file");
-    return { media: media ?? null, wav, level, floor, pauses: parseSilences(await run.stdout(), duration ?? Infinity), duration, seconds: (Date.now() - started) / 1000 };
+    return { media: media ?? null, wav, level, floor, pauses: parseSilences(await run.stdout(), duration ?? Infinity), duration, seconds: (Date.now() - started) / 1000, isolated };
   } finally {
     await bash(sandbox, 'rm -rf "$1"', [dir]).catch(() => {});
   }

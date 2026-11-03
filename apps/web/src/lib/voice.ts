@@ -1,5 +1,5 @@
 import "server-only";
-import { fromScribe, transcriptionCostUsd, usdToEur, voiceTranscriptSchema, type VoiceTranscript } from "@fauve/agent";
+import { fromScribe, isolationCostUsd, transcriptionCostUsd, usdToEur, voiceTranscriptSchema, type VoiceTranscript } from "@fauve/agent";
 import { env } from "@/lib/env";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { costMeta } from "@/lib/cost-scope";
@@ -45,6 +45,41 @@ export async function transcribeSpeech(studioId: string, mediaId: string, wav: B
     console.warn("clip speech transcription failed", mediaId, error instanceof Error ? error.message.slice(0, 300) : error);
     return null;
   }
+}
+
+/** The seconds of sound in a PCM WAV (its byte rate read from its header). */
+function wavSeconds(wav: Buffer): number {
+  const rate = wav.length > 44 ? wav.readUInt32LE(28) : 0;
+  return rate > 0 ? Math.max(0, wav.length - 44) / rate : 0;
+}
+
+/**
+ * Her voice alone, the music and noise behind it removed by ElevenLabs' voice isolator (a busy shop, the café's
+ * playlist), from a WAV of her clip's sound: the audio it returns (its own format, read as it is by ffmpeg), its cost
+ * logged ($0.12 a minute). Throws when it cannot: the denoiser cleans the sound instead.
+ */
+export async function isolateVoice(studioId: string, mediaId: string, wav: Buffer): Promise<Buffer> {
+  const key = env("ELEVENLABS_API_KEY");
+  if (!key) throw new Error("ELEVENLABS_API_KEY missing");
+  const form = new FormData();
+  form.append("audio", new Blob([new Uint8Array(wav)], { type: "audio/wav" }), "speech.wav");
+  const started = Date.now();
+  const res = await fetch("https://api.elevenlabs.io/v1/audio-isolation", { method: "POST", headers: { "xi-api-key": key }, body: form, signal: AbortSignal.timeout(240_000) });
+  if (!res.ok) throw new Error(`ElevenLabs voice isolator ${res.status}: ${(await res.text().catch(() => "")).slice(0, 300)}`);
+  const audio = Buffer.from(await res.arrayBuffer());
+  if (audio.length < 2000) throw new Error("ElevenLabs voice isolator sent no audio");
+  const seconds = wavSeconds(wav);
+  await supabaseAdmin()
+    .from("cost_events")
+    .insert({
+      studio_id: studioId,
+      kind: "voice_isolation",
+      provider: "elevenlabs",
+      units: Math.round(seconds),
+      cost_eur: usdToEur(isolationCostUsd(seconds), env("USD_TO_EUR")),
+      meta: costMeta({ media_id: mediaId, ms: Date.now() - started, type: res.headers.get("content-type") ?? "" }),
+    });
+  return audio;
 }
 
 /** The transcript of a voice note, made once; null without the service, or when it fails. */

@@ -170,6 +170,14 @@ export function musicCostUsd(seconds: number): number {
   return (Math.max(0, seconds) / 60) * ELEVENLABS_MUSIC_USD_PER_MINUTE;
 }
 
+/** Her voice isolated from the music and noise behind it (Voice Isolator), $0.12 a minute of audio (elevenlabs.io/pricing/api, November 2026). */
+export const ELEVENLABS_ISOLATION_USD_PER_MINUTE = 0.12;
+
+/** A clip's voice isolated, by its length. */
+export function isolationCostUsd(seconds: number): number {
+  return (Math.max(0, seconds) / 60) * ELEVENLABS_ISOLATION_USD_PER_MINUTE;
+}
+
 /** Sound effects, $0.12 a minute of sound (elevenlabs.io/pricing/api, November 2026; its FAQ says « billed per generation »: to check on the invoice). */
 export const ELEVENLABS_SFX_USD_PER_MINUTE = 0.12;
 

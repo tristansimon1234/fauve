@@ -388,7 +388,8 @@ export async function renderPost(studioId: string, postId: string, options: { ed
     depthPhotoIds(plan).length ? ensureReliefs(studioId, postId, plan).catch((e: unknown) => console.warn("reliefs unavailable", e instanceof Error ? e.message : e)) : null,
   ]);
   // She wants the sound cleaned, even where it was not noisy: the cleaned copies are made first.
-  if (plan.finish?.sound === "clean") await ensureCleanCopies(studioId, planMediaIds(plan), plan.voice?.media_id);
+  if (plan.finish?.sound === "clean" || plan.finish?.sound === "voice")
+    await ensureCleanCopies(studioId, planMediaIds(plan), plan.voice?.media_id, { isolate: plan.finish.sound === "voice" });
   const { clipIds, clipFiles, clips, clipUrls, photoIds, words, aspects, accent, logoUrl, logoOnDark, studioName, fonts, colors, customFonts, reelSignature: signature, voice, cutouts, sceneCutouts, copyCutouts, overlayPhotos, depth, reliefs, subjects, photoAspects, tracks, facts } =
     await loadMontageInputs(studioId, plan, { postId });
   const motion = motionTemplateSchema.safeParse(plan.template);
