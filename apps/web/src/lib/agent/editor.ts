@@ -719,6 +719,15 @@ export async function designEdit(params: {
       ];
     }),
   });
+  // An animation over the montage: the shots under it, numbered as in the plan (its Subject, SubjectOutline, Depth name
+  // them), when each plays (frames from its start) and what it shows, for the tools that cut out what is in them.
+  const underLayer = (layer: { from: number; to: number }): SceneRequest["under"] => {
+    const start = Math.round(layer.from * 30);
+    const end = Math.round(layer.to * 30);
+    const c = composition();
+    const plans = c.plans.filter((p) => p.to > start && p.from < end).map((p) => ({ ...p, from: p.from - start, to: p.to - start }));
+    return plans.length ? { plans, shots: c.shots.map((s) => ({ ...s, from: s.from - start })) } : undefined;
+  };
   // Her voice's subtitles show all along it (an animation over several shots meets the subtitles of who speaks in them):
   // an animation's words keep off their row.
   const subtitles = plan.subtitles ? { y: plan.subtitle_y ?? SUBTITLE_ROW.y, h: SUBTITLE_ROW.h } : null;
@@ -729,6 +738,7 @@ export async function designEdit(params: {
     const segment = found && isMotionSegment(found) ? found : null;
     const durationInFrames = Math.round((layer ? layer.to - layer.from : (segment?.duration ?? 2)) * 30);
     const compose = layer?.compose ? composition() : undefined;
+    const under = layer && !compose ? underLayer(layer) : undefined;
     // The animation that draws a copied Reel's texts: they are its to draw, at their moments.
     const words = layer?.words ? compositionTexts(plan).texts : undefined;
     // What moves under it: the footage of its passage (a scene), the shots under it (an animation over the montage),
@@ -755,6 +765,7 @@ export async function designEdit(params: {
       ...(segment?.over?.busy?.length ? { busy: segment.over.busy } : {}),
       ...(layer ? { cuts: cutsUnder(layer.from, layer.to) } : {}),
       ...(compose ? { compose } : {}),
+      ...(under ? { under } : {}),
       ...(words ? { words } : {}),
       ...(photos.length ? { photos } : {}),
       ...(track.length ? { track } : {}),

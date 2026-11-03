@@ -29,7 +29,7 @@ import { Elements } from "./Elements";
 import { TextLayer } from "./TextLayer";
 import { TEXT_Y, themeFor, type Theme } from "./theme";
 import { cameraMotion, faceFocus, framingPercent, punchScale, straightening, type FaceZone } from "./track";
-import type { CameraMove, ReelProps, ReelUnder, SpeedPiece, TextLook } from "./types";
+import type { CameraMove, ComposeShot, ReelProps, ReelUnder, SpeedPiece, TextLook } from "./types";
 
 const clamp = { extrapolateLeft: "clamp", extrapolateRight: "clamp" } as const;
 
@@ -296,6 +296,18 @@ export function Reel(props: ReelProps) {
               cuts={layer.cuts}
               track={layer.track}
               spoken={layer.spoken}
+              // The shots under it, as the montage draws them full frame: her cut out, an object, its depth fall exactly on them.
+              {...(layer.shots?.length
+                ? {
+                    footage: {
+                      shots: layer.shots,
+                      draw: (shot: ComposeShot, size: { width: number; height: number }) => drawShot(props.segments[shot.segment], theme, size, shot.face),
+                      subject: (shot: ComposeShot, size: { width: number; height: number }) => drawShot(props.segments[shot.segment], theme, size, shot.face, "subject"),
+                      object: (shot: ComposeShot, name: string, size: { width: number; height: number }) => drawShot(props.segments[shot.segment], theme, size, shot.face, { object: name }),
+                      depth: (shot: ComposeShot, size: { width: number; height: number }) => drawShot(props.segments[shot.segment], theme, size, shot.face, "depth"),
+                    },
+                  }
+                : {})}
               {...(layer.drawsTexts ? { reelTexts: layer.reelTexts } : {})}
             />
           </Sequence>

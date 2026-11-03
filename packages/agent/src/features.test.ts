@@ -946,6 +946,35 @@ test("what a composition's code cuts out: her, or the objects it names, shot by 
   assert.deepEqual(passages, [{ clip_id: "v1", from: 1, to: 4, key: objectKey("v1", 1, 4, "cup"), name: "cup" }]);
   assert.match(passages[0]!.key, /^v1@1\.00-4\.00#cup$/);
   assert.ok(OBJECT_MAX >= 2);
+  // An animation laid over the montage follows them too (the Text Brush test: a word around her cup, behind it).
+  const over = { ...(plan as object), layers: [{ from: 0, to: 4, brief: "", motion: { js: `SubjectOutline(shots[1], frame, laid, "espresso cup")` } }] } as never;
+  assert.deepEqual(objectPassages(over, (id) => id.startsWith("v")).map((p) => p.name), ["espresso cup"]);
+});
+
+test("an animation over the montage gets the shots under it when its code draws one, and her cut out when it uses Subject", async () => {
+  const { wantsSubjects, subjectPassages } = await import("./subject.ts");
+  const plan = {
+    format: "9:16",
+    duration: 4,
+    template: "libre",
+    segments: [{ clip_id: "v1", in: 0, out: 4, zoom: "none" }],
+    texts: [],
+    images: [],
+    transitions: "cut",
+    subtitles: false,
+    music: null,
+    layers: [
+      { from: 0, to: 2, brief: "", motion: { js: `React.createElement(Subject, { shot: 0, style: { left: 0, top: 0, width: 1080, height: 1920 },} )` } },
+      { from: 2, to: 4, brief: "", motion: { js: `React.createElement("div", null, "bonjour")` } },
+    ],
+  } as never;
+  assert.equal(wantsSubjects(plan), true);
+  assert.deepEqual(subjectPassages(plan, () => true).map((p) => p.clip_id), ["v1"]);
+  const props = buildReelProps(plan, { template: "libre", clipUrls: { v1: "https://x/v1.mp4" }, brand: { name: "Studio" } } as never);
+  const [drawing, plain] = props.layers ?? [];
+  assert.equal(drawing?.shots?.length, 1);
+  assert.equal(drawing?.shots?.[0]?.from, 0);
+  assert.equal(plain?.shots, undefined);
 });
 
 test("what a composition shows in depth: the shots its code names, read through their passages, given to the render", async () => {

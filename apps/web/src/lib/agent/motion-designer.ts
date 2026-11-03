@@ -62,6 +62,8 @@ export type SceneRequest = {
   photos?: OfferedPhoto[];
   cuts?: number[];
   compose?: { plans: CompositionShot[]; shots: ComposeShot[] } & CompositionTexts;
+  /** An animation over the montage: the shots under it (what each shows, frames from its start) and every shot for its code (shots[i]). */
+  under?: { plans: CompositionShot[]; shots: ComposeShot[] };
   /** What moves in the footage under it: the pieces its `track` reads (its test render follows them), and what the designer is told of them. */
   track?: TrackPiece[];
   moves?: DesignerMoves | { by_shot: ({ shot: number } & DesignerMoves)[] };
@@ -251,6 +253,7 @@ async function writeScene(
   const parts: MotionPromptParts = {
     photos: Boolean(request.photos?.length || request.compose?.plans.some((p) => p.cut_out)),
     cuts: Boolean(request.cuts && !request.compose),
+    under: Boolean(request.under && !request.compose),
     moves: Boolean(request.moves || request.track?.length || request.compose?.shots.some((x) => x.track)),
     composition: Boolean(request.compose),
     words: Boolean(request.words),
@@ -302,7 +305,7 @@ async function writeScene(
               },
             }
           : request.cuts
-            ? { shots_under: { shots: request.cuts.length + 1, cut_frames: request.cuts } }
+            ? { shots_under: { shots: request.cuts.length + 1, cut_frames: request.cuts, ...(request.under ? { her_shots: request.under.plans } : {}) } }
             : {}),
         ...(seen ? { previous_version: { frames: `${seen.frames.length} images attached, above`, code: seen.code } } : {}),
         ...(canvas ? { reel_frames: `${canvas.length} images attached, above` } : {}),
@@ -434,6 +437,8 @@ function smokeScenes(results: SceneResult[], requestOf: (id: string) => SceneReq
         ...(r.fonts?.length ? { fonts: r.fonts } : {}),
         ...(request.cuts ? { cuts: request.cuts } : {}),
         ...(request.compose ? { shots: request.compose.shots, reelTexts: request.compose.texts, end: request.compose.end } : {}),
+        // An animation over the montage gets every shot too (its code may name one: Subject, SubjectOutline, Depth).
+        ...(request.under && !request.compose ? { shots: request.under.shots } : {}),
         // The animation that draws the Reel's texts: checked that each one is there, whole, in its moment.
         ...(request.words ? { reelTexts: request.words } : {}),
         // A scene that follows what moves is checked where it goes, with the Reel's camera moves.

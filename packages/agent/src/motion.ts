@@ -179,6 +179,9 @@ export type ComposeShot = ScenePhoto & {
   objects?: Record<string, { boxes?: (number[] | null)[]; contours?: (number[] | null)[] }>;
 };
 
+/** An animation's code that draws one of her shots or what is cut out of it (her, an object, its depth). */
+const DRAWS_SHOTS = /\b(?:Footage|Subject|SubjectBox|SubjectOutline|Outline|Depth)\b/;
+
 /** The objects followed through a passage (keys `subjectKey#name` among the cut-outs), by name. */
 function passageObjects(subjects: ReelInputs["subjects"], key: string): [string, NonNullable<ReelInputs["subjects"]>[string]][] {
   if (!subjects) return [];
@@ -862,6 +865,9 @@ export function buildReelProps(plan: EditPlan, inputs: ReelInputs): ReelProps {
         cuts: starts.filter((f) => f > from && f < from + length).map((f) => f - from),
         ...(l.motion.photos?.length ? { photos: scenePhotos(l.motion.photos, inputs) } : {}),
         ...(l.compose ? { compose: true, shots: composeShots(from, length) } : {}),
+        // An animation over the montage that draws one of her shots, her cut out, an object or its depth: the shots under it,
+        // played full frame by the montage (its Subject laid full frame falls exactly on her).
+        ...(!l.compose && DRAWS_SHOTS.test(l.motion.js) ? { shots: composeShots(from, length) } : {}),
         // A composition that draws the whole picture gets the Reel's texts and its end to draw; one written without an
         // end card (draws_end false, or no word of it in its code) leaves the card to the engine and stops before it.
         // The animation that draws the Reel's texts as the copied Reel does (the engine's texts step aside for it).

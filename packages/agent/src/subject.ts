@@ -87,9 +87,13 @@ export function objectsDrawn(js: string | undefined): { shot: number; name: stri
   return [...found.values()];
 }
 
-/** A plan that draws her cut out: a composition that uses Subject, or what is said written around her (its strong words behind her). */
+/**
+ * A plan that draws her cut out: an animation that uses Subject (a composition, or one laid over the montage: a word
+ * behind her as she walks on a shot played full frame), a composition about to be written (anticipate), or what is said
+ * written around her (its strong words behind her).
+ */
 export const wantsSubjects = (plan: Pick<EditPlan, "layers"> & { subtitles?: boolean; captions?: EditPlan["captions"]; finish?: EditPlan["finish"] }, anticipate = false) =>
-  (plan.layers ?? []).some((l) => l.compose && (anticipate || drawsSubject(l.motion?.js))) || Boolean(plan.subtitles && captionStyle(plan) === "kinetic");
+  (plan.layers ?? []).some((l) => (l.compose && anticipate) || drawsSubject(l.motion?.js)) || Boolean(plan.subtitles && captionStyle(plan) === "kinetic");
 
 /** What asks for her cut out before any code is written: her background replaced, a word behind her, her silhouette. */
 export const CUT_OUT_WORDS = /\bfond\b|d[ée]tour|derri[eè]re (moi|elle|lui|la personne)|silhouette|d[ée]coup[ée]e?\b|background|behind (me|her|him)|cut.?out/i;
@@ -108,8 +112,8 @@ export function subjectPassages(
   anticipate = false,
 ): SubjectPassage[] {
   if (!wantsSubjects(plan, anticipate)) return [];
-  // Only the opening passages for the captions alone; a composition that draws her (or will: anticipate), as many as the budget holds.
-  const composed = (plan.layers ?? []).some((l) => l.compose && (anticipate || drawsSubject(l.motion?.js)));
+  // Only the opening passages for the captions alone; an animation that draws her (or a composition that will: anticipate), as many as the budget holds.
+  const composed = (plan.layers ?? []).some((l) => (l.compose && anticipate) || drawsSubject(l.motion?.js));
   const budget = composed ? SUBJECT_MAX_SECONDS : CAPTION_SUBJECT_SECONDS;
   const out: SubjectPassage[] = [];
   let seconds = 0;
@@ -130,8 +134,8 @@ export function subjectPassages(
 export const OBJECT_MAX = 4;
 export const OBJECT_MAX_SECONDS = 20;
 
-/** A plan whose compositions follow an object (Subject, SubjectBox, SubjectOutline or Outline given its name). */
-export const wantsObjects = (plan: Pick<EditPlan, "layers">) => (plan.layers ?? []).some((l) => l.compose && objectsDrawn(l.motion?.js).length > 0);
+/** A plan whose animations follow an object (Subject, SubjectBox, SubjectOutline or Outline given its name): a composition, or one laid over the montage. */
+export const wantsObjects = (plan: Pick<EditPlan, "layers">) => (plan.layers ?? []).some((l) => objectsDrawn(l.motion?.js).length > 0);
 
 /** An object to follow through a passage of her video: the passage, and the object's name. */
 export type ObjectPassage = SubjectPassage & { name: string };
@@ -146,7 +150,6 @@ export function objectPassages(plan: Pick<EditPlan, "segments" | "layers">, isVi
   const out: ObjectPassage[] = [];
   let seconds = 0;
   for (const layer of plan.layers ?? []) {
-    if (!layer.compose) continue;
     for (const { shot, name } of objectsDrawn(layer.motion?.js)) {
       const s = shots[shot];
       if (!s || !isVideo(s.clip_id) || s.ramp || (s.speed && Math.abs(s.speed - 1) > 0.01)) continue;
@@ -180,8 +183,8 @@ export function depthsDrawn(js: string | undefined): number[] {
   return [...shots];
 }
 
-/** A plan whose compositions show a shot's depth. */
-export const wantsDepth = (plan: Pick<EditPlan, "layers">) => (plan.layers ?? []).some((l) => l.compose && depthsDrawn(l.motion?.js).length > 0);
+/** A plan whose animations show a shot's depth (a composition, or one laid over the montage). */
+export const wantsDepth = (plan: Pick<EditPlan, "layers">) => (plan.layers ?? []).some((l) => depthsDrawn(l.motion?.js).length > 0);
 
 /**
  * The passages a Reel reads in depth: the shot each composition names (her shot n is the plan's n-th shot, as its
@@ -193,7 +196,6 @@ export function depthPassages(plan: Pick<EditPlan, "segments" | "layers">, isVid
   const out: SubjectPassage[] = [];
   let seconds = 0;
   for (const layer of plan.layers ?? []) {
-    if (!layer.compose) continue;
     for (const shot of depthsDrawn(layer.motion?.js)) {
       const s = shots[shot];
       if (!s || !isVideo(s.clip_id) || s.ramp || (s.speed && Math.abs(s.speed - 1) > 0.01)) continue;
