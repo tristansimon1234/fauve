@@ -123,9 +123,9 @@ function checkScope(width: number, height: number, durationInFrames: number): ty
   );
   // Her cut out: an empty box where it is drawn, marked with its shot (a word laid before it is behind her, and her
   // silhouette there is read from what was tracked in that shot).
-  const Subject = ({ shot, style }: { shot: number; style?: CSSProperties }) => (
-    <div data-fauve-subject={shot} style={{ position: "absolute", left: 0, top: 0, width, height, ...style }} />
-  );
+  // An object followed instead of her (`object`): not her silhouette, nothing to read behind it here.
+  const Subject = ({ shot, style, object }: { shot: number; style?: CSSProperties; object?: string }) =>
+    object ? null : <div data-fauve-subject={shot} style={{ position: "absolute", left: 0, top: 0, width, height, ...style }} />;
   const useVideoConfig = () => ({ ...SCOPE.useVideoConfig(), width, height, durationInFrames });
   return {
     ...SCOPE,

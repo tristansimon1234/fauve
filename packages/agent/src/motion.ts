@@ -101,6 +101,8 @@ export type ReelSegment =
        * drawn exactly over the shot by a composition's Subject, so a text can pass between the shot and her.
        */
       subject?: { src: string; still?: boolean; top?: number };
+      /** Objects followed through the passage (a cup, a product), by name, cut out the same way: Subject with `object`. */
+      objects?: Record<string, { src: string; still?: boolean }>;
     }
   /**
    * A photo: a carousel slide (with its retouch and blurred zones), or a photo in a Reel (zoom: a slow Ken Burns move).
@@ -169,7 +171,15 @@ export type ComposeShot = ScenePhoto & {
   subjectBoxes?: (number[] | null)[];
   /** Its subject's outline at each image (64 points, x y shares, flat), from its cut-out: Outline and SubjectOutline draw it. */
   subjectContours?: (number[] | null)[];
+  /** The objects followed through it, by name: where each one is and its outline, image by image (SubjectBox, SubjectOutline, Outline given its name). */
+  objects?: Record<string, { boxes?: (number[] | null)[]; contours?: (number[] | null)[] }>;
 };
+
+/** The objects followed through a passage (keys `subjectKey#name` among the cut-outs), by name. */
+function passageObjects(subjects: ReelInputs["subjects"], key: string): [string, NonNullable<ReelInputs["subjects"]>[string]][] {
+  if (!subjects) return [];
+  return Object.entries(subjects).flatMap(([k, v]) => (k.startsWith(`${key}#`) ? [[k.slice(key.length + 1), v] as [string, typeof v]] : []));
+}
 
 /**
  * A text of the Reel that a collage's composition draws itself: its words, its role (the hook, a
@@ -684,6 +694,9 @@ export function buildReelProps(plan: EditPlan, inputs: ReelInputs): ReelProps {
       ...(s.subtitle_y !== undefined ? { subtitleY: s.subtitle_y } : {}),
       // Its subject cut out, image for image: only at its own pace (a cut-out follows the clip's images one by one).
       ...(!ramp && !speed && inputs.subjects?.[subjectKey(s.clip_id, s.in, s.out)] ? { subject: inputs.subjects[subjectKey(s.clip_id, s.in, s.out)] } : {}),
+      ...(!ramp && !speed && passageObjects(inputs.subjects, subjectKey(s.clip_id, s.in, s.out)).length
+        ? { objects: Object.fromEntries(passageObjects(inputs.subjects, subjectKey(s.clip_id, s.in, s.out)).map(([name, o]) => [name, { src: o.src, ...(o.still ? { still: true } : {}) }])) }
+        : {}),
     };
   });
   const durationInFrames = cursor + fadeFrames;
@@ -800,6 +813,13 @@ export function buildReelProps(plan: EditPlan, inputs: ReelInputs): ReelProps {
           ...(track ? { track: face ? { ...track, look: { ...track.look, face } } : track } : {}),
           ...(inputs.subjects?.[subjectKey(s.clip_id, s.in, s.out)]?.boxes?.length ? { subjectBoxes: inputs.subjects[subjectKey(s.clip_id, s.in, s.out)]!.boxes } : {}),
           ...(inputs.subjects?.[subjectKey(s.clip_id, s.in, s.out)]?.contours?.length ? { subjectContours: inputs.subjects[subjectKey(s.clip_id, s.in, s.out)]!.contours } : {}),
+          ...(passageObjects(inputs.subjects, subjectKey(s.clip_id, s.in, s.out)).length
+            ? {
+                objects: Object.fromEntries(
+                  passageObjects(inputs.subjects, subjectKey(s.clip_id, s.in, s.out)).map(([name, o]) => [name, { ...(o.boxes?.length ? { boxes: o.boxes } : {}), ...(o.contours?.length ? { contours: o.contours } : {}) }]),
+                ),
+              }
+            : {}),
         },
       ];
     });

@@ -762,6 +762,40 @@ test("a word behind her: her silhouette from what was tracked hides it on a clos
   assert.equal(onlyProbe("-20 % sur tout"), false);
 });
 
+test("what a composition's code cuts out: her, or the objects it names, shot by shot", async () => {
+  const { drawsSubject, objectsDrawn, objectPassages, objectKey, OBJECT_MAX } = await import("./subject.ts");
+  // Her: Subject, SubjectBox, SubjectOutline or Outline without an object's name (an outline needs her cut out too).
+  assert.equal(drawsSubject(`<Outline shot={shots[0]} at={4} />`), true);
+  assert.equal(drawsSubject(`const b = SubjectBox(shots[1], f, laid);`), true);
+  assert.equal(drawsSubject(`<Subject shot={0} rim={8} />`), true);
+  // Only objects: she is not cut out for them. As kept (compiled by sucrase, a style nested in the props) and as JSX.
+  const objectsOnly =
+    `const b = SubjectBox(shots[1], f, laid, "the red bag"); React.createElement(Subject, { shot: 2, style: { left: 0, top: 0 }, object: "Coffee  Cup"  ,} ), ` +
+    `React.createElement(Outline, { shot: shots[2], object: "coffee cup" , dash: true,} )`;
+  assert.equal(drawsSubject(objectsOnly), false);
+  assert.deepEqual(objectsDrawn(objectsOnly), [
+    { shot: 2, name: "coffee cup" },
+    { shot: 1, name: "the red bag" },
+  ]);
+  assert.deepEqual(objectsDrawn(`<Subject shot={3} style={{ left: 0 }} object="vase" />`), [{ shot: 3, name: "vase" }]);
+  assert.equal(drawsSubject(`${objectsOnly} React.createElement(Subject, { shot: 0, rim: 8,} )`), true);
+  assert.equal(drawsSubject(undefined), false);
+  assert.deepEqual(objectsDrawn(`<Subject shot={i} object="cup" />`), []);
+  // Each object through the passage of its shot (the plan's n-th shot, photos counted), videos at their own pace only.
+  const plan = {
+    segments: [
+      { clip_id: "photo1", in: 0, out: 2 },
+      { clip_id: "v1", in: 1, out: 4 },
+      { clip_id: "v2", in: 0, out: 3, speed: 0.5 },
+    ],
+    layers: [{ from: 0, to: 9, brief: "", compose: true, motion: { js: `<Subject shot={1} object="cup" /> <Subject shot={2} object="ball" /> <Subject shot={0} object="vase" />` } }],
+  } as never;
+  const passages = objectPassages(plan, (id) => id.startsWith("v"));
+  assert.deepEqual(passages, [{ clip_id: "v1", from: 1, to: 4, key: objectKey("v1", 1, 4, "cup"), name: "cup" }]);
+  assert.match(passages[0]!.key, /^v1@1\.00-4\.00#cup$/);
+  assert.ok(OBJECT_MAX >= 2);
+});
+
 test("her outline: a smooth closed path, open where the frame cuts her", async () => {
   const { outlinePath } = await import("../../../apps/render/src/outline.ts");
   const ring = (pts: number[][]) => pts.flat();

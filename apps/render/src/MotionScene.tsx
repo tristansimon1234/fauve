@@ -17,6 +17,7 @@ import { makeKit } from "./Kit";
 import { makeType } from "./Type";
 import { makeGraphic } from "./Graphic";
 import { makeEffects, SubjectBox, SubjectOutline } from "./Effects";
+import { objectName } from "./outline";
 import { Marker } from "./Marker";
 import { Captions } from "./Captions";
 import { PaperCutout, type RimSpec } from "./PaperCutout";
@@ -63,6 +64,8 @@ export type FootageSource = {
   draw: (shot: ComposeShot, size: { width: number; height: number }) => ReactNode;
   /** Its subject cut out at every image (matte.py), drawn exactly like the shot; nothing when it has none. */
   subject?: (shot: ComposeShot, size: { width: number; height: number }) => ReactNode;
+  /** An object followed through it (by name), cut out the same way; nothing when it was not followed. */
+  object?: (shot: ComposeShot, name: string, size: { width: number; height: number }) => ReactNode;
 };
 
 /** Given by the Reel to a collage's composition only; none in the scene check (a grey card stands in for each shot). */
@@ -116,8 +119,11 @@ function Subject({
   fill,
   tint,
   hold,
+  object,
 }: {
   shot: number;
+  /** An object followed through the shot instead of her (a cup she lifts, a product she shows), by the name its code gives it. */
+  object?: string;
   style?: CSSProperties;
   rim?: number;
   rimColor?: string;
@@ -133,8 +139,10 @@ function Subject({
   const { width, height } = useVideoConfig();
   const id = useId().replace(/[^a-zA-Z0-9_-]/g, "");
   const info = source?.shots[shot];
-  if (!source?.subject || !info) return null;
-  const media = source.subject(info, { width: px(style?.width) ?? width, height: px(style?.height) ?? height });
+  const size = { width: px(style?.width) ?? width, height: px(style?.height) ?? height };
+  const name = object ? objectName(object) : "";
+  if (!info) return null;
+  const media = name ? source?.object?.(info, name, size) : source?.subject?.(info, size);
   if (!media) return null;
   const local = frame - info.from;
   const r = Math.max(0, rim);

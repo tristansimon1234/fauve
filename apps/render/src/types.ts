@@ -51,6 +51,8 @@ export type ComposeShot = ScenePhoto & {
   subjectBoxes?: (number[] | null)[];
   /** Its subject's outline at each image (64 points, x y shares, flat), from its cut-out: Outline and SubjectOutline draw it. */
   subjectContours?: (number[] | null)[];
+  /** The objects followed through it, by name: where each one is and its outline, image by image (SubjectBox, SubjectOutline, Outline given its name). */
+  objects?: Record<string, { boxes?: (number[] | null)[]; contours?: (number[] | null)[] }>;
 };
 /** A text of the Reel that a collage's composition draws itself (frames from its start): its words, its role, the words to stress, a message's lines. */
 export type ComposeText = { text: string; role: "hook" | "band" | "caption"; from: number; to: number; emphasis: string[]; items?: { title: string; detail?: string }[] };
@@ -130,6 +132,8 @@ export type ReelProps = {
         subtitleY?: number;
         /** Its subject cut out at every image of the passage (a transparent video, or one image when nothing moves), for a composition's Subject. */
         subject?: { src: string; still?: boolean; top?: number };
+        /** Objects followed through the passage (a cup, a product), by name, cut out the same way: Subject with `object`. */
+        objects?: Record<string, { src: string; still?: boolean }>;
       }
     | {
         type: "image";

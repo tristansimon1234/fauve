@@ -21,8 +21,71 @@ export const CAPTION_SUBJECT_SECONDS = 12;
 /** The name of a passage's cut-out: its clip and its seconds, to the hundredth (the same passage keeps it from one version to the next). */
 export const subjectKey = (clipId: string, from: number, to: number) => `${clipId}@${from.toFixed(2)}-${to.toFixed(2)}`;
 
-/** A composition's code that draws her subject. */
-export const drawsSubject = (js: string | undefined) => Boolean(js && /\bSubject(?:Box)?\b/.test(js));
+/**
+ * Each use of the scope's cut-out tools with props in a code: `React.createElement(Subject|Outline, {…})` as kept (the
+ * motion designer's TSX compiled by sucrase), `h(…)`, or a JSX tag; its props as written, braces matched.
+ */
+function toolProps(js: string): string[] {
+  const out: string[] = [];
+  for (const m of js.matchAll(/\b(?:React\.createElement|h)\(\s*(?:Subject|Outline)\s*,\s*|<(?:Subject|Outline)\b/g)) {
+    const jsx = m[0].startsWith("<");
+    const from = m.index + m[0].length;
+    if (!jsx && js[from] !== "{") continue;
+    let depth = 0;
+    let to = from;
+    for (; to < js.length; to++) {
+      const c = js[to];
+      if (c === "{") depth++;
+      else if (c === "}") {
+        depth--;
+        if (!jsx && depth === 0) break;
+      } else if (jsx && c === ">" && depth === 0) break;
+    }
+    out.push(js.slice(from, to + 1));
+  }
+  return out;
+}
+
+/** The calls of its functions (`SubjectBox(shots[2], f, box, "the cup")`): the shot, and the object's name when one is given last. */
+const CALLS = /\bSubject(?:Box|Outline)\(\s*([^,)]*)(?:,[^;]*?)?(?:,\s*["'`]([^"'`]+)["'`])?\s*\)/g;
+const OBJECT_PROP = /\bobject\s*[:=]\s*\{?\s*["'`]([^"'`]+)["'`]/;
+const SHOT_PROP = /\bshot\s*[:=]\s*\{?\s*((?:shots\s*\[\s*)?\d+)/;
+
+/**
+ * A composition's code that draws her subject (the person, or what stands in front: what its cut-out keeps): any use
+ * of Subject, SubjectBox, SubjectOutline or Outline that does not name an object (with one, it is that object, not
+ * her). Counted on every mention, so a tool used another way (aliased, in a list) still has her cut out.
+ */
+export function drawsSubject(js: string | undefined): boolean {
+  if (!js) return false;
+  const mentions = js.match(/\b(?:Subject|SubjectBox|SubjectOutline|Outline)\b/g)?.length ?? 0;
+  const forObjects = toolProps(js).filter((props) => OBJECT_PROP.test(props)).length + [...js.matchAll(CALLS)].filter((m) => m[2]).length;
+  return mentions > forObjects;
+}
+
+/** An object's name as kept: lower case, its spaces single (« The coffee cup » and « the coffee cup » are one). */
+export const objectName = (name: string) => name.trim().toLowerCase().replace(/\s+/g, " ").slice(0, 60);
+
+/** The name of an object's passage: the passage's, then the object's. */
+export const objectKey = (clipId: string, from: number, to: number, name: string) => `${subjectKey(clipId, from, to)}#${objectName(name)}`;
+
+/**
+ * The objects a composition's code follows (a cup she lifts, a product she shows, a ball): by shot (its index in
+ * shots, written as a number or shots[n]) and name, from Subject or Outline given `object` (compiled or as JSX), and
+ * SubjectBox or SubjectOutline given a name last. A shot written as a variable is not read.
+ */
+export function objectsDrawn(js: string | undefined): { shot: number; name: string }[] {
+  if (!js) return [];
+  const found = new Map<string, { shot: number; name: string }>();
+  const add = (shot: string | undefined, name: string | undefined) => {
+    const n = /^(?:shots\s*\[\s*)?(\d+)\s*\]?$/.exec((shot ?? "").trim());
+    const named = name ? objectName(name) : "";
+    if (n && named) found.set(`${n[1]}#${named}`, { shot: Number(n[1]), name: named });
+  };
+  for (const props of toolProps(js)) add(SHOT_PROP.exec(props)?.[1], OBJECT_PROP.exec(props)?.[1]);
+  for (const m of js.matchAll(CALLS)) add(m[1], m[2]);
+  return [...found.values()];
+}
 
 /** A plan that draws her cut out: a composition that uses Subject, or what is said written around her (its strong words behind her). */
 export const wantsSubjects = (plan: Pick<EditPlan, "layers"> & { subtitles?: boolean; captions?: EditPlan["captions"]; finish?: EditPlan["finish"] }, anticipate = false) =>
@@ -59,6 +122,37 @@ export function subjectPassages(
     if (out.some((p) => p.key === key)) continue;
     out.push({ clip_id: s.clip_id, from: s.in, to: s.out, key });
     seconds += length;
+  }
+  return out;
+}
+
+/** The most objects followed for one Reel, and the most seconds of video they take (each one is read on its whole passage). */
+export const OBJECT_MAX = 4;
+export const OBJECT_MAX_SECONDS = 20;
+
+/** An object to follow through a passage of her video: the passage, and the object's name. */
+export type ObjectPassage = SubjectPassage & { name: string };
+
+/**
+ * The objects a Reel's compositions follow, each through the passage of the shot its code names: her shot n is the
+ * plan's n-th shot (video or photo, as the composition's shots list them), a video at its own pace only (a speed or a
+ * ramp changes which images show); OBJECT_MAX at most, OBJECT_MAX_SECONDS in all.
+ */
+export function objectPassages(plan: Pick<EditPlan, "segments" | "layers">, isVideo: (clipId: string) => boolean): ObjectPassage[] {
+  const shots = plan.segments.filter(isClipSegment);
+  const out: ObjectPassage[] = [];
+  let seconds = 0;
+  for (const layer of plan.layers ?? []) {
+    if (!layer.compose) continue;
+    for (const { shot, name } of objectsDrawn(layer.motion?.js)) {
+      const s = shots[shot];
+      if (!s || !isVideo(s.clip_id) || s.ramp || (s.speed && Math.abs(s.speed - 1) > 0.01)) continue;
+      const key = objectKey(s.clip_id, s.in, s.out, name);
+      const length = Math.max(0, s.out - s.in);
+      if (out.some((p) => p.key === key) || out.length >= OBJECT_MAX || !length || seconds + length > OBJECT_MAX_SECONDS) continue;
+      out.push({ clip_id: s.clip_id, from: s.in, to: s.out, key, name });
+      seconds += length;
+    }
   }
   return out;
 }

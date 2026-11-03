@@ -1,7 +1,7 @@
 import { useId, type CSSProperties, type ReactNode } from "react";
 import { Easing, interpolate, random } from "remotion";
 import type { Box, KitHooks } from "./Kit";
-import { outlinePath } from "./outline";
+import { objectName, outlinePath } from "./outline";
 import { faceFocus, framingPercent } from "./track";
 import type { ComposeShot } from "./types";
 
@@ -366,9 +366,9 @@ function nearest<T>(list: (T | null)[] | undefined, shot: ComposeShot, frame: nu
  * it (cover, on its subject, its faces kept whole): { x, y, w, h } in px, or null when nothing is cut out there. Labels,
  * brackets and words follow it; a shot whose cut-out is missing gives null (the animation keeps its default place).
  */
-export function SubjectBox(shot: ComposeShot | undefined, frame: number, laid?: Laid): Box | null {
+export function SubjectBox(shot: ComposeShot | undefined, frame: number, laid?: Laid, object?: string): Box | null {
   if (!shot) return null;
-  const b = nearest(shot.subjectBoxes, shot, frame);
+  const b = nearest(object ? shot.objects?.[objectName(object)]?.boxes : shot.subjectBoxes, shot, frame);
   if (!b) return null;
   const { at, dw, dh } = placer(shot, laid);
   const [x, y] = at(b[0]!, b[1]!);
@@ -382,9 +382,9 @@ export function SubjectBox(shot: ComposeShot | undefined, frame: number, laid?: 
  * laid in, as an SVG path (px), smooth through its points, open where the picture's edge cuts her; null when it was not
  * cut out there. Draw it yourself (a glow, a double line, a fill) or with Outline.
  */
-export function SubjectOutline(shot: ComposeShot | undefined, frame: number, laid?: Laid): string | null {
+export function SubjectOutline(shot: ComposeShot | undefined, frame: number, laid?: Laid, object?: string): string | null {
   if (!shot) return null;
-  const c = nearest(shot.subjectContours, shot, frame);
+  const c = nearest(object ? shot.objects?.[objectName(object)]?.contours : shot.subjectContours, shot, frame);
   return c ? outlinePath(c, placer(shot, laid).at) : null;
 }
 
@@ -392,6 +392,8 @@ type OutlineProps = {
   /** The shot (shots[i]) and the box it was laid in with Footage (the whole frame by default). */
   shot: ComposeShot | undefined;
   box?: Laid;
+  /** An object followed through the shot instead of her (a cup she lifts), by the name its code gives it. */
+  object?: string;
   /** Frame it starts to draw itself along her edge (from the top of her head, clockwise), frames to go round (18; 0: there at once). */
   at?: number;
   frames?: number;
@@ -406,10 +408,10 @@ type OutlineProps = {
 };
 
 function OutlineOf(hooks: KitHooks) {
-  return function Outline({ shot, box, at = 0, frames = 18, out, color = "#FFFFFF", width = 6, dash, glow }: OutlineProps) {
+  return function Outline({ shot, box, object, at = 0, frames = 18, out, color = "#FFFFFF", width = 6, dash, glow }: OutlineProps) {
     const frame = hooks.useCurrentFrame();
     const { width: W, height: H } = hooks.useVideoConfig();
-    const d = SubjectOutline(shot, frame, box);
+    const d = SubjectOutline(shot, frame, box, object);
     if (!d) return null;
     const drawn = frames > 0 ? interpolate(frame, [at, at + frames], [0, 1], { ...clamp, easing: settle }) : frame >= at ? 1 : 0;
     const gone = out === undefined ? 1 : 1 - interpolate(frame, [out, out + 10], [0, 1], clamp);
