@@ -146,15 +146,19 @@ export function sandboxCostUsd(seconds: number, vcpus: number, region: string = 
   return (Math.max(0, seconds) / 3600) * vcpus * (rate.cpuHour + 2 * rate.memoryGbHour);
 }
 
-// Modal (modal.com/pricing, November 2026), USD a second: an L4 card, and a sandbox's CPU (per physical core) and
-// memory (per GiB), which sandboxes pay at three times the functions' list price.
-export const MODAL_L4_USD_PER_SECOND = 0.000222;
+// Modal (modal.com/pricing, November 2026), USD a second: its cards (« A10 » on the page, A10G in the API), and a
+// sandbox's CPU (per physical core) and memory (per GiB), which sandboxes pay at three times the functions' list price.
+export const MODAL_GPU_USD_PER_SECOND: Record<string, number> = { T4: 0.000164, L4: 0.000222, A10G: 0.000306, L40S: 0.000542, A100: 0.000583 };
 export const MODAL_SANDBOX_CORE_USD_PER_SECOND = 0.00003942;
 export const MODAL_SANDBOX_GIB_USD_PER_SECOND = 0.00000667;
 
-/** What `seconds` of a Modal sandbox with an L4, `cores` and `gib` cost (its whole life: it is created for the job and ended after it). */
-export function modalCostUsd(seconds: number, cores: number, gib: number): number {
-  return Math.max(0, seconds) * (MODAL_L4_USD_PER_SECOND + cores * MODAL_SANDBOX_CORE_USD_PER_SECOND + gib * MODAL_SANDBOX_GIB_USD_PER_SECOND);
+/**
+ * What `seconds` of a Modal sandbox with the card `gpu` (none for a machine without one), `cores` and `gib` cost
+ * (from the moment it is up to its end: it is created for the job and ended after it). An unknown card counts as an A100.
+ */
+export function modalCostUsd(seconds: number, cores: number, gib: number, gpu: string | null = "A10G"): number {
+  const card = gpu ? (MODAL_GPU_USD_PER_SECOND[gpu.toUpperCase()] ?? MODAL_GPU_USD_PER_SECOND.A100!) : 0;
+  return Math.max(0, seconds) * (card + cores * MODAL_SANDBOX_CORE_USD_PER_SECOND + gib * MODAL_SANDBOX_GIB_USD_PER_SECOND);
 }
 
 // ElevenLabs on the API (elevenlabs.io/pricing/api, October 2026), USD.

@@ -4,7 +4,7 @@ import { isClipSegment, mediaSubjectsSchema, mediaTracksSchema, subjectPassages,
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { costMeta } from "@/lib/cost-scope";
 import { timeLeft } from "@/lib/step-clock";
-import { GPU_START_MS, gpuCostEur, gpuReady, subjectsOnGpu } from "./gpu";
+import { GPU, GPU_START_MS, gpuCostEur, gpuReady, subjectsOnGpu } from "./gpu";
 import { cutoutCostEur, subjectsInSandbox } from "./sandbox";
 
 // Her subject cut out at every image of the passages a composition draws it on (Subject), made in the cut-out
@@ -42,12 +42,12 @@ type Row = { id: string; kind: string; storage_path: string | null; subjects: un
 const kept = (row: Row | undefined): MediaSubjects => mediaSubjectsSchema.safeParse(row?.subjects ?? {}).data ?? {};
 
 /**
- * On the card: its clip fetched and its model loaded, then a second of video (its 30 images read and their edge
- * made). The card gets its start, this, and as much again, never the whole step: when it fails, the cut-out sandbox
- * still has time for the passages.
+ * On the card: its model loaded and its clip fetched (7 s and 2 s measured), then a second of video (its 30 images
+ * read, 16 s, and their edge made, 2.4 s, on an A10G). The card gets its start, this, and twice the work, never the
+ * whole step: when it fails, the cut-out sandbox still has time for the passages.
  */
-const GPU_LOAD_MS = 60_000;
-const GPU_WORK_PER_SECOND = 12;
+const GPU_LOAD_MS = 30_000;
+const GPU_WORK_PER_SECOND = 20;
 
 /**
  * Cuts out the passages this plan's compositions draw her on and that have no cut-out yet, as many as the step has
@@ -145,7 +145,7 @@ async function cutOnGpu(studioId: string, postId: string, chosen: SubjectPassage
       provider: "modal",
       units: Math.round(seconds),
       cost_eur: gpuCostEur(seconds),
-      meta: costMeta({ post_id: postId, passages: jobs.length, done: done.size, gpu: "L4", seconds_of_video: Math.round(chosen.reduce((n, p) => n + p.to - p.from, 0) * 10) / 10 }),
+      meta: costMeta({ post_id: postId, passages: jobs.length, done: done.size, gpu: GPU, seconds_of_video: Math.round(chosen.reduce((n, p) => n + p.to - p.from, 0) * 10) / 10 }),
     });
   return done;
 }

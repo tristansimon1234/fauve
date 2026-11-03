@@ -1,7 +1,7 @@
 import { after, type NextRequest } from "next/server";
 import { cronAuthorized } from "@/lib/cron-auth";
 import { designEdit } from "@/lib/agent/editor";
-import { gpuCostEur, gpuReady, subjectsOnGpu } from "@/lib/render/gpu";
+import { GPU, gpuCostEur, gpuReady, subjectsOnGpu } from "@/lib/render/gpu";
 import { renderPost } from "@/lib/render/render-post";
 import { dropSandbox, pruneSnapshots, trackSandbox, warmRemotionPool } from "@/lib/render/sandbox";
 import { supabaseAdmin } from "@/lib/supabase/admin";
@@ -64,11 +64,14 @@ export async function POST(request: NextRequest) {
       // Its steps are in the logs as they happen (« gpu … »), then its result (« gpu subject »).
       const { results, seconds } = await subjectsOnGpu([{ key: "lab", url: clip.data.signedUrl, from, to, upload: { webm: webm.data.signedUrl, png: png.data.signedUrl } }], 700_000, { gpu });
       const result = results.lab;
-      const cost = gpuCostEur(seconds);
-      if (seconds > 0) await db.from("cost_events").insert({ studio_id: row.studio_id, kind: "matting", provider: "modal", units: Math.round(seconds), cost_eur: cost, meta: { lab: true, media, from, to, gpu: "L4" } });
+      const card = gpu === undefined ? GPU : gpu;
+      const cost = gpuCostEur(seconds, card);
+      if (seconds > 0) await db.from("cost_events").insert({ studio_id: row.studio_id, kind: "matting", provider: "modal", units: Math.round(seconds), cost_eur: cost, meta: { lab: true, media, from, to, gpu: card ?? "none" } });
       const still = result && !(result instanceof Error) && result.still;
       const link = result && !(result instanceof Error) ? (await db.storage.from("media").createSignedUrl(`${base}.${still ? "png" : "webm"}`, 86_400)).data?.signedUrl : null;
-      console.log("gpu subject", JSON.stringify({ media, from, to, gpu: gpu === undefined ? "L4" : (gpu ?? "none"), seconds: Math.round(seconds), cost_eur: Math.round(cost * 1000) / 1000, result: result instanceof Error ? result.message : result, link }));
+      // Its link first (a log line is cut after a few hundred characters), its boxes counted, not listed.
+      const summary = result instanceof Error || !result ? (result?.message ?? "nothing") : { ...result, boxes: result.boxes?.length ?? 0 };
+      console.log("gpu subject", JSON.stringify({ link, media, from, to, gpu: card ?? "none", seconds: Math.round(seconds), cost_eur: Math.round(cost * 1000) / 1000, result: summary }));
     });
     return Response.json({ ok: true, started: true }, { status: 202 });
   }

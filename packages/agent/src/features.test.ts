@@ -762,9 +762,13 @@ test("a word behind her: her silhouette from what was tracked hides it on a clos
   assert.equal(onlyProbe("-20 % sur tout"), false);
 });
 
-test("the rented card's price: an L4 and a sandbox's CPU and memory by the second", async () => {
+test("the rented card's price: its card and a sandbox's CPU and memory by the second", async () => {
   const { modalCostUsd } = await import("./pricing.ts");
-  // 100 s with 2 cores and 8 GiB: about 3.5 cents (the card, then the sandbox's CPU and memory at 3 times the functions' price).
-  assert.ok(Math.abs(modalCostUsd(100, 2, 8) - 0.03542) < 1e-6);
+  // 100 s with an A10G, 2 cores and 8 GiB: about 4.4 cents (the card, then the sandbox's CPU and memory at 3 times the functions' price).
+  assert.ok(Math.abs(modalCostUsd(100, 2, 8) - 0.04382) < 1e-6);
+  assert.ok(Math.abs(modalCostUsd(100, 2, 8, "L4") - 0.03542) < 1e-6);
+  // A machine without a card: its CPU and memory only; an unknown card at the price of an A100.
+  assert.ok(Math.abs(modalCostUsd(100, 2, 8, null) - 0.01322) < 1e-6);
+  assert.ok(Math.abs(modalCostUsd(100, 2, 8, "B300") - 0.07152) < 1e-6);
   assert.equal(modalCostUsd(-5, 2, 8), 0);
 });

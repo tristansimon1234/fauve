@@ -7,7 +7,7 @@ import { REMOTION_SOURCE_FILES } from "./remotion-source.generated";
 import { HDR_TO_SDR } from "./sandbox";
 
 // Her video cut out at every image on a graphics card rented by the second (Modal, Tristan: « rétro-engineer ça pour
-// avoir un truc bien », on poof.bg): a Modal sandbox with an L4 is created for the job and ended after it, its image
+// avoir un truc bien », on poof.bg): a Modal sandbox with an A10G is created for the job and ended after it, its image
 // built once by Modal (Debian, ffmpeg, onnxruntime-gpu with its CUDA libraries from pip, BiRefNet-portrait checked
 // by its digest), and apps/render/portrait.py run in it with matte.py's finish. The web app only needs the two Modal
 // variables: nothing is deployed to Modal by hand. Without them, or when the card fails, the cut-out sandbox does it.
@@ -30,8 +30,13 @@ const IMAGE_COMMANDS = [
   `RUN mkdir -p /models && curl -fsSL -o /models/portrait.onnx ${MODEL_URL} && echo '${MODEL_SHA256}  /models/portrait.onnx' | sha256sum -c -`,
 ];
 const APP = "fauve";
-/** Its size: an L4, and the CPUs and memory for the edge made at full size and the clip's images (an 8 s passage is 1.5 GB). */
-const GPU = "L4";
+/**
+ * Its size: an A10G (24 GB), and the CPUs and memory for the edge made at full size and the clip's images (an 8 s
+ * passage is 1.5 GB). Not an L4, cheaper: none was ever allotted to this account (three tries, 90 s to 13 min), while an
+ * A10G came in 1.7 s. Measured on 3 s of a fashion shoot: model loaded in 7 s, 0.53 s an image, edges in 7 s, 70 s and
+ * 0.021 € in all.
+ */
+export const GPU = "A10G";
 const CORES = 2;
 const MEMORY_GIB = 8;
 
@@ -53,8 +58,8 @@ export type GpuPassage = { key: string; url: string; from: number; to: number; u
 /** A passage cut out on the card (its file already sent to its upload link). */
 export type GpuCut = { still: boolean; frames: number; keys: number; people: boolean; top?: number; boxes?: (number[] | null)[] };
 
-/** What `seconds` of the card's sandbox cost, in euros (logged in cost_events). */
-export const gpuCostEur = (seconds: number) => usdToEur(modalCostUsd(seconds, CORES, MEMORY_GIB), env("USD_TO_EUR"));
+/** What `seconds` of the card's sandbox cost, in euros (logged in cost_events); `gpu`: another card tried, or none. */
+export const gpuCostEur = (seconds: number, gpu: string | null = GPU) => usdToEur(modalCostUsd(seconds, CORES, MEMORY_GIB, gpu), env("USD_TO_EUR"));
 
 /** A time limit for Modal, which takes whole seconds only (« timeoutMs must be a multiple of 1000ms »). */
 const wholeSeconds = (ms: number) => Math.max(1000, Math.floor(ms / 1000) * 1000);
