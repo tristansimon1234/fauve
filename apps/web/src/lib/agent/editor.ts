@@ -73,8 +73,11 @@ import {
   honestLength,
   lengthNote,
   missesLength,
+  houseModel,
+  FONT_PAIRS,
 } from "@fauve/agent";
 import { outputFormat } from "@fauve/agent/answer";
+import { HOUSE_EXAMPLES } from "@fauve/agent/house-examples";
 import { ensureCutouts, photoOffers } from "@/lib/render/cutout";
 import { logoNamed } from "@/lib/render/logo-tone";
 import { videoFramesInSandbox } from "@/lib/render/sandbox";
@@ -374,6 +377,8 @@ export async function designEdit(params: {
       fonts: profile.fonts,
       // Her own uploaded fonts: usable by name in fonts and looks.
       own_fonts: profile.custom_fonts?.map((f) => f.family),
+      // Pairings that work, for the fonts it brings when this Reel takes a liberty with her charter (never instead of it).
+      font_pairs: { note: "si ce Reel prend d'autres polices que sa charte, une de ces paires (titres + textes)", paires: FONT_PAIRS.map((p) => `${p.display.family} + ${p.body.family} : ${p.fits}`) },
       // Text looks the manager keeps (copied from examples): the editor reuses them.
       text_looks: profile.text_looks?.length ? profile.text_looks : undefined,
       dos: profile.dos,
@@ -769,6 +774,11 @@ export async function designEdit(params: {
       }
     }
   }
+  // One of Edith's models: its reference composition, timed on the model, a worked example for each animation that
+  // remakes it (the composition over the whole Reel first of all), never pasted as it is.
+  const house = houseModel(followed?.house);
+  const example = house?.example ? HOUSE_EXAMPLES[house.example] : undefined;
+  if (house && example) for (const request of requests) request.example = { name: house.name, ...example };
   // A correction: each animation rewritten first looks at how its earlier version came out on her images.
   if (correction && previousPlan.success && baseId && requests.length) {
     await lookAtEarlierRender(params.studioId, params.postId, baseId, previousPlan.data, plan, requests, {

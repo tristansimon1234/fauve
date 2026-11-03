@@ -1,7 +1,7 @@
 import { PageSuspense } from "@/components/page-suspense";
 import type { Metadata } from "next";
 import { Suspense } from "react";
-import { readOwnVoice, resolveReelBrand } from "@fauve/agent";
+import { HOUSE_SOURCE, readOwnVoice, resolveReelBrand } from "@fauve/agent";
 import { NoStudio } from "@/components/empty-state";
 import { studioScenes } from "@/lib/creations";
 import { loadMontageInputs } from "@/lib/render/render-post";
@@ -90,6 +90,8 @@ async function StyleLoader() {
     .from("inspirations")
     .select("id, title, url, source, analysis, storage_path, created_at, missed:style->>miss")
     .eq("studio_id", studioId)
+    // Edith's own models are not her inspirations (picked in Créer, house-models.ts).
+    .neq("source", HOUSE_SOURCE)
     .order("created_at", { ascending: false })
     .limit(12);
   const inspirations: Inspiration[] = (shared ?? []).map((i) => ({

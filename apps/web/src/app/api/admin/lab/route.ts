@@ -24,6 +24,7 @@ import { startEffectWords } from "@/lib/effect-words";
 import { usableFonts } from "@/lib/fonts";
 import { queueJob } from "@/lib/jobs";
 import { readSiteLook } from "@/lib/site-look";
+import { houseInspiration } from "@/lib/house-models";
 import { missMessage, modelVideo, stealNow, stealStyle } from "@/lib/steal";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { ensureClipAnalysis } from "@/lib/video/analyze";
@@ -84,7 +85,7 @@ import { photoRegions } from "@/lib/video/regions";
 //                        a test render of every slide, the critic, one correction), never charged;
 //                        idea=<her words> what she asks for (else the case's carousel idea);
 //                        step=result then gives its slides (signed links, 24 h) and its outline.
-//   ?site=<url>[&kind=coiffeur|restaurant|pilates][&clips=1][&own=<file>,…][&reset=1][&idea=…][&voice=…|&own_voice=…][&format=carrousel][&steal=<url>[&steal_only=1]]
+//   ?site=<url>[&kind=coiffeur|restaurant|pilates][&clips=1][&own=<file>,…][&reset=1][&idea=…][&voice=…|&own_voice=…][&format=carrousel][&steal=<url>[&steal_only=1]|&model=<key of a house model>]
 //                        a real business from its website, as at onboarding: its site read
 //                        (facts and activity, colours and fonts of its code, logo), then its look
 //                        (its page read in the sandbox's browser: fonts and colours measured, captures;
@@ -414,6 +415,13 @@ async function clearPosts(studioId: string) {
 
 /** « Steal » in the lab: a Reel's style read (from its link, a video file's URL, or a video uploaded to the lab studio), for the lab Reel to copy. */
 async function labSteal(studioId: string, url: string): Promise<string> {
+  // One of Edith's own models (model=<key>): the studio's row for it, already read (the catalogue is its reading).
+  if (url.startsWith("house:")) {
+    const house = await houseInspiration(studioId, url.slice(6));
+    if (!house) throw new Error(`lab: no house model ${url.slice(6)}`);
+    console.log("lab: house model", house.name);
+    return house.id;
+  }
   let outcome: Awaited<ReturnType<typeof stealStyle>>;
   if (url.startsWith("lab:")) {
     // As a video she sends Edith in the chat: in her library first, then read (and out of it once read).
@@ -776,8 +784,8 @@ export async function POST(request: Request) {
     const asCarousel = params.get("format") === "carrousel";
     const motion = motionOf(params);
     if (motion === "bad") return Response.json({ error: "motion=claude|<gemini model>|<kimi model>" }, { status: 400 });
-    const steal = params.get("steal");
-    if (steal && !/^https:\/\/\S{8,500}$/.test(steal)) return Response.json({ error: "steal=<https url>" }, { status: 400 });
+    const steal = params.get("model") ? `house:${params.get("model")}` : params.get("steal");
+    if (steal && !/^https:\/\/\S{8,500}$/.test(steal) && !/^house:[a-z-]{2,40}$/.test(steal)) return Response.json({ error: "steal=<https url>|model=<key>" }, { status: 400 });
     const stealing = { url: steal, only: params.get("steal_only") === "1" };
     after(() =>
       startSite(url.href, kind, params.get("clips") === "1", params.get("reset") === "1", voiceOf(params), ideaOf(params), template?.data, asCarousel, motion, stealing, own).catch((error: unknown) =>
@@ -816,8 +824,8 @@ export async function POST(request: Request) {
   const media = own ? { ...c, clips: [], own } : stock ? { ...c, clips: stock.split(",").map(Number) } : c;
   const run = route ? { ...media, route: route as "agent" | "chain" } : media;
   // « Steal »: a Reel's link, a video file's URL (https), or a video uploaded to the lab studio (lab:<file>).
-  const steal = params.get("steal");
-  if (steal && !/^https:\/\/\S{8,500}$/.test(steal) && !(steal.startsWith("lab:") && LAB_FILE.test(steal.slice(4)))) {
+  const steal = params.get("model") ? `house:${params.get("model")}` : params.get("steal");
+  if (steal && !/^https:\/\/\S{8,500}$/.test(steal) && !(steal.startsWith("lab:") && LAB_FILE.test(steal.slice(4))) && !/^house:[a-z-]{2,40}$/.test(steal)) {
     return Response.json({ error: "steal=<https url>|lab:<file>" }, { status: 400 });
   }
   const stealing = { url: steal, only: params.get("steal_only") === "1" };

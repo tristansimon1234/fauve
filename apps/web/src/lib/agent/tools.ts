@@ -70,6 +70,8 @@ import {
   isBaked,
   reelFinishSchema,
   type ReelFinish,
+  HOUSE_SOURCE,
+  houseModelsForEdith,
 } from "@fauve/agent";
 import { createLoginLink } from "@/lib/auth/login-link";
 import { supabaseAdmin } from "@/lib/supabase/admin";
@@ -109,6 +111,7 @@ import { charterFromImages, rereadBrand } from "@/lib/brand-read";
 import { socialConnect } from "@/lib/social/connect";
 import { addToMoodboard } from "@/lib/moodboard-add";
 import { completeFirstPost, isFirstReel } from "@/lib/onboarding";
+import { houseInspiration } from "@/lib/house-models";
 import { listInspirations } from "@/lib/inspirations";
 import { freeSlots } from "@/lib/slots";
 import { studioAccess } from "@/lib/billing/access";
@@ -256,7 +259,7 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
   /** A Reel she likes, sent before she subscribes: read for her first Reel, like her first videos (two at most). */
   const earlySteal = async (access: Awaited<ReturnType<typeof studioAccess>>) => {
     if (access.subscribed || !access.analyze) return false;
-    const { count } = await db.from("inspirations").select("id", { count: "exact", head: true }).eq("studio_id", studioId);
+    const { count } = await db.from("inspirations").select("id", { count: "exact", head: true }).eq("studio_id", studioId).neq("source", HOUSE_SOURCE);
     return (count ?? 0) < EARLY_STEALS;
   };
   const json = jsonIn(ctx.timezone ?? "Europe/Paris");
@@ -646,7 +649,7 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
       });
     },
 
-    async montage({ post_id, media_ids, brief, correction, max_new_scenes, variant, plan, effort, inspiration_id, son, anciens_fichiers, remplacer_fichiers }) {
+    async montage({ post_id, media_ids, brief, correction, max_new_scenes, variant, plan, effort, inspiration_id, modele_edith, son, anciens_fichiers, remplacer_fichiers }) {
       const post = unwrap(await db.from("posts").select("id, title, edit_plan_id, media_ids").eq("id", post_id).eq("studio_id", studioId).single());
       // A correction's new files join the Reel's own, unless Edith read that she wants to start again from them alone:
       // given alone, Promo Edith 2's five new photos replaced its twenty files and it came back as 3 s.
@@ -676,6 +679,12 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
             note: `${foreign.length} de ces fichiers n'ont été ni envoyés ni choisis pour ce Reel. Demande-lui quelles images prendre (ou d'en envoyer), sans en prendre d'office ; si elle t'a dit de prendre ceux d'avant, relance aussitôt avec anciens_fichiers true, sans rien en écrire (elle lit chaque mot de ta réponse). Un Reel en pur motion design n'en prend aucun.`,
           });
         }
+      }
+      // One of Edith's models: the studio's row for it (made the first time), followed like a Reel she sends.
+      if (modele_edith && !inspiration_id) {
+        const house = await houseInspiration(studioId, modele_edith);
+        if (!house) return json({ error: "Ce modèle n'existe pas : reprends une clé de list_inspirations (modeles_edith)." });
+        check(await db.from("posts").update({ inspiration_id: house.id }).eq("id", post_id).eq("studio_id", studioId));
       }
       if (inspiration_id) {
         const known = await db.from("inspirations").select("id").eq("id", inspiration_id).eq("studio_id", studioId).maybeSingle();
@@ -1372,7 +1381,9 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
       const items = await listInspirations(studioId, 10);
       return json({
         inspirations: items.map((i) => ({ inspiration_id: i.id, titre: i.title, a_reprendre: i.summary ?? (i.reading ? "en cours de lecture" : undefined), source: i.source })),
-        note: items.length ? "Propose-en 2 au plus, par leur titre." : "Aucune inspiration : elle peut partager un Reel à Edith sur Instagram ou en ajouter un dans l'app.",
+        // Edith's own models: a Reel made like one of them (montage modele_edith), shown with their preview in Créer.
+        modeles_edith: houseModelsForEdith(),
+        note: `${items.length ? "Propose-en 2 au plus, par leur titre." : "Aucune inspiration à elle : elle peut envoyer le lien d'un Reel qu'elle aime."} Les modèles d'Edith : propose-en 2 ou 3 qui vont avec ses fichiers et son idée (par leur nom, en une phrase chacun), jamais toute la liste ; elle les voit en vidéo dans Créer › « Un modèle d'Edith ».`,
       });
     },
 

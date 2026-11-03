@@ -322,6 +322,10 @@ export const stolenStyleSchema = z.object({
   sheets: z.array(z.object({ from: z.number().min(0), to: z.number().min(0), path: z.string().min(1).max(300) })).max(16).optional(),
   /** Its filter as a look's settings (looks.ts), designed once from its words when it was read. */
   filter_look: reelLookSchema.optional(),
+  /** One of Edith's own models (house-models.ts): its key and the catalogue's version it was written from. */
+  house: z.object({ key: z.string().min(1).max(40), version: z.number().int() }).optional(),
+  /** Its font pairing (font-pairs.ts): this Reel's title and text faces. */
+  fonts: z.object({ display: z.string().regex(FONT_FAMILY), body: z.string().regex(FONT_FAMILY) }).optional(),
 });
 
 /**
@@ -363,6 +367,10 @@ export const followedStyleSchema = z.object({
   measured: reelMeasuresSchema.pick({ duration: true, cuts: true }).optional(),
   /** Its filter as a look's settings, when it has one (stolenStyleSchema.filter_look). */
   filter_look: reelLookSchema.optional(),
+  /** One of Edith's own models (house-models.ts), by its key: its reference composition is shown to the motion designer. */
+  house: z.string().min(1).max(40).optional(),
+  /** Its font pairing: this Reel's title and text faces. */
+  fonts: z.object({ display: z.string(), body: z.string() }).optional(),
 });
 export type FollowedStyle = z.infer<typeof followedStyleSchema>;
 
@@ -377,6 +385,8 @@ export function followedFrom(inspirationId: string, style: StolenStyle, own = fa
     ...(style.outline ? { outline: style.outline } : {}),
     ...(style.measures.duration > 0 ? { measured: { duration: style.measures.duration, cuts: style.measures.cuts } } : {}),
     ...(style.filter_look ? { filter_look: style.filter_look } : {}),
+    ...(style.house ? { house: style.house.key } : {}),
+    ...(style.fonts ? { fonts: style.fonts } : {}),
   };
 }
 
@@ -568,6 +578,12 @@ export function signatureOf(profile: { signature?: BrandSignature; followed?: Fo
  * says « never a cold blue », next to its orange animations.
  */
 export function followedLook(plan: { fonts?: { display?: string; body?: string } }, followed: FollowedStyle | undefined): { fonts?: { display?: string; body?: string } } {
+  // A model of Edith's is set in its pairing, both faces (a face this request chose stays).
+  const pair = followed?.fonts;
+  if (pair) {
+    const fonts = { display: plan.fonts?.display ?? pair.display, body: plan.fonts?.body ?? pair.body };
+    return fonts.display === plan.fonts?.display && fonts.body === plan.fonts?.body ? {} : { fonts };
+  }
   const font = followed?.look.text.font;
   return font && !plan.fonts?.display ? { fonts: { ...plan.fonts, display: font } } : {};
 }
@@ -634,6 +650,12 @@ export function followedForEditor(followed: FollowedStyle) {
   return {
     nom: look.name,
     ...(followed.own ? { origine: "un de ses Reels à elle, qu'elle a gardé comme modèle : refais-le avec ses nouvelles images et de nouveaux mots" } : {}),
+    ...(followed.house
+      ? {
+          origine:
+            "un modèle d'Edith qu'elle a choisi : sa forme, son rythme, ses moments et sa finition sont à refaire avec ses images et ses mots à elle ; le motion designer reçoit la composition de référence de ce modèle",
+        }
+      : {}),
     // Its plan, when it is one of hers: the same build, shot for shot and text for text, cut to her new images.
     ...(followed.outline ? { structure: followed.outline } : {}),
     forme: FORMAT_WORDS[look.format],
@@ -656,7 +678,11 @@ export function followedForEditor(followed: FollowedStyle) {
     texte: `${look.text.amount} ; ${look.text.composition}${look.text.subtitles ? " ; des sous-titres" : ""}`,
     ...(textDrawingWords(look.text) ? { dessin_des_mots: textDrawingWords(look.text)! } : {}),
     // Its font is already set on the plan by the engine (followedLook): the editor and the animations follow it.
-    ...(takenFont(look) ? { police: takenFont(look)! } : {}),
+    ...(followed.fonts
+      ? { police: `ses polices (« ${followed.fonts.display} » pour les titres, « ${followed.fonts.body} » pour les petits textes) : elles font son style, ce Reel les prend à la place de celles de sa charte` }
+      : takenFont(look)
+        ? { police: takenFont(look)! }
+        : {}),
     // Its colours are the editor's call: it has her charter and her request in front of it.
     ...(offeredColors(look, "editor") ? { couleurs: offeredColors(look, "editor")! } : {}),
     ...(filterWords(look) ? { effet: filterWords(look) } : {}),
@@ -701,7 +727,7 @@ export function momentsLine(look: Pick<StolenLook, "moments">): string | null {
 export function followedLine(followed: FollowedStyle): string {
   const { look } = followed;
   return [
-    `Reel à recopier (${followed.own ? "un de ses Reels, gardé comme modèle" : "un Reel qu'elle a envoyé"}, « ${look.name} ») : ${FORMAT_WORDS[look.format]}, ${paceWords(followed.average_shot, followed.bpm)}`,
+    `Reel à recopier (${followed.own ? "un de ses Reels, gardé comme modèle" : followed.house ? "un modèle d'Edith qu'elle a choisi" : "un Reel qu'elle a envoyé"}, « ${look.name} ») : ${FORMAT_WORDS[look.format]}, ${paceWords(followed.average_shot, followed.bpm)}`,
     ...(composedLayout(look) ? [`mise en page : ${composedLayout(look)}`] : []),
     `accroche ${look.hook.kind}`,
     ...(momentsLine(look) ? [`ses moments, chacun à refaire avec ses images : ${momentsLine(look)}`] : []),

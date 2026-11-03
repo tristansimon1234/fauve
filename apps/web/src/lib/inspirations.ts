@@ -1,4 +1,5 @@
 import "server-only";
+import { HOUSE_SOURCE } from "@fauve/agent";
 import { READING_MS, SENT_TO_COPY, stealStyle } from "@/lib/steal";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { readInspiration } from "@/lib/video/inspiration";
@@ -24,6 +25,8 @@ export async function listInspirations(studioId: string, limit = 8): Promise<Ins
     .from("inspirations")
     .select("id, title, analysis, storage_path, source, created_at")
     .eq("studio_id", studioId)
+    // Edith's own models are not hers: picked from their own list (house-models.ts).
+    .neq("source", HOUSE_SOURCE)
     .order("created_at", { ascending: false })
     .limit(limit);
   return (data ?? []).map((i) => ({

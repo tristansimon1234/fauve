@@ -6027,3 +6027,44 @@ test("subject cut-outs: only for a composition that draws Subject, at the clip's
   assert.deepEqual(subjectFiles({ k: { path: "s/subjects/a.webm", still: false, at: "x" }, j: { failed_at: "x", error: "e" } }), ["s/subjects/a.webm"]);
   assert.deepEqual(subjectFiles(null), []);
 });
+
+test("house models: each one read like a Reel she sends, measured, finished, set in a pairing, with its reference composition", async () => {
+  const { HOUSE_MODELS, houseStyle, houseFinish, houseModel, houseLines } = await import("./house-models.ts");
+  const { HOUSE_EXAMPLES } = await import("./house-examples.ts");
+  const { FONT_PAIRS, fontPair } = await import("./font-pairs.ts");
+  const { stolenStyleSchema, followedFrom, followedLook, followedForEditor, followedLine, composedLayout } = await import("./steal.ts");
+  const { copyable } = await import("./copy.ts");
+  const keys = new Set<string>();
+  for (const m of HOUSE_MODELS) {
+    assert.ok(!keys.has(m.key), `${m.key} once`);
+    keys.add(m.key);
+    assert.match(m.key, /^[a-z-]{2,40}$/);
+    assert.ok(m.files[0] <= m.files[1], m.key);
+    assert.ok(fontPair(m.pair), `${m.key}: its pairing`);
+    if (m.example) assert.ok(HOUSE_EXAMPLES[m.example]?.code.startsWith("function Scene("), `${m.key}: its example`);
+    const style = stolenStyleSchema.parse(houseStyle(m));
+    assert.equal(style.house?.key, m.key);
+    assert.ok(houseFinish(m).name, m.key);
+    assert.equal(houseLines(m).length >= 3, true);
+    // A model is composed by the motion designer, except plain fixed shots (remade by code on its own cuts).
+    const followed = followedFrom("00000000-0000-4000-8000-000000000000", style);
+    if (m.key === "plans-fixes") assert.ok(!composedLayout(m.look) && copyable(m.look, followed.measured!));
+    else assert.ok(composedLayout(m.look), `${m.key} is composed`);
+    assert.ok(followed.bpm !== null, `${m.key} has a tempo`);
+  }
+  assert.ok(HOUSE_MODELS.length >= 30);
+  for (const p of FONT_PAIRS) for (const f of [p.display.family, p.body.family]) assert.match(f, /^[A-Za-z0-9 ]{2,40}$/);
+  // Followed: its two faces on the plan, a face her request chose stays; the editor and the critic know where it comes from.
+  const decode = houseModel("decode")!;
+  const followed = followedFrom("00000000-0000-4000-8000-000000000000", stolenStyleSchema.parse(houseStyle(decode)));
+  assert.equal(followed.house, "decode");
+  assert.deepEqual(followedLook({}, followed), { fonts: { display: "Open Sans", body: "Inter" } });
+  assert.deepEqual(followedLook({ fonts: { display: "Fraunces" } }, followed), { fonts: { display: "Fraunces", body: "Inter" } });
+  assert.deepEqual(followedLook({ fonts: { display: "Open Sans", body: "Inter" } }, followed), {});
+  assert.match(followedForEditor(followed).origine ?? "", /modèle d'Edith/);
+  assert.match(followedForEditor(followed).police ?? "", /Open Sans.*Inter/);
+  assert.match(followedLine(followed), /un modèle d'Edith/);
+  // Its look comes with it (no other look on the plan), its tempo from its measure.
+  assert.equal(followed.filter_look?.preset, "cine");
+  assert.equal(followed.bpm, 122);
+});

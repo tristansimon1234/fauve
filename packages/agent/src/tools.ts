@@ -107,7 +107,7 @@ export const toolSpecs = {
   },
   list_inspirations: {
     description:
-      "Les inspirations de la gérante : des Reels qu'elle aime, partagés sur Instagram ou ajoutés dans l'app, avec ce qu'on peut en reprendre (accroche, rythme, textes). Source « model » : un de ses Reels qu'elle a gardé comme modèle (« Garder comme modèle ») : quand elle veut un Reel « comme celui de … », passe son inspiration_id à montage. À regarder avant de proposer un nouveau Reel, pour lui demander s'il doit suivre l'une d'elles.",
+      "Les inspirations de la gérante : des Reels qu'elle aime, partagés sur Instagram ou ajoutés dans l'app, avec ce qu'on peut en reprendre (accroche, rythme, textes). Avec elles, « modeles_edith » : les modèles d'Edith (des Reels de référence que le monteur sait refaire, chacun avec sa forme, sa typo et sa finition), à proposer quand elle veut un Reel stylé sans avoir de modèle, puis à passer à montage par modele_edith. Source « model » : un de ses Reels qu'elle a gardé comme modèle (« Garder comme modèle ») : quand elle veut un Reel « comme celui de … », passe son inspiration_id à montage. À regarder avant de proposer un nouveau Reel, pour lui demander s'il doit suivre l'une d'elles.",
     input: z.object({}),
   },
   steal_style: {
@@ -197,6 +197,11 @@ export const toolSpecs = {
         .uuid()
         .optional()
         .describe("Le Reel qu'elle t'a envoyé à recopier pour celui-ci (steal_style, ou la ligne « Reel à recopier » du contexte), ou l'inspiration qu'elle a choisie (list_inspirations) : le monteur le suit en priorité. Inutile si elle l'a déjà choisie en créant la publication."),
+      modele_edith: z
+        .string()
+        .max(40)
+        .optional()
+        .describe("La clé d'un modèle d'Edith qu'elle a choisi (list_inspirations, modeles_edith) : ce Reel est fait comme lui (sa forme, ses moments, sa typo, sa finition), avec ses images et ses mots. À la place d'inspiration_id."),
       anciens_fichiers: z
         .boolean()
         .optional()

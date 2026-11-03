@@ -132,7 +132,9 @@ function TilesOf(hooks: KitHooks) {
       {drawAt(ordered[step]!.show, size)}
     </div>
   );
-  const lineOpacity = lines ? interpolate(frame, [num(lines.to, Infinity) - 10, num(lines.to, Infinity)], [1, 0], clamp) : 0;
+  // Lines kept to the end when no `to` is given (an infinite range made interpolate throw, and the whole composition with it).
+  const linesTo = lines && Number.isFinite(Number(lines.to)) ? Number(lines.to) : null;
+  const lineOpacity = !lines ? 0 : linesTo === null ? 1 : interpolate(frame, [linesTo - 10, linesTo], [1, 0], clamp);
   const drawn = lines ? interpolate(frame, [num(lines.from, 0), num(lines.from, 0) + 20], [0, 1], { ...clamp, easing: settle }) : 0;
   return (
     <div style={{ position: "absolute", left: area.x, top: area.y, width: area.w, height: area.h, overflow: "hidden" }}>

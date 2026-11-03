@@ -70,6 +70,8 @@ export type SceneRequest = {
   canvas?: SceneFrame[];
   /** The Reel she copies, at the moment this animation remakes: sheets of its frames (ten each), seen before writing. */
   model?: SceneFrame[];
+  /** One of Edith's models she chose: its reference composition (house-examples.ts), a worked example to make hers. */
+  example?: { name: string; code: string; frames: number; shots: number };
   /** The sound effects already made (the library's), reused by name when one fits. */
   readySounds?: string[];
   /** It draws the Reel's texts as the copied Reel does (its texts, frames from its start), over the montage. */
@@ -250,6 +252,7 @@ async function writeScene(
     composition: Boolean(request.compose),
     words: Boolean(request.words),
     correction: Boolean(seen),
+    example: Boolean(!fix && request.example),
   };
   const text = fix
     ? `This code failed: ${fix.error}\nFix it, keeping the same intention${kept.length ? ` and ${kept.join(" and ")}` : ""}.\n\nBrief: ${request.brief}\n\nCode:\n${fix.code}`
@@ -302,6 +305,15 @@ async function writeScene(
         ...(canvas ? { reel_frames: `${canvas.length} images attached, above` } : {}),
         ...(request.readySounds?.length ? { ready_sounds: request.readySounds } : {}),
         ...(request.words ? { reel_texts: request.words } : {}),
+        ...(request.example
+          ? {
+              model_code: {
+                model: request.example.name,
+                reference: `${request.example.frames} frames, ${request.example.shots} shots of the bench; its words and shots are placeholders`,
+                code: request.example.code,
+              },
+            }
+          : {}),
         ...(copied ? { model_frames: `${copied.length} sheets of the Reel she copies attached, first: remake how its elements appear, change, move and leave, at its pace, with her images and her words, never its images nor its words` } : {}),
       });
   const shown: string | Block[] = seen

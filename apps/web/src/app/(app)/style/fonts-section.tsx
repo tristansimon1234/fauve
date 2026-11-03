@@ -1,5 +1,6 @@
 "use client";
 
+import { FONT_PAIRS, type FontPair } from "@fauve/agent";
 import { useId, useState } from "react";
 import { CheckIcon } from "@/components/icons";
 import {
@@ -54,8 +55,75 @@ export function FontsSection({
           onChange={(family) => onChange({ body_font: family })}
         />
       </div>
+      <PairPicker display={display} body={body} onPick={(pair) => onChange({ display_font: pair.display.family, body_font: pair.body.family })} />
       {own}
     </Section>
+  );
+}
+
+const CASE = { upper: "uppercase", normal: "none" } as const;
+const TRACKING = { tight: "-0.03em", normal: "0", wide: "0.18em" } as const;
+
+/**
+ * Pairings that work (font-pairs.ts, read on the reference Reels): a title face and a text face, set as the
+ * references set them, picked in one tap. Their fonts load only once the list is open.
+ */
+function PairPicker({ display, body, onPick }: { display: string | null; body: string | null; onPick: (pair: FontPair) => void }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <details className="group mt-4 flex flex-col" onToggle={(e) => setOpen((e.target as HTMLDetailsElement).open)}>
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-[14px] font-bold text-violet [&::-webkit-details-marker]:hidden">
+        Des associations qui marchent
+        <span className="text-[13px] font-semibold text-muted group-open:hidden">Titres + textes, en un clic</span>
+      </summary>
+      {open && <PairList display={display} body={body} onPick={onPick} />}
+    </details>
+  );
+}
+
+function PairList({ display, body, onPick }: { display: string | null; body: string | null; onPick: (pair: FontPair) => void }) {
+  useStylesheets([...new Set(FONT_PAIRS.flatMap((p) => [fontStylesheet(p.display.family), fontStylesheet(p.body.family)]))]);
+  return (
+    <div role="radiogroup" aria-label="Associations de polices" className="mt-3 grid gap-2.5 sm:grid-cols-2">
+      {FONT_PAIRS.map((pair) => {
+        const on = display === pair.display.family && body === pair.body.family;
+        return (
+          <button
+            key={pair.key}
+            type="button"
+            role="radio"
+            aria-checked={on}
+            onClick={() => onPick(pair)}
+            className={`fauve-press flex min-w-0 flex-col gap-1.5 rounded-[16px] border-[1.5px] px-4 py-3.5 text-left ${on ? "border-violet bg-violet-tint" : "border-line bg-white hover:border-violet/40"}`}
+          >
+            <span
+              className="truncate text-[30px] leading-none"
+              style={{
+                fontFamily: fontStack(pair.display.family),
+                fontWeight: pair.display.weight,
+                fontStyle: pair.display.italic ? "italic" : "normal",
+                textTransform: CASE[pair.display.case],
+                letterSpacing: TRACKING[pair.display.tracking],
+              }}
+            >
+              {pair.name}
+            </span>
+            <span
+              className="truncate text-[14px] leading-snug text-muted"
+              style={{
+                fontFamily: fontStack(pair.body.family),
+                fontWeight: pair.body.weight,
+                textTransform: CASE[pair.body.case ?? "normal"],
+                letterSpacing: TRACKING[pair.body.tracking ?? "normal"],
+              }}
+            >
+              {pair.display.family} + {pair.body.family}
+            </span>
+            <span className="text-[12.5px] leading-snug text-muted">Pour {pair.fits}</span>
+          </button>
+        );
+      })}
+    </div>
   );
 }
 

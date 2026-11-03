@@ -8,6 +8,7 @@ import { studioAccess } from "@/lib/billing/access";
 import { localInstant, localDateOf, localTimeOf, parseIsoDate, toIsoDate } from "@/lib/dates";
 import { queueJob } from "@/lib/jobs";
 import { freeSlots, type Slot } from "@/lib/slots";
+import { houseCards, houseInspiration, type HouseCard } from "@/lib/house-models";
 import { studioModels, type ReelModel } from "@/lib/reel-models";
 import { missMessage, pendingSteal, READING_MS, startSteal, type StealMissReason, type StealSource } from "@/lib/steal";
 import { getStudioContext, signMediaUrls } from "@/lib/studio";
@@ -41,6 +42,8 @@ export type NewPostOptions = {
   copy: { id: string; name: string | null; lines: string[] } | null;
   /** Her Reels kept as models (« Garder comme modèle »): a new Reel made like one of them. */
   models: ReelModel[];
+  /** Edith's own models (house-models.ts), each with its preview: a new Reel made like one of them. */
+  house: HouseCard[];
 };
 
 export async function newPostOptions(): Promise<NewPostOptions | null> {
@@ -98,7 +101,22 @@ export async function newPostOptions(): Promise<NewPostOptions | null> {
     tiktok: tiktok?.status === "connected",
     copy: copy ? { id: copy.id, name: copy.name, lines: copy.lines } : null,
     models,
+    house: houseCards(),
   };
+}
+
+/**
+ * « Un modèle d'Edith » on the Créer screen: the studio's row for that model (made the first time), its id for this
+ * Reel to follow, and what her Reel takes from it. Never read again: the catalogue is the reading.
+ */
+export async function pickHouseModel(key: string): Promise<{ ok: true; id: string; name: string; lines: string[] } | { ok: false; error: string }> {
+  const { member } = await getStudioContext();
+  if (!member) return { ok: false, error: "Connecte-toi d’abord." };
+  const picked = await houseInspiration(member.studio.id, z.string().max(40).parse(key)).catch((error: unknown) => {
+    console.warn("house model not picked", key, error);
+    return null;
+  });
+  return picked ? { ok: true, ...picked } : { ok: false, error: "Je n’arrive pas à prendre ce modèle pour l’instant. Réessaie dans un instant." };
 }
 
 export type CopyStart = { ok: true; id: string } | { ok: false; error: string };
