@@ -1231,6 +1231,39 @@ test("Edith's art direction by default: a model her files can make, never one of
   assert.notEqual(followedSignature(charter, chosen.look).music, "warm acoustic guitar");
 });
 
+test("each of Edith's models shows its original's frames as a Reel she sends: sheets of ten frames over its passage", async () => {
+  const { HOUSE_MODELS, houseModel, houseStyle, HOUSE_VERSION } = await import("./house-models.ts");
+  const { houseSheets, sheetSpan, houseOriginalPath, HOUSE_PASSAGES, MODEL_SHEETS } = await import("./house-sheets.ts");
+  const { HOUSE_MEASURES } = await import("./house-measures.ts");
+  const { stolenStyleSchema } = await import("./steal.ts");
+  // A studio's row written before the sheets is rewritten.
+  assert.equal(HOUSE_VERSION, 3);
+  for (const m of HOUSE_MODELS) {
+    const sheets = houseSheets(m.key);
+    const duration = HOUSE_MEASURES[m.key]!.duration;
+    // Every model has sheets over its whole passage, in order, a twelfth of it each (two seconds at least), twelve at most.
+    assert.ok(sheets.length > 0 && sheets.length <= MODEL_SHEETS, m.key);
+    assert.equal(sheets[0]!.from, 0);
+    assert.ok(Math.abs(sheets.at(-1)!.to - duration) < 0.01, m.key);
+    for (const [i, s] of sheets.entries()) {
+      assert.ok(s.to > s.from && s.to - s.from <= sheetSpan(duration) + 0.01, m.key);
+      assert.equal(s.path, `house/sheets/${m.key}/${String(i).padStart(2, "0")}.jpg`);
+    }
+    // Named on the model's row, read as a Reel she sends.
+    assert.deepEqual(stolenStyleSchema.parse(houseStyle(m)).sheets, sheets);
+    // A passage ends where the model was measured.
+    if (HOUSE_PASSAGES[m.key]) assert.equal(HOUSE_PASSAGES[m.key]!.to, duration, m.key);
+  }
+  assert.equal(houseOriginalPath("facade"), "house/originals/facade.mp4");
+  // A 31 s original: twelve sheets of 2.583 s; a 9.4 s one: five of 2 s.
+  assert.equal(sheetSpan(31), 2.583);
+  assert.equal(houseSheets("createur").length, 12);
+  assert.equal(houseSheets("facade").length, 5);
+  assert.deepEqual(houseSheets("facade").at(-1), { from: 8, to: 9.4, path: "house/sheets/facade/04.jpg" });
+  assert.deepEqual(houseSheets("inconnu"), []);
+  assert.ok(houseModel("nike") && HOUSE_PASSAGES.nike!.crop);
+});
+
 test("the director's look at its own Reel: its first image, each text coming in and read, each shot, its end, sixteen at most", async () => {
   const { lookMoments, LOOK_FRAMES } = await import("./rework.ts");
   const plan = { duration: 10, texts: [{ from: 0, to: 2 }, { from: 4, to: 6 }] } as unknown as Pick<EditPlan, "duration" | "texts">;

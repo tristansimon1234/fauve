@@ -75,6 +75,8 @@ export type SceneRequest = {
   canvas?: SceneFrame[];
   /** The Reel she copies, at the moment this animation remakes: sheets of its frames (ten each), seen before writing. */
   model?: SceneFrame[];
+  /** Whose frames `model` holds: a Reel she sent (copy), the original of one of Edith's models she chose (house), or of one Edith picked and dressed in her charter (dressed). */
+  modelOf?: "copy" | "house" | "dressed";
   /** One of Edith's models she chose: its reference composition (house-examples.ts), a worked example to make hers. */
   example?: { name: string; code: string; frames: number; shots: number };
   /** The sound effects already made (the library's), reused by name when one fits. */
@@ -323,7 +325,14 @@ async function writeScene(
               },
             }
           : {}),
-        ...(copied ? { model_frames: `${copied.length} sheets of the Reel she copies attached, first: remake how its elements appear, change, move and leave, at its pace, with her images and her words, never its images nor its words` } : {}),
+        ...(copied
+          ? {
+              model_frames:
+                request.modelOf === "dressed"
+                  ? `${copied.length} sheets of the original Reel this model of Edith's was written from attached, first: remake its idea, how its elements appear, change, move and leave, at its pace, with her images and her words, dressed in her charter (brand: her fonts and colours), never its images, its words, its fonts nor its colours`
+                  : `${copied.length} sheets of the ${request.modelOf === "house" ? "original Reel of the model she chose" : "Reel she copies"} attached, first: remake how its elements appear, change, move and leave, at its pace, with her images and her words, never its images nor its words`,
+            }
+          : {}),
       });
   const shown: string | Block[] = seen
     ? withFrames(request.look ? "Your Reel as it renders now, before it goes to her:" : "Your earlier animation, rendered on her images:", seen.frames, text)
@@ -340,7 +349,7 @@ async function writeScene(
   const content: string | Block[] = copied
     ? [
         ...withFrames(
-          "The Reel she copies, at the moment you remake (each image a sheet of ten frames in order, left to right then top to bottom):",
+          `${request.modelOf === "dressed" ? "The original Reel of the model, at the moment you remake (its form, never its look: yours is her charter)" : request.modelOf === "house" ? "The original Reel of the model she chose, at the moment you remake" : "The Reel she copies, at the moment you remake"} (each image a sheet of ten frames in order, left to right then top to bottom):`,
           copied,
           "",
         ).slice(0, -1),

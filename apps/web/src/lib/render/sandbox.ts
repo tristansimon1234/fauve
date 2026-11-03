@@ -5,6 +5,7 @@ import {
   BEAT_STEP,
   GROOVE_STEP,
   MIX_CEILING,
+  MODEL_SHEETS,
   mixFilter,
   mixGains,
   soundLevelsFilter,
@@ -696,6 +697,44 @@ export async function videoFramesInSandbox(id: string, url: string, times: numbe
       if (jpeg?.length) frames.push({ t, jpeg });
     }
     return frames;
+  } finally {
+    await bash(sandbox, 'rm -rf "$1"', [dir]).catch(() => {});
+  }
+}
+
+/**
+ * The sheets of one of Edith's models' originals (house-sheets.ts), as for a Reel she sends: its passage (`to` seconds,
+ * the part of the image `crop` as w:h:x:y), then ten frames a sheet over `span` seconds, five by two, 320 px on the long side.
+ */
+export async function houseSheetsInSandbox(id: string, url: string, passage: { span: number; to?: number; crop?: string }): Promise<{ sheets: Buffer[]; seconds: number }> {
+  const started = Date.now();
+  const sandbox = await jobSandbox();
+  const dir = `${ROOT}/jobs/${id}`;
+  try {
+    await bash(sandbox, 'rm -rf "$1" && mkdir -p "$1"', [dir]);
+    await bash(sandbox, FETCH, [`${dir}/in.mp4`, url]);
+    await bash(
+      sandbox,
+      [
+        "set -eo pipefail",
+        'cd "$1"',
+        'vf="fps=30,format=yuv420p"',
+        'if [ -n "$4" ]; then vf="crop=$4,$vf"; fi',
+        "trim=()",
+        'if [ -n "$3" ]; then trim=(-t "$3"); fi',
+        `${ROOT}/ffmpeg -loglevel error -y -i in.mp4 "\${trim[@]}" -map 0:v:0 -an -vf "$vf" -c:v libx264 -preset veryfast -crf 20 reel.mp4`,
+        // The recipe of a Reel she sends (STEAL_JOB): ten frames a sheet, five by two, 320 px on the long side.
+        `${ROOT}/ffmpeg -v error -i reel.mp4 -an -vf "fps=10/$2,scale='if(gt(iw,ih),320,-2)':'if(gt(iw,ih),-2,320)',tile=5x2" -q:v 5 -y sheet_%02d.jpg`,
+      ].join("\n"),
+      [dir, passage.span.toFixed(3), passage.to ? passage.to.toFixed(2) : "", passage.crop ?? ""],
+    );
+    const sheets: Buffer[] = [];
+    for (let i = 1; i <= MODEL_SHEETS; i++) {
+      const jpeg = await sandbox.readFileToBuffer({ path: `${dir}/sheet_${String(i).padStart(2, "0")}.jpg` }).catch(() => null);
+      if (!jpeg?.length) break;
+      sheets.push(jpeg);
+    }
+    return { sheets, seconds: (Date.now() - started) / 1000 };
   } finally {
     await bash(sandbox, 'rm -rf "$1"', [dir]).catch(() => {});
   }
@@ -1636,9 +1675,6 @@ function stealSandbox(): Promise<Sandbox> {
  * 720 px or more, once more as a browser if refused) or the file at `$2` when `$3` is « file ».
  * Exits 10 when it cannot be opened, 11 when it runs over STEAL_MAX_SECONDS, 12 when it is no video.
  */
-/** The most sheets of a copied Reel's frames kept for its animations (ten frames each). */
-const MODEL_SHEETS = 12;
-
 const STEAL_JOB = [
   "set -uo pipefail",
   'cd "$1"',

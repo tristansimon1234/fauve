@@ -1,5 +1,6 @@
 import { fontPair, pairFonts, type FontPair } from "./font-pairs.ts";
 import { HOUSE_MEASURES } from "./house-measures.ts";
+import { houseSheets } from "./house-sheets.ts";
 import { reelLookSchema, type ReelLook } from "./looks.ts";
 import { filmWords, STEAL_READER, stolenStyleLines, type StolenLook, type StolenStyle } from "./steal.ts";
 import type { z } from "zod";
@@ -16,8 +17,8 @@ import type { z } from "zod";
 
 /** The source of the inspiration row a house model is kept on, per studio (one per model, made when first used). */
 export const HOUSE_SOURCE = "house";
-/** The catalogue's version: a studio's row written by an older one is rewritten when the model is used again. */
-export const HOUSE_VERSION = 2;
+/** The catalogue's version: a studio's row written by an older one is rewritten when the model is used again (3: its original's sheets). */
+export const HOUSE_VERSION = 3;
 
 export type HouseModel = {
   key: string;
@@ -1088,6 +1089,8 @@ export function houseStyle(model: HouseModel): StolenStyle {
     filter_look: houseFinish(model),
     house: { key: model.key, version: HOUSE_VERSION },
     ...(pair ? { fonts: pairFonts(pair) } : {}),
+    // Its original's frames, seen by the agents that remake it as a Reel she sends is seen (house-sheets.ts).
+    ...(houseSheets(model.key).length ? { sheets: houseSheets(model.key) } : {}),
   };
 }
 

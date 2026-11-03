@@ -876,7 +876,8 @@ export async function designEdit(params: {
     if (sheets.length) {
       const modelLength = sheets.at(-1)!.to || 1;
       const spans = planTimeline(plan).segments;
-      const label = (s: { from: number; to: number }) => `Le Reel qu'elle recopie, de ${s.from.toFixed(1).replace(".", ",")} s à ${s.to.toFixed(1).replace(".", ",")} s :`;
+      const modelOf = followed?.dressed ? "dressed" : followed?.house ? "house" : "copy";
+      const label = (s: { from: number; to: number }) => `${modelOf === "copy" ? "Le Reel qu'elle recopie" : "L'original du modèle"}, de ${s.from.toFixed(1).replace(".", ",")} s à ${s.to.toFixed(1).replace(".", ",")} s :`;
       for (const request of requests) {
         const layer = request.id.startsWith("l") ? layers[Number(request.id.slice(1))] : null;
         const at = layer ? { start: layer.from, end: layer.to } : spans[Number(request.id.slice(1))] ? { start: spans[Number(request.id.slice(1))]!.start, end: spans[Number(request.id.slice(1))]!.start + spans[Number(request.id.slice(1))]!.length } : null;
@@ -885,7 +886,10 @@ export async function designEdit(params: {
         const from = (at.start / plan.duration) * modelLength - 0.5;
         const to = (at.end / plan.duration) * modelLength + 0.5;
         const chosen = whole ? sheets.filter((_, i) => sheets.length <= 8 || i % Math.ceil(sheets.length / 8) === 0).slice(0, 8) : sheets.filter((s) => s.to > from && s.from < to).slice(0, 3);
-        if (chosen.length) request.model = chosen.map((s) => ({ label: label(s), jpeg: s.jpeg }));
+        if (chosen.length) {
+          request.model = chosen.map((s) => ({ label: label(s), jpeg: s.jpeg }));
+          request.modelOf = modelOf;
+        }
       }
     }
   }
