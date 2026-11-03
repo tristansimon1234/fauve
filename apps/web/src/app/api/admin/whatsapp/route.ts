@@ -10,7 +10,8 @@ import { graph, WhatsAppError } from "@/lib/whatsapp/client";
 //   ?action=subscribe           subscribe this app to the WABA's webhooks
 //   ?action=templates           list message templates and their review status
 //   ?action=create_templates    submit Fauve's templates (see whatsappTemplates) for review (&only=a,b: just these)
-// POST with CRON_SECRET (select public.call_app('/api/admin/whatsapp?action=…')): status, templates and create_templates only.
+//   ?action=display_name&name=… ask Meta for this display name (replaces a pending change; applied at the next register)
+// POST with CRON_SECRET (select public.call_app('/api/admin/whatsapp?action=…')): status, display_name, templates and create_templates.
 
 // Must match whatsappTemplates (packages/agent) and the senders in lib/whatsapp/client.ts.
 const TEMPLATE_DEFINITIONS = [
@@ -198,7 +199,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   if (!cronAuthorized(request)) return new Response("Forbidden", { status: 403 });
   const params = request.nextUrl.searchParams;
-  if (!["status", "templates", "create_templates"].includes(params.get("action") ?? "")) return Response.json({ error: "status, templates or create_templates only" }, { status: 400 });
+  if (!["status", "display_name", "templates", "create_templates"].includes(params.get("action") ?? "")) return Response.json({ error: "status, display_name, templates or create_templates only" }, { status: 400 });
   return run(params);
 }
 
@@ -215,6 +216,15 @@ async function run(params: URLSearchParams) {
       }),
     );
     return Response.json({ action, result });
+  }
+
+  if (action === "display_name") {
+    const name = (params.get("name") ?? "").trim();
+    if (name.length < 3 || name.length > 50) return Response.json({ error: "name: 3 to 50 characters" }, { status: 400 });
+    const result = await attempt(() =>
+      graph(`${env("WHATSAPP_PHONE_ID")}`, { method: "POST", body: JSON.stringify({ new_display_name: name }) }),
+    );
+    return Response.json({ action, name, result });
   }
 
   if (action === "subscribe") {
