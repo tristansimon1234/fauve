@@ -32,10 +32,17 @@ export const HOUSE_PASSAGES: Record<string, { to: number; crop?: { width: number
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
-/** A model's sheets as named on its inspiration row: their span on its original and their path; none without its measures. */
+/**
+ * A model's sheets as named on its inspiration row: their span on its original and their path, the last one to its
+ * end; none without its measures. A last stretch shorter than a frame's interval has no frame, so no sheet (the
+ * mosaic's 6.04 s made three sheets, not four).
+ */
 export function houseSheets(key: string): { from: number; to: number; path: string }[] {
   const duration = HOUSE_MEASURES[key]?.duration ?? 0;
   if (!(duration > 0)) return [];
   const span = sheetSpan(duration);
-  return Array.from({ length: MODEL_SHEETS }, (_, i) => ({ from: round2(i * span), to: round2(Math.min(duration, (i + 1) * span)), path: houseSheetPath(key, i) })).filter((s) => s.from < duration);
+  const sheets = Array.from({ length: MODEL_SHEETS }, (_, i) => ({ from: round2(i * span), to: round2(Math.min(duration, (i + 1) * span)), path: houseSheetPath(key, i) })).filter(
+    (s) => s.from <= duration - span / 10 + 1e-9,
+  );
+  return sheets.map((s, i) => (i === sheets.length - 1 ? { ...s, to: round2(duration) } : s));
 }

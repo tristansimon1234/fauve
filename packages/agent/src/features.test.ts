@@ -1246,7 +1246,8 @@ test("each of Edith's models shows its original's frames as a Reel she sends: sh
     assert.equal(sheets[0]!.from, 0);
     assert.ok(Math.abs(sheets.at(-1)!.to - duration) < 0.01, m.key);
     for (const [i, s] of sheets.entries()) {
-      assert.ok(s.to > s.from && s.to - s.from <= sheetSpan(duration) + 0.01, m.key);
+      // The last one reaches the end: a span and less than a frame's interval more.
+      assert.ok(s.to > s.from && s.to - s.from <= sheetSpan(duration) * 1.1 + 0.01, m.key);
       assert.equal(s.path, `house/sheets/${m.key}/${String(i).padStart(2, "0")}.jpg`);
     }
     // Named on the model's row, read as a Reel she sends.
@@ -1255,10 +1256,10 @@ test("each of Edith's models shows its original's frames as a Reel she sends: sh
     if (HOUSE_PASSAGES[m.key]) assert.equal(HOUSE_PASSAGES[m.key]!.to, duration, m.key);
   }
   assert.equal(houseOriginalPath("facade"), "house/originals/facade.mp4");
-  // A 31 s original: twelve sheets of 2.583 s; a 9.4 s one: five of 2 s.
+  // A 31 s original: twelve sheets of 2.583 s; a 9.4 s one: five of 2 s; as many as the workshop made for each model.
   assert.equal(sheetSpan(31), 2.583);
-  assert.equal(houseSheets("createur").length, 12);
-  assert.equal(houseSheets("facade").length, 5);
+  const made: Record<string, number> = { decode: 12, "quatre-coins": 11, mosaique: 3, "carte-feutre": 5, pile: 5, "photo-dump": 6, table: 5, "ecran-partage": 7, cadre: 4, fenetres: 7, facade: 5, gaufre: 7, "mot-cle": 12, frappe: 7, "titre-derriere": 6, journee: 8, "plans-fixes": 7, "coups-de-fouet": 12, tourne: 7, nike: 6, eventail: 10, coulisses: 6, interrupteur: 5, interface: 7, pixel: 8, "mots-meles": 10, aplat: 5, detourages: 9, createur: 12, silhouette: 6, vision: 5 };
+  for (const m of HOUSE_MODELS) assert.equal(houseSheets(m.key).length, made[m.key], m.key);
   assert.deepEqual(houseSheets("facade").at(-1), { from: 8, to: 9.4, path: "house/sheets/facade/04.jpg" });
   assert.deepEqual(houseSheets("inconnu"), []);
   assert.ok(houseModel("nike") && HOUSE_PASSAGES.nike!.crop);
