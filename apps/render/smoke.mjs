@@ -94,6 +94,8 @@ const scope = {
   Glitch: ({ children }) => React.createElement("div", null, children),
   Callout: ({ label }) => React.createElement("div", null, String(label ?? "")),
   Brackets: ({ label }) => React.createElement("div", null, String(label ?? "")),
+  // Nothing is cut out here: the scene must hold without a subject's box.
+  SubjectBox: () => null,
   // What is said, written: the words themselves are what the check reads.
   Captions: ({ words = [] }) => React.createElement("div", null, (Array.isArray(words) ? words : []).map((w) => String(w?.w ?? "")).join(" ")),
 };

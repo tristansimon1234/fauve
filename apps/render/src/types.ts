@@ -47,6 +47,8 @@ export type ComposeShot = ScenePhoto & {
   face?: FaceZone;
   /** What was tracked in a video shot (hands, faces, bodies) and how it is drawn: track(frame, box) places it in the box it is laid in. */
   track?: Omit<TrackPiece, "at" | "length">;
+  /** Where its subject is at each image (shares of the picture), from its cut-out: SubjectBox places it in the box it is laid in. */
+  subjectBoxes?: (number[] | null)[];
 };
 /** A text of the Reel that a collage's composition draws itself (frames from its start): its words, its role, the words to stress, a message's lines. */
 export type ComposeText = { text: string; role: "hook" | "band" | "caption"; from: number; to: number; emphasis: string[]; items?: { title: string; detail?: string }[] };

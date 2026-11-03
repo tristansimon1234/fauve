@@ -100,7 +100,16 @@ export async function ensureSubjects(studioId: string, postId: string, plan: Pla
           console.warn("subject cut-out not kept", p.key, uploaded.error.message);
           continue;
         }
-        next[p.key] = { path, still: result.still, at, frames: result.frames, keys: result.keys, people: result.people, ...(result.top !== undefined ? { top: result.top } : {}) };
+        next[p.key] = {
+          path,
+          still: result.still,
+          at,
+          frames: result.frames,
+          keys: result.keys,
+          people: result.people,
+          ...(result.top !== undefined ? { top: result.top } : {}),
+          ...(result.boxes?.length ? { boxes: result.boxes } : {}),
+        };
       }
       updates.set(p.clip_id, next);
     }
@@ -119,15 +128,17 @@ export async function ensureSubjects(studioId: string, postId: string, plan: Pla
 }
 
 /** The cut-outs this plan can draw, signed for the render and the live preview (by passage, subjectKey). */
-export async function subjectInputs(studioId: string, plan: Plan): Promise<Record<string, { src: string; still?: boolean; top?: number }>> {
+export async function subjectInputs(studioId: string, plan: Plan): Promise<Record<string, { src: string; still?: boolean; top?: number; boxes?: (number[] | null)[] }>> {
   const { passages, rows } = await planned(studioId, plan);
   const found = passages.flatMap((p) => {
     const k = kept(rows.get(p.clip_id))[p.key];
-    return k && "path" in k && k.path.startsWith(`${studioId}/`) ? [{ key: p.key, path: k.path, still: k.still, top: k.top }] : [];
+    return k && "path" in k && k.path.startsWith(`${studioId}/`) ? [{ key: p.key, path: k.path, still: k.still, top: k.top, boxes: k.boxes }] : [];
   });
   if (!found.length) return {};
   const signed = (await supabaseAdmin().storage.from("media").createSignedUrls(found.map((f) => f.path), 7200)).data ?? [];
   return Object.fromEntries(
-    found.flatMap((f, i) => (signed[i]?.signedUrl ? [[f.key, { src: signed[i]!.signedUrl, ...(f.still ? { still: true } : {}), ...(f.top !== undefined ? { top: f.top } : {}) }]] : [])),
+    found.flatMap((f, i) =>
+      signed[i]?.signedUrl ? [[f.key, { src: signed[i]!.signedUrl, ...(f.still ? { still: true } : {}), ...(f.top !== undefined ? { top: f.top } : {}), ...(f.boxes?.length ? { boxes: f.boxes } : {}) }]] : [],
+    ),
   );
 }

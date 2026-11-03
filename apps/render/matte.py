@@ -277,6 +277,16 @@ def finish(job, frames, masks, still, keys, people, started, ow, oh, still_at=0)
     # behind her is placed where her head covers only its bottom.
     top = round(float(np.percentile([head_top(m) for m in masks], 20)), 3)
 
+    def box_of(m):
+        # Where the subject is in the image (shares of it: left, top, width, height), so a label or brackets follow it.
+        ys, xs = np.nonzero(m > 0.5)
+        if not len(xs):
+            return None
+        h, w = m.shape
+        return [round(xs.min() / w, 3), round(ys.min() / h, 3), round((xs.max() - xs.min() + 1) / w, 3), round((ys.max() - ys.min() + 1) / h, 3)]
+
+    boxes = [box_of(m) for m in masks]
+
     # The edge at full size: the guided filter's reach and the band where the edge's colours are carried out.
     reach = max(4, ow // 135)
     soft = (2 * reach + 1) | 1
@@ -314,7 +324,7 @@ def finish(job, frames, masks, still, keys, people, started, ow, oh, still_at=0)
         enc.stdin.close()
         if enc.wait() != 0:
             raise RuntimeError("encodage du détourage impossible")
-    return {"file": out, "still": still, "frames": len(frames), "keys": keys, "people": people, "top": top, "seconds": round(time.time() - started, 1)}
+    return {"file": out, "still": still, "frames": len(frames), "keys": keys, "people": people, "top": top, "boxes": boxes, "seconds": round(time.time() - started, 1)}
 
 
 if __name__ == "__main__":

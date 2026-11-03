@@ -22,7 +22,7 @@ export const CAPTION_SUBJECT_SECONDS = 12;
 export const subjectKey = (clipId: string, from: number, to: number) => `${clipId}@${from.toFixed(2)}-${to.toFixed(2)}`;
 
 /** A composition's code that draws her subject. */
-export const drawsSubject = (js: string | undefined) => Boolean(js && /\bSubject\b/.test(js));
+export const drawsSubject = (js: string | undefined) => Boolean(js && /\bSubject(?:Box)?\b/.test(js));
 
 /** A plan that draws her cut out: a composition that uses Subject, or what is said written around her (its strong words behind her). */
 export const wantsSubjects = (plan: Pick<EditPlan, "layers"> & { subtitles?: boolean; captions?: EditPlan["captions"]; finish?: EditPlan["finish"] }, anticipate = false) =>
@@ -76,6 +76,8 @@ export const mediaSubjectsSchema = z.record(
       people: z.boolean().optional(),
       /** The top of the subject (its head) along the passage, as a share of the height: a word behind her goes above it. */
       top: z.number().optional(),
+      /** Where the subject is at each image of the passage (shares: left, top, width, height; null when nothing is cut out). */
+      boxes: z.array(z.array(z.number()).length(4).nullable()).optional(),
     }),
     z.object({ failed_at: z.string(), error: z.string() }),
   ]),

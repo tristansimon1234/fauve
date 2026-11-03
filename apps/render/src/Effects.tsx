@@ -1,6 +1,8 @@
 import { useId, type CSSProperties, type ReactNode } from "react";
 import { Easing, interpolate, random } from "remotion";
 import type { Box, KitHooks } from "./Kit";
+import { faceFocus, framingPercent } from "./track";
+import type { ComposeShot } from "./types";
 
 // The effects kit of the animations (lot 7), from Tristan's reference Reels: cinema bars that open and close (and what
 // steps out of them in front: Subject laid after), black and white turning to colour, a grade revealed inside a mask
@@ -327,6 +329,34 @@ function BracketsOf(hooks: KitHooks) {
       </div>
     );
   };
+}
+
+// ——— SubjectBox: where her subject is, image by image ———————————————————————————————————
+
+/**
+ * Where a shot's subject (a person, a product, a ball: what its cut-out keeps) is at a frame of the composition, in the
+ * box the shot was laid in with Footage ({ left, top, width, height }, the whole frame by default), as Footage frames
+ * it (cover, on its subject, its faces kept whole): { x, y, w, h } in px, or null when nothing is cut out there. Labels,
+ * brackets and words follow it; a shot whose cut-out is missing gives null (the animation keeps its default place).
+ */
+export function SubjectBox(shot: ComposeShot | undefined, frame: number, laid?: { left: number; top: number; width: number; height: number }): Box | null {
+  const boxes = shot?.subjectBoxes;
+  if (!shot || !boxes?.length) return null;
+  const t = Math.max(0, Math.min(boxes.length - 1, Math.round(frame - shot.from)));
+  // The nearest image where something was cut out (a frame or two without it does not make the label jump away).
+  let b: number[] | null = null;
+  for (let d = 0; d <= 6 && !b; d++) b = boxes[t - d] ?? boxes[t + d] ?? null;
+  if (!b) return null;
+  const L = laid ?? { left: 0, top: 0, width: 1080, height: 1920 };
+  const frameAspect = L.width / L.height;
+  const A = shot.aspect || frameAspect;
+  // The picture as Footage covers the box with it, and where it is anchored (its subject, its faces kept whole).
+  const dw = A > frameAspect ? L.height * A : L.width;
+  const dh = A > frameAspect ? L.height : L.width / A;
+  const [px, py] = framingPercent(faceFocus(shot.focus, shot.face, A, frameAspect), A, frameAspect) ?? [50, 50];
+  const ox = ((dw - L.width) * px) / 100;
+  const oy = ((dh - L.height) * py) / 100;
+  return { x: L.left - ox + b[0]! * dw, y: L.top - oy + b[1]! * dh, w: b[2]! * dw, h: b[3]! * dh };
 }
 
 /** The effects kit, bound to a clock (the render's, or the scene check's own for each copy). */

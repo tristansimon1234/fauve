@@ -16,7 +16,7 @@ import { Fit } from "./Fit";
 import { makeKit } from "./Kit";
 import { makeType } from "./Type";
 import { makeGraphic } from "./Graphic";
-import { makeEffects } from "./Effects";
+import { makeEffects, SubjectBox } from "./Effects";
 import { Marker } from "./Marker";
 import { Captions } from "./Captions";
 import { PaperCutout, type RimSpec } from "./PaperCutout";
@@ -263,6 +263,7 @@ export const SCOPE = {
   Glitch: effects.Glitch,
   Callout: effects.Callout,
   Brackets: effects.Brackets,
+  SubjectBox,
 };
 
 export type SceneComponent = (props: {
