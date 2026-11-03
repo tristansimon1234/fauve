@@ -1,10 +1,10 @@
 import "server-only";
 import { createHash, randomUUID } from "node:crypto";
-import { isClipSegment, mediaSubjectsSchema, mediaTracksSchema, subjectPassages, type EditPlan, type MediaSubjects, type SubjectPassage } from "@fauve/agent";
+import { isClipSegment, mediaSubjectsSchema, mediaTracksSchema, objectPassages, subjectPassages, wantsObjects, type EditPlan, type MediaSubjects, type ObjectPassage, type SubjectPassage } from "@fauve/agent";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { costMeta } from "@/lib/cost-scope";
 import { timeLeft } from "@/lib/step-clock";
-import { GPU, GPU_START_MS, gpuCostEur, gpuReady, subjectsOnGpu } from "./gpu";
+import { GPU, GPU_START_MS, gpuCostEur, gpuReady, objectsOnGpu, subjectsOnGpu } from "./gpu";
 import { cutoutCostEur, subjectsInSandbox } from "./sandbox";
 
 // Her subject cut out at every image of the passages a composition draws it on (Subject), made in the cut-out
@@ -258,7 +258,9 @@ export async function subjectInputs(
   studioId: string,
   plan: Plan,
 ): Promise<Record<string, { src: string; still?: boolean; top?: number; boxes?: (number[] | null)[]; contours?: (number[] | null)[] }>> {
-  const { passages, rows } = await planned(studioId, plan);
+  const { passages: herPassages, rows } = await planned(studioId, plan);
+  // The objects its compositions follow too (a cup, a product), kept the same way under their own keys.
+  const passages = [...herPassages, ...objectPassages(plan, (id) => rows.get(id)?.kind === "video")];
   const found = passages.flatMap((p) => {
     const k = kept(rows.get(p.clip_id))[p.key];
     return k && "path" in k && k.path.startsWith(`${studioId}/`)
@@ -288,4 +290,92 @@ export async function subjectInputs(
         : [],
     ),
   );
+}
+
+// ——— Objects she shows (a cup, a product): followed on the card ————————————————————————————————————————
+
+/** On the card: the object found on one image and followed both ways through its passage (SAM 2), then its edge made, a second of video. */
+const OBJECT_LOAD_MS = 60_000;
+const OBJECT_WORK_PER_SECOND = 12;
+
+/**
+ * Follows the objects a Reel's compositions name (Subject, SubjectBox, SubjectOutline or Outline given its name)
+ * through their passages, on the rented card only (on the sandbox's CPUs it would take minutes a second): each found
+ * by its name on one image, followed image by image, cut out like her, kept beside the clip (media_assets.subjects,
+ * under `subjectKey#name`). Never fails a render: an object not followed is simply not drawn.
+ */
+export async function ensureObjects(studioId: string, postId: string, plan: Plan): Promise<void> {
+  if (!gpuReady() || !wantsObjects(plan) || plan.finish?.steady === "off") return;
+  const db = supabaseAdmin();
+  const ids = [...new Set(plan.segments.flatMap((s) => (isClipSegment(s) ? [s.clip_id] : [])))];
+  const { data } = await db.from("media_assets").select("id, kind, storage_path, subjects, tracks").eq("studio_id", studioId).in("id", ids);
+  const rows = new Map(((data ?? []) as Row[]).map((r) => [r.id, r]));
+  const missing = objectPassages(plan, (id) => rows.get(id)?.kind === "video").filter((p) => {
+    const k = kept(rows.get(p.clip_id))[p.key];
+    return !k || ("failed_at" in k && Date.now() - Date.parse(k.failed_at) > RETRY_MS);
+  });
+  if (!missing.length) return;
+  const left = timeLeft();
+  const budget = (Number.isFinite(left) ? left : 800_000) - RENDER_MARGIN_MS;
+  const work = missing.reduce((n, p) => n + (p.to - p.from) * OBJECT_WORK_PER_SECOND * 1000, 0);
+  const deadline = Math.min(budget, GPU_START_MS + OBJECT_LOAD_MS + 2 * work);
+  if (deadline < GPU_START_MS) return;
+  const clips = [...new Set(missing.map((p) => p.clip_id))];
+  const clipPaths = clips.map((id) => rows.get(id)?.storage_path ?? "");
+  const signed = (await db.storage.from("media").createSignedUrls(clipPaths.filter(Boolean), 3600)).data ?? [];
+  const jobs = (
+    await Promise.all(
+      missing.map(async (p) => {
+        const url = signed.find((x) => x.path === clipPaths[clips.indexOf(p.clip_id)])?.signedUrl;
+        const [webm, png] = await Promise.all(
+          [false, true].map((still) => db.storage.from("media").createSignedUploadUrl(subjectPath(studioId, p.clip_id, p.key, still), { upsert: true })),
+        );
+        return url && webm?.data?.signedUrl && png?.data?.signedUrl ? [{ key: p.key, url, from: p.from, to: p.to, name: p.name, upload: { webm: webm.data.signedUrl, png: png.data.signedUrl } }] : [];
+      }),
+    )
+  ).flat();
+  if (!jobs.length) return;
+  const { results, seconds } = await objectsOnGpu(jobs, deadline);
+  const at = new Date().toISOString();
+  const updates = new Map<string, MediaSubjects>();
+  const record = (p: ObjectPassage, value: MediaSubjects[string]) => {
+    const next = updates.get(p.clip_id) ?? { ...kept(rows.get(p.clip_id)) };
+    next[p.key] = value;
+    updates.set(p.clip_id, next);
+  };
+  let done = 0;
+  for (const p of missing) {
+    const result = results[p.key];
+    if (!result) continue;
+    if (result instanceof Error) {
+      console.warn("object not followed", p.key, result.message);
+      record(p, { failed_at: at, error: result.message.slice(0, 200) });
+      continue;
+    }
+    done++;
+    const contour = await keepContour(studioId, p.clip_id, p.key, result.contours);
+    record(p, {
+      path: subjectPath(studioId, p.clip_id, p.key, result.still),
+      still: result.still,
+      at,
+      frames: result.frames,
+      keys: result.keys,
+      people: false,
+      object: p.name,
+      ...(result.top !== undefined ? { top: result.top } : {}),
+      ...(result.boxes?.length ? { boxes: result.boxes } : {}),
+      ...(contour ? { contour } : {}),
+    });
+  }
+  await Promise.all([...updates].map(([id, subjects]) => db.from("media_assets").update({ subjects }).eq("id", id).eq("studio_id", studioId)));
+  // The card's time, billed whether or not it followed them (none when no card was allotted).
+  if (seconds > 0)
+    await db.from("cost_events").insert({
+      studio_id: studioId,
+      kind: "matting",
+      provider: "modal",
+      units: Math.round(seconds),
+      cost_eur: gpuCostEur(seconds),
+      meta: costMeta({ post_id: postId, objects: jobs.length, done, gpu: GPU, seconds_of_video: Math.round(missing.reduce((n, p) => n + p.to - p.from, 0) * 10) / 10 }),
+    });
 }

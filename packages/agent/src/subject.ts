@@ -130,6 +130,9 @@ export function subjectPassages(
 export const OBJECT_MAX = 4;
 export const OBJECT_MAX_SECONDS = 20;
 
+/** A plan whose compositions follow an object (Subject, SubjectBox, SubjectOutline or Outline given its name). */
+export const wantsObjects = (plan: Pick<EditPlan, "layers">) => (plan.layers ?? []).some((l) => l.compose && objectsDrawn(l.motion?.js).length > 0);
+
 /** An object to follow through a passage of her video: the passage, and the object's name. */
 export type ObjectPassage = SubjectPassage & { name: string };
 
@@ -174,6 +177,8 @@ export const mediaSubjectsSchema = z.record(
       boxes: z.array(z.array(z.number()).length(4).nullable()).optional(),
       /** Its outline at each image ({path}.contour.json: 64 points, x y shares, flat), for a line along its edge (Outline). */
       contour: z.string().optional(),
+      /** The object followed through the passage (a cup she lifts), when it is one and not her. */
+      object: z.string().optional(),
     }),
     z.object({ failed_at: z.string(), error: z.string() }),
   ]),

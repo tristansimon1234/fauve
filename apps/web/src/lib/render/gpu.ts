@@ -48,6 +48,29 @@ const FP16_COMMANDS = [`RUN pip install --no-cache-dir 'onnx==1.17.0' && ${half(
 const PHOTO_COMMANDS = [
   `RUN curl -fsSL -o /models/general.onnx ${GENERAL_URL} && echo '${GENERAL_SHA256}  /models/general.onnx' | sha256sum -c - && ${half("/models/general.onnx", "/models/general-fp16.onnx")} && rm /models/general.onnx`,
 ];
+/**
+ * The PyTorch machine (track_objects.py): torch 2.14.1 for CUDA 12.6 from PyTorch's own index (PyPI's builds need CUDA
+ * 13), transformers with its native Grounding DINO and SAM 2 video classes (since 4.56; no code from a model hub), and
+ * the two models' safetensors pinned by their revision and checked by their digests: Grounding DINO tiny (Apache 2.0)
+ * finds the object by its name, SAM 2.1 tiny (Apache 2.0) follows it. matte.py's finish needs ffmpeg and OpenCV.
+ */
+const HF = "https://huggingface.co";
+const TORCH_MODELS = [
+  { dir: "grounding-dino-tiny", repo: "IDEA-Research/grounding-dino-tiny", rev: "a2bb814dd30d776dcf7e30523b00659f4f141c71", sha: "1a2412ef99bd74bcd3c2a246fa1e48581f8889a1300c9051974741314fc042f3", configs: ["config.json", "preprocessor_config.json", "special_tokens_map.json", "tokenizer.json", "tokenizer_config.json", "vocab.txt", "added_tokens.json"] },
+  { dir: "sam2.1-hiera-tiny", repo: "facebook/sam2.1-hiera-tiny", rev: "de431c4043854a71d8101e17995dfe596bf101a5", sha: "48c14467e5cf9e51870511feb72c89688e82dd74523142c0538b663e193ac2a7", configs: ["config.json", "preprocessor_config.json", "processor_config.json", "video_preprocessor_config.json"] },
+];
+const TORCH_COMMANDS = [
+  "RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg curl ca-certificates && rm -rf /var/lib/apt/lists/*",
+  "RUN pip install --no-cache-dir 'torch==2.14.1+cu126' 'torchvision==0.29.1+cu126' --index-url https://download.pytorch.org/whl/cu126",
+  // The versions the script was run with here, on the espresso of a café terrace (found at 0.80, followed through 60 images).
+  "RUN pip install --no-cache-dir 'transformers==5.22.1' 'safetensors==0.8.0' 'numpy==2.5.4' 'opencv-python-headless==5.0.0.93' 'pillow==13.0.0'",
+  ...TORCH_MODELS.map(
+    (m) =>
+      `RUN mkdir -p /models/${m.dir} && cd /models/${m.dir} && ` +
+      [...m.configs, "model.safetensors"].map((f) => `curl -fsSL -o ${f} ${HF}/${m.repo}/resolve/${m.rev}/${f}`).join(" && ") +
+      ` && echo '${m.sha}  model.safetensors' | sha256sum -c -`,
+  ),
+];
 const APP = "fauve";
 /**
  * Its size: an A10G (24 GB), and the CPUs and memory for the edge made at full size and the clip's images (an 8 s
@@ -119,12 +142,19 @@ async function echo(stream: ReadableStream<string>, say: (line: string) => void)
 type CardOptions = { gpu?: string | null; fp16?: boolean; startMs?: number };
 
 /**
+ * The card's machines, each built once by Modal and kept apart (adding a model to one never rebuilds the other):
+ * `cut`, onnxruntime with the cut-out models; `torch`, PyTorch with the models that need it (TORCH_COMMANDS).
+ */
+type Machine = "cut" | "torch";
+
+/**
  * Runs one of the card's scripts on its jobs in a machine of its own, created for them and ended after. `envFor` is given
  * the seconds left when the script starts (it stops on its own when its pace would not finish in time). Never throws:
  * its readings by job id, or why there are none. `seconds`: the time the card ran (what Modal bills), 0 when none came.
  */
 async function onCard(
-  script: "portrait.py" | "photo_cut.py",
+  script: "portrait.py" | "photo_cut.py" | "track_objects.py",
+  machine: Machine,
   jobs: { id: string }[],
   envFor: (secondsLeft: number) => Record<string, string>,
   deadlineMs: number,
@@ -135,7 +165,7 @@ async function onCard(
   const started = Date.now();
   const at = () => `${((Date.now() - started) / 1000).toFixed(1)} s`;
   const say = (what: string) => console.log(`gpu ${at()}: ${what}`);
-  const files = ["portrait.py", "matte.py", "photo_cut.py"].map((name) => ({ name, text: REMOTION_SOURCE_FILES[name] }));
+  const files = ["portrait.py", "matte.py", "photo_cut.py", "track_objects.py"].map((name) => ({ name, text: REMOTION_SOURCE_FILES[name] }));
   const missing = files.find((f) => !f.text);
   if (missing) return { readings: new Error(`${missing.name} is missing from the render source`), seconds: 0 };
 
@@ -151,7 +181,10 @@ async function onCard(
   const work = async (): Promise<Record<string, Record<string, unknown>>> => {
     const app = await before(upBy, client.apps.fromName(APP, { createIfMissing: true }), "Modal did not answer");
     // One image for both jobs: the portrait model (full and half precision) and the general one (half).
-    const base = client.images.fromRegistry(BASE_IMAGE).dockerfileCommands(IMAGE_COMMANDS).dockerfileCommands(FP16_COMMANDS).dockerfileCommands(PHOTO_COMMANDS);
+    const base =
+      machine === "torch"
+        ? client.images.fromRegistry(BASE_IMAGE).dockerfileCommands(TORCH_COMMANDS)
+        : client.images.fromRegistry(BASE_IMAGE).dockerfileCommands(IMAGE_COMMANDS).dockerfileCommands(FP16_COMMANDS).dockerfileCommands(PHOTO_COMMANDS);
     const image = await before(upBy, base.build(app), `its image was not ready after ${startMs / 1000} s`);
     say(`image ready (${image.imageId})`);
     const created = await before(
@@ -224,6 +257,7 @@ export async function subjectsOnGpu(passages: GpuPassage[], deadlineMs: number, 
   const jobs = passages.map((p) => ({ id: p.key, url: p.url, from: p.from, to: p.to, upload: p.upload }));
   const { readings, seconds } = await onCard(
     "portrait.py",
+    "cut",
     jobs,
     (secondsLeft) => ({ PORTRAIT_MODEL: fp16 ? "/models/portrait-fp16.onnx" : "/models/portrait.onnx", PORTRAIT_WORK: "/work", PORTRAIT_SECONDS: String(secondsLeft), HDR_FILTER: HDR_TO_SDR }),
     deadlineMs,
@@ -255,7 +289,7 @@ export async function subjectsOnGpu(passages: GpuPassage[], deadlineMs: number, 
 export async function photosOnGpu(photos: GpuPhoto[], deadlineMs: number, options: CardOptions = {}): Promise<{ results: Record<string, GpuPhotoCut | Error>; seconds: number }> {
   if (!photos.length) return { results: {}, seconds: 0 };
   const jobs = photos.map((p) => ({ id: p.key, url: p.url, upload: p.upload }));
-  const { readings, seconds } = await onCard("photo_cut.py", jobs, () => ({ PHOTO_MODEL: "/models/general-fp16.onnx", PHOTO_WORK: "/work" }), deadlineMs, options);
+  const { readings, seconds } = await onCard("photo_cut.py", "cut", jobs, () => ({ PHOTO_MODEL: "/models/general-fp16.onnx", PHOTO_WORK: "/work" }), deadlineMs, options);
   const results: Record<string, GpuPhotoCut | Error> = {};
   for (const p of photos) {
     const r = readingOf(readings, p.key);
@@ -265,6 +299,43 @@ export async function photosOnGpu(photos: GpuPhoto[], deadlineMs: number, option
     }
     const reading = Object.fromEntries(Object.entries(r).filter(([k]) => k !== "ext" && k !== "uploaded"));
     results[p.key] = { reading: reading as CutoutReading, ext: r.ext === "png" ? "png" : "webp" };
+  }
+  return { results, seconds };
+}
+
+/** A passage where an object is followed: the passage's, and the object's name (as its animation gives it). */
+export type GpuObjectPassage = GpuPassage & { name: string };
+
+/**
+ * Follows each object through its passage on the card (the PyTorch machine: the detector finds it by its name, SAM 2
+ * follows it both ways, matte.py's finish cuts it out with its boxes and outline). Never throws, like subjectsOnGpu.
+ */
+export async function objectsOnGpu(passages: GpuObjectPassage[], deadlineMs: number, options: CardOptions = {}): Promise<{ results: Record<string, GpuCut | Error>; seconds: number }> {
+  if (!passages.length) return { results: {}, seconds: 0 };
+  const jobs = passages.map((p) => ({ id: p.key, url: p.url, from: p.from, to: p.to, name: p.name, upload: p.upload }));
+  const { readings, seconds } = await onCard(
+    "track_objects.py",
+    "torch",
+    jobs,
+    () => ({ DETECTOR_MODEL: "/models/grounding-dino-tiny", TRACKER_MODEL: "/models/sam2.1-hiera-tiny", OBJECTS_WORK: "/work", HDR_FILTER: HDR_TO_SDR }),
+    deadlineMs,
+    options,
+  );
+  const results: Record<string, GpuCut | Error> = {};
+  for (const p of passages) {
+    const r = readingOf(readings, p.key);
+    results[p.key] =
+      r instanceof Error
+        ? r
+        : {
+            still: Boolean(r.still),
+            frames: Number(r.frames),
+            keys: Number(r.keys),
+            people: false,
+            ...(typeof r.top === "number" ? { top: r.top } : {}),
+            ...(Array.isArray(r.boxes) ? { boxes: r.boxes as (number[] | null)[] } : {}),
+            ...(Array.isArray(r.contours) ? { contours: r.contours as (number[] | null)[] } : {}),
+          };
   }
   return { results, seconds };
 }

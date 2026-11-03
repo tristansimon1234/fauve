@@ -1,7 +1,7 @@
 import { after, type NextRequest } from "next/server";
 import { cronAuthorized } from "@/lib/cron-auth";
 import { designEdit } from "@/lib/agent/editor";
-import { GPU, gpuCostEur, gpuReady, photosOnGpu, subjectsOnGpu } from "@/lib/render/gpu";
+import { GPU, gpuCostEur, gpuReady, objectsOnGpu, photosOnGpu, subjectsOnGpu } from "@/lib/render/gpu";
 import { renderPost } from "@/lib/render/render-post";
 import { dropSandbox, pruneSnapshots, trackSandbox, warmRemotionPool } from "@/lib/render/sandbox";
 import { supabaseAdmin } from "@/lib/supabase/admin";
@@ -18,7 +18,8 @@ import { adminKeyAuthorized } from "@/lib/test-studio";
 // ?action=prune: deletes the snapshots the sandboxes in service no longer need (the last two stay). And POST
 // ?action=gpu-subject&media=<media id>&from=<s>&to=<s>: one passage of a video cut out on the rented card (Modal,
 // lib/render/gpu.ts), in the background, its file in {studio}/lab-gpu/ and a 24 h link, its timing and cost in the logs
-// (« gpu subject »), to try the card without a whole Reel.
+// (« gpu subject »), to try the card without a whole Reel. And POST ?action=gpu-objects&…&name=<object>: the same for
+// an object followed by its name (« gpu object »).
 
 export const maxDuration = 800;
 
@@ -80,6 +81,37 @@ export async function POST(request: NextRequest) {
       const studio = photos[0]!.studio_id as string;
       if (seconds > 0) await db.from("cost_events").insert({ studio_id: studio, kind: "cutout", provider: "modal", units: Math.round(seconds), cost_eur: cost, meta: { lab: true, photos: jobs.length, gpu: GPU } });
       console.log("gpu photos", JSON.stringify({ photos: jobs.length, seconds: Math.round(seconds), cost_eur: Math.round(cost * 1000) / 1000 }));
+    });
+    return Response.json({ ok: true, started: true }, { status: 202 });
+  }
+  // ?action=gpu-objects&media=<id>&from=<s>&to=<s>&name=<the object, in English>: an object followed through a passage
+  // on the card (PyTorch: found by its name, followed by SAM 2, cut out), its file in {studio}/lab-gpu/ (« gpu object »);
+  // its first call builds the card's PyTorch machine (10 min allowed for it).
+  if (action === "gpu-objects") {
+    const media = request.nextUrl.searchParams.get("media") ?? "";
+    const from = Number(request.nextUrl.searchParams.get("from") ?? "0");
+    const to = Number(request.nextUrl.searchParams.get("to") ?? "0");
+    const name = (request.nextUrl.searchParams.get("name") ?? "").trim().slice(0, 60);
+    if (!/^[0-9a-f-]{36}$/.test(media) || !(to > from) || to - from > 8 || !name) return Response.json({ error: "media=<uuid>&from=<s>&to=<s>&name=<object> (8 s at most)" }, { status: 400 });
+    if (!gpuReady()) return Response.json({ error: "MODAL_TOKEN_ID / MODAL_TOKEN_SECRET not set" }, { status: 400 });
+    after(async () => {
+      const db = supabaseAdmin();
+      const { data: row } = await db.from("media_assets").select("studio_id, storage_path").eq("id", media).maybeSingle();
+      if (!row?.storage_path) return console.error("gpu object: no such media", media);
+      const base = `${row.studio_id}/lab-gpu/object-${media}-${from}-${to}`;
+      const [clip, webm, png] = await Promise.all([
+        db.storage.from("media").createSignedUrl(row.storage_path, 3600),
+        db.storage.from("media").createSignedUploadUrl(`${base}.webm`, { upsert: true }),
+        db.storage.from("media").createSignedUploadUrl(`${base}.png`, { upsert: true }),
+      ]);
+      if (!clip.data?.signedUrl || !webm.data?.signedUrl || !png.data?.signedUrl) return console.error("gpu object: links refused");
+      const { results, seconds } = await objectsOnGpu([{ key: "lab", url: clip.data.signedUrl, from, to, name, upload: { webm: webm.data.signedUrl, png: png.data.signedUrl } }], 700_000, { startMs: 600_000 });
+      const result = results.lab;
+      const cost = gpuCostEur(seconds);
+      if (seconds > 0) await db.from("cost_events").insert({ studio_id: row.studio_id, kind: "matting", provider: "modal", units: Math.round(seconds), cost_eur: cost, meta: { lab: true, media, from, to, object: name, gpu: GPU } });
+      const link = result && !(result instanceof Error) ? (await db.storage.from("media").createSignedUrl(`${base}.${result.still ? "png" : "webm"}`, 86_400)).data?.signedUrl : null;
+      const summary = result instanceof Error || !result ? (result?.message ?? "nothing") : { ...result, boxes: result.boxes?.length ?? 0, contours: result.contours?.length ?? 0 };
+      console.log("gpu object", JSON.stringify({ link, media, from, to, name, seconds: Math.round(seconds), cost_eur: Math.round(cost * 1000) / 1000, result: summary }));
     });
     return Response.json({ ok: true, started: true }, { status: 202 });
   }
