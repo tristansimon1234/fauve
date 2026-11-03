@@ -8,7 +8,7 @@ import { previewMusic, speechWindows, type MixCase } from "./mix.ts";
 import { placeSounds, planCues, type SoundFacts, type SoundPlacement } from "./sfx.ts";
 import type { SfxLevel } from "./schemas.ts";
 import { faceZone, layerTrack, sceneTrack, shotTrack, type FaceZone, type ShotTrack, type TrackPiece, type TracksByClip } from "./tracking.ts";
-import { DEPTH_MOVES } from "./depth.ts";
+import { DEPTH_MOVES, reliefOf } from "./depth.ts";
 import { subjectKey } from "./subject.ts";
 import { lookMatrix, lookStamp, planLook, type ReelLook } from "./looks.ts";
 
@@ -121,6 +121,8 @@ export type ReelSegment =
       cutout?: { src: string; box: { x: number; y: number; w: number; h: number } };
       /** A moving photo in relief (depth.ts): its subject cut out (framed like the photo), moving a little more than the room. */
       depth?: { src: string; box: { x: number; y: number; w: number; h: number } };
+      /** A moving photo with its depth read on the card: the video of every pixel moved by its depth (relief.py), as long as the shot. */
+      relief?: { src: string; frames: number };
     }
   /**
    * Animations play over her footage when there is some (`under`), else on the studio's colours. composed: an engine
@@ -461,6 +463,8 @@ export type ReelInputs = {
   today?: string;
   /** The moving photos whose subject cuts out cleanly (depthPhotoIds): signed cut-out and the subject's box, played in relief. */
   depth?: Record<string, { src: string; box: { x: number; y: number; w: number; h: number } }>;
+  /** The moving photos whose depth the card read for their shot (reliefJobs: `{media}#{key}`), signed, with their length in images. */
+  reliefs?: Record<string, { src: string; frames: number }>;
   /** The passages of her clips cut out at every image (subjectKey: clip, in, out), signed: what a composition's Subject draws. */
   subjects?: Record<string, { src: string; still?: boolean; top?: number; boxes?: (number[] | null)[]; contours?: (number[] | null)[] }>;
 };
@@ -657,6 +661,9 @@ export function buildReelProps(plan: EditPlan, inputs: ReelInputs): ReelProps {
     const move: CameraMove = s.move ?? (zoom ? "in" : "none");
     // A photo in a Reel: the move the engine chose (photoMoves: most held still); a plan from before those moves keeps its slow zoom.
     if (inputs.photoIds?.includes(s.clip_id)) {
+      // Its depth read on the card for this very shot (same move, length and framing), else the relief of its subject.
+      const shot = inputs.template !== "collage" && plan.finish?.relief !== "off" ? reliefOf(s, lengths[i]!) : null;
+      const relief = shot ? inputs.reliefs?.[`${s.clip_id}#${shot.key}`] : undefined;
       return {
         type: "image",
         src,
@@ -673,6 +680,7 @@ export function buildReelProps(plan: EditPlan, inputs: ReelInputs): ReelProps {
         ...(inputs.template !== "collage" && plan.finish?.relief !== "off" && s.photo && !s.photo.blur?.length && s.move && DEPTH_MOVES.includes(s.move) && inputs.depth?.[s.clip_id]
           ? { depth: inputs.depth[s.clip_id] }
           : {}),
+        ...(relief && relief.frames === lengths[i] ? { relief } : {}),
       };
     }
     const ramp = rampFrames(s, lengths[i]!);

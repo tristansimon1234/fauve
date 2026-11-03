@@ -1,7 +1,8 @@
 import { after, type NextRequest } from "next/server";
 import { cronAuthorized } from "@/lib/cron-auth";
 import { designEdit } from "@/lib/agent/editor";
-import { GPU, gpuCostEur, gpuReady, objectsOnGpu, photosOnGpu, subjectsOnGpu } from "@/lib/render/gpu";
+import { GPU, gpuCostEur, gpuReady, objectsOnGpu, photosOnGpu, reliefsOnGpu, subjectsOnGpu } from "@/lib/render/gpu";
+import { reliefOf } from "@fauve/agent";
 import { renderPost } from "@/lib/render/render-post";
 import { dropSandbox, pruneSnapshots, trackSandbox, warmRemotionPool } from "@/lib/render/sandbox";
 import { supabaseAdmin } from "@/lib/supabase/admin";
@@ -19,7 +20,8 @@ import { adminKeyAuthorized } from "@/lib/test-studio";
 // ?action=gpu-subject&media=<media id>&from=<s>&to=<s>: one passage of a video cut out on the rented card (Modal,
 // lib/render/gpu.ts), in the background, its file in {studio}/lab-gpu/ and a 24 h link, its timing and cost in the logs
 // (« gpu subject »), to try the card without a whole Reel. And POST ?action=gpu-objects&…&name=<object>: the same for
-// an object followed by its name (« gpu object »).
+// an object followed by its name (« gpu object »). And POST ?action=gpu-relief&media=<photo>&move=in|out|left|right
+// &seconds=<s>: a photo drawn in relief by its depth (« gpu relief »).
 
 export const maxDuration = 800;
 
@@ -112,6 +114,45 @@ export async function POST(request: NextRequest) {
       const link = result && !(result instanceof Error) ? (await db.storage.from("media").createSignedUrl(`${base}.${result.still ? "png" : "webm"}`, 86_400)).data?.signedUrl : null;
       const summary = result instanceof Error || !result ? (result?.message ?? "nothing") : { ...result, boxes: result.boxes?.length ?? 0, contours: result.contours?.length ?? 0 };
       console.log("gpu object", JSON.stringify({ link, media, from, to, name, seconds: Math.round(seconds), cost_eur: Math.round(cost * 1000) / 1000, result: summary }));
+    });
+    return Response.json({ ok: true, started: true }, { status: 202 });
+  }
+  // ?action=gpu-relief&media=<photo id>&move=in|out|left|right&seconds=<s>: a photo drawn in relief by its depth on the
+  // card (relief.py, the PyTorch machine), framed as a Reel frames it, its video in {studio}/lab-gpu/ (« gpu relief »);
+  // its first call adds the depth model to the card's PyTorch machine.
+  if (action === "gpu-relief") {
+    const media = request.nextUrl.searchParams.get("media") ?? "";
+    const move = request.nextUrl.searchParams.get("move") ?? "in";
+    const seconds = Math.min(6, Math.max(1, Number(request.nextUrl.searchParams.get("seconds") ?? "3") || 3));
+    if (!/^[0-9a-f-]{36}$/.test(media) || !["in", "out", "left", "right"].includes(move)) return Response.json({ error: "media=<uuid>&move=in|out|left|right&seconds=<s>" }, { status: 400 });
+    if (!gpuReady()) return Response.json({ error: "MODAL_TOKEN_ID / MODAL_TOKEN_SECRET not set" }, { status: 400 });
+    after(async () => {
+      const db = supabaseAdmin();
+      const { data: row } = await db.from("media_assets").select("studio_id, storage_path, kind, regions").eq("id", media).maybeSingle();
+      if (!row?.storage_path || row.kind !== "image") return console.error("gpu relief: no such photo", media);
+      const read = (row.regions ?? {}) as { width?: number; height?: number };
+      const frames = Math.round(seconds * 30);
+      const shot = reliefOf(
+        { clip_id: media, in: 0, out: seconds, zoom: "none", move: move as "in", photo: { source: { width: read.width ?? 1080, height: read.height ?? 1350 } } },
+        frames,
+      );
+      if (!shot) return console.error("gpu relief: no shot");
+      const path = `${row.studio_id}/lab-gpu/relief-${media}-${move}-${frames}.mp4`;
+      const [photo, upload] = await Promise.all([
+        db.storage.from("media").createSignedUrl(row.storage_path, 3600),
+        db.storage.from("media").createSignedUploadUrl(path, { upsert: true }),
+      ]);
+      if (!photo.data?.signedUrl || !upload.data?.signedUrl) return console.error("gpu relief: links refused");
+      const { results, seconds: card } = await reliefsOnGpu(
+        [{ key: "lab", url: photo.data.signedUrl, move: shot.move, frames, origin: shot.origin, shift: shot.shift, upload: { mp4: upload.data.signedUrl } }],
+        700_000,
+        { startMs: 600_000 },
+      );
+      const result = results.lab;
+      const cost = gpuCostEur(card);
+      if (card > 0) await db.from("cost_events").insert({ studio_id: row.studio_id, kind: "relief", provider: "modal", units: Math.round(card), cost_eur: cost, meta: { lab: true, media, move, frames, gpu: GPU } });
+      const link = result && !(result instanceof Error) ? (await db.storage.from("media").createSignedUrl(path, 86_400)).data?.signedUrl : null;
+      console.log("gpu relief", JSON.stringify({ link, media, move, frames, origin: shot.origin, shift: shot.shift, seconds: Math.round(card), cost_eur: Math.round(cost * 1000) / 1000, result: result instanceof Error ? result.message : result }));
     });
     return Response.json({ ok: true, started: true }, { status: 202 });
   }

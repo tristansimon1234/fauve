@@ -52,6 +52,7 @@ import { usableFonts } from "@/lib/fonts";
 import { makeSceneSprite } from "./scene-sprite";
 import { copyCutoutInputs, ensureCutouts, overlayPhotoInputs, sceneCutoutInputs, stickerInputs } from "./cutout";
 import { ensureObjects, ensureSubjects, subjectInputs } from "./subjects";
+import { ensureReliefs, reliefInputs } from "./relief";
 import { ensureCleanCopies } from "@/lib/video/speech";
 import { loadTracks } from "./tracks";
 import { postStyle } from "@/lib/steal";
@@ -176,6 +177,8 @@ export async function loadMontageInputs(
   // A moving photo whose subject cuts out cleanly plays in relief (the same clean cut-out).
   const moving = depthPhotoIds(plan);
   const depth = moving.length ? await sceneCutoutInputs(studioId, moving).catch(() => ({})) : undefined;
+  // The same photos with their depth read on the card for their shots (relief.py), when it was.
+  const reliefs = moving.length ? await reliefInputs(studioId, plan).catch(() => ({})) : undefined;
   // Her subject cut out at every image, for the compositions that draw it (Subject).
   const subjects = wantsSubjects(plan) || wantsObjects(plan) ? await subjectInputs(studioId, plan).catch(() => ({})) : undefined;
   // Each photo's shape, from its reading.
@@ -230,6 +233,7 @@ export async function loadMontageInputs(
     copyCutouts,
     overlayPhotos,
     depth,
+    reliefs,
     subjects,
     photoAspects,
     tracks,
@@ -375,11 +379,16 @@ export async function renderPost(studioId: string, postId: string, options: { ed
   if (toCut.length) await ensureCutouts(studioId, toCut);
   // A composition that draws her subject over her shots (Subject): its passages cut out at every image, as many as
   // the step has time for before its render.
-  // The objects its compositions follow by name (a cup she lifts), on the rented card, at the same time.
-  await Promise.all([wantsSubjects(plan) ? ensureSubjects(studioId, postId, plan) : null, wantsObjects(plan) ? ensureObjects(studioId, postId, plan) : null]);
+  // The objects its compositions follow by name (a cup she lifts), on the rented card, at the same time, and its
+  // moving photos drawn in relief by their depth.
+  await Promise.all([
+    wantsSubjects(plan) ? ensureSubjects(studioId, postId, plan) : null,
+    wantsObjects(plan) ? ensureObjects(studioId, postId, plan) : null,
+    depthPhotoIds(plan).length ? ensureReliefs(studioId, postId, plan).catch((e: unknown) => console.warn("reliefs unavailable", e instanceof Error ? e.message : e)) : null,
+  ]);
   // She wants the sound cleaned, even where it was not noisy: the cleaned copies are made first.
   if (plan.finish?.sound === "clean") await ensureCleanCopies(studioId, planMediaIds(plan), plan.voice?.media_id);
-  const { clipIds, clipFiles, clips, clipUrls, photoIds, words, aspects, accent, logoUrl, logoOnDark, studioName, fonts, colors, customFonts, reelSignature: signature, voice, cutouts, sceneCutouts, copyCutouts, overlayPhotos, depth, subjects, photoAspects, tracks, facts } =
+  const { clipIds, clipFiles, clips, clipUrls, photoIds, words, aspects, accent, logoUrl, logoOnDark, studioName, fonts, colors, customFonts, reelSignature: signature, voice, cutouts, sceneCutouts, copyCutouts, overlayPhotos, depth, reliefs, subjects, photoAspects, tracks, facts } =
     await loadMontageInputs(studioId, plan, { postId });
   const motion = motionTemplateSchema.safeParse(plan.template);
 
@@ -435,6 +444,7 @@ export async function renderPost(studioId: string, postId: string, options: { ed
         ...(copyCutouts ? { copyCutouts } : {}),
         ...(overlayPhotos ? { overlayPhotos } : {}),
         ...(depth ? { depth } : {}),
+        ...(reliefs && Object.keys(reliefs).length ? { reliefs } : {}),
         ...(subjects && Object.keys(subjects).length ? { subjects } : {}),
         today: dayIn(),
         photoAspects,

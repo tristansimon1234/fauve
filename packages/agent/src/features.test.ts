@@ -22,7 +22,7 @@ import {
 } from "./speech.ts";
 import { mixFilter, mixGains } from "./mix.ts";
 import { fromEditorPlan, normalizeEditPlan } from "./editor.ts";
-import { depthPhotoIds } from "./depth.ts";
+import { depthPhotoIds, reliefFiles, reliefJobs, reliefOf, RELIEF_VERSION } from "./depth.ts";
 import { dayIn, LOOK_PRESETS, lookChoice, lookFromDesign, lookMatrix, lookStamp, planLook, reelLookSchema, withLook, type LookDesign } from "./looks.ts";
 import { clampLook, followedFilter, followedForEditor, followedFrom, followedLine, stolenStyleLines, type StolenLookReading } from "./steal.ts";
 import { editorLook } from "./editor.ts";
@@ -353,6 +353,66 @@ test("depth and looks: the render gets the cut-out of a moving photo, the effect
   assert.equal(props.look?.preset, "disposable");
   assert.equal(props.look?.matrix.length, 20);
   assert.equal(props.stamp, "'26 10 29");
+});
+
+test("relief: each moving photo shot gets a key of its own, and the Reel plays its video only for that very shot", () => {
+  const plan: EditPlan = editPlanSchema.parse({
+    format: "9:16",
+    duration: 6,
+    template: "libre",
+    segments: [
+      // A portrait photo of the frame's shape, pushed in: the frame's centre is the photo's.
+      { clip_id: "p1", in: 0, out: 3, zoom: "none", move: "in", photo: { source: { width: 1080, height: 1920 } } },
+      // A wide photo panned left: the room slides 1.3 % of the frame's width, a share of the much wider photo.
+      { clip_id: "p2", in: 0, out: 2, zoom: "none", move: "left", photo: { source: { width: 4000, height: 2000 } } },
+      { clip_id: "p3", in: 0, out: 1, zoom: "none", move: "none", photo: photoEdit },
+    ],
+    texts: [],
+    images: [],
+    transitions: "cut",
+    subtitles: false,
+    music: null,
+  });
+  const jobs = reliefJobs(plan);
+  assert.deepEqual(
+    jobs.map((j) => [j.media_id, j.move, j.frames]),
+    [
+      ["p1", "in", 90],
+      ["p2", "left", 60],
+    ],
+  );
+  assert.deepEqual(jobs[0]?.origin, { x: 0.5, y: 0.5 });
+  assert.equal(jobs[0]?.shift, 0);
+  // The photo 3840 px wide on screen (1920 high): 1.3 % of 1080 is 0.0037 of it, to the right for a pan left.
+  assert.equal(jobs[1]?.shift, 0.0037);
+  assert.match(jobs[0]!.key, new RegExp(`-v${RELIEF_VERSION}$`));
+  // No relief in a collage, with the relief turned off, nor twice for the same shot.
+  assert.deepEqual(reliefJobs({ ...plan, template: "collage" }), []);
+  assert.deepEqual(reliefJobs({ ...plan, finish: { relief: "off" } }), []);
+  assert.equal(reliefJobs({ ...plan, segments: [plan.segments[0]!, plan.segments[0]!] }).length, 1);
+  // A longer shot is another shot: its key changes.
+  assert.notEqual(reliefOf(plan.segments[0]!, 120)?.key, jobs[0]?.key);
+
+  const video = { src: "https://x/relief.mp4", frames: 90 };
+  const inputs = { template: "libre" as const, clipUrls: { p1: "https://x/p1.jpg", p2: "https://x/p2.jpg", p3: "https://x/p3.jpg" }, photoIds: ["p1", "p2", "p3"], brand: { name: "Studio" } };
+  const props = buildReelProps(plan, { ...inputs, reliefs: { [`p1#${jobs[0]!.key}`]: video } });
+  const [first, second] = props.segments;
+  assert.deepEqual(first?.type === "image" && first.relief, video);
+  assert.equal(second?.type === "image" && second.relief, undefined);
+  // The segment is exactly as long as the video made for it.
+  assert.equal(first?.durationInFrames, video.frames);
+  // A video made for a shot of another length is never played.
+  const stale = buildReelProps(plan, { ...inputs, reliefs: { [`p1#${jobs[0]!.key}`]: { ...video, frames: 80 } } });
+  assert.equal(stale.segments[0]?.type === "image" && stale.segments[0].relief, undefined);
+});
+
+test("relief: the videos a photo keeps go with it", () => {
+  assert.deepEqual(
+    reliefFiles({ a: { path: "s/reliefs/p-1.mp4", frames: 90, w: 1080, h: 1440, at: "2026-11-03T12:00:00Z" }, b: { failed_at: "2026-11-03T12:00:00Z", error: "no card" } }),
+    ["s/reliefs/p-1.mp4"],
+  );
+  assert.deepEqual(reliefFiles(null), []);
+  assert.deepEqual(reliefFiles({ broken: 1 }), []);
 });
 
 test("looks: the date a look prints, in its camera's format", () => {

@@ -149,6 +149,8 @@ export type ReelProps = {
         cutout?: { src: string; box: Box };
         /** A moving photo in relief: its subject cut out (framed like the photo), moving a little more than the room behind it. */
         depth?: { src: string; box: Box };
+        /** A moving photo whose depth the card read (relief.py): the video of every pixel moved by its depth, drawn in its place. */
+        relief?: { src: string; frames: number };
       }
     /** composed: an engine screen inside a composition that draws the whole picture, drawn only in its fallback. */
     | { type: "scene"; scene: Scene; startAt: number; durationInFrames: number; under?: ReelUnder; composed?: true }

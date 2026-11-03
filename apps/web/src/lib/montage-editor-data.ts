@@ -62,8 +62,9 @@ export async function loadEditorData(studioId: string, planId: string, extraMedi
       ...(inputs.sceneCutouts ? { sceneCutouts: inputs.sceneCutouts } : {}),
       ...(inputs.copyCutouts ? { copyCutouts: inputs.copyCutouts } : {}),
       ...(Object.keys(overlayPhotos).length ? { overlayPhotos } : {}),
-      // A moving photo in relief, as in the video.
+      // A moving photo in relief, as in the video (its depth video when the card drew it for this shot).
       ...(inputs.depth ? { depth: inputs.depth } : {}),
+      ...(inputs.reliefs && Object.keys(inputs.reliefs).length ? { reliefs: inputs.reliefs } : {}),
       ...(inputs.subjects && Object.keys(inputs.subjects).length ? { subjects: inputs.subjects } : {}),
       today: dayIn(),
       photoAspects: inputs.photoAspects,

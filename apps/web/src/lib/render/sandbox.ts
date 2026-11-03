@@ -389,7 +389,8 @@ async function localMedia(sandbox: Sandbox, id: string, props: ReelProps, option
     const known = files.get(src);
     if (known) return known;
     // A subject's cut-out (a transparent WebM, matte.py) is fetched as is: normalizing it would drop its transparency.
-    const ext = video ? "mp4" : (/\.(png|webp|jpe?g|webm)(?:\?|$)/i.exec(src)?.[1]?.toLowerCase() ?? "jpg");
+    // So is a photo's relief (an MP4 made at 30 images a second, as long as its shot, relief.py): re-encoding it would only lose detail.
+    const ext = video ? "mp4" : (/\.(png|webp|jpe?g|webm|mp4)(?:\?|$)/i.exec(src)?.[1]?.toLowerCase() ?? "jpg");
     const file = `jobs/${id}/m${files.size}.${ext}`;
     files.set(src, `/public/${file}`);
     jobs.set(src, bash(sandbox, video ? NORMALIZE : FETCH, [`${REMOTION}/build/public/${file}`, src]));
@@ -402,7 +403,13 @@ async function localMedia(sandbox: Sandbox, id: string, props: ReelProps, option
   const photos = (list: ScenePhoto[]) => list.map((p) => ({ ...p, src: local(p.src, false), ...(p.cutout ? { cutout: local(p.cutout, false) } : {}) }));
   const segments = props.segments.map((segment, index) => {
     if (segment.type === "image" && segment.cutout) return { ...segment, src: local(segment.src, false), cutout: { ...segment.cutout, src: local(segment.cutout.src, false) } };
-    if (segment.type === "image" && segment.depth) return { ...segment, src: local(segment.src, false), depth: { ...segment.depth, src: local(segment.depth.src, false) } };
+    if (segment.type === "image" && (segment.depth || segment.relief))
+      return {
+        ...segment,
+        src: local(segment.src, false),
+        ...(segment.depth ? { depth: { ...segment.depth, src: local(segment.depth.src, false) } } : {}),
+        ...(segment.relief ? { relief: { ...segment.relief, src: local(segment.relief.src, false) } } : {}),
+      };
     if (segment.type === "clip" && options.smooth && /^https?:/.test(segment.src) && (segment.ramp ?? [{ speed: segment.speed ?? 1 }]).some((p) => p.speed < 0.99)) {
       const passages = segment.ramp ?? [{ at: 0, length: segment.durationInFrames, startFrom: segment.startFrom, speed: segment.speed ?? 1 }];
       const end = Math.max(...passages.map((p) => p.startFrom + Math.ceil(p.length * p.speed)));

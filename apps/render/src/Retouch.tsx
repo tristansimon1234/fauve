@@ -1,5 +1,5 @@
 import type { CSSProperties } from "react";
-import { AbsoluteFill, Img, useCurrentFrame, useVideoConfig } from "remotion";
+import { AbsoluteFill, Img, OffthreadVideo, useCurrentFrame, useVideoConfig } from "remotion";
 import type { Adjust, Box, ClipBlur, PhotoEdit } from "./types";
 
 // Retouch and blur, as decided by Gemini (or by hand) and computed by the web
@@ -117,16 +117,21 @@ function BlurBox({ box, shape, size }: { box: Box; shape: "ellipse" | "rect"; si
  * A photo with its retouch and blurred zones, covering the frame (or the box it is drawn in,
  * `frame`: a collage's print); `grade`: the Reel's light grade, before its own retouch.
  */
-export function Photo({ src, edit, grade, frame }: { src: string; edit?: PhotoEdit; grade?: string; frame?: { width: number; height: number } }) {
+/**
+ * A photo covering the frame, framed and retouched as its edit says. `moving`: a video of the photo's own frame drawn in
+ * its place (a photo in relief, relief.py), with the same framing and retouch.
+ */
+export function Photo({ src, edit, grade, frame, moving }: { src: string; edit?: PhotoEdit; grade?: string; frame?: { width: number; height: number }; moving?: string }) {
   const video = useVideoConfig();
   const { width, height } = frame ?? video;
   if (!edit) return <Img src={src} style={{ width: "100%", height: "100%", objectFit: "cover", filter: grade }} />;
   const layout = coverLayout({ width, height }, edit.source, edit.adjust);
+  const style: CSSProperties = { width: "100%", height: "100%", display: "block", filter: [grade, cssFilter(edit.adjust)].filter(Boolean).join(" ") || undefined };
   return (
     <AbsoluteFill style={{ overflow: "hidden" }}>
       <AbsoluteFill style={{ transform: edit.adjust?.straighten ? `rotate(${edit.adjust.straighten}deg)` : undefined }}>
         <div style={{ position: "absolute", left: layout.left, top: layout.top, width: layout.width, height: layout.height }}>
-          <Img src={src} style={{ width: "100%", height: "100%", display: "block", filter: [grade, cssFilter(edit.adjust)].filter(Boolean).join(" ") || undefined }} />
+          {moving ? <OffthreadVideo src={moving} muted style={{ ...style, objectFit: "fill" }} /> : <Img src={src} style={style} />}
           {(edit.blur ?? []).map((region, i) => (
             <BlurBox key={i} box={region} shape={region.shape} size={layout} />
           ))}

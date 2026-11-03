@@ -17,7 +17,7 @@ import type { CaptionCard } from "./captions";
 import { CopyLayer } from "./Copy";
 import { Overlays } from "./Overlays";
 import { COLLAGE_OVERLAP, COLLAGE_SERIF, CollageBackdrop, CollageBand, CollageCaption, CollageCard, CollageEndCard, CollageHook, CollageMessage, Grain, printSize, stickerTop, type Sticker } from "./Collage";
-import { DEPTH_MOVES, DepthPhoto } from "./Depth";
+import { DEPTH_MOVES, DepthPhoto, ReliefPhoto } from "./Depth";
 import { gradesFootage, LookDefs, LookOverlay, lookFilter } from "./Looks";
 import { Fit } from "./Fit";
 import { loadCustomFonts, loadFonts } from "./fonts";
@@ -177,6 +177,9 @@ export function Reel(props: ReelProps) {
               ) : (
                 <Shot segment={segment} theme={theme} />
               )
+            ) : segment.relief && segment.relief.frames === segment.durationInFrames && segment.edit && !segment.edit.blur?.length && segment.move && DEPTH_MOVES.includes(segment.move) ? (
+              // A moving photo whose depth the card read: every pixel moves by its depth, the room's own move on top.
+              <ReliefPhoto src={segment.src} relief={segment.relief.src} edit={segment.edit} grade={theme.grade} move={segment.move} durationInFrames={segment.durationInFrames} theme={theme} />
             ) : segment.depth && segment.edit && !segment.edit.blur?.length && segment.move && DEPTH_MOVES.includes(segment.move) ? (
               // A moving photo whose subject cuts out cleanly: in relief, the subject ahead of the room.
               <DepthPhoto src={segment.src} cutout={segment.depth} edit={segment.edit} grade={theme.grade} move={segment.move} durationInFrames={segment.durationInFrames} theme={theme} />
