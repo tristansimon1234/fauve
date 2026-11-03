@@ -42,12 +42,12 @@ type Row = { id: string; kind: string; storage_path: string | null; subjects: un
 const kept = (row: Row | undefined): MediaSubjects => mediaSubjectsSchema.safeParse(row?.subjects ?? {}).data ?? {};
 
 /**
- * On the card: its model loaded and its clip fetched (7 s and 2 s measured), then a second of video (its 30 images
- * read, 16 s, and their edge made, 2.4 s, on an A10G). The card gets its start, this, and twice the work, never the
- * whole step: when it fails, the cut-out sandbox still has time for the passages.
+ * On the card: its model loaded and its clip fetched (5 s and 1 s measured), then a second of video (its 30 images
+ * read, 12.3 s, and their edge made, 2.3 s, on an A10G in half precision). The card gets its start, this, and twice
+ * the work, never the whole step: when it fails, the cut-out sandbox still has time for the passages.
  */
 const GPU_LOAD_MS = 30_000;
-const GPU_WORK_PER_SECOND = 20;
+const GPU_WORK_PER_SECOND = 16;
 
 /**
  * Cuts out the passages this plan's compositions draw her on and that have no cut-out yet, as many as the step has
