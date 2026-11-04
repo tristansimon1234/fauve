@@ -78,8 +78,11 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
     return best ? best.lines : [text];
   };
 
-  // 1. Her shots, full frame, calm, cut on the beat (the last one runs on under the paper).
-  const film = frame < PAPER ? h(Footage, { shot: cur, style: box }) : null;
+  // 1. Her shots, full frame, calm, cut on the beat (the last one runs on under the paper); a photo that opens the Reel
+  // slowly pushed in, so its first image moves (the others stay still, as a composition lays them).
+  const first = shots[0];
+  const push = cur === 0 && first && first.kind === "photo" ? 1 + 0.06 * interpolate(frame, [0, Math.max(1, Math.min(first.durationInFrames, PAPER))], [0, 1], clamp) : 1;
+  const film = frame < PAPER ? h(Footage, { shot: cur, style: { ...box, ...(push > 1 ? { transform: "scale(" + push.toFixed(4) + ")" } : {}) } }) : null;
 
   // 2. The card: her title pressed into the paper at the cut, as big as the card holds (the original's single word
   // fills two thirds of its width), a line in spaced capitals under it, justified to the title's width; the ink flows
@@ -109,18 +112,24 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
         }),
         r < lines.length - 1 ? " " : null));
     let q = 0;
-    const lineLetters = small
+    const lineLetters = small && !fast
       ? Array.from(small.toUpperCase()).map((c, i) =>
           /\s/.test(c)
             ? h("span", { key: "s" + i, style: { width: "0.4em", flex: "0 0 auto" } }, " ")
             : h("span", { key: "c" + i, style: { flex: "0 0 auto" } }, letter(c, "l" + i, ink(q++, lineAt, lineEach, lineGap), lineSize)))
       : null;
-    return h(FitText, { style: { position: "absolute", left: 140, top: fast ? 680 : 620, width: width - 280, height: fast ? 560 : 680 } },
+    const block = h(FitText, { style: { position: "absolute", left: 140, top: fast ? 600 : 620, width: width - 280, height: fast ? 520 : 680 } }, (scale) =>
       h("div", { style: { display: "inline-flex", flexDirection: "column", alignItems: "stretch", fontKerning: "none", fontVariantLigatures: "none" } },
         h("div", { style: { fontFamily: display, fontWeight: 700, fontSynthesis: "none", fontSize: size, lineHeight: 1.02, letterSpacing: "-0.01em", textAlign: "center", color: RELIEF } }, titleRows),
-        small
-          ? h("div", { "data-fauve-accent": "", style: { display: "flex", justifyContent: justify ? "space-between" : "center", marginTop: Math.round(size * 0.14), fontFamily: body, fontWeight: 700, fontSynthesis: "none", fontSize: lineSize, lineHeight: 1.1, letterSpacing: justify ? 0 : "0.28em", whiteSpace: "nowrap", color: RELIEF } }, lineLetters)
+        // The line keeps a size that reads when a long title makes the card shrink.
+        lineLetters
+          ? h("div", { "data-fauve-accent": "", style: { display: "flex", justifyContent: justify ? "space-between" : "center", marginTop: Math.round(size * 0.14), fontFamily: body, fontWeight: 700, fontSynthesis: "none", fontSize: Math.round(lineSize / Math.max(0.65, scale)), lineHeight: 1.1, letterSpacing: justify ? 0 : "0.28em", whiteSpace: "nowrap", color: RELIEF } }, lineLetters)
           : null));
+    if (!fast || !small) return block;
+    // The ending card's line (an address, a date: as long as it needs) under its title, pressed, then inked as a whole.
+    const p = ink(0, lineAt, 10, 1);
+    return h(React.Fragment, null, block,
+      h(FitText, { style: { position: "absolute", left: 140, top: 1150, width: width - 280, height: 170 }, innerStyle: { fontFamily: body, fontWeight: 700, fontSynthesis: "none", fontSize: 52, lineHeight: 1.2, letterSpacing: "0.12em", textTransform: "uppercase", textWrap: "balance", color: interpolateColors(p, [0, 1], [RELIEF, INK]), filter: "drop-shadow(0 -1px 0.8px rgba(70,30,5,0.45)) drop-shadow(0 1px 0.8px rgba(255,251,243,0.85))" } }, small));
   };
   const onPaper = frame >= PAPER && frame < endAt;
   const titled = onPaper && (hook || line)
@@ -134,14 +143,12 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   // 3. Its ending card: the next card of the same paper, its title pressed and inked at once, its line under it.
   const ending = end && frame >= endAt ? card(String(end.title || ""), end.subtitle ? String(end.subtitle) : "", endAt, true) : null;
 
-  // The paper: its colour and grain, and the wavy fibres of a handmade sheet in relief, lit from the top left.
+  // The paper: its colour and grain, and the wavy fibres of a handmade sheet in relief, lit from the top left (an
+  // image drawn once and laid in overlay, so a long card costs nothing more).
+  const FIBRES = "<svg xmlns='http://www.w3.org/2000/svg' width='" + width + "' height='" + height + "'><filter id='f' x='0' y='0' width='100%' height='100%'><feTurbulence type='turbulence' baseFrequency='0.012 0.022' numOctaves='3' seed='4'/><feDiffuseLighting lighting-color='#ffffff' surfaceScale='3' diffuseConstant='1'><feDistantLight azimuth='235' elevation='28'/></feDiffuseLighting></filter><rect width='100%' height='100%' filter='url(#f)'/></svg>";
   const paper = frame >= PAPER
     ? h(Paper, { color: PAPER_COLOR, grain: 0.3, fibers: false, shade: 0.18 },
-        false && h("svg", { width: "100%", height: "100%", style: { position: "absolute", inset: 0, mixBlendMode: "overlay", opacity: 0.5 }, "aria-hidden": "true" },
-          h("filter", { id: "gaufre-sheet", x: "0", y: "0", width: "100%", height: "100%" },
-            h("feTurbulence", { type: "turbulence", baseFrequency: "0.012 0.022", numOctaves: 3, seed: 4, result: "fibres" }),
-            h("feDiffuseLighting", { in: "fibres", lightingColor: "#ffffff", surfaceScale: 3, diffuseConstant: 1 }, h("feDistantLight", { azimuth: 235, elevation: 28 }))),
-          h("rect", { width: "100%", height: "100%", filter: "url(#gaufre-sheet)" })))
+        h("div", { "aria-hidden": "true", style: { position: "absolute", inset: 0, backgroundImage: "url(\"data:image/svg+xml;charset=utf-8," + encodeURIComponent(FIBRES) + "\")", backgroundSize: "100% 100%", mixBlendMode: "overlay", opacity: 0.5 } }))
     : null;
   return h(AbsoluteFill, { style: { backgroundColor: "#000000" } }, film, paper, titled, ending, extra);
 }`;
@@ -161,7 +168,7 @@ export const gaufre: MontageSkill = {
   timeline(n, { end }) {
     // Calm shots of two beats, the last one held three before the paper; a single shot holds four (the original's
     // street, before its paper, holds about five).
-    const count = Math.max(1, n);
+    const count = Math.max(1, Math.min(6, n));
     const lens = count === 1 ? [4] : [...Array.from({ length: count - 1 }, () => 2), 3];
     const shown = lens.reduce((a, b) => a + b, 0);
     // The last shot's segment runs on under the paper (its cut to the paper is on a beat), and under the ending card.

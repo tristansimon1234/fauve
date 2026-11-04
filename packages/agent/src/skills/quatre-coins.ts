@@ -38,9 +38,9 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const others = reelTexts.filter((t) => t !== opening && t !== address && t !== name && t !== place);
   const endAt = end ? end.from : durationInFrames + 1;
   const on = (t, until) => t && frame >= t.from && frame < Math.min(t.to, until);
-  // The original's creamy white, a light shade only, so it reads on a bright wall.
+  // The original's creamy white with a soft shade, and a tight dark edge so it reads on a bright wall.
   const cream = "#EFE7D4";
-  const shade = "0 1px 2px rgba(0,0,0,0.32), 0 2px 18px rgba(0,0,0,0.22)";
+  const shade = "0 1px 2px rgba(0,0,0,0.5), 0 0 1px rgba(0,0,0,0.35), 0 2px 18px rgba(0,0,0,0.22)";
   const word = { fontFamily: display, fontWeight: 600, fontSize: 84, lineHeight: 1.04, letterSpacing: "-0.035em", color: cream, whiteSpace: "nowrap", textShadow: shade };
   const lower = { textTransform: "lowercase" };
 

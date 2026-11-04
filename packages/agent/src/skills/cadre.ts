@@ -10,7 +10,7 @@ import { beatSpans, type MontageSkill } from "../skills.ts";
 
 const BPM = 120;
 /** The window phase lasts about this many beats, whatever her number of pictures (on thirds of a beat: 5 images). */
-const WINDOW_BEATS = 11;
+const WINDOW_BEATS = 10;
 /** The last shot, full frame and in colour: this many beats, and this many more with an ending card (its last 1,6 s). */
 const FINAL_BEATS = 3;
 const END_BEATS = 3.5;
@@ -30,8 +30,9 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const right = reelTexts.find((t) => t.role === "caption");
   const others = reelTexts.filter((t) => t !== left && t !== right);
   const endAt = end ? end.from : durationInFrames + 1;
-  const shade = "0 1px 2px rgba(0,0,0,0.42), 0 2px 12px rgba(0,0,0,0.3)";
-  const label = { fontFamily: body, fontWeight: 500, fontSize: 52, lineHeight: 1.1, letterSpacing: "0.01em", textTransform: "uppercase", color: "#ffffff", whiteSpace: "nowrap", textShadow: shade };
+  // White, with a tight dark edge so it reads over a bright picture in the window too.
+  const shade = "0 1px 2px rgba(0,0,0,0.5), 0 0 1px rgba(0,0,0,0.35), 0 2px 12px rgba(0,0,0,0.3)";
+  const label = { fontFamily: body, fontWeight: 500, fontSize: 48, lineHeight: 1.1, letterSpacing: "0.01em", textTransform: "uppercase", color: "#ffffff", whiteSpace: "nowrap", textShadow: shade };
 
   // 1. The window: centred, upright (2:3), a little larger at each cut, from 15 % of the width to 95 %; her picture in it
   // in colour, at its own moment. Behind it, the wide shot in black and white, still (its first image, held).
@@ -53,9 +54,10 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
           h(Footage, { shot: cur, style: { left: 0, top: 0, width: b.w, height: b.h } })));
 
   // 3. Its two labels, on either side of the window at mid-height, over it as it grows; clear of the apps' buttons
-  // (above the middle), with room for a font whose letters reach far above and below their line.
+  // (above the middle), with room for a font whose letters reach far above and below their line; a label too long for
+  // its line (a wide font) goes on two rather than shrinking.
   const tag = (t, x) => t && frame >= t.from && frame < Math.min(t.to, endAt)
-    ? h(FitText, { key: x, style: { position: "absolute", left: x, top: 866, width: 480, height: 80 }, innerStyle: label }, t.text)
+    ? h(FitText, { key: x, style: { position: "absolute", left: x, top: 816, width: 480, height: 130 }, innerStyle: { ...label, whiteSpace: "normal", textWrap: "balance" } }, t.text)
     : null;
   const labels = [tag(left, 40), tag(right, width - 520)];
 
@@ -86,14 +88,14 @@ export const cadre: MontageSkill = {
   how: "Un plan large de son lieu en noir et blanc, figé, remplit l'écran ; au centre, un cadre droit sans bord s'ouvre dès la première image sur ses plans en couleur, qui changent sur le temps ; à chaque coupe le cadre grandit un peu, jusqu'à presque tout l'écran ; puis le plan large lui-même passe en couleur et en plein écran pour finir. Deux petites étiquettes en capitales restent de part et d'autre du cadre, à mi-hauteur, tout le Reel.",
   end: true,
   texts: [
-    { slot: "gauche", role: "hook", want: "l'étiquette de gauche : ce qui se passe, 1 à 3 mots en capitales (une forme comme « travaux en cours », « nouvelle carte », « en cuisine »)", max: 14, required: true },
-    { slot: "droite", role: "caption", want: "l'étiquette de droite : son nom, ou le nom du lieu", max: 14, required: true },
+    { slot: "gauche", role: "hook", want: "l'étiquette de gauche : ce qui se passe, 1 à 3 mots en capitales (une forme comme « travaux en cours », « nouvelle carte », « en cuisine »)", max: 16, required: true },
+    { slot: "droite", role: "caption", want: "l'étiquette de droite : son nom, ou le nom du lieu", max: 16, required: true },
   ],
   timeline(n, { end }) {
     // Her pictures in the window, each the same length on thirds of a beat (two thirds when she has many, as the
-    // original, up to two beats when she has few), then the wide shot, full frame.
+    // original, up to four thirds when she has few: it stays a quick succession), then the wide shot, full frame.
     const m = Math.max(1, n - 1);
-    const each = Math.min(2, Math.max(2 / 3, Math.round((WINDOW_BEATS / m) * 3) / 3));
+    const each = Math.min(4 / 3, Math.max(2 / 3, Math.round((WINDOW_BEATS / m) * 3) / 3));
     const final = FINAL_BEATS + (end ? END_BEATS : 0);
     const spans = beatSpans(BPM, [...Array.from({ length: m }, () => each), final]);
     const duration = spans.at(-1)!.end;
