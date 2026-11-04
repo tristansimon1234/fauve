@@ -294,6 +294,9 @@ export const frappe: MontageSkill = {
     const frame = 1 / 30;
     return {
       duration,
+      // Its music plays on under the black and stops dead four images before the end, as the original's (13,22 s of
+      // 13,35, measured on its sound); no typing sound: its original has none.
+      music: { end: { at: round(duration - 4 / 30), fade: 0.02 } },
       shots: spans.map((s, i) => ({ ...s, want: wants[i]! })),
       // The name types in the sky shot and goes with the cut on her sign.
       texts: { lieu: { from: round(sky.start + TYPE_FROM * beat), to: reveal.start } },

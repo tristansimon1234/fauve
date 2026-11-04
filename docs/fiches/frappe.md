@@ -3,7 +3,7 @@
 > Fiche d'un original : ce qu'on y voit, mesuré image par image, et les effets qu'on veut savoir refaire sur les vidéos de n'importe quel commerce (la méthode : `docs/modeles.md`, « La chaîne des modèles »). Les temps sont en secondes de l'original ; « temps » compte les temps de sa musique depuis son premier temps.
 
 **L'original** : `house/originals/frappe.mp4`, 13,35 s, 720 × 406, 30 i/s, **horizontal 16:9** montré tel quel (des bandes noires dans un fil vertical), avec son.
-**Sa musique** : un beat lo-fi hip-hop, **82,4 BPM** (un temps toutes les 0,727 s, le premier à 0 s ; la pulsation mesurée, 164,75, en est la croche ; Gemini disait 95 : faux). Caisse claire sur chaque temps pair (1,42 · 2,89 · 4,31 · 5,80 · 7,24 · 8,71 · 10,13 · 11,56 s), un roulement de 11,56 à 12,48 s.
+**Sa musique** : un beat lo-fi hip-hop, **82,4 BPM** (un temps toutes les 0,727 s, le premier à 0 s ; la pulsation mesurée, 164,75, en est la croche ; Gemini disait 95 : faux). Caisse claire sur chaque temps pair (1,42 · 2,89 · 4,31 · 5,80 · 7,24 · 8,71 · 10,13 · 11,56 s), un roulement de 11,56 à 12,48 s. Elle continue sous le noir et s'arrête net à 13,22 s, 4 images avant la fin : refait depuis la v4 (forme de la musique, `docs/son.md`). Aucun bruit de frappe sous le nom tapé (les transitoires de 5,3 à 7,3 s suivent le charleston, pas les lettres) : le modèle n'en ajoute pas.
 **Mesuré avec** : `scripts/fiche/measure.py` (coupes, clignotements, tempo), des planches à 30 i/s de chaque passage, et la lecture de Gemini (`house/breakdowns/frappe.json`).
 
 ## Déroulé

@@ -1639,6 +1639,9 @@ test("« Lieu tapé » cuts where its original does, on its own music (82,5 BPM)
   assert.ok(!/ffcc00|strokeDasharray/i.test(frappe.code));
   // Its quick zoom lands on the closer shot's first image (the original's images 46 to 51 straddle it).
   assert.equal(line.marks.zoom, Math.round(line.shots[1]!.start * 30));
+  // Its music stops dead four images before the end, as the original's; it adds no sound its original has not.
+  assert.ok(Math.abs(line.music!.end!.at - (line.duration - 4 / 30)) < 0.01);
+  assert.equal(line.sounds, undefined);
   // A piece comes out at its own light, the rest dimmed: never pushed into white (a lit neon burnt into blots).
   assert.ok(!/brightness\(1\.[6-9]/.test(frappe.code));
   assert.ok(/background: "#000000", opacity: dimK/.test(frappe.code));
