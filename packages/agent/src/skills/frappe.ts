@@ -162,18 +162,25 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const ny = Math.round(bh * (wide ? 0.343 : 0.3));
   const nw = Math.round(bw * (wide ? 0.57 : 0.76));
   const nh = Math.round(nameSize * 1.3);
+  // Where her name types: the largest clear area of HER sky shot (its sky, else a calm wall), the name's shape with room
+  // above it for her logo, inside the Reel's safe zone; the original's place when there is none (on its bench, the
+  // original's place had laid « LE PETIT PONT » over Notre-Dame's towers instead of the sky beside them).
+  const textW = Math.min(nw, Math.round(chars.length * nameSize * 0.68));
+  const logoH = brand.logoUrl ? Math.round(nameSize * 1.25) : 0;
+  const spot = ClearBox(shots[2], frame, laid, { aspect: textW / (nh + logoH), min: { w: Math.round(textW * 0.6), h: Math.round((nh + logoH) * 0.6) }, max: { w: textW, h: nh + logoH }, origin: { x: 0, y: by }, fallback: { x: nx, y: ny - logoH, w: textW, h: nh + logoH } });
+  const fit = spot.h / (nh + logoH);
+  const at = { x: Math.round(spot.x), y: Math.round(spot.y + logoH * fit), w: Math.round(spot.w), h: Math.round(nh * fit) };
   const showing = hook && frame >= TYPE_AT && frame < Math.min(REVEAL_AT, BLACK_AT);
   const typed = showing
-    ? h(FitText, { style: { position: "absolute", left: nx, top: ny, width: nw, height: nh }, innerStyle: { ...nameStyle, justifyContent: "flex-start", textAlign: "left" } },
+    ? h(FitText, { style: { position: "absolute", left: at.x, top: at.y, width: at.w, height: at.h }, innerStyle: { ...nameStyle, fontSize: Math.round(nameSize * fit), justifyContent: "flex-start", textAlign: "left" } },
         h("span", null, chars.map((c, i) => h("span", { key: i, style: { opacity: frame >= shows[i] ? 1 : 0 } }, c))))
     : null;
 
   // 4. Her logo wipes in above her name, then the cut lands on her sign. Without a logo, nothing is drawn: the
   // original's arrow is its own brand's mark, never hers.
   const strokeK = interpolate(frame, [STROKE_AT, Math.max(STROKE_AT + 1, REVEAL_AT - 1)], [0, 1], { ...clamp, easing: Easing.out(Easing.cubic) });
-  const textW = Math.min(nw, Math.round(chars.length * nameSize * 0.68));
   const logo = showing && frame >= STROKE_AT && brand.logoUrl
-    ? h("div", { style: { position: "absolute", left: nx, top: Math.round(ny - nameSize * 1.25), width: textW, height: Math.round(nameSize * 1.1), clipPath: "inset(0 " + Math.round((1 - strokeK) * 100) + "% 0 0)" } },
+    ? h("div", { style: { position: "absolute", left: at.x, top: Math.round(at.y - logoH * fit), width: at.w, height: Math.round(nameSize * 1.1 * fit), clipPath: "inset(0 " + Math.round((1 - strokeK) * 100) + "% 0 0)" } },
         h(Img, { src: brand.logoUrl, style: { width: "100%", height: "100%", objectFit: "contain", objectPosition: "left center" } }))
     : null;
 

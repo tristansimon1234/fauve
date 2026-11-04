@@ -43,7 +43,7 @@
 ### 4. Son nom tapé dans le ciel
 - **Mesuré** : « IN-N-OUT » tapé caractère par caractère (les traits d'union aussi), de 5,47 à 7,17 s : un caractère toutes les 6 images environ, avec deux pauses plus longues (11 images avant le second trait d'union, 10 avant la dernière lettre) : une frappe à la main, pas une machine. Capitales géométriques extra-grasses, rouge orangé #FF2B00, un liseré clair fin et une ombre douce ; le bord gauche à 38,8 % de la largeur, le haut à 34,3 % de la hauteur, hauteur des capitales 5,8 % de l'image ; posé dans le ciel, là où l'enseigne sera au plan suivant.
 - **Sur quoi** : un plan avec du ciel ou un mur dégagé.
-- **Outil** : code du modèle (comme TypeOn) ; le rythme de frappe avec ses deux pauses.
+- **Outil** : code du modèle (comme TypeOn) ; le rythme de frappe avec ses deux pauses. Depuis la v4, posé dans la zone dégagée de son plan, son ciel d'abord (`ClearBox`, `docs/detourage.md`), la place de l'original en secours : à la place fixe de l'original, « LE PETIT PONT » tombait sur les tours de Notre-Dame.
 
 ### 5. Son logo qui se dessine, et le raccord sur son enseigne
 - **Mesuré** : de 7,40 à 7,87 s, une flèche jaune #FFCC00 se dessine trait par trait autour du nom (de sous le nom, vers le haut, puis par-dessus vers la droite) ; la coupe tombe sur l'enseigne réelle au même endroit de l'image.
