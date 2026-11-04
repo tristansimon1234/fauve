@@ -1,5 +1,5 @@
 import "server-only";
-import { houseModel, JOB_STALE_MINUTES, type FeedbackKind } from "@fauve/agent";
+import { HOUSE_MODELS, houseOriginalPath, JOB_STALE_MINUTES, type FeedbackKind } from "@fauve/agent";
 import { MONTAGE_SKILLS } from "@fauve/agent/skills";
 import type { SkillReviewStatus } from "@/lib/skill-reviews";
 import { brakeSettings, type BrakeSettings } from "@/lib/brake-settings";
@@ -29,18 +29,21 @@ export type AdminView = {
   montages: { id: string; studio: string; stage: string; since: string }[];
   signups: { studio: string; firstName: string | null; phone: string; at: string; step: string; subscription: string | null }[];
   /**
-   * Each montage skill of the library (docs/modeles.md): Tristan's review of its version (« pending » before it) and
-   * its bench Reel on free rushes (a signed link for an hour), those to look at first.
+   * Each of Edith's models (docs/modeles.md): the Reel it was written on (its video, signed for an hour, and its link),
+   * and when it is coded as a montage skill, Tristan's review of its version (« pending » before it) and its bench Reel on
+   * free rushes; those to look at first.
    */
   skills: {
     key: string;
-    version: number;
+    /** Its skill's version; null: not coded yet (the chain makes it). */
+    version: number | null;
     name: string;
     how: string;
-    status: SkillReviewStatus | "pending";
+    status: SkillReviewStatus | "pending" | "uncoded";
     note: string | null;
     reviewedAt: string | null;
     bench: { url: string; seconds: number | null; costEur: number | null; labCase: string | null; at: string } | null;
+    original: { url: string | null; link: string | null };
   }[];
   /** What people said of Edith and the app, the newest first: those not done yet. */
   feedback: { id: string; studio: string; kind: FeedbackKind; words: string; at: string; status: "new" | "seen"; source: string; byEdith: boolean }[];
@@ -122,40 +125,42 @@ export async function adminView(): Promise<AdminView> {
   };
 }
 
-const REVIEW_ORDER: Record<SkillReviewStatus | "pending", number> = { pending: 0, revise: 1, refused: 2, approved: 3 };
+const REVIEW_ORDER: Record<AdminView["skills"][number]["status"], number> = { pending: 0, revise: 1, refused: 2, approved: 3, uncoded: 4 };
 
-/** Each skill of the library, with its review and its bench Reel: the ones waiting for Tristan first. */
+/** Each of Edith's models, with its original, its review and its bench Reel: the ones waiting for Tristan first. */
 async function skillsView(): Promise<AdminView["skills"]> {
   const db = supabaseAdmin();
-  const [reviews, benches] = await Promise.all([
+  const [reviews, benches, links] = await Promise.all([
     db.from("skill_reviews").select("key, version, status, note, reviewed_at"),
     db.from("skill_benches").select("key, version, path, seconds, cost_eur, lab_case, created_at"),
+    db.from("house_originals").select("key, link"),
   ]);
   const at = (rows: { key: unknown; version: unknown }[] | null) => new Map((rows ?? []).map((r) => [`${r.key as string}@${r.version as number}`, r]));
   const reviewed = at(reviews.data);
   const benched = at(benches.data);
-  const paths = (benches.data ?? []).map((b) => b.path as string);
+  const linkOf = new Map((links.data ?? []).map((l) => [l.key as string, (l.link as string | null) ?? null]));
+  const paths = [...(benches.data ?? []).map((b) => b.path as string), ...HOUSE_MODELS.map((m) => houseOriginalPath(m.key))];
   const signed = paths.length ? ((await db.storage.from("media").createSignedUrls(paths, 3600)).data ?? []) : [];
-  const url = new Map(signed.flatMap((s) => (s.path && s.signedUrl ? [[s.path, s.signedUrl] as const] : [])));
-  return Object.values(MONTAGE_SKILLS)
-    .map((skill) => {
-      const id = `${skill.key}@${skill.version}`;
-      const review = reviewed.get(id) as { status: SkillReviewStatus; note: string | null; reviewed_at: string } | undefined;
-      const bench = benched.get(id) as { path: string; seconds: number | null; cost_eur: number | null; lab_case: string | null; created_at: string } | undefined;
-      const link = bench ? url.get(bench.path) : undefined;
-      return {
-        key: skill.key,
-        version: skill.version,
-        name: houseModel(skill.key)?.name ?? skill.key,
-        how: skill.how,
-        status: review?.status ?? ("pending" as const),
-        note: review?.note ?? null,
-        reviewedAt: review?.reviewed_at ?? null,
-        bench:
-          bench && link
-            ? { url: link, seconds: bench.seconds === null ? null : Number(bench.seconds), costEur: bench.cost_eur === null ? null : Number(bench.cost_eur), labCase: bench.lab_case?.replace(/^lab:\/\//, "") ?? null, at: bench.created_at }
-            : null,
-      };
-    })
-    .sort((a, b) => REVIEW_ORDER[a.status] - REVIEW_ORDER[b.status] || a.name.localeCompare(b.name, "fr"));
+  const url = new Map(signed.flatMap((s) => (s.path && s.signedUrl && !s.error ? [[s.path, s.signedUrl] as const] : [])));
+  return HOUSE_MODELS.map((model) => {
+    const skill = MONTAGE_SKILLS[model.key];
+    const id = skill ? `${skill.key}@${skill.version}` : "";
+    const review = reviewed.get(id) as { status: SkillReviewStatus; note: string | null; reviewed_at: string } | undefined;
+    const bench = benched.get(id) as { path: string; seconds: number | null; cost_eur: number | null; lab_case: string | null; created_at: string } | undefined;
+    const link = bench ? url.get(bench.path) : undefined;
+    return {
+      key: model.key,
+      version: skill?.version ?? null,
+      name: model.name,
+      how: skill?.how ?? model.pitch,
+      status: skill ? (review?.status ?? ("pending" as const)) : ("uncoded" as const),
+      note: review?.note ?? null,
+      reviewedAt: review?.reviewed_at ?? null,
+      bench:
+        bench && link
+          ? { url: link, seconds: bench.seconds === null ? null : Number(bench.seconds), costEur: bench.cost_eur === null ? null : Number(bench.cost_eur), labCase: bench.lab_case?.replace(/^lab:\/\//, "") ?? null, at: bench.created_at }
+          : null,
+      original: { url: url.get(houseOriginalPath(model.key)) ?? null, link: linkOf.get(model.key) ?? null },
+    };
+  }).sort((a, b) => REVIEW_ORDER[a.status] - REVIEW_ORDER[b.status] || a.name.localeCompare(b.name, "fr"));
 }

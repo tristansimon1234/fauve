@@ -5,7 +5,7 @@ import { adminView, teamMember, type AdminView } from "@/lib/admin";
 import { formatPhone, formatShortDateTime } from "@/lib/format";
 import type { ProviderBudget } from "@/lib/provider-budgets";
 import { FEEDBACK_LABELS } from "@fauve/agent";
-import { dropWaiting, letIn, markFeedback, reviewSkill, saveBrakes, setBudget } from "./actions";
+import { dropWaiting, letIn, markFeedback, reviewSkill, saveBrakes, setBudget, setOriginalLink } from "./actions";
 
 export const metadata: Metadata = { title: "Admin" };
 
@@ -227,29 +227,46 @@ const REVIEW_LABELS: Record<AdminView["skills"][number]["status"], string> = {
   revise: "À revoir",
   refused: "Refusé",
   approved: "Dans la bibliothèque",
+  uncoded: "Pas encore codé",
 };
 
 // Tristan's review of each montage skill (« par quel biais je validerai les modèles ? »): its bench Reel on free rushes,
 // what it does, and the three answers. A business plays only those added; the team's studio and the lab's play them all.
 function Skills({ view }: { view: AdminView }) {
   const waiting = view.skills.filter((s) => s.status === "pending" || s.status === "revise").length;
+  const coded = view.skills.filter((s) => s.status !== "uncoded").length;
   return (
     <Section
       title="Modèles"
-      hint={`${waiting} à regarder. Un commerce ne joue que les modèles ajoutés à la bibliothèque ; le studio de l’équipe et le banc les jouent tous. Chaque rendu est fait par la chaîne d’Edith sur des rushes libres.`}
+      hint={`${waiting} à regarder, ${coded} codés sur ${view.skills.length}. À gauche l’original dont le modèle est écrit (pour l’équipe seulement), à droite le rendu du banc, fait par la chaîne d’Edith sur des rushes libres. Un commerce ne joue que les modèles ajoutés à la bibliothèque ; le studio de l’équipe et le banc les jouent tous.`}
     >
       <ul className="flex flex-col divide-y divide-line">
         {view.skills.map((s) => (
-          <li key={`${s.key}@${s.version}`} className="flex flex-col gap-4 py-4 sm:flex-row sm:items-start">
-            {s.bench ? (
-              <video src={s.bench.url} controls playsInline preload="metadata" className="aspect-[9/16] w-[180px] shrink-0 bg-ink" />
-            ) : (
-              <div className="flex aspect-[9/16] w-[180px] shrink-0 items-center justify-center border border-line p-3 text-center text-[13px] text-muted">Pas encore passé au banc</div>
-            )}
+          <li key={s.key} className="flex flex-col gap-4 py-4 sm:flex-row sm:items-start">
+            <div className="flex shrink-0 gap-2">
+              <figure className="flex flex-col gap-1">
+                {s.original.url ? (
+                  <video src={s.original.url} controls playsInline preload="none" className="aspect-[9/16] w-[150px] bg-ink object-contain" />
+                ) : (
+                  <div className="flex aspect-[9/16] w-[150px] items-center justify-center border border-line p-3 text-center text-[13px] text-muted">Original absent</div>
+                )}
+                <figcaption className="mono-label text-muted">Original</figcaption>
+              </figure>
+              <figure className="flex flex-col gap-1">
+                {s.bench ? (
+                  <video src={s.bench.url} controls playsInline preload="none" className="aspect-[9/16] w-[150px] bg-ink" />
+                ) : (
+                  <div className="flex aspect-[9/16] w-[150px] items-center justify-center border border-line p-3 text-center text-[13px] text-muted">
+                    {s.status === "uncoded" ? "Pas encore codé" : "Pas encore passé au banc"}
+                  </div>
+                )}
+                <figcaption className="mono-label text-muted">Banc</figcaption>
+              </figure>
+            </div>
             <div className="flex min-w-0 flex-1 flex-col gap-2">
               <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
                 <h3 className="text-[17px] font-bold">{s.name}</h3>
-                <span className="mono-label text-muted">v{s.version}</span>
+                {s.version !== null && <span className="mono-label text-muted">v{s.version}</span>}
                 <span className={`mono-label ${s.status === "approved" ? "text-muted" : "text-violet"}`}>{REVIEW_LABELS[s.status]}</span>
               </div>
               <p className="text-sm leading-snug text-muted">{s.how}</p>
@@ -261,6 +278,25 @@ function Skills({ view }: { view: AdminView }) {
                 </p>
               )}
               {s.note && <p className="text-[13px] leading-snug whitespace-pre-line">Ta note : « {s.note} »</p>}
+              <form action={setOriginalLink} className="flex flex-wrap items-center gap-2">
+                <input type="hidden" name="key" value={s.key} />
+                {s.original.link && (
+                  <a href={s.original.link} target="_blank" rel="noreferrer" className="text-[13px] underline underline-offset-2 break-all">
+                    {s.original.link}
+                  </a>
+                )}
+                <input
+                  type="url"
+                  name="link"
+                  defaultValue={s.original.link ?? ""}
+                  placeholder="Lien du Reel d’origine"
+                  className="h-9 min-w-0 flex-1 border border-line bg-white px-3 text-[13px] outline-none focus:border-violet"
+                />
+                <button type="submit" className="btn btn-secondary h-9 px-3 text-[13px]">
+                  {s.original.link ? "Changer le lien" : "Ajouter le lien"}
+                </button>
+              </form>
+              {s.version !== null && (
               <form action={reviewSkill} className="flex flex-col gap-2">
                 <input type="hidden" name="key" value={s.key} />
                 <input type="hidden" name="version" value={s.version} />
@@ -283,6 +319,7 @@ function Skills({ view }: { view: AdminView }) {
                   </button>
                 </div>
               </form>
+              )}
             </div>
           </li>
         ))}

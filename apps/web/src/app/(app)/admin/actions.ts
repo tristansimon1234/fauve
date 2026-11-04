@@ -5,7 +5,7 @@ import { z } from "zod";
 import { teamMember } from "@/lib/admin";
 import { brakeSettingsSchema, saveBrakeSettings } from "@/lib/brake-settings";
 import { startWaitingMontages } from "@/lib/montage-queue";
-import { PROVIDERS, type ProviderKey } from "@fauve/agent";
+import { HOUSE_MODELS, PROVIDERS, type ProviderKey } from "@fauve/agent";
 import { forgetBudget, saveBudget } from "@/lib/provider-budgets";
 import { admitNow, dropFromWaitlist } from "@/lib/waitlist";
 import { supabaseAdmin } from "@/lib/supabase/admin";
@@ -101,3 +101,18 @@ export async function reviewSkill(form: FormData): Promise<void> {
   forgetApprovedSkills();
   revalidatePath("/admin");
 }
+
+const originalSchema = z.object({ key: z.string().min(1).max(40), link: z.union([z.literal(""), z.url().max(600).regex(/^https?:\/\//)]) });
+
+/** The link of the Reel one of Edith's models was written on (empty: forgotten). */
+export async function setOriginalLink(form: FormData): Promise<void> {
+  await guard();
+  const original = originalSchema.safeParse({ key: form.get("key"), link: String(form.get("link") ?? "").trim() });
+  if (!original.success || !HOUSE_MODELS.some((m) => m.key === original.data.key)) return;
+  const { error } = await supabaseAdmin()
+    .from("house_originals")
+    .upsert({ key: original.data.key, link: original.data.link || null, updated_at: new Date().toISOString() });
+  if (error) throw new Error(error.message);
+  revalidatePath("/admin");
+}
+
