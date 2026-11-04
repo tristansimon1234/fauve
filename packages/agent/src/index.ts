@@ -68,6 +68,7 @@ export * from "./voice.ts";
 export * from "./voice-over.ts";
 export * from "./hook.ts";
 export * from "./tempo.ts";
+export * from "./sound-follow.ts";
 export * from "./mix.ts";
 export * from "./when.ts";
 export * from "./creation.ts";

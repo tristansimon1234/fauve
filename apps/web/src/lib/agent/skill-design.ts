@@ -24,7 +24,11 @@ import {
   skillPlan,
   skillShotCount,
   skillFit,
+  skillFitAt,
   skillLengths,
+  leadPlan,
+  soundLead,
+  soundTempo,
   type BrandProfile,
   type ClipAnalysis,
   type EditPlan,
@@ -99,13 +103,23 @@ export async function designSkill(params: {
   previous?: EditPlan | null;
   studio: { name?: string | null; business?: string | null; memory?: unknown; booking?: boolean };
   profile: Partial<BrandProfile>;
+  /** The sound she follows (its tempo and first beat): the skill plays at its tempo, its cuts on its beats. */
+  sound?: { bpm: number; offset: number };
 }): Promise<SkillDesign | null> {
   const { skill } = params;
   const name = houseModel(skill.key)?.name ?? skill.key;
   const files = skillFiles(params.mediaIds, params.clips, params.photos);
   if (!files.length) return null;
-  // As many shots as her files give, or, for a length she asked for, the count (then the tempo) that comes closest to it.
-  const fit = params.contract?.duration ? skillFit(skill, params.contract.duration) : { n: skillShotCount(skill, files), bpm: skill.bpm };
+  // As many shots as her files give, or, for a length she asked for, the count (then the tempo) that comes closest to it;
+  // following a sound, its tempo (its own, halved or doubled, nearest the model's), the count closest to her length at it.
+  const soundBpm = params.sound ? soundTempo(params.sound.bpm, skill.bpm) : undefined;
+  const fit = soundBpm
+    ? { n: params.contract?.duration ? skillFitAt(skill, params.contract.duration, soundBpm) : skillShotCount(skill, files), bpm: soundBpm }
+    : params.contract?.duration
+      ? skillFit(skill, params.contract.duration)
+      : { n: skillShotCount(skill, files), bpm: skill.bpm };
+  // Its first beat: the Reel's first image held that long, then every cut on the sound's beats.
+  const lead = params.sound && soundBpm ? soundLead(params.sound.offset, soundBpm) : 0;
   const n = fit.n;
   const bpm = fit.bpm !== skill.bpm ? fit.bpm : undefined;
   // A model Edith picked gives the form, never the silence: its optional title is written (dressedFloorNote's floor).
@@ -153,7 +167,7 @@ export async function designSkill(params: {
   const made = async (answer: SkillFillAnswer): Promise<{ plan: EditPlan; error?: string } | null> => {
     const fill = readSkillFill(skill, files, n, answer, { wordsWanted });
     if (!fill) return null;
-    const plan = skillPlan({ skill, name, files, fill, ...(bpm ? { bpm } : {}) });
+    const plan = leadPlan(skillPlan({ skill, name, files, fill, ...(bpm ? { bpm } : {}) }), lead);
     // The model's lettering when she chose it (her charter's when Edith picked it), and its finish (its grade, its grain).
     Object.assign(plan, followedLook(plan, params.followed));
     Object.assign(plan, followedFilter(plan, params.followed));

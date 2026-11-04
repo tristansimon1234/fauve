@@ -267,6 +267,8 @@ export type ReelProps = {
     photos?: ScenePhoto[];
     /** A collage's composition: it lays the Reel's shots itself (Footage), nothing plays under it. */
     compose?: boolean;
+    /** A composition that starts after the Reel does (the sound she follows): its first image held from the Reel's start. */
+    holdFirst?: boolean;
     /** The shots it lays, in the order of the montage. */
     shots?: ComposeShot[];
     /** What moves in the shots under it (hands, faces, bodies), read by its `track`. */

@@ -47,6 +47,19 @@ export const postMusicSchema = z.object({
   mode: z.enum(["on", "off", "model"]).default("on"),
   /** Her own publishing was set for the model's sound (given back with Edith's music). */
   hand: z.boolean().optional(),
+  /**
+   * The sound she follows, given by a link (a Reel or a TikTok that uses it; mode model): the Reel comes out silent, cut
+   * on its beats, and she adds it with « Utiliser l'audio » on that Reel (lib/sound-follow.ts). Its tempo and its first
+   * beat (s) are measured on the link before the montage; null when it has no steady beat; miss when it could not be read.
+   */
+  sound: z
+    .object({
+      link: z.string().url().max(600),
+      bpm: z.number().min(30).max(300).nullable().optional(),
+      offset: z.number().min(0).max(4).nullable().optional(),
+      miss: z.string().max(40).optional(),
+    })
+    .optional(),
   /** What she asked for the music of this Reel (her contract's, in English): the composer's brief, over every default. */
   wish: z.string().max(300).optional(),
   /** How present this Reel's sound effects are (light, more, off); absent: her default, else light (sfx.ts). */

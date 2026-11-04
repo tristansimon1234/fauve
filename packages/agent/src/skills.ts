@@ -171,6 +171,12 @@ export function skillFit(skill: Pick<MontageSkill, "shots" | "long" | "timeline"
   return { n: best.n, bpm };
 }
 
+/** At a tempo set from elsewhere (the sound she follows): the count of shots that comes closest to her length. */
+export function skillFitAt(skill: Pick<MontageSkill, "shots" | "long" | "timeline">, seconds: number, bpm: number): number {
+  const at = lengthsAt(skill, bpm);
+  return at.reduce((a, b) => (Math.abs(b.duration - seconds) < Math.abs(a.duration - seconds) - 0.01 ? b : a)).n;
+}
+
 /** @deprecated The count alone: skillFit, which may also move its tempo. */
 export const skillShotsFor = (skill: Pick<MontageSkill, "shots" | "long" | "timeline" | "bpm" | "tempo">, seconds: number) => skillFit(skill, seconds).n;
 
@@ -259,7 +265,8 @@ export function skillPlan(input: { skill: MontageSkill; name: string; files: Ski
     const at = line.texts[t.slot];
     return words && at && at.to > at.from ? [{ text: words, from: round(at.from), to: round(Math.min(line.duration, at.to)), style: t.role }] : [];
   });
-  const tempo = Math.round(Math.min(140, Math.max(60, bpm ?? skill.bpm)));
+  // To the hundredth: a sound she follows keeps its own tempo (a beat rounded off drifts off its beats over 30 s).
+  const tempo = Math.round(Math.min(140, Math.max(60, bpm ?? skill.bpm)) * 100) / 100;
   return {
     format: "9:16",
     duration: round(line.duration),

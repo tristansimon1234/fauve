@@ -391,6 +391,8 @@ export type ReelProps = {
     photos?: ScenePhoto[];
     /** A collage's composition: it lays the Reel's shots itself (Footage), nothing plays under it. */
     compose?: boolean;
+    /** A composition that starts after the Reel does (the sound she follows): its first image held from the Reel's start. */
+    holdFirst?: boolean;
     /** The shots it lays, in the order of the montage. */
     shots?: ComposeShot[];
     /** What moves in the shots under it (hands, faces, bodies), read by its `track`. */
@@ -914,6 +916,7 @@ export function buildReelProps(plan: EditPlan, inputs: ReelInputs): ReelProps {
         cuts: starts.filter((f) => f > from && f < from + length).map((f) => f - from),
         ...(l.motion.photos?.length ? { photos: scenePhotos(l.motion.photos, inputs) } : {}),
         ...(l.compose ? { compose: true, shots: composeShots(from, length) } : {}),
+        ...(l.compose && l.hold_first && from > 0 ? { holdFirst: true } : {}),
         // An animation over the montage that draws one of her shots, her cut out, an object or its depth: the shots under it,
         // played full frame by the montage (its Subject laid full frame falls exactly on her).
         ...(!l.compose && DRAWS_SHOTS.test(l.motion.js) ? { shots: composeShots(from, length) } : {}),

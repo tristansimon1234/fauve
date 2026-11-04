@@ -49,14 +49,19 @@ export function snapToTempo(plan: EditPlan, clipDurations: Record<string, number
   if (!beat || plan.voice || plan.copy || !plan.segments.length) return plan;
   // Worked in frames, as the composition plays it (a crossfade overlaps whole frames).
   const frames = (t: number) => Math.round(t * REEL_FPS);
+  // The sound she follows starts its beats `lead` in (beat_at): every cut on lead + k beats, the first shot that much longer.
+  const lead = plan.beat_at ?? 0;
+  const at = (b: number) => (b <= 1e-9 ? 0 : frames(lead + b * beat));
   const fade = usesFades(plan) ? frames(FADE) : 0;
   const last = plan.segments.length - 1;
   let beats = 0; // beats before the current segment's cut (a fraction after a fixed shot)
+  // A segment's own length in beats (the first one's without the lead).
+  const own = (s: EditPlan["segments"][number], extra: number) => (segmentSeconds(s) - extra / REEL_FPS - (beats <= 1e-9 ? lead : 0)) / beat;
   const segments = plan.segments.map((s, i) => {
     // The last segment's length moves no cut, but its end still lands on a beat.
     const extra = i === last ? 0 : fade;
     if (fixed?.(s)) {
-      beats += (segmentSeconds(s) - extra / REEL_FPS) / beat;
+      beats += own(s, extra);
       return s;
     }
     const scene = !isClipSegment(s);
@@ -68,22 +73,22 @@ export function snapToTempo(plan: EditPlan, clipDurations: Record<string, number
       : isMotionSegment(s)
         ? MOTION_MAX
         : SCENE_MAX;
-    const lengthOf = (n: number) => (frames((beats + n) * beat) - frames(beats * beat) + extra) / REEL_FPS;
+    const lengthOf = (n: number) => (at(beats + n) - at(beats) + extra) / REEL_FPS;
     // Back on the grid after a fixed shot: its end on the nearest beat (whole beats otherwise, as before).
     const offGrid = beats - Math.floor(beats + 1e-9);
-    let n = Math.max(minBeats, Math.round(beats + (segmentSeconds(s) - extra / REEL_FPS) / beat) - beats);
+    let n = Math.max(minBeats, Math.round(beats + own(s, extra)) - beats);
     if (offGrid > 1e-9 && n < minBeats + 1e-9) n = Math.ceil(beats + minBeats) - beats;
     while (n - 1 >= minBeats - 1e-9 && lengthOf(n) > maxLen + 0.001) n--;
     const length = round(lengthOf(n));
     if (length > maxLen + 0.001) {
       // Too short to hold even one beat: kept as it is, the grid goes on from where it ends.
-      beats += Math.round((segmentSeconds(s) - extra / REEL_FPS) / beat);
+      beats += Math.round(own(s, extra));
       return s;
     }
     beats += n;
     return isClipSegment(s) ? { ...s, out: round(s.in + length * speed) } : { ...s, duration: length };
   });
-  const onBeat = (t: number) => round(Math.round(t / beat) * beat);
+  const onBeat = (t: number) => (t < lead ? round(t) : round(lead + Math.round((t - lead) / beat) * beat));
   const texts = plan.texts.map((t) => {
     const from = onBeat(t.from);
     let to = onBeat(t.to);

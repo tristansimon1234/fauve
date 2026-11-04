@@ -12,10 +12,19 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 /** An Instagram link: only its sound can be used in Instagram on her Reel. */
 const INSTAGRAM = /^https?:\/\/(www\.)?instagram\.com\//i;
 
-/** The sound she can keep: the Instagram Reel this post copies (its link), and whether her account is a Business one (null: not known). */
-export async function modelSound(studioId: string, postId: string): Promise<{ link: string; business: boolean | null } | null> {
+/**
+ * The sound she can keep: the sound she follows (the link of a Reel that uses it, lib/sound-follow.ts), else the
+ * Instagram Reel this post copies (its link), and whether her account is a Business one (null: not known).
+ */
+export async function modelSound(studioId: string, postId: string): Promise<{ link: string; business: boolean | null; followed?: boolean } | null> {
   const db = supabaseAdmin();
-  const { data: post } = await db.from("posts").select("inspiration_id").eq("id", postId).eq("studio_id", studioId).maybeSingle();
+  const { data: post } = await db.from("posts").select("inspiration_id, music").eq("id", postId).eq("studio_id", studioId).maybeSingle();
+  const followed = readPostMusic(post?.music).sound?.link;
+  if (followed) {
+    const { data: account } = await db.from("social_accounts").select("account_type").eq("studio_id", studioId).eq("platform", "instagram").maybeSingle();
+    const type = account?.account_type as string | null | undefined;
+    return { link: followed, business: type ? type === "BUSINESS" : null, followed: true };
+  }
   if (!post?.inspiration_id) return null;
   const [inspiration, account] = await Promise.all([
     db.from("inspirations").select("source, url").eq("id", post.inspiration_id as string).eq("studio_id", studioId).maybeSingle(),
@@ -46,9 +55,11 @@ export async function keepModelSound(studioId: string, postId: string, keep: boo
 }
 
 /** What the delivery tells her of a Reel without music for the model's sound: how to add it, and the Business caveat. */
-export function modelSoundLine(sound: { link: string; business: boolean | null }): string {
+export function modelSoundLine(sound: { link: string; business: boolean | null; followed?: boolean }): string {
   return [
-    `Elle est sans musique, sur les coupes du Reel que tu m'as envoyé, pour que tu mettes son son : dans Instagram, ouvre ce Reel (${sound.link}), touche le nom du son en bas, « Utiliser l'audio », puis choisis cette vidéo (télécharge-la depuis sa page).`,
+    sound.followed
+      ? `Elle est sans musique, coupée sur les temps du son que tu m'as donné : dans Instagram, ouvre ce Reel (${sound.link}), touche le nom du son en bas, « Utiliser l'audio », puis choisis cette vidéo (télécharge-la depuis sa page). Laisse le son partir du début : c'est là que tombent les coupes.`
+      : `Elle est sans musique, sur les coupes du Reel que tu m'as envoyé, pour que tu mettes son son : dans Instagram, ouvre ce Reel (${sound.link}), touche le nom du son en bas, « Utiliser l'audio », puis choisis cette vidéo (télécharge-la depuis sa page).`,
     sound.business
       ? "Ton compte est un compte Entreprise : Instagram n'y propose pas tous les sons. Si « Utiliser l'audio » n'apparaît pas, dis-moi « mets ta musique »."
       : "Si « Utiliser l'audio » n'apparaît pas (certains sons ne sont pas proposés aux comptes Entreprise), dis-moi « mets ta musique ».",

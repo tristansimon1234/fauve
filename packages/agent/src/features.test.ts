@@ -1509,3 +1509,49 @@ test("a model whose middle repeats reaches 30 s at its own tempo for a length sh
     assert.equal(skillShotCount(skill, many), skill.shots[1], key);
   }
 });
+
+test("a Reel that follows a sound: its tempo, halved or doubled, and its cuts from the sound's first beat", async () => {
+  const { soundTempo, soundLead, leadPlan } = await import("./sound-follow.ts");
+  const { snapToTempo } = await import("./tempo.ts");
+  const { planTimeline } = await import("./motion.ts");
+  const { skillFor } = await import("./skill-library.ts");
+  const { skillPlan } = await import("./skills.ts");
+  const { buildReelProps } = await import("./motion.ts");
+  // Its own tempo when it fits, else halved or doubled within 60 to 140, the nearest to the one wanted.
+  assert.equal(soundTempo(96, 100), 96);
+  assert.equal(soundTempo(150, 100), 75);
+  assert.equal(soundTempo(70, 120), 140);
+  assert.equal(soundTempo(70, 80), 70);
+  // Its first beat within one of the Reel's beats; under a frame from a beat, none.
+  assert.equal(soundLead(0.25, 120), 0.25);
+  assert.equal(soundLead(1.2, 120), 0.2);
+  assert.equal(soundLead(0.51, 120), 0);
+  // A skill's plan held on its first image: its cuts all that much later, its composition starting then, held before.
+  const skill = skillFor("decode")!;
+  const files = Array.from({ length: 4 }, (_, i) => ({ id: `v${i}`, photo: false, seconds: 30 }));
+  const fill = { shots: Array.from({ length: 9 }, (_, i) => ({ file: files[i % 4]!.id, at: 2 + Math.floor(i / 4) * 8 })), texts: { surtitre: "un samedi dans", titre: "le marais" }, end: null };
+  const plan = skillPlan({ skill, name: "Chez Lou", files, fill, bpm: 120 });
+  const led = leadPlan(plan, 0.25);
+  assert.equal(led.beat_at, 0.25);
+  assert.ok(Math.abs(led.duration - plan.duration - 0.25) < 0.01);
+  const cuts = (p: typeof plan) => planTimeline(p).segments.slice(1).map((s) => s.start);
+  cuts(plan).forEach((t, i) => assert.ok(Math.abs(cuts(led)[i]! - t - 0.25) < 0.04, `cut ${i}`));
+  assert.equal(led.layers![0]!.from, 0.25);
+  assert.equal(led.layers![0]!.hold_first, true);
+  assert.ok(Math.abs(led.texts[0]!.from - plan.texts[0]!.from - 0.25) < 0.01);
+  // Its first shot starts that much earlier in its video, so its first image is the same.
+  const first = (p: typeof plan) => p.segments[0] as { in: number; out: number };
+  assert.ok(Math.abs(first(plan).in - first(led).in - 0.25) < 0.01);
+  // The render holds the composition's first image until it starts.
+  const props = buildReelProps(led, { template: "libre", clipUrls: Object.fromEntries(files.map((f) => [f.id, `/${f.id}.mp4`])), photoIds: [], brand: { name: "Chez Lou" } });
+  const layer = props.layers!.find((l) => l.compose)!;
+  assert.equal(layer.holdFirst, true);
+  assert.ok(layer.from >= 7 && layer.from <= 8);
+  // The editor's plan: its grid starts at the sound's first beat, every cut on beat_at + k beats.
+  const editor = {
+    format: "9:16", duration: 6, template: "libre", tempo: 120, beat_at: 0.25, images: [], transitions: "cut", subtitles: false, music: null, texts: [],
+    segments: [{ clip_id: "a", in: 0, out: 1.1, zoom: "none" }, { clip_id: "b", in: 0, out: 1.4, zoom: "none" }, { clip_id: "c", in: 0, out: 2, zoom: "none" }],
+  } as never;
+  const snapped = snapToTempo(editor, { a: 10, b: 10, c: 10 });
+  for (const t of planTimeline(snapped).segments.slice(1).map((s) => s.start)) assert.ok(Math.abs(((t - 0.25) / 0.5) - Math.round((t - 0.25) / 0.5)) < 0.07, `${t} s on a beat from 0.25`);
+});

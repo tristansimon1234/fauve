@@ -3,6 +3,7 @@ import {
   AbsoluteFill,
   Audio,
   Easing,
+  Freeze,
   Img,
   OffthreadVideo,
   Sequence,
@@ -227,54 +228,68 @@ export function Reel(props: ReelProps) {
     </Sequence>
   ) : null;
 
+  // The composition over the whole Reel, drawn where it plays (and frozen on its first image before, when it holds it).
+  const composition = () =>
+    compose ? (
+        <MotionScene
+          js={compose.js}
+          texts={compose.texts}
+          durationInFrames={compose.durationInFrames}
+          props={props}
+          theme={theme}
+          k={k}
+          overlay
+          photos={compose.photos}
+          cuts={compose.cuts}
+          footage={{
+            shots: (compose.shots ?? []).map((shot) => placedShot(shot, props.segments[shot.segment], theme, false)),
+            draw: (shot, size) => drawShot(props.segments[shot.segment], theme, size, shot.face),
+            subject: (shot, size) => drawShot(props.segments[shot.segment], theme, size, shot.face, "subject"),
+            object: (shot, name, size) => drawShot(props.segments[shot.segment], theme, size, shot.face, { object: name }),
+            depth: (shot, size) => drawShot(props.segments[shot.segment], theme, size, shot.face, "depth"),
+          }}
+          reelTexts={compose.reelTexts}
+          end={compose.end}
+          spoken={compose.spoken}
+          fallbackNode={
+            !collage ? (
+              // The plain montage: her shots full frame, the engine's screens it covered, the Reel's texts and end card.
+              <>
+                {props.segments.map((segment, i) => (isShot(segment) || composedScreen(segment) ? montaged(segment, i) : null))}
+                {engineTexts}
+                {endCard}
+              </>
+            ) : whole ? (
+              // The fixed collage in full: its paper, its prints, the Reel's texts and end card on paper.
+              <>
+                <CollageBackdrop props={props} />
+                {props.segments.map((segment, i) => (composedScreen(segment) ? montaged(segment, i) : print(segment, i, compose.from)))}
+                {engineTexts}
+                {endCard}
+                <Grain props={props} />
+              </>
+            ) : (
+              <>{props.segments.map((segment, i) => print(segment, i, compose.from))}</>
+            )
+          }
+        />
+    ) : null;
+
   const footage = (
     <>
       {collage && !whole ? <CollageBackdrop props={props} /> : null}
       {compose ? (
-        <Sequence from={compose.from} durationInFrames={composeLength} layout="none">
-          <MotionScene
-            js={compose.js}
-            texts={compose.texts}
-            durationInFrames={compose.durationInFrames}
-            props={props}
-            theme={theme}
-            k={k}
-            overlay
-            photos={compose.photos}
-            cuts={compose.cuts}
-            footage={{
-              shots: (compose.shots ?? []).map((shot) => placedShot(shot, props.segments[shot.segment], theme, false)),
-              draw: (shot, size) => drawShot(props.segments[shot.segment], theme, size, shot.face),
-              subject: (shot, size) => drawShot(props.segments[shot.segment], theme, size, shot.face, "subject"),
-              object: (shot, name, size) => drawShot(props.segments[shot.segment], theme, size, shot.face, { object: name }),
-              depth: (shot, size) => drawShot(props.segments[shot.segment], theme, size, shot.face, "depth"),
-            }}
-            reelTexts={compose.reelTexts}
-            end={compose.end}
-            spoken={compose.spoken}
-            fallbackNode={
-              !collage ? (
-                // The plain montage: her shots full frame, the engine's screens it covered, the Reel's texts and end card.
-                <>
-                  {props.segments.map((segment, i) => (isShot(segment) || composedScreen(segment) ? montaged(segment, i) : null))}
-                  {engineTexts}
-                  {endCard}
-                </>
-              ) : whole ? (
-                // The fixed collage in full: its paper, its prints, the Reel's texts and end card on paper.
-                <>
-                  <CollageBackdrop props={props} />
-                  {props.segments.map((segment, i) => (composedScreen(segment) ? montaged(segment, i) : print(segment, i, compose.from)))}
-                  {engineTexts}
-                  {endCard}
-                  <Grain props={props} />
-                </>
-              ) : (
-                <>{props.segments.map((segment, i) => print(segment, i, compose.from))}</>
-              )
-            }
-          />
-        </Sequence>
+        <>
+          {/* A composition that starts after the Reel does (the sound she follows starts its beats later): its first image held until then. */}
+          {compose.holdFirst && compose.from > 0 ? (
+            <Sequence from={0} durationInFrames={compose.from} layout="none">
+              <Freeze frame={0}>{composition()}</Freeze>
+            </Sequence>
+          ) : null}
+          <Sequence from={compose.from} durationInFrames={composeLength} layout="none">
+            {composition()}
+          </Sequence>
+        </>
       ) : null}
       {props.segments.map((segment, i) =>
         // A composed Reel's shots are laid by its composition; a collage's, else each one a print.

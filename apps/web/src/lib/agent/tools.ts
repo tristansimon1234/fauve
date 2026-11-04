@@ -82,6 +82,7 @@ import { effectRoute } from "@/lib/agent/effects-agent";
 import { fewSubjects } from "@/lib/agent/copy-design";
 import { skillTooShort, skillWantsMore } from "@/lib/agent/skill-design";
 import { keepModelSound } from "@/lib/model-sound";
+import { followSound } from "@/lib/sound-follow";
 import { queueRerender } from "@/lib/rerender";
 import { startEffectWords } from "@/lib/effect-words";
 import { montageStatus, stoppedMontages, unseenReel } from "@/lib/montage-status";
@@ -650,7 +651,7 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
       });
     },
 
-    async montage({ post_id, media_ids, brief, correction, max_new_scenes, variant, plan, effort, inspiration_id, modele_edith, son, anciens_fichiers, remplacer_fichiers, avec_ceux_la, duree, garde_la_duree }) {
+    async montage({ post_id, media_ids, brief, correction, max_new_scenes, variant, plan, effort, inspiration_id, modele_edith, son, son_lien, anciens_fichiers, remplacer_fichiers, avec_ceux_la, duree, garde_la_duree }) {
       const post = unwrap(await db.from("posts").select("id, title, edit_plan_id, media_ids").eq("id", post_id).eq("studio_id", studioId).single());
       // A correction's new files join the Reel's own, unless Edith read that she wants to start again from them alone:
       // given alone, Promo Edith 2's five new photos replaced its twenty files and it came back as 3 s.
@@ -705,6 +706,20 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
             peu_de_fichiers: short.files,
             il_en_faut: short.least,
             note: `Le modèle « ${short.name} » prend au moins ${short.least} photos ou vidéos, et elle en a donné ${short.files}. Demande-lui en une phrase si elle en a d'autres pour toi, avec les boutons « J'en envoie d'autres » et « Fais avec ceux-là » (reply_with). Sur « Fais avec ceux-là », relance montage avec avec_ceux_la true : tu coupes plusieurs passages dans ses vidéos. Rien n'est lancé d'ici là.`,
+          });
+        }
+      }
+      // A sound she wants her Reel cut on, from the link of an Instagram Reel that uses it: kept on the post, measured with the montage.
+      if (son_lien) {
+        const followed = await followSound(studioId, post_id, son_lien).catch(() => ({ ok: false as const, why: "missing" as const }));
+        if (!followed.ok) {
+          return json({
+            possible: false,
+            son: followed.why,
+            note:
+              followed.why === "voice"
+                ? "Ce Reel a sa voix : un son ajouté dans Instagram la remplacerait. Propose-lui plutôt ta musique dans ce genre (set_music, ses mots de genre, jamais le nom de l'artiste). Rien n'est lancé."
+                : "Il me faut le lien d'un Reel Instagram qui utilise ce son (dans Instagram : touche le nom du son sous un Reel, puis un des Reels de la liste, « Copier le lien »). Demande-le-lui en une phrase. Rien n'est lancé.",
           });
         }
       }

@@ -349,6 +349,8 @@ export const editPlanLayerSchema = z.object({
    * appear: a title typed word by word, words that slam), the engine laying her shots under it. Set by the engine.
    */
   words: z.boolean().optional(),
+  /** A composition that starts after the Reel does (the sound she follows starts its beats later): its first image held until then. Set by the engine. */
+  hold_first: z.boolean().optional(),
 });
 export type PlanLayer = z.infer<typeof editPlanLayerSchema>;
 
@@ -439,6 +441,11 @@ export const editPlanObjectSchema = z.object({
   template: z.string().min(1),
   /** The Reel's rhythm, in beats per minute, chosen by the editor for this Reel: its cuts, its music and how its words move. Without it, the template's. */
   tempo: z.number().min(60).max(140).optional(),
+  /**
+   * When its first beat falls (s, under one beat), for a Reel that follows a sound she gave by a link (sound-follow.ts):
+   * its cuts land on beat_at + k beats, on that sound's beats, its first shot held that much longer. Set by the engine.
+   */
+  beat_at: z.number().min(0).max(3).optional(),
   segments: z.array(z.union([editPlanSegmentSchema, editPlanSceneSegmentSchema, editPlanMotionSegmentSchema])).min(1),
   texts: z.array(editPlanTextSchema),
   images: z.array(editPlanImageSchema),

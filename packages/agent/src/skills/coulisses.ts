@@ -47,8 +47,8 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const TL_H = 272;
   // Capitals, as the model sets everything; an ordinal keeps its small letters (« PARIS 3e », « 1er »).
   const caps = (s) => String(s || "").toUpperCase().replace(/(\d)(ER|E)\b/g, (m, d, x) => d + x.toLowerCase());
-  // A phone number or a date never breaks between its digits.
-  const keep = (s) => String(s || "").replace(/(\d) (?=\d)/g, "$1\u00a0");
+  // A phone number or a date never breaks between its digits, nor « Paris 3e » before its number.
+  const keep = (s) => String(s || "").replace(/(\d) (?=\d)/g, "$1\u00a0").replace(/ (\d+(?:er|e))\b/g, "\u00a0$1");
   const hook = reelTexts.find((t) => t.role === "hook");
   const kicker = reelTexts.find((t) => t.role === "caption");
   const list = reelTexts.find((t) => t.role === "band");

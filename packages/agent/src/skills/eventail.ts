@@ -53,8 +53,8 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const cx = width / 2;
   const cy = height / 2;
   const full = { position: "absolute", left: 0, top: 0, width, height };
-  // A phone number or a date never breaks between its digits.
-  const keep = (s) => String(s || "").replace(/(\d) (?=\d)/g, "$1\u00a0");
+  // A phone number or a date never breaks between its digits, nor « Paris 3e » before its number.
+  const keep = (s) => String(s || "").replace(/(\d) (?=\d)/g, "$1\u00a0").replace(/ (\d+(?:er|e))\b/g, "\u00a0$1");
   const credit = reelTexts.find((t) => t.role === "hook");
   const line = reelTexts.find((t) => t.role === "caption");
   const others = reelTexts.filter((t) => t !== credit && t !== line);

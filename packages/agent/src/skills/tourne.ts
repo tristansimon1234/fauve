@@ -122,6 +122,9 @@ export const tourne: MontageSkill = {
   bpm: BPM,
   shots: [12, 24],
   files: [6, 16],
+  // Its code draws its black and white and its contrast (as its reference does): its model's finish keeps only its grain
+  // and vignette, else the contrast doubled and crushed its blacks and whites.
+  finish: { contrast: 0 },
   how: "Tous ses plans tournés d'un quart de tour pour remplir l'écran, une fois dans un sens, une fois dans l'autre, en noir et blanc très contrasté : une rafale d'ouverture qui scintille, des plans calmes d'une seconde coupés net, un zoom qui traverse un plan dans le suivant, une image blanche et une rafale de plans d'un cinquième de seconde, deux plans plus longs liés par un coup de fouet, une image blanche et le dernier plan tenu jusqu'à la fin.",
   end: true,
   texts: [

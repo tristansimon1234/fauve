@@ -219,6 +219,11 @@ export const toolSpecs = {
         .boolean()
         .optional()
         .describe("true seulement quand, prévenue que son modèle ne va pas jusqu'à cette durée (trop_long), elle la garde : le monteur l'étire"),
+      son_lien: z
+        .string()
+        .max(600)
+        .optional()
+        .describe("Le lien d'un Reel Instagram qui utilise le son (une chanson, un son tendance) sur lequel elle veut caler ce Reel : la vidéo sort sans musique, coupée sur ses temps, et elle l'ajoute en publiant, avec « Utiliser l'audio » sur ce Reel"),
       son: z
         .enum(["modele", "edith"])
         .optional()

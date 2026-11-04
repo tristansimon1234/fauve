@@ -39,8 +39,8 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const TITLE_SHADOW = "0 4px 0 rgba(28,74,68,0.9), 2px 0 0 rgba(28,74,68,0.55), -2px 0 0 rgba(28,74,68,0.55), 0 -2px 0 rgba(28,74,68,0.45), 0 2px 14px rgba(0,0,0,0.3)";
   const SMALL_SHADOW = "0 1px 2px rgba(0,0,0,0.85), 0 0 3px rgba(0,0,0,0.65), 0 0 9px rgba(0,0,0,0.4)";
   const DROP = "drop-shadow(0 1px 1.5px rgba(0,0,0,0.6))";
-  // A phone number or a date never breaks between its digits.
-  const keep = (s) => String(s || "").replace(/(\d) (?=\d)/g, "$1\u00a0");
+  // A phone number or a date never breaks between its digits, nor « Paris 3e » before its number.
+  const keep = (s) => String(s || "").replace(/(\d) (?=\d)/g, "$1\u00a0").replace(/ (\d+(?:er|e))\b/g, "\u00a0$1");
   const wordsIn = (s) => String(s || "").split(/[\s\u00a0\u202f]+/).filter((w) => /[\p{L}\p{N}]/u.test(w)).length;
   const hook = reelTexts.find((t) => t.role === "hook");
   const list = reelTexts.find((t) => t.role === "band");

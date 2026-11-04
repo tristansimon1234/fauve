@@ -83,6 +83,8 @@ import {
   houseModel,
   FONT_PAIRS,
   SPOKEN_WRITTEN,
+  soundLead,
+  soundTempo,
 } from "@fauve/agent";
 import { outputFormat } from "@fauve/agent/answer";
 import { HOUSE_EXAMPLES } from "@fauve/agent/house-examples";
@@ -101,6 +103,7 @@ import { latestReport } from "@/lib/performance";
 import { judgeHooks } from "./hook-judge";
 import { copyCandidate, designCopy } from "./copy-design";
 import { designSkill, skillCandidate } from "./skill-design";
+import { followedSound } from "@/lib/sound-follow";
 import { skillFor } from "@fauve/agent/skills";
 import { recordToolUses } from "@/lib/tool-maker";
 import { designMotionScenes, type SceneRequest, type SceneResult } from "./motion-designer";
@@ -312,7 +315,7 @@ export async function designEdit(params: {
 }): Promise<DesignedEdit> {
   const db = supabaseAdmin();
   const [post, studio, brand, previous, recent, report, inspirations, hooks, readyForEditor] = await Promise.all([
-    db.from("posts").select("id, title, kind, caption, platforms, edit_plan_id, template, inspiration_id, voice_media_id").eq("id", params.postId).eq("studio_id", params.studioId).single(),
+    db.from("posts").select("id, title, kind, caption, platforms, edit_plan_id, template, inspiration_id, voice_media_id, music").eq("id", params.postId).eq("studio_id", params.studioId).single(),
     db.from("studios").select("name, business_type, booking_url, memory, website_url, team").eq("id", params.studioId).single(),
     db.from("brand_profiles").select("profile").eq("studio_id", params.studioId).order("version", { ascending: false }).limit(1),
     db.from("edit_plans").select("plan, version").eq("post_id", params.postId).order("version", { ascending: false }).limit(1),
@@ -323,6 +326,11 @@ export async function designEdit(params: {
     readySounds().catch(() => []),
   ]);
   if (post.error) throw new Error("Publication introuvable");
+  // The sound she follows (the link of a Reel that uses it): its tempo and first beat measured once, while the rest is read.
+  const following = followedSound(params.studioId, params.postId, post.data.music).catch((error: unknown) => {
+    console.warn("sound-follow: none", error);
+    return null;
+  });
   // The Reel she sent to copy (« Steal »): its style, read after her message, is waited for while the rest is read.
   // A new montage follows the latest reading of the Reel it copies; a correction, the one its Reel was made with.
   const copying = post.data.inspiration_id
@@ -415,6 +423,7 @@ export async function designEdit(params: {
   // A model of Edith's coded as a whole Reel (a montage skill) is played by its skill, else by the editor from its code: never
   // remade as a simple copy of its cuts (a reading of « Mots aux quatre coins » without « posés sur » had made it one).
   const skill = skillCandidate(followed, params.contract, Boolean(voice));
+  const sound = await following;
   // A simple Reel she copies is remade by code (copy.ts: the model's own cuts, her photos' subjects laid over, its title, its
   // ending): no editor nor motion designer, one small call writes its words. Its correction too; anything it cannot do, the editor.
   const previousCopy = previousPlan.success && previousPlan.data.copy ? previousPlan.data : null;
@@ -452,6 +461,7 @@ export async function designEdit(params: {
       previous: correction ? previousSkill : null,
       studio: { name: studio.data?.name, business: studio.data?.business_type, memory: studio.data?.memory, booking: Boolean(studio.data?.booking_url) },
       profile,
+      ...(sound ? { sound } : {}),
     });
     if (made) return { editPlanId: made.editPlanId, version: made.version, plan: made.plan, rationale: made.rationale, newScenes: 0, reusedScenes: 0 };
   }
@@ -507,12 +517,15 @@ export async function designEdit(params: {
     },
     // What she fixed herself for this Reel (her text, the layout, the length, the ending…): followed to the letter.
     ...(contractLines(params.contract).length ? { contrat: contractLines(params.contract) } : {}),
+    // The sound she follows, added by her in Instagram: its tempo is the Reel's, every cut on its beats (no music composed).
+    ...(sound ? { son_suivi: `Ce Reel suit un son qu'elle a choisi, qu'elle ajoutera dans Instagram : son tempo est fixé (${soundTempo(sound.bpm, 100)} BPM) et tes coupes tombent sur ses temps ; aucune musique à composer.` } : {}),
     post: {
       ...post.data,
       edit_plan_id: undefined,
       template: undefined,
       inspiration_id: undefined,
       voice_media_id: undefined,
+      music: undefined,
       // The collage form she chose for this Reel (or an older Reel's ambiance); « libre » says nothing.
       chosen_template: chosenTemplate.success && chosenTemplate.data !== "libre" ? chosenTemplate.data : undefined,
       chosen_inspiration: chosenInspiration ?? undefined,
@@ -694,7 +707,11 @@ export async function designEdit(params: {
   const writeSpoken = captionStyle({ finish }) && (Boolean(spoken) || clips.some((c) => c.analysis.words?.length));
   const toPlan = (answer: EditorOutput | EditorOutputLegacy) => {
     // A model Edith picked as this Reel's form is always composed: its director draws the whole Reel, then looks at it.
-    const read = fromEditorPlan(followed?.dressed && !correction ? ({ ...answer.plan, form: "composition" } as typeof answer.plan) : answer.plan, profile.text_looks ?? []);
+    const fromEditor = fromEditorPlan(followed?.dressed && !correction ? ({ ...answer.plan, form: "composition" } as typeof answer.plan) : answer.plan, profile.text_looks ?? []);
+    // The sound she follows sets the tempo (its own, halved or doubled, nearest the editor's) and its first beat the grid's.
+    const soundBpm = sound ? soundTempo(sound.bpm, fromEditor.tempo ?? 100) : undefined;
+    const lead = sound && soundBpm ? soundLead(sound.offset, soundBpm) : 0;
+    const read = soundBpm ? { ...fromEditor, tempo: soundBpm, ...(lead ? { beat_at: lead } : {}) } : fromEditor;
     const written = writeSpoken ? { ...read, subtitles: true } : read;
     const withWritten = keepWrittenAnimations(Object.keys(finish).length ? { ...written, finish } : written, params.fresh ? null : base);
     // A correction that redraws nothing keeps the composition's code as it is: never written again for a voice or a subtitle.
