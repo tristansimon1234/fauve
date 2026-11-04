@@ -179,11 +179,13 @@ export const gaufre: MontageSkill = {
     const cardAt = onFrame((shown + PAPER_BEATS) * BEAT);
     const duration = round(end ? onFrame(cardAt + END_CARD) : cardAt);
     spans[spans.length - 1] = { start: spans.at(-1)!.start, end: duration };
+    // The last one is seen for its first beats only: the paper comes over it.
+    const seen = (lens.at(-1)! * BEAT).toFixed(1).replace(".", ",");
     const wants = lens.map((_, i) =>
-      i === 0
-        ? "le plan qui ouvre le Reel, calme et beau, en plein écran : son lieu, son travail ou ses produits"
-        : i === lens.length - 1
-          ? "le dernier plan, calme et tenu, juste avant le papier : un plan large ou un détail qui respire"
+      i === lens.length - 1
+        ? `${i === 0 ? "le seul plan du Reel" : "le dernier plan"}, calme et beau, en plein écran : seules ses ${seen} premières secondes se voient, puis le papier vient par-dessus (un plan large ou un détail qui respire)`
+        : i === 0
+          ? "le plan qui ouvre le Reel, calme et beau, en plein écran : son lieu, son travail ou ses produits"
           : "un plan calme de son lieu, de ses gestes ou de ses produits, en plein écran",
     );
     return {
