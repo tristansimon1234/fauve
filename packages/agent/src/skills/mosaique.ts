@@ -9,11 +9,10 @@ import { beatSpans, toFrame, type MontageSkill } from "../skills.ts";
 // wave lays blank paper tiles instead, and its words are written on them.
 
 const BPM = 100;
-const BEAT = 60 / BPM;
 /** Beats per picture: its wave sweeps the twelve tiles in that time. */
 const CYCLE = 2;
-/** The ending card's beats: exactly the engine's 1,6 s, so its words land as the paper wave ends. */
-const CARD = 1.6 / BEAT;
+/** The ending card's length (s): exactly the engine's 1,6 s at any tempo, so its words land as the paper wave ends. */
+const CARD_SECONDS = 1.6;
 
 const CODE = String.raw`function Scene({ width, height, durationInFrames, brand, shots, reelTexts, end, texts }) {
   const h = React.createElement;
@@ -94,15 +93,18 @@ export const mosaique: MontageSkill = {
   how: "Ses images plein cadre, coupées en une grille de 3 × 4 cases posées sur du papier clair ; l'image suivante remplace les cases une à une dans l'ordre de lecture, une case tous les sixièmes de temps, chaque vague longue de deux temps, si bien qu'une case change toujours ; la dernière vague ramène la première image et le Reel tourne en boucle.",
   end: true,
   texts: [{ slot: "titre", role: "hook", want: "facultatif : un titre court posé sur une étiquette de papier en haut, le temps de la première vague (son nom, son plat, son moment), seulement quand le Reel a besoin de mots", max: 28, required: false }],
-  timeline(n, { end }) {
-    const spans = beatSpans(BPM, Array.from({ length: n }, (_, i) => (i < n - 1 ? CYCLE : CYCLE + (end ? CARD : 0))));
+  timeline(n, { end, bpm: tempo }) {
+    // At another tempo (a longer Reel, or a music's own): every length in beats follows it.
+    const bpm = tempo ?? BPM;
+    const beat = 60 / bpm;
+    const spans = beatSpans(bpm, Array.from({ length: n }, (_, i) => (i < n - 1 ? CYCLE : CYCLE + (end ? CARD_SECONDS / beat : 0))));
     const duration = spans.at(-1)!.end;
     const wants = spans.map((_, i) =>
       i === 0
         ? "la plus belle image, plein cadre : elle ouvre la grille et la referme en boucle (un plat, un produit ou une création, serré)"
         : "une image serrée et pleine de ses plats, produits ou réalisations, différente de la précédente, vue en entier à travers la grille",
     );
-    return { duration, shots: spans.map((s, i) => ({ ...s, want: wants[i]! })), texts: { titre: { from: 0, to: Math.min(duration, Math.max(2.6, spans[0]!.end)) } }, marks: { cycle: toFrame(CYCLE * BEAT) } };
+    return { duration, shots: spans.map((s, i) => ({ ...s, want: wants[i]! })), texts: { titre: { from: 0, to: Math.min(duration, Math.max(2.6, spans[0]!.end)) } }, marks: { cycle: toFrame(CYCLE * beat) } };
   },
   code: CODE,
 };

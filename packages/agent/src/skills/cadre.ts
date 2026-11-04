@@ -94,13 +94,17 @@ export const cadre: MontageSkill = {
     { slot: "gauche", role: "hook", want: "l'étiquette de gauche : ce qui se passe, 1 à 3 mots en capitales (une forme comme « travaux en cours », « nouvelle carte », « en cuisine »)", max: 16, required: true },
     { slot: "droite", role: "caption", want: "l'étiquette de droite : son nom, ou le nom du lieu", max: 16, required: true },
   ],
-  timeline(n, { end }) {
+  timeline(n, options) {
+    const { end } = options;
+    // At its own tempo, or at a music's when the Reel follows one: every length in beats, so a slower tempo makes it longer
+    // and calmer, a faster one shorter, its cuts still on the beats.
+    const bpm = options.bpm ?? BPM;
     // Her pictures in the window, each the same length on thirds of a beat (two thirds when she has many, as the
     // original, up to four thirds when she has few: it stays a quick succession), then the wide shot, full frame.
     const m = Math.max(1, n - 1);
     const each = Math.min(4 / 3, Math.max(2 / 3, Math.round((WINDOW_BEATS / m) * 3) / 3));
     const final = FINAL_BEATS + (end ? END_BEATS : 0);
-    const spans = beatSpans(BPM, [...Array.from({ length: m }, () => each), final]);
+    const spans = beatSpans(bpm, [...Array.from({ length: m }, () => each), final]);
     const duration = spans.at(-1)!.end;
     const wants = [
       ...Array.from({ length: m }, (_, i) =>

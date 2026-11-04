@@ -66,8 +66,12 @@ export const photoDump: MontageSkill = {
   how: "Ses photos et petits passages de vidéo, un à la fois, posés d'un coup au milieu d'une page gris très clair, chacun à sa forme sur la même largeur (de temps en temps un plus petit), sans bord, sans ombre ni texte, un nouveau tous les demi-temps, comme un carnet qu'on feuillette ; le dernier un peu plus long.",
   end: true,
   texts: [{ slot: "titre", role: "hook", want: "facultatif : un titre court dans une pastille blanche au-dessus de la première image, comme sur Instagram (sa semaine, son nom, son moment), seulement quand le Reel a besoin de mots", max: 28, required: false }],
-  timeline(n, { end }) {
-    const spans = beatSpans(BPM, Array.from({ length: n }, (_, i) => (i < n - 1 ? EACH : LAST + (end ? CARD : 0))));
+  timeline(n, { end, bpm: tempo }) {
+    // At another tempo (a longer Reel, or a music's own): every length in beats follows it.
+    const bpm = tempo ?? BPM;
+    const beat = 60 / bpm;
+    // Its card lasts the engine's 1,6 s at least, whatever the tempo.
+    const spans = beatSpans(bpm, Array.from({ length: n }, (_, i) => (i < n - 1 ? EACH : LAST + (end ? Math.max(CARD, 1.6 / beat) : 0))));
     const duration = spans.at(-1)!.end;
     const wants = spans.map((_, i) =>
       i === 0

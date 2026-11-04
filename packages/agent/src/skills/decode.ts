@@ -8,7 +8,6 @@ import { beatSpans, toFrame, type MontageSkill } from "../skills.ts";
 // title's style on black.
 
 const BPM = 122;
-const BEAT = 60 / BPM;
 /** The opening (bands, fold, black, the title landing) lasts this many beats; the band opens on the next one. */
 const OPENING_BEATS = 10;
 
@@ -113,7 +112,10 @@ export const decode: MontageSkill = {
     { slot: "surtitre", role: "caption", want: "1 à 3 petits mots posés au-dessus du titre, espacés sur sa ligne, qui l'amènent (une forme comme « un samedi dans », « bienvenue chez », « le matin à »)", max: 24, required: true },
     { slot: "titre", role: "hook", want: "le titre qui se décode : son nom, son lieu ou son quartier, court (il s'écrit en capitales sur une ligne)", max: 22, required: true },
   ],
-  timeline(n, { end }) {
+  timeline(n, { end, bpm: tempo }) {
+    // At another tempo (a longer Reel, or a music's own): every length in beats follows it.
+    const bpm = tempo ?? BPM;
+    const beat = 60 / bpm;
     // Full frame at the end: three shots for a long Reel, two otherwise; the band takes the others after the opening.
     const tail = n >= 10 ? 3 : 2;
     const inBand = Math.max(1, n - 1 - tail);
@@ -122,7 +124,7 @@ export const decode: MontageSkill = {
     // Full frame: four beats each, the last one held (longer with an ending card over its end).
     const last = end ? 9 : 5;
     const fullBeats = [...Array.from({ length: tail - 1 }, () => 4), last];
-    const spans = beatSpans(BPM, [OPENING_BEATS, ...band, ...fullBeats]);
+    const spans = beatSpans(bpm, [OPENING_BEATS, ...band, ...fullBeats]);
     const duration = spans.at(-1)!.end;
     const bandAt = spans[1]!.start;
     const fullAt = spans[1 + inBand]!.start;
@@ -136,10 +138,10 @@ export const decode: MontageSkill = {
       shots: spans.map((s, i) => ({ ...s, want: wants[i]! })),
       // The words land after the fold (4,5 beats) and leave as the band grows.
       texts: {
-        surtitre: { from: Math.round(4.5 * BEAT * 100) / 100, to: Math.min(duration, Math.round((fullAt + 0.6) * 100) / 100) },
-        titre: { from: Math.round(4.5 * BEAT * 100) / 100, to: Math.min(duration, Math.round((fullAt + 0.6) * 100) / 100) },
+        surtitre: { from: Math.round(4.5 * beat * 100) / 100, to: Math.min(duration, Math.round((fullAt + 0.6) * 100) / 100) },
+        titre: { from: Math.round(4.5 * beat * 100) / 100, to: Math.min(duration, Math.round((fullAt + 0.6) * 100) / 100) },
       },
-      marks: { beat: (60 / BPM) * 30, band: toFrame(bandAt), full: toFrame(fullAt) },
+      marks: { beat: beat * 30, band: toFrame(bandAt), full: toFrame(fullAt) },
     };
   },
   code: CODE,

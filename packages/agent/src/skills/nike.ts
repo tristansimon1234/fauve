@@ -8,10 +8,10 @@ import { beatSpans, toFrame, type MontageSkill } from "../skills.ts";
 // middle of the frame (its cities), each one landing on a cut with two images in negative where the word is black;
 // black and white very contrasted, a shot now and then all red (multiplied), some held image by image; a gesture
 // frozen on the last beat, then black. Here the burst flashes her later shots ahead (a teaser), the title and the words
-// are hers; its ending card (an offer, an announcement) is the title's red on the black.
+// are hers (white over a red shot, where the original's red word would vanish); its ending card (an offer, an
+// announcement) is the title's red on the black.
 
 const BPM = 120;
-const BEAT = 60 / BPM;
 /** Each section in beats: the burst, the title on black, the last shot before it freezes, its freeze, the black. */
 const BURST = 2;
 const TITLE = 4;
@@ -162,28 +162,32 @@ export const nike: MontageSkill = {
     { slot: "titre", role: "hook", want: "le titre sur le noir, en capitales : 1 à 3 mots qui annoncent la série de mots qui suit (une forme comme « sept jours », « le geste », « un samedi »)", max: 18, required: true },
     { slot: "mots", role: "band", want: "4 à 6 mots ou groupes de 2 mots, séparés par des virgules, un par plan en grand : les gestes, les moments ou les lieux de son métier (une forme comme « pétrir, façonner, cuire, servir »)", max: 60, required: true },
   ],
-  timeline(n, { end }) {
+  timeline(n, options: { end: boolean; bpm?: number }) {
+    const { end } = options;
+    // At her music's tempo when one is given (slower: a longer, calmer Reel; faster: a shorter one), else the model's.
+    const bpm = options.bpm ?? BPM;
+    const beat = 60 / bpm;
     const count = Math.max(8, Math.min(16, n));
     // Shots 1 and 2: a beat each; shot 3: a beat, then the burst over it (its video runs on under it); the words' shots
     // on the pattern, the first one under the title before it is seen; the last one: two beats, frozen one, then black
     // (or the ending card). No segment longer than it must be: each one's video holds its passage.
     const words = Array.from({ length: count - 4 }, (_, i) => PATTERN[i % PATTERN.length]!);
     const beats = [1, 1, 1 + BURST, TITLE + words[0]!, ...words.slice(1), LAST + FROZEN + BLACK];
-    const spans = beatSpans(BPM, beats);
+    const spans = beatSpans(bpm, beats);
     const lastAt = spans.at(-1)!.start;
-    const freezeAt = onFrame(lastAt + LAST * BEAT);
-    const blackAt = onFrame(freezeAt + FROZEN * BEAT);
+    const freezeAt = onFrame(lastAt + LAST * beat);
+    const blackAt = onFrame(freezeAt + FROZEN * beat);
     const duration = round(end ? onFrame(blackAt + END_CARD) : spans.at(-1)!.end);
     spans[spans.length - 1] = { start: lastAt, end: duration };
-    const burstAt = onFrame(3 * BEAT);
-    const titleAt = onFrame((3 + BURST) * BEAT);
-    const wordsAt = onFrame((3 + BURST + TITLE) * BEAT);
+    const burstAt = onFrame(3 * beat);
+    const titleAt = onFrame((3 + BURST) * beat);
+    const wordsAt = onFrame((3 + BURST + TITLE) * beat);
     const wants = [
       "le plan qui ouvre : un geste fort en mouvement (il passe en rouge et en négatif)",
       "un plan en mouvement, de près",
-      "un plan fort, un visage ou un geste : il passe en rouge, juste avant la rafale",
-      ...words.map((b, i) => (i === 0 ? "le premier plan des mots, juste après le titre : un geste fort, un mot en grand par-dessus" : b > 1 ? "un plan d'action tenu : un geste, un effort, un service, un mot en grand par-dessus" : "un plan d'action rapide, saccadé image par image")),
-      "le dernier geste, fort et net : il se fige sur le dernier temps",
+      "un plan fort, un visage ou un geste : seule sa première demi-seconde se voit, en rouge, juste avant la rafale",
+      ...words.map((b, i) => (i === 0 ? "le premier plan des mots, juste après le titre (sa vidéo part quand on la voit) : un geste fort, un mot en grand par-dessus" : b > 1 ? "un plan d'action tenu : un geste, un effort, un service, un mot en grand par-dessus" : "un plan d'action rapide, saccadé image par image")),
+      "le dernier geste, fort et net : il joue une seconde puis se fige sur le dernier temps",
     ];
     return {
       duration,
@@ -192,7 +196,7 @@ export const nike: MontageSkill = {
         titre: { from: round(titleAt), to: round(wordsAt) },
         mots: { from: round(wordsAt), to: round(blackAt) },
       },
-      marks: { beat: BEAT * 30, burst: toFrame(burstAt), title: toFrame(titleAt), words: toFrame(wordsAt), freeze: toFrame(freezeAt), black: toFrame(blackAt) },
+      marks: { beat: beat * 30, burst: toFrame(burstAt), title: toFrame(titleAt), words: toFrame(wordsAt), freeze: toFrame(freezeAt), black: toFrame(blackAt) },
     };
   },
   code: CODE,

@@ -1428,18 +1428,51 @@ test("a skill without words of its own writes its title when Edith picked the mo
   assert.equal(input.textes[0]!.obligatoire, true);
 });
 
-test("a montage skill comes close to the length she asked for by its number of shots", async () => {
+test("a montage skill comes close to the length she asked for by its number of shots, then by its tempo", async () => {
   const { MONTAGE_SKILLS } = await import("./skill-library.ts");
-  const { skillLengths, skillShotsFor } = await import("./skills.ts");
+  const { skillFit, skillLengths, skillTempos } = await import("./skills.ts");
   for (const skill of Object.values(MONTAGE_SKILLS)) {
+    const [slow, fast] = skillTempos(skill);
+    assert.ok(slow >= 60 && slow <= skill.bpm && fast <= 140 && fast >= skill.bpm, skill.key);
+    const length = (fit: { n: number; bpm: number }) => skill.timeline(fit.n, { end: false, bpm: fit.bpm }).duration;
     const { min, max } = skillLengths(skill);
     assert.ok(min <= max, skill.key);
-    assert.equal(skill.timeline(skillShotsFor(skill, 0), { end: false }).duration, min);
-    assert.equal(skill.timeline(skillShotsFor(skill, 999), { end: false }).duration, max);
-    // A length inside its range lands within a shot's length of it.
-    const mid = (min + max) / 2;
-    const n = skillShotsFor(skill, mid);
-    const durations = Array.from({ length: skill.shots[1] - skill.shots[0] + 1 }, (_, k) => skill.timeline(skill.shots[0] + k, { end: false }).duration);
-    assert.equal(Math.abs(skill.timeline(n, { end: false }).duration - mid), Math.min(...durations.map((d) => Math.abs(d - mid))), `${skill.key}: ${mid} s`);
+    // Past its ends: its fastest tempo and fewest shots, its slowest tempo and most.
+    assert.equal(skillFit(skill, 0).bpm, fast, skill.key);
+    assert.equal(length(skillFit(skill, 0)), min, skill.key);
+    assert.equal(skillFit(skill, 999).bpm, slow, skill.key);
+    assert.equal(length(skillFit(skill, 999)), max, skill.key);
+    // Inside its own lengths: its own tempo, the closest count.
+    const own = Array.from({ length: skill.shots[1] - skill.shots[0] + 1 }, (_, k) => skill.timeline(skill.shots[0] + k, { end: false }).duration);
+    const mid = (Math.min(...own) + Math.max(...own)) / 2;
+    const fit = skillFit(skill, mid);
+    const gap = Math.min(...own.map((d) => Math.abs(d - mid)));
+    if (gap <= 1) {
+      assert.equal(fit.bpm, skill.bpm, `${skill.key}: ${mid} s`);
+      assert.equal(Math.abs(length(fit) - mid), gap, `${skill.key}: ${mid} s`);
+    }
+    // A third longer than its longest at its own tempo: slower, and closer to it than its own tempo could come.
+    const long = Math.max(...own) * 1.3;
+    const slower = skillFit(skill, long);
+    assert.ok(slower.bpm < skill.bpm, `${skill.key}: ${long} s at ${slower.bpm} BPM`);
+    assert.ok(Math.abs(length(slower) - long) < long - Math.max(...own), `${skill.key}: ${long} s, ${length(slower)} s`);
+  }
+});
+
+test("a montage skill played at another tempo keeps its cuts on that tempo's beats and composes its music at it", async () => {
+  const { MONTAGE_SKILLS } = await import("./skill-library.ts");
+  const { skillPlan } = await import("./skills.ts");
+  for (const skill of Object.values(MONTAGE_SKILLS)) {
+    const n = skill.shots[0];
+    const bpm = Math.max(60, Math.round(skill.bpm * 0.8));
+    const own = skill.timeline(n, { end: false });
+    const slower = skill.timeline(n, { end: false, bpm });
+    // Every length counted in beats follows the tempo: about its ratio longer.
+    assert.ok(Math.abs(slower.duration / own.duration - skill.bpm / bpm) < 0.15, `${skill.key}: ${own.duration} s → ${slower.duration} s`);
+    const files = Array.from({ length: n }, (_, i) => ({ id: `f${i}`, photo: true, seconds: 0 }));
+    const fill = { shots: files.map((f) => ({ file: f.id, at: 0 })), texts: Object.fromEntries(skill.texts.map((t) => [t.slot, "Chez Lou"])), end: null };
+    const plan = skillPlan({ skill, name: "Chez Lou", files, fill, bpm });
+    assert.equal(plan.tempo, bpm, skill.key);
+    assert.ok(Math.abs(plan.duration - slower.duration) < 0.05, `${skill.key}: ${plan.duration} s`);
   }
 });

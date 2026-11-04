@@ -127,9 +127,13 @@ export const ecranPartage: MontageSkill = {
     { slot: "personne", role: "hook", want: "le petit titre de la moitié gauche : qui travaille ou ce qu'on y fait, 1 à 3 mots (une forme comme « les mains », « l'équipe », « le geste »)", max: 16, required: true },
     { slot: "resultat", role: "caption", want: "le petit titre de la moitié droite : ce que ça donne, 1 à 3 mots (une forme comme « l'œuvre », « l'assiette », « le résultat »)", max: 16, required: true },
   ],
-  timeline(n, { end }) {
+  timeline(n, options) {
+    const { end } = options;
+    // At its own tempo, or at a music's when the Reel follows one: every length in beats, so a slower tempo makes it longer
+    // and calmer, a faster one shorter, its cuts still on the beats.
+    const bpm = options.bpm ?? BPM;
     const list = slots(n, end);
-    const spans = beatSpans(BPM, list.map((s) => s.beats));
+    const spans = beatSpans(bpm, list.map((s) => s.beats));
     const duration = spans.at(-1)!.end;
     const want = (s: Slot) =>
       s.side === "solo"

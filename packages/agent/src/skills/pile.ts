@@ -8,7 +8,6 @@ import { beatSpans, toFrame, type MontageSkill } from "../skills.ts";
 // and the words end alone on the white. Its ending card (an offer, an announcement) is set in its words' style.
 
 const BPM = 110;
-const BEAT = 60 / BPM;
 /** The full pile, held (beats). */
 const HOLD = 0.5;
 /** The words alone on the white at the end (beats), or before the ending card. */
@@ -144,14 +143,18 @@ export const pile: MontageSkill = {
       required: true,
     },
   ],
-  timeline(n, { end }) {
+  timeline(n, { end, bpm: tempo }) {
+    // At another tempo (a longer Reel, or a music's own): every length in beats follows it.
+    const bpm = tempo ?? BPM;
+    const beat = 60 / bpm;
     const { step, slow } = cadence(n);
     const build = gaps(n).reduce((a, b) => a + b, 0);
     // The build, the full pile held, the pile leaving at the pace it came, the words alone (or a beat, then the card).
-    const beats = build + HOLD + build + (end ? ALONE_BEFORE_CARD + CARD : ALONE);
+    // Its card lasts the engine's 1,6 s at least, whatever the tempo.
+    const beats = build + HOLD + build + (end ? ALONE_BEFORE_CARD + Math.max(CARD, CARD_SECONDS / beat) : ALONE);
     // Its code lays each photo on its own beat subdivision and plays a video from there: the slots only say how long
     // each one moves, the same for all (no passage longer than the others, and an even montage if the code cannot run).
-    const spans = beatSpans(BPM, Array.from({ length: n }, () => beats / Math.max(1, n)));
+    const spans = beatSpans(bpm, Array.from({ length: n }, () => beats / Math.max(1, n)));
     const duration = spans.at(-1)!.end;
     const wants = spans.map((_, i) =>
       i === 0
@@ -166,11 +169,11 @@ export const pile: MontageSkill = {
       // Its words are there from the first image to the end, or to the card.
       texts: { mots: { from: 0, to: Math.round((end ? duration - CARD_SECONDS : duration) * 100) / 100 } },
       marks: {
-        beat: BEAT * 30,
+        beat: beat * 30,
         step,
         slow,
-        shift: toFrame((build + HOLD) * BEAT),
-        alone: toFrame((end ? ALONE_BEFORE_CARD : ALONE) * BEAT),
+        shift: toFrame((build + HOLD) * beat),
+        alone: toFrame((end ? ALONE_BEFORE_CARD : ALONE) * beat),
       },
     };
   },

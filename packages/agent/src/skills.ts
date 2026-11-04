@@ -52,8 +52,13 @@ export type MontageSkill = {
   texts: SkillText[];
   /** Whether its code draws an ending card (an offer, an announcement) when the Reel has one. */
   end: boolean;
-  /** For n shots: its length, each shot's span and want, its texts' moments and its code's marks. */
-  timeline(n: number, options: { end: boolean }): SkillTimeline;
+  /**
+   * For n shots: its length, each shot's span and want, its texts' moments and its code's marks; `bpm`, at another
+   * tempo than its own (a longer or shorter Reel, a music's tempo): every length it counts in beats follows it.
+   */
+  timeline(n: number, options: { end: boolean; bpm?: number }): SkillTimeline;
+  /** The tempos it plays at (default: from 0,7 to 1,2 times its own, within 60 to 140). */
+  tempo?: [number, number];
   /** Its composition over the whole Reel: plain JS defining function Scene (h = React.createElement, no JSX), the kit's scope. */
   code: string;
   /** Google Fonts families its code brings besides the Reel's two. */
@@ -115,29 +120,42 @@ export function skillShotCount(skill: Pick<MontageSkill, "shots">, files: SkillF
   return Math.max(skill.shots[0], Math.min(skill.shots[1], skillPassages(files)));
 }
 
-/** The lengths a skill reaches (s) over all its numbers of shots, without its ending card (a pile's cadence changes with its count: not always longer with more). */
-export function skillLengths(skill: Pick<MontageSkill, "shots" | "timeline">): { min: number; max: number } {
-  const lengths = Array.from({ length: skill.shots[1] - skill.shots[0] + 1 }, (_, k) => skill.timeline(skill.shots[0] + k, { end: false }).duration);
-  return { min: Math.min(...lengths), max: Math.max(...lengths) };
+/** The tempos a skill plays at: its own range, else 0,7 to 1,2 times its tempo, always within 60 to 140. */
+export function skillTempos(skill: Pick<MontageSkill, "bpm" | "tempo">): [number, number] {
+  const [low, high] = skill.tempo ?? [skill.bpm * 0.7, skill.bpm * 1.2];
+  return [Math.round(Math.max(60, Math.min(skill.bpm, low))), Math.round(Math.min(140, Math.max(skill.bpm, high)))];
+}
+
+/** Its lengths (s) at a tempo over all its numbers of shots, without its ending card (a pile's cadence changes with its count). */
+const lengthsAt = (skill: Pick<MontageSkill, "shots" | "timeline">, bpm?: number) =>
+  Array.from({ length: skill.shots[1] - skill.shots[0] + 1 }, (_, k) => ({ n: skill.shots[0] + k, duration: skill.timeline(skill.shots[0] + k, { end: false, ...(bpm ? { bpm } : {}) }).duration }));
+
+/** The lengths a skill reaches (s): its fewest at its fastest tempo, its most at its slowest. */
+export function skillLengths(skill: Pick<MontageSkill, "shots" | "timeline" | "bpm" | "tempo">): { min: number; max: number } {
+  const [slow, fast] = skillTempos(skill);
+  return { min: Math.min(...lengthsAt(skill, fast).map((l) => l.duration)), max: Math.max(...lengthsAt(skill, slow).map((l) => l.duration)) };
 }
 
 /**
- * The number of shots whose Reel comes closest to the length she asked for (Tristan: « on peut jouer sur la longueur
- * du reel ? »): a skill's length follows its shots (its rapid section, its prints, its tiles…), so the engine picks
- * the count, the skill's code stays the same; the fewest shots among equally close ones.
+ * How to come closest to the length she asked for (Tristan: « on peut jouer sur la longueur du reel ? », « mais on
+ * peut pas étendre la durée d'un modèle ? »): first its number of shots at its own tempo (its rapid section, its
+ * prints, its tiles: the middle lasts longer, its opening and its ending stay); then, past its longest or under its
+ * shortest, its tempo within its range (slower: longer and calmer, its music composed at it, its cuts on its beats).
  */
-export function skillShotsFor(skill: Pick<MontageSkill, "shots" | "timeline">, seconds: number): number {
-  let best = skill.shots[0];
-  let gap = Infinity;
-  for (let n = skill.shots[0]; n <= skill.shots[1]; n++) {
-    const off = Math.abs(skill.timeline(n, { end: false }).duration - seconds);
-    if (off < gap - 0.01) {
-      gap = off;
-      best = n;
-    }
-  }
-  return best;
+export function skillFit(skill: Pick<MontageSkill, "shots" | "timeline" | "bpm" | "tempo">, seconds: number): { n: number; bpm: number } {
+  const own = lengthsAt(skill);
+  const closest = own.reduce((a, b) => (Math.abs(b.duration - seconds) < Math.abs(a.duration - seconds) - 0.01 ? b : a));
+  if (Math.abs(closest.duration - seconds) <= 1) return { n: closest.n, bpm: skill.bpm };
+  const [slow, fast] = skillTempos(skill);
+  // A length is about inversely proportional to the tempo: the tempo that brings the closest count to it, within its range.
+  const bpm = Math.round(Math.min(fast, Math.max(slow, (skill.bpm * closest.duration) / Math.max(1, seconds))));
+  const at = lengthsAt(skill, bpm);
+  const best = at.reduce((a, b) => (Math.abs(b.duration - seconds) < Math.abs(a.duration - seconds) - 0.01 ? b : a));
+  return { n: best.n, bpm };
 }
+
+/** @deprecated The count alone: skillFit, which may also move its tempo. */
+export const skillShotsFor = (skill: Pick<MontageSkill, "shots" | "timeline" | "bpm" | "tempo">, seconds: number) => skillFit(skill, seconds).n;
 
 /** Fewer distinct files than the skill wants: Edith asks her first whether she has others (Tristan: « tu n'as que 3 plans, en as-tu d'autres ? »). */
 export const fewFiles = (skill: Pick<MontageSkill, "files">, files: number) => files < skill.files[0];
@@ -199,10 +217,11 @@ export const skillBrief = (name: string) => `Le modèle « ${name} » joué tel 
  * Her Reel on a skill, built by code: her files in its shots (on its beats), her words in its texts at their moments,
  * its composition over the whole Reel drawing everything (shots, texts, ending), its tempo for the music.
  */
-export function skillPlan(input: { skill: MontageSkill; name: string; files: SkillFile[]; fill: SkillFill }): EditPlan {
+export function skillPlan(input: { skill: MontageSkill; name: string; files: SkillFile[]; fill: SkillFill; bpm?: number }): EditPlan {
   const { skill, fill } = input;
   if (!fill.shots.length) throw new Error("Aucun plan pour ce modèle");
-  const line = skill.timeline(fill.shots.length, { end: Boolean(fill.end) });
+  const bpm = input.bpm && input.bpm !== skill.bpm ? input.bpm : undefined;
+  const line = skill.timeline(fill.shots.length, { end: Boolean(fill.end), ...(bpm ? { bpm } : {}) });
   const files = new Map(input.files.map((f) => [f.id, f]));
   const taken = new Map<string, [number, number][]>();
   const segments = line.shots.map((span, i): PlanSegment => {
@@ -223,7 +242,7 @@ export function skillPlan(input: { skill: MontageSkill; name: string; files: Ski
     const at = line.texts[t.slot];
     return words && at && at.to > at.from ? [{ text: words, from: round(at.from), to: round(Math.min(line.duration, at.to)), style: t.role }] : [];
   });
-  const tempo = Math.round(Math.min(140, Math.max(60, skill.bpm)));
+  const tempo = Math.round(Math.min(140, Math.max(60, bpm ?? skill.bpm)));
   return {
     format: "9:16",
     duration: round(line.duration),
@@ -283,7 +302,7 @@ export type SkillFillAnswer = z.infer<typeof skillFillSchema>;
 
 export const SKILL_FILL_PROMPT = `You fill one of Edith's montage models for a local business: a whole Reel coded once, like an Edits or CapCut template. Its shots are slots timed on its music, its texts have their place, its look, its signature moment and its ending are in its code. You only choose which of her files plays in each slot and from where, and write its words: the code plays everything else exactly as the model does.
 
-First decide "fits": true when the model, filled with her files and her words, gives her what she asked for. Her request may simply ask for this model, give her words, a mood, her files: that fits (the music and the caption are made elsewhere, never a reason for false). A length she asks for inside the model's lengths (« longueurs ») fits: the code has already set the number of slots for it. When she asks for something the model does not do and that matters to her (a voice-over, subtitles of what she says, an animation of its own, another layout, a text the model has no slot for, a shot at a precise moment, another ending, a length outside its lengths), "fits" is false and "missing" says what in a few words: the editor then makes her Reel from this model. When in doubt about something she clearly wants, false.
+First decide "fits": true when the model, filled with her files and her words, gives her what she asked for. Her request may simply ask for this model, give her words, a mood, her files: that fits (the music and the caption are made elsewhere, never a reason for false). A length she asks for inside the model's lengths (« longueurs ») fits: the code has already set the number of slots and its tempo for it. When she asks for something the model does not do and that matters to her (a voice-over, subtitles of what she says, an animation of its own, another layout, a text the model has no slot for, a shot at a precise moment, another ending, a length outside its lengths), "fits" is false and "missing" says what in a few words: the editor then makes her Reel from this model. When in doubt about something she clearly wants, false.
 
 Then cast her files on its slots (« cases », in order: each with its length and what it wants), as a good editor would:
 - each slot gets the file and the passage that suits what it wants; the first slot opens the Reel: the strongest, most beautiful image;
@@ -316,8 +335,10 @@ export function skillFillInput(input: {
    * the silence (Tristan: dressedFloorNote), so a model without words of its own still writes its title.
    */
   wordsWanted?: boolean;
+  /** The tempo it plays at, when not its own (a length she asked for). */
+  bpm?: number;
 }) {
-  const line = input.skill.timeline(input.n, { end: input.skill.end });
+  const line = input.skill.timeline(input.n, { end: input.skill.end, ...(input.bpm ? { bpm: input.bpm } : {}) });
   return {
     commerce: {
       nom: input.business.name ?? undefined,
@@ -334,7 +355,7 @@ export function skillFillInput(input: {
       fin: input.skill.end ? "le modèle peut finir sur une carte (une offre, une annonce)" : "aucune",
       longueurs: (() => {
         const l = skillLengths(input.skill);
-        return `de ${round(l.min)} à ${round(l.max)} s selon le nombre de cases (ce Reel : ${round(line.duration)} s, ${input.n} cases)`;
+        return `de ${round(l.min)} à ${round(l.max)} s selon le nombre de cases et son tempo (ce Reel : ${round(line.duration)} s, ${input.n} cases)`;
       })(),
     },
     cases: line.shots.map((s, i) => ({ case: i + 1, duree: `${round(s.end - s.start)} s`, veut: s.want })),

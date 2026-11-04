@@ -9,7 +9,6 @@ import { beatSpans, toFrame, type MontageSkill } from "../skills.ts";
 // announcement) is set the same way over the front, darkened. The words are never cut by the frame in the original.
 
 const BPM = 93;
-const BEAT = 60 / BPM;
 /** The first shot (the sentence on the edges) lasts this many beats; the words leave on its cut. */
 const OPENING_BEATS = 8;
 /** The words land this many beats apart (one every half second, as the original). */
@@ -20,6 +19,11 @@ const NAME_BEATS = 2.5;
 /** With an ending card (its last 1,6 s), the front is held half a beat longer and the name lands half a beat sooner. */
 const END_FRONT_BEATS = 7.5;
 const END_NAME_BEATS = 2;
+/** How long its address (seven words at most, landing on the sixth word) and her name before the card are read at a glance (s). */
+const ADDRESS_READ = 2.4;
+const NAME_READ = 1.5;
+/** The ending card: the Reel's last 1,6 s. */
+const CARD = 1.6;
 
 const CODE = String.raw`function Scene({ width, height, durationInFrames, brand, shots, reelTexts, end, texts }) {
   const h = React.createElement;
@@ -111,17 +115,25 @@ export const quatreCoins: MontageSkill = {
     { slot: "lieu", role: "band", want: "son quartier ou sa ville quand on les sait, sinon ce qu'elle est en un mot (« fleuriste », « atelier ») ; posé au milieu du bord droit (il s'écrit en minuscules)", max: 12, required: true },
     { slot: "adresse", role: "caption", want: "une ligne posée en bas : son adresse quand on la sait, sinon un repère concret qu'on sait (« ouvert dès 8 h »), sinon ce qu'elle fait en quelques mots (« fleurs de saison »)", max: 36, required: true },
   ],
-  timeline(n, { end }) {
+  timeline(n, options) {
+    const { end } = options;
+    // At its own tempo, or at a music's when the Reel follows one: every length in beats, so a slower tempo makes it longer
+    // and calmer, a faster one shorter, its cuts still on the beats.
+    const bpm = options.bpm ?? BPM;
+    const beat = 60 / bpm;
     // The life of the place between the first shot and its front: two quick shots, then a beat and a half or a beat and a quarter.
     const middle = Math.max(1, n - 2);
     const mids = Array.from({ length: middle }, (_, k) => (k < 2 ? 1 : k % 2 === 0 ? 1.5 : 1.25));
-    const front = end ? END_FRONT_BEATS : FRONT_BEATS;
-    const spans = beatSpans(BPM, [OPENING_BEATS, ...mids, front]);
+    // At a fast tempo a section is never shorter than its words need to be read (the address, her name before the card),
+    // in whole beats or half beats so its cut stays on one; at its own tempo, its beats as written.
+    const opening = Math.max(OPENING_BEATS, Math.ceil((5 * WORD_BEATS * beat + ADDRESS_READ) / beat));
+    const front = end ? Math.max(END_FRONT_BEATS, Math.ceil(((END_NAME_BEATS * beat + NAME_READ + CARD) / beat) * 2) / 2) : FRONT_BEATS;
+    const spans = beatSpans(bpm, [opening, ...mids, front]);
     const duration = spans.at(-1)!.end;
     const cut = spans[1]!.start;
     const frontAt = spans.at(-1)!.start;
     // A word every three quarters of a beat from the first image: its first words, then the name, the place, the address.
-    const word = (k: number) => round(k * WORD_BEATS * BEAT);
+    const word = (k: number) => round(k * WORD_BEATS * beat);
     const wants = [
       "le premier plan du lieu, large et vivant : quelqu'un au comptoir ou au travail, au centre de l'image ; les mots se posent sur ses bords, son centre reste libre",
       ...mids.map(() => "un plan vivant du lieu, en plein écran : l'équipe au travail, les clients, un geste, un détail"),
@@ -133,11 +145,11 @@ export const quatreCoins: MontageSkill = {
       texts: {
         debut: { from: word(0), to: cut },
         // Her name stays hers to the end: on the left edge with the sentence, then alone on her front.
-        nom: { from: word(3), to: end ? round(duration - 1.6) : duration },
+        nom: { from: word(3), to: end ? round(duration - CARD) : duration },
         lieu: { from: word(4), to: cut },
         adresse: { from: word(5), to: cut },
       },
-      marks: { step: WORD_BEATS * BEAT * 30, cut: toFrame(cut), name: toFrame(frontAt + (end ? END_NAME_BEATS : NAME_BEATS) * BEAT) },
+      marks: { step: WORD_BEATS * beat * 30, cut: toFrame(cut), name: toFrame(frontAt + (end ? END_NAME_BEATS : NAME_BEATS) * beat) },
     };
   },
   code: CODE,

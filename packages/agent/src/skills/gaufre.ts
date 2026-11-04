@@ -9,7 +9,6 @@ import { beatSpans, toFrame, type MontageSkill } from "../skills.ts";
 // card (an offer, an announcement) is the next card of the same paper, pressed and inked at once.
 
 const BPM = 84;
-const BEAT = 60 / BPM;
 /** The paper and its title last this many beats (the ink about 2,5 s, then held), as on the original (3,8 s). */
 const PAPER_BEATS = 5;
 /** The engine's ending card: the Reel's last 1.6 s (motion.ts, END_CARD_SECONDS). */
@@ -50,8 +49,11 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
     const front = (p * 150 - 32).toFixed(1);
     const back = (p * 150 - 6).toFixed(1);
     const layers = "linear-gradient(155deg, " + INK + " " + front + "%, rgba(168,56,10,0) " + back + "%), " + CAVITY;
-    const filter = "drop-shadow(0 " + px(-d) + " " + px(d * 0.6) + " rgba(70,30,5," + (0.6 - 0.45 * p).toFixed(3) + ")) drop-shadow(0 " + px(d) + " " + px(d * 0.6) + " rgba(255,251,243," + (0.95 - 0.6 * p).toFixed(3) + "))" +
-      (p > 0 ? " drop-shadow(" + px(d * 0.3 * p) + " " + px(d * 0.8 * p) + " 0 rgba(96,28,4," + (0.6 * p).toFixed(3) + ")) drop-shadow(0 " + px(d * 2 * p) + " " + px(d * 2.4) + " rgba(90,35,8," + (0.3 * p).toFixed(3) + "))" : "");
+    // Its shadows, each a filter pass: pressed, its two lips; inked, its thickness and its soft shadow; all four only
+    // while its ink flows in (a letter or two at a time), each fading out or in.
+    const lips = p < 1 ? "drop-shadow(0 " + px(-d) + " " + px(d * 0.6) + " rgba(70,30,5," + (0.6 * (1 - p)).toFixed(3) + ")) drop-shadow(0 " + px(d) + " " + px(d * 0.6) + " rgba(255,251,243," + (0.95 * (1 - p)).toFixed(3) + "))" : "";
+    const printed = p > 0 ? "drop-shadow(" + px(d * 0.3 * p) + " " + px(d * 0.8 * p) + " 0 rgba(96,28,4," + (0.6 * p).toFixed(3) + ")) drop-shadow(0 " + px(d * 2 * p) + " " + px(d * 2.4) + " rgba(90,35,8," + (0.3 * p).toFixed(3) + "))" : "";
+    const filter = [lips, printed].filter(Boolean).join(" ");
     return h("span", { key, style: { display: "inline-block", padding: "0.18em 0.12em 0.26em", margin: "-0.18em -0.12em -0.26em", backgroundImage: layers, backgroundSize: "100% 100%", WebkitBackgroundClip: "text", backgroundClip: "text", color: "transparent", WebkitTextFillColor: "transparent", filter } }, c);
   };
   const ink = (j, start, each, gap) => interpolate(frame, [start + j * gap, start + j * gap + each], [0, 1], { ...clamp, easing: Easing.inOut(Easing.quad) });
@@ -93,8 +95,10 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
     const longest = Math.max(1, ...lines.map((l) => l.length));
     const size = Math.round(Math.max(120, Math.min(fast ? 210 : 400, 800 / (longest * 0.4))));
     const n = count(title);
-    const each = fast ? 9 : 20;
-    const gap = fast ? Math.max(1, Math.min(3, Math.round(12 / Math.max(1, n - 1)))) : Math.max(3, Math.min(14, Math.round(50 / Math.max(1, n - 1))));
+    // The ink takes about two thirds of the card's time (its five beats: slower at a slower tempo), the line inks last.
+    const k = fast ? 1 : Math.max(0.6, Math.min(1.5, ((end ? endAt : durationInFrames) - PAPER) / 107));
+    const each = fast ? 9 : Math.round(20 * k);
+    const gap = fast ? Math.max(1, Math.min(3, Math.round(12 / Math.max(1, n - 1)))) : Math.max(2, Math.min(Math.round(14 * k), Math.round((50 * k) / Math.max(1, n - 1))));
     const titleDone = at + 3 + gap * Math.max(0, n - 1) + each;
     // The line: about a fifth of the title's size, never wider than the title, spread over its width when long enough.
     const m = small ? small.length : 0;
@@ -103,8 +107,8 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
     // Spread over the title's width when it nearly fills it (the original's line); a short one centred, spaced.
     const justify = m > 6 && m * 0.72 * lineSize >= titleWidth * 0.6;
     const lineAt = fast ? at + 8 : Math.round(at + (titleDone - at) * 0.6);
-    const lineEach = fast ? 7 : 12;
-    const lineGap = fast ? 1 : Math.max(1, Math.min(3, Math.round(20 / Math.max(1, count(small || "") - 1))));
+    const lineEach = fast ? 7 : Math.round(12 * k);
+    const lineGap = fast ? 1 : Math.max(1, Math.min(3, Math.round((20 * k) / Math.max(1, count(small || "") - 1))));
     let k = 0;
     const titleRows = lines.map((l, r) =>
       h("div", { key: "t" + r, style: { whiteSpace: "nowrap" } },
@@ -145,12 +149,18 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   // 3. Its ending card: the next card of the same paper, its title pressed and inked at once, its line under it.
   const ending = end && frame >= endAt ? card(String(end.title || ""), end.subtitle ? String(end.subtitle) : "", endAt, true) : null;
 
-  // The paper: its colour and grain, and the wavy fibres of a handmade sheet in relief, lit from the top left (an
-  // image drawn once and laid in overlay, so a long card costs nothing more).
-  const FIBRES = "<svg xmlns='http://www.w3.org/2000/svg' width='" + width + "' height='" + height + "'><filter id='f' x='0' y='0' width='100%' height='100%'><feTurbulence type='turbulence' baseFrequency='0.012 0.022' numOctaves='3' seed='4'/><feDiffuseLighting lighting-color='#ffffff' surfaceScale='3' diffuseConstant='1'><feDistantLight azimuth='235' elevation='28'/></feDiffuseLighting></filter><rect width='100%' height='100%' filter='url(#f)'/></svg>";
+  // The paper: its colour, its fine grain, the wavy fibres of a handmade sheet in relief lit from the top left, a little
+  // darker at its edges. Its textures are images drawn once (the same for every frame), so a long card costs nothing
+  // more, in the render as in the scene check.
+  const svg = (inner) => "url(\"data:image/svg+xml;charset=utf-8," + encodeURIComponent("<svg xmlns='http://www.w3.org/2000/svg' width='" + width + "' height='" + height + "'>" + inner + "</svg>") + "\")";
+  const FIBRES = svg("<filter id='f' x='0' y='0' width='100%' height='100%'><feTurbulence type='turbulence' baseFrequency='0.012 0.022' numOctaves='3' seed='4'/><feDiffuseLighting lighting-color='#ffffff' surfaceScale='3' diffuseConstant='1'><feDistantLight azimuth='235' elevation='28'/></feDiffuseLighting></filter><rect width='100%' height='100%' filter='url(#f)'/>");
+  const GRAIN = svg("<filter id='g'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' seed='7'/><feColorMatrix values='0 0 0 0 0.25  0 0 0 0 0.2  0 0 0 0 0.15  0 0 0 0.55 0'/></filter><rect width='100%' height='100%' filter='url(#g)'/>");
+  const layer = (image, extra) => h("div", { "aria-hidden": "true", style: { position: "absolute", inset: 0, backgroundImage: image, backgroundSize: "100% 100%", ...extra } });
   const paper = frame >= PAPER
-    ? h(Paper, { color: PAPER_COLOR, grain: 0.3, fibers: false, shade: 0.18 },
-        h("div", { "aria-hidden": "true", style: { position: "absolute", inset: 0, backgroundImage: "url(\"data:image/svg+xml;charset=utf-8," + encodeURIComponent(FIBRES) + "\")", backgroundSize: "100% 100%", mixBlendMode: "overlay", opacity: 0.5 } }))
+    ? h("div", { style: { ...box, backgroundColor: PAPER_COLOR, overflow: "hidden" } },
+        layer(GRAIN, { opacity: 0.3 }),
+        layer(FIBRES, { mixBlendMode: "overlay", opacity: 0.5 }),
+        h("div", { style: { position: "absolute", inset: 0, background: "radial-gradient(ellipse at 50% 45%, transparent 45%, rgba(40,24,10,0.063) 100%)" } }))
     : null;
   return h(AbsoluteFill, { style: { backgroundColor: "#000000" } }, film, paper, titled, ending, extra);
 }`;
@@ -167,20 +177,24 @@ export const gaufre: MontageSkill = {
     { slot: "titre", role: "hook", want: "le titre pressé dans le papier puis encré : son nom (le mieux), ou 1 à 3 mots qui la disent, dans sa casse, sans point", max: 22, required: true },
     { slot: "ligne", role: "caption", want: "une ligne courte sous le titre, en capitales espacées : son métier et son quartier, une date, ce qu'elle fait (une forme comme « pâtisserie · paris 11e », « depuis 1998 »)", max: 24, required: false },
   ],
-  timeline(n, { end }) {
+  timeline(n, options: { end: boolean; bpm?: number }) {
+    const { end } = options;
+    // At her music's tempo when one is given (slower: a longer, calmer Reel; faster: a shorter one), else the model's.
+    const bpm = options.bpm ?? BPM;
+    const beat = 60 / bpm;
     // Calm shots of two beats, the last one held three before the paper; a single shot holds four (the original's
     // street, before its paper, holds about five).
     const count = Math.max(1, Math.min(6, n));
     const lens = count === 1 ? [4] : [...Array.from({ length: count - 1 }, () => 2), 3];
     const shown = lens.reduce((a, b) => a + b, 0);
     // The last shot's segment runs on under the paper (its cut to the paper is on a beat), and under the ending card.
-    const spans = beatSpans(BPM, [...lens.slice(0, -1), lens.at(-1)! + PAPER_BEATS]);
-    const paperAt = onFrame(shown * BEAT);
-    const cardAt = onFrame((shown + PAPER_BEATS) * BEAT);
+    const spans = beatSpans(bpm, [...lens.slice(0, -1), lens.at(-1)! + PAPER_BEATS]);
+    const paperAt = onFrame(shown * beat);
+    const cardAt = onFrame((shown + PAPER_BEATS) * beat);
     const duration = round(end ? onFrame(cardAt + END_CARD) : cardAt);
     spans[spans.length - 1] = { start: spans.at(-1)!.start, end: duration };
     // The last one is seen for its first beats only: the paper comes over it.
-    const seen = (lens.at(-1)! * BEAT).toFixed(1).replace(".", ",");
+    const seen = (lens.at(-1)! * beat).toFixed(1).replace(".", ",");
     const wants = lens.map((_, i) =>
       i === lens.length - 1
         ? `${i === 0 ? "le seul plan du Reel" : "le dernier plan"}, calme et beau, en plein écran : seules ses ${seen} premières secondes se voient, puis le papier vient par-dessus (un plan large ou un détail qui respire)`
@@ -196,7 +210,7 @@ export const gaufre: MontageSkill = {
         titre: { from: round(paperAt), to: round(cardAt) },
         ligne: { from: round(paperAt), to: round(cardAt) },
       },
-      marks: { beat: BEAT * 30, paper: toFrame(paperAt) },
+      marks: { beat: beat * 30, paper: toFrame(paperAt) },
     };
   },
   code: CODE,

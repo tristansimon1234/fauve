@@ -23,7 +23,7 @@ import {
   skillFillSchema,
   skillPlan,
   skillShotCount,
-  skillShotsFor,
+  skillFit,
   type BrandProfile,
   type ClipAnalysis,
   type EditPlan,
@@ -103,8 +103,10 @@ export async function designSkill(params: {
   const name = houseModel(skill.key)?.name ?? skill.key;
   const files = skillFiles(params.mediaIds, params.clips, params.photos);
   if (!files.length) return null;
-  // As many shots as her files give, or, for a length she asked for, the count that comes closest to it.
-  const n = params.contract?.duration ? skillShotsFor(skill, params.contract.duration) : skillShotCount(skill, files);
+  // As many shots as her files give, or, for a length she asked for, the count (then the tempo) that comes closest to it.
+  const fit = params.contract?.duration ? skillFit(skill, params.contract.duration) : { n: skillShotCount(skill, files), bpm: skill.bpm };
+  const n = fit.n;
+  const bpm = fit.bpm !== skill.bpm ? fit.bpm : undefined;
   // A model Edith picked gives the form, never the silence: its optional title is written (dressedFloorNote's floor).
   const wordsWanted = Boolean(params.followed.dressed) && !skill.texts.some((t) => t.required) && skill.texts.length > 0;
   // A correction keeps its words but what her request changes: the words of its texts, by slot.
@@ -123,6 +125,7 @@ export async function designSkill(params: {
     contract: contractLines(params.contract),
     ...(current && Object.keys(current).length ? { current } : {}),
     ...(wordsWanted ? { wordsWanted } : {}),
+    ...(bpm ? { bpm } : {}),
   });
   // One small call fills it; `again`: its answer and what the check said of it, for a second try.
   const fillIt = async (again?: { answer: SkillFillAnswer; note: string }): Promise<SkillFillAnswer | null> => {
@@ -149,7 +152,7 @@ export async function designSkill(params: {
   const made = async (answer: SkillFillAnswer): Promise<{ plan: EditPlan; error?: string } | null> => {
     const fill = readSkillFill(skill, files, n, answer, { wordsWanted });
     if (!fill) return null;
-    const plan = skillPlan({ skill, name, files, fill });
+    const plan = skillPlan({ skill, name, files, fill, ...(bpm ? { bpm } : {}) });
     // The model's lettering when she chose it (her charter's when Edith picked it), and its finish (its grade, its grain).
     Object.assign(plan, followedLook(plan, params.followed));
     Object.assign(plan, followedFilter(plan, params.followed));

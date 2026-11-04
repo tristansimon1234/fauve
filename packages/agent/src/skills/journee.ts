@@ -6,11 +6,10 @@ import { beatSpans, toFrame, type MontageSkill } from "../skills.ts";
 // title stays over the next shot, where people walk past in front of it, and goes at the cut; then the day in short
 // shots, about one a beat (some half, some one and a half), details, gestures, passers-by; and an evening shot of
 // blurred lights held to the end. Here the title is hers and her passers-by walk in front of it when they are cut out
-// (in front of it, it simply stays, when they are not); its ending card (an offer, an announcement) is the title's red
+// (when they are not, the title simply stays in front); its ending card (an offer, an announcement) is the title's red
 // over the last shot.
 
 const BPM = 92;
-const BEAT = 60 / BPM;
 /** The title's two shots, in beats, and the evening shot that ends it. */
 const TITLE_SHOT = 2;
 const EVENING = 4;
@@ -131,14 +130,18 @@ export const journee: MontageSkill = {
     { slot: "surtitre", role: "caption", want: "2 ou 3 petits mots écrits à la main au-dessus du titre, qui l'amènent (une forme comme « une journée à », « un samedi chez », « le matin au »)", max: 20, required: true },
     { slot: "titre", role: "hook", want: "le titre rouge géant, sur une ligne en capitales : un seul mot de préférence (son quartier, sa rue, son nom s'il est court), plus il est court plus il est grand", max: 12, required: true },
   ],
-  timeline(n, { end }) {
+  timeline(n, options: { end: boolean; bpm?: number }) {
+    const { end } = options;
+    // At her music's tempo when one is given (slower: a longer, calmer Reel; faster: a shorter one), else the model's.
+    const bpm = options.bpm ?? BPM;
+    const beat = 60 / bpm;
     const count = Math.max(10, Math.min(18, n));
     // Two quick shots, the title's two shots, the day on the pattern, the evening shot held (longer under the ending card).
     const day = Array.from({ length: count - 5 }, (_, i) => PATTERN[i % PATTERN.length]!);
     const beats = [1, 1, TITLE_SHOT, TITLE_SHOT, ...day, EVENING];
-    const spans = beatSpans(BPM, beats);
+    const spans = beatSpans(bpm, beats);
     const eveningAt = spans.at(-1)!.start;
-    const duration = round(end ? onFrame(eveningAt + (EVENING - 1) * BEAT + END_CARD) : spans.at(-1)!.end);
+    const duration = round(end ? onFrame(eveningAt + (EVENING - 1) * beat + END_CARD) : spans.at(-1)!.end);
     spans[spans.length - 1] = { start: eveningAt, end: duration };
     const titleAt = spans[2]!.start;
     const dayAt = spans[4]!.start;
@@ -157,7 +160,7 @@ export const journee: MontageSkill = {
         surtitre: { from: round(titleAt), to: round(dayAt) },
         titre: { from: round(titleAt), to: round(dayAt) },
       },
-      marks: { beat: BEAT * 30, title: toFrame(titleAt), day: toFrame(dayAt) },
+      marks: { beat: beat * 30, title: toFrame(titleAt), day: toFrame(dayAt) },
     };
   },
   code: CODE,
