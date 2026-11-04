@@ -1,6 +1,6 @@
 # Reprise — où on en est (4 novembre 2026)
 
-À lire en premier dans une nouvelle conversation, avant CLAUDE.md. Une conversation = un chantier.
+À lire en premier dans une nouvelle conversation (CLAUDE.md y renvoie). Une conversation = un chantier ; ce fichier se met à jour à la fin de chacun.
 
 ## Fait (3 et 4 novembre, en ligne sur edith-ai.app)
 
@@ -8,6 +8,7 @@
 2. **Les 31 modèles d'Edith voient leur original.** Chaque Reel de référence est gardé (`house/originals/<clé>.mp4`, jamais montré) avec ses planches de dix images (`house/sheets/<clé>/`, `houseSheets`, `/api/admin/house-sheets`) ; la vidéo des « ingénieurs IA » n'est plus gardée.
 3. **Un seul réalisateur pour un Reel qui suit un modèle** (`lib/agent/director.ts`, `packages/agent/src/director.ts`) : il voit l'original et ses fichiers en planches, écrit le plan et le code de la composition en une réponse, puis regarde son Reel à côté de l'original au même instant dans sa propre étape (`look`) et corrige tout ou garde. Repli sur le monteur et le motion designer s'il échoue. Le format de sa réponse est plat (une composition imbriquée faisait refuser la grammaire par l'API) ; `step=grammar` du banc le vérifie pour quelques jetons.
 4. **Plus de marque dans le nom d'un modèle** : « Montage façon Nike » s'appelle « Montage sport noir et blanc » (sa clé reste `nike` ; `HOUSE_VERSION` 4 réécrit les modèles en base).
+5. **CLAUDE.md allégé** (4 novembre) : 37 700 caractères au lieu de 424 000 (environ 10 000 jetons au lieu de 115 000). Il garde le produit, la stack, les conventions, les règles de travail avec Tristan, des règles transverses et l'index des sujets ; le détail de chaque fonction est dans 31 fichiers `docs/<sujet>.md`, déplacé mot pour mot par script (aucune ligne perdue ni doublée).
 
 ## Banc du réalisateur (3 novembre, soir)
 
@@ -24,7 +25,7 @@ Pistes : il écrit plan et code en un appel, en effort medium, avec un très lon
 
 ## Prochains chantiers (dans l'ordre)
 
-1. **Alléger CLAUDE.md** (une conversation courte, conseillée en premier : toutes les suivantes en profitent) : 413 000 caractères, environ 115 000 jetons chargés au début de chaque conversation (c'est ce qui la remplit si vite). Garder 15 000 à 20 000 jetons : le produit, la stack, les conventions, les règles de travail, l'index des sujets ; déplacer le détail de chaque fonction dans `docs/<sujet>.md`, lu seulement quand on y touche. Déplacer les paragraphes par script, sans les réécrire, pour ne rien perdre.
+1. ~~Alléger CLAUDE.md~~ : fait le 4 novembre (voir « Fait »).
 2. **Une librairie de « skills de montage »** (plan validé avec Tristan le 4 novembre, détail ci-dessous).
 3. **Ajouter des skills au fil de l'eau** : un outil d'admin « nouveau skill depuis un lien » (original et planches, lecture, skill écrit sur des plans du banc, aperçu à valider par Tristan avant d'entrer dans la librairie).
 4. **Recopie fidèle des 9 Reels de la landing** par la chaîne, avant/après.
@@ -47,9 +48,4 @@ Plus tard : des skills qui se combinent (l'ouverture d'un modèle, la fin d'un a
 
 ## Règles de travail avec Tristan
 
-- Dire la correction avant de la faire ; en français, court.
-- Expliquer d'abord ce qu'on veut faire et où on en est, avec ce qu'il connaît (Edits, CapCut), avant de proposer : il veut comprendre, pas une liste de fonctions.
-- Aucun appel d'API facturé hors d'un banc d'essai annoncé (quelques centimes à 1 € par essai, le coût dit après).
-- Toujours dire qui a fait un Reel : la chaîne d'Edith ou Claude à la main. Ne pas toucher la landing sans qu'il le demande.
-- Jamais de secret affiché ni demandé : les appels d'admin passent par la base (`net.http_post` avec les secrets du Vault, réponse lue dans `net._http_response`).
-- À l'écran : « tu », jamais « la gérante » ; Edith n'est pas genré (« il », « l'assistant IA »).
+Dans CLAUDE.md (« Règles de travail avec Tristan »), lu au début de chaque conversation.
