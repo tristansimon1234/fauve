@@ -1731,3 +1731,38 @@ test("a skill's sound effects: on their own moments, all kept a frame apart at a
   assert.deepEqual(placed.map((p) => [p.at, p.gain]), [[0.995, 2], [1.195, 2], [1.395, 2], [1.595, 2]]);
 });
 
+test("« Plans fixes de cinéma » (v2): a dry click on each word of its title as its code lays it, again on her words", async () => {
+  const { plansFixes } = await import("./skills/plans-fixes.ts");
+  const { skillPlan, replaySkillAudio, skillWordsOf } = await import("./skills.ts");
+  const { leadPlan } = await import("./sound-follow.ts");
+  // The original's words land on its images 14, 26, 41, 59 and 83 (docs/fiches/plans-fixes.md): its code within 3 images,
+  // and a click on each.
+  const line = plansFixes.timeline(10, { end: false, words: { accroche: "The power of", titre: "Static shot" } });
+  const frames = (line.sounds ?? []).map((s) => Math.round(s.at * 30));
+  assert.deepEqual(frames, [14, 28, 42, 56, 83]);
+  [14, 26, 41, 59, 83].forEach((f, i) => assert.ok(Math.abs(frames[i]! - f) <= 3, `word ${i + 1}: image ${frames[i]}, the original's ${f}`));
+  assert.ok(line.sounds!.every((s) => s.sound === "light click" && s.seconds === 0.5));
+  // Its lengths never follow her words; without them (its lengths, the filler's input), no sounds.
+  const bare = plansFixes.timeline(10, { end: false });
+  assert.equal(bare.sounds, undefined);
+  assert.equal(bare.duration, line.duration);
+  // On the plan: its sounds, its own, valid; at another tempo, they follow its beats.
+  const files = Array.from({ length: 10 }, (_, i) => ({ id: `p${i}`, photo: true, seconds: 0 }));
+  const fill = { shots: files.map((f) => ({ file: f.id, at: 0 })), texts: { accroche: "un soir à", titre: "Belleville" }, end: null };
+  const plan = skillPlan({ skill: plansFixes, name: "Plans fixes", files, fill });
+  assert.ok(editPlanSchema.safeParse(plan).success);
+  assert.deepEqual(plan.sounds?.map((s) => [Math.round(s.at * 30), s.sound, s.skill]), [[14, "light click", true], [28, "light click", true], [42, "light click", true], [56, "light click", true]]);
+  assert.equal(plan.music_shape, undefined);
+  const slower = skillPlan({ skill: plansFixes, name: "Plans fixes", files, fill, bpm: 60 });
+  assert.equal(Math.round(slower.sounds![1]!.at * 30), 30);
+  // Her words changed by hand: a click on each of the new ones; another version or another cut keeps its own.
+  assert.deepEqual(skillWordsOf(plansFixes, plan.texts), { accroche: "un soir à", titre: "Belleville" });
+  const edited = { ...plan, texts: plan.texts.map((t) => (t.style === "hook" ? { ...t, text: "le canal Saint-Martin" } : t)) };
+  assert.equal(replaySkillAudio(plansFixes, edited)?.sounds?.length, 6);
+  assert.equal(replaySkillAudio(plansFixes, { ...edited, skill: { key: "plans-fixes", version: 1 } }), null);
+  assert.equal(replaySkillAudio(plansFixes, { ...edited, duration: edited.duration + 1 }), null);
+  // Held on its first image for a sound she follows: its clicks that much later, again the same on her words.
+  const held = leadPlan(plan, 0.3);
+  assert.deepEqual(held.sounds?.map((s) => s.at), plan.sounds!.map((s) => Math.round((s.at + 0.3) * 1000) / 1000));
+  assert.deepEqual(replaySkillAudio(plansFixes, held)?.sounds?.map((s) => Math.round(s.at * 100)), held.sounds?.map((s) => Math.round(s.at * 100)));
+});

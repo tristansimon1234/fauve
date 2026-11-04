@@ -6,9 +6,10 @@ import { beatSpans, type MontageSkill } from "../skills.ts";
 // the half beats: 0,47, 0,87 and 1,37 s), two serif words under them (1,97 and 2,77 s), nothing else, no shade but a
 // soft one, gone with the cut; then still shots of a beat each, from golden hour to blue hour, the camera never moving
 // and the world moving in it; the last one, at night, held two beats, a tiny line at the middle fading in. Here her words
-// land on the same beats, her photos are still too (the one that opens moves a little), a file seen again shows another
-// part of its picture (a video in width) or a closer frame, and its ending card (an offer, an announcement) is the
-// title's two levels at the middle of the last shot, faintly darkened.
+// land on the same beats, each with the original's dry click (docs/fiches/plans-fixes.md, effect 3: « chaque mot arrive
+// avec un clic sec, à une image près »), her photos are still too (the one that opens moves a little), a file seen again
+// shows another part of its picture (a video in width) or a closer frame, and its ending card (an offer, an
+// announcement) is the title's two levels at the middle of the last shot, faintly darkened.
 
 const BPM = 65;
 /** The first shot, with the title on it, then each still shot, then the last one, in beats. */
@@ -19,8 +20,32 @@ const LAST = 2;
 const MORE = 2;
 /** The engine's ending card: the Reel's last 1.6 s (motion.ts, END_CARD_SECONDS). */
 const END_CARD = 1.6;
+/** The click on each word of its title, as it lands (the sound library's « light click »). */
+const CLICK = { sound: "light click", seconds: 0.5 };
 const onFrame = (s: number) => Math.round(s * 30) / 30;
 const round = (n: number) => Math.round(n * 100) / 100;
+
+/** Its words as its code splits them: by spaces, a separator (« · », « — ») kept with the word before it. */
+function titleWords(text: string | undefined): string[] {
+  const out: string[] = [];
+  for (const w of String(text ?? "").split(/[ \t\n]+/).filter(Boolean)) {
+    if (out.length && !/[\p{L}\p{N}]/u.test(w)) out[out.length - 1] += "\u00a0" + w;
+    else out.push(w);
+  }
+  return out;
+}
+
+/**
+ * The frame each word of its title lands on, as its code lays them (its two levels from `start`, its words' first
+ * frame; `BEAT`, frames a beat): its small words on the half beats, its serif words after them, all in by the third beat.
+ */
+function wordFrames(small: string[], title: string[], start: number, BEAT: number): number[] {
+  const HALF = BEAT / 2;
+  const smallStep = Math.min(HALF, (1.5 * BEAT) / Math.max(1, small.length));
+  const serifFrom = start + (small.length ? small.length * smallStep : 0);
+  const serifStep = title.length > 1 ? Math.min(BEAT, Math.max(HALF / 2, (start + 3 * BEAT - serifFrom) / (title.length - 1))) : 0;
+  return [...small.map((_, i) => Math.round(start + i * smallStep)), ...title.map((_, i) => Math.round(serifFrom + i * serifStep))];
+}
 
 const CODE = String.raw`function Scene({ width, height, durationInFrames, brand, shots, reelTexts, end, texts }) {
   const h = React.createElement;
@@ -137,13 +162,14 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
 
 export const plansFixes: MontageSkill = {
   key: "plans-fixes",
-  version: 1,
+  // 2: the original's dry click on each word of the title, as it lands (its timeline's sounds).
+  version: 2,
   bpm: BPM,
   shots: [5, 12],
   // Up to 20 for a length she asks for: about 30 s at its own tempo.
   long: 20,
   files: [4, 10],
-  how: "Des plans fixes, la caméra posée, le monde qui bouge dedans : le premier tenu quatre temps et demi, un petit titre blanc au milieu en deux niveaux, ses petits mots sans serif au-dessus qui arrivent un à un sur les demi-temps, ses mots en serif dessous ; puis un plan fixe par temps, de l'heure dorée à l'heure bleue, et un dernier plan du soir tenu deux temps.",
+  how: "Des plans fixes, la caméra posée, le monde qui bouge dedans : le premier tenu quatre temps et demi, un petit titre blanc au milieu en deux niveaux, ses petits mots sans serif au-dessus qui arrivent un à un sur les demi-temps, ses mots en serif dessous, chaque mot avec un petit clic sec ; puis un plan fixe par temps, de l'heure dorée à l'heure bleue, et un dernier plan du soir tenu deux temps.",
   end: true,
   texts: [
     {
@@ -161,7 +187,7 @@ export const plansFixes: MontageSkill = {
       required: true,
     },
   ],
-  timeline(n, options: { end: boolean; bpm?: number }) {
+  timeline(n, options: { end: boolean; bpm?: number; words?: Record<string, string> }) {
     const { end } = options;
     // At her music's tempo when one is given (slower: a longer, calmer Reel; faster: a shorter one), else the model's.
     const bpm = options.bpm ?? BPM;
@@ -184,15 +210,20 @@ export const plansFixes: MontageSkill = {
       ),
       "le dernier plan fixe, tenu jusqu'à la fin : un plan du soir ou de nuit, calme, des lumières",
     ];
+    // Its words cut in from half a beat in, on the first shot, and go with the cut.
+    const from = round(onFrame(beat / 2));
+    // A click on each word as its code lays it (its beat in frames as its code reads it, its words' first frame).
+    const words = options.words;
+    const frames = words ? wordFrames(titleWords(words.accroche), titleWords(words.titre), Math.round(from * 30), Math.round(beat * 30 * 1000) / 1000) : [];
     return {
       duration,
       shots: spans.map((s, i) => ({ ...s, want: wants[i]! })),
-      // Its words cut in from half a beat in, on the first shot, and go with the cut.
       texts: {
-        accroche: { from: round(onFrame(beat / 2)), to: round(cut) },
-        titre: { from: round(onFrame(beat / 2)), to: round(cut) },
+        accroche: { from, to: round(cut) },
+        titre: { from, to: round(cut) },
       },
       marks: { beat: beat * 30 },
+      ...(frames.length ? { sounds: frames.map((f) => ({ at: f / 30, ...CLICK })) } : {}),
     };
   },
   code: CODE,
