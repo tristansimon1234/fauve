@@ -18,7 +18,7 @@ import type { z } from "zod";
 /** The source of the inspiration row a house model is kept on, per studio (one per model, made when first used). */
 export const HOUSE_SOURCE = "house";
 /** The catalogue's version: a studio's row written by an older one is rewritten when the model is used again (3: its original's sheets; 4: no brand in a model's name). */
-export const HOUSE_VERSION = 4;
+export const HOUSE_VERSION = 5;
 
 export type HouseModel = {
   key: string;
@@ -119,7 +119,7 @@ export const HOUSE_MODELS: HouseModel[] = [
   model({
     key: "quatre-coins",
     name: "Mots aux quatre coins",
-    pitch: "Une phrase posée mot à mot sur les bords du cadre, les grands mots coupés par le bord, sur tes plans du lieu.",
+    pitch: "Une phrase posée mot à mot le long des bords du cadre sur le premier plan de ton lieu, puis ton nom seul sur ta devanture.",
     needs: "4 à 10 vidéos de ton lieu, de l'équipe au travail et de ta devanture",
     files: [4, 12],
     pair: "grotesque",
@@ -132,24 +132,24 @@ export const HOUSE_MODELS: HouseModel[] = [
       hook: { kind: "pov", what: "une phrase qui se pose mot à mot sur les bords du cadre pendant le premier plan du lieu" },
       text: {
         amount: "un message tenu",
-        composition: "une phrase répartie sur les bords : trois petits mots en haut (gauche, milieu, droite), deux grands mots au milieu des bords gauche et droit coupés par le cadre, l'adresse en bas ; sans serif grasse très serrée, en minuscules",
+        composition: "une phrase le long des bords : ses premiers mots en haut (gauche, milieu, droite), son nom au milieu du bord gauche, son quartier au milieu du bord droit, l'adresse en bas ; même taille, jamais coupés ; sans serif grasse serrée, minuscules",
         case: "normal",
         weight: "bold",
         tracking: "tight",
         align: "left",
         shadow: "soft",
       },
-      layout: "plein cadre, avec des mots posés sur les quatre bords du cadre et coupés par lui pendant les premiers plans",
+      layout: "plein cadre, avec des mots posés le long des quatre bords du cadre pendant le premier plan",
       moments: [
-        { at: 0, what: "un mot toutes les demi-secondes, d'un coup, sur les bords : en haut à gauche, en haut au milieu, en haut à droite, puis un grand mot coupé par le bord gauche et un autre coupé par le bord droit, puis l'adresse en bas" },
-        { at: 4.2, what: "les mots restent pendant que les plans du lieu se succèdent sous eux, puis disparaissent d'un coup sur une coupe" },
-        { at: 14.5, what: "la devanture avec son enseigne, tenue jusqu'à la fin" },
+        { at: 0, what: "un mot toutes les demi-secondes, d'un coup, sur les bords : en haut à gauche, en haut au milieu, en haut à droite, puis son nom au milieu du bord gauche et son quartier au milieu du bord droit, puis l'adresse en bas" },
+        { at: 5.2, what: "les mots partent tous d'un coup sur la première coupe, puis la vie du lieu en plein écran, coupée sur le temps" },
+        { at: 14.5, what: "la devanture avec son enseigne, tenue jusqu'à la fin, son nom posé seul au milieu" },
       ],
       camera: "à la main",
       grade: "warm",
       music: "laid-back indie pop, warm guitar and soft drums",
       ending: "la devanture et son enseigne, tenue trois secondes",
-      why: "Le lieu se lit comme une couverture de magazine : les mots coupés par le bord donnent de l'échelle et une allure de studio, sans jamais cacher les gens.",
+      why: "Le lieu se lit comme une couverture de magazine : la phrase qui longe les bords donne de l'échelle et une allure de studio, sans jamais cacher les gens.",
     },
   }),
   model({
