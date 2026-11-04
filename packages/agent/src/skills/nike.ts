@@ -60,6 +60,7 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   // 1. The opening: her first shots, the first one through the strobe (red, negative, red), then the burst: her later
   // shots flashed ahead, each one still, red then black and white.
   let film = null;
+  let redShot = false;
   if (frame < BURST_AT) {
     const strobe = frame < 2 || (frame >= 5 && frame < 7) ? "red" : frame >= 2 && frame < 5 ? "negative" : null;
     film = strobe ? shot(0, strobe) : shot(cur, cur === 2 ? "red" : "bw", cur === 1 ? { hold: 3 } : null);
@@ -80,7 +81,9 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
     const s = shots[i];
     const frozen = frame >= FREEZE_AT && s ? { hold: Math.max(2, FREEZE_AT - s.from) } : null;
     const quick = s && s.durationInFrames <= Math.round(BEAT) + 1;
-    film = shot(i, (i - 3) % 4 === 2 ? "red" : "bw", frozen || (quick ? { hold: 3 } : null));
+    redShot = (i - 3) % 4 === 2;
+    // The first of them runs on under the title: it starts playing when it is seen.
+    film = shot(i, redShot ? "red" : "bw", frozen || (quick ? { hold: 3 } : s && s.from < WORDS_AT ? { at: WORDS_AT } : null));
   }
 
   // A long title on two lines, as even as can be, broken between words (a non-breaking space keeps « 9 h » whole).
@@ -105,17 +108,18 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
       : h(FitText, { style: { position: "absolute", left: 140, top: 760, width: width - 280, height: 400 }, innerStyle: { ...wordStyle, whiteSpace: "pre", color: RED } }, stacked(hook.text));
   }
 
-  // 3. The words, one per shot (or per beat when she gave more words than shots), red at the middle of the frame, each
-  // landing on its cut with two images in negative where it is black. Every word is in the page all along (her
-  // separators too), only the current one seen.
+  // 3. The words, one per shot (or per beat when she gave more words than shots), red at the middle of the frame (white
+  // over a red shot, where red would vanish), each landing on its cut with two images in negative where it is black.
+  // Every word is in the page all along (her separators too), only the current one seen.
   let words = null;
   let flash = false;
   if (list && frame >= WORDS_AT && frame < BLACK_AT) {
-    const parts = list.text.split(/(\s*[,;·|\/\n]\s*)/);
+    // Her words between commas (or slashes, dots, lines); none of them: a word each.
+    const parts = list.text.split(/[,;·|\/\n]/.test(list.text) ? /(\s*[,;·|\/\n]\s*)/ : /( +)/);
     const items = parts.filter((p, i) => i % 2 === 0 && p.trim());
     const W = Math.max(1, items.length);
     const section = [];
-    for (let i = 3; i < n; i++) section.push(shots[i].from);
+    for (let i = 3; i < n; i++) section.push(Math.max(WORDS_AT, shots[i].from));
     if (!section.length) section.push(WORDS_AT);
     const starts = items.map((_, k) =>
       W <= section.length ? section[Math.floor((k * section.length) / W)] : WORDS_AT + Math.round((k * (FREEZE_AT - WORDS_AT)) / W / BEAT) * BEAT);
@@ -127,9 +131,9 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
         if (i % 2 === 1 || !p.trim()) return h("span", { key: "p" + i, style: { position: "absolute", opacity: 0, fontSize: 1 } }, p);
         index += 1;
         const on = index === current;
-        return h(FitText, { key: "w" + i, style: { position: "absolute", left: 140, top: 850, width: width - 280, height: 220, opacity: on ? 1 : 0 }, innerStyle: { ...wordStyle, color: on && flash ? "#000000" : RED } }, p.trim());
+        return h(FitText, { key: "w" + i, style: { position: "absolute", left: 140, top: 760, width: width - 280, height: 400, opacity: on ? 1 : 0 }, innerStyle: { ...wordStyle, whiteSpace: "pre", color: on && flash ? "#000000" : redShot ? "#ffffff" : RED } }, stacked(p.trim()));
       }));
-    if (flash) film = shot(Math.max(3, cur), "negative");
+    if (flash) film = shot(Math.max(3, cur), "negative", shots[Math.max(3, cur)] && shots[Math.max(3, cur)].from < WORDS_AT ? { at: WORDS_AT } : null);
   }
 
   // Any other text of the Reel (none in its slots): a plain white line, so nothing she wrote is lost.
@@ -160,10 +164,11 @@ export const nike: MontageSkill = {
   ],
   timeline(n, { end }) {
     const count = Math.max(8, Math.min(16, n));
-    // Shots 1 and 2: a beat each; shot 3: a beat, then the burst and the title over it (its video runs on under them);
-    // the words' shots on the pattern; the last one: two beats, frozen one, then black (or the ending card).
+    // Shots 1 and 2: a beat each; shot 3: a beat, then the burst over it (its video runs on under it); the words' shots
+    // on the pattern, the first one under the title before it is seen; the last one: two beats, frozen one, then black
+    // (or the ending card). No segment longer than it must be: each one's video holds its passage.
     const words = Array.from({ length: count - 4 }, (_, i) => PATTERN[i % PATTERN.length]!);
-    const beats = [1, 1, 1 + BURST + TITLE, ...words, LAST + FROZEN + BLACK];
+    const beats = [1, 1, 1 + BURST, TITLE + words[0]!, ...words.slice(1), LAST + FROZEN + BLACK];
     const spans = beatSpans(BPM, beats);
     const lastAt = spans.at(-1)!.start;
     const freezeAt = onFrame(lastAt + LAST * BEAT);
@@ -176,8 +181,8 @@ export const nike: MontageSkill = {
     const wants = [
       "le plan qui ouvre : un geste fort en mouvement (il passe en rouge et en négatif)",
       "un plan en mouvement, de près",
-      "un plan fort, un visage ou un geste : il passe en rouge, juste avant la rafale et le titre",
-      ...words.map((b) => (b > 1 ? "un plan d'action tenu : un geste, un effort, un service, un mot en grand par-dessus" : "un plan d'action rapide, saccadé image par image")),
+      "un plan fort, un visage ou un geste : il passe en rouge, juste avant la rafale",
+      ...words.map((b, i) => (i === 0 ? "le premier plan des mots, juste après le titre : un geste fort, un mot en grand par-dessus" : b > 1 ? "un plan d'action tenu : un geste, un effort, un service, un mot en grand par-dessus" : "un plan d'action rapide, saccadé image par image")),
       "le dernier geste, fort et net : il se fige sur le dernier temps",
     ];
     return {

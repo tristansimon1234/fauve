@@ -2,16 +2,16 @@ import { beatSpans, toFrame, type MontageSkill } from "../skills.ts";
 
 // « Titre gaufré », written on its original (house/originals/gaufre.mp4, 12,8 s, looked at image by image): after the
 // façade that builds itself (its own model), a calm shot held full frame; a hard cut to a sheet of peach paper, its
-// grain and fibres visible, where the title is already pressed in (a big serif, in her case) with a line under it in
-// spaced capitals, set to the title's width; the rust ink flows into the letters one after the other from their top
-// left corner (the first letter in about a second, the next ones faster), the line inks last, and the inked card
-// holds to the end. Here her calm shots come first, cut on the beat, and the card is the Reel's end; its ending card
-// (an offer, an announcement) is the next card of the same paper, pressed and inked at once.
+// grain and fibres visible, where the title is already pressed in (one big serif word, in normal case) with a line
+// under it in spaced capitals, set to the title's width; the rust ink flows into the letters one after the other from
+// their top left corner (the first letter in about a second, the next ones faster), the line inks last, and the inked
+// card holds to the end. Here her calm shots come first, cut on the beat, and the card is the Reel's end; its ending
+// card (an offer, an announcement) is the next card of the same paper, pressed and inked at once.
 
 const BPM = 84;
 const BEAT = 60 / BPM;
-/** The paper and its title last this many beats (the ink about 3 s, then held). */
-const PAPER_BEATS = 6;
+/** The paper and its title last this many beats (the ink about 2,5 s, then held), as on the original (3,8 s). */
+const PAPER_BEATS = 5;
 /** The engine's ending card: the Reel's last 1.6 s (motion.ts, END_CARD_SECONDS). */
 const END_CARD = 1.6;
 const onFrame = (s: number) => Math.round(s * 30) / 30;
@@ -22,12 +22,13 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const frame = useCurrentFrame();
   const mark = (k, d) => { const v = Number(texts && texts[k]); return Number.isFinite(v) ? v : d; };
   const BEAT = mark("beat", 21.43);
-  const PAPER = mark("paper", Math.max(0, durationInFrames - Math.round(6 * BEAT)));
+  const PAPER = mark("paper", Math.max(0, durationInFrames - Math.round(5 * BEAT)));
   const clamp = { extrapolateLeft: "clamp", extrapolateRight: "clamp" };
   const cur = shots.reduce((k, s, i) => (s.from <= frame ? i : k), 0);
   const display = "'" + brand.displayFont + "', serif";
   const body = "'" + brand.bodyFont + "', serif";
-  // The model's own card: a peach paper and a rust ink, measured on its original.
+  // The model's own card: a peach paper and a rust ink, measured on its original (the paper's colour under its grain,
+  // shade and fibres, which bring it to the original's #f3caa2).
   const PAPER_COLOR = "#fac492";
   const INK = "#a8380a";
   const RELIEF = interpolateColors(0.07, [0, 1], [PAPER_COLOR, "#000000"]);
@@ -86,23 +87,24 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
 
   // 2. The card: her title pressed into the paper at the cut, as big as the card holds (the original's single word
   // fills two thirds of its width), a line in spaced capitals under it, justified to the title's width; the ink flows
-  // letter by letter (about 3 s whatever its length), then the line. One box, shrunk as a whole if it must.
+  // letter by letter (about 2,5 s whatever its length), then the line. One box, shrunk as a whole if it must.
   const card = (title, small, at, fast) => {
     const lines = linesOf(title, fast ? 2 : 3);
     const longest = Math.max(1, ...lines.map((l) => l.length));
     const size = Math.round(Math.max(120, Math.min(fast ? 210 : 400, 800 / (longest * 0.4))));
     const n = count(title);
-    const each = fast ? 9 : 22;
-    const gap = fast ? Math.max(1, Math.min(3, Math.round(12 / Math.max(1, n - 1)))) : Math.max(4, Math.min(16, Math.round(62 / Math.max(1, n - 1))));
+    const each = fast ? 9 : 20;
+    const gap = fast ? Math.max(1, Math.min(3, Math.round(12 / Math.max(1, n - 1)))) : Math.max(3, Math.min(14, Math.round(50 / Math.max(1, n - 1))));
     const titleDone = at + 3 + gap * Math.max(0, n - 1) + each;
     // The line: about a fifth of the title's size, never wider than the title, spread over its width when long enough.
     const m = small ? small.length : 0;
     const titleWidth = Math.min(800, longest * 0.45 * size);
     const lineSize = Math.round(Math.max(40, Math.min(size * 0.22, 96, titleWidth / Math.max(1, m * 0.7))));
-    const justify = m > 6;
-    const lineAt = fast ? at + 8 : Math.round(at + (titleDone - at) * 0.7);
-    const lineEach = fast ? 7 : 14;
-    const lineGap = fast ? 1 : Math.max(1, Math.min(4, Math.round(24 / Math.max(1, count(small || "") - 1))));
+    // Spread over the title's width when it nearly fills it (the original's line); a short one centred, spaced.
+    const justify = m > 6 && m * 0.72 * lineSize >= titleWidth * 0.6;
+    const lineAt = fast ? at + 8 : Math.round(at + (titleDone - at) * 0.6);
+    const lineEach = fast ? 7 : 12;
+    const lineGap = fast ? 1 : Math.max(1, Math.min(3, Math.round(20 / Math.max(1, count(small || "") - 1))));
     let k = 0;
     const titleRows = lines.map((l, r) =>
       h("div", { key: "t" + r, style: { whiteSpace: "nowrap" } },
@@ -129,7 +131,7 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
     // The ending card's line (an address, a date: as long as it needs) under its title, pressed, then inked as a whole.
     const p = ink(0, lineAt, 10, 1);
     return h(React.Fragment, null, block,
-      h(FitText, { style: { position: "absolute", left: 140, top: 1150, width: width - 280, height: 170 }, innerStyle: { fontFamily: body, fontWeight: 700, fontSynthesis: "none", fontSize: 52, lineHeight: 1.2, letterSpacing: "0.12em", textTransform: "uppercase", textWrap: "balance", color: interpolateColors(p, [0, 1], [RELIEF, INK]), filter: "drop-shadow(0 -1px 0.8px rgba(70,30,5,0.45)) drop-shadow(0 1px 0.8px rgba(255,251,243,0.85))" } }, small));
+      h(FitText, { style: { position: "absolute", left: 140, top: 1150, width: width - 280, height: 210 }, innerStyle: { fontFamily: body, fontWeight: 700, fontSynthesis: "none", fontSize: 52, lineHeight: 1.2, letterSpacing: "0.08em", textTransform: "uppercase", textWrap: "balance", color: interpolateColors(p, [0, 1], [RELIEF, INK]), filter: "drop-shadow(0 -1px 0.8px rgba(70,30,5,0.45)) drop-shadow(0 1px 0.8px rgba(255,251,243,0.85))" } }, small));
   };
   const onPaper = frame >= PAPER && frame < endAt;
   const titled = onPaper && (hook || line)

@@ -33,6 +33,9 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const endAt = end ? end.from : durationInFrames + 1;
   // White on her footage with the model's soft shade, and a tight dark edge so it reads on a white plate too.
   const shade = "0 1px 2px rgba(0,0,0,0.5), 0 0 1px rgba(0,0,0,0.35), 0 2px 14px rgba(0,0,0,0.3)";
+  // A line that wraps never cuts a word at its hyphen (« rendez-vous » stays whole); its spaces are kept as they are, the
+  // words held in one block so the box lays them out as one text.
+  const unbroken = (text) => h("span", { style: { display: "block" } }, String(text || "").split(/(\s+)/).map((w, i) => (/^\s+$/.test(w) || !w ? w : h("span", { key: i, style: { whiteSpace: "nowrap" } }, w))));
 
   // Its moments, in order: pairs (the person on the left, what she makes on the right) and the person alone.
   const moments = [];
@@ -72,20 +75,20 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const label = { fontFamily: display, fontWeight: 400, fontSize: 54, lineHeight: 1.1, letterSpacing: "0.005em", color: "#ffffff", whiteSpace: "nowrap", textShadow: shade };
   const paired = now && now.b >= 0;
   const title = (t, center) => t && paired && frame >= t.from && frame < Math.min(t.to, endAt)
-    ? h(FitText, { key: "t" + center, style: { position: "absolute", left: center - 230, top: 812, width: 460, height: 134 }, innerStyle: { ...label, whiteSpace: "normal", textWrap: "balance" } }, t.text)
+    ? h(FitText, { key: "t" + center, style: { position: "absolute", left: center - 230, top: 812, width: 460, height: 134 }, innerStyle: { ...label, whiteSpace: "normal", textWrap: "balance" } }, unbroken(t.text))
     : null;
   const titles = [title(person, M + Math.round(half / 2)), title(result, M + half + Math.round((W - half) / 2))];
 
   // Any other text of the Reel (none in its slots): a plain line under the titles, so nothing she wrote is lost.
   const extra = others.filter((t) => frame >= t.from && frame < Math.min(t.to, endAt)).map((t, i) =>
-    h(FitText, { key: "x" + i, style: { position: "absolute", left: 140, top: 1180, width: width - 280, height: 150 }, innerStyle: { ...label, whiteSpace: "normal", textWrap: "balance" } }, t.text));
+    h(FitText, { key: "x" + i, style: { position: "absolute", left: 140, top: 1180, width: width - 280, height: 150 }, innerStyle: { ...label, whiteSpace: "normal", textWrap: "balance" } }, unbroken(t.text)));
 
   // 3. Its ending card: the last pair darkened, its title in the serif across the middle, a line in small capitals.
   const ending = end && frame >= endAt
     ? h(AbsoluteFill, { style: { backgroundColor: "rgba(0,0,0," + (0.55 * Math.min(1, (frame - endAt + 1) / 6)).toFixed(3) + ")" } },
-        h(FitText, { style: { position: "absolute", left: 140, top: 680, width: width - 280, height: 340 }, innerStyle: { ...label, fontSize: 116, lineHeight: 1.0, whiteSpace: "normal", textWrap: "balance" } }, String(end.title || "")),
+        h(FitText, { style: { position: "absolute", left: 140, top: 680, width: width - 280, height: 340 }, innerStyle: { ...label, fontSize: 116, lineHeight: 1.0, whiteSpace: "normal", textWrap: "balance" } }, unbroken(end.title)),
         end.subtitle
-          ? h(FitText, { style: { position: "absolute", left: 140, top: 1046, width: width - 280, height: 200 }, innerStyle: { fontFamily: body, fontWeight: 500, fontSize: 48, lineHeight: 1.15, letterSpacing: "0.1em", textTransform: "uppercase", color: "#ffffff", whiteSpace: "normal", textWrap: "balance", justifyContent: "flex-start", textShadow: shade, opacity: frame >= endAt + 6 ? 1 : 0 } }, end.subtitle)
+          ? h(FitText, { style: { position: "absolute", left: 140, top: 1046, width: width - 280, height: 200 }, innerStyle: { fontFamily: body, fontWeight: 500, fontSize: 48, lineHeight: 1.15, letterSpacing: "0.1em", textTransform: "uppercase", color: "#ffffff", whiteSpace: "normal", textWrap: "balance", justifyContent: "flex-start", textShadow: shade, opacity: frame >= endAt + 6 ? 1 : 0 } }, unbroken(end.subtitle))
           : null)
     : null;
 

@@ -17,8 +17,9 @@ const WORD_BEATS = 0.75;
 /** The front, held: this many beats, and the name lands this many beats into it. */
 const FRONT_BEATS = 7;
 const NAME_BEATS = 2.5;
-/** With an ending card, the front is held this many beats longer (the card is its last 1,6 s). */
-const END_BEATS = 2.5;
+/** With an ending card (its last 1,6 s), the front is held half a beat longer and the name lands half a beat sooner. */
+const END_FRONT_BEATS = 7.5;
+const END_NAME_BEATS = 2;
 
 const CODE = String.raw`function Scene({ width, height, durationInFrames, brand, shots, reelTexts, end, texts }) {
   const h = React.createElement;
@@ -43,6 +44,9 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const shade = "0 1px 2px rgba(0,0,0,0.5), 0 0 1px rgba(0,0,0,0.35), 0 2px 18px rgba(0,0,0,0.22)";
   const word = { fontFamily: display, fontWeight: 600, fontSize: 84, lineHeight: 1.04, letterSpacing: "-0.035em", color: cream, whiteSpace: "nowrap", textShadow: shade };
   const lower = { textTransform: "lowercase" };
+  // A line that wraps never cuts a word at its hyphen (« rendez-vous » stays whole); its spaces are kept as they are, the
+  // words held in one block so the box lays them out as one text.
+  const unbroken = (text) => h("span", { style: { display: "block" } }, String(text || "").split(/(\s+)/).map((w, i) => (/^\s+$/.test(w) || !w ? w : h("span", { key: i, style: { whiteSpace: "nowrap" } }, w))));
 
   // 1. Her shots full frame, one after the other, each at its own moment.
   const footage = h(Footage, { shot: cur, style: { left: 0, top: 0, width, height } });
@@ -51,11 +55,11 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   // places (the first on the left edge, the last on the right one), shrunk together for long words. A word not landed
   // yet is laid out already, unseen, so nothing moves when it lands.
   const first = opening ? opening.text.split(/\s+/).filter(Boolean) : [];
-  const top = first.length > 3 ? [first[0], first[1], first.slice(2).join(" ")] : first;
+  const along = first.length > 3 ? [first[0], first[1], first.slice(2).join(" ")] : first;
   const topRow = on(opening, CUT)
     ? h(FitText, { style: { position: "absolute", left: 40, top: 84, width: width - 80, height: 104 }, innerStyle: { alignItems: "stretch" } },
-        h("div", { style: { display: "flex", justifyContent: top.length > 1 ? "space-between" : "flex-start", alignItems: "baseline", gap: 36 } },
-          top.map((w, i) => h("span", { key: i, style: { ...word, ...(i ? lower : {}), opacity: frame >= opening.from + Math.round(i * STEP) ? 1 : 0 } }, w))))
+        h("div", { style: { display: "flex", justifyContent: along.length > 1 ? "space-between" : "flex-start", alignItems: "baseline", gap: 36 } },
+          along.map((w, i) => h("span", { key: i, style: { ...word, ...(i ? lower : {}), opacity: frame >= opening.from + Math.round(i * STEP) ? 1 : 0 } }, w))))
     : null;
   // Her name on the middle of the left edge, her place on the right one: clear of the apps' buttons (above the middle).
   const midRow = on(name, CUT) || on(place, CUT)
@@ -67,7 +71,7 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   // A line along the bottom (her address), as written, on two lines when it is long; above the apps' caption, with room
   // for a font whose letters reach far above and below their line.
   const bottomRow = on(address, CUT)
-    ? h(FitText, { style: { position: "absolute", left: 140, top: 1266, width: width - 280, height: 152 }, innerStyle: { ...word, fontSize: 64, whiteSpace: "normal", textWrap: "balance", justifyContent: "flex-end" } }, address.text)
+    ? h(FitText, { style: { position: "absolute", left: 140, top: 1266, width: width - 280, height: 152 }, innerStyle: { ...word, fontSize: 64, whiteSpace: "normal", textWrap: "balance", justifyContent: "flex-end" } }, unbroken(address.text))
     : null;
 
   // 3. Her front, held: her name lands alone in the middle, white, a little larger.
@@ -77,14 +81,14 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
 
   // Any other text of the Reel (none in its slots): a plain line above the bottom one, so nothing she wrote is lost.
   const extra = others.filter((t) => frame >= t.from && frame < Math.min(t.to, endAt)).map((t, i) =>
-    h(FitText, { key: "x" + i, style: { position: "absolute", left: 140, top: 1090, width: width - 280, height: 150 }, innerStyle: { ...word, fontSize: 60, whiteSpace: "normal", textWrap: "balance" } }, t.text));
+    h(FitText, { key: "x" + i, style: { position: "absolute", left: 140, top: 1090, width: width - 280, height: 150 }, innerStyle: { ...word, fontSize: 60, whiteSpace: "normal", textWrap: "balance" } }, unbroken(t.text)));
 
   // 4. Its ending card: the front darkened, its title in the middle and its line along the bottom, cut in like its words.
   const ending = end && frame >= endAt
     ? h(AbsoluteFill, { style: { backgroundColor: "rgba(0,0,0," + (0.5 * Math.min(1, (frame - endAt + 1) / 6)).toFixed(3) + ")" } },
-        h(FitText, { style: { position: "absolute", left: 140, top: 700, width: width - 280, height: 320 }, innerStyle: { ...word, fontSize: 92, lineHeight: 1.02, whiteSpace: "normal", textWrap: "balance", color: "#ffffff" } }, String(end.title || "")),
+        h(FitText, { style: { position: "absolute", left: 140, top: 700, width: width - 280, height: 320 }, innerStyle: { ...word, fontSize: 92, lineHeight: 1.02, whiteSpace: "normal", textWrap: "balance", color: "#ffffff" } }, unbroken(end.title)),
         end.subtitle
-          ? h(FitText, { style: { position: "absolute", left: 140, top: 1240, width: width - 280, height: 178 }, innerStyle: { ...word, fontSize: 56, lineHeight: 1.04, whiteSpace: "normal", textWrap: "balance", justifyContent: "flex-end", opacity: frame >= endAt + 8 ? 1 : 0 } }, end.subtitle)
+          ? h(FitText, { style: { position: "absolute", left: 140, top: 1240, width: width - 280, height: 178 }, innerStyle: { ...word, fontSize: 56, lineHeight: 1.04, whiteSpace: "normal", textWrap: "balance", justifyContent: "flex-end", opacity: frame >= endAt + 8 ? 1 : 0 } }, unbroken(end.subtitle))
           : null)
     : null;
 
@@ -104,14 +108,14 @@ export const quatreCoins: MontageSkill = {
   texts: [
     { slot: "debut", role: "caption", want: "1 à 3 petits mots qui ouvrent la phrase, posés en haut à gauche, au milieu et à droite (une forme comme « un matin chez », « un samedi au », « une journée chez ») ; chacun court", max: 24, required: true },
     { slot: "nom", role: "hook", want: "son nom, posé au milieu du bord gauche, puis seul au milieu de sa devanture à la fin (il s'écrit en minuscules)", max: 14, required: true },
-    { slot: "lieu", role: "band", want: "son quartier ou sa ville, posé au milieu du bord droit (il s'écrit en minuscules)", max: 12, required: true },
-    { slot: "adresse", role: "caption", want: "une ligne posée en bas : son adresse, ou un repère concret qu'on sait (« ouvert dès 8 h »), sinon vide", max: 36, required: false },
+    { slot: "lieu", role: "band", want: "son quartier ou sa ville quand on les sait, sinon ce qu'elle est en un mot (« fleuriste », « atelier ») ; posé au milieu du bord droit (il s'écrit en minuscules)", max: 12, required: true },
+    { slot: "adresse", role: "caption", want: "une ligne posée en bas : son adresse quand on la sait, sinon un repère concret qu'on sait (« ouvert dès 8 h »), sinon ce qu'elle fait en quelques mots (« fleurs de saison »)", max: 36, required: true },
   ],
   timeline(n, { end }) {
     // The life of the place between the first shot and its front: two quick shots, then a beat and a half or a beat and a quarter.
     const middle = Math.max(1, n - 2);
     const mids = Array.from({ length: middle }, (_, k) => (k < 2 ? 1 : k % 2 === 0 ? 1.5 : 1.25));
-    const front = FRONT_BEATS + (end ? END_BEATS : 0);
+    const front = end ? END_FRONT_BEATS : FRONT_BEATS;
     const spans = beatSpans(BPM, [OPENING_BEATS, ...mids, front]);
     const duration = spans.at(-1)!.end;
     const cut = spans[1]!.start;
@@ -133,7 +137,7 @@ export const quatreCoins: MontageSkill = {
         lieu: { from: word(4), to: cut },
         adresse: { from: word(5), to: cut },
       },
-      marks: { step: WORD_BEATS * BEAT * 30, cut: toFrame(cut), name: toFrame(frontAt + NAME_BEATS * BEAT) },
+      marks: { step: WORD_BEATS * BEAT * 30, cut: toFrame(cut), name: toFrame(frontAt + (end ? END_NAME_BEATS : NAME_BEATS) * BEAT) },
     };
   },
   code: CODE,
