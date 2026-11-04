@@ -1477,7 +1477,7 @@ test("a montage skill played at another tempo keeps its cuts on that tempo's bea
   }
 });
 
-test("a montage skill's still shots get none of the engine's slow pushes: its code moves them", async () => {
+test("still shots get none of the engine's slow pushes, in a montage skill (its code moves them) or in the editor's plan", async () => {
   const { skillFor } = await import("./skill-library.ts");
   const { skillPlan } = await import("./skills.ts");
   const { finishPlan } = await import("./finish.ts");
@@ -1490,7 +1490,7 @@ test("a montage skill's still shots get none of the engine's slow pushes: its co
   const facts = { clips: { v: { duration: 60, orientation: "landscape", summary: "", setting: "", lighting: "ok", shots: [still], best_moments: [], transcript: "", issues: [] } }, photos: {} } as never;
   const moved = (p: typeof plan) => p.segments.filter((s) => "move" in s && s.move && s.move !== "none").length;
   assert.equal(moved(finishPlan(plan, facts, { v: 60 })), 0);
-  // The same shots in a plan of the editor's: one long still shot in two gets its slow push.
+  // The same shots in a plan of the editor's: as filmed too (Tristan, on the light zooms: « je trouve ça cheap »).
   const { skill: _skill, ...chain } = plan;
-  assert.ok(moved(finishPlan(chain as typeof plan, facts, { v: 60 })) > 0);
+  assert.equal(moved(finishPlan(chain as typeof plan, facts, { v: 60 })), 0);
 });

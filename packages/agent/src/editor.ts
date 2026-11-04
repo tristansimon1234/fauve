@@ -82,7 +82,7 @@ Her voice (« voice »): the Reel is cut on it and lasts at least « ends_at » 
 
 Her first Reel (« first_reel ») is how she discovers what Edith can do: it should make her say « waouh » within a second: her most beautiful shot with the promise in an animation over it, her best shots in a real story, little text, a lively pace, an ending on the most beautiful shot, the animations allowed (usually 2) over her images. Her request and « reel_a_recopier » still come first.
 
-Transitions stay invisible: « cut » almost always, « fade » only for a calm Reel with long shots; no strong zoom on every shot. The engine puts one signature transition on the shot where your « band » appears. « look »: « none » most of the time; « dust » (discreet film dust) for a key message or a retro, night or handmade mood; another only when her request or « reel_a_recopier » has one: « disposable », « vhs », « y2k », « cine », « bw », or her words in French.
+Transitions stay invisible: « cut » almost always, « fade » only for a calm Reel with long shots; never a zoom as a transition (it reads cheap). On a calm Reel, the engine sweeps her colour into the shot where your « band » appears. « look »: « none » most of the time; « dust » (discreet film dust) for a key message or a retro, night or handmade mood; another only when her request or « reel_a_recopier » has one: « disposable », « vhs », « y2k », « cine », « bw », or her words in French.
 
 « duration »: the sum of the shots' lengths on screen. 7 to 15 s for an announcement or a mood, 20 to 30 s for a story; up to 45 s only when someone speaks or a voice tells it all along, or when the Reel she copies is that long; never over 45 s.
 
@@ -181,7 +181,8 @@ export const editorOutputSchema = z.object({
     ...editorRhythm,
     segments: z.array(z.union([editorShotSchema, editorAnimationSchema])).min(1),
     texts: z.array(editorTextSchema),
-    transitions: z.enum(["cut", "fade", "light_zoom"]),
+    // No « light_zoom » (every shot pushing in, Tristan: « je trouve ça cheap »): an older plan's stays readable (EditPlan).
+    transitions: z.enum(["cut", "fade"]),
     subtitles: z.boolean(),
     captions: z
       .enum(["native", "kinetic", "stickers"])
@@ -214,12 +215,13 @@ export function editorLook(plan: unknown): { look: ReelLook | null } | { design:
 }
 
 /**
- * The Reel's signature transition: a short zoom for a lively Reel (and a collage), a
- * brand-colour wipe for a calm one (100 BPM and up is lively; an older Reel: by its ambiance).
+ * The Reel's signature transition: a brand-colour wipe for a calm one (under 100 BPM; an older Reel: by its
+ * ambiance); a lively Reel (and a collage) cuts clean. Its short zoom that settled (« punch ») is gone (Tristan: « un
+ * truc que je trouve cheap les transitions avec un zoom léger »): an older plan's still plays.
  */
-export function signatureTransition(template: MotionTemplate, tempo?: number): "punch" | "wipe" {
-  if (template === "libre") return (tempo ?? TEMPLATE_BPM.libre) >= 100 ? "punch" : "wipe";
-  return template === "dynamique" || template === "collage" ? "punch" : "wipe";
+export function signatureTransition(template: MotionTemplate, tempo?: number): "wipe" | null {
+  if (template === "libre") return (tempo ?? TEMPLATE_BPM.libre) >= 100 ? null : "wipe";
+  return template === "dynamique" || template === "collage" ? null : "wipe";
 }
 
 /** The tempo the editor may choose (beats per minute). */
@@ -478,7 +480,7 @@ export function fromEditorPlan(input: EditorPlanIn, looks: SavedLook[] = []): Ed
           ...(move ? { move } : {}),
           ...(speed ? { speed } : {}),
           // The one signature transition goes on the shot the editor named (a video or a photo).
-          ...(i === signatureAt ? { accent: signature } : {}),
+          ...(i === signatureAt && signature ? { accent: signature } : {}),
         };
       }
       if (!("motion" in s)) return s as PlanSegment;

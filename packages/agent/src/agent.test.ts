@@ -397,7 +397,8 @@ test("the editor chooses each Reel's tempo and the collage form, no ambiance", a
   assert.equal(calm.tempo, 82);
   assert.equal(calm.segments.find((s) => "accent" in s && s.accent)?.["accent" as never], "wipe"); // a calm Reel's signature: the wipe
   const lively = fromEditorPlan({ ...base, tempo: 124, form: "montage" as const });
-  assert.equal(lively.segments.find((s) => "accent" in s && s.accent)?.["accent" as never], "punch");
+  // A lively Reel cuts clean: no short zoom that settles (Tristan: « je trouve ça cheap »).
+  assert.equal(lively.segments.find((s) => "accent" in s && s.accent), undefined);
   assert.equal(fromEditorPlan({ ...base, tempo: 400, form: "montage" as const }).tempo, 130); // kept in its range
   assert.equal(fromEditorPlan({ ...base, tempo: 20, form: "montage" as const }).tempo, 70);
   const collage = fromEditorPlan({ ...base, tempo: 104, form: "collage" as const });
@@ -420,7 +421,7 @@ test("the editor chooses each Reel's tempo and the collage form, no ambiance", a
   assert.equal(keepWrittenAnimations(bare, written).layers?.[0]?.motion.js, "x");
   // A plan written with a template (older callers) keeps it.
   assert.equal(fromEditorPlan({ ...base, template: "chic" }).template, "chic");
-  assert.equal(signatureTransition("libre"), "punch"); // 100 BPM by default
+  assert.equal(signatureTransition("libre"), null); // 100 BPM by default: lively, a clean cut
   assert.equal(signatureTransition("doux"), "wipe");
   assert.doesNotMatch(EDITOR_SYSTEM_PROMPT, /quatre ambiances|default_template/);
   assert.match(EDITOR_SYSTEM_PROMPT, /« tempo »/);
@@ -2136,7 +2137,7 @@ test("editor: the signature transition goes on the shot where the band appears, 
   const base = {
     format: "9:16" as const,
     duration: 11,
-    template: "dynamique" as const,
+    template: "doux" as const,
     images: [],
     transitions: "cut" as const,
     subtitles: false,
@@ -2154,7 +2155,9 @@ test("editor: the signature transition goes on the shot where the band appears, 
   };
   assert.equal(signatureShot(base), 2);
   const plan = fromEditorPlan(base);
-  assert.deepEqual(plan.segments.map((s) => ("accent" in s ? s.accent : undefined)), [undefined, undefined, "punch", undefined]);
+  assert.deepEqual(plan.segments.map((s) => ("accent" in s ? s.accent : undefined)), [undefined, undefined, "wipe", undefined]);
+  // A lively Reel has none: it cuts clean.
+  assert.deepEqual(fromEditorPlan({ ...base, template: "dynamique" }).segments.map((s) => ("accent" in s ? s.accent : undefined)), [undefined, undefined, undefined, undefined]);
   assert.equal(signatureShot({ ...base, texts: [base.texts[0]!] }), null);
   // The editor writes no accent: the structured-output grammar is at the API's limit.
   assert.doesNotMatch(JSON.stringify(z.toJSONSchema(editorOutputSchema, { unrepresentable: "any" })), /"accent":/);
@@ -2306,7 +2309,7 @@ test("end card: the Reel ends on a real shot and no text runs under the card", a
   assert.ok(out.texts.every((t) => t.to <= out.duration - 1.6 + 0.001));
 });
 
-test("finish: clips corrected and framed, still shots move, animations play over footage, texts off faces", async () => {
+test("finish: clips corrected and framed, still shots as filmed, animations play over footage, texts off faces", async () => {
   const { finishPlan } = await import("./finish.ts");
   const shot = (start: number, end: number, extra: object) => ({
     start, end, description: "", subject: "", energy: 2, hook_score: 3, quality: { blurry: false, dark: false, shaky: false }, faces_visible: false, ...extra,
@@ -2335,7 +2338,8 @@ test("finish: clips corrected and framed, still shots move, animations play over
   const out = finishPlan(plan, facts, { a: 10, b: 10 });
   const [a, motion, b] = out.segments as Record<string, unknown>[];
   assert.deepEqual(a!.adjust, { exposure: 0.3, warmth: 0.1, straighten: 2, focus: { x: 0.75, y: 0.55 } });
-  assert.equal(a!.move, "in");
+  // A shot filmed still keeps the camera as filmed: no slow push of the engine's (Tristan: « je trouve ça cheap »).
+  assert.equal(a!.move, undefined);
   // The animation carries on shot a's footage, from where it stopped.
   assert.deepEqual(motion!.over, { clip_id: "a", in: 2 });
   // A handheld shot keeps the camera as filmed.
@@ -2796,7 +2800,7 @@ test("motion: the signature reaches the render's brand, only what the render app
   assert.equal(resolveReelBrand({}, "doux", { name: "Test" }).signature, undefined);
 });
 
-test("photo moves: most photos held still, one slow push on the strongest, a pan for a wide one, never twice the same in a row", async () => {
+test("photo moves: most photos held still, one slow push on the opening photo or the editor's, a pan for a wide one, never twice the same in a row", async () => {
   const { photoMoves } = await import("./finish.ts");
   const detection = { regions: [], notes: "", subject: null } as never;
   const photos = {
@@ -2812,9 +2816,9 @@ test("photo moves: most photos held still, one slow push on the strongest, a pan
   // Opening on a video: the editor's own push wins and is the only one.
   const afterVideo = photoMoves({ segments: [seg("v", 1.5), seg("b", 2.6), seg("c", 1.8), seg("d", 1.4, "in")] as never }, photos);
   assert.deepEqual([...afterVideo.entries()], [[1, "none"], [2, "left"], [3, "in"]]);
-  // Without one: the photo held longest.
+  // Without one: none of the engine's choosing, all held still.
   const second = photoMoves({ segments: [seg("v", 1.5), seg("a", 1.2), seg("b", 2.6), seg("d", 1.4)] as never }, photos);
-  assert.deepEqual([...second.values()], ["none", "in", "none"]);
+  assert.deepEqual([...second.values()], ["none", "none", "none"]);
 });
 
 test("signature: its narrators are the gallery's voices that are not whispered", async () => {

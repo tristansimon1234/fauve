@@ -99,8 +99,8 @@ export const coupsDeFouet: MontageSkill = {
   key: "coups-de-fouet",
   version: 1,
   bpm: BPM,
-  // Its title holds three beats: past 124, a title of three words would not be read.
-  tempo: [78, 124],
+  // Its title holds three beats: past 118, a title of four short words would not be read in time.
+  tempo: [78, 118],
   shots: [8, 20],
   files: [6, 16],
   how: "Un plan bref qui bouge, un flash blanc, et sur le plan suivant le nom du lieu en capitales blanches très condensées au milieu du ciel ; puis ses plans sur le temps, une seconde environ chacun, enchaînés par des coups de fouet (un flou de mouvement qui jette un plan dans le suivant, à gauche puis à droite), des flashs blancs et des coupes franches ; le dernier coup de fouet arrive sur un plan large et calme (un ciel, un coucher de soleil) tenu jusqu'à la fin.",

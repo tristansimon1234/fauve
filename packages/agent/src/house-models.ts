@@ -139,7 +139,7 @@ export const HOUSE_MODELS: HouseModel[] = [
         align: "left",
         shadow: "soft",
       },
-      layout: "plein cadre, avec des mots posés le long des quatre bords du cadre pendant le premier plan",
+      layout: "plein cadre, avec des mots posés sur les quatre bords du cadre, le long de chacun, pendant le premier plan",
       moments: [
         { at: 0, what: "un mot toutes les demi-secondes, d'un coup, sur les bords : en haut à gauche, en haut au milieu, en haut à droite, puis son nom au milieu du bord gauche et son quartier au milieu du bord droit, puis l'adresse en bas" },
         { at: 5.2, what: "les mots partent tous d'un coup sur la première coupe, puis la vie du lieu en plein écran, coupée sur le temps" },

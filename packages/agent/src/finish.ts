@@ -88,8 +88,6 @@ export function correctionAdjust(analysis: ClipAnalysis): Adjust | undefined {
   return Object.keys(adjust).length ? adjust : undefined;
 }
 
-/** A shot filmed still (on a tripod, or a phone set down): it gets a slow camera move. */
-const isStill = (shot: Shot | undefined) => shot?.camera === "static" || (!shot?.camera && (shot?.energy ?? 3) <= 2);
 
 /**
  * Where the footage under an animation comes from when the plan does not say: the clip
@@ -143,9 +141,10 @@ function footageUnder(plan: EditPlan, i: number, facts: MediaFacts, clipDuration
  * How the photos of a Reel move, the way a good creator edits them: most are held still and
  * cut on the beat (a slow zoom on every photo reads as a slideshow); the Reel's one slow push
  * goes to the photo that opens it (it moves from the first image), else to the editor's own
- * choice, else to the photo held longest; a landscape photo too wide for the vertical frame
- * a slow pan that shows more of it; never the same move on two photos in a row. A move the
- * editor chose stays, within the same limits. Returns each photo segment's move, by index.
+ * choice, never to a photo of the engine's choosing (Tristan, on the light zooms: « je trouve ça
+ * cheap »); a landscape photo too wide for the vertical frame a slow pan that shows more of it;
+ * never the same move on two photos in a row. A move the editor chose stays, within the same
+ * limits. Returns each photo segment's move, by index.
  */
 export function photoMoves(plan: Pick<EditPlan, "segments">, photos: MediaFacts["photos"]): Map<number, CameraMove> {
   const moves = new Map<number, CameraMove>();
@@ -154,9 +153,9 @@ export function photoMoves(plan: Pick<EditPlan, "segments">, photos: MediaFacts[
   let pans = 0;
   let last: CameraMove = "none";
   const slow = (m: CameraMove) => m === "in" || m === "out";
-  // The one slow push: the opening photo, else the editor's own, else the photo held longest (2 s at least).
+  // The one slow push: the opening photo, else the editor's own.
   const opening = shown[0]?.i === 0 ? 0 : undefined;
-  const chosen = opening ?? shown.find((p) => slow(p.s.move ?? "none"))?.i ?? [...shown].filter((p) => p.seconds >= 2).sort((a, b) => b.seconds - a.seconds)[0]?.i;
+  const chosen = opening ?? shown.find((p) => slow(p.s.move ?? "none"))?.i;
   for (const p of shown) {
     const wide = p.facts.width / Math.max(1, p.facts.height) > 1.25;
     let move: CameraMove = p.s.move ?? "none";
@@ -228,13 +227,9 @@ export function asAsked<S extends PlanSegment>(s: S): S {
 }
 
 export function finishPlan(plan: EditPlan, facts: MediaFacts, clipDurations: Record<string, number> = {}): EditPlan {
-  let still = 0;
   const photoMove = photoMoves(plan, facts.photos);
   // A composed Reel lays its shots itself, at their own pace: no ramp there; nor when she wants plain slow motion.
   const composed = Boolean(plan.layers?.some((l) => l.compose)) || plan.finish?.ramp === "off";
-  // A model of Edith's coded as a whole Reel (a skill) moves its shots itself, as its original does: none of the engine's
-  // slow pushes on its still shots (Tristan, on the light zooms: « je trouve ça cheap »).
-  const ownMoves = Boolean(plan.skill);
   const segments = plan.segments.map((s, i): PlanSegment => {
     if (isMotionSegment(s)) {
       const over = footageUnder(plan, i, facts, clipDurations);
@@ -254,10 +249,9 @@ export function finishPlan(plan: EditPlan, facts: MediaFacts, clipDurations: Rec
     // A clip's light and framing are the engine's (no switch sets them by hand): read again for
     // the passage shown, so a correction that picks another passage is framed on its own subject.
     const adjust: Adjust = { ...correctionAdjust(analysis), ...(focus ? { focus } : {}) };
-    const filmedStill = isStill(shot) && !s.speed;
-    // A shot filmed still gets a slow move, one in two at most (in, then out): a push on every shot gets boring.
-    const move: CameraMove | undefined =
-      !ownMoves && (s.move ?? (s.zoom === "light" ? "in" : "none")) === "none" && filmedStill && segmentSeconds(s) >= 1.5 ? (["in", "none", "out", "none"] as const)[still++ % 4] : s.move;
+    // A video moves only as the editor (or the model) moved it: no slow push of the engine's on a shot filmed still,
+    // nor in a model coded as a whole Reel, whose code moves its shots (Tristan, on the light zooms: « je trouve ça cheap »).
+    const move: CameraMove | undefined = s.move;
     const { adjust: _carried, ...rest } = s;
     const finished: ClipSegment = {
       ...rest,
