@@ -23,6 +23,7 @@ import {
   skillFillSchema,
   skillPlan,
   skillShotCount,
+  skillShotsFor,
   type BrandProfile,
   type ClipAnalysis,
   type EditPlan,
@@ -102,7 +103,8 @@ export async function designSkill(params: {
   const name = houseModel(skill.key)?.name ?? skill.key;
   const files = skillFiles(params.mediaIds, params.clips, params.photos);
   if (!files.length) return null;
-  const n = skillShotCount(skill, files);
+  // As many shots as her files give, or, for a length she asked for, the count that comes closest to it.
+  const n = params.contract?.duration ? skillShotsFor(skill, params.contract.duration) : skillShotCount(skill, files);
   // A model Edith picked gives the form, never the silence: its optional title is written (dressedFloorNote's floor).
   const wordsWanted = Boolean(params.followed.dressed) && !skill.texts.some((t) => t.required) && skill.texts.length > 0;
   // A correction keeps its words but what her request changes: the words of its texts, by slot.

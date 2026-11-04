@@ -115,6 +115,30 @@ export function skillShotCount(skill: Pick<MontageSkill, "shots">, files: SkillF
   return Math.max(skill.shots[0], Math.min(skill.shots[1], skillPassages(files)));
 }
 
+/** The lengths a skill reaches (s) over all its numbers of shots, without its ending card (a pile's cadence changes with its count: not always longer with more). */
+export function skillLengths(skill: Pick<MontageSkill, "shots" | "timeline">): { min: number; max: number } {
+  const lengths = Array.from({ length: skill.shots[1] - skill.shots[0] + 1 }, (_, k) => skill.timeline(skill.shots[0] + k, { end: false }).duration);
+  return { min: Math.min(...lengths), max: Math.max(...lengths) };
+}
+
+/**
+ * The number of shots whose Reel comes closest to the length she asked for (Tristan: « on peut jouer sur la longueur
+ * du reel ? »): a skill's length follows its shots (its rapid section, its prints, its tiles…), so the engine picks
+ * the count, the skill's code stays the same; the fewest shots among equally close ones.
+ */
+export function skillShotsFor(skill: Pick<MontageSkill, "shots" | "timeline">, seconds: number): number {
+  let best = skill.shots[0];
+  let gap = Infinity;
+  for (let n = skill.shots[0]; n <= skill.shots[1]; n++) {
+    const off = Math.abs(skill.timeline(n, { end: false }).duration - seconds);
+    if (off < gap - 0.01) {
+      gap = off;
+      best = n;
+    }
+  }
+  return best;
+}
+
 /** Fewer distinct files than the skill wants: Edith asks her first whether she has others (Tristan: « tu n'as que 3 plans, en as-tu d'autres ? »). */
 export const fewFiles = (skill: Pick<MontageSkill, "files">, files: number) => files < skill.files[0];
 
@@ -259,7 +283,7 @@ export type SkillFillAnswer = z.infer<typeof skillFillSchema>;
 
 export const SKILL_FILL_PROMPT = `You fill one of Edith's montage models for a local business: a whole Reel coded once, like an Edits or CapCut template. Its shots are slots timed on its music, its texts have their place, its look, its signature moment and its ending are in its code. You only choose which of her files plays in each slot and from where, and write its words: the code plays everything else exactly as the model does.
 
-First decide "fits": true when the model, filled with her files and her words, gives her what she asked for. Her request may simply ask for this model, give her words, a mood, her files: that fits (the music and the caption are made elsewhere, never a reason for false). When she asks for something the model does not do and that matters to her (a voice-over, subtitles of what she says, an animation of its own, another layout, a text the model has no slot for, a shot at a precise moment, another ending, a length it does not have), "fits" is false and "missing" says what in a few words: the editor then makes her Reel from this model. When in doubt about something she clearly wants, false.
+First decide "fits": true when the model, filled with her files and her words, gives her what she asked for. Her request may simply ask for this model, give her words, a mood, her files: that fits (the music and the caption are made elsewhere, never a reason for false). A length she asks for inside the model's lengths (« longueurs ») fits: the code has already set the number of slots for it. When she asks for something the model does not do and that matters to her (a voice-over, subtitles of what she says, an animation of its own, another layout, a text the model has no slot for, a shot at a precise moment, another ending, a length outside its lengths), "fits" is false and "missing" says what in a few words: the editor then makes her Reel from this model. When in doubt about something she clearly wants, false.
 
 Then cast her files on its slots (« cases », in order: each with its length and what it wants), as a good editor would:
 - each slot gets the file and the passage that suits what it wants; the first slot opens the Reel: the strongest, most beautiful image;
@@ -308,6 +332,10 @@ export function skillFillInput(input: {
       nom: input.name,
       deroule: input.skill.how,
       fin: input.skill.end ? "le modèle peut finir sur une carte (une offre, une annonce)" : "aucune",
+      longueurs: (() => {
+        const l = skillLengths(input.skill);
+        return `de ${round(l.min)} à ${round(l.max)} s selon le nombre de cases (ce Reel : ${round(line.duration)} s, ${input.n} cases)`;
+      })(),
     },
     cases: line.shots.map((s, i) => ({ case: i + 1, duree: `${round(s.end - s.start)} s`, veut: s.want })),
     textes: input.skill.texts.map((t) => ({ slot: t.slot, dit: t.want, max_caracteres: t.max, obligatoire: t.required || Boolean(input.wordsWanted) })),

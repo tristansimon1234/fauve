@@ -1427,3 +1427,19 @@ test("a skill without words of its own writes its title when Edith picked the mo
   const input = skillFillInput({ skill: mosaique, name: "Mosaïque", n: 4, files, business: {}, request: "", wordsWanted: true });
   assert.equal(input.textes[0]!.obligatoire, true);
 });
+
+test("a montage skill comes close to the length she asked for by its number of shots", async () => {
+  const { MONTAGE_SKILLS } = await import("./skill-library.ts");
+  const { skillLengths, skillShotsFor } = await import("./skills.ts");
+  for (const skill of Object.values(MONTAGE_SKILLS)) {
+    const { min, max } = skillLengths(skill);
+    assert.ok(min <= max, skill.key);
+    assert.equal(skill.timeline(skillShotsFor(skill, 0), { end: false }).duration, min);
+    assert.equal(skill.timeline(skillShotsFor(skill, 999), { end: false }).duration, max);
+    // A length inside its range lands within a shot's length of it.
+    const mid = (min + max) / 2;
+    const n = skillShotsFor(skill, mid);
+    const durations = Array.from({ length: skill.shots[1] - skill.shots[0] + 1 }, (_, k) => skill.timeline(skill.shots[0] + k, { end: false }).duration);
+    assert.equal(Math.abs(skill.timeline(n, { end: false }).duration - mid), Math.min(...durations.map((d) => Math.abs(d - mid))), `${skill.key}: ${mid} s`);
+  }
+});
