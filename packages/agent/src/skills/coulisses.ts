@@ -101,7 +101,8 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
       parts.map((p, i) => {
         const k = items.indexOf(i);
         if (k < 0) return h("span", { key: "s" + i, style: { position: "absolute", left: 0, top: 0, opacity: 0, fontSize: 1 } }, p);
-        return h(FitText, { key: "l" + i, style: { position: "absolute", left: 140, top: LABEL_Y, width: 800, height: 100, opacity: k === current ? 1 : 0 }, innerStyle: { fontFamily: body, fontWeight: 700, fontSize: 72, lineHeight: 1, letterSpacing: "-0.01em", color: WHITE, whiteSpace: "nowrap" } }, caps(p.trim()));
+        // Its count keeps its small x, as the model writes « WHOOSH x 2 ».
+        return h(FitText, { key: "l" + i, style: { position: "absolute", left: 140, top: LABEL_Y, width: 800, height: 100, opacity: k === current ? 1 : 0 }, innerStyle: { fontFamily: body, fontWeight: 700, fontSize: 72, lineHeight: 1, letterSpacing: "-0.01em", color: WHITE, whiteSpace: "nowrap" } }, caps(p.trim()).replace(/(^|\s)X(\s?\d)/g, "$1x$2"));
       }));
   }
 
@@ -120,6 +121,7 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
     h("div", { style: { width: 12, height: Math.min(8, r[2]), borderRadius: 2, backgroundColor: "#3d3a46" } }),
     h("div", { style: { width: 12, height: Math.min(8, r[2]), borderRadius: 2, backgroundColor: "#3d3a46" } })));
   const ticks = Array.from({ length: 11 }, (_, i) => h("div", { key: "t" + i, style: { position: "absolute", left: Math.round(HEAD + (i * SPAN) / 10), top: 18, width: 1, height: 10, backgroundColor: "#6d6977" } }));
+  const marksOnRuler = Array.from({ length: 5 }, (_, i) => h("div", { key: "r" + i, style: { position: "absolute", left: Math.round(HEAD + 4 + (i * SPAN) / 5), top: 6, fontFamily: "sans-serif", fontSize: 9, color: "#8d8997" } }, "01:00:" + pad(Math.floor((i * durationInFrames) / 150)) + ":00"));
   const span = (s) => [xAt(s.from), xAt(s.from + s.durationInFrames) - xAt(s.from) - 2];
   const film = "repeating-linear-gradient(90deg, rgba(255,255,255,0.16) 0 2px, transparent 2px 30px), linear-gradient(180deg, #5b5866, #3b3943)";
   const clips = shots.map((s, i) => {
@@ -143,7 +145,7 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
     h("div", { style: { position: "absolute", left: 16, top: 4, fontFamily: "sans-serif", fontWeight: 700, fontSize: 20, color: "#e9e7ee", letterSpacing: "0.02em" } }, tc),
     h("div", { style: { position: "absolute", left: HEAD - 6, top: 0, width: 1, height: TL_H, backgroundColor: "#34313d" } }),
     h("div", { style: { position: "absolute", left: HEAD, top: 30, width: SPAN, height: 1, backgroundColor: "#3a3744" } }),
-    ticks, heads, bars, clips,
+    ticks, marksOnRuler, heads, bars, clips,
     h("div", { style: { position: "absolute", left: Math.round(head - 1), top: 12, width: 3, height: TL_H - 12, backgroundColor: "#ff3b30" } }),
     h("div", { style: { position: "absolute", left: Math.round(head - 8), top: 4, width: 17, height: 14, backgroundColor: "#ff3b30", clipPath: "polygon(0 0, 100% 0, 100% 55%, 50% 100%, 0 55%)" } }));
 
@@ -194,7 +196,7 @@ export const coulisses: MontageSkill = {
     {
       slot: "etiquettes",
       role: "band",
-      want: "une étiquette par plan, dans l'ordre des plans (autant que de cases), séparées par des virgules : ce qu'on voit à ce plan en 1 ou 2 mots, 14 caractères au plus chacune, avec si tu veux combien de fois (« x2 », « x3 »), comme une fiche technique (une forme comme « le pétrin, la pâte x2, le four, la fournée »)",
+      want: "une étiquette par plan, dans l'ordre des plans (autant que de cases), séparées par des virgules : ce qu'on voit à ce plan en 1 ou 2 mots (« le four »), ou un mot et combien de fois (« beurre x2 »), 14 caractères au plus chacune, comme une fiche technique (une forme comme « le pétrin, farine x2, le four, la fournée »)",
       max: 120,
       required: true,
     },
