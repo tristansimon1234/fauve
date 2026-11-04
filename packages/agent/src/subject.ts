@@ -333,6 +333,86 @@ export function depthPassages(plan: Pick<EditPlan, "segments" | "layers">, isVid
   return out;
 }
 
+// ——— Where a text can be set in her shot (ClearBox in the scope: clear_area.py, in the objects' machine) ——————————
+
+/** The most passages read for their clear areas in one Reel, and the most seconds of video in all (a few milliseconds an image). */
+export const CLEAR_MAX = 8;
+export const CLEAR_MAX_SECONDS = 60;
+
+/** The name of a passage's clear areas among a clip's cut-outs: the passage's, then « ~clear » (never an object's « # »); a photo's from 0 to 0. */
+export const clearKey = (clipId: string, from: number, to: number) => `${subjectKey(clipId, from, to)}~clear`;
+
+/**
+ * The shots a composition's code sets a text in the clear area of (`ClearBox(shots[2], frame, laid, { … })`): its first
+ * argument, written as a number or shots[n]; a shot written as a variable is ANY_SHOT (every shot under the animation).
+ */
+export function clearsDrawn(js: string | undefined): number[] {
+  if (!js) return [];
+  const shots = new Set<number>();
+  for (const m of js.matchAll(/\bClearBox\(\s*([^,()]*)/g)) {
+    const n = /^(?:shots\s*\[\s*)?(\d+)\s*\]?$/.exec((m[1] ?? "").trim());
+    shots.add(n ? Number(n[1]) : ANY_SHOT);
+  }
+  return [...shots];
+}
+
+/** A plan whose animations set a text in the clear area of one of her shots (a composition, or one laid over the montage). */
+export const wantsClear = (plan: Pick<EditPlan, "layers">) => (plan.layers ?? []).some((l) => clearsDrawn(l.motion?.js).length > 0);
+
+/** A passage read for its clear areas: its clip and seconds, or one of her photos (`photo`: one image, from 0 to 0). */
+export type ClearPassage = SubjectPassage & { photo?: true };
+
+/**
+ * The passages a Reel reads for their clear areas: the shot each animation names (her shot n is the plan's n-th shot,
+ * video or photo, as its shots list them; a variable, every shot under it), a video at its own pace only (a speed or a
+ * ramp changes which images show: ClearBox then gives its fallback); CLEAR_MAX at most, CLEAR_MAX_SECONDS of video.
+ */
+export function clearPassages(plan: Pick<EditPlan, "segments" | "layers">, isVideo: (clipId: string) => boolean): ClearPassage[] {
+  const shots = plan.segments.filter(isClipSegment);
+  let at = 0;
+  const spans = plan.segments.flatMap((s) => {
+    const from = at;
+    at += segmentSeconds(s);
+    return isClipSegment(s) ? [{ from, to: at }] : [];
+  });
+  const out: ClearPassage[] = [];
+  let seconds = 0;
+  for (const layer of plan.layers ?? []) {
+    const under = shots.flatMap((_, i) => (spans[i]!.to > layer.from + 0.05 && spans[i]!.from < layer.to - 0.05 ? [i] : []));
+    for (const shot of clearsDrawn(layer.motion?.js).flatMap((n) => (n === ANY_SHOT ? under : [n]))) {
+      const s = shots[shot];
+      if (!s || out.length >= CLEAR_MAX) continue;
+      if (s.photo) {
+        const key = clearKey(s.clip_id, 0, 0);
+        if (!out.some((p) => p.key === key)) out.push({ clip_id: s.clip_id, from: 0, to: 0, key, photo: true });
+        continue;
+      }
+      if (!isVideo(s.clip_id) || s.ramp || (s.speed && Math.abs(s.speed - 1) > 0.01)) continue;
+      const key = clearKey(s.clip_id, s.in, s.out);
+      const length = Math.max(0, s.out - s.in);
+      if (out.some((p) => p.key === key) || !length || seconds + length > CLEAR_MAX_SECONDS) continue;
+      out.push({ clip_id: s.clip_id, from: s.in, to: s.out, key });
+      seconds += length;
+    }
+  }
+  return out;
+}
+
+/**
+ * A passage's clear areas (clear_area.py), as its file keeps them and the render reads them: its grid (cols × rows
+ * cells, rows from the top: « 2 » the sky, « 1 » calm, « 0 » busy or out of the picture at some image), in its first
+ * image's place, and the camera's move (s, dx, dy for each image, flat) when it moves.
+ */
+export const clearMapSchema = z
+  .object({
+    cols: z.number().int().min(2).max(256),
+    rows: z.number().int().min(2).max(256),
+    cells: z.string().regex(/^[012]+$/),
+    motion: z.array(z.number()).optional(),
+  })
+  .refine((m) => m.cells.length === m.cols * m.rows, "cells");
+export type ClearMap = z.infer<typeof clearMapSchema>;
+
 /** The cut-outs kept on a video (media_assets.subjects), by passage: its file, or why it failed (tried again later). */
 export const mediaSubjectsSchema = z.record(
   z.string(),
@@ -359,6 +439,8 @@ export const mediaSubjectsSchema = z.record(
       parts: z.array(z.number()).optional(),
       /** Its depth at every image (a grey video, near white), not a cut-out: Depth draws it. */
       depth: z.boolean().optional(),
+      /** Its clear areas (a JSON file: ClearMap), not a cut-out: ClearBox reads them. */
+      clear: z.boolean().optional(),
     }),
     z.object({ failed_at: z.string(), error: z.string() }),
   ]),

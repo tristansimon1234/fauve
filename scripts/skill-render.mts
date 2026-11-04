@@ -13,6 +13,8 @@
 // --named names its objects as the filler would (its « @slot » in its code); --objects lays the cut-outs the card made of
 // them (apps/render/track_objects.py, run with OBJECTS_CPU=1), by shot: its file (webm) and its reading in that run's
 // printed result (its boxes, outline and pieces), on that shot's passage of the plan.
+// The shots its code sets a text in the clear area of (ClearBox) are read here as the engine reads them
+// (apps/render/clear_area.py, by PYTHON: a Python with OpenCV and numpy, `python3` by default); without it, the fallback.
 // Clips are local files (videos or photos); they are normalized at 30 images a second into the bundle's public folder,
 // once per file (named after its path, size and date: another file at the same place in the list is normalized anew),
 // as the render workshop does. The browser is Playwright's Chromium (CHROME, default /opt/pw-browsers/…), whose fonts
@@ -27,7 +29,7 @@ import { buildReelProps } from "../packages/agent/src/motion.ts";
 import { HOUSE_MODELS } from "../packages/agent/src/house-models.ts";
 import { MONTAGE_SKILLS } from "../packages/agent/src/skill-library.ts";
 import { isClipSegment } from "../packages/agent/src/schemas.ts";
-import { objectKey } from "../packages/agent/src/subject.ts";
+import { clearPassages, objectKey, type ClearMap } from "../packages/agent/src/subject.ts";
 import { skillLongest, skillPlan, skillShotCount, type MontageSkill, type SkillFile, type SkillFill } from "../packages/agent/src/skills.ts";
 
 const { values } = parseArgs({
@@ -70,7 +72,7 @@ const probe = (path: string) => {
     .filter((x) => Number.isFinite(x));
   return { width: w ?? 1080, height: h ?? 1920, seconds: d ?? 0 };
 };
-const files: (SkillFile & { src: string; aspect: number })[] = (values.clips ?? "").split(",").filter(Boolean).map((path, i) => {
+const files: (SkillFile & { src: string; aspect: number; path: string })[] = (values.clips ?? "").split(",").filter(Boolean).map((path, i) => {
   const source = resolve(path);
   const photo = PHOTO.test(source);
   const id = `f${i}`;
@@ -83,7 +85,7 @@ const files: (SkillFile & { src: string; aspect: number })[] = (values.clips ?? 
       execFileSync("ffmpeg", ["-v", "error", "-y", "-i", source, "-an", "-vf", "scale='if(gt(iw,ih),min(iw,2560),-2)':'if(gt(iw,ih),-2,min(ih,2560))',fps=30,tpad=stop_mode=clone:stop_duration=2,format=yuv420p", "-c:v", "libx264", "-preset", "veryfast", "-crf", "18", "-movflags", "+faststart", target]);
   }
   const p = probe(source);
-  return { id, photo, seconds: photo ? 0 : Math.max(0, p.seconds), shows: basename(source), src: `/public/jobs/${job}/${basename(target)}`, aspect: p.width / Math.max(1, p.height) };
+  return { id, photo, seconds: photo ? 0 : Math.max(0, p.seconds), shows: basename(source), src: `/public/jobs/${job}/${basename(target)}`, aspect: p.width / Math.max(1, p.height), path: source };
 });
 if (!files.length) throw new Error("--clips: at least one file");
 
@@ -106,7 +108,7 @@ const bpm = values.bpm ? Math.round(Math.min(140, Math.max(60, Number(values.bpm
 const plan = skillPlan({ skill, name: model?.name ?? skill.key, files, fill, ...(bpm ? { bpm } : {}) });
 const fonts = (values.fonts || "").split(",").map((f) => f.trim()).filter(Boolean);
 // The cut-outs of its objects, laid on their shots' passages as the render workshop gets them (by passage and name).
-const subjects: Record<string, { src: string; boxes?: (number[] | null)[]; contours?: (number[] | null)[]; parts?: number[] }> = {};
+const subjects: Record<string, { src: string; boxes?: (number[] | null)[]; contours?: (number[] | null)[]; parts?: number[]; clear?: ClearMap }> = {};
 for (const [shot, o] of Object.entries(JSON.parse(values.objects ?? "{}") as Record<string, { src: string; result: string; id: string }>)) {
   const segment = plan.segments.filter(isClipSegment)[Number(shot)];
   const name = plan.layers?.[0]?.motion.js?.match(/object: "([^"@][^"]*)"/g)?.map((m) => m.slice(9, -1)).find((x) => plan.layers?.[0]?.motion.js?.includes(`shot: ${shot}, object: "${x}"`));
@@ -117,6 +119,23 @@ for (const [shot, o] of Object.entries(JSON.parse(values.objects ?? "{}") as Rec
   execFileSync("cp", [resolve(o.src), target]);
   subjects[objectKey(segment.clip_id, segment.in, segment.out, name)] = { src: `/public/jobs/${job}/${basename(target)}`, ...(reading.boxes ? { boxes: reading.boxes } : {}), ...(reading.contours ? { contours: reading.contours } : {}), ...(reading.parts ? { parts: reading.parts } : {}) };
   console.log(`object « ${name} » on shot ${shot}: ${reading.parts ? reading.parts.length / 4 : 0} pieces`);
+}
+// Where its texts are set in her shots (ClearBox): their clear areas read on her own files, as the engine reads them.
+const clears = clearPassages(plan, (id) => !files.find((f) => f.id === id)?.photo);
+if (clears.length) {
+  const jobs = clears.map((p) => ({ id: p.key, src: files.find((f) => f.id === p.clip_id)!.path, from: p.from, to: p.to, ...(p.photo ? { photo: true } : {}) }));
+  writeFileSync(`${media}/clear-jobs.json`, JSON.stringify(jobs));
+  try {
+    const printed = execFileSync(process.env.PYTHON ?? "python3", ["-I", `${RENDER}/clear_area.py`, `${media}/clear-jobs.json`], { encoding: "utf8" });
+    const read = JSON.parse(printed.trim().split("\n").at(-1) ?? "{}") as Record<string, { clear?: ClearMap; error?: string }>;
+    for (const p of clears) {
+      const r = read[p.key];
+      if (r?.clear) subjects[p.key] = { src: "", clear: r.clear };
+      console.log(`clear areas of ${p.clip_id} (${p.from}–${p.to} s): ${r?.clear ? `${r.clear.cols} × ${r.clear.rows}, ${r.clear.motion ? "the camera moves" : "still"}` : (r?.error ?? "none")}`);
+    }
+  } catch (error) {
+    console.log("clear areas not read (PYTHON: a Python with OpenCV and numpy):", error instanceof Error ? error.message.split("\n")[0] : error);
+  }
 }
 const props = buildReelProps(plan, {
   template: "libre",

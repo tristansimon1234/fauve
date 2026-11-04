@@ -1,5 +1,6 @@
 import { useId, type CSSProperties, type ReactNode } from "react";
 import { Easing, interpolate, random } from "remotion";
+import { affineOf, cameraAt, chooseClear, clearRoom, placeClear, readableMap, withCamera, type ClearMap, type ClearOptions } from "./clear";
 import type { Box, KitHooks } from "./Kit";
 import { objectName, outlinePath } from "./outline";
 import { coverLayout } from "./Retouch";
@@ -452,6 +453,38 @@ export function SubjectParts(shot: ComposeShot | undefined, frame: number, laid?
     out.push({ x, y, w: Math.max(...xs) - x, h: Math.max(...ys) - y });
   }
   return out;
+}
+
+// ——— ClearBox: where a text can be set in her shot ———————————————————————————————————————————
+
+/** The areas chosen, by a shot's grid and the way it is laid and asked for: chosen once, the same at every frame. */
+const chosenAreas = new WeakMap<ClearMap, Map<string, Box | null>>();
+
+/**
+ * The largest clear area of a shot to set a text in, at a frame of the composition, in the box the shot was laid in
+ * with Footage ({ left, top, width, height }, the whole frame by default): its sky first (calm and open to the top of
+ * the picture), else an empty wall or any calm, even area, read on its images before the render; { x, y, w, h } px,
+ * the same place of the scene for the whole shot, moving with its camera (a pan, a push, the Reel's punch), inside the
+ * box and the Reel's safe zone at every image, off her faces. `aspect` (width / height) the shape wanted, `min` and
+ * `max` its sizes (px), `prefer` "top" (default), "bottom" or "any", `sky: false` any calm area alike, `pad` the px kept
+ * clear around it, `within` where it may lie instead of the safe zone (`origin`: where the box's space starts on the
+ * frame). `fallback` (the box to use when there is none: no grid read, none large enough, the scene check) is returned
+ * as it is, else null.
+ */
+export function ClearBox(shot: ComposeShot | undefined, frame: number, laid?: Laid, options?: ClearOptions & { fallback?: Box | null }): Box | null {
+  const { fallback = null, ...asked } = options ?? {};
+  const map = shot?.clear;
+  if (!shot || !readableMap(map)) return fallback;
+  const L = laid ?? { left: 0, top: 0, width: 1080, height: 1920 };
+  const n = Math.max(1, Math.round(shot.durationInFrames));
+  // Shares of the passage's first image → px of the composition at image t of the shot: the camera, then the Reel's drawing.
+  const project = (t: number) => withCamera(affineOf(placer(shot, L, shot.from + t).at), cameraAt(map, t));
+  const key = JSON.stringify([L, asked, shot.from, n, shot.kind, shot.aspect, shot.focus, shot.face, shot.camera, shot.edit?.adjust, shot.edit?.source]);
+  let areas = chosenAreas.get(map);
+  if (!areas) chosenAreas.set(map, (areas = new Map()));
+  if (!areas.has(key)) areas.set(key, chooseClear(map, project, n, clearRoom(L, asked.within, asked.origin), { ...asked, avoid: shot.face ? [shot.face] : [] }));
+  const area = areas.get(key);
+  return area ? placeClear(area, project(Math.max(0, Math.min(n - 1, Math.round(frame - shot.from))))) : fallback;
 }
 
 // ——— Outline: a line along her edge ——————————————————————————————————————————————————————

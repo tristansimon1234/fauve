@@ -1781,3 +1781,178 @@ test("« Plans fixes de cinéma » (v2): a dry click on each word of its title a
   assert.deepEqual(held.sounds?.map((s) => s.at), plan.sounds!.map((s) => Math.round((s.at + 0.3) * 1000) / 1000));
   assert.deepEqual(replaySkillAudio(plansFixes, held)?.sounds?.map((s) => Math.round(s.at * 100)), held.sounds?.map((s) => Math.round(s.at * 100)));
 });
+
+// ——— Where a text can be set in her shot (ClearBox): the grid clear_area.py reads, the area apps/render/src/clear.ts chooses ———
+
+/** A synthetic picture's grid, a string a row (« 2 » sky, « 1 » calm, « 0 » busy). */
+const grid = (rows: string[], motion?: number[]) => ({ cols: rows[0]!.length, rows: rows.length, cells: rows.join(""), ...(motion ? { motion } : {}) });
+/** A picture of `aspect` covering a box, centred, as the Reel's placer lays a video without a camera move. */
+const cover = (aspect: number, laid: { left: number; top: number; width: number; height: number }) => {
+  const frame = laid.width / laid.height;
+  const dw = aspect > frame ? laid.height * aspect : laid.width;
+  const dh = aspect > frame ? laid.height : laid.width / aspect;
+  return (x: number, y: number) => [laid.left - (dw - laid.width) / 2 + x * dw, laid.top - (dh - laid.height) / 2 + y * dh] as const;
+};
+/** A 16:9 shot laid in frappe's horizontal frame (1080 × 608 at the top 656 of the Reel), and laid over the whole vertical frame. */
+const WIDE = { left: 0, top: 0, width: 1080, height: 608 };
+const FULL = { left: 0, top: 0, width: 1080, height: 1920 };
+
+test("where a text can be set: the shots a composition names in ClearBox are read, a photo once, a video at its own pace", async () => {
+  const { ANY_SHOT, clearKey, clearPassages, clearsDrawn, drawsSubject, objectsDrawn, wantsClear, CLEAR_MAX } = await import("./subject.ts");
+  assert.deepEqual(clearsDrawn(`const a = ClearBox(shots[2], frame, laid, { aspect: 6 }); const b = ClearBox( 3 , f);`), [2, 3]);
+  assert.deepEqual(clearsDrawn(`ClearBox(shots[i], frame, laid)`), [ANY_SHOT]);
+  assert.deepEqual(clearsDrawn(`SubjectBox(shots[1], frame, laid)`), []);
+  // It never cuts her out nor follows an object.
+  assert.equal(drawsSubject(`ClearBox(shots[1], frame, laid)`), false);
+  assert.deepEqual(objectsDrawn(`ClearBox(shots[1], frame, laid, { fallback: "x" })`), []);
+  const plan = {
+    segments: [
+      { clip_id: "v0", in: 0, out: 2 },
+      { clip_id: "v1", in: 1, out: 4 },
+      { clip_id: "photo1", in: 0, out: 2, photo: { source: { width: 4, height: 3 } } },
+      { clip_id: "v2", in: 0, out: 3, speed: 0.5 },
+    ],
+    layers: [{ from: 0, to: 10, brief: "", compose: true, motion: { js: `ClearBox(shots[1], frame, laid); ClearBox(shots[2], frame, laid); ClearBox(shots[3], frame, laid)` } }],
+  } as never;
+  assert.equal(wantsClear(plan), true);
+  assert.equal(wantsClear({ layers: [{ from: 0, to: 2, brief: "", motion: { js: `SubjectBox(shots[0], f)` } }] } as never), false);
+  // Its photo once, under its own key; the shot at half speed is left out (its camera's move would not match: the fallback).
+  assert.deepEqual(clearPassages(plan, (id) => id.startsWith("v")), [
+    { clip_id: "v1", from: 1, to: 4, key: clearKey("v1", 1, 4) },
+    { clip_id: "photo1", from: 0, to: 0, key: clearKey("photo1", 0, 0), photo: true },
+  ]);
+  assert.match(clearKey("v1", 1, 4), /^v1@1\.00-4\.00~clear$/);
+  // A shot written as a variable: every shot under the animation, CLEAR_MAX at most.
+  const any = { ...(plan as object), layers: [{ from: 0, to: 3, brief: "", motion: { js: `ClearBox(shots[k], frame, laid)` } }] } as never;
+  assert.deepEqual(clearPassages(any, (id) => id.startsWith("v")).map((p) => p.clip_id), ["v0", "v1"]);
+  assert.ok(CLEAR_MAX >= 4);
+});
+
+test("where a text can be set: its grid kept in a file beside the clip, removed with it, given to the composition's shot", async () => {
+  const { clearKey, clearMapSchema, mediaSubjectsSchema, subjectFiles } = await import("./subject.ts");
+  const map = grid(["2200", "2200", "0011"]);
+  assert.ok(clearMapSchema.safeParse(map).success);
+  assert.equal(clearMapSchema.safeParse({ ...map, cells: "22001" }).success, false);
+  assert.equal(clearMapSchema.safeParse({ ...map, cells: "2200220000a1" }).success, false);
+  // Its entry is a reading like the others (an older deploy reads it too, and the retention removes its file).
+  const kept = { [clearKey("v1", 1, 4)]: { path: "s/subjects/v1-abc.clear.json", still: true, at: "x", frames: 90, clear: true } };
+  assert.ok(mediaSubjectsSchema.safeParse(kept).success);
+  assert.deepEqual(subjectFiles(kept), ["s/subjects/v1-abc.clear.json"]);
+  const plan = {
+    format: "9:16",
+    duration: 3,
+    template: "libre",
+    segments: [{ clip_id: "v1", in: 1, out: 4, zoom: "none" }],
+    texts: [],
+    images: [],
+    transitions: "cut",
+    subtitles: false,
+    music: null,
+    layers: [{ from: 0, to: 3, brief: "", compose: true, motion: { js: `function Scene({ shots }) { const b = ClearBox(shots[0], 0, undefined, { fallback: null }); return null; }` } }],
+  } as never;
+  const props = buildReelProps(plan, { template: "libre", clipUrls: { v1: "https://x/v1.mp4" }, brand: { name: "Studio" }, subjects: { [clearKey("v1", 1, 4)]: { src: "", clear: map } } } as never);
+  assert.deepEqual(props.layers?.[0]?.shots?.[0]?.clear, map);
+  // Never taken for her cut-out or an object of the shot.
+  const segment = props.segments[0] as { subject?: unknown; objects?: unknown };
+  assert.equal(segment.subject, undefined);
+  assert.equal(segment.objects, undefined);
+  // An animation over the montage that calls it gets the shots under it.
+  const over = buildReelProps({ ...(plan as object), layers: [{ from: 0, to: 3, brief: "", motion: { js: `ClearBox(shots[0], frame, laid)` } }] } as never, {
+    template: "libre",
+    clipUrls: { v1: "https://x/v1.mp4" },
+    brand: { name: "Studio" },
+    subjects: { [clearKey("v1", 1, 4)]: { src: "", clear: map } },
+  } as never);
+  assert.deepEqual(over.layers?.[0]?.shots?.[0]?.clear, map);
+});
+
+test("the clear area: the sky beside the towers and never on them, the largest, the upper part first, off the busy cells", async () => {
+  const { affineOf, chooseClear, clearRoom, placeClear } = await import("../../../apps/render/src/clear.ts");
+  // A white sky over a city, two towers in the middle (columns 7 and 8), trees on the right from row 3, a plain wall
+  // low on the left, the ground at the bottom (a 16:9 picture, 16 × 9 cells).
+  const city = grid([
+    "2222222002222222",
+    "2222222002222222",
+    "2222222002222222",
+    "2222222002200000",
+    "2222222000000000",
+    "0000000000000000",
+    "1111100000000000",
+    "1111100000000000",
+    "0000000000000000",
+  ]);
+  const place = affineOf(cover(16 / 9, WIDE));
+  const room = clearRoom(WIDE, undefined, { x: 0, y: 656 });
+  const free = chooseClear(city, () => place, 90, room)!;
+  const box = placeClear(free, place);
+  // The sky left of the towers (cells of 67.6 px), less the safe zone's 40 px on the left, its pad (12 px) and the
+  // room's off the box's edges (12 px): columns 1 to 6, rows 1 to 4.
+  const cell = 608 / 9;
+  assert.ok(box.x >= 52 && box.x + box.w <= 7 * cell, JSON.stringify(box));
+  assert.ok(box.y >= 12 && box.y + box.h <= 5 * cell, JSON.stringify(box));
+  assert.ok(box.w > 370 && box.h > 240, JSON.stringify(box));
+  // A one-line name (6 times wider than tall): in the sky, on one side of the towers, in its upper part.
+  const name = placeClear(chooseClear(city, () => place, 90, room, { aspect: 6 })!, place);
+  assert.ok(Math.abs(name.w / name.h - 6) < 0.01);
+  assert.ok(name.x + name.w <= 7 * cell || name.x >= 9 * cell, JSON.stringify(name));
+  assert.ok(name.y < 2 * cell, JSON.stringify(name));
+  // Its size: no larger than max, its shape kept, in the middle of the sky it found.
+  const capped = placeClear(chooseClear(city, () => place, 90, room, { aspect: 6, max: { w: 300 } })!, place);
+  assert.ok(Math.abs(capped.w - 300) < 0.5 && Math.abs(capped.h - 50) < 0.5, JSON.stringify(capped));
+  // Too large a minimum: none (the composition takes its fallback).
+  assert.equal(chooseClear(city, () => place, 90, room, { min: { w: 700 } }), null);
+  // Any calm area alike, in the lower part first, at a size both can hold: the plain wall low on the left.
+  const low = placeClear(chooseClear(city, () => place, 90, room, { sky: false, prefer: "bottom", aspect: 2, max: { w: 220 } })!, place);
+  assert.ok(low.y > 6 * cell && low.x + low.w <= 5 * cell, JSON.stringify(low));
+  // No sky large enough (a strip at the top): the calm wall instead.
+  const strip = grid(["2222222222222222", "0000000000000000", "0000000000000000", "0000111111110000", "0000111111110000", "0000111111110000", "0000000000000000", "0000000000000000", "0000000000000000"]);
+  const wall = placeClear(chooseClear(strip, () => place, 90, room, { min: { w: 200, h: 100 } })!, place);
+  assert.ok(wall.y >= 3 * (608 / 9) - 0.5 && wall.x >= 4 * 67.5 - 0.5 && wall.x + wall.w <= 12 * 67.5 + 0.5, JSON.stringify(wall));
+});
+
+test("the clear area: in the part of her picture the box shows, inside the Reel's safe zone, off her faces", async () => {
+  const { affineOf, chooseClear, clearRoom, placeClear, readableMap } = await import("../../../apps/render/src/clear.ts");
+  // A 16:9 picture laid over the vertical frame shows its middle third only: the sky on its left is out of the box.
+  const left = grid(["2222200000000000", "2222200000000000", "2222200022222000", "2222200022222000", "0000000022222000", "0000000000000000", "1111111111111111", "1111111111111111", "1111111111111111"]);
+  const place = affineOf(cover(16 / 9, FULL));
+  const room = clearRoom(FULL);
+  const box = placeClear(chooseClear(left, () => place, 60, room)!, place);
+  // The sky in the middle columns (8 to 12, of which the box shows 6 to 10), never the bottom's calm floor (under 0.75 of the height).
+  assert.ok(box.x >= 40 && box.x + box.w <= 1040 && box.y >= 80 && box.y + box.h <= 1440, JSON.stringify(box));
+  assert.ok(box.y < 5 * (1920 / 9), JSON.stringify(box));
+  // Only a calm floor at the bottom: nothing (the apps' interface covers it).
+  const floor = grid(["0000000000000000", "0000000000000000", "0000000000000000", "0000000000000000", "0000000000000000", "0000000000000000", "0000000000000000", "1111111111111111", "1111111111111111"]);
+  assert.equal(chooseClear(floor, () => place, 60, room), null);
+  // The whole box (within: null) takes it.
+  assert.ok(chooseClear(floor, () => place, 60, clearRoom(FULL, null)));
+  // Her face in the middle of an even wall: the area keeps off it.
+  const even = grid(Array.from({ length: 9 }, () => "1111111111111111"));
+  const face = { x: 0.4, y: 0.2, w: 0.2, h: 0.4 };
+  const off = chooseClear(even, () => affineOf(cover(16 / 9, WIDE)), 60, clearRoom(WIDE, undefined, { x: 0, y: 656 }), { avoid: [face] })!;
+  assert.ok(off.x + off.w <= face.x + 1e-9 || off.x >= face.x + face.w - 1e-9 || off.y + off.h <= face.y + 1e-9 || off.y >= face.y + face.h - 1e-9, JSON.stringify(off));
+  // A grid that cannot be read is no grid.
+  assert.equal(readableMap({ cols: 4, rows: 2, cells: "2222" }), false);
+  assert.equal(readableMap(undefined), false);
+});
+
+test("the clear area follows the camera: the same place of the scene at every image, never out of the box", async () => {
+  const { affineOf, cameraAt, chooseClear, clearRoom, placeClear, withCamera } = await import("../../../apps/render/src/clear.ts");
+  // The camera pans right: the scene moves left by 10 % of the picture over 31 images.
+  const motion = Array.from({ length: 31 }, (_, t) => [1, (-0.1 * t) / 30, 0]).flat();
+  const sky = grid(["2222222222222222", "2222222222222222", "2222222222222222", "2222222222222222", "0000000000000000", "0000000000000000", "0000000000000000", "0000000000000000", "0000000000000000"], motion);
+  assert.deepEqual(cameraAt(sky, 30), [1, -0.1, 0]);
+  assert.deepEqual(cameraAt(sky, 99), [1, -0.1, 0]);
+  assert.deepEqual(cameraAt({ ...sky, motion: undefined }, 5), [1, 0, 0]);
+  const place = affineOf(cover(16 / 9, WIDE));
+  const project = (t: number) => withCamera(place, cameraAt(sky, t));
+  const area = chooseClear(sky, project, 31, clearRoom(WIDE, undefined, { x: 0, y: 656 }))!;
+  const first = placeClear(area, project(0));
+  const last = placeClear(area, project(30));
+  // It moves with the scene, 108 px left, and stays in the box (less its pad) at both ends.
+  assert.ok(Math.abs(first.x - last.x - 108) < 0.5 && Math.abs(first.y - last.y) < 0.01, JSON.stringify([first, last]));
+  assert.ok(last.x >= 12 && first.x + first.w <= 1080 - 12, JSON.stringify([first, last]));
+  // A push in (scale 1.2 about the centre) enlarges it with the picture.
+  const pushed = withCamera(place, [1.2, 0, 0]);
+  const near = placeClear({ x: 0.45, y: 0.45, w: 0.1, h: 0.1 }, pushed);
+  assert.ok(Math.abs(near.w - 0.12 * 1080) < 0.5 && Math.abs(near.x + near.w / 2 - 540) < 0.5, JSON.stringify(near));
+});

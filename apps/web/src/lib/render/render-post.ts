@@ -40,6 +40,7 @@ import {
   type ReelProps,
   type TracksByClip,
   voiceTranscriptSchema,
+  wantsClear,
   wantsDepth,
   wantsObjects,
   wantsSubjects,
@@ -182,8 +183,8 @@ export async function loadMontageInputs(
   const depth = moving.length ? await sceneCutoutInputs(studioId, moving).catch(() => ({})) : undefined;
   // The same photos with their depth read on the card for their shots (relief.py), when it was.
   const reliefs = moving.length ? await reliefInputs(studioId, plan).catch(() => ({})) : undefined;
-  // Her subject cut out at every image, for the compositions that draw it (Subject).
-  const subjects = wantsSubjects(plan) || wantsObjects(plan) || wantsDepth(plan) ? await subjectInputs(studioId, plan).catch(() => ({})) : undefined;
+  // Her subject cut out at every image, for the compositions that draw it (Subject), and the clear areas their texts are set in (ClearBox).
+  const subjects = wantsSubjects(plan) || wantsObjects(plan) || wantsDepth(plan) || wantsClear(plan) ? await subjectInputs(studioId, plan).catch(() => ({})) : undefined;
   // Each photo's shape, from its reading.
   const photoAspects = Object.fromEntries(
     assets.flatMap((a) => {
@@ -367,11 +368,12 @@ export async function prepareRenderAssets(studioId: string, postId: string, plan
   if (subjectPhotoIds(plan).length) await ensureCutoutContours(studioId, subjectPhotoIds(plan));
   // A composition that draws her subject over her shots (Subject): its passages cut out at every image, as many as
   // the step has time for before its render.
-  // The objects its compositions follow by name (a cup she lifts), on the rented card, at the same time, the shots
-  // they show in depth (Depth), and its moving photos drawn in relief by their depth.
+  // The objects its compositions follow by name (a cup she lifts), on the rented card, at the same time (and in the same
+  // machine, the clear areas of the shots their texts are set in: ClearBox), the shots they show in depth (Depth), and
+  // its moving photos drawn in relief by their depth.
   await Promise.all([
     wantsSubjects(plan) ? ensureSubjects(studioId, postId, plan) : null,
-    wantsObjects(plan) ? ensureObjects(studioId, postId, plan) : null,
+    wantsObjects(plan) || wantsClear(plan) ? ensureObjects(studioId, postId, plan) : null,
     wantsDepth(plan) ? ensureDepths(studioId, postId, plan) : null,
     depthPhotoIds(plan).length ? ensureReliefs(studioId, postId, plan).catch((e: unknown) => console.warn("reliefs unavailable", e instanceof Error ? e.message : e)) : null,
   ]);
