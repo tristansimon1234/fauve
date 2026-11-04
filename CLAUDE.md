@@ -205,7 +205,7 @@ Intégration bsport (planning et données élèves), relances aux élèves (bspo
 
 ## Dans le repo
 - Commandes : `npm run dev`, `npm test`, `npm run typecheck`, `npm run lint`, `npm run build` (à la racine).
-- Un push qui ne change que des fichiers `.md` ou `docs/` ne reconstruit pas l'app sur Vercel (`ignoreCommand` dans `apps/web/vercel.json`, comparé au dernier déploiement réussi, `VERCEL_GIT_PREVIOUS_SHA` ; Tristan : « ba oui », chaque build se paie en minutes de CPU). Un fichier `.md` lu par l'app au déploiement ne doit donc jamais exister.
+- Un push qui ne change que des fichiers `.md`, `docs/`, l'outil de rendu local des skills ou des brouillons de skills que `skill-library.ts` n'importe pas ne reconstruit pas l'app sur Vercel (`ignoreCommand` dans `apps/web/vercel.json` → `scripts/vercel-ignore.sh`, comparé au dernier déploiement réussi, `VERCEL_GIT_PREVIOUS_SHA` ; Tristan : « ba oui », chaque build se paie en minutes de CPU). Un fichier `.md` lu par l'app au déploiement ne doit donc jamais exister.
 - Next.js 16 avec Cache Components : lire `node_modules/next/dist/docs/` avant d'utiliser une API Next ; toute lecture de cookies/session doit être sous `<Suspense>`.
 - Les écrans de la web app lisent les vraies données du studio connecté via `apps/web/src/lib/studio.ts` (`getStudioContext`).
 - Supabase : projet `fauve` (ref `tfxkhktofgtljlqlksba`, eu-west-3). Les noms des fichiers de migration reprennent les versions appliquées en base.

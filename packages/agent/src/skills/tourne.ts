@@ -139,8 +139,9 @@ export const tourne: MontageSkill = {
     const beat = 60 / bpm;
     const count = Math.max(12, Math.min(24, n));
     const { calm, rapid } = sections(count);
-    // The last shot is held; with an ending card, the black after it carries the card (at least the engine's 1,6 s).
-    const card = end ? Math.max(END_CARD / beat, 2) : 0;
+    // The last shot is held; with an ending card, the black after it carries the card: two beats, and always the
+    // engine's 1,6 s (on the quarter-beat grid, rounded up, so a frame lost to rounding never cuts into it).
+    const card = end ? Math.max(2, Math.ceil(((END_CARD + 0.05) / beat) * 4) / 4) : 0;
     const beats = [
       ...FLURRY,
       ...Array.from({ length: calm }, (_, i) => CALM[i % CALM.length]!),
@@ -180,7 +181,7 @@ export const tourne: MontageSkill = {
         burst,
         release,
         final,
-        ...(end ? { black: toFrame(round(spans.at(-1)!.start + LAST * beat)) } : {}),
+        ...(end ? { black: toFrame(round(duration - card * beat)) } : {}),
       },
     };
   },

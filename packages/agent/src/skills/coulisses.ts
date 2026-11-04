@@ -58,7 +58,9 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   // the card (a short title as tall as the model's, a long one shrunk to the card's width). Her small words split in
   // two groups, the most even between words; a single one sits over the left end.
   const halves = (text) => {
-    const words = String(text || "").split(/[ \t\n]+/).filter(Boolean);
+    // Her name is kept whole by the engine (non-breaking spaces): over the two ends, it splits there too.
+    let words = String(text || "").split(/[ \t\n]+/).filter(Boolean);
+    if (words.length < 2) words = String(text || "").split(/[\s\u00a0\u202f]+/).filter(Boolean);
     if (words.length < 2) return [words.join(" "), ""];
     const gap = (k) => Math.abs(words.slice(0, k).join(" ").length - words.slice(k).join(" ").length);
     let best = 1;
@@ -67,12 +69,12 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   };
   const pair = halves(caps(kicker ? kicker.text : ""));
   const title = caps(hook ? hook.text : "");
-  const big = Math.min(168, Math.round(W / (Math.max(4, Array.from(title).length) * 0.5)));
+  const big = Math.min(196, Math.round(W / (Math.max(4, Array.from(title).length) * 0.42)));
   const titleBlock = shown(hook) || shown(kicker)
-    ? h(FitText, { key: "title", style: { position: "absolute", left: X, top: 386, width: W, height: 200 }, innerStyle: { justifyContent: "flex-end" } }, (scale) =>
+    ? h(FitText, { key: "title", style: { position: "absolute", left: X, top: 336, width: W, height: 250 }, innerStyle: { justifyContent: "flex-end" } }, (scale) =>
         h("div", { style: { display: "inline-flex", flexDirection: "column", alignItems: "stretch" } },
           shown(kicker)
-            ? h("div", { style: { display: "flex", justifyContent: pair[1] ? "space-between" : "flex-start", gap: Math.round(28 / scale), fontFamily: body, fontWeight: 700, fontSize: Math.round(60 / Math.max(0.75, scale)), lineHeight: 1, letterSpacing: "-0.01em", color: WHITE, whiteSpace: "nowrap", marginBottom: Math.round(2 / scale) } },
+            ? h("div", { style: { display: "flex", justifyContent: pair[1] ? "space-between" : "flex-start", gap: Math.round(28 / scale), fontFamily: body, fontWeight: 700, fontSize: Math.round(66 / Math.max(0.75, scale)), lineHeight: 1, letterSpacing: "-0.01em", color: WHITE, whiteSpace: "nowrap", marginBottom: Math.round(2 / scale) } },
                 h("span", { "data-fauve-accent": "" }, pair[0]),
                 pair[1] ? h("span", { "data-fauve-accent": "" }, pair[1]) : null)
             : null,
@@ -183,7 +185,7 @@ export const coulisses: MontageSkill = {
       slot: "surtitre",
       role: "caption",
       want: "2 petits mots posés au-dessus des deux bouts du titre, le premier à gauche, le second à droite : chez qui, ou de quoi (une forme comme « chez lino », « pâte fraîche », « le fournil »)",
-      max: 20,
+      max: 18,
       required: true,
     },
     {

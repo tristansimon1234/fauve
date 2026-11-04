@@ -136,7 +136,7 @@ export const frappe: MontageSkill = {
     const first = Math.max(1, Math.min(4, Math.round(quick / 3)));
     const last = quick - first;
     // The black at the end: a beat, or the ending card's time (on the beat grid) when the Reel ends on one.
-    const black = end ? Math.max(BLACK, Math.ceil((END_CARD / beat) * 4) / 4) : BLACK;
+    const black = end ? Math.max(BLACK, Math.ceil(((END_CARD + 0.05) / beat) * 4) / 4) : BLACK;
     const beats = [
       OPENING,
       TYPED_SHOT,
