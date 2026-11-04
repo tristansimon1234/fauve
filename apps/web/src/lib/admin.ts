@@ -1,5 +1,7 @@
 import "server-only";
-import { JOB_STALE_MINUTES, type FeedbackKind } from "@fauve/agent";
+import { houseModel, JOB_STALE_MINUTES, type FeedbackKind } from "@fauve/agent";
+import { MONTAGE_SKILLS } from "@fauve/agent/skills";
+import type { SkillReviewStatus } from "@/lib/skill-reviews";
 import { brakeSettings, type BrakeSettings } from "@/lib/brake-settings";
 import { providerBudgets, type ProviderBudget } from "@/lib/provider-budgets";
 import { teamToday } from "@/lib/reply-cap";
@@ -26,6 +28,20 @@ export type AdminView = {
   waitlistTotal: number;
   montages: { id: string; studio: string; stage: string; since: string }[];
   signups: { studio: string; firstName: string | null; phone: string; at: string; step: string; subscription: string | null }[];
+  /**
+   * Each montage skill of the library (docs/modeles.md): Tristan's review of its version (« pending » before it) and
+   * its bench Reel on free rushes (a signed link for an hour), those to look at first.
+   */
+  skills: {
+    key: string;
+    version: number;
+    name: string;
+    how: string;
+    status: SkillReviewStatus | "pending";
+    note: string | null;
+    reviewedAt: string | null;
+    bench: { url: string; seconds: number | null; costEur: number | null; labCase: string | null; at: string } | null;
+  }[];
   /** What people said of Edith and the app, the newest first: those not done yet. */
   feedback: { id: string; studio: string; kind: FeedbackKind; words: string; at: string; status: "new" | "seen"; source: string; byEdith: boolean }[];
 };
@@ -39,7 +55,7 @@ export async function adminView(): Promise<AdminView> {
   const db = supabaseAdmin();
   const since = await teamToday();
   const fresh = new Date(Date.now() - JOB_STALE_MINUTES * 60_000).toISOString();
-  const [settings, providers, signups, spent, montages, waitlist, recent, feedback] = await Promise.all([
+  const [settings, providers, signups, spent, montages, waitlist, recent, feedback, skills] = await Promise.all([
     brakeSettings(),
     providerBudgets(),
     db.from("members").select("id", { count: "exact", head: true }).gte("created_at", since),
@@ -60,11 +76,13 @@ export async function adminView(): Promise<AdminView> {
       .neq("status", "done")
       .order("created_at", { ascending: false })
       .limit(60),
+    skillsView(),
   ]);
   const jobs = montages.data ?? [];
   return {
     settings,
     providers,
+    skills,
     today: {
       signups: signups.count ?? 0,
       spent: Number(spent.data ?? 0),
@@ -102,4 +120,42 @@ export async function adminView(): Promise<AdminView> {
       };
     }),
   };
+}
+
+const REVIEW_ORDER: Record<SkillReviewStatus | "pending", number> = { pending: 0, revise: 1, refused: 2, approved: 3 };
+
+/** Each skill of the library, with its review and its bench Reel: the ones waiting for Tristan first. */
+async function skillsView(): Promise<AdminView["skills"]> {
+  const db = supabaseAdmin();
+  const [reviews, benches] = await Promise.all([
+    db.from("skill_reviews").select("key, version, status, note, reviewed_at"),
+    db.from("skill_benches").select("key, version, path, seconds, cost_eur, lab_case, created_at"),
+  ]);
+  const at = (rows: { key: unknown; version: unknown }[] | null) => new Map((rows ?? []).map((r) => [`${r.key as string}@${r.version as number}`, r]));
+  const reviewed = at(reviews.data);
+  const benched = at(benches.data);
+  const paths = (benches.data ?? []).map((b) => b.path as string);
+  const signed = paths.length ? ((await db.storage.from("media").createSignedUrls(paths, 3600)).data ?? []) : [];
+  const url = new Map(signed.flatMap((s) => (s.path && s.signedUrl ? [[s.path, s.signedUrl] as const] : [])));
+  return Object.values(MONTAGE_SKILLS)
+    .map((skill) => {
+      const id = `${skill.key}@${skill.version}`;
+      const review = reviewed.get(id) as { status: SkillReviewStatus; note: string | null; reviewed_at: string } | undefined;
+      const bench = benched.get(id) as { path: string; seconds: number | null; cost_eur: number | null; lab_case: string | null; created_at: string } | undefined;
+      const link = bench ? url.get(bench.path) : undefined;
+      return {
+        key: skill.key,
+        version: skill.version,
+        name: houseModel(skill.key)?.name ?? skill.key,
+        how: skill.how,
+        status: review?.status ?? ("pending" as const),
+        note: review?.note ?? null,
+        reviewedAt: review?.reviewed_at ?? null,
+        bench:
+          bench && link
+            ? { url: link, seconds: bench.seconds === null ? null : Number(bench.seconds), costEur: bench.cost_eur === null ? null : Number(bench.cost_eur), labCase: bench.lab_case?.replace(/^lab:\/\//, "") ?? null, at: bench.created_at }
+            : null,
+      };
+    })
+    .sort((a, b) => REVIEW_ORDER[a.status] - REVIEW_ORDER[b.status] || a.name.localeCompare(b.name, "fr"));
 }

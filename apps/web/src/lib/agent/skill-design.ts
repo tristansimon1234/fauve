@@ -43,6 +43,7 @@ import { outputFormat, readAnswer } from "@fauve/agent/answer";
 import { MONTAGE_SKILLS, skillFor } from "@fauve/agent/skills";
 import { insertPlanVersion } from "@/lib/edit-plans";
 import { usableFonts } from "@/lib/fonts";
+import { skillGate } from "@/lib/skill-reviews";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { noteGap } from "@/lib/toolkit";
 import { designMotionScenes, type SceneRequest } from "./motion-designer";
@@ -273,7 +274,8 @@ export async function skillWantsMore(studioId: string, postId: string, mediaIds:
   // Picked by Edith while the Reel is made: she only picks a model her files fill.
   if (!post?.inspiration_id || post.inspiration_id === post.edith_pick) return null;
   const { data: inspiration } = await db.from("inspirations").select("source, external_id").eq("id", post.inspiration_id).maybeSingle();
-  const skill = inspiration?.source === "house" ? skillFor(inspiration.external_id as string | null) : undefined;
+  const gate = await skillGate(studioId);
+  const skill = inspiration?.source === "house" ? gate(skillFor(inspiration.external_id as string | null)) : undefined;
   if (!skill) return null;
   const files = new Set(mediaIds.length ? mediaIds : ((post.media_ids as string[] | null) ?? [])).size;
   return fewFiles(skill, files) ? { name: houseModel(skill.key)?.name ?? skill.key, least: skill.files[0], files } : null;
@@ -289,12 +291,13 @@ export async function skillTooShort(studioId: string, postId: string, seconds: n
   const { data: post } = await db.from("posts").select("inspiration_id").eq("id", postId).eq("studio_id", studioId).maybeSingle();
   if (!post?.inspiration_id) return null;
   const { data: inspiration } = await db.from("inspirations").select("source, external_id").eq("id", post.inspiration_id).maybeSingle();
-  const skill = inspiration?.source === "house" ? skillFor(inspiration.external_id as string | null) : undefined;
+  const gate = await skillGate(studioId);
+  const skill = inspiration?.source === "house" ? gate(skillFor(inspiration.external_id as string | null)) : undefined;
   if (!skill) return null;
   const { max } = skillLengths(skill);
   if (seconds <= max + 1) return null;
   const others = Object.values(MONTAGE_SKILLS)
-    .filter((s) => s.key !== skill.key && skillLengths(s).max + 1 >= seconds)
+    .filter((s) => s.key !== skill.key && gate(s) && skillLengths(s).max + 1 >= seconds)
     .flatMap((s) => houseModel(s.key)?.name ?? [])
     .slice(0, 2);
   return { name: houseModel(skill.key)?.name ?? skill.key, max: Math.floor(max), others };

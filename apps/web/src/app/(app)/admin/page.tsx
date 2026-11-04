@@ -5,7 +5,7 @@ import { adminView, teamMember, type AdminView } from "@/lib/admin";
 import { formatPhone, formatShortDateTime } from "@/lib/format";
 import type { ProviderBudget } from "@/lib/provider-budgets";
 import { FEEDBACK_LABELS } from "@fauve/agent";
-import { dropWaiting, letIn, markFeedback, saveBrakes, setBudget } from "./actions";
+import { dropWaiting, letIn, markFeedback, reviewSkill, saveBrakes, setBudget } from "./actions";
 
 export const metadata: Metadata = { title: "Admin" };
 
@@ -42,6 +42,7 @@ async function Admin() {
       <h1 className="text-[28px] leading-tight font-extrabold tracking-[-0.02em]">Admin</h1>
       <Today view={view} />
       <Feedback view={view} />
+      <Skills view={view} />
       <Providers providers={view.providers} />
       <Brakes view={view} />
       <Waitlist view={view} />
@@ -217,6 +218,75 @@ function Feedback({ view }: { view: AdminView }) {
       ) : (
         <p className="text-sm text-muted">Aucun retour pour l’instant.</p>
       )}
+    </Section>
+  );
+}
+
+const REVIEW_LABELS: Record<AdminView["skills"][number]["status"], string> = {
+  pending: "À valider",
+  revise: "À revoir",
+  refused: "Refusé",
+  approved: "Dans la bibliothèque",
+};
+
+// Tristan's review of each montage skill (« par quel biais je validerai les modèles ? »): its bench Reel on free rushes,
+// what it does, and the three answers. A business plays only those added; the team's studio and the lab's play them all.
+function Skills({ view }: { view: AdminView }) {
+  const waiting = view.skills.filter((s) => s.status === "pending" || s.status === "revise").length;
+  return (
+    <Section
+      title="Modèles"
+      hint={`${waiting} à regarder. Un commerce ne joue que les modèles ajoutés à la bibliothèque ; le studio de l’équipe et le banc les jouent tous. Chaque rendu est fait par la chaîne d’Edith sur des rushes libres.`}
+    >
+      <ul className="flex flex-col divide-y divide-line">
+        {view.skills.map((s) => (
+          <li key={`${s.key}@${s.version}`} className="flex flex-col gap-4 py-4 sm:flex-row sm:items-start">
+            {s.bench ? (
+              <video src={s.bench.url} controls playsInline preload="metadata" className="aspect-[9/16] w-[180px] shrink-0 bg-ink" />
+            ) : (
+              <div className="flex aspect-[9/16] w-[180px] shrink-0 items-center justify-center border border-line p-3 text-center text-[13px] text-muted">Pas encore passé au banc</div>
+            )}
+            <div className="flex min-w-0 flex-1 flex-col gap-2">
+              <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                <h3 className="text-[17px] font-bold">{s.name}</h3>
+                <span className="mono-label text-muted">v{s.version}</span>
+                <span className={`mono-label ${s.status === "approved" ? "text-muted" : "text-violet"}`}>{REVIEW_LABELS[s.status]}</span>
+              </div>
+              <p className="text-sm leading-snug text-muted">{s.how}</p>
+              {s.bench && (
+                <p className="text-[13px] text-muted">
+                  Banc : {s.bench.seconds !== null ? `${String(s.bench.seconds).replace(".", ",")} s` : "durée inconnue"}
+                  {s.bench.costEur !== null ? ` · ${s.bench.costEur.toFixed(2).replace(".", ",")} €` : ""}
+                  {s.bench.labCase ? ` · cas ${s.bench.labCase}` : ""} · {formatShortDateTime(s.bench.at, ZONE)}
+                </p>
+              )}
+              {s.note && <p className="text-[13px] leading-snug whitespace-pre-line">Ta note : « {s.note} »</p>}
+              <form action={reviewSkill} className="flex flex-col gap-2">
+                <input type="hidden" name="key" value={s.key} />
+                <input type="hidden" name="version" value={s.version} />
+                <textarea
+                  name="note"
+                  rows={2}
+                  maxLength={2000}
+                  placeholder="Ce qui ne va pas, pour qu’on le reprenne (facultatif)"
+                  className="w-full border border-line bg-white px-3 py-2 text-[14px] outline-none focus:border-violet"
+                />
+                <div className="flex flex-wrap gap-2">
+                  <button type="submit" name="status" value="approved" className="btn btn-primary h-9 px-3 text-[13px]">
+                    Ajouter à la bibliothèque
+                  </button>
+                  <button type="submit" name="status" value="revise" className="btn btn-secondary h-9 px-3 text-[13px]">
+                    À revoir
+                  </button>
+                  <button type="submit" name="status" value="refused" className="btn btn-secondary h-9 px-3 text-[13px]">
+                    Refuser
+                  </button>
+                </div>
+              </form>
+            </div>
+          </li>
+        ))}
+      </ul>
     </Section>
   );
 }

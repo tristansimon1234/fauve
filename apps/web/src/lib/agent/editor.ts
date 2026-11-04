@@ -104,6 +104,7 @@ import { judgeHooks } from "./hook-judge";
 import { copyCandidate, designCopy } from "./copy-design";
 import { designSkill, skillCandidate } from "./skill-design";
 import { followedSound } from "@/lib/sound-follow";
+import { skillGate } from "@/lib/skill-reviews";
 import { skillFor } from "@fauve/agent/skills";
 import { recordToolUses } from "@/lib/tool-maker";
 import { designMotionScenes, type SceneRequest, type SceneResult } from "./motion-designer";
@@ -120,10 +121,10 @@ import { anthropic, CACHE_AN_HOUR, logClaudeCost } from "./run";
 /** The voice note a post carries (a voice leads the Reel: never a montage skill). */
 const voiceIdOf = (post: { voice_media_id?: unknown }) => (typeof post.voice_media_id === "string" ? post.voice_media_id : null);
 
-/** Whether the post follows one of Edith's models that has its montage skill (its inspiration's row, read once). */
-async function skillOfInspiration(studioId: string, inspirationId: string): Promise<boolean> {
+/** Whether the post follows one of Edith's models that has its montage skill, one this studio plays (its inspiration's row, read once). */
+async function skillOfInspiration(studioId: string, inspirationId: string, gate: Awaited<ReturnType<typeof skillGate>>): Promise<boolean> {
   const { data } = await supabaseAdmin().from("inspirations").select("source, external_id").eq("id", inspirationId).eq("studio_id", studioId).maybeSingle();
-  return data?.source === "house" && Boolean(skillFor(data.external_id as string | null));
+  return data?.source === "house" && Boolean(gate(skillFor(data.external_id as string | null)));
 }
 
 /** The brief of the animation that draws a copied Reel's texts as its model does (constant: a correction keeps its code). */
@@ -369,7 +370,9 @@ export async function designEdit(params: {
   // started now so it runs while the rest is read: an animation can then start from a gesture, hold on to it or follow it.
   // Not for a Reel a montage skill will play (one of Edith's models with its skill, nothing it needs): started after it
   // only if the editor takes the Reel.
-  const skilled = Boolean(!voiceIdOf(post.data) && post.data.inspiration_id && (await skillOfInspiration(params.studioId, post.data.inspiration_id as string)));
+  // The skills this studio plays: those Tristan added to the library (the team's and the lab's play them all).
+  const gate = await skillGate(params.studioId);
+  const skilled = Boolean(!voiceIdOf(post.data) && post.data.inspiration_id && (await skillOfInspiration(params.studioId, post.data.inspiration_id as string, gate)));
   const startTracks = () => (clips.length ? ensureTracks(params.studioId, clips.map((c) => c.media_id)).catch((e: unknown) => console.warn("tracks: not ready", e)) : null);
   let earlyTracks = skilled ? null : startTracks();
   // Someone speaking in a video analysed before its speech was read: read now (its sound cleaned, its « euh » timed).
@@ -422,7 +425,7 @@ export async function designEdit(params: {
   const profile = brandProfileSchema.partial().catch({}).parse(brand.data?.[0]?.profile ?? {});
   // A model of Edith's coded as a whole Reel (a montage skill) is played by its skill, else by the editor from its code: never
   // remade as a simple copy of its cuts (a reading of « Mots aux quatre coins » without « posés sur » had made it one).
-  const skill = skillCandidate(followed, params.contract, Boolean(voice));
+  const skill = gate(skillCandidate(followed, params.contract, Boolean(voice)));
   const sound = await following;
   // A simple Reel she copies is remade by code (copy.ts: the model's own cuts, her photos' subjects laid over, its title, its
   // ending): no editor nor motion designer, one small call writes its words. Its correction too; anything it cannot do, the editor.
@@ -598,7 +601,7 @@ export async function designEdit(params: {
   // Reel, next to the original, is its own step. The editor cuts the others (a voice leads them, a correction, no model).
   const house = houseModel(followed?.house);
   // A model coded as a montage skill: its whole Reel is the example, kept as it is but for what her request needs.
-  const coded = skillFor(house?.key);
+  const coded = gate(skillFor(house?.key));
   const example = coded
     ? { code: coded.code, frames: 0, shots: coded.shots[0], photos: 0, skill: true as const }
     : house?.example

@@ -9,6 +9,8 @@ import { PROVIDERS, type ProviderKey } from "@fauve/agent";
 import { forgetBudget, saveBudget } from "@/lib/provider-budgets";
 import { admitNow, dropFromWaitlist } from "@/lib/waitlist";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { forgetApprovedSkills } from "@/lib/skill-reviews";
+import { MONTAGE_SKILLS } from "@fauve/agent/skills";
 
 // The admin page's actions: the team's studio only (lib/admin.ts), checked again on each one.
 
@@ -76,5 +78,26 @@ export async function markFeedback(form: FormData): Promise<void> {
   if (!parsed.success) return;
   const { error } = await supabaseAdmin().from("feedback").update({ status: parsed.data.status }).eq("id", parsed.data.id);
   if (error) console.warn("feedback not marked", error.message);
+  revalidatePath("/admin");
+}
+
+const reviewSchema = z.object({
+  key: z.string().min(1).max(40),
+  version: z.coerce.number().int().min(1),
+  status: z.enum(["approved", "refused", "revise"]),
+  note: z.string().max(2000).optional(),
+});
+
+/** Tristan's review of a montage skill version: added to the library (a business plays it), refused, or to redo with his note. */
+export async function reviewSkill(form: FormData): Promise<void> {
+  await guard();
+  const review = reviewSchema.safeParse({ key: form.get("key"), version: form.get("version"), status: form.get("status"), note: String(form.get("note") ?? "").trim() || undefined });
+  if (!review.success || MONTAGE_SKILLS[review.data.key]?.version !== review.data.version) return;
+  const { key, version, status, note } = review.data;
+  const { error } = await supabaseAdmin()
+    .from("skill_reviews")
+    .upsert({ key, version, status, note: note ?? null, reviewed_at: new Date().toISOString() });
+  if (error) throw new Error(error.message);
+  forgetApprovedSkills();
   revalidatePath("/admin");
 }

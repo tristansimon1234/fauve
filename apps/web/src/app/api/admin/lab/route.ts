@@ -665,6 +665,23 @@ const photoMime = (file: string) => (/\.png$/i.test(file) ? "image/png" : /\.web
 /** What she writes in « Ce que tu imagines » (500 characters at most, as on the screen). */
 const ideaOf = (params: URLSearchParams) => params.get("idea")?.trim().slice(0, 500) || null;
 
+/** A skill version's bench Reel, copied out of the lab case's renders (they go when the case is reset), once per render. */
+async function keepBench(skill: { key: string; version: number }, from: string, facts: { seconds: number | null; costEur: number; labCase: string }) {
+  const db = supabaseAdmin();
+  const path = `house/skill-benches/${skill.key}-v${skill.version}.mp4`;
+  const { data: known } = await db.from("skill_benches").select("created_at").eq("key", skill.key).eq("version", skill.version).maybeSingle();
+  const { data: render } = await db.from("renders").select("created_at").eq("storage_path", from).maybeSingle();
+  // The same render already kept: nothing to copy again.
+  if (known && render && new Date(known.created_at as string) >= new Date(render.created_at as string)) return;
+  await db.storage.from("media").remove([path]);
+  const copied = await db.storage.from("media").copy(from, path);
+  if (copied.error) throw new Error(copied.error.message);
+  const { error } = await db
+    .from("skill_benches")
+    .upsert({ key: skill.key, version: skill.version, path, seconds: facts.seconds, cost_eur: Math.round(facts.costEur * 1000) / 1000, lab_case: facts.labCase, created_at: new Date().toISOString() });
+  if (error) throw new Error(error.message);
+}
+
 async function result(key: string) {
   const db = supabaseAdmin();
   const studio = await db.from("studios").select("id, name, business_type, memory, motion_model").eq("website_url", key).maybeSingle();
@@ -722,6 +739,16 @@ async function result(key: string) {
     }
     return sums;
   };
+  // A Reel a montage skill played: its render kept as that skill version's bench, for Tristan's review on /admin.
+  const played = plan.success ? plan.data.skill : undefined;
+  const benched = played ? renders.findLast((r) => r.edit_plan_id === kept?.id && r.status === "done" && r.storage_path) : undefined;
+  if (played && benched) {
+    await keepBench(played, benched.storage_path as string, {
+      seconds: benched.duration_ms ? Math.round((benched.duration_ms as number) / 10) / 100 : null,
+      costEur: Object.values(byKind(post.data.created_at as string)).reduce((a, b) => a + b, 0),
+      labCase: key,
+    }).catch((error: unknown) => console.warn("skill bench: not kept", error));
+  }
   // Its animations: who wrote them, and what they cost for this Reel (with their fixes and the director's look).
   const motionCost = (costs.data ?? [])
     .filter(
