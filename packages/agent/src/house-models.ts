@@ -1098,10 +1098,50 @@ export function houseStyle(model: HouseModel): StolenStyle {
 /** What her Reel takes from a house model, in three lines (as for a Reel she sends). */
 export const houseLines = (model: HouseModel): string[] => stolenStyleLines(houseStyle(model));
 
+/**
+ * What each model is for, and not for (Tristan: « j'espère que le système est assez bien fait pour qu'il puisse bien
+ * comprendre le modèle qu'il peut utiliser dans quel contexte ») : read by the art director who picks one (house-pick.ts)
+ * and by Edith when she proposes one. In French, as the business would say it.
+ */
+export const HOUSE_WHEN: Record<string, { pour: string; pas_pour: string }> = {
+  decode: { pour: "présenter un lieu, un quartier ou un nom, une ouverture, une rentrée", pas_pour: "une offre à lire en détail, un produit en gros plan, quelqu'un qui parle" },
+  "quatre-coins": { pour: "présenter le lieu et son équipe, son adresse, ce qu'on y vit", pas_pour: "des produits seuls, quelqu'un face caméra" },
+  mosaique: { pour: "des plats, des produits ou des créations en série, une carte, une collection", pas_pour: "un message à lire, quelqu'un qui parle, un lieu en plan large" },
+  "carte-feutre": { pour: "un message de quelques mots qui s'écrit sur ses images (une offre, une nouveauté, un horaire)", pas_pour: "un Reel sans message" },
+  pile: { pour: "montrer son travail en série (réalisations, coupes, pièces) avec une phrase courte qui dit qui on est", pas_pour: "des vidéos qui racontent une histoire, une voix" },
+  "photo-dump": { pour: "une semaine, un événement, l'envers du décor en vrac, beaucoup de photos", pas_pour: "un message précis, une offre" },
+  table: { pour: "des plats ou des produits présentés comme des tirages posés sur sa table, un moment chaleureux", pas_pour: "un lieu, une rue" },
+  "ecran-partage": { pour: "le geste et le résultat côte à côte (l'artisan et sa pièce, la coiffeuse et la coupe, le chef et l'assiette)", pas_pour: "un seul sujet, un lieu" },
+  cadre: { pour: "faire entrer dans un lieu (un couloir, une salle), une ouverture, des travaux", pas_pour: "des produits en gros plan" },
+  fenetres: { pour: "une sortie, un quartier, un voyage, des lieux qui défilent", pas_pour: "des produits, une offre" },
+  facade: { pour: "une ouverture, un lancement, présenter sa devanture", pas_pour: "sans vidéo fixe de la devanture filmée de face" },
+  gaufre: { pour: "une annonce élégante, un nom, une nouvelle collection, comme un faire-part", pas_pour: "un Reel rythmé ou drôle" },
+  "mot-cle": { pour: "quelqu'un qui parle face caméra (un conseil, une explication)", pas_pour: "des images sans parole" },
+  frappe: { pour: "présenter un lieu au soleil, une terrasse, une saison", pas_pour: "un intérieur sombre, des produits seuls" },
+  "titre-derriere": { pour: "un nom de lieu en grand avec des gens qui passent devant, une rue vivante", pas_pour: "sans plan large où des gens passent" },
+  journee: { pour: "raconter une journée du lieu, du matin au soir, son ambiance", pas_pour: "une offre, un produit seul" },
+  "plans-fixes": { pour: "un lieu calme et beau, une ambiance, l'heure dorée", pas_pour: "un Reel rythmé, une annonce" },
+  "coups-de-fouet": { pour: "l'énergie d'une rue, d'un quartier, d'un lieu animé", pas_pour: "un lieu calme, un long message" },
+  tourne: { pour: "des matières, des gestes, un savoir-faire, un look graphique", pas_pour: "ce dont la couleur compte (des plats, des fleurs)" },
+  nike: { pour: "l'effort, le geste, l'énergie (sport, danse, un service en plein rush)", pas_pour: "un lieu calme, des produits" },
+  eventail: { pour: "une ouverture graphique, un lieu, une marque qui ose", pas_pour: "un message à lire" },
+  coulisses: { pour: "les coulisses, la préparation, les étapes d'un geste", pas_pour: "un lieu en plan large, une offre" },
+  interrupteur: { pour: "présenter sa marque, un lancement, son logo qui s'allume", pas_pour: "sans vidéo d'elle qui lève la main vers un mur" },
+  interface: { pour: "faire suivre son compte, une app, un service en ligne", pas_pour: "montrer un lieu ou des produits" },
+  pixel: { pour: "une recette, une préparation en étapes, une ambiance chaleureuse", pas_pour: "un lieu, une rue" },
+  "mots-meles": { pour: "un jeu, une devinette, un message caché, un lieu calme", pas_pour: "un Reel rythmé" },
+  aplat: { pour: "présenter une personne (la patronne, l'équipe), une marque qui ose la couleur", pas_pour: "sans vidéo d'elle qui marche" },
+  detourages: { pour: "des produits ou des objets qui surgissent dans la rue, un ton joueur", pas_pour: "sans photos d'objets sur fond simple" },
+  createur: { pour: "quelqu'un qui explique en parlant, avec des images de ce dont il parle", pas_pour: "des images sans parole" },
+  silhouette: { pour: "une personne qui passe, un mot fort, un ton graphique", pas_pour: "des produits" },
+  vision: { pour: "un lieu fréquenté, un ton tech ou graphique", pas_pour: "un lieu vide" },
+};
+
 /** The models for Edith: their key, name, what they do, what they want, and what only she can film for one. */
-export function houseModelsForEdith(): { key: string; nom: string; ce_que_ca_fait: string; il_faut: string; a_lui_dire?: string }[] {
+export function houseModelsForEdith(): { key: string; nom: string; ce_que_ca_fait: string; il_faut: string; pour?: string; pas_pour?: string; a_lui_dire?: string }[] {
   return HOUSE_MODELS.map((m) => {
     const film = filmWords(m.look);
-    return { key: m.key, nom: m.name, ce_que_ca_fait: m.pitch, il_faut: m.needs, ...(film ? { a_lui_dire: film } : {}) };
+    const when = HOUSE_WHEN[m.key];
+    return { key: m.key, nom: m.name, ce_que_ca_fait: m.pitch, il_faut: m.needs, ...(when ? { pour: when.pour, pas_pour: when.pas_pour } : {}), ...(film ? { a_lui_dire: film } : {}) };
   });
 }

@@ -204,7 +204,7 @@ export const detourages: MontageSkill = {
   long: 31,
   files: [6, 16],
   fonts: ["Permanent Marker"],
-  how: "Tes plans de rue ou de ton lieu en plein cadre, coupés sur le temps ; toutes les deux secondes environ, sur le temps, une de tes photos (un objet, un produit, quelqu'un) surgit en grand par-dessus, détourée avec un épais bord blanc de ciseau et une ombre, un peu penchée, chaque fois à une autre place, un petit mot écrit au feutre blanc à côté ; elle reste le plan suivant et part à la coupe ; la dernière se pose sur le dernier plan, tenu jusqu'à la fin.",
+  how: "Ses plans de rue ou de son lieu en plein cadre, coupés sur le temps ; toutes les deux secondes environ, sur le temps, une de ses photos (un objet, un produit, quelqu'un) surgit en grand par-dessus, détourée avec un épais bord blanc de ciseau et une ombre, un peu penchée, chaque fois à une autre place, un petit mot écrit au feutre blanc à côté ; elle reste le plan suivant et part à la coupe ; la dernière se pose sur le dernier plan, tenu jusqu'à la fin.",
   end: true,
   texts: [
     { slot: "mots", role: "band", want: "un petit mot écrit au feutre à côté de chaque détourage, dans l'ordre des détourages (autant que de cases « détourage »), séparés par des virgules, 1 ou 2 mots chacun : ce qu'il est ou qui (une forme comme « la baguette, Léa, le four, à emporter ») ; une virgule de plus sans mot laisse un détourage sans mot", max: 96, required: true },
@@ -223,14 +223,14 @@ export const detourages: MontageSkill = {
     let cutouts = 0;
     const wants = roles.map((r, i) =>
       i === 0
-        ? "le plan qui ouvre le Reel : ta rue, ta devanture ou ton lieu, vivant, en mouvement"
+        ? "le plan qui ouvre le Reel : sa rue, sa devanture ou son lieu, vivant, en mouvement"
         : r === "pop"
           ? `détourage ${++cutouts} : une photo d'un objet, d'un produit ou de quelqu'un, sur un fond simple et net${i === roles.length - 2 ? " (le plus beau : il se pose sur le dernier plan)" : ""} ; il surgit détouré en grand par-dessus le plan suivant, avec un petit mot à côté`
           : r === "with"
-            ? "un plan de ta rue ou de ton lieu en plein cadre, assez calme : le détourage reste posé dessus"
+            ? "un plan de sa rue ou de son lieu en plein cadre, assez calme : le détourage reste posé dessus"
             : r === "final"
               ? "le dernier plan, large et calme, tenu jusqu'à la fin : le dernier détourage s'y pose"
-              : "un plan vivant de ta rue ou de ton lieu, en plein cadre, différent du précédent : des gens qui passent, un geste, un détail",
+              : "un plan vivant de sa rue ou de son lieu, en plein cadre, différent du précédent : des gens qui passent, un geste, un détail",
     );
     const firstPop = spans[roles.indexOf("pop")]!.start;
     return {

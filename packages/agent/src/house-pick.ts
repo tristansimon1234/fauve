@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { HOUSE_MODELS, houseModel } from "./house-models.ts";
+import { HOUSE_MODELS, HOUSE_WHEN, houseModel } from "./house-models.ts";
 
 // Edith's art direction by default (Tristan: « avec la même DA par défaut que les reels envoyés », « des 31 reels
 // envoyés et des modèles »): a Reel that has no model, no Reel to copy and no form of her own is made in one of
@@ -18,6 +18,7 @@ export const HOUSE_PICK_AVOID = 3;
 export const HOUSE_PICK_PROMPT = `You are Edith's art director. A local business (a salon, a café, a studio, a shop, a restaurant…) has sent its footage for one Instagram Reel. Edith's Reels are never made in a neutral, safe default: each one is made in one of Edith's own models (modeles), a form with one strong idea that carries every second of the Reel (a title that decodes like a film's credits, words in the four corners, a mosaic that never settles, a giant title the passers-by walk in front of…), dressed in the business's own fonts and colours. Choose the model this Reel is made in.
 
 How to choose
+- What each model is for (pour) and not for (pas_pour): never one whose pas_pour is her Reel.
 - Her files first: a model can only be made with the footage it needs (il_faut, and its number of files). One that needs someone walking in front of the place, someone talking to the camera, a hand raised to a wall, a fixed shot of the shop front or photos on a plain background is out unless her files have it.
 - Then her request (demande): what people must feel or do; when she names a form (a split screen, a collage, a word in big, black and white, a mosaic…), the model that is that form.
 - Then her trade and what her footage shows: the model whose idea makes this business look its best (a mosaic for dishes or creations, fixed cinema shots for a calm place, whip pans for a lively street, a typed name for a place in the sun…).
@@ -53,7 +54,14 @@ export function housePickInput(input: { request: string; business: string | null
     })),
     voix_off: input.voice,
     derniers_modeles: input.avoid,
-    modeles: HOUSE_MODELS.map((m) => ({ key: m.key, nom: m.name, ce_que_ca_fait: m.pitch, il_faut: m.needs, fichiers: input.least?.[m.key] ? [input.least[m.key], m.files[1]] : m.files })),
+    modeles: HOUSE_MODELS.map((m) => ({
+      key: m.key,
+      nom: m.name,
+      ce_que_ca_fait: m.pitch,
+      ...(HOUSE_WHEN[m.key] ? { pour: HOUSE_WHEN[m.key]!.pour, pas_pour: HOUSE_WHEN[m.key]!.pas_pour } : {}),
+      il_faut: m.needs,
+      fichiers: input.least?.[m.key] ? [input.least[m.key], m.files[1]] : m.files,
+    })),
   });
 }
 

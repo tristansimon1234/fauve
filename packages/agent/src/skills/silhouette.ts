@@ -9,7 +9,7 @@ import { beatSpans, toFrame, type MontageSkill } from "../skills.ts";
 // word (her name), very bold and tight, flickers on letter by letter at the centre and inverts where she passes under
 // it (the word drawn white in difference over the ground and her: dark on the pale, white on her); her other words
 // may take its place on the beat in the middle shots, then her word comes back alone on the pale ground, a small line
-// typed under it. Without her cut-out (a shot where it failed) her shot plays as a very contrasted black and white
+// typed under it. Without her cut-out (a shot where it failed) her shot plays as a hard, high-key black and white
 // print clamped to the pale ground, her dark shapes for silhouettes, the word inverting on them the same way. Its
 // ending card (an offer, an announcement) takes the word's place, in its type, on the pale ground.
 
@@ -105,6 +105,8 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const swapBeats = need.reduce((at, b) => { starts.push(at); return at + b * scale; }, 0);
   const swapping = list && items.length && frame >= SWAP_AT && frame < Math.min(ALONE_AT, SWAP_AT + Math.round(swapBeats * BEAT));
   const current = swapping ? starts.reduce((c, s, k) => (SWAP_AT + Math.round(s * BEAT) <= frame ? k : c), 0) : -1;
+  // Its tight dark shadow vanishes in the difference (black over anything leaves it as it is): it only tells the scene
+  // check, which reads the word's own colour and not the blend, that the word carries its own edge.
   const wordStyle = { fontFamily: display, fontWeight: 800, fontSize: 250, lineHeight: 1, letterSpacing: "-0.055em", textTransform: "lowercase", fontKerning: "none", fontVariantLigatures: "none", whiteSpace: "nowrap", color: "#ffffff", textShadow: "0 0 1px rgba(0,0,0,0.9), 0 0 2px rgba(0,0,0,0.6)" };
   const cell = (key, seen, child) => h("span", { key, style: { gridArea: "1 / 1", justifySelf: "center", opacity: seen ? 1 : 0, paddingRight: "0.06em" } }, child);
   const hidden = (key, text) => h("span", { key, style: { position: "absolute", left: 0, top: 0, opacity: 0, fontSize: 1 } }, text);
@@ -153,11 +155,11 @@ export const silhouette: MontageSkill = {
   bpm: BPM,
   shots: [2, 5],
   files: [1, 4],
-  how: "Sur un fond gris très pâle, ta silhouette toute noire qui marche ; au centre, un grand mot très gras en minuscules s'allume lettre par lettre en clignotant, sombre sur le fond pâle et blanc là où ta silhouette passe dessous ; dans les plans du milieu, d'autres mots peuvent le remplacer l'un après l'autre sur le temps ; à la fin, le mot revient seul sur le fond pâle, une petite ligne tapée dessous.",
+  how: "Sur un fond gris très pâle, la silhouette toute noire de quelqu'un qui marche ; au centre, un grand mot très gras en minuscules s'allume lettre par lettre en clignotant, sombre sur le fond pâle et blanc là où la silhouette passe dessous ; dans les plans du milieu, d'autres mots peuvent le remplacer l'un après l'autre sur le temps ; à la fin, le mot revient seul sur le fond pâle, une petite ligne tapée dessous.",
   end: true,
   texts: [
     { slot: "mot", role: "hook", want: "le grand mot au centre, très gras, en minuscules : son nom s'il est court, sinon le mot de son nom qui la distingue (« Farine » pour « Maison Farine »), ou son quartier ; un seul mot de préférence, plus il est court plus il est grand", max: 12, required: true },
-    { slot: "mots", role: "band", want: "facultatif : 2 à 4 mots qui prennent la place du grand mot l'un après l'autre, sur le temps, pendant les plans du milieu, séparés par des virgules, un seul mot court chacun : ce qu'elle fait ou ce qu'on trouve chez elle (une forme comme « bouquets, mariages, deuil »)", max: 40, required: false },
+    { slot: "mots", role: "band", want: "facultatif : 2 à 4 mots qui prennent la place du grand mot l'un après l'autre, sur le temps, pendant les plans du milieu, séparés par des virgules, un seul mot court chacun : ce qu'on y fait ou ce qu'on y trouve (une forme comme « bouquets, mariages, deuil »)", max: 40, required: false },
     { slot: "ligne", role: "caption", want: "facultatif : une petite ligne tapée sous le mot à la fin, sur le fond pâle : son métier et son quartier, ou son compte (une forme comme « fleuriste · Paris 11 », « @studio.ciel »)", max: 30, required: false },
   ],
   timeline(n, { end, bpm: tempo }) {
@@ -175,7 +177,7 @@ export const silhouette: MontageSkill = {
     const until = round(end ? duration - CARD_SECONDS : duration);
     const wants = spans.map((_, i) =>
       i === 0
-        ? "une vidéo filmée fixe où tu marches (ou des passants), en entier dans l'image et pas trop loin, au moins 5 s : ta silhouette devient toute noire sur un fond pâle, le grand mot posé au centre"
+        ? "une vidéo filmée fixe de quelqu'un qui marche (la personne ou des passants), en entier dans l'image et pas trop loin, au moins 5 s : sa silhouette devient toute noire sur un fond pâle, le grand mot posé au centre"
         : i < spans.length - 1
           ? "un autre passage filmé fixe où quelqu'un marche ou passe, différent du précédent (une autre vidéo, ou un autre moment de la même) : sa silhouette noire passe sous le mot"
           : "le dernier passage filmé fixe où quelqu'un marche ou sort de l'image : puis le mot reste seul sur le fond pâle",

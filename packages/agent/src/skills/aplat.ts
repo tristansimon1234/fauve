@@ -179,10 +179,10 @@ export const aplat: MontageSkill = {
   // Up to 20 for a length she asks for (29 s at its own tempo, 30 a touch slower): more of her shots on the beat.
   long: 20,
   files: [3, 10],
-  how: "Ta silhouette détourée marche seule sur un grand aplat de couleur vive, blanche et lumineuse pendant trois images puis à tes couleurs, ton titre empilé en très grand derrière toi ; puis ton vrai plan revient autour de toi en trois morceaux, du sol au ciel, chacun en un flash blanc ; puis tes plans coupés sur le temps, le premier se resserrant dans un épais cadre de la même couleur, un sur quatre encadré lui aussi ; le dernier se fait encadrer à son tour et le Reel finit sur la couleur, ton titre revenu dessus.",
+  how: "La silhouette détourée de quelqu'un qui marche, seule sur un grand aplat de couleur vive (blanche et lumineuse pendant trois images, puis à ses couleurs), le titre empilé en très grand derrière elle ; puis son vrai plan revient autour d'elle en trois morceaux, du sol au ciel, chacun en un flash blanc ; puis ses plans coupés sur le temps, le premier se resserrant dans un épais cadre de la même couleur, un sur quatre encadré lui aussi ; le dernier se fait encadrer à son tour et le Reel finit sur la couleur, le titre revenu dessus.",
   end: true,
   texts: [
-    { slot: "titre", role: "hook", want: "facultatif : 1 à 3 mots empilés en très grand sur l'aplat, derrière toi, un par ligne en capitales : ce qu'on va voir, ou ton nom s'il est court (une forme comme « un samedi », « au marché », « chez Lou »)", max: 18, required: false },
+    { slot: "titre", role: "hook", want: "facultatif : 1 à 3 mots empilés en très grand sur l'aplat, derrière la silhouette, un par ligne en capitales : ce qu'on va voir, ou son nom s'il est court (une forme comme « un samedi », « au marché », « chez Lou »)", max: 18, required: false },
     { slot: "ligne", role: "caption", want: "facultatif : une petite ligne en capitales espacées au-dessus du titre, 2 à 4 mots : où, quand (une forme comme « au marché · samedi », « rue des Martyrs »)", max: 28, required: false },
   ],
   timeline(n, { end, bpm: tempo }) {
@@ -199,14 +199,14 @@ export const aplat: MontageSkill = {
     const framed = (i: number) => i === 1 || i === count - 1 || (i >= 2 && i <= count - 2 && (i - 2) % 4 === 3);
     const wants = spans.map((_, i) =>
       i === 0
-        ? "une vidéo de toi (ou de quelqu'un) qui marche, de dos ou de profil, en entier dans l'image, au moins 5 s : ta silhouette marche seule sur l'aplat de couleur, puis ton vrai plan revient autour de toi"
+        ? "une vidéo de la personne (ou de quelqu'un) qui marche, de dos ou de profil, en entier dans l'image, au moins 5 s : sa silhouette marche seule sur l'aplat de couleur, puis le vrai plan revient autour d'elle"
         : i === 1
-          ? "un plan fort de ton lieu ou de ton travail, en mouvement : il se resserre dans un épais cadre de couleur"
+          ? "un plan fort de son lieu ou de son travail, en mouvement : il se resserre dans un épais cadre de couleur"
           : i === spans.length - 1
             ? "un dernier plan large et calme : il se fait encadrer de couleur, puis le Reel finit sur la couleur"
             : framed(i)
-              ? "un plan vivant de ton lieu, dans un cadre de couleur : un geste, quelqu'un, un détail"
-              : "un plan vivant en plein cadre, différent du précédent : un geste, quelqu'un, un détail, ton lieu",
+              ? "un plan vivant de son lieu, dans un cadre de couleur : un geste, quelqu'un, un détail"
+              : "un plan vivant en plein cadre, différent du précédent : un geste, quelqu'un, un détail, son lieu",
     );
     // Her title and its line on the colour at the start, until the middle piece of her shot lands on them.
     const p2 = round(PIECES[1]! * beat);
