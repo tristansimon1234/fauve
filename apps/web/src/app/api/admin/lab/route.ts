@@ -159,7 +159,7 @@ const CASES: Record<string, LabCase> = {
     brand: { colors: ["#B4232A", "#F4EDE2", "#1B1B1B"], fonts: ["Syne", "Inter Tight"], tone: "élégant, parisien, tutoiement" },
     title: "Au Procope",
     idea: "Le nom « Au Procope » en très grand dans le décor, les passants qui passent devant les lettres, puis une rafale de plans du quartier.",
-    // Tristan's own videos of the street, uploaded with step=upload (2-le-procope-serveur.mp4: people walking past its front).
+    // Public domain videos of the street Tristan uploaded with step=upload (2-le-procope-serveur.mp4: people walking past its front).
     own: ["2-le-procope-serveur.mp4", "1-terrasse-mariniere.mp4", "3-boulangerie-le-viennoise.mp4", "4-rue-passantes-graphic.mp4", "5-feu-pieton-affiches.mp4", "6-passage-pieton-rue.mp4"],
   },
   // The other Reels of the landing's wall, on their very clips (Tristan: « renvoie les mêmes photos et reproduis les
