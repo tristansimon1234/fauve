@@ -39,8 +39,8 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const SMALL_SHADOW = "0 1px 2px rgba(0,0,0,0.85), 0 0 3px rgba(0,0,0,0.65), 0 0 9px rgba(0,0,0,0.4)";
   const DROP = "drop-shadow(0 1px 1.5px rgba(0,0,0,0.6))";
   // A phone number or a date never breaks between its digits.
-  const keep = (s) => String(s || "").replace(/(\d) (?=\d)/g, "$1 ");
-  const wordsIn = (s) => String(s || "").split(/[\s  ]+/).filter((w) => /[\p{L}\p{N}]/u.test(w)).length;
+  const keep = (s) => String(s || "").replace(/(\d) (?=\d)/g, "$1\u00a0");
+  const wordsIn = (s) => String(s || "").split(/[\s\u00a0\u202f]+/).filter((w) => /[\p{L}\p{N}]/u.test(w)).length;
   const hook = reelTexts.find((t) => t.role === "hook");
   const list = reelTexts.find((t) => t.role === "band");
   const captions = reelTexts.filter((t) => t.role === "caption");

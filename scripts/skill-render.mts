@@ -135,7 +135,21 @@ try {
   check = failed.stdout ?? "";
   console.log(`scene check crashed (exit ${failed.status ?? "?"}):`, (failed.stderr ?? "").trim().split("\n").slice(-3).join(" | "));
 }
-console.log("scene check:", check.trim().split("\n").at(-1) ?? "(nothing)");
+const verdict = check.trim().split("\n").at(-1) ?? "";
+console.log("scene check:", verdict || "(nothing)");
+// A refusal (or no verdict at all) ends the run with code 2, the Reel still rendered: « ok » from a batch meant nothing.
+const refused = (() => {
+  try {
+    const results = (JSON.parse(verdict) as { results?: Record<string, unknown> }).results ?? {};
+    return Object.values(results).some((r) => r !== null);
+  } catch {
+    return true;
+  }
+})();
+if (refused) {
+  console.log("SCENE CHECK REFUSED: read its notes above");
+  process.exitCode = 2;
+}
 
 if (!values["no-render"]) {
   execFileSync(

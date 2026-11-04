@@ -156,6 +156,8 @@ export const nike: MontageSkill = {
   bpm: BPM,
   shots: [8, 16],
   files: [5, 14],
+  // Its code draws its black and white and its red over it: its model's finish keeps only its contrast, grain and vignette.
+  finish: { saturation: 0 },
   how: "Noir et blanc très contrasté : un stroboscope rouge et négatif sur le premier plan, deux plans, puis une rafale de ses plans figés image par image ; sur le noir, son titre en rouge géant mot par mot, puis entier ; puis un mot en rouge condensé par plan au milieu de l'écran, chacun arrivant sur une coupe avec deux images en négatif, un plan sur quatre tout rouge, les plans rapides saccadés ; le dernier geste se fige sur le dernier temps, puis le noir.",
   end: true,
   texts: [

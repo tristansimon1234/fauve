@@ -156,6 +156,8 @@ export async function designSkill(params: {
     // The model's lettering when she chose it (her charter's when Edith picked it), and its finish (its grade, its grain).
     Object.assign(plan, followedLook(plan, params.followed));
     Object.assign(plan, followedFilter(plan, params.followed));
+    // What its code does itself comes out of that finish (its own black and white, with its red over it).
+    if (skill.finish && plan.look) plan.look = { ...plan.look, ...skill.finish };
     if (!planLook(plan) && params.profile.look) plan.look = params.profile.look;
     // Each shot framed on its subject and its light corrected, as any montage.
     const durations = Object.fromEntries(files.map((f) => [f.id, f.photo ? plan.duration : f.seconds]));

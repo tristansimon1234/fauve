@@ -93,7 +93,7 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   // 3. Its optional title, turned a quarter like the shots: very condensed white capitals along the middle of the frame,
   // reading upward, on and off on a cut.
   const title = hook && frame >= hook.from && frame < Math.min(hook.to, endAt, BLACK_AT)
-    ? h(FitText, { style: { position: "absolute", left: Math.round(width / 2 - 620), top: 760 - 140, width: 1240, height: 280, transform: "rotate(-90deg)", transformOrigin: "50% 50%" }, innerStyle: { fontFamily: display, fontWeight: 800, fontSynthesis: "none", fontSize: 260, lineHeight: 1, letterSpacing: "0.01em", textTransform: "uppercase", color: "#ffffff", whiteSpace: "nowrap", textShadow: "0 0 2px rgba(0,0,0,0.35), 0 2px 18px rgba(0,0,0,0.3)" } }, hook.text)
+    ? h(FitText, { style: { position: "absolute", left: Math.round(width / 2 - 620), top: 760 - 140, width: 1240, height: 280, transform: "rotate(-90deg)", transformOrigin: "50% 50%" }, innerStyle: { fontFamily: display, fontWeight: 800, fontSynthesis: "none", fontSize: 260, lineHeight: 1, letterSpacing: "0.01em", textTransform: "uppercase", color: "#ffffff", whiteSpace: "nowrap", textShadow: "0 0 2px rgba(0,0,0,0.55), 0 1px 5px rgba(0,0,0,0.4), 0 2px 18px rgba(0,0,0,0.32)" } }, hook.text)
     : null;
 
   // Any other text of the Reel (none in its slots): a plain white line, upright, so nothing she wrote is lost.

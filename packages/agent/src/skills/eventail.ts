@@ -15,8 +15,11 @@ const BPM = 120;
 const OPENING = 7;
 /** The whole first shot, then each of her shots in the frame (beats). */
 const EACH = 2;
-/** The credit on the black (beats): its red line comes two beats after it. */
-const CREDIT = 4;
+/**
+ * The credit on the black (beats), its red line two beats after it; before an ending card a beat shorter, its red line
+ * one beat after it, so both still read before the card.
+ */
+const CREDIT = 5;
 const LINE_AFTER = 2;
 /** The engine's ending card: the Reel's last 1,6 s. */
 const CARD_SECONDS = 1.6;
@@ -51,7 +54,7 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const cy = height / 2;
   const full = { position: "absolute", left: 0, top: 0, width, height };
   // A phone number or a date never breaks between its digits.
-  const keep = (s) => String(s || "").replace(/(\d) (?=\d)/g, "$1 ");
+  const keep = (s) => String(s || "").replace(/(\d) (?=\d)/g, "$1\u00a0");
   const credit = reelTexts.find((t) => t.role === "hook");
   const line = reelTexts.find((t) => t.role === "caption");
   const others = reelTexts.filter((t) => t !== credit && t !== line);
@@ -86,21 +89,24 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
 
   // 3. Its end on a blue black inside the frame: the credit, white, at the middle; its red line two beats later, under it.
   const night = frame >= BLACK ? h("div", { key: "night", style: { position: "absolute", left: FRAME, top: FRAME, width: width - 2 * FRAME, height: height - 2 * FRAME, backgroundColor: NIGHT } }) : null;
-  const say = (key, text, top, tall, size, color, weight) =>
-    h(FitText, { key, style: { position: "absolute", left: 140, top, width: 800, height: tall }, innerStyle: { fontFamily: display, fontWeight: weight, fontSize: size, lineHeight: 1.1, letterSpacing: "-0.01em", color, textAlign: "center", textWrap: "balance" } }, keep(text));
+  const say = (key, text, top, tall, size, color, weight, accent) =>
+    h(FitText, { key, style: { position: "absolute", left: 140, top, width: 800, height: tall }, innerStyle: { fontFamily: display, fontWeight: weight, fontSize: size, lineHeight: 1.1, letterSpacing: "-0.01em", color, textAlign: "center", textWrap: "balance" } },
+      accent ? h("span", { "data-fauve-accent": "" }, keep(text)) : keep(text));
+  // The red line is small beside the credit, as the model's (4 words at most; a longer one at the size that reads).
+  const few = (t) => String(t || "").split(/[\s\u00a0\u202f]+/).filter((w) => /[\p{L}\p{N}]/u.test(w)).length <= 4;
   const words = [
-    shown(credit) ? say("credit", credit.text, 880, 112, 60, INK, 500) : null,
-    shown(line) ? say("line", line.text, 992, 72, 42, RED, 400) : null,
+    shown(credit) ? say("credit", credit.text, 876, 116, 62, INK, 500, false) : null,
+    shown(line) ? (few(line.text) ? say("line", line.text, 992, 72, 42, RED, 400, true) : say("line", line.text, 992, 124, 48, RED, 400, false)) : null,
   ];
   // Any other text of the Reel (none in its slots): a plain line on the black above the credit, so nothing she wrote is lost.
-  const extra = others.filter((t) => shown(t)).map((t, i) => say("x" + i, t.text, 740 - i * 110, 100, 52, INK, 500));
+  const extra = others.filter((t) => shown(t)).map((t, i) => say("x" + i, t.text, 740 - i * 110, 100, 52, INK, 500, false));
 
   // Its ending card: on the black, its title in the credit's white and its line in the red, at the credit's place.
   const ending = end && frame >= endAt
     ? h(React.Fragment, { key: "end" },
         frame < BLACK ? h("div", { style: { position: "absolute", left: FRAME, top: FRAME, width: width - 2 * FRAME, height: height - 2 * FRAME, backgroundColor: NIGHT } }) : null,
-        say("end-title", end.title, 790, 200, 64, INK, 500),
-        end.subtitle ? say("end-line", end.subtitle, 998, 130, 44, RED, 400) : null)
+        say("end-title", end.title, 790, 200, 64, INK, 500, false),
+        end.subtitle ? say("end-line", end.subtitle, 998, 130, 48, RED, 400, false) : null)
     : null;
 
   return h(Paper, { color: GROUND, grain: 0.42, shade: 0.7 }, star, edge, film, passe, night, words, extra, ending);
@@ -137,11 +143,12 @@ export const eventail: MontageSkill = {
     // The first shot: the star, then whole; her other shots two beats each; the last one holds under the black (and the
     // ending card after it: 1,6 s at least).
     const card = end ? CARD_SECONDS / beat : 0;
+    const credit = end ? CREDIT - 1 : CREDIT;
     const count = Math.max(2, n);
-    const spans = beatSpans(bpm, [OPENING + EACH, ...Array.from({ length: count - 2 }, () => EACH), EACH + CREDIT + card]);
+    const spans = beatSpans(bpm, [OPENING + EACH, ...Array.from({ length: count - 2 }, () => EACH), EACH + credit + card]);
     const duration = spans.at(-1)!.end;
     const black = round(spans.at(-1)!.start + EACH * beat);
-    const lineAt = round(black + LINE_AFTER * beat);
+    const lineAt = round(black + (end ? LINE_AFTER - 1 : LINE_AFTER) * beat);
     const until = round(end ? duration - CARD_SECONDS : duration);
     const wants = spans.map((_, i) =>
       i === 0

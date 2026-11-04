@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { ReelLook } from "./looks.ts";
 import { REEL_FPS } from "./motion.ts";
 import type { EditPlan, PlanSegment } from "./schemas.ts";
 
@@ -63,6 +64,12 @@ export type MontageSkill = {
   code: string;
   /** Google Fonts families its code brings besides the Reel's two. */
   fonts?: string[];
+  /**
+   * What its code does itself, taken out of its model's finish (laid over the whole Reel, its composition too): « Montage
+   * sport noir et blanc » draws its own black and white with its red over it, so its finish keeps only its contrast,
+   * grain and vignette (saturation 0), else its red came out grey.
+   */
+  finish?: Partial<Pick<ReelLook, "saturation" | "contrast" | "warmth" | "grain" | "vignette" | "fade">>;
 };
 
 /** One of her files, as a skill uses it. */

@@ -47,7 +47,7 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const TL_H = 272;
   const caps = (s) => String(s || "").toUpperCase();
   // A phone number or a date never breaks between its digits.
-  const keep = (s) => String(s || "").replace(/(\d) (?=\d)/g, "$1 ");
+  const keep = (s) => String(s || "").replace(/(\d) (?=\d)/g, "$1\u00a0");
   const hook = reelTexts.find((t) => t.role === "hook");
   const kicker = reelTexts.find((t) => t.role === "caption");
   const list = reelTexts.find((t) => t.role === "band");

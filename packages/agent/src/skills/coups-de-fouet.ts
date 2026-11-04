@@ -37,8 +37,8 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const others = reelTexts.filter((t) => t !== hook);
   // A phone number or a date never breaks between its digits.
   const keep = (s) => String(s || "").replace(/(\d) (?=\d)/g, "$1 ");
-  // White on her sky, as the model: a light shade only, so it still reads on a pale sky.
-  const shade = "0 0 2px rgba(0,0,0,0.35), 0 2px 16px rgba(0,0,0,0.25)";
+  // White on her sky, as the model: a tight shade only, so it still reads on a pale sky.
+  const shade = "0 0 2px rgba(0,0,0,0.55), 0 1px 5px rgba(0,0,0,0.4), 0 2px 18px rgba(0,0,0,0.32)";
   const titleStyle = { fontFamily: display, fontWeight: 800, fontSynthesis: "none", fontSize: 230, lineHeight: 1, letterSpacing: "-0.005em", textTransform: "uppercase", color: "#ffffff", whiteSpace: "nowrap", textShadow: shade };
 
   // How each cut goes, as in the model: into the title's shot a white flash, out of it a whip; then hard cuts, a whip,
