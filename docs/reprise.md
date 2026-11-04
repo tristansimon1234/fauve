@@ -44,7 +44,11 @@ Tristan : « edith pourrait choisir d'adapter ces modèles comme une librairie d
 3. Si sa demande sort du skill (plus de plans qu'il n'en prend, un élément en plus, une autre fin), le motion designer reçoit le code du skill et ne change que ce qu'il faut. Sa consigne (partie `example` de `packages/agent/src/motion-scene.ts`, qui dit encore « Start from it… make it hers… Never paste it unchanged ») doit dire : garde le code du skill tel quel là où il va, ne change que les plans et leur nombre, ses mots, sa charte, la longueur et les coupes, et ce que sa demande ajoute ; ne retire, ne réduis et n'assagis jamais son moment signature. Pas encore appliqué.
 4. Commencer par les 10 meilleurs modèles (à choisir avec Tristan sur leurs planches), lui montrer les rendus, puis les 21 autres.
 
-Plus tard : des skills qui se combinent (l'ouverture d'un modèle, la fin d'un autre), et un juge Sonnet avant livraison.
+Plus tard : des skills qui se combinent (l'ouverture d'un modèle, la fin d'un autre), et un juge Sonnet avant livraison. Un skill se montre rendu sur des images libres de droits, jamais sur l'original (les images de vrais comptes) : la librairie pourra être montrée dans « Créer ».
+
+**Le risque** : que les Reels se ressemblent (l'effet « modèle CapCut »). La landing promet d'ailleurs « pas de modèle tout fait » (`NOT` et la FAQ de `app/page.tsx`) : à revoir avec Tristan quand les skills sortent, jamais sans lui. Garde-fous : chaque skill habillé de sa charte, de ses images et de ses mots ; jamais le même deux fois de suite pour un commerce (déjà vrai pour les modèles choisis par Edith) ; un skill choisi d'après ce qu'elle a filmé (un skill qui attend un visage n'est jamais choisi sans visage dans ses vidéos) ; adapté par le motion designer quand la demande sort du cadre.
+
+**Comment savoir si c'est la bonne direction** : après les 10 premiers, mêmes rushes par skill et par la chaîne actuelle, comparés sur le coût, le temps et la seule vraie question (Tristan le posterait-il ?), puis un ou deux vrais commerces. Si les skills ne battent pas la chaîne, on s'arrête là.
 
 ## Règles de travail avec Tristan
 
