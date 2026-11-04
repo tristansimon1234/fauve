@@ -59,14 +59,14 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const cutAt = (k) => (shots[k] ? shots[k].from : durationInFrames + 1);
 
   // Each shot turned: one filmed in width a quarter, one way then the other, so it fills the vertical frame; one filmed
-  // upright, a half turn (turned a quarter, only a sliver of it would fill the frame).
+  // upright plays upright (a quarter turn would leave a sliver of it, a half turn its faces upside down).
   const turned = (i) => {
     const s = shots[i];
     const wide = !s || (Number(s.aspect) || 1.78) >= 0.9;
     const draw = (size) => h(Footage, { shot: i, style: { position: "absolute", left: 0, top: 0, width: size.width, height: size.height } });
     return wide
       ? h(Turn, { key: "t" + i, angle: i % 2 ? -90 : 90, draw })
-      : h(AbsoluteFill, { key: "t" + i, style: { transform: "rotate(180deg)" } }, draw({ width, height }));
+      : h(AbsoluteFill, { key: "t" + i }, draw({ width, height }));
   };
 
   // 1. Her shots, turned, cut on the beat; a whip upward into the flurry's last shot, a zoom through one shot into the

@@ -1,9 +1,11 @@
 import type { MontageSkill } from "./skills.ts";
 import { cadre } from "./skills/cadre.ts";
 import { coulisses } from "./skills/coulisses.ts";
+import { coupsDeFouet } from "./skills/coups-de-fouet.ts";
 import { decode } from "./skills/decode.ts";
 import { ecranPartage } from "./skills/ecran-partage.ts";
 import { eventail } from "./skills/eventail.ts";
+import { frappe } from "./skills/frappe.ts";
 import { gaufre } from "./skills/gaufre.ts";
 import { journee } from "./skills/journee.ts";
 import { mosaique } from "./skills/mosaique.ts";
@@ -12,6 +14,7 @@ import { photoDump } from "./skills/photo-dump.ts";
 import { pile } from "./skills/pile.ts";
 import { pixel } from "./skills/pixel.ts";
 import { quatreCoins } from "./skills/quatre-coins.ts";
+import { tourne } from "./skills/tourne.ts";
 
 // The montage skills written so far, by the key of the house model each one plays (skills.ts). Server side only
 // (@fauve/agent/skills): their code stays out of the pages. Each one is written by hand on its model's original,
@@ -20,9 +23,11 @@ import { quatreCoins } from "./skills/quatre-coins.ts";
 export const MONTAGE_SKILLS: Record<string, MontageSkill> = {
   cadre,
   coulisses,
+  "coups-de-fouet": coupsDeFouet,
   decode,
   "ecran-partage": ecranPartage,
   eventail,
+  frappe,
   gaufre,
   journee,
   mosaique,
@@ -31,6 +36,7 @@ export const MONTAGE_SKILLS: Record<string, MontageSkill> = {
   pile,
   pixel,
   "quatre-coins": quatreCoins,
+  tourne,
 };
 
 /** The skill of a house model, when it has one. */
