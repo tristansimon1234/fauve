@@ -1,0 +1,102 @@
+# « Ville en coups de fouet » (`coups-de-fouet`) : fiche de l'original
+
+> Fiche d'un original : ce qu'on y voit, mesuré image par image, et les effets qu'on veut savoir refaire sur les vidéos de n'importe quel commerce (la méthode : `docs/modeles.md`, « La chaîne des modèles »). Les temps sont en secondes de l'original ; « temps » compte les temps de sa musique depuis son premier temps.
+
+**L'original** : `house/originals/coups-de-fouet.mp4`, 23,30 s, 720 × 540, 30 i/s, **horizontal 4:3** montré tel quel, avec son. Une ville (New York) en 23 plans. Le modèle prend tout le Reel (pas de passage dans `HOUSE_PASSAGES`). Ses vidéos sont en 24 i/s (une image sur cinq en double à 30 i/s) ; les poussées du monteur, elles, bougent à chaque image : c'est ce qui les distingue des mouvements de la caméra.
+**Sa musique** : une nappe de cinéma sans batterie, puis une **percussion légère qui entre à 8,62 s, pile sur la coupe du taxi**, se tait de 10,8 à 13,0 s (quelques coups sourds à la place, sous la rue calme) et revient avec la rame jusqu'à la fin. Sa grille : une double croche toutes les 0,1786 s, soit **84,0 BPM** (un temps toutes les 0,714 s, le premier à 0,05 s ; 8,62 s est le temps 12). La grille est sûre (elle colle de 8,6 à 23 s). Le tempo l'est moins : les accents vont par 3-3-2 doubles croches, ce qui fait entendre aussi un 112 (celui de la v1) ; la grosse caisse et le cycle de 8 doubles croches disent 84. À confirmer à l'oreille. Gemini disait « non métronomique » : vrai pour les 8,6 premières secondes seulement. Sous la musique, les sons de la ville (le métro, la circulation) ; le son s'éteint sur la dernière seconde, pas l'image.
+**Mesuré avec** : `scripts/fiche/measure.py` (coupes, mouvements rapides, tempo, clignotements, flashs), des planches à 30 i/s de chaque passage, des mesures ajoutées (lumière et écart image par image, recherche de zoom, déplacement de l'image, sens du flou, bandes du son, grille des doubles croches) et la lecture de Gemini (`house/breakdowns/coups-de-fouet.json`). `measure.py` a manqué la coupe de 3,53 s, pris les images tenues pour des coupes, et ses deux « mouvements rapides » sont un fouet éclair (1,8 s) et un flash (5,3 s). Ses 25 « clignotements » sont des choses qui bougent (la rame, le soleil dans les feuilles, le taxi, les passages filés) : rien ne s'allume dans cet original. Ce qui clignote, ce sont ses six flashs.
+
+## Déroulé
+
+| De – à (s) | Temps | Ce qu'on voit | Effets |
+|---|---|---|---|
+| 0 – 0,67 | 0 – 0,9 | Une rame de métro passe à toute vitesse, la caméra file le long du quai ; le bruit du métro | **Flash** à la sortie (images 19 et 20) |
+| 0,67 – 1,80 | 0,9 – 2,45 | Les toits de Manhattan sous un ciel gris, « NEW YORK » au centre | **Le nom posé dans le ciel**, immobile, l'image **pousse** derrière (×1,11) ; le métro se tait sur un coup sourd |
+| 1,80 – 1,87 | 2,45 – 2,55 | Deux images floues très claires (un immeuble, du ciel bleu) | **Fouet éclair** n° 1, avec un souffle |
+| 1,87 – 2,87 | 2,55 – 3,95 | Une tour en contre-plongée | **Noir et blanc** ; poussée ×1,09 |
+| 2,87 – 4,43 | 3,95 – 6,15 | Un passant que la caméra suit ; un oiseau qui vole devant un immeuble | Coupes franches |
+| 4,43 – 5,37 | 6,15 – 7,45 | Le plan démarre en plein mouvement : la caméra file vers la gauche, freine et se pose sur un feu devant une façade de brique | **Fouet de la caméra** (images 133 à 145) ; **flash** à la sortie (159 et 160) |
+| 5,37 – 6,30 | 7,45 – 8,75 | Un arbre doré contre le ciel, le soleil scintille entre les feuilles | — (le scintillement est le soleil : pas un effet) |
+| 6,30 – 8,53 | 8,75 – 11,9 | Un jeune homme à vélo filmé depuis le guidon ; des feuillages sombres où tombe une feuille | Coupes franches |
+| 8,53 – 8,63 | 11,9 – 12 | Les deux mêmes images floues | **Fouet éclair** n° 2 |
+| 8,63 – 9,13 | 12 – 12,7 | La portière d'un taxi jaune « NYC » | **La percussion entre** sur la coupe, pile sur le temps 12 |
+| 9,13 – 9,97 | 12,7 – 13,9 | Un cycliste de dos | **Flash** à l'entrée et à la sortie, **noir et blanc**, **images fantômes** |
+| 9,97 – 12,97 | 13,9 – 18,1 | Un homme en costume de dos, un taxi passe derrière lui ; une rue calme sous les arbres ; un feu devant un grand immeuble | Coupes franches (celle du feu pile sur le temps 17) ; la percussion se tait de 10,8 s à 13,0 s, sous la rue calme |
+| 12,97 – 13,03 | 18,1 – 18,2 | Les deux mêmes images floues | **Fouet éclair** n° 3 : la percussion revient |
+| 13,03 – 14,63 | 18,2 – 20,4 | Une rame passe très vite, puis l'intérieur du métro, penché | **Flash** à la sortie (436 à 438) ; ce qui clignote dans la rame, ce sont ses voitures |
+| 14,63 – 15,53 | 20,4 – 21,7 | Le pont de Manhattan, plan fixe | Recul ×0,94 |
+| 15,53 – 17,10 | 21,7 – 23,9 | Un chariot de hot-dogs à contre-jour ; un BMX et des passants sur un passage piéton | Poussée ×1,065 sur le chariot ; la coupe du BMX pile sur le temps 23 |
+| 17,10 – 18,10 | 23,9 – 25,3 | Un mouvement de caméra très flou : arbres, ciel, murs | **Fouet saccadé** : fondu de 2 images à l'entrée, images tenues 2 à 5 images, fondu de 2 images à la sortie |
+| 18,10 – 18,97 | 25,3 – 26,5 | Une façade de brique en contre-plongée, la caméra glisse | Arrive sur un coup fort (18,07 s) ; s'éclaircit sur ses 4 dernières images |
+| 18,97 – 19,13 | 26,5 – 26,7 | Les deux mêmes images floues, sous un voile blanc | **Fouet éclair** n° 4 et **flash** |
+| 19,13 – 19,87 | 26,7 – 27,75 | Caméra levée vers le ciel, elle balaie vers la droite de plus en plus vite (immeubles, feu rouge, arbres) | **Fouet de la caméra** ; **flash** à la sortie (594 et 595) |
+| 19,87 – 23,30 | 27,75 – 32,6 | Un hélicoptère dans le ciel, la caméra descend vers un coucher de soleil sur l'eau, tenu 3,4 s | Arrive sur un coup de grosse caisse ; pas de texte de fin ; le son s'éteint, pas l'image |
+
+**Rythme** : 23 plans de 0,5 à 1,2 s (0,9 s en moyenne, 1 à 1,75 temps), le dernier tenu 3,4 s (4,8 temps). Entre eux : 10 coupes franches, 4 fouets éclair, 6 flashs (un septième sur le 4e fouet), 2 fondus. Avant la percussion, les coupes ne suivent aucun temps. Après, quatre tombent pile sur un temps (le taxi, le feu, le BMX, le fouet saccadé), le dernier plan sur un coup de grosse caisse ; les autres flottent. Ce qui suit la musique, ce sont ses parties : les fouets éclair n° 2 et 3 font entrer puis revenir la percussion, et les plans les plus calmes (la rue, le feu) tombent dans sa pause.
+
+## Effets (ce qu'on veut savoir refaire)
+
+### 1. Le fouet éclair
+- **Mesuré** : à 1,80 s (images 54–55), 8,53 s (256–258), 12,97 s (389–390) et 18,97 s (569–573), **les deux mêmes images** à chaque fois (écart de 1 sur 255 d'une fois à l'autre). Un immeuble et du ciel bleu, filés en biais, bien plus clairs que les plans autour (lumière 162 et 177 sur 255, contre 40 à 115). 2 images (0,07 s) ; 3 à 8,53 s (une image doublée) ; 5 à 18,97 s, sous un voile blanc. Un souffle monte 0,2 s avant celui de 1,80 s (les aigus, 8 à 11 kHz, gagnent 20 dB) et s'arrête 0,1 s après ; aux autres, le bruit du plan suivant prend le relais. Où : sur les changements de la musique et de lieu : à la sortie du titre, à l'entrée du taxi (la percussion entre), de la rame (elle revient après sa pause), du dernier balayage. C'est un bout de fouet tout fait, pris ailleurs : pas un mouvement entre les deux plans.
+- **Sur quoi** : rien à chercher dans ses vidéos : un éclat flou entre deux de ses plans.
+- **Outil** : `Whip` (existant) réglé court (`frames={3}` : deux images filées), flou fort, éclairci par un voile blanc (code du modèle) ; ou un bout de son propre mouvement rapide (effet 4), éclairci. Le filé en biais manque à `Whip` (gauche, droite, haut, bas) : un petit réglage. Le souffle : les bruitages existent (un whoosh qui monte démarre avant la coupe), mais un skill ne peut pas en poser (`MontageSkill` n'a pas de sons) : manquant.
+- **Si rien ne s'y prête** : toujours faisable (fait de ses plans).
+
+### 2. Le flash blanc
+- **Mesuré** : six flashs de 2 ou 3 images. L'image d'avant s'éclaircit (+60 sur 255 environ) 1 ou 2 images, puis une image d'un gris très clair uni, #D9D9D9 (217 : le blanc de l'étalonnage, ses coins un peu plus sombres), puis le plan suivant arrive à sa lumière, sans fondu. À 0,63 s (images 19–20 : l'image blanche montre déjà le titre), 5,30 s (159–160), 9,13 s (274–275 : l'image claire est déjà le plan suivant), 9,87 s (296–298), 14,53 s (436–438), 19,80 s (594–595 : l'hélicoptère déjà visible) ; un septième monte sur 4 images (565–568) dans le 4e fouet.
+- **Sur quoi** : n'importe quelle coupe. L'original les met à l'entrée de ses plans calmes ou en noir et blanc : le titre, l'arbre, le cycliste (entrée et sortie), le pont, le dernier plan.
+- **Outil** : `Flash` (existant : des images unies sur une coupe) et l'image d'avant éclaircie (code du modèle : un voile blanc à 50 % sur une image). Blanc pur, ou le gris #D9D9D9 de l'original : pas clair si notre finition le ramène d'elle-même.
+
+### 3. Le nom posé dans le ciel, immobile, et l'image qui pousse derrière
+- **Mesuré** : « NEW YORK » de l'image 20 (dans le flash) à la 53 (1,13 s, temps 0,9 à 2,45), parti avec le fouet éclair. Capitales blanches pures (251 sur 255, au-dessus de l'étalonnage), sans contour ni ombre. Sa boîte : de 36,4 à 63,7 % de la largeur (27,4 %), de 43,7 à 59,1 % de la hauteur, centrée (son milieu à 50 % de la largeur, 51 % de la hauteur) ; hauteur des capitales 15,4 % de la hauteur de l'image (11,5 % de sa largeur). Extra-condensées et grasses : une lettre fait 0,30 de sa hauteur (25 px pour 83), des fûts de 7 px, des creux de 2 px, 2 à 4 px entre les lettres, une espace de 9 px. Posé devant le haut de la tour. **Il ne bouge pas** (même boîte aux images 21, 30, 45 et 53) pendant que l'image grossit derrière lui, droit depuis le centre et régulièrement : ×1,11 en 32 images (+0,33 % par image). Au même moment, le bruit du métro se coupe (les aigus perdent 30 dB en 7 images) sur un coup sourd.
+- **Sur quoi** : un plan large et calme avec du ciel au-dessus des toits : sa rue, sa façade vue d'en face, son quartier. Le nom : son quartier, sa ville, le nom de son lieu (1 à 3 mots).
+- **Outil** : `FitText` (existant), centré ; la poussée par un `scale` sur `Footage` (code du modèle) ou `move: "in"` du montage (existant). Police de la paire `cinema` (Big Shoulders Display 800) : à comparer au 0,30 mesuré, l'original est peut-être plus étroit.
+- **Si rien ne s'y prête** : pas de ciel : le nom au centre de son plan large le plus calme, immobile.
+- Tristan trouve cheap les poussées posées d'office ; celle-ci fait l'effet (le nom fixe, la ville qui avance) : à confirmer avec lui.
+
+### 4. Les fouets de la caméra
+- **Mesuré** : de vrais mouvements de caméra, pas des effets. À 4,43 s (images 133–145), le plan démarre en plein élan : l'image file de 15 à 17 % de sa largeur par image, freine en 0,4 s et se pose sur un feu (6 images floues). De 19,13 à 19,80 s (574–594), caméra levée vers le ciel, elle balaie vers la droite (9 % de la largeur par image), puis de plus en plus vite (18 à 31 %) jusqu'au flash du dernier plan : un filé horizontal (Gemini y voyait un « tilt vers le haut »). À l'ouverture, la rame passe pendant que la caméra suit le quai.
+- **Sur quoi** : ses vidéos où la caméra bouge vite : un balayage de sa rue, de sa vitrine, de son plafond, qui se pose sur un détail (son enseigne, une lampe, un produit).
+- **Outil** : **manquant** : une lecture datée des mouvements rapides de la caméra dans ses vidéos (où, combien d'images, dans quel sens), mesurée comme ici par le déplacement de l'image d'une image à l'autre ; l'analyse d'une vidéo ne dit aujourd'hui que « fixe, à la main, en mouvement » (`camera` de `shotLookSchema`).
+- **Si rien ne s'y prête** : un `Whip` entre deux de ses plans, dans le sens du mouvement.
+
+### 5. Le fouet saccadé
+- **Mesuré** : de 17,10 à 18,10 s (images 513–542). Un fondu de 2 images depuis le BMX (513–514), puis un mouvement de caméra très flou (arbres, ciel, murs) dont chaque image est **tenue** 2 à 5 images (3, 5, 3, 2, 3, 4, 4, 2, 2 : environ 10 images par seconde), filé en biais (environ 25°) puis à l'horizontale ; un fondu de 2 images le pose sur la façade de brique (543–544), sur un coup fort (18,07 s). Ses images tenues démarrent sur le temps 24.
+- **Sur quoi** : un de ses mouvements rapides de caméra (effet 4), ou deux de ses plans filés.
+- **Outil** : `Footage hold={3}` (existant : chaque image tenue 3 images) sur le passage qui bouge ; les deux fondus (code du modèle) ; trouver le passage qui bouge : la lecture qui manque (effet 4).
+- **Si rien ne s'y prête** : un `Whip` long (8 images) entre deux de ses plans, tenu par `hold`, ou on s'en passe.
+
+### 6. Deux plans en noir et blanc
+- **Mesuré** : la tour en contre-plongée (1,87–2,87 s) et le cycliste (9,20–9,87 s) ; tout le reste en couleur. Contrastés : des noirs pleins (1 sur 255) et des blancs francs (223). Le premier arrive par un fouet éclair, le second entre deux flashs.
+- **Sur quoi** : une façade ou un immeuble en contre-plongée ; quelqu'un qui passe (un vélo, un passant).
+- **Outil** : `Footage` avec un filtre `grayscale(1)` et du contraste (existant).
+
+### 7. Les images fantômes du cycliste
+- **Mesuré** : de 9,20 à 9,87 s, chaque image garde les précédentes en transparence : le cycliste dédoublé, des traînées derrière ce qui bouge. Le bas de l'image (son cinquième) s'étire en traits verticaux : pas clair si c'est un effet ou la prise de vue. Gemini y voyait un « flou de bougé radial ».
+- **Sur quoi** : quelqu'un qui passe, un vélo, des mains qui bougent.
+- **Outil** : **manquant** : un écho (le plan posé sur ses images d'il y a 2, 4 et 6 images, de moins en moins visibles, comme l'« Écho » de CapCut). Faisable aujourd'hui dans le code du modèle en empilant des `Footage` décalés (`at`), mais lourd.
+- **Si rien ne s'y prête** : rien ne bouge : pas d'écho, le noir et blanc reste.
+
+### 8. Les poussées sur les plans fixes
+- **Mesuré** : en plus du titre, le monteur bouge trois plans fixes, droit depuis le centre : il pousse sur la tour (×1,09 en 29 images) et sur le chariot (×1,065 en 27), il recule sur le pont (×0,94 en 26). De 7 à 10 % par seconde. Posées à 30 i/s sur des vidéos à 24 i/s : ce n'est pas la caméra. Le feu qui grossit (×1,12 en 22 images), lui, est filmé ainsi.
+- **Outil** : `move: "in"` ou `"out"` du montage (existant), ou un `scale` dans le code du modèle.
+- Tristan trouve cheap les poussées lentes posées d'office : par défaut, pas de poussée hors du titre ; à confirmer avec lui.
+
+### 9. Le son
+- **Mesuré** : voir « Sa musique ». 8,6 s de nappe sans batterie, puis la percussion qui entre sur la coupe du taxi, une pause de 2,2 s sous les plans calmes, son retour sur un fouet éclair. Les sons des plans sous la musique : le métro (0 à 0,7 s, coupé net sur le titre ; 13,0 à 14,3 s avec la rame), et sans doute la circulation sous le taxi et l'homme en costume (pas clair : la percussion joue en même temps). Un souffle avant le premier fouet, un coup sourd sous le titre ; le son qui s'éteint sur la dernière seconde (22,3 à 23,3 s) quand l'image reste.
+- **Outil** : le son de ses vidéos sous la musique (`finish.video_sound` « all », cas `ambient` du mix : existant) ; le fondu de fin du mix (0,8 s, existant) ; le souffle et le coup sourd : des bruitages, qu'un skill ne peut pas poser (effet 1). **Manquant** : une musique qui commence sans batterie, dont la percussion entre sur une coupe choisie et peut se taire puis revenir (la consigne du compositeur interdit aujourd'hui intro, pause et « drop »).
+
+### 10. Étalonnage
+Film, retenu : les blancs tenus bas (le plus clair de chaque image à 206 sur 255 en médiane, les flashs à 217), les noirs presque noirs (7), des ombres brunes et chaudes, des couleurs douces (le taxi et la brique restent francs), des coins 20 % plus sombres que le centre. Pas de grain mesurable (Gemini en voyait un). La finition « Ville » du modèle (contraste, couleurs un peu retenues, coins sombres) va dans ce sens. Il lui manque de tenir les blancs bas (`fade` lève les noirs, rien ne retient les blancs), et son grain n'est pas dans l'original.
+
+## Format
+L'original est horizontal 4:3 (720 × 540), montré tel quel : dans le fil vertical, une bande de 1080 × 810 au milieu, du noir dessus et dessous. Réglage « format » : `auto` (horizontal quand la plupart de ses vidéos le sont, sinon vertical plein écran), `horizontal` (4:3 sur du noir comme l'original : une vidéo 16:9 y perd 12,5 % de chaque côté ; ou 16:9 entier, à décider), `vertical` (plein écran). Le nom suit le cadre : centré, 27 % de sa largeur, au milieu de la bande en horizontal, dans le ciel au-dessus du milieu en vertical.
+
+## Ce que Gemini a vu, et ce qu'il a raté
+Vu : le 4:3, le découpage (à quelques images près), le titre (sa place à 2 % près, condensé, blanc plein, le temps de son plan), les fouets, le noir et blanc mêlé à la couleur chaude, le contraste, la vignette, le métro au début et les souffles. Raté : le fouet éclair est **le même insert de deux images**, quatre fois ; **cinq des six flashs** (il n'a vu que celui de 9,13 s ; à 0,67 s il dit « cut franc ») ; les **poussées** sur les plans fixes (et le pont recule) ; les **images tenues** du fouet saccadé et ses deux fondus (il y voit une rotation) ; les **images fantômes** du cycliste ; la **percussion** qui entre à 8,62 s et sa pause de 10,8 à 13,0 s ; le dernier fouet est horizontal, pas vertical ; le grain ne se mesure pas.
+
+## Ce que le modèle v1 ratait
+Il jouait tout en vertical, à 112 BPM avec chaque plan sur le temps (l'original n'a pas de temps avant 8,6 s, et 84 est plus probable). Son nom était géant (jusqu'à 230 px, dans une boîte de 74 % de la largeur ; l'original : 27 %), et son look le faisait « sortir du flou mot par mot » : il est là d'un coup et ne bouge pas, l'image pousse derrière. Ses fouets glissaient sur 8 images (12 pour le dernier ; l'original : deux images claires) et ses flashs duraient 4 images, dans un ordre fixe. Ni noir et blanc, ni images fantômes, ni images tenues, ni fondus, ni fouets de la caméra, ni sons de la ville ; une musique « indie electronic, driving drums » ; un carton de fin que l'original n'a pas. Ses mesures (`house-measures.ts`) comptaient des coupes qui n'en sont pas (0,27 et 13,27 s : les rames ; 9,77 s : les images fantômes ; 17,43 à 17,97 s : les images tenues ; 19,27 et 19,6 s : le balayage) et en manquaient (3,53 · 8,63 · 9,97 · 19,87 s).
+
+## Ce qu'il faut filmer
+Un plan qui défile déjà (un tram, un bus, une rue filmée en marchant vite) ; un plan large et fixe de sa rue, de sa façade ou de son quartier, avec du ciel au-dessus des toits ; une ou deux contre-plongées (une façade, un immeuble, un arbre) ; des passants, quelqu'un à vélo, quelqu'un de dos ; un plan qui démarre en balayant vite puis s'arrête sur son enseigne ou un détail ; un détail de couleur franche (sa devanture, un produit) ; un plan fixe où quelque chose passe ; un balayage rapide des toits et du ciel, téléphone levé ; un plan large et calme pour finir (un ciel, un coucher de soleil, une vue), 4 s au moins. En horizontal comme l'original, ou en vertical.

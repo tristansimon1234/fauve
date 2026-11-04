@@ -117,15 +117,16 @@ def track(frames, k, boxes, tracker, device, dtype, size):
 
     processor, model = tracker
     session = processor.init_video_session(video=list(frames), inference_device=device, dtype=dtype)
-    ids = list(range(1, len(boxes) + 1))
-    processor.add_inputs_to_inference_session(inference_session=session, frame_idx=k, obj_ids=ids if len(ids) > 1 else 1, input_boxes=[boxes])
-    masks = [{} for _ in ids]
+    count = len(boxes)
+    # A copy of the ids: the processor empties the list it is given (a list of ids it kept had left none to read back).
+    processor.add_inputs_to_inference_session(inference_session=session, frame_idx=k, obj_ids=list(range(1, count + 1)) if count > 1 else 1, input_boxes=[boxes])
+    masks = [{} for _ in range(count)]
     with torch.inference_mode():
         model(inference_session=session, frame_idx=k)
         for reverse in (False, True):
             for out in model.propagate_in_video_iterator(session, start_frame_idx=k, reverse=reverse):
                 logits = processor.post_process_masks([out.pred_masks.float()], original_sizes=[[session.video_height, session.video_width]], binarize=False)[0]
-                for j in range(len(ids)):
+                for j in range(min(count, logits.shape[0])):
                     prob = torch.sigmoid(logits[j, 0]).cpu().numpy().astype(np.float32)
                     masks[j][out.frame_idx] = cv2.resize(prob, size, interpolation=cv2.INTER_LINEAR)
     empty = np.zeros((size[1], size[0]), np.float32)

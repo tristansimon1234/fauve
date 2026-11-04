@@ -1,0 +1,133 @@
+# « Silhouette et mot » (`silhouette`) : fiche de l'original
+
+> Fiche d'un original : ce qu'on y voit, mesuré image par image, et les effets qu'on veut savoir refaire sur les vidéos de n'importe quel commerce (la méthode : `docs/modeles.md`, « La chaîne des modèles »). Les temps sont en secondes de l'original ; « temps » compte les temps de sa musique (84,5 BPM) depuis le premier temps de sa première mesure entière, à 1,06 s (la coupe sur la silhouette) : avant, ils sont négatifs.
+
+**L'original** : `house/originals/silhouette.mp4`, 11,07 s (332 images ; le son, 11,12 s), 720 × 406, 30 i/s, **horizontal 16:9** montré tel quel, avec son. Le Reel entier (pas de passage dans `HOUSE_PASSAGES`). C'est le générique animé d'un créatif : du motion design sur deux aplats, bleu nuit et pâle. Une seule vraie vidéo : sa silhouette de profil (1,07 – 3,90 s).
+**Ce qu'il dit** : une présentation. « Hello », « I'm », son nom (« Tiago Feitosa »), « Your », « Creative » et ses métiers, son nom, son logo (« KORAI »). Pour un commerce : « Bonjour », « Je suis », son nom, « Ton » ou « Votre », son métier et ce qu'elle fait, son nom, son logo.
+**Sa musique** : un beat électronique lent, en demi-tempo, **84,5 BPM** (un temps toutes les 0,710 s ; la double croche, 0,177 s, tient du début à la fin à 10 ms près). Ses mesures commencent à 1,06 · 3,90 · 6,74 · 9,58 s : les trois vraies coupes (la silhouette, l'œil, le logo) tombent sur leur premier temps. Dans chaque mesure, un coup fort toutes les trois doubles croches (0, 3, 6, 9 et 12 sur 16) : un coup toutes les 0,53 s, d'où la pulsation de 112,75 que mesure le script. Une basse grave tenue (vers 75 Hz). Des **clics de touche** aigus sur les lettres tapées, hors de la grille. Un **break** de 0,6 s (3,22 – 3,85 s) puis le **drop** sur la coupe de l'œil (effet 14). Le dernier coup tombe sur le logo, puis le son s'éteint. Gemini disait 120 BPM, le modèle v1 90 : faux. Le script disait 84,75, mais avec un premier temps à 0,51 s, une double croche trop tard : les coupes tombaient 0,2 temps avant ses temps. Sûr pour la grille et les mesures ; le genre (trap lent, future beat ?) n'est pas clair sans l'écouter.
+**Mesuré avec** : `scripts/fiche/measure.py` (ses cinq « coupes » : trois vraies, à 1,07 · 3,90 · 9,57 s, plus le négatif de 0,47 s et l'œil qui finit de s'ouvrir à 5,37 s ; ses « clignotements » sont des lettres qui apparaissent et le geste de la tête ; son « flash blanc » de 7,83 à 9,57 s est le fond pâle presque vide), des planches à 30 i/s de tout le Reel, des gros plans (lettres, curseur, main, silhouette, iris, clap, logo), les couleurs prises sur les pixels, la silhouette séparée du texte à chaque image, le son par bandes (grille des doubles croches, clics, break), et la lecture de Gemini (`house/breakdowns/silhouette.json`).
+
+## Déroulé
+
+| De – à (s) | Temps | Ce qu'on voit | Effets |
+|---|---|---|---|
+| 0 – 0,17 | −1,5 – −1,3 | Bleu nuit. Au centre, un champ de texte vide : ses repères en tirets, ses deux cotes en px qui défilent, un curseur qui clignote | Logiciel (1) |
+| 0,17 – 0,47 | −1,3 – −0,8 | Un « H » blanc tapé (un clic), seul. Les cotes accélèrent sur le premier coup (0,35 s) | Frappe (3) |
+| 0,47 | −0,8 | **Tout passe en négatif en une image** : fond pâle, H à l'encre, repères gris. Aucun son | Négatif (2) |
+| 0,57 – 1,07 | −0,7 – 0 | « ello » tapé, un clic par lettre ; le mot grandit de moitié, une traîne pêche derrière ; une main en points se construit et salue en haut à droite | Frappe (3), traîne (4), main (5) |
+| 1,07 | 0 (mesure 1) | **Coupe** : sa silhouette de profil, d'un seul bleu nuit, sur le pâle ; « I'm » en blanc dans sa tête | Silhouette (6), mot dans sa tête (7) |
+| 1,37 – 1,77 | 0,4 – 1 | Le « I » devient un curseur pêche et le mot s'efface ; il **baisse la tête** (1,50 – 1,77 s, sur le coup de 1,60 s) | (7), (8) |
+| 1,67 – 2,57 | 0,85 – 2,1 | Son nom tapé en 0,27 s juste derrière sa tête qui descend, posé sur ses cheveux ; le curseur clignote ; le nom de famille monte et s'efface | Nom tapé (8) |
+| 2,67 – 3,73 | 2,25 – 3,8 | Le prénom se réduit à son « a », qui devient un « o » ; « Your » rebondit autour ; l'o se remplit de pêche puis d'une pupille : un œil. Le break commence à 3,22 s | Lettres en œil (9) |
+| 3,73 – 3,90 | 3,8 – 4 | L'œil sort de l'o et monte ; il **relève la tête** vers lui | (9) |
+| 3,90 | 4 (mesure 2, drop) | **Coupe** : des paupières bleu nuit se ferment sur l'image en amande ; l'o est l'iris, sa tête encore au fond de l'œil | Œil (10) |
+| 3,93 – 5,33 | 4 – 6 | L'œil plissé, la pupille devient une fente de chat, l'œil s'ouvre grand, l'iris file avec sa traîne ; « Creative » en blanc, vu seulement dans l'iris | (10), (4) |
+| 5,33 – 5,40 | 6 – 6,1 | L'iris s'efface, « Creative » passe à l'encre ; l'œil s'ouvre jusqu'à remplir l'écran : le fond pâle | (10) |
+| 5,47 – 7,47 | 6,2 – 9 | « Creative » fixe ; le second mot change sur les coups : Producer, Director, Designer, Editor, Partner ; un trait ondulé dessous, une pastille pêche puis un clap au trait sur la fin du mot | Métiers (11) |
+| 7,47 – 7,80 | 9 – 9,5 | La ligne rapetisse, le trait s'efface, fondu enchaîné vers son nom | (11) |
+| 7,80 – 9,57 | 9,5 – 12 | Son nom seul, petit, qui recule doucement | Nom qui recule (12) |
+| 9,57 – 10,77 | 12 – 13,7 | **Coupe** sur le premier temps de la mesure 4 et le dernier coup : bleu nuit, le logo blanc, petit, au centre | Logo (13) |
+| 10,77 – 11,07 | 13,7 – 14,1 | Bleu nuit vide ; la musique s'éteint | (13) |
+
+Aucun zoom ni poussée sur une vidéo. Les seuls changements de taille touchent des textes (« Hello » qui grandit, la ligne qui rapetisse, le nom qui recule) et l'œil qui monte en 4 images avant une coupe franche.
+
+## Effets (ce qu'on veut savoir refaire)
+
+### 1. L'ouverture en logiciel de mise en page
+- **Mesuré** : sur un bleu nuit #0D0D1B, la boîte d'un texte comme dans un logiciel de mise en page. Deux traits horizontaux et deux verticaux en tirets fins (1 px sur 720, gris #282836, à peine visibles), qui traversent tout le cadre aux bords du texte : en bas à 60,3 % de la hauteur, en haut juste au-dessus des lettres (de 49 à 39 % quand le mot grandit) ; de 43 à 49 % de la largeur autour du « H », de 33 à 66 % autour de « Hello ». Deux cotes minuscules (« 106px » au-dessus, « 140px » à gauche, environ 1,5 % de la hauteur) comptent sans arrêt, de 97 à 636 px en une seconde, sans rapport avec la vraie taille ; elles accélèrent sur le premier coup (0,35 s). Avant la première lettre, la boîte est vide et un curseur clignote (images 0 à 2). Les repères suivent le mot quand il grandit et s'arrêtent à la coupe (1,07 s).
+- **Sur quoi** : rien à filmer. Son premier mot (« Bonjour », « Salut », son prénom).
+- **Outil** : code du modèle (quatre traits en tirets autour de la boîte du mot) ; `Count suffix="px"` (existant) pour les cotes ; `TypeOn caret="bar"` (existant) pour le curseur.
+- **Si rien ne s'y prête** : toujours faisable.
+
+### 2. Le négatif d'un coup
+- **Mesuré** : à 0,47 s (image 14), en une image, le bleu nuit devient un pâle froid #F3F4F9, le H blanc devient encre, les repères passent au gris clair (#D6D7DC). Rien ne fond. Ni sur un temps ni sur un son : entre le premier coup (0,35 s) et la lettre suivante (0,60 s). Le Reel joue ensuite sur ces deux couleurs : le bleu nuit revient en paupières sur l'œil (3,90 s), le pâle revient quand l'œil s'ouvre (5,37 s), le bleu nuit revient sur le logo (9,57 s).
+- **Outil** : code du modèle (les deux couleurs échangées sur une image).
+- **Si rien ne s'y prête** : toujours faisable.
+
+### 3. Le mot tapé, un clic par lettre, qui grandit
+- **Mesuré** : « H » à l'image 5 (0,17 s), puis 0,43 s d'arrêt, puis « e », « l », « l », « o » aux images 18, 22, 25 et 29 (une lettre toutes les 3 à 4 images). Chaque lettre a son clic de touche, aigu (au-dessus de 6 kHz), hors de la grille du beat : 0,16 · 0,60 · 0,71 · 0,83 · 0,97 s. Pendant la frappe, le mot grandit de moitié : ses capitales passent de 12,8 à 19 % de la hauteur (images 13 à 28), centré, sa ligne de pied fixe à 59,4 %. « Hello » finit à 34,2 – 65,6 % de la largeur. Une grotesque neutre (genre Inter ou SF Pro), demi-grasse, en casse normale, interlettrage normal. Blanc #FFFFFF sur le bleu nuit, encre sur le pâle.
+- **Sur quoi** : son premier mot, court (5 à 8 lettres).
+- **Outil** : `TypeOn` (existant), mais son rythme est régulier, au hasard : le modèle donne ses propres temps (une lettre seule, une pause, puis une rafale). La taille qui grandit : code du modèle. Les clics : **manquant**, un skill ne pose aucun bruitage ; il faut des `sounds` dans son déroulé (un clic sur chaque lettre).
+- **Si rien ne s'y prête** : toujours faisable.
+
+### 4. La traîne pêche derrière ce qui bouge
+- **Mesuré** : ce qui bouge laisse derrière lui 3 à 5 copies pêche (#D79B6E), de plus en plus pâles, décalées vers là d'où il vient. Les lettres de « Hello » pendant qu'il grandit et se recentre vers la gauche (images 18 à 28 : copies à droite), le « a » qui grossit (81 à 83), l'iris qui file en bas à droite (136 à 140). Rien d'autre n'en a : la silhouette garde le simple flou de bougé de la caméra.
+- **Sur quoi** : ses mots et les formes qui bougent. Dans ses vidéos, sa silhouette quand elle baisse la tête (l'original ne le fait pas : à voir avec Tristan).
+- **Outil** : **manquant** : une traîne (`Echo` : les positions d'un élément quelques images plus tôt, teintées, de plus en plus transparentes). Sur un texte, le code du modèle peut la dessiner ; sur elle, des `Subject fill` posés avec `at` en retard (existants).
+- **Si rien ne s'y prête** : sans traîne.
+
+### 5. La main en points qui salue
+- **Mesuré** : un pictogramme de main ouverte, fait d'une grille de petits carrés gris foncé, en haut à droite du mot (à la fin, x 65 – 74 % de la largeur, son haut à 22 % de la hauteur). Il se construit en 4 images, des points épars qui montent du bas (images 17 à 20), puis il salue en basculant d'un côté et de l'autre jusqu'à la coupe, et suit le mot quand il grandit.
+- **Sur quoi** : sa main à elle, filmée quand elle salue, ou son logo, rendus en points.
+- **Outil** : **manquant** : une trame de points (un détourage, un logo ou un pictogramme dessiné en grille de points, qui se construit point par point). Le moteur n'a ni pictogrammes ni émojis, et la consigne du motion designer trouve cheap les icônes qui flottent : à voir avec Tristan.
+- **Si rien ne s'y prête** : le mot seul.
+
+### 6. Sa silhouette d'un seul ton, de profil, qui fait un geste
+- **Mesuré** : une vraie vidéo, la seule du Reel (1,07 – 3,90 s, 85 images). Un homme de profil, tête et épaules, tourné vers la droite, cheveux bouclés, détouré et rempli d'un bleu nuit plein #0F0F1C (celui du fond du début), sur le pâle #F3F4F9. Bord net, mèches fines gardées, ni contour ni ombre. Le buste est coupé par le bas, de 29 à 65 % de la largeur, le haut de la tête à 16 % de la hauteur. Caméra fixe. Il tient 0,45 s (il s'enfonce à peine, 2 % de la hauteur), puis **baisse la tête** d'un coup en 8 images (1,50 – 1,77 s : le haut de sa tête passe de 19 à 51 % de la hauteur, flou de bougé gardé ; sur le coup de 1,60 s). Il la garde baissée 2 s en descendant encore doucement (49 → 55 %), puis commence à la **relever** (3,80 – 3,87 s) quand l'œil monte, juste avant la coupe.
+- **Sur quoi** : elle, ou quelqu'un de son équipe, de profil, devant un fond clair. Un geste de la tête : elle se penche sur son travail (une coiffeuse sur une coupe, une fleuriste sur un bouquet, un boulanger sur sa pâte), puis se redresse.
+- **Outil** : `Subject fill` (existant : « sa silhouette d'un seul ton, noire sur un fond pâle ») posé sans sa `Footage`, sur l'aplat pâle. Son plan doit être à sa vraie vitesse : un plan ralenti n'est pas détouré. Sa tête : `track(frame)` (existant) lit son visage à chaque image. **Manquant** : un geste de tête mesuré et nommé (elle baisse, relève ou tourne la tête), comme `handMoves` pour les mains, pour caler l'effacement et l'œil dessus.
+- **Si rien ne s'y prête** : détourage manqué, son plan en tirage noir et blanc très contrasté ramené sur le pâle (le repli du brouillon v1) ; sans vidéo d'elle, le modèle reste du motion design, son mot au centre.
+
+### 7. Le mot blanc dans sa tête
+- **Mesuré** : « I'm » en blanc pur #FFFFFF, la même grotesque demi-grasse (capitales de 13,8 % de la hauteur), au milieu de sa tête, à hauteur des yeux (x 39,4 – 54 %, y 43 – 57 %), entièrement dans la silhouette. Il est là dès la coupe, glisse de 13 px vers la gauche en 0,27 s et se pose. Puis le « I » devient le curseur : il passe du blanc au pêche en 4 images (1,37 – 1,47 s), le « m » pâlit et s'en va (1,50 – 1,53 s), l'apostrophe aussi (1,63 s). Le mot s'efface pendant qu'il baisse la tête. **Il ne s'inverse jamais** : aucun mot n'est à cheval sur son bord, blanc sur lui et sombre à côté.
+- **Sur quoi** : sa tête ou son buste en silhouette, une grande forme sombre et calme. « Je suis » (7 signes au lieu de 3) y tient aux deux tiers de la taille.
+- **Outil** : `Subject fill`, puis le mot posé après lui, à la place de sa tête lue par `track(frame).faces` ou `SubjectBox` (existants). S'il doit rester pendant qu'elle bouge, `SubjectOutline` en `clip-path` (existant) le garde dans sa silhouette.
+- **Si rien ne s'y prête** : le mot au centre, à l'encre sur le pâle.
+
+### 8. Son geste efface le mot, son nom s'écrit derrière sa tête
+- **Mesuré** : son nom (prénom en romain, nom en gras, encre #0A0A10, capitales de 5,5 % de la hauteur, x 39 – 63 %, y 48 – 55 %) est tapé en 9 images (1,67 – 1,93 s, environ 40 lettres par seconde), juste derrière sa tête qui descend : ses cheveux cachent les dernières lettres 2 images (le nom est derrière lui, le curseur pêche devant). Il finit posé sur ses cheveux. Le curseur clignote (allumé 5 images, éteint 8). Puis le nom de famille monte de 10 px et s'efface (2,43 – 2,57 s) ; le prénom reste.
+- **Sur quoi** : son prénom et son nom, ou le nom de son lieu, au-dessus de sa tête penchée.
+- **Outil** : `TypeOn` (existant : vitesse 40, `caret="bar"`, `caretColor` pêche) posé avant `Subject`, pour qu'elle passe devant ; sa place au-dessus de sa tête à la fin du geste (`SubjectBox`, existant). **Manquant** dans `TypeOn` : l'effacement (le curseur qui recule et mange le mot) ; code du modèle en attendant.
+- **Si rien ne s'y prête** (pas de geste) : le mot s'efface sur les temps ½ à ¾, le nom au-dessus de sa tête immobile.
+
+### 9. Les lettres qui se changent en œil
+- **Mesuré** : le prénom se réduit à son « a » (2,67 s, sur un coup), qui grossit avec sa traîne et devient un « o » (2,80 s). « Y », « u » et « r » sortent autour de lui (2,93 s, sur un clic) et rebondissent, l'o plus haut que les autres, avant de se poser : « Your », en romain, capitales de 8,4 % de la hauteur. Dès le coup sec du temps 3 (3,20 s), l'o se remplit de pêche, puis une pupille bleu nuit y grandit (3,40 – 3,53 s) : c'est un œil. Le « r » s'efface (3,67 s), la pupille sort de l'o par le haut, son iris pêche dessous, et l'œil monte en grossissant (3,73 – 3,87 s, 4 images) : il relève la tête vers lui.
+- **Sur quoi** : une lettre ronde de son mot qui devient l'œil (« Ton », « Votre » : l'o). Elle répond : elle relève la tête quand l'œil monte.
+- **Outil** : code du modèle (aucun outil ne change une lettre en une autre).
+- **Si rien ne s'y prête** (pas de lettre ronde) : une pastille pêche posée à la fin du mot devient l'œil.
+
+### 10. L'œil qui se ferme sur l'image, puis s'ouvre sur la suite
+- **Mesuré** : sur le drop (3,90 s, premier temps de la mesure 2), en une image, des paupières bleu nuit se ferment sur l'image et n'en laissent qu'une amande (x 9 – 91 %, y 0 – 76 %). Le pâle devient le blanc de l'œil, sa tête se voit encore au fond, et l'o devient l'iris, presque à la même place (un raccord). L'œil se plisse (3,93 s : amande y 4 – 51 %), la pupille ronde devient une fente de chat (4,27 – 4,50 s, sur le coup de 4,43 s), l'œil s'ouvre grand vers le bas en 8 images (4,40 – 4,63 s, jusqu'à 88 % de la hauteur), l'iris file en bas à droite avec sa traîne. De 4,87 à 5,30 s, un mot blanc (« Creative ») n'apparaît **que dans l'iris** : à côté, sur le blanc de l'œil, rien. À 5,33 s (temps 6), l'iris s'efface et le mot passe à l'encre sur le blanc ; l'amande s'élargit (5,20 – 5,33 s) puis remplit l'écran (5,37 s) : l'œil ouvert devient le fond pâle de la suite. Aucun zoom : l'œil s'ouvre, il ne grossit pas. Un dessin à plat : iris #D69665 à fines stries rayonnantes, cerclé d'un trait brun, un reflet blanc rond, pupille bleu nuit.
+- **Sur quoi** : le dessin ne demande rien. Avec ses vidéos : l'amande peut s'ouvrir sur un plan à elle (son lieu vu à travers l'œil, puis plein écran), et le mot n'apparaître qu'à travers une forme ronde de son plan (une tasse vue de dessus, une assiette, un miroir rond, un hublot).
+- **Outil** : la fenêtre en amande est **manquante** dans `Window` (seul `reveal="iris"`, un cercle ; il faudrait une forme « œil », deux arcs qui se ferment et s'ouvrent) ; sinon un `clipPath` du code du modèle. L'œil : code du modèle. Un mot vu seulement dans une forme de son plan : `SubjectOutline` en `clip-path` (existant).
+- **Si rien ne s'y prête** : l'œil dessiné, comme l'original.
+
+### 11. Les métiers qui défilent sur les coups
+- **Mesuré** : « Creative » reste (romain, capitales de 7 % de la hauteur, encre), et un second mot en gras change d'un coup, sur les coups de la musique : Producer (5,47 s ; il entre par la droite en 3 images, flou de bougé), Director (6,03), Designer (6,57), Editor (6,90), Partner (7,27). Soit 3, 3, 2, 2 puis 3 doubles croches d'écart : ça accélère, puis ça se pose. La ligne est calée à gauche (33,3 % de la largeur) et ne se recentre pas quand le mot change de longueur (elle fait 37 à 46 % de la largeur). Sous « Creative », un trait ondulé à la main se trace de gauche à droite (5,53 – 6,00 s) et s'efface de droite à gauche à la fin (7,47 – 7,73 s). Une pastille pêche (3,5 % de la largeur) se pose sur la fin du second mot (5,57 s) ; à 6,07 s, un clap de cinéma au trait (encre, fond blanc) vient devant elle et suit la fin de chaque mot, son clapet s'ouvrant lentement. Puis la ligne rapetisse d'un quart (7,47 – 7,77 s) et passe en fondu enchaîné de 2 images à son nom (7,80 s).
+- **Sur quoi** : son métier, fixe, et 3 à 5 choses qu'elle fait (« Coiffure » puis « couleur », « coupe », « chignon », « mariage ») ; le pictogramme de son métier (ciseaux, tasse, fleur).
+- **Outil** : code du modèle (comme la case « mots » du brouillon v1, mais à la suite d'un mot fixe et sur ses coups) ; `Scribble kind="zigzag"` (existant, lissé : proche de l'ondulation), tracé puis effacé ; la pastille : code du modèle. Le pictogramme : **manquant** (une petite bibliothèque de pictogrammes au trait par métier).
+- **Si rien ne s'y prête** (un seul mot) : son métier seul, tenu, la pastille sans pictogramme.
+
+### 12. Son nom seul, qui recule
+- **Mesuré** : son nom, petit, à l'encre sur le pâle, centré à mi-hauteur, de 7,80 à 9,57 s. Il rapetisse régulièrement de 21 à 14 % de la largeur (×0,68 en 1,7 s). Rien d'autre à l'écran.
+- **Outil** : code du modèle. À la taille de l'original sur une largeur de 1080, ce nom fait 35 puis 24 px de corps (et le nom tapé de l'effet 8, environ 45) : sous les 48 px du contrôle des scènes. Le modèle les garde plus grands.
+- C'est le texte qui recule, pas une vidéo : à confirmer avec Tristan, qui trouve cheap les poussées lentes posées d'office.
+
+### 13. Le logo sur le bleu nuit, et la fin
+- **Mesuré** : coupe sur le premier temps de la mesure 4 (9,57 s), qui est aussi le dernier coup de la musique. Bleu nuit, le logo en blanc (« KORAI », capitales géométriques grasses, un A carré), petit (10 % de la largeur, capitales de 4,2 % de la hauteur), centré, tenu 1,2 s. Puis 0,3 s de bleu nuit vide (10,77 – 11,07 s). Après ce coup, plus aucun coup : une traîne (la basse et un souffle) qui s'éteint, −12 dBFS jusqu'à 10,3 s, −25 ensuite, silence à 11,0 s.
+- **Sur quoi** : son logo, ou son nom en capitales s'il n'en a pas.
+- **Outil** : `brand.logoUrl` (existant, `logoOnDark` en blanc). La musique qui finit sur un coup : **manquant** (la musique d'Edith est une boucle continue, fondue sur ses 0,8 dernières secondes au mixage, `muxAudioInSandbox`) : il faut finir le morceau sur un temps et laisser sa traîne.
+- **Si rien ne s'y prête** : son nom en blanc.
+
+### 14. Le break avant le drop
+- **Mesuré** : sur le coup sec du temps 3 (3,20 s), la basse et la batterie s'arrêtent : 0,6 s presque muettes (−30 dBFS contre −13 avant), un son tenu seul. Puis un souffle aigu monte en 0,14 s (3,76 – 3,90 s) jusqu'au drop, sur la coupe de l'œil (3,90 s, temps 4). La suite est 2 dB plus forte qu'avant (−11 dBFS). Pendant le break, l'o devient un œil et monte.
+- **Outil** : **manquant** : un break voulu dans la musique composée (la consigne du compositeur interdit pauses et drops, et un creux de plus d'une seconde la fait recomposer, `grooveGaps`, `docs/son.md`).
+- **Tant qu'il manque** : la coupe de l'œil sur le premier temps d'une mesure.
+
+### 15. Couleurs
+Deux aplats et un accent, aucune image filmée à étalonner. Bleu nuit #0D0D1B (le début, les paupières, la fin ; la silhouette #0F0F1C, la pupille), pâle froid #F3F4F9 (le milieu, le blanc de l'œil), pêche #D99868 (curseur, traîne, pastille, iris), blanc pur sur le sombre, encre #0A0A10 sur le pâle. Ni grain, ni vignettage, ni dégradé. (Une colonne grise d'un pixel au bord droit des images pâles est un reste de l'export, pas un effet.)
+
+## Format
+L'original est horizontal 16:9 (720 × 406), montré tel quel : dans un fil vertical, des bandes noires dessus et dessous. Tout est dessiné sur deux aplats, sauf sa silhouette : le format ne dépend presque pas de ses vidéos. Réglage « format » :
+- `vertical` (par défaut) : 9:16 plein écran. Les aplats remplissent tout, sa silhouette en bas au centre, coupée par le bas comme l'original (environ 60 % de la largeur), l'amande de l'œil sur 80 % de la largeur. Les mots au milieu, plutôt au-dessus du milieu : le quart du bas est couvert par Instagram, et ses boutons à droite sous le milieu (la ligne des métiers, calée à gauche, s'étend vers la droite). Sa vidéo, horizontale ou verticale, est recadrée autour de sa tête.
+- `horizontal` : le cadre 16:9 de l'original, au milieu du Reel, sur des bandes bleu nuit (les scènes sombres remplissent alors l'écran, les pâles font une bande).
+- `auto` : vertical.
+
+## Ce que Gemini a vu, et ce qu'il a raté
+Vu : le format, les grandes parties (les coupes de 1,07 · 3,90 · 9,57 s à une image près), les textes et leur ordre, la silhouette de profil, le curseur orange, « Your » qui rebondit et l'o qui devient un œil, la pupille ronde qui devient une fente, les métiers, le trait ondulé et le clap, le nom puis le logo blanc sur bleu nuit, des bruits de touches. Raté : le **tempo** (120 au lieu de 84,5 : ses coups toutes les trois doubles croches donnent une pulsation de 113) ; le **break** de 3,22 à 3,85 s et le **drop** sur la coupe de l'œil ; le **négatif**, à 0,47 s et non à 1,0 s ; le **geste** (« léger abaissement de tête » : la tête tombe d'un tiers de l'image en 0,27 s, puis se relève vers l'œil) ; le nom tapé **derrière** sa tête ; l'œil n'est pas un « zoom avant » mais des paupières qui se ferment sur l'image, puis un œil qui s'ouvre jusqu'à devenir le fond ; le mot vu **seulement dans l'iris** ; les métiers changent d'un coup, sans « défilement vertical » ; le nom qui **recule** (il le dit fixe) ; la **traîne pêche** ; les cotes qui défilent ; la fin, sans « fondu au noir » : le logo disparaît net et le bleu nuit reste. Ses couleurs : le fond n'est pas blanc #FFFFFF mais #F3F4F9, et le noir est un bleu nuit. Ses « bips d'interface » et son « claquement sur le clap » ne se distinguent pas à la mesure : chaque changement de mot tombe déjà sur un coup.
+
+## Ce que le modèle v1 ratait
+Sa phrase et son effet signature ne sont pas dans l'original : aucun « grand mot qui s'inverse quand tu passes dessous ». Le mot blanc est entièrement dans sa tête et s'efface quand il bouge ; son nom s'écrit à l'encre sur le pâle, derrière lui. Le modèle demandait « une vidéo de toi ou de passants qui marchent, filmée fixe » et 2 à 5 plans : l'original n'a qu'une vidéo, un buste de profil qui baisse puis relève la tête, et personne ne marche. Sa lecture (`house-models.ts`) commençait sur la silhouette : le début est le logiciel sur bleu nuit, puis le négatif. Elle faisait clignoter le mot lettre par lettre (il est tapé, avec des clics), en très gras serré et en minuscules (une grotesque demi-grasse, romain et gras, casse normale, interlettrage normal). Sa musique : « minimal deep house » à 90 BPM, sans break ni drop. Son brouillon de skill (`skills/silhouette.ts`) avait des couleurs proches (#eef0f4 et #0d0f1a) et des mots qui se remplacent sur le temps. Mais son mot passe en différence sur toute l'image, en 250 px très gras et en minuscules ; ses repères restent tout du long (ils ne sont qu'à l'ouverture, avec leurs cotes) ; il n'a ni ouverture, ni négatif, ni œil, ni traîne, ni logo sur bleu nuit. Son exemple (`house-examples.ts`) fait clignoter « procope » (`Reveal from="flicker"`) : rien ne clignote dans l'original, sauf le curseur. Son « pour » (« une personne qui passe, un mot fort ») et son « pas pour » (« des produits ») sont à revoir avec Tristan : l'original est une présentation, donc pour se présenter (elle ou son équipe), un lancement, un ton de studio graphique ; pas pour des produits seuls, un lieu sans personne ou une offre à lire.
+
+## Ce qu'il faut filmer
+Elle (ou quelqu'un de son équipe) de profil, tête et épaules, devant un fond clair et uni : un mur blanc, ou une fenêtre derrière elle, à contre-jour, c'est encore mieux. Le téléphone posé, environ 5 s d'une traite, à vitesse réelle : 1 s le regard droit devant, puis elle baisse vite la tête (comme penchée sur son travail), la garde baissée 2 s, puis la relève et lève les yeux. Et aussi : son logo (un PNG), son prénom et son nom (ou celui du lieu), son métier en un mot et 3 à 5 choses qu'elle fait.
