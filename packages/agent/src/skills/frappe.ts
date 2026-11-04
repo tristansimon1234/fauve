@@ -5,10 +5,14 @@ import { beatSpans, toFrame, type MontageSkill } from "../skills.ts";
 // reels manque réellement », « tu n'as pas tout vu, il y a des trucs qui clignotent », « c'est un effet que l'on veut
 // pouvoir faire, pas exactement reproduire l'image »). Its music is a lo-fi beat at 82,5 BPM (Gemini heard 95), and
 // every length below is in its beats, so its cuts fall where the original's do (within an image) on its own music:
-//   0 – 2,25    a wide sunny shot of the place (the original's quick zoom in is a plain cut: Tristan finds them cheap);
-//   2,25 – 6,75 the same place closer: what can light up in it (her sign's letters, each window, a garland: named by
-//               the filler from what the file shows) lights up piece by piece, 2 or 3 images each, then all of it at
-//               once for 6 images on beat 6, its bright parts blooming;
+//   0 – 2,25    a wide sunny shot of the place, zooming fast into the next one as the original does over 6 images
+//               (Tristan, of its originals' zooms: « on garde »);
+//   2,25 – 6,75 the same place closer: what can stand out piece by piece in it (her sign's letters, her cups or pastries
+//               side by side, the books of a shelf, each window, a garland: named by the filler from what the file
+//               shows; Tristan: « il choisit à chaque fois des lumières, ça pourrait être autre chose ») comes out one
+//               piece after the other, 2 or 3 images each, the rest of the shot dimmed, then all of it at once for 6
+//               images on beat 6. Each piece keeps its own light with a soft halo: lifted harder, a neon already lit
+//               had burnt into white blots on the bench (Le Petit Pont);
 //   6,75 – 10,75 a fixed shot with sky beside a building: her name typed by hand in capitals of her colour (a
 //               character a third of a beat or so, a pause in the middle and before the last letter), then her logo
 //               wiping in above it when she has one, the cut landing on her sign (the match cut);
@@ -68,6 +72,7 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const BARS_AT = mark("bars", durationInFrames + 1);
   const BARRED_AT = mark("barred", BARS_AT + 6);
   const WHITE_AT = mark("white", -100);
+  const ZOOM_AT = mark("zoom", -100);
   const BLACK_AT = mark("black", durationInFrames);
   const endAt = end ? end.from : durationInFrames + 1;
   const cur = shots.reduce((k, s, i) => (s.from <= frame ? i : k), 0);
@@ -96,29 +101,40 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const name = hook ? keep(hook.text).toUpperCase() : "";
   const chars = letters(name);
 
-  // 1. Her shots in its frame, cut on its beats; black at the end.
+  // 1. Her shots in its frame, cut on its beats; black at the end. Its quick zoom into the closer shot, as the original's
+  // images 46 to 51: the wide shot's last two images rush in, the closer one lands from tighter over four, a little blur.
   const shot = (k) => h(Footage, { shot: k, style: { left: 0, top: 0, width: bw, height: bh } });
-  const film = frame < BLACK_AT ? shot(cur) : null;
+  const zoomK = cur === 0 && frame >= ZOOM_AT - 2 && frame < ZOOM_AT ? 1 + 0.18 * (frame - ZOOM_AT + 3) : cur === 1 && frame >= ZOOM_AT && frame < ZOOM_AT + 4 ? 1 + 0.1 * (ZOOM_AT + 4 - frame) : 1;
+  const zoomed = (el) => (zoomK > 1 ? h("div", { style: { position: "absolute", left: 0, top: 0, width: bw, height: bh, transform: "scale(" + zoomK.toFixed(3) + ")", transformOrigin: "50% 45%", filter: "blur(" + ((zoomK - 1) * 6).toFixed(1) + "px)" } }, el) : el);
+  const film = frame < BLACK_AT ? zoomed(shot(cur)) : null;
 
-  // 2. What lights up in the closer shot (her sign's letters, each window, a garland: what the filler saw there, cut
-  // out at every image): its pieces one after the other, 2 or 3 images each, then dark, then all of it at once on the
-  // beat for 6 images. Lit: its own picture brighter, paler, with a warm halo; the rest of the shot as it is.
-  const litStyle = { position: "absolute", left: 0, top: 0, width: bw, height: bh, filter: "brightness(1.85) saturate(0.55) contrast(1.05) drop-shadow(0 0 " + Math.round(bh * 0.008) + "px rgba(255,238,205,0.95))" };
+  // 2. What stands out piece by piece in the closer shot (her sign's letters, her cups, each window, a garland: what the
+  // filler saw there, cut out at every image): the rest of the shot dims, its pieces come out one after the other, 2 or
+  // 3 images each, then none, then all of them at once on the beat for 6 images. A piece keeps its own picture, a little
+  // brighter and warmer with a soft halo (pushed harder, a lit neon burns into a white blot).
+  const glow = Math.max(2, Math.round(bh * 0.006));
+  const litStyle = { position: "absolute", left: 0, top: 0, width: bw, height: bh, filter: "brightness(1.22) saturate(1.12) drop-shadow(0 0 " + glow + "px rgba(255,236,200,0.85))" };
+  // The night sign blinks on harder, three images only.
+  const blinkStyle = { ...litStyle, filter: "brightness(1.5) saturate(1.08) drop-shadow(0 0 " + glow + "px rgba(255,236,200,0.8))" };
   // (Each object written with its shot as a number, so the engine follows it in that shot before the render.)
-  const lit = (cutOut, clip) => h("div", { style: { ...litStyle, ...(clip ? { clipPath: clip } : {}) } }, cutOut);
+  const lit = (cutOut, clip, style) => h("div", { style: { ...(style || litStyle), ...(clip ? { clipPath: clip } : {}) } }, cutOut);
   const sign = () => h(Subject, { shot: 1, object: "@lumieres", style: { left: 0, top: 0, width: bw, height: bh } });
   const night = () => h(Subject, { shot: 3, object: "@nuit", style: { left: 0, top: 0, width: bw, height: bh } });
   const pieces = cur === 1 ? SubjectParts(shots[1], frame, laid, "@lumieres", Math.max(4, Math.min(12, chars.filter((c) => /\S/.test(c) && c !== "-").length || 8))) : [];
   const chaseFrom = FLASH - DARK - pieces.length * PIECE;
   const piece = pieces.length && frame >= chaseFrom && frame < FLASH - DARK ? Math.floor((frame - chaseFrom) / PIECE) : -1;
   const p = piece >= 0 ? pieces[Math.min(pieces.length - 1, piece)] : null;
-  const pad = Math.round(bh * 0.006);
+  const pad = Math.round(bh * 0.012);
   const chase = p ? lit(sign(), "inset(" + Math.max(0, Math.round(p.y - pad)) + "px " + Math.max(0, Math.round(bw - p.x - p.w - pad)) + "px " + Math.max(0, Math.round(bh - p.y - p.h - pad)) + "px " + Math.max(0, Math.round(p.x - pad)) + "px)") : null;
   const flashing = frame >= FLASH && frame < FLASH + 6 && frame < BLACK_AT;
   const allLit = flashing && cur === 1 ? lit(sign()) : null;
+  // The rest of the shot dims while its pieces come out (in over three images), until all of them have been lit at once.
+  const dimFrom = chaseFrom - 3;
+  const dimK = cur === 1 && pieces.length && frame >= dimFrom && frame < FLASH + 6 ? 0.58 * Math.min(1, (frame - dimFrom + 1) / 3) : 0;
+  const dim = dimK > 0 ? h("div", { style: { position: "absolute", left: 0, top: 0, width: bw, height: bh, background: "#000000", opacity: dimK } }) : null;
   // The night shot's sign and lights blink on for 3 images just after its cut.
   const blinking = frame >= BLINK_AT && frame < BLINK_AT + 3 && frame < BLACK_AT;
-  const nightLit = blinking && cur === 3 ? lit(night()) : null;
+  const nightLit = blinking && cur === 3 ? lit(night(), null, blinkStyle) : null;
   // Nothing found to light in that shot (no sign, no lamp): the whole picture takes a short flash of light on the beat
   // instead, three images (a bloom of its bright parts lit the sky of a sunny shot whole).
   const missing = (flashing && cur === 1 && !SubjectBox(shots[1], frame, laid, "@lumieres")) || (blinking && cur === 3 && !SubjectBox(shots[3], frame, laid, "@nuit"));
@@ -173,7 +189,7 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
         h("div", { style: { position: "absolute", left: 0, top: bh - bar, width: bw, height: bar, background: "#000000" } }))
     : null;
 
-  const frameBox = h("div", { style: { position: "absolute", left: 0, top: by, width: bw, height: bh, overflow: "hidden", backgroundColor: "#000000" } }, film, bloom, chase, allLit, nightLit, white, typed, logo, bars);
+  const frameBox = h("div", { style: { position: "absolute", left: 0, top: by, width: bw, height: bh, overflow: "hidden", backgroundColor: "#000000" } }, film, dim, bloom, chase, allLit, nightLit, white, typed, logo, bars);
 
   // Any other text of the Reel (none in its slots): a plain white line under its frame, so nothing she wrote is lost.
   const extra = others.filter((t) => frame >= t.from && frame < t.to && frame < Math.min(endAt, BLACK_AT)).map((t, i) =>
@@ -201,11 +217,13 @@ export const frappe: MontageSkill = {
   key: "frappe",
   // 2: written again on its original's fiche (its format, its music, its lights, its typing, its logo, its bars, its burst).
   // 3: the original's own marks left to it (its arrow, its colours): her logo and her colour, or nothing.
-  version: 3,
+  // 4: on its bench on a Paris café (Le Petit Pont): any piece of her place stands out, not only lights, the rest dimmed
+  // and each piece at its own light (no white blot on a lit neon); the original's quick zoom kept.
+  version: 4,
   bpm: BPM,
   shots: [12, 18],
   files: [5, 12],
-  how: "Un plan large et ensoleillé de son lieu, puis le même plus serré, où ce qui peut s'allumer (les lettres de son enseigne, ses fenêtres, une guirlande) s'allume morceau par morceau puis d'un coup sur un temps ; un plan fixe avec du ciel à côté d'un bâtiment, où son nom se tape à la main en capitales de sa couleur, puis son logo apparaît au-dessus (si elle en a un), et la coupe tombe sur son enseigne de nuit, qui clignote ; trois plans éclair, un plan large, une façade sur laquelle des bandes de cinéma se ferment, six plans éclair entre les bandes, un passant qui flashe en blanc, et le noir. En horizontal comme l'original quand ses vidéos le sont.",
+  how: "Un plan large et ensoleillé de son lieu qui zoome vite dans le suivant, le même plus serré, où ce qui peut ressortir morceau par morceau (les lettres de son enseigne, ses tasses ou ses pâtisseries côte à côte, les livres d'une étagère, ses fenêtres, une guirlande) ressort un morceau après l'autre, le reste assombri, puis tout d'un coup sur un temps ; un plan fixe avec du ciel à côté d'un bâtiment, où son nom se tape à la main en capitales de sa couleur, puis son logo apparaît au-dessus (si elle en a un), et la coupe tombe sur son enseigne de nuit, qui clignote ; trois plans éclair, un plan large, une façade sur laquelle des bandes de cinéma se ferment, six plans éclair entre les bandes, un passant qui flashe en blanc, et le noir. En horizontal comme l'original quand ses vidéos le sont.",
   end: true,
   texts: [
     {
@@ -217,7 +235,11 @@ export const frappe: MontageSkill = {
     },
   ],
   objects: [
-    { slot: "lumieres", shot: 1, want: "ce qui peut s'allumer morceau par morceau dans ce plan : les lettres de son enseigne, un néon, chaque fenêtre d'une façade (« every window »), une guirlande, des lampes" },
+    {
+      slot: "lumieres",
+      shot: 1,
+      want: "ce qui peut ressortir morceau par morceau dans ce plan, le reste assombri : d'abord les lettres de son enseigne ; sinon ce qu'elle vend posé côte à côte (ses tasses, ses pâtisseries, ses bouquets, ses vêtements sur un portant), les livres d'une étagère, chaque fenêtre d'une façade (« every window »), une guirlande ; pas forcément une lumière",
+    },
     { slot: "nuit", shot: 3, want: "ce qui s'allume dans sa devanture de nuit ou éclairée : son enseigne, son néon, ses lampes, ses vitrines" },
   ],
   settings: [
@@ -259,7 +281,7 @@ export const frappe: MontageSkill = {
     const blackAt = round(duration - black * beat);
     const wants = [
       "le plan qui ouvre : large, ensoleillé, son lieu ou sa rue avec son enseigne, la caméra qui avance un peu",
-      "son lieu plus serré, avec ce qui peut s'allumer : son enseigne (des lettres séparées ou un néon, c'est mieux), ses fenêtres, une guirlande, des lampes",
+      "son lieu plus serré, avec ce qui peut ressortir morceau par morceau : son enseigne (des lettres séparées ou un néon, c'est mieux), sinon ce qu'elle vend posé côte à côte, ses fenêtres, une guirlande",
       "un plan fixe avec beaucoup de ciel ou de mur dégagé en haut, à côté d'un bâtiment : son nom s'y tape dans le vide",
       "sa devanture avec son enseigne, de nuit ou éclairée, l'enseigne dans le haut de l'image : là où son nom vient de se taper",
       "un plan éclair de l'intérieur ou d'un détail, sur le temps",
@@ -276,6 +298,8 @@ export const frappe: MontageSkill = {
       // The name types in the sky shot and goes with the cut on her sign.
       texts: { lieu: { from: round(sky.start + TYPE_FROM * beat), to: reveal.start } },
       marks: {
+        // Its quick zoom lands on the closer shot's first image.
+        zoom: toFrame(spans[1]!.start),
         flash: toFrame(FLASH_BEAT * beat),
         // Images: a piece lit, the dark before it all lights up, a character's step and the longest typing.
         piece: Math.round(((PIECE * beat) / frame) * 100) / 100,

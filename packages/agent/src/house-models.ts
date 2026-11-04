@@ -17,8 +17,8 @@ import type { z } from "zod";
 
 /** The source of the inspiration row a house model is kept on, per studio (one per model, made when first used). */
 export const HOUSE_SOURCE = "house";
-/** The catalogue's version: a studio's row written by an older one is rewritten when the model is used again (3: its original's sheets; 4: no brand in a model's name; 5: Mots aux quatre coins as its original; 6: Plans fixes at 65 BPM). */
-export const HOUSE_VERSION = 7;
+/** The catalogue's version: a studio's row written by an older one is rewritten when the model is used again (3: its original's sheets; 4: no brand in a model's name; 5: Mots aux quatre coins as its original; 6: Plans fixes at 65 BPM; 7: four renamed; 8: Lieu tapé without its original's orange). */
+export const HOUSE_VERSION = 8;
 
 export type HouseModel = {
   key: string;
@@ -500,8 +500,10 @@ export const HOUSE_MODELS: HouseModel[] = [
   model({
     key: "frappe",
     name: "Lieu tapé lettre à lettre",
-    pitch: "Le nom de ton lieu se tape lettre à lettre en orange sur un plan de la rue, puis on coupe dessus.",
-    needs: "6 à 10 vidéos ensoleillées de ton quartier, de ta devanture et de l'intérieur",
+    // 8: its original's orange (In-N-Out's) left to it (Tristan: what belongs to the original's own visual is never
+    // copied): her name in her colour, a faithful copy too.
+    pitch: "Ce qui fait ton lieu ressort morceau par morceau (les lettres de ton enseigne, tes tasses, ta vitrine), puis ton nom se tape lettre à lettre dans le ciel, dans ta couleur, et on coupe sur ta devanture.",
+    needs: "6 à 12 vidéos de ton lieu et de ton quartier : un plan large au soleil, ton enseigne de près, un plan avec du ciel, ta devanture le soir, des détails, du monde",
     files: [5, 12],
     pair: "affiche",
     example: "U-frappe",
@@ -509,15 +511,14 @@ export const HOUSE_MODELS: HouseModel[] = [
     look: {
       name: "lieu tapé lettre à lettre",
       format: "pov",
-      hook: { kind: "pov", what: "un plan large de la rue, où le nom du lieu commence à se taper en orange" },
+      hook: { kind: "pov", what: "un plan large de son lieu au soleil, puis son enseigne dont les lettres ressortent une à une" },
       text: {
         amount: "une ligne",
-        composition: "le nom du lieu tapé lettre à lettre en capitales grasses orange, petit, posé dans le ciel ou sur un mur du plan, puis coupé",
+        composition: "le nom du lieu tapé lettre à lettre en capitales grasses de sa couleur, petit, posé dans le ciel ou sur un mur du plan, puis coupé",
         case: "upper",
         weight: "black",
         tracking: "tight",
       },
-      colors: ["#ff5a1f"],
       layout: "plein cadre, avec le nom du lieu tapé par-dessus un plan avant de couper sur ce lieu",
       moments: [
         { at: 0, what: "des plans de rue ensoleillés coupés sur le temps, une coupe toutes les 1,3 s" },

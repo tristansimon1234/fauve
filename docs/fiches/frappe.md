@@ -11,7 +11,7 @@
 | De – à (s) | Temps | Ce qu'on voit | Effets |
 |---|---|---|---|
 | 0 – 1,60 | 0 – 2,2 | Plan large ensoleillé du lieu (une jetée, sa grande roue, la foule), la caméra avance un peu | — |
-| 1,60 – 1,73 | 2,2 – 2,4 | **Zoom rapide** de 4 images (46 à 51) vers le même lieu, plus serré | Refait en coupe franche (Tristan trouve les zooms en transition cheap) ; à confirmer avec lui |
+| 1,60 – 1,73 | 2,2 – 2,4 | **Zoom rapide** de 4 images (46 à 51) vers le même lieu, plus serré | Refait depuis la v4 (Tristan, des zooms des originaux : « on garde ») : les deux dernières images du plan large foncent, le plan serré arrive de plus près sur quatre images, un peu flou |
 | 1,73 – 4,87 | 2,4 – 6,7 | Plan serré : l'enseigne « PACIFIC PARK » devant la grande roue, la caméra avance lentement | **Allumage lettre par lettre** de 3,20 à 4,10 s, puis **tout s'allume d'un coup** à 4,33 s (voir Effets) |
 | 4,87 – 7,87 | 6,7 – 10,8 | Plan fixe : du ciel à côté d'un bâtiment | **Nom tapé** « IN-N-OUT » de 5,47 à 7,17 s, puis **son logo se dessine** de 7,40 à 7,87 s |
 | 7,87 – 8,40 | 10,8 – 11,55 | Le restaurant de nuit, son enseigne allumée à l'endroit où le nom était tapé (**raccord**) | **Clignotement** de ses auvents et de son enseigne à 8,03 s (3 images) |
@@ -25,8 +25,8 @@
 
 ### 1. Allumage morceau par morceau
 - **Mesuré** : les lettres de l'enseigne s'allument une à une, de gauche à droite, chacune 2 ou 3 images, la précédente éteinte quand la suivante s'allume (P 96–98, A 99–100, C 101–103, I 104–105, F 106–108, I 109–110, C 111–113, P 114–115, A 116–118, R 119–120, K 121–122) : 11 lettres en 27 images (0,9 s, environ un seizième de temps chacune), à partir du temps 4,4. Une lettre allumée devient crème (≈ #FFF3D9) avec un léger halo. Puis tout est éteint 7 images (123 à 129).
-- **Sur quoi** : l'enseigne de l'original. Dans ses vidéos à elle : **les morceaux de ce qui peut s'allumer** dans son plan : les lettres de son enseigne, les carreaux d'une fenêtre, chaque fenêtre d'une façade (« every window »), les ampoules d'une guirlande, des lampes.
-- **Outil** : nouveau, `SubjectParts` (les morceaux d'un objet suivi, dans l'ordre de lecture ; un objet d'un seul tenant coupé en tranches) avec `Subject object=…` (sa découpe, éclaircie, posée dans la boîte de chaque morceau). Le nom de l'objet est choisi pour son plan par le remplisseur du modèle (ce qu'il voit dans la lecture de sa vidéo).
+- **Sur quoi** : l'enseigne de l'original. Dans ses vidéos à elle : **ce qui peut ressortir morceau par morceau** dans son plan, pas forcément une lumière (Tristan : « il choisit à chaque fois des lumières, ça pourrait être autre chose ») : d'abord les lettres de son enseigne ; sinon ce qu'elle vend posé côte à côte (ses tasses, ses pâtisseries, ses bouquets, ses vêtements sur un portant), les livres d'une étagère, chaque fenêtre d'une façade (« every window »), les ampoules d'une guirlande.
+- **Outil** : `SubjectParts` (les morceaux d'un objet suivi, dans l'ordre de lecture ; un objet d'un seul tenant coupé en tranches) avec `Subject object=…` (sa découpe posée dans la boîte de chaque morceau). Depuis la v4, le reste du plan s'assombrit (58 %, en trois images) pendant que les morceaux ressortent un par un puis tous ensemble, et chaque morceau garde sa propre lumière, un peu plus vive et plus chaude, avec un halo léger : poussé à ×1,85 et désaturé (v3), un néon déjà allumé brûlait en taches blanches (banc Le Petit Pont). Le nom de l'objet est choisi pour son plan par le remplisseur du modèle (ce qu'il voit dans la lecture de sa vidéo).
 - **Si rien ne s'y prête** : pas d'allumage morceau par morceau ; l'effet 2 reste (les lumières du plan).
 
 ### 2. Tout s'allume d'un coup, sur le temps
@@ -65,6 +65,9 @@ Vu : le découpage, le nom tapé, sa couleur et sa place, la flèche jaune, les 
 
 ## Ce que le modèle v1 ratait
 Il jouait tout en vertical, à 95 BPM, sans aucune lumière (ni allumage, ni flash, ni clignotement), un nom tapé à intervalles réguliers, sans logo dessiné ni bandes.
+
+## Ce que le banc v3 sur Le Petit Pont a montré (4 novembre)
+Sur douze beaux plans d'un café face à Notre-Dame (cas `petitpont`, `docs/banc.md`), 13,9 s, 0,36 € : le déroulé de l'original tient (coupes sur le temps, son néon, le nom tapé, la coupe sur son néon qui clignote, la rafale entre les bandes, le passant en blanc). Trois défauts : les lettres du néon brûlaient en taches blanches (corrigé en v4, ci-dessus) ; le nom était tapé dans l'orange de l'original, resté dans sa fiche au catalogue et pris par une copie fidèle (`followedLook`), retiré en v4 (`HOUSE_VERSION` 8) ; il était posé à la place fixe de l'original, sur les tours de la cathédrale, au lieu du ciel de son plan (outil « zone dégagée » en cours).
 
 ## Ce qu'il faut filmer
 Un plan large de son lieu en plein jour ; son enseigne de près (des lettres séparées ou un néon, c'est mieux) ; un plan fixe avec du ciel ou un mur dégagé à côté d'un bâtiment ; sa devanture de nuit ou éclairée, l'enseigne dans le haut de l'image ; des détails ; un plan large et vivant ; une façade de face ; un plan avec un passant au premier plan.

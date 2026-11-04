@@ -1237,7 +1237,7 @@ test("each of Edith's models shows its original's frames as a Reel she sends: sh
   const { HOUSE_MEASURES } = await import("./house-measures.ts");
   const { stolenStyleSchema } = await import("./steal.ts");
   // A studio's row written before the sheets is rewritten (7: four models renamed after their originals).
-  assert.equal(HOUSE_VERSION, 7);
+  assert.equal(HOUSE_VERSION, 8);
   for (const m of HOUSE_MODELS) {
     const sheets = houseSheets(m.key);
     const duration = HOUSE_MEASURES[m.key]!.duration;
@@ -1637,4 +1637,16 @@ test("« Lieu tapé » cuts where its original does, on its own music (82,5 BPM)
   assert.equal(line.marks.type, 164);
   // What belongs to the original's brand is left to it: no In-N-Out arrow, no yellow of its own.
   assert.ok(!/ffcc00|strokeDasharray/i.test(frappe.code));
+  // Its quick zoom lands on the closer shot's first image (the original's images 46 to 51 straddle it).
+  assert.equal(line.marks.zoom, Math.round(line.shots[1]!.start * 30));
+  // A piece comes out at its own light, the rest dimmed: never pushed into white (a lit neon burnt into blots).
+  assert.ok(!/brightness\(1\.[6-9]/.test(frappe.code));
+  assert.ok(/background: "#000000", opacity: dimK/.test(frappe.code));
+});
+
+test("« Lieu tapé » in the catalogue: her colour, not its original's orange", async () => {
+  const { houseModel } = await import("./house-models.ts");
+  const model = houseModel("frappe")!;
+  assert.ok(!model.look.colors?.length);
+  assert.ok(!/orange/i.test(JSON.stringify(model)));
 });
