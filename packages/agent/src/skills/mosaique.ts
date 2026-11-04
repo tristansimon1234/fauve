@@ -18,17 +18,43 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const h = React.createElement;
   const frame = useCurrentFrame();
   const mark = (k, d) => { const v = Number(texts && texts[k]); return Number.isFinite(v) ? v : d; };
+  // Her words' settings (cases, ordre, papier), the original's by default.
+  const setting = (k, d) => { const v = texts && texts[k]; return typeof v === "string" && v ? v : d; };
   const n = shots.length;
   const C = mark("cycle", 36);
-  const COLS = 3;
-  const ROWS = 4;
-  const STEP = C / (COLS * ROWS);
+  const grid = /^(\d)x(\d)$/.exec(setting("cases", "3x4"));
+  const COLS = grid ? Number(grid[1]) : 3;
+  const ROWS = grid ? Number(grid[2]) : 4;
+  const N = COLS * ROWS;
+  const STEP = C / N;
   const endAt = end ? end.from : durationInFrames + 1;
   const display = "'" + brand.displayFont + "', 'Instrument Serif', Georgia, serif";
   const body = "'" + brand.bodyFont + "', 'Inter Tight', 'Inter', sans-serif";
-  const PAPER = "#ddd4cb";
-  const SHEET = "#f2ece4";
-  const INK = "#1c1916";
+  // Between the tiles: the original's light paper, her own colour, or black.
+  const paper = setting("papier", "clair");
+  const PAPER = paper === "couleur" ? brand.accent : paper === "noir" ? "#111111" : "#ddd4cb";
+  const SHEET = paper === "noir" ? "#1d1b19" : paper === "couleur" ? ((brand.palette && brand.palette.light) || "#f2ece4") : "#f2ece4";
+  const INK = paper === "noir" ? "#f2ece4" : "#1c1916";
+  // The order the tiles change in: reading order (the original's), a spiral from the edge in, or at random (the same at every render).
+  const kind = setting("ordre", "lecture");
+  const order = (() => {
+    const ids = Array.from({ length: N }, (_, j) => j);
+    if (kind === "hasard") return ids.map((j) => ({ j, r: random("mosaic-order-" + j) })).sort((a, b) => a.r - b.r).map((x) => x.j);
+    if (kind !== "spirale") return ids;
+    const out = [];
+    let top = 0, left = 0, bottom = ROWS - 1, right = COLS - 1;
+    while (top <= bottom && left <= right) {
+      for (let c = left; c <= right; c++) out.push(top * COLS + c);
+      top++;
+      for (let r = top; r <= bottom; r++) out.push(r * COLS + right);
+      right--;
+      if (top <= bottom) { for (let c = right; c >= left; c--) out.push(bottom * COLS + c); bottom--; }
+      if (left <= right) { for (let r = bottom; r >= top; r--) out.push(r * COLS + left); left++; }
+    }
+    return out;
+  })();
+  const rank = new Array(N);
+  order.forEach((j, k) => { rank[j] = k; });
   // A phone number or a date never breaks between its digits.
   const keep = (s) => String(s || "").replace(/(\d) (?=\d)/g, "$1\u00a0");
   const clamp = { extrapolateLeft: "clamp", extrapolateRight: "clamp" };
@@ -39,7 +65,7 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const GAP = 5;
   const tw = (width - 2 * MX - (COLS - 1) * GAP) / COLS;
   const th = (height - 2 * MY - (ROWS - 1) * GAP) / ROWS;
-  const tiles = Array.from({ length: COLS * ROWS }, (_, j) => {
+  const tiles = Array.from({ length: N }, (_, j) => {
     const c = j % COLS;
     const r = Math.floor(j / COLS);
     const dx = Math.round((random("mosaic-x-" + j) - 0.5) * 4);
@@ -47,9 +73,9 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
     return { j, x: Math.round(MX + c * (tw + GAP)) + dx, y: Math.round(MY + r * (th + GAP)) + dy, w: Math.round(tw), h: Math.round(th) };
   });
 
-  // Waves: wave w (1 to n) starts a tile after (w - 1) cycles and lays picture w on the tiles in reading order; the last
+  // Waves: wave w (1 to n) starts a tile after (w - 1) cycles and lays picture w on the tiles in their order; the last
   // one brings the first picture back (the loop), or blank paper when the Reel ends on a card.
-  const waveOf = (j) => Math.max(0, Math.min(n, Math.floor((frame - STEP * (j + 1)) / C) + 1));
+  const waveOf = (j) => Math.max(0, Math.min(n, Math.floor((frame - STEP * (rank[j] + 1)) / C) + 1));
   // A video plays a cycle long, centred on the moment its picture is whole; the first picture brought back holds its
   // first image, as the Reel starts on it.
   const playAt = (w, k) => (w === 0 ? undefined : w >= n ? n * C : Math.max(0, k * C - C / 2));
@@ -86,25 +112,67 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
 
 export const mosaique: MontageSkill = {
   key: "mosaique",
-  version: 1,
+  // 2: its settings (cases, vitesse, ordre, papier); played with none, it is version 1's.
+  version: 2,
   bpm: BPM,
   shots: [4, 10],
   files: [4, 10],
   how: "Ses images plein cadre, coupées en une grille de 3 × 4 cases posées sur du papier clair ; l'image suivante remplace les cases une à une dans l'ordre de lecture, une case tous les sixièmes de temps, chaque vague longue de deux temps, si bien qu'une case change toujours ; la dernière vague ramène la première image et le Reel tourne en boucle.",
   end: true,
   texts: [{ slot: "titre", role: "hook", want: "facultatif : un titre court posé sur une étiquette de papier en haut, le temps de la première vague (son nom, son plat, son moment), seulement quand le Reel a besoin de mots", max: 28, required: false }],
-  timeline(n, { end, bpm: tempo }) {
+  settings: [
+    {
+      name: "cases",
+      want: "le nombre de cases de la grille",
+      choices: [
+        { value: "3x4", says: "12 grandes cases" },
+        { value: "4x6", says: "24 cases" },
+        { value: "6x8", says: "48 petites cases, une mosaïque fine" },
+        { value: "2x3", says: "6 très grandes cases" },
+      ],
+    },
+    {
+      name: "vitesse",
+      want: "la vitesse des vagues : combien de temps chaque image met à remplir la grille",
+      choices: [
+        { value: "normale", says: "une image tous les deux temps" },
+        { value: "lente", says: "une image tous les quatre temps, plus calme" },
+        { value: "rapide", says: "une image à chaque temps, plus nerveux" },
+      ],
+    },
+    {
+      name: "ordre",
+      want: "l'ordre dans lequel les cases changent",
+      choices: [
+        { value: "lecture", says: "dans l'ordre de lecture, de gauche à droite et de haut en bas" },
+        { value: "spirale", says: "en spirale, du bord vers le centre" },
+        { value: "hasard", says: "dans le désordre" },
+      ],
+    },
+    {
+      name: "papier",
+      want: "la couleur entre les cases",
+      choices: [
+        { value: "clair", says: "un papier clair" },
+        { value: "couleur", says: "sa couleur à elle (celle de sa charte)" },
+        { value: "noir", says: "du noir" },
+      ],
+    },
+  ],
+  timeline(n, { end, bpm: tempo, settings }) {
     // At another tempo (a longer Reel, or a music's own): every length in beats follows it.
     const bpm = tempo ?? BPM;
     const beat = 60 / bpm;
-    const spans = beatSpans(bpm, Array.from({ length: n }, (_, i) => (i < n - 1 ? CYCLE : CYCLE + (end ? CARD_SECONDS / beat : 0))));
+    // Her pace: a picture every two beats (the original's), four (calmer) or one (quicker).
+    const cycle = ({ lente: 4, rapide: 1 } as Record<string, number>)[settings?.vitesse ?? ""] ?? CYCLE;
+    const spans = beatSpans(bpm, Array.from({ length: n }, (_, i) => (i < n - 1 ? cycle : cycle + (end ? CARD_SECONDS / beat : 0))));
     const duration = spans.at(-1)!.end;
     const wants = spans.map((_, i) =>
       i === 0
         ? "la plus belle image, plein cadre : elle ouvre la grille et la referme en boucle (un plat, un produit ou une création, serré)"
         : "une image serrée et pleine de ses plats, produits ou réalisations, différente de la précédente, vue en entier à travers la grille",
     );
-    return { duration, shots: spans.map((s, i) => ({ ...s, want: wants[i]! })), texts: { titre: { from: 0, to: Math.min(duration, Math.max(2.6, spans[0]!.end)) } }, marks: { cycle: toFrame(CYCLE * beat) } };
+    return { duration, shots: spans.map((s, i) => ({ ...s, want: wants[i]! })), texts: { titre: { from: 0, to: Math.min(duration, Math.max(2.6, spans[0]!.end)) } }, marks: { cycle: toFrame(cycle * beat) } };
   },
   code: CODE,
 };

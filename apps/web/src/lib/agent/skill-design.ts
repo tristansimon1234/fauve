@@ -26,6 +26,7 @@ import {
   skillFit,
   skillFitAt,
   skillLengths,
+  mergeSkillSettings,
   leadPlan,
   soundLead,
   soundTempo,
@@ -126,6 +127,8 @@ export async function designSkill(params: {
   // A model Edith picked gives the form, never the silence: its optional title is written (dressedFloorNote's floor).
   const wordsWanted = Boolean(params.followed.dressed) && !skill.texts.some((t) => t.required) && skill.texts.length > 0;
   // A correction keeps its words but what her request changes: the words of its texts, by slot.
+  // A correction keeps the settings it had (« plus de cases » once asked) but what her request changes.
+  const previousSettings = params.previous?.skill?.key === skill.key ? params.previous.skill.settings : undefined;
   const current = params.previous?.skill?.key === skill.key ? Object.fromEntries(skill.texts.flatMap((t) => {
     const same = params.previous!.texts.filter((x) => x.style === t.role);
     const k = skill.texts.filter((x) => x.role === t.role).indexOf(t);
@@ -142,6 +145,7 @@ export async function designSkill(params: {
     ...(current && Object.keys(current).length ? { current } : {}),
     ...(wordsWanted ? { wordsWanted } : {}),
     ...(bpm ? { bpm } : {}),
+    ...(previousSettings && Object.keys(previousSettings).length ? { currentSettings: previousSettings } : {}),
   });
   // One small call fills it; `again`: its answer and what the check said of it, for a second try.
   const fillIt = async (again?: { answer: SkillFillAnswer; note: string }): Promise<SkillFillAnswer | null> => {
@@ -166,8 +170,11 @@ export async function designSkill(params: {
   const facts: MediaFacts = { clips: Object.fromEntries(params.clips.map((c) => [c.media_id, c.analysis])), photos: params.photos, tracks: {} };
   // Her Reel from an answer: the plan by code, dressed as a model followed and finished as any montage, then checked.
   const made = async (answer: SkillFillAnswer): Promise<{ plan: EditPlan; error?: string } | null> => {
-    const fill = readSkillFill(skill, files, n, answer, { wordsWanted });
-    if (!fill) return null;
+    const read = readSkillFill(skill, files, n, answer, { wordsWanted });
+    if (!read) return null;
+    // A correction keeps the settings it had but what her request changes (a new Reel: only those she asks).
+    const settings = mergeSkillSettings(skill, previousSettings, answer.settings);
+    const fill = { ...read, settings };
     const plan = leadPlan(skillPlan({ skill, name, files, fill, ...(bpm ? { bpm } : {}) }), lead);
     // The model's lettering when she chose it (her charter's when Edith picked it), and its finish (its grade, its grain).
     Object.assign(plan, followedLook(plan, params.followed));

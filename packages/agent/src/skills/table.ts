@@ -25,6 +25,8 @@ const PRINT_SLOT = 1 / 8;
 /** The two quick shots of the place, the split screen's pairs (in turn), the close-up that ends it (beats). */
 const QUICK = [0.5, 0.5];
 const PAIRS = [1.5, 1];
+/** A short split screen (three pairs or fewer) holds each pair a little longer, so it is still a moment. */
+const FEW_PAIRS = [2, 1.5];
 const FINAL = 4;
 /** With an ending card: beats more on the last close-up (at least the engine's 1,6 s). */
 const CARD = 3;
@@ -127,17 +129,19 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
 
   // Its two words written by hand, white, on either side of the pile's middle (the first on the left, against it; her
   // name on the right), fading in on the bare table; they stay over the quick shots and go with the split screen.
-  // Above the middle, clear of the apps' buttons, a long one over the pile's edge; on two lines rather than smaller (her
-  // name stays on one: the engine keeps it whole).
+  // Above the middle, clear of the apps' buttons, a long one over the pile's edge; on two lines rather than smaller.
   const hook = reelTexts.find((t) => t.role === "hook");
   const lead = reelTexts.find((t) => t.role === "caption");
   const others = reelTexts.filter((t) => t !== hook && t !== lead);
-  // (The hand's letters' boxes are a size and a half high: its box leaves them room for two lines.)
-  const wordStyle = { fontFamily: hand, fontWeight: 400, fontSize: 70, lineHeight: 1.0, letterSpacing: "0.03em", color: "#ffffff", textShadow: shade, whiteSpace: "normal", textWrap: "balance" };
+  // (The hand's letters' boxes are a size and a half high: its box leaves them room for two lines.) A fine edge of
+  // their own white thickens its thin pen a little, so they read on a phone.
+  const wordStyle = { fontFamily: hand, fontWeight: 400, fontSize: 80, lineHeight: 1.0, letterSpacing: "0.03em", color: "#ffffff", WebkitTextStroke: "1.2px #ffffff", textShadow: shade, whiteSpace: "normal", textWrap: "balance" };
   const unbroken = (text) => h("span", { style: { display: "block" } }, String(text || "").split(/(\s+)/).map((w, i) => (/^\s+$/.test(w) || !w ? w : h("span", { key: i, style: { whiteSpace: "nowrap" } }, w))));
+  // Her name may go on two lines beside the pile (the engine keeps it whole with no-break spaces, for a title).
+  const breakable = (text) => String(text || "").replace(/(\p{L})\u00a0(?=\p{L})/gu, "$1 ");
   const written = (t, left, align, key) => t && frame >= t.from && frame < Math.min(t.to, endAt)
-    ? h(FitText, { key, style: { position: "absolute", left, top: 746, width: 360, height: 200 }, innerStyle: { ...wordStyle, alignItems: align, textAlign: align === "flex-end" ? "right" : "left" } },
-        h("span", { style: { display: "inline-block", opacity: o(t.from, t.from + Math.round(0.25 * BEAT)) } }, unbroken(t.text)))
+    ? h(FitText, { key, style: { position: "absolute", left, top: 736, width: 360, height: 212 }, innerStyle: { ...wordStyle, alignItems: align, textAlign: align === "flex-end" ? "right" : "left" } },
+        h("span", { style: { display: "inline-block", opacity: o(t.from, t.from + Math.round(0.25 * BEAT)) } }, unbroken(breakable(t.text))))
     : null;
   const words = [written(lead, 40, "flex-end", "lead"), written(hook, width - 400, "flex-start", "name")];
 
@@ -179,7 +183,8 @@ export const table: MontageSkill = {
     const open = openingBeats(prints);
     // The table's slot and its prints' fill the opening; then the quick shots, the pairs (each half half the pair), the
     // close-up (longer with an ending card, which lasts the engine's 1,6 s at least, whatever the tempo).
-    const halves = Array.from({ length: pairs }, (_, j) => PAIRS[j % PAIRS.length]! / 2).flatMap((b) => [b, b]);
+    const lengths = pairs <= 3 ? FEW_PAIRS : PAIRS;
+    const halves = Array.from({ length: pairs }, (_, j) => lengths[j % lengths.length]! / 2).flatMap((b) => [b, b]);
     const beats = [open - prints * PRINT_SLOT, ...Array.from({ length: prints }, () => PRINT_SLOT), ...QUICK, ...halves, FINAL + (end ? Math.max(CARD, CARD_SECONDS / beat) : 0)];
     const spans = beatSpans(bpm, beats.slice(0, n));
     const duration = spans.at(-1)!.end;

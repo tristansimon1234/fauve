@@ -1555,3 +1555,29 @@ test("a Reel that follows a sound: its tempo, halved or doubled, and its cuts fr
   const snapped = snapToTempo(editor, { a: 10, b: 10, c: 10 });
   for (const t of planTimeline(snapped).segments.slice(1).map((s) => s.start)) assert.ok(Math.abs(((t - 0.25) / 0.5) - Math.round((t - 0.25) / 0.5)) < 0.07, `${t} s on a beat from 0.25`);
 });
+
+test("a skill's settings: her words choose them, the code reads them, a correction keeps them", async () => {
+  const { mosaique } = await import("./skills/mosaique.ts");
+  const { readSkillFill, skillPlan, skillSettings, mergeSkillSettings, skillFillInput } = await import("./skills.ts");
+  // Only its own settings at one of their choices; a default needs no saying.
+  assert.deepEqual(skillSettings(mosaique, [{ name: "cases", value: "6x8" }, { name: "cases", value: "9x9" }, { name: "taille", value: "xl" }, { name: "ordre", value: "lecture" }]), { cases: "6x8" });
+  const files = Array.from({ length: 6 }, (_, i) => ({ id: `v${i}`, photo: false, seconds: 30 }));
+  const answer = { fits: true, missing: "", shots: files.map((f) => ({ file: f.id, at: 2 })), texts: [], end: null, settings: [{ name: "cases", value: "6x8" }, { name: "vitesse", value: "lente" }], why: "" };
+  const fill = readSkillFill(mosaique, files, 6, answer)!;
+  assert.deepEqual(fill.settings, { cases: "6x8", vitesse: "lente" });
+  const plan = skillPlan({ skill: mosaique, name: "Mosaïque", files, fill });
+  // The code reads them by name; its timeline follows them (lente: four beats a picture instead of two).
+  assert.equal(plan.layers![0]!.motion.texts!.cases, "6x8");
+  assert.deepEqual(plan.skill?.settings, { cases: "6x8", vitesse: "lente" });
+  const plain = skillPlan({ skill: mosaique, name: "Mosaïque", files, fill: { ...fill, settings: {} } });
+  assert.ok(Math.abs(plan.duration - plain.duration * 2) < 0.1, `${plan.duration} s, ${plain.duration} s`);
+  assert.equal(plain.skill?.settings, undefined);
+  // A correction keeps them but what it asks; the original's asked again is the default back.
+  assert.deepEqual(mergeSkillSettings(mosaique, { cases: "6x8", vitesse: "lente" }, [{ name: "vitesse", value: "rapide" }]), { cases: "6x8", vitesse: "rapide" });
+  assert.deepEqual(mergeSkillSettings(mosaique, { cases: "6x8" }, [{ name: "cases", value: "3x4" }]), {});
+  // The filler sees them, the default marked as the original's, and a correction's current ones.
+  const input = skillFillInput({ skill: mosaique, name: "Mosaïque", n: 6, files, business: {}, request: "plus de cases", currentSettings: { cases: "6x8" } });
+  assert.equal(input.reglages?.[0]?.nom, "cases");
+  assert.match(input.reglages![0]!.choix[0]!, /par défaut/);
+  assert.deepEqual(input.reglages_actuels, { cases: "6x8" });
+});

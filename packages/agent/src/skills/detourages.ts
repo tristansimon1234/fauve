@@ -49,8 +49,8 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const body = "'" + brand.bodyFont + "', 'Inter Tight', 'Inter', sans-serif";
   const PAPER = "#fbfaf7";
   const full = { position: "absolute", left: 0, top: 0, width, height };
-  // The marker's white, with a tight dark edge so it reads on a bright street.
-  const edge = "0 2px 0 rgba(0,0,0,0.35), 0 0 2px rgba(0,0,0,0.7), 0 1px 3px rgba(0,0,0,0.6)";
+  // The marker's white, with a fine dark edge all round (and a soft drop) so it reads on a bright street too.
+  const edge = "0 0 1px rgba(0,0,0,0.9), 1px 1px 0 rgba(0,0,0,0.55), -1px 1px 0 rgba(0,0,0,0.55), 1px -1px 0 rgba(0,0,0,0.55), -1px -1px 0 rgba(0,0,0,0.55), 0 3px 6px rgba(0,0,0,0.45)";
   const hook = reelTexts.find((t) => t.role === "hook");
   const list = reelTexts.find((t) => t.role === "band");
   const others = reelTexts.filter((t) => t !== hook && t !== list);
@@ -105,16 +105,19 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
     const s = shots[popNow];
     const t = frame - s.from;
     const grow = interpolate(t, [0, 7], [0.3, 1], { ...clamp, easing: pop });
-    const sway = Math.sin(t / 13) * 0.8;
-    const turn = spot.tilt * interpolate(t, [0, 7], [2.2, 1], clamp) + sway;
     const breath = 1 + 0.015 * Math.sin(t / 17);
     // Its box is the spot's (not the frame's: a layer of the whole frame moved at every image is heavy), what it holds
-    // placed from the spot's corner.
+    // placed from the spot's corner. It turns to its tilt about its middle; one standing on the frame's bottom edge
+    // grows from its foot, upright, so its cut edge stays on the frame's.
     const X0 = Math.round(spot.cx - spot.w / 2);
     const Y0 = Math.round(spot.cy - spot.h / 2);
-    const wrap = (child) => h("div", { style: { position: "absolute", left: X0, top: Y0, width: spot.w, height: spot.h, opacity: t < 0 ? 0 : interpolate(t, [0, 2], [0, 1], clamp), transformOrigin: "50% 50%", transform: "rotate(" + turn.toFixed(2) + "deg) scale(" + (grow * breath).toFixed(4) + ")" } }, child);
-    // Where the piece lies once landed (for its word).
     let at = null;
+    let standing = false;
+    const wrap = (child) => {
+      const turn = standing ? 0 : spot.tilt * interpolate(t, [0, 7], [2.2, 1], clamp) + Math.sin(t / 13) * 0.8;
+      const origin = standing ? Math.round(at.x + at.w / 2 - X0) + "px " + Math.round(height - Y0) + "px" : "50% 50%";
+      return h("div", { style: { position: "absolute", left: X0, top: Y0, width: spot.w, height: spot.h, opacity: t < 0 ? 0 : interpolate(t, [0, 2], [0, 1], clamp), transformOrigin: origin, transform: "rotate(" + turn.toFixed(2) + "deg) scale(" + (grow * breath).toFixed(4) + ")" } }, child);
+    };
     const sub = s.subject;
     const a = Math.max(0.3, Math.min(3.5, s.aspect || 0.8));
     if (s.kind === "photo" && s.cutout && sub && sub.w > 0 && sub.h > 0) {
@@ -122,23 +125,25 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
       const ratio = (sub.w * a) / sub.h;
       const hh = Math.min(spot.h, spot.w / Math.max(0.05, ratio));
       const ww = hh * ratio;
-      const bottom = (s.cutEdges || []).indexOf("bottom") >= 0;
-      const y = bottom ? height - hh : spot.cy - hh / 2;
-      at = { x: spot.cx - ww / 2, y, w: ww, h: hh };
-      piece = wrap(h(Cutout, { photo: s, x: Math.round(at.x) - X0, y: Math.round(y) - Y0, height: Math.round(hh), rim: 13, shadow: true }));
+      standing = (s.cutEdges || []).indexOf("bottom") >= 0;
+      at = { x: spot.cx - ww / 2, y: standing ? height - hh : spot.cy - hh / 2, w: ww, h: hh };
+      piece = wrap(h(Cutout, { photo: s, x: Math.round(at.x) - X0, y: Math.round(at.y) - Y0, height: Math.round(hh), rim: 13, shadow: true }));
     } else if (s.subjectBoxes && s.subjectBoxes.some(Boolean)) {
-      // Her video's subject read in its whole picture (a box of its own shape), then fitted to the spot.
+      // Her video's subject read in its whole picture (a box of its own shape), then fitted to the spot; one cut by the
+      // picture's bottom edge (a bust, a counter) stands on the frame's.
       const whole = { left: 0, top: 0, width: Math.round(1000 * a), height: 1000 };
       const b = SubjectBox(s, s.from, whole);
       if (b && b.w > 0 && b.h > 0) {
         const k2 = Math.min(spot.w / b.w, spot.h / b.h);
-        at = { x: spot.cx - (k2 * b.w) / 2, y: spot.cy - (k2 * b.h) / 2, w: k2 * b.w, h: k2 * b.h };
-        const laid = { left: Math.round(spot.cx - k2 * (b.x + b.w / 2)) - X0, top: Math.round(spot.cy - k2 * (b.y + b.h / 2)) - Y0, width: Math.round(whole.width * k2), height: Math.round(whole.height * k2) };
+        standing = b.y + b.h >= whole.height - 8;
+        at = { x: spot.cx - (k2 * b.w) / 2, y: standing ? height - k2 * b.h : spot.cy - (k2 * b.h) / 2, w: k2 * b.w, h: k2 * b.h };
+        const laid = { left: Math.round(at.x - k2 * b.x) - X0, top: Math.round(at.y - k2 * b.y) - Y0, width: Math.round(whole.width * k2), height: Math.round(whole.height * k2) };
         piece = wrap(h(Subject, { shot: popNow, rim: 12, rimColor: PAPER, shadow: true, style: { position: "absolute", ...laid } }));
       }
     }
     if (!piece) {
       // The print: the picture at its own shape, fitted to the spot, a white border and a soft shadow.
+      standing = false;
       const pw = Math.min(spot.w, spot.h * a) * 0.92;
       const ph = pw / a;
       at = { x: spot.cx - pw / 2, y: spot.cy - ph / 2, w: pw, h: ph };

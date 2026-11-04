@@ -6,7 +6,7 @@
 //   node scripts/skill-render.mts --skill decode --clips a.mp4,b.mp4,c.mp4 \
 //     [--module packages/agent/src/skills/<key>.ts]   (a skill not in the library yet: its module, exporting it)
 //     --words '{"surtitre":"un samedi dans","titre":"le marais"}' [--end '{"title":"…","subtitle":"…"}'] \
-//     [--shots 10] [--bpm 90] [--fonts "Open Sans,Inter"] [--name "Café des Arts"] [--out reel.mp4] [--no-render]
+//     [--shots 10] [--bpm 90] [--settings '{"cases":"6x8"}'] [--fonts "Open Sans,Inter"] [--name "Café des Arts"] [--out reel.mp4] [--no-render]
 //
 // --bpm plays it at another tempo than its own (a longer Reel, a music's tempo), as skillFit would.
 // Clips are local files (videos or photos); they are normalized at 30 images a second into the bundle's public folder,
@@ -33,6 +33,7 @@ const { values } = parseArgs({
     end: { type: "string" },
     shots: { type: "string" },
     bpm: { type: "string" },
+    settings: { type: "string" },
     fonts: { type: "string", default: "" },
     name: { type: "string", default: "Studio Test" },
     out: { type: "string" },
@@ -90,6 +91,7 @@ const fill: SkillFill = {
   }),
   texts: JSON.parse(values.words ?? "{}"),
   end: values.end ? JSON.parse(values.end) : null,
+  ...(values.settings ? { settings: JSON.parse(values.settings) as Record<string, string> } : {}),
 };
 const bpm = values.bpm ? Math.round(Math.min(140, Math.max(60, Number(values.bpm)))) : undefined;
 const plan = skillPlan({ skill, name: model?.name ?? skill.key, files, fill, ...(bpm ? { bpm } : {}) });

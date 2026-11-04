@@ -51,8 +51,9 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const keep = (s) => String(s || "").replace(/(\d) (?=\d)/g, "$1\u00a0");
 
   // 1. The ground: the pale grey, faint layout lines framing the word (decor), and her silhouette walking on it, her
-  // cut-out filled with the blue black. A shot without its cut-out: her shot as a hard black and white print, clamped
-  // to the pale ground (darken), so its dark shapes read as silhouettes on the same grey.
+  // cut-out filled with the blue black. A shot without its cut-out: her shot as a hard, high-key black and white print
+  // (its mid tones pushed to white, only its darks kept), clamped to the pale ground (darken), so its dark shapes read
+  // as silhouettes on the same grey.
   const hasCut = (i) => Boolean(shots[i] && shots[i].subjectBoxes && shots[i].subjectBoxes.some(Boolean));
   const shown = frame < ALONE_AT && n > 0;
   const people = !shown
@@ -60,7 +61,7 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
     : hasCut(cur)
       ? h(Subject, { key: "her", shot: cur, fill: INK, style: full })
       : h(React.Fragment, { key: "print" },
-          h(Footage, { shot: cur, style: { ...full, filter: "grayscale(1) contrast(3.4) brightness(1.12)" } }),
+          h(Footage, { shot: cur, style: { ...full, filter: "grayscale(1) brightness(1.35) contrast(3.2)" } }),
           h("div", { style: { ...full, backgroundColor: PALE, mixBlendMode: "darken" } }));
   const BOX = { left: 140, top: 820, width: 800, height: 280 };
   const hair = (key, s) => h("div", { key, style: { position: "absolute", backgroundColor: "rgba(13,15,26,0.07)", ...s } });

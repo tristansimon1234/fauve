@@ -37,6 +37,21 @@ export type SkillTimeline = {
   marks: Record<string, number>;
 };
 
+/**
+ * A setting of a skill that her words can ask (Tristan: « on peut se dire qu'il faut plus de cases ? »), like the
+ * variants of an Edits or CapCut template: the filler picks a choice only when her request asks for what it does, its
+ * code reads it by name (setting(name, default)) and its timeline gets it (options.settings). Its first choice is the
+ * default, the original's.
+ */
+export type SkillSetting = {
+  /** Read by its code and its timeline (« cases »). */
+  name: string;
+  /** What it changes, in French, for the filler and Edith. */
+  want: string;
+  /** Its values, the default first: each one's value and what it looks like, in French. */
+  choices: { value: string; says: string }[];
+};
+
 export type MontageSkill = {
   /** The house model it plays (house-models.ts). */
   key: string;
@@ -57,9 +72,11 @@ export type MontageSkill = {
    * For n shots: its length, each shot's span and want, its texts' moments and its code's marks; `bpm`, at another
    * tempo than its own (a longer or shorter Reel, a music's tempo): every length it counts in beats follows it.
    */
-  timeline(n: number, options: { end: boolean; bpm?: number }): SkillTimeline;
+  timeline(n: number, options: { end: boolean; bpm?: number; settings?: Record<string, string> }): SkillTimeline;
   /** The tempos it plays at (default: from 0,7 to 1,2 times its own, within 60 to 140). */
   tempo?: [number, number];
+  /** What her words can change in it, as a template's variants (its grid, its pace, its order, its colour). */
+  settings?: SkillSetting[];
   /**
    * The most shots it takes for a length she asks for, past `shots[1]` (the most it takes from her files alone): a model
    * whose middle can repeat (more full frames after a title, more of the place's life, more of the day) reaches 30 s at
@@ -96,7 +113,35 @@ export type SkillFill = {
   shots: { file: string; at: number }[];
   texts: Record<string, string>;
   end: { title: string; subtitle?: string } | null;
+  /** The settings her words chose (only those, each a choice of the skill's); the others play their default. */
+  settings?: Record<string, string>;
 };
+
+/**
+ * A correction's settings: those it had, with what her request asks now (a default asked again is the original's back:
+ * « remets les cases d'origine »). Only the skill's own settings, at one of their choices.
+ */
+export function mergeSkillSettings(skill: Pick<MontageSkill, "settings">, previous: Record<string, string> | undefined, asked: { name: string; value: string }[] | undefined): Record<string, string> {
+  const merged = skillSettings(skill, previous);
+  for (const a of asked ?? []) {
+    const setting = skill.settings?.find((x) => x.name === a.name);
+    if (!setting || !setting.choices.some((c) => c.value === a.value)) continue;
+    if (setting.choices[0]?.value === a.value) delete merged[a.name];
+    else merged[a.name] = a.value;
+  }
+  return merged;
+}
+
+/** The settings a fill keeps: each one a skill's, at one of its choices, never its default (which needs no saying). */
+export function skillSettings(skill: Pick<MontageSkill, "settings">, asked: { name: string; value: string }[] | Record<string, string> | undefined): Record<string, string> {
+  const pairs = Array.isArray(asked) ? asked.map((a) => [a.name, a.value] as const) : Object.entries(asked ?? {});
+  const kept: Record<string, string> = {};
+  for (const [name, value] of pairs) {
+    const setting = skill.settings?.find((x) => x.name === name);
+    if (setting && setting.choices.some((c) => c.value === value) && setting.choices[0]?.value !== value) kept[name] = value;
+  }
+  return kept;
+}
 
 const round = (n: number) => Math.round(n * 100) / 100;
 /** A time on the frame grid of the Reel (so a cut on a beat is a cut on a frame). */
@@ -212,7 +257,7 @@ export function fitWords(text: string, max: number): string {
  * replaced by her files in turn), a video's start inside it; each text cut to its place; the ending only when the
  * skill draws one. Null when a required text is missing (the filler failed: the editor makes the Reel).
  */
-export function readSkillFill(skill: Pick<MontageSkill, "texts" | "end">, files: SkillFile[], n: number, answer: SkillFillAnswer, options: { wordsWanted?: boolean } = {}): SkillFill | null {
+export function readSkillFill(skill: Pick<MontageSkill, "texts" | "end" | "settings">, files: SkillFile[], n: number, answer: SkillFillAnswer, options: { wordsWanted?: boolean } = {}): SkillFill | null {
   if (!files.length) return null;
   const known = new Map(files.map((f) => [f.id, f]));
   let turn = 0;
@@ -230,7 +275,8 @@ export function readSkillFill(skill: Pick<MontageSkill, "texts" | "end">, files:
   }
   const title = fitWords(answer.end?.title ?? "", 40);
   const end = skill.end && title ? { title, ...(answer.end?.subtitle?.trim() ? { subtitle: fitWords(answer.end.subtitle, 60) } : {}) } : null;
-  return { shots, texts, end };
+  const settings = skillSettings(skill, answer.settings);
+  return { shots, texts, end, ...(Object.keys(settings).length ? { settings } : {}) };
 }
 
 /** The brief a skill's composition carries (what the motion designer reads if her request ever needs it changed). */
@@ -244,7 +290,9 @@ export function skillPlan(input: { skill: MontageSkill; name: string; files: Ski
   const { skill, fill } = input;
   if (!fill.shots.length) throw new Error("Aucun plan pour ce modèle");
   const bpm = input.bpm && input.bpm !== skill.bpm ? input.bpm : undefined;
-  const line = skill.timeline(fill.shots.length, { end: Boolean(fill.end), ...(bpm ? { bpm } : {}) });
+  const settings = skillSettings(skill, fill.settings);
+  const chosen = Object.keys(settings).length ? settings : undefined;
+  const line = skill.timeline(fill.shots.length, { end: Boolean(fill.end), ...(bpm ? { bpm } : {}), ...(chosen ? { settings: chosen } : {}) });
   const files = new Map(input.files.map((f) => [f.id, f]));
   const taken = new Map<string, [number, number][]>();
   const segments = line.shots.map((span, i): PlanSegment => {
@@ -288,14 +336,15 @@ export function skillPlan(input: { skill: MontageSkill; name: string; files: Ski
           brief: skillBrief(input.name),
           code: skill.code,
           js: skill.code,
-          texts: Object.fromEntries(Object.entries(line.marks).map(([k, v]) => [k, String(Math.round(v * 1000) / 1000)])),
+          // Its marks (numbers) and its settings (her words' choices), read by its code by name.
+          texts: { ...Object.fromEntries(Object.entries(line.marks).map(([k, v]) => [k, String(Math.round(v * 1000) / 1000)])), ...(chosen ?? {}) },
           draws_texts: true,
           draws_end: Boolean(fill.end),
           ...(skill.fonts?.length ? { fonts: skill.fonts.slice(0, 3) } : {}),
         },
       },
     ],
-    skill: { key: skill.key, version: skill.version },
+    skill: { key: skill.key, version: skill.version, ...(chosen ? { settings: chosen } : {}) },
   };
 }
 
@@ -320,6 +369,10 @@ export const skillFillSchema = z.object({
     .object({ title: z.string().describe("The ending card's line, 40 characters at most"), subtitle: z.string().describe("A second line, 60 characters at most, or empty") })
     .nullable()
     .describe("Only when the model has an ending (« fin ») and she has an offer or an announcement to end on; null otherwise"),
+  settings: z
+    .array(z.object({ name: z.string().describe("The setting's name (« reglages »)"), value: z.string().describe("The value of the choice her request asks for") }))
+    .optional()
+    .describe("Only the settings her request asks for; none otherwise (each one plays the original's)"),
   why: z.string().describe("One sentence in French for her (tu): why these shots in this model"),
 });
 export type SkillFillAnswer = z.infer<typeof skillFillSchema>;
@@ -340,6 +393,7 @@ Then write its texts, in French (what her customers read), each in its slot (« 
 - each within its most characters (count them), in normal case: the code sets the capitals when the model has them; a name longer than its place is never cut, write the word that sets it apart instead (« Farine » for « Maison Farine »: never « Maison »);
 - an optional slot (obligatoire false) is left empty unless her request or the Reel needs those words; a required one is always written.
 
+"settings": its settings (« reglages », when it has some), like the variants of a template: one only when her request asks for what it does (« plus de cases », « plus lent », « dans le désordre », « avec ma couleur »), with the value that does it; never to vary for its own sake; otherwise none, each one plays the original's. A request a setting answers fits.
 "end": only when the model has an ending (« fin ») and she has something to end on (an offer, an opening, a date, in her request or what we know): its title (40 characters at most) and a subtitle or empty; otherwise null.
 "why": one sentence for her in French (tu), what you chose and why, in plain words.`;
 
@@ -361,6 +415,8 @@ export function skillFillInput(input: {
   wordsWanted?: boolean;
   /** The tempo it plays at, when not its own (a length she asked for). */
   bpm?: number;
+  /** A correction: the settings it has now, kept except what her request changes. */
+  currentSettings?: Record<string, string>;
 }) {
   const line = input.skill.timeline(input.n, { end: input.skill.end, ...(input.bpm ? { bpm: input.bpm } : {}) });
   return {
@@ -384,7 +440,11 @@ export function skillFillInput(input: {
     },
     cases: line.shots.map((s, i) => ({ case: i + 1, duree: `${round(s.end - s.start)} s`, veut: s.want })),
     textes: input.skill.texts.map((t) => ({ slot: t.slot, dit: t.want, max_caracteres: t.max, obligatoire: t.required || Boolean(input.wordsWanted) })),
+    ...(input.skill.settings?.length
+      ? { reglages: input.skill.settings.map((x) => ({ nom: x.name, change: x.want, choix: x.choices.map((c, i) => `${c.value} : ${c.says}${i === 0 ? " (celui de l'original, par défaut)" : ""}`) })) }
+      : {}),
     ...(input.current ? { textes_actuels: input.current } : {}),
+    ...(input.currentSettings && Object.keys(input.currentSettings).length ? { reglages_actuels: input.currentSettings } : {}),
     fichiers: input.files.map((f) =>
       f.photo
         ? { id: f.id, type: "photo", montre: f.shows }

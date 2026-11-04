@@ -1,4 +1,4 @@
-import { beatSpans, toFrame, type MontageSkill } from "../skills.ts";
+import { beatSpans, type MontageSkill } from "../skills.ts";
 
 // « Fenêtres et étiquettes », written on its original (house/originals/fenetres.mp4, 13,8 s at 93 BPM, a road trip
 // filmed in width, looked at image by image): two small technical labels in white condensed capitals (an altitude on
@@ -186,7 +186,8 @@ export const fenetres: MontageSkill = {
       shots: spans.map((s, i) => ({ ...s, want: wants[i]! })),
       // Both labels the whole Reel, its ending card too (between its title and its line).
       texts: { gauche: { from: 0, to: duration }, droite: { from: 0, to: duration } },
-      marks: { beat: beat * 30, loop: end ? 0 : 1, last: toFrame(spans.at(-1)!.start) },
+      // Its code reads the beat, and whether the Reel loops (without an ending card).
+      marks: { beat: beat * 30, loop: end ? 0 : 1 },
     };
   },
   code: CODE,
