@@ -114,6 +114,15 @@ import { LAYER_ROLE, markTemplatesUsed, OVERLAY_ROLE, PHOTO_ROLE, recentlyShownT
 import { timeLeft } from "@/lib/step-clock";
 import { anthropic, CACHE_AN_HOUR, logClaudeCost } from "./run";
 
+/** The voice note a post carries (a voice leads the Reel: never a montage skill). */
+const voiceIdOf = (post: { voice_media_id?: unknown }) => (typeof post.voice_media_id === "string" ? post.voice_media_id : null);
+
+/** Whether the post follows one of Edith's models that has its montage skill (its inspiration's row, read once). */
+async function skillOfInspiration(studioId: string, inspirationId: string): Promise<boolean> {
+  const { data } = await supabaseAdmin().from("inspirations").select("source, external_id").eq("id", inspirationId).eq("studio_id", studioId).maybeSingle();
+  return data?.source === "house" && Boolean(skillFor(data.external_id as string | null));
+}
+
 /** The brief of the animation that draws a copied Reel's texts as its model does (constant: a correction keeps its code). */
 const WORDS_BRIEF =
   "Draw the Reel's texts (reel_texts) exactly as the Reel she copies draws its texts (model_frames): where they sit on the image, their size, font and weight, how each one appears and leaves (typed word by word, slammed, faded), at its pace. Her shots play under you; draw nothing else.";
@@ -350,9 +359,11 @@ export async function designEdit(params: {
   if (videoIds.length && !clips.length && !photoIds.length) throw new Error("Les vidéos ne sont pas encore analysées, réessaie dans une minute");
   // What moves in her videos (hands, faces, bodies), followed once per clip with someone in it (the cut-out sandbox),
   // started now so it runs while the rest is read: an animation can then start from a gesture, hold on to it or follow it.
-  const earlyTracks = clips.length
-    ? ensureTracks(params.studioId, clips.map((c) => c.media_id)).catch((e: unknown) => console.warn("tracks: not ready", e))
-    : null;
+  // Not for a Reel a montage skill will play (one of Edith's models with its skill, nothing it needs): started after it
+  // only if the editor takes the Reel.
+  const skilled = Boolean(!voiceIdOf(post.data) && post.data.inspiration_id && (await skillOfInspiration(params.studioId, post.data.inspiration_id as string)));
+  const startTracks = () => (clips.length ? ensureTracks(params.studioId, clips.map((c) => c.media_id)).catch((e: unknown) => console.warn("tracks: not ready", e)) : null);
+  let earlyTracks = skilled ? null : startTracks();
   // Someone speaking in a video analysed before its speech was read: read now (its sound cleaned, its « euh » timed).
   const earlySpeech = clips.length
     ? ensureSpeech(params.studioId, clips).catch((e: unknown) => {
@@ -446,6 +457,7 @@ export async function designEdit(params: {
   // frame (the editor puts an animation that hangs on a gesture where it can be seen), where the faces really are
   // (the texts keep off them) and what the animations follow. Never more than a few minutes of waiting (a sandbox
   // installing the tracker for the first time): without them, the faces are Gemini's and the animations follow nothing.
+  if (!earlyTracks && skilled) earlyTracks = startTracks();
   if (earlyTracks) await Promise.race([earlyTracks, new Promise((resolve) => setTimeout(resolve, TRACKS_WAIT_MS))]);
   // Her speech read (the hesitations and pauses the engine cuts): a minute and a half at most, else cut as it is.
   if (earlySpeech) {
