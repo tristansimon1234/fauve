@@ -5,9 +5,11 @@ import {
   BEAT_STEP,
   GROOVE_STEP,
   MIX_CEILING,
+  MIX_FADE,
   MODEL_SHEETS,
   mixFilter,
   mixGains,
+  type MusicShape,
   soundLevelsFilter,
   soundLoudness,
   soundsOnlyFilter,
@@ -888,19 +890,22 @@ function printed(stdout: string, name: string): number | null {
 
 /**
  * A rendered video with its soundtrack: the picture copied as it is, the music in
- * AAC under the video's own sound, faded out over the last 0.8 s and cut at the
- * end of the video. Both are measured first: what is said (her voice, Edith's,
+ * AAC under the video's own sound, faded out over the last 0.8 s (or ended where its
+ * model's shape ends it) and cut at the end of the video. Both are measured first: what is said (her voice, Edith's,
  * someone in a clip) is brought to the level of a voice, the music lies under it
  * and ducks while it speaks (mixGains: well under a voice over the whole Reel,
  * at its level around a few spoken shots). A video without sound just gets the music.
  * Its sound effects (`sounds`, placed and levelled by sfx.ts) join the mix before its
  * limiter; without music (`audio` null) they go over the video's own sound as it is.
+ * `shape`: how its model shapes its music (music-shape.ts: its pauses, its muffled passages,
+ * its end), applied to the music alone, sample by sample, before anything joins it; `duration`,
+ * the Reel's length when the video's cannot be read.
  */
 export async function muxAudioInSandbox(
   id: string,
   mp4: Buffer,
   audio: Uint8Array | null,
-  options: { voiceOver?: boolean; ambient?: boolean; sounds?: (SoundInMix & { mp3: Uint8Array })[] } = {},
+  options: { voiceOver?: boolean; ambient?: boolean; sounds?: (SoundInMix & { mp3: Uint8Array })[]; shape?: MusicShape | null; duration?: number } = {},
 ): Promise<Buffer> {
   const sounds = options.sounds ?? [];
   if (!audio && !sounds.length) return mp4;
@@ -936,11 +941,14 @@ export async function muxAudioInSandbox(
       );
     } else {
       const gains = mixGains({ speech: printed(measured, "speech"), music: printed(measured, "music") }, Boolean(options.voiceOver), Boolean(options.ambient));
-      console.info("mix", id, measured.trim(), gains, { sounds: placed.length });
+      // Its model's shape on the music, over the Reel's length (the video's, else the plan's).
+      const length = duration ?? options.duration;
+      const shaped = options.shape && length ? { shape: options.shape, duration: length } : undefined;
+      console.info("mix", id, measured.trim(), gains, { sounds: placed.length, ...(shaped ? { shape: options.shape } : {}) });
       await bash(
         sandbox,
         `cd "$1" && ${ROOT}/ffmpeg -loglevel error -y -i in.mp4 -i music.mp3 ${inputs.map((_, i) => `"\${${i + 3}}"`).join(" ")} -filter_complex "$2" -map 0:v:0 -map "[a]" -c:v copy -c:a aac -b:a 192k -shortest -movflags +faststart out.mp4`,
-        [dir, mixFilter(gains, duration ? duration - 0.8 : null, placed), ...inputs],
+        [dir, mixFilter(gains, duration ? duration - MIX_FADE : null, placed, shaped), ...inputs],
       );
     }
     const out = await sandbox.readFileToBuffer({ path: `${dir}/out.mp4` });

@@ -135,8 +135,8 @@ const editorRhythm = {
  */
 export const editorOutputSchemaLegacy = z.object({
   // No sound effects either: the grammar is at the API's limit (400 « compiled grammar is too large » on 2 November);
-  // the animations bring theirs (the motion designer's answer).
-  plan: editPlanObjectSchema.omit({ voice: true, layers: true, template: true, tempo: true, copy: true, sounds: true, finish: true, look: true }).extend({
+  // the animations bring theirs (the motion designer's answer). Nor a music's shape (a montage skill's, set by the engine).
+  plan: editPlanObjectSchema.omit({ voice: true, layers: true, template: true, tempo: true, copy: true, sounds: true, finish: true, look: true, music_shape: true }).extend({
     ...editorRhythm,
     texts: z.array(editorTextSchema),
     // Retouch and blur are set by their own tools and carried over (carryRetouch), never written by the editor.

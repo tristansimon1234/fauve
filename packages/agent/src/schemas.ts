@@ -5,6 +5,7 @@ import { brandSignatureSchema } from "./signature.ts";
 import { styleSampleSchema } from "./moodboard.ts";
 import { voiceSettingSchema } from "./voice-over.ts";
 import { REEL_EFFECTS, reelLookSchema } from "./looks.ts";
+import { musicShapeSchema } from "./music-shape.ts";
 
 // Mirrors the Postgres enums in supabase/migrations.
 export const postStatusSchema = z.enum([
@@ -183,6 +184,13 @@ export const sfxCueSchema = z.object({
   seconds: z.number().min(0.5).max(3).optional(),
   /** One she asked for (« un petit clic à chaque mot »): kept whatever the level's spacing, under a voice too. */
   asked: z.boolean().optional(),
+  /**
+   * One of a montage skill's, from its timeline (a key click on each typed letter, a whoosh up to the drop): played on its
+   * own moment, never moved onto a cut, all kept one frame apart at least, unless her sound effects are off.
+   */
+  skill: z.boolean().optional(),
+  /** How loud, from the loudness of its level in the mix (dB): a soft tick under it, an impact over it (its peak still capped). */
+  gain: z.number().min(-24).max(6).optional(),
 });
 export type SfxCue = z.infer<typeof sfxCueSchema>;
 
@@ -513,8 +521,16 @@ export const editPlanObjectSchema = z.object({
   overlays: z.array(planOverlaySchema).max(MAX_OVERLAYS).optional(),
   /** Her videos kept whole and horizontal, on black above and below (her request, read by her contract): the engine draws it. */
   frame: z.enum(["letterbox"]).optional(),
-  /** Sound effects on the Reel's clock: those she asked for on each text or cut (her contract), placed by the engine. */
+  /**
+   * Sound effects on the Reel's clock: those she asked for on each text or cut (her contract), placed by the engine, or a
+   * montage skill's, from its timeline (skill).
+   */
   sounds: z.array(sfxCueSchema).max(40).optional(),
+  /**
+   * How its music is shaped (music-shape.ts: its pauses, its muffled passages, its end), from a montage skill's timeline:
+   * applied by the mix to whatever music it gets. Set by the engine, never by the editor nor the browser.
+   */
+  music_shape: musicShapeSchema.optional(),
 });
 
 export const editPlanSchema = editPlanObjectSchema.superRefine((plan, ctx) => {

@@ -1638,3 +1638,96 @@ test("« Lieu tapé » cuts where its original does, on its own music (82,5 BPM)
   // What belongs to the original's brand is left to it: no In-N-Out arrow, no yellow of its own.
   assert.ok(!/ffcc00|strokeDasharray/i.test(frappe.code));
 });
+
+// ---------------------------------------------------------------------------
+// A model's music shaped as its original's (pauses, muffled passages, its end) and its own sound effects.
+// ---------------------------------------------------------------------------
+
+test("a model's music shape: read on the Reel, kept on the plan, shaped on its own samples by the mix", async () => {
+  const { readMusicShape, musicShapeGraph, shiftMusicShape, musicEnvelope, shapesMusic } = await import("./music-shape.ts");
+  // In order, two that touch are one, one at the very start is a late start, nothing shaped after its end.
+  assert.deepEqual(
+    readMusicShape({ pauses: [{ from: 5, to: 5.5 }, { from: 0.01, to: 0.5 }, { from: 5.505, to: 6 }, { from: 7.9, to: 8 }, { from: 3, to: 3.01 }], end: { at: 7.5 } }, 8),
+    { pauses: [{ from: 0, to: 0.5 }, { from: 5, to: 6 }], end: { at: 7.5, fade: 0.012 } },
+  );
+  // Filtered passages one after the other (the next one once the previous has opened), within the Reel; two of a kind that touch, one.
+  assert.deepEqual(readMusicShape({ filters: [{ kind: "radio", from: 2, to: 6 }, { kind: "muffled", from: 5, to: 9 }] }, 8), {
+    filters: [{ kind: "radio", from: 2, to: 6, open: 0.02 }, { kind: "muffled", from: 6.02, to: 8, open: 0.02 }],
+  });
+  assert.deepEqual(readMusicShape({ filters: [{ kind: "muffled", from: 0, to: 2 }, { kind: "muffled", from: 2, to: 3, open: 3 }] }, 8), { filters: [{ kind: "muffled", from: 0, to: 3, open: 3 }] });
+  // No music at all stands alone; nothing left, no shape.
+  assert.deepEqual(readMusicShape({ none: true, pauses: [{ from: 1, to: 2 }] }, 8), { none: true });
+  assert.equal(readMusicShape({ pauses: [{ from: 9, to: 10 }] }, 8), null);
+  assert.equal(shapesMusic({ none: true }), false);
+  // Kept on the plan (bounded), never in the editor's answer.
+  const { editorOutputSchemaLegacy } = await import("./editor.ts");
+  assert.ok(!("music_shape" in editorOutputSchemaLegacy.shape.plan.shape));
+  const plan = {
+    format: "9:16", duration: 8, template: "libre", segments: [{ clip_id: "a", in: 0, out: 8, zoom: "none" }], texts: [], images: [], transitions: "cut", subtitles: false, music: null,
+  };
+  assert.ok(editPlanSchema.safeParse({ ...plan, music_shape: { pauses: [{ from: 2, to: 2.5 }], filters: [{ kind: "muffled", from: 0, to: 2 }], end: { at: 7.5 } } }).success);
+  assert.ok(!editPlanSchema.safeParse({ ...plan, music_shape: { filters: [{ kind: "underwater", from: 0, to: 2 }] } }).success);
+  // Sample accurate: a one-beat stop at 120 BPM (2 s to 2,5 s) silent from sample 88 200, back from 110 030 (5 ms of fade
+  // before the beat), the music cut dead at 7,5 s (its last 12 ms faded), a muffled intro closed into the dry sound.
+  const graph = musicShapeGraph({ pauses: [{ from: 2, to: 2.5 }], filters: [{ kind: "muffled", from: 0, to: 4 }], end: { at: 7.5 } }, "in", "out", 8);
+  assert.match(graph, /^\[in\]asplit=2\[ms_dry\]\[ms_muffled\];/);
+  assert.match(graph, /\[ms_muffled\]lowpass=f=1300\[ms_muffledf\]/);
+  assert.match(graph, /\[ms_dryk\]\[ms_muffledk\]amix=inputs=2:normalize=0\[ms_filtered\]/);
+  assert.match(graph, /atrim=end_sample=88200,asetpts=PTS-STARTPTS,afade=t=out:ss=87979:ns=221\[ms_paused_k0\]/);
+  assert.match(graph, /anullsrc=r=44100:cl=stereo,atrim=end_sample=21830\[ms_paused_z1\]/);
+  assert.match(graph, /atrim=start_sample=110030,asetpts=PTS-STARTPTS,afade=t=in:ns=220\[ms_paused_k1\]/);
+  assert.match(graph, /\[ms_paused\]afade=t=out:ss=330221:ns=529\[ms_ended\];\[ms_ended\]anull\[out\]$/);
+  // A pause to the end: silent to the end of the Reel (and half a second more), the mix never shorter than the video.
+  assert.match(musicShapeGraph({ pauses: [{ from: 6, to: 8 }] }, "in", "out", 8), /anullsrc=r=44100:cl=stereo,atrim=end_sample=110250\[ms_paused_zend\]/);
+  assert.equal(musicShapeGraph({ none: true }, "in", "out", 8), "[in]anull[out]");
+  // In the mix: shaped before anything joins it; its own end replaces the mix's fade (its last 20 ms only).
+  const gains = mixGains({ speech: null, music: -15 }, false);
+  const shaped = mixFilter(gains, 7.2, [], { shape: { pauses: [{ from: 2, to: 2.5 }], end: { at: 7.5 } }, duration: 8 });
+  assert.match(shaped, /^\[1:a\]aformat=sample_rates=44100:channel_layouts=stereo,volume=1dB\[ms_in\];\[ms_in\]asplit=2/);
+  assert.match(shaped, /\[ms_out\]anull,alimiter=limit=0\.891:level=false,afade=t=out:st=7\.980:d=0\.02\[a\]$/);
+  // Without an end of its own, the mix's fade; without a shape, the mix as before.
+  assert.match(mixFilter(gains, 7.2, [], { shape: { pauses: [{ from: 2, to: 2.5 }] }, duration: 8 }), /afade=t=out:st=7\.20:d=0\.8\[a\]$/);
+  assert.equal(mixFilter(gains, 7.2, [], { shape: { none: true }, duration: 8 }), mixFilter(gains, 7.2));
+  const ducked = mixFilter(mixGains({ speech: -20, music: -15 }, false), 7.2, [], { shape: { pauses: [{ from: 2, to: 2.5 }] }, duration: 8 });
+  assert.match(ducked, /\[ms_out\]anull\[m\];\[m\]\[key\]sidechaincompress/);
+  // Later with the Reel's first image held (a sound she follows): a late start still starts at 0.
+  assert.deepEqual(shiftMusicShape({ pauses: [{ from: 0, to: 0.5 }, { from: 2, to: 2.5 }], end: { at: 7.5, fade: 0.012 } }, 0.2), {
+    pauses: [{ from: 0, to: 0.7 }, { from: 2.2, to: 2.7 }],
+    end: { at: 7.7, fade: 0.012 },
+  });
+  // The live preview: silent in its pauses and after its end (its filters are the render's).
+  assert.deepEqual(musicEnvelope({ pauses: [{ from: 0, to: 0.5 }, { from: 2, to: 2.5 }], end: { at: 7.5 } }, 8, 30), [
+    [0, 0], [14, 0], [15, 1], [59, 1], [60, 0], [74, 0], [75, 1], [224, 1], [225, 0], [241, 0],
+  ]);
+  assert.deepEqual(musicEnvelope({ filters: [{ kind: "radio", from: 0, to: 2 }] }, 8, 30), []);
+  const props = buildReelProps({ ...plan, music_shape: { pauses: [{ from: 2, to: 2.5 }] } } as EditPlan, { template: "libre", clipUrls: { a: "https://x/a.mp4" }, brand: { name: "Studio" }, soundtrack: "https://x/m.mp3" });
+  assert.deepEqual(props.soundtrack?.envelope, [[59, 1], [60, 0], [74, 0], [75, 1]]);
+});
+
+test("a skill's sound effects: on their own moments, all kept a frame apart at any level but off, at their own gain", async () => {
+  const { planCues, pickCues, placeSounds, sfxGain } = await import("./sfx.ts");
+  const plan = {
+    duration: 8,
+    texts: [{ text: "CHEZ LOU", from: 1, to: 3, style: "hook" }],
+    segments: [{ clip_id: "a", in: 0, out: 4 }, { clip_id: "b", in: 0, out: 4 }],
+    sounds: [
+      // A key click on each letter typed 6 images apart, the first on the text's own moment: never pulled onto it.
+      ...[30, 36, 42, 48].map((f) => ({ at: f / 30, sound: "typewriter key click", seconds: 0.5, skill: true, gain: -4 })),
+      { at: 4.1, sound: "soft whoosh", seconds: 1 },
+    ],
+  } as never;
+  const cues = planCues(plan, [{ start: 0, length: 4 }, { start: 4, length: 4 }]);
+  assert.deepEqual(cues.map((c) => [c.at, c.from, c.gain ?? 0]), [[1, "skill", -4], [1.2, "skill", -4], [1.4, "skill", -4], [1.6, "skill", -4], [4, "editor", 0]]);
+  // All kept at the light level, one frame apart (not a quarter of a second), under speech too, lower; a free sound gives way near them.
+  const many = [...[0, 1, 2, 3, 4, 5].map((f) => ({ at: 1 + Math.round((f / 30) * 1000) / 1000, skill: true })), { at: 1.3 }, { at: 1 + 1 / 60, skill: true }];
+  const kept = pickCues(many, { level: "light", duration: 8, speech: [[1.25, 1.4]] });
+  assert.deepEqual(kept.map((c) => [c.at, c.under]), [[1, false], [1.033, false], [1.067, false], [1.1, true], [1.133, true], [1.167, true]]);
+  assert.deepEqual(pickCues(many, { level: "off", duration: 8, speech: [] }), []);
+  // Its gain from its level's target, its peak still under -4 dBFS.
+  assert.equal(sfxGain({ lufs: -30, peak: -20 }, "music", "light", false, -4), sfxGain({ lufs: -30, peak: -20 }, "music", "light") - 4);
+  assert.equal(sfxGain({ lufs: -30, peak: -6 }, "music", "light", false, 6), 2);
+  const library = { "typewriter key click@0.5": { lufs: -26, peak: -10, onset: 0.04, end: 0.12, hit: 0.045 } };
+  const placed = placeSounds(cues, { level: "light", mix: "music", duration: 8, speech: [], library });
+  assert.deepEqual(placed.map((p) => [p.at, p.gain]), [[0.995, 2], [1.195, 2], [1.395, 2], [1.595, 2]]);
+});
+

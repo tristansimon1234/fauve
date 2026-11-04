@@ -243,8 +243,11 @@ export type ReelProps = {
   };
   /** logoNamed false: the logo does not write the name (a mascot, a symbol), the card writes it under it. */
   endCard: { title: string; subtitle: string | null; from: number; logoNamed?: false } | null;
-  /** Edith's music in the live preview (the render gets it mixed in afterwards). */
-  soundtrack?: { src: string; volume?: number; duck?: { volume: number; windows: [number, number][] } } | null;
+  /**
+   * Edith's music in the live preview (the render gets it mixed in afterwards); `envelope`, its model's shape (its
+   * pauses, its end): points (frame, 0–1) to draw straight lines between.
+   */
+  soundtrack?: { src: string; volume?: number; duck?: { volume: number; windows: [number, number][] }; envelope?: [number, number][] } | null;
   /** Its sound effects in the live preview (the render strips them and mixes them afterwards): from its frame, its gain in dB, the part of its file played (s). */
   sfx?: { src: string; key: string; from: number; at: number; gain: number; onset: number; end: number }[];
   /** Her videos kept whole and horizontal, on black above and below. */

@@ -77,28 +77,41 @@ export function soundKey(sound: string, seconds?: number): string {
   return `${words}@${soundSeconds(seconds)}`;
 }
 
+/** Who placed a sound: an animation (from its own start), the editor (pulled onto its cut), a montage skill (on its own moment). */
+export type CueSource = "animation" | "editor" | "skill";
+
 /**
  * Every sound a plan asks for, on the Reel's clock, in order: each animation's from its own start
  * (`starts`, the start and length of each segment, from planTimeline), the editor's pulled onto the
- * cut or the text it was meant for when one is near (its cuts are snapped on the beat after it writes).
+ * cut or the text it was meant for when one is near (its cuts are snapped on the beat after it writes),
+ * a montage skill's where its timeline puts it (a key click on each typed letter is never moved).
  */
 export function planCues(
   plan: Pick<EditPlan, "segments" | "texts" | "layers" | "sounds" | "duration">,
   starts: { start: number; length: number }[],
-): (SfxCue & { key: string; from: "animation" | "editor" })[] {
+): (SfxCue & { key: string; from: CueSource })[] {
   const events = [...starts.map((s) => s.start).filter((t) => t > 0), ...plan.texts.map((t) => t.from)];
   const snap = (at: number) => {
     const near = events.reduce((best, t) => (Math.abs(t - at) < Math.abs(best - at) ? t : best), Number.POSITIVE_INFINITY);
     return Math.abs(near - at) <= SFX_SNAP ? near : at;
   };
-  const cues: (SfxCue & { key: string; from: "animation" | "editor" })[] = [];
-  const add = (c: SfxCue, at: number, from: "animation" | "editor") => {
+  const cues: (SfxCue & { key: string; from: CueSource })[] = [];
+  const add = (c: SfxCue, at: number, from: CueSource) => {
     if (!c.sound?.trim() || !Number.isFinite(at)) return;
     const key = soundKey(c.sound, c.seconds);
     if (key.startsWith("@")) return;
-    cues.push({ at: round3(at), sound: c.sound.trim(), seconds: soundSeconds(c.seconds), key, from, ...(c.asked ? { asked: true } : {}) });
+    cues.push({
+      at: round3(at),
+      sound: c.sound.trim(),
+      seconds: soundSeconds(c.seconds),
+      key,
+      from,
+      ...(c.asked ? { asked: true } : {}),
+      ...(c.skill ? { skill: true } : {}),
+      ...(c.gain ? { gain: c.gain } : {}),
+    });
   };
-  for (const c of plan.sounds ?? []) add(c, snap(c.at), "editor");
+  for (const c of plan.sounds ?? []) add(c, c.skill ? c.at : snap(c.at), c.skill ? "skill" : "editor");
   plan.segments.forEach((s, i) => {
     const span = starts[i];
     if (!isMotionSegment(s) || !span) return;
@@ -114,23 +127,31 @@ export const SFX_MIN_GAP = 0.25;
 /** How much a sound she asked for steps back under speech when the level would have left it out (dB). */
 export const SFX_ASKED_UNDER = -8;
 
+/** The closest two of a montage skill's sounds may fall (s): one frame (a key click on each letter typed 3 images apart, the six « tchh » of an opening). */
+export const SFX_SKILL_GAP = 1 / 30;
+
 /**
  * The cues kept at a level, in order: far enough apart, a few per second at most, none while
  * someone speaks when light (`speech`: spans in seconds); `under` marks one kept under speech.
  * The ones she asked for (`asked`) are all kept, a quarter of a second apart at least, under a voice
  * too (lower): « un petit clic à chaque mot » is hers, never thinned by the level (Tristan's Paris Reel lost its every click).
+ * A montage skill's (`skill`) are its model's, played as it plays them: all kept, one frame apart at least, under speech
+ * too (lower), and first (another sound near one gives way).
  */
-export function pickCues<C extends { at: number; asked?: boolean }>(cues: C[], options: { level: SfxLevel; duration: number; speech: [number, number][] }): (C & { under: boolean })[] {
+export function pickCues<C extends { at: number; asked?: boolean; skill?: boolean }>(cues: C[], options: { level: SfxLevel; duration: number; speech: [number, number][] }): (C & { under: boolean })[] {
   if (options.level === "off") return [];
   const rules = SFX_RULES[options.level];
   const cap = Math.min(rules.max, Math.max(1, Math.round(options.duration * rules.perSecond)));
   const kept: (C & { under: boolean })[] = [];
   let free = 0;
-  for (const cue of [...cues].sort((a, b) => Number(Boolean(b.asked)) - Number(Boolean(a.asked)) || a.at - b.at)) {
+  const rank = (c: C) => (c.skill ? 2 : c.asked ? 1 : 0);
+  for (const cue of [...cues].sort((a, b) => rank(b) - rank(a) || a.at - b.at)) {
     const under = options.speech.some(([from, to]) => cue.at >= from - 0.15 && cue.at <= to + 0.15);
-    const near = kept.some((k) => Math.abs(k.at - cue.at) < (cue.asked ? SFX_MIN_GAP : rules.gap));
+    // (A frame apart on the Reel's clock, its times rounded to the millisecond.)
+    const gap = cue.skill ? SFX_SKILL_GAP - 0.005 : cue.asked ? SFX_MIN_GAP : rules.gap;
+    const near = kept.some((k) => Math.abs(k.at - cue.at) < gap);
     if (near) continue;
-    if (!cue.asked) {
+    if (!cue.asked && !cue.skill) {
       if (free >= cap || (under && rules.underSpeech === null)) continue;
       free++;
     }
@@ -139,10 +160,13 @@ export function pickCues<C extends { at: number; asked?: boolean }>(cues: C[], o
   return kept.sort((a, b) => a.at - b.at);
 }
 
-/** The gain (dB) that sets a sound at its level in a mix: its loudest 400 ms on the target, its peak under SFX_PEAK. */
-export function sfxGain(facts: Pick<SoundFacts, "lufs" | "peak">, mix: MixCase, level: Exclude<SfxLevel, "off">, under = false): number {
+/**
+ * The gain (dB) that sets a sound at its level in a mix: its loudest 400 ms on the target (`offset` dB from it: a
+ * skill's soft tick, its impact), its peak under SFX_PEAK.
+ */
+export function sfxGain(facts: Pick<SoundFacts, "lufs" | "peak">, mix: MixCase, level: Exclude<SfxLevel, "off">, under = false, offset = 0): number {
   const rules = SFX_RULES[level];
-  const target = rules.target[mix] + (under ? (rules.underSpeech ?? SFX_ASKED_UNDER) : 0);
+  const target = rules.target[mix] + (under ? (rules.underSpeech ?? SFX_ASKED_UNDER) : 0) + offset;
   let gain = target - (facts.lufs !== null && Number.isFinite(facts.lufs) ? facts.lufs : -16);
   if (facts.peak !== null && Number.isFinite(facts.peak)) gain = Math.min(gain, SFX_PEAK - facts.peak);
   return round1(clamp(gain, -40, 12));
@@ -153,7 +177,7 @@ export function sfxGain(facts: Pick<SoundFacts, "lufs" | "peak">, mix: MixCase, 
  * level, each one the library has, at its gain for the mix, its attack on its moment.
  */
 export function placeSounds(
-  cues: { at: number; key: string; asked?: boolean }[],
+  cues: { at: number; key: string; asked?: boolean; skill?: boolean; gain?: number }[],
   options: { level: SfxLevel; mix: MixCase; duration: number; speech: [number, number][]; library: Record<string, SoundFacts> },
 ): SoundPlacement[] {
   if (options.level === "off") return [];
@@ -167,7 +191,7 @@ export function placeSounds(
     const onset = facts.onset + Math.max(0, -start);
     const at = Math.max(0, start);
     const end = Math.min(facts.end, onset + SFX_EDGE.max, onset + Math.max(0.05, options.duration - at));
-    return { key: c.key, at: round3(at), gain: sfxGain(facts, options.mix, level, c.under), onset: round3(onset), end: round3(Math.max(onset + 0.05, end)) };
+    return { key: c.key, at: round3(at), gain: sfxGain(facts, options.mix, level, c.under, c.gain ?? 0), onset: round3(onset), end: round3(Math.max(onset + 0.05, end)) };
   });
 }
 
