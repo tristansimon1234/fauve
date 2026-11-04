@@ -118,6 +118,8 @@ export const eventail: MontageSkill = {
   bpm: BPM,
   shots: [5, 12],
   files: [5, 12],
+  // Its code draws her shots in black and white on its bordeaux: its model's finish keeps only its contrast and grain.
+  finish: { saturation: 0 },
   how: "Sur un fond bordeaux, un petit carré bordé de blanc au milieu montre le cœur de son premier plan ; une bande du même plan en noir et blanc arrive à chaque temps, des coins et des côtés, et toutes convergent vers le carré comme les branches d'une étoile ; au temps suivant le plan entier, dans un fin cadre bordeaux ; puis ses plans en noir et blanc coupés tous les deux temps dans le cadre ; la fin sur un noir bleuté, une petite ligne blanche au milieu comme une signature, et une ligne rouge plus petite dessous.",
   end: true,
   texts: [

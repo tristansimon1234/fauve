@@ -1,13 +1,16 @@
 import type { MontageSkill } from "./skills.ts";
 import { cadre } from "./skills/cadre.ts";
+import { coulisses } from "./skills/coulisses.ts";
 import { decode } from "./skills/decode.ts";
 import { ecranPartage } from "./skills/ecran-partage.ts";
+import { eventail } from "./skills/eventail.ts";
 import { gaufre } from "./skills/gaufre.ts";
 import { journee } from "./skills/journee.ts";
 import { mosaique } from "./skills/mosaique.ts";
 import { nike } from "./skills/nike.ts";
 import { photoDump } from "./skills/photo-dump.ts";
 import { pile } from "./skills/pile.ts";
+import { pixel } from "./skills/pixel.ts";
 import { quatreCoins } from "./skills/quatre-coins.ts";
 
 // The montage skills written so far, by the key of the house model each one plays (skills.ts). Server side only
@@ -16,14 +19,17 @@ import { quatreCoins } from "./skills/quatre-coins.ts";
 
 export const MONTAGE_SKILLS: Record<string, MontageSkill> = {
   cadre,
+  coulisses,
   decode,
   "ecran-partage": ecranPartage,
+  eventail,
   gaufre,
   journee,
   mosaique,
   nike,
   "photo-dump": photoDump,
   pile,
+  pixel,
   "quatre-coins": quatreCoins,
 };
 
