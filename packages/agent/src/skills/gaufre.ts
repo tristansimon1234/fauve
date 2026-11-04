@@ -96,9 +96,9 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
     const size = Math.round(Math.max(120, Math.min(fast ? 210 : 400, 800 / (longest * 0.4))));
     const n = count(title);
     // The ink takes about two thirds of the card's time (its five beats: slower at a slower tempo), the line inks last.
-    const k = fast ? 1 : Math.max(0.6, Math.min(1.5, ((end ? endAt : durationInFrames) - PAPER) / 107));
-    const each = fast ? 9 : Math.round(20 * k);
-    const gap = fast ? Math.max(1, Math.min(3, Math.round(12 / Math.max(1, n - 1)))) : Math.max(2, Math.min(Math.round(14 * k), Math.round((50 * k) / Math.max(1, n - 1))));
+    const pace = fast ? 1 : Math.max(0.6, Math.min(1.5, ((end ? endAt : durationInFrames) - PAPER) / 107));
+    const each = fast ? 9 : Math.round(20 * pace);
+    const gap = fast ? Math.max(1, Math.min(3, Math.round(12 / Math.max(1, n - 1)))) : Math.max(2, Math.min(Math.round(14 * pace), Math.round((50 * pace) / Math.max(1, n - 1))));
     const titleDone = at + 3 + gap * Math.max(0, n - 1) + each;
     // The line: about a fifth of the title's size, never wider than the title, spread over its width when long enough.
     const m = small ? small.length : 0;
@@ -107,8 +107,8 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
     // Spread over the title's width when it nearly fills it (the original's line); a short one centred, spaced.
     const justify = m > 6 && m * 0.72 * lineSize >= titleWidth * 0.6;
     const lineAt = fast ? at + 8 : Math.round(at + (titleDone - at) * 0.6);
-    const lineEach = fast ? 7 : Math.round(12 * k);
-    const lineGap = fast ? 1 : Math.max(1, Math.min(3, Math.round((20 * k) / Math.max(1, count(small || "") - 1))));
+    const lineEach = fast ? 7 : Math.round(12 * pace);
+    const lineGap = fast ? 1 : Math.max(1, Math.min(3, Math.round((20 * pace) / Math.max(1, count(small || "") - 1))));
     let k = 0;
     const titleRows = lines.map((l, r) =>
       h("div", { key: "t" + r, style: { whiteSpace: "nowrap" } },
