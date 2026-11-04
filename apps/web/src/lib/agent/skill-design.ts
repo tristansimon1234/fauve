@@ -103,6 +103,8 @@ export async function designSkill(params: {
   const files = skillFiles(params.mediaIds, params.clips, params.photos);
   if (!files.length) return null;
   const n = skillShotCount(skill, files);
+  // A model Edith picked gives the form, never the silence: its optional title is written (dressedFloorNote's floor).
+  const wordsWanted = Boolean(params.followed.dressed) && !skill.texts.some((t) => t.required) && skill.texts.length > 0;
   // A correction keeps its words but what her request changes: the words of its texts, by slot.
   const current = params.previous?.skill?.key === skill.key ? Object.fromEntries(skill.texts.flatMap((t) => {
     const same = params.previous!.texts.filter((x) => x.style === t.role);
@@ -118,6 +120,7 @@ export async function designSkill(params: {
     request: params.brief?.slice(0, BRIEF_MAX) || "Un Reel fait sur ce modèle, avec ses fichiers.",
     contract: contractLines(params.contract),
     ...(current && Object.keys(current).length ? { current } : {}),
+    ...(wordsWanted ? { wordsWanted } : {}),
   });
   // One small call fills it; `again`: its answer and what the check said of it, for a second try.
   const fillIt = async (again?: { answer: SkillFillAnswer; note: string }): Promise<SkillFillAnswer | null> => {
@@ -142,7 +145,7 @@ export async function designSkill(params: {
   const facts: MediaFacts = { clips: Object.fromEntries(params.clips.map((c) => [c.media_id, c.analysis])), photos: params.photos, tracks: {} };
   // Her Reel from an answer: the plan by code, dressed as a model followed and finished as any montage, then checked.
   const made = async (answer: SkillFillAnswer): Promise<{ plan: EditPlan; error?: string } | null> => {
-    const fill = readSkillFill(skill, files, n, answer);
+    const fill = readSkillFill(skill, files, n, answer, { wordsWanted });
     if (!fill) return null;
     const plan = skillPlan({ skill, name, files, fill });
     // The model's lettering when she chose it (her charter's when Edith picked it), and its finish (its grade, its grain).

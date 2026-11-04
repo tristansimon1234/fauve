@@ -54,15 +54,19 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   // A video plays a cycle long, centred on the moment its picture is whole; the first picture brought back holds its
   // first image, as the Reel starts on it.
   const playAt = (w, k) => (w === 0 ? undefined : w >= n ? n * C : Math.max(0, k * C - C / 2));
-  const tile = (t) => {
-    const w = waveOf(t.j);
-    const paper = end && w >= n;
+  // Each picture on screen drawn once, full frame, seen through its tiles only (the paper shows in the gaps).
+  const groups = {};
+  tiles.forEach((t) => { const w = waveOf(t.j); (groups[w] = groups[w] || []).push(t); });
+  const layers = Object.keys(groups).map((key) => {
+    const w = Number(key);
+    const d = groups[key].map((t) => "M" + t.x + " " + t.y + "h" + t.w + "v" + t.h + "h" + -t.w + "Z").join(" ");
+    const paper = Boolean(end) && w >= n;
     const k = w % Math.max(1, n);
-    return h("div", { key: "t" + t.j, style: { position: "absolute", left: t.x, top: t.y, width: t.w, height: t.h, overflow: "hidden", backgroundColor: SHEET } },
-      paper || !n ? null : h(Footage, { shot: k, at: playAt(w, k), style: { left: -t.x, top: -t.y, width, height } }));
-  };
+    return h("div", { key: "w" + w, style: { position: "absolute", left: 0, top: 0, width, height, clipPath: "path('" + d + "')", backgroundColor: SHEET } },
+      paper || !n ? null : h(Footage, { shot: k, at: playAt(w, k), style: { left: 0, top: 0, width, height } }));
+  });
 
-  // Any text of the Reel (none in its slots): a plain line on a paper label at the top, so nothing she wrote is lost.
+  // Its optional title (and any other text of the Reel): a plain line on a paper label at the top, so nothing she wrote is lost.
   const extra = reelTexts.filter((t) => frame >= t.from && frame < t.to && frame < endAt).map((t, i) =>
     h(FitText, { key: "x" + i, style: { position: "absolute", left: 140, width: width - 280, top: 150 + i * 120, height: 104 }, innerStyle: { fontFamily: body, fontWeight: 500, fontSize: 50, lineHeight: 1.15, color: INK, textAlign: "center" } },
       h("span", { style: { background: SHEET, padding: "8px 22px" } }, t.text)));
@@ -78,7 +82,7 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
           : null)
     : null;
 
-  return h(AbsoluteFill, { style: { backgroundColor: PAPER } }, tiles.map(tile), extra, ending);
+  return h(AbsoluteFill, { style: { backgroundColor: PAPER } }, layers, extra, ending);
 }`;
 
 export const mosaique: MontageSkill = {
@@ -89,7 +93,7 @@ export const mosaique: MontageSkill = {
   files: [4, 10],
   how: "Ses images plein cadre, coupées en une grille de 3 × 4 cases posées sur du papier clair ; l'image suivante remplace les cases une à une dans l'ordre de lecture, une case tous les sixièmes de temps, chaque vague longue de deux temps, si bien qu'une case change toujours ; la dernière vague ramène la première image et le Reel tourne en boucle.",
   end: true,
-  texts: [],
+  texts: [{ slot: "titre", role: "hook", want: "facultatif : un titre court posé sur une étiquette de papier en haut, le temps de la première vague (son nom, son plat, son moment), seulement quand le Reel a besoin de mots", max: 28, required: false }],
   timeline(n, { end }) {
     const spans = beatSpans(BPM, Array.from({ length: n }, (_, i) => (i < n - 1 ? CYCLE : CYCLE + (end ? CARD : 0))));
     const duration = spans.at(-1)!.end;
@@ -98,7 +102,7 @@ export const mosaique: MontageSkill = {
         ? "la plus belle image, plein cadre : elle ouvre la grille et la referme en boucle (un plat, un produit ou une création, serré)"
         : "une image serrée et pleine de ses plats, produits ou réalisations, différente de la précédente, vue en entier à travers la grille",
     );
-    return { duration, shots: spans.map((s, i) => ({ ...s, want: wants[i]! })), texts: {}, marks: { cycle: toFrame(CYCLE * BEAT) } };
+    return { duration, shots: spans.map((s, i) => ({ ...s, want: wants[i]! })), texts: { titre: { from: 0, to: Math.min(duration, Math.max(2.6, spans[0]!.end)) } }, marks: { cycle: toFrame(CYCLE * BEAT) } };
   },
   code: CODE,
 };

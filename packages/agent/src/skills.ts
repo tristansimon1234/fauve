@@ -147,7 +147,7 @@ export function fitWords(text: string, max: number): string {
  * replaced by her files in turn), a video's start inside it; each text cut to its place; the ending only when the
  * skill draws one. Null when a required text is missing (the filler failed: the editor makes the Reel).
  */
-export function readSkillFill(skill: Pick<MontageSkill, "texts" | "end">, files: SkillFile[], n: number, answer: SkillFillAnswer): SkillFill | null {
+export function readSkillFill(skill: Pick<MontageSkill, "texts" | "end">, files: SkillFile[], n: number, answer: SkillFillAnswer, options: { wordsWanted?: boolean } = {}): SkillFill | null {
   if (!files.length) return null;
   const known = new Map(files.map((f) => [f.id, f]));
   let turn = 0;
@@ -161,7 +161,7 @@ export function readSkillFill(skill: Pick<MontageSkill, "texts" | "end">, files:
     const written = answer.texts.find((w) => w.slot === t.slot)?.text ?? "";
     const fitted = fitWords(written, t.max);
     if (fitted) texts[t.slot] = fitted;
-    else if (t.required) return null;
+    else if (t.required || options.wordsWanted) return null;
   }
   const title = fitWords(answer.end?.title ?? "", 40);
   const end = skill.end && title ? { title, ...(answer.end?.subtitle?.trim() ? { subtitle: fitWords(answer.end.subtitle, 60) } : {}) } : null;
@@ -270,7 +270,8 @@ Then cast her files on its slots (« cases », in order: each with its length an
 Then write its texts, in French (what her customers read), each in its slot (« textes »: what it says and its most characters):
 - words she gives (« contrat », her request) are kept as she wrote them, only spelled right (accents, apostrophes, hyphens, « WhatsApp »), never one of her typos, never rewritten;
 - otherwise words a good creator would write for this business: concrete, specific to it, never an ad slogan, a promise or a formula; nothing invented (no price, hour, place, offer or review that is not given);
-- each within its most characters (count them), in normal case: the code sets the capitals when the model has them.
+- each within its most characters (count them), in normal case: the code sets the capitals when the model has them;
+- an optional slot (obligatoire false) is left empty unless her request or the Reel needs those words; a required one is always written.
 
 "end": only when the model has an ending (« fin ») and she has something to end on (an offer, an opening, a date, in her request or what we know): its title (40 characters at most) and a subtitle or empty; otherwise null.
 "why": one sentence for her in French (tu), what you chose and why, in plain words.`;
@@ -286,6 +287,11 @@ export function skillFillInput(input: {
   contract?: string[];
   /** A correction: the words it has now, kept except what her request changes. */
   current?: Record<string, string>;
+  /**
+   * Words on screen wanted even in its optional slots: a model Edith picked as this Reel's form gives the form, never
+   * the silence (Tristan: dressedFloorNote), so a model without words of its own still writes its title.
+   */
+  wordsWanted?: boolean;
 }) {
   const line = input.skill.timeline(input.n, { end: input.skill.end });
   return {
@@ -304,7 +310,7 @@ export function skillFillInput(input: {
       fin: input.skill.end ? "le modèle peut finir sur une carte (une offre, une annonce)" : "aucune",
     },
     cases: line.shots.map((s, i) => ({ case: i + 1, duree: `${round(s.end - s.start)} s`, veut: s.want })),
-    textes: input.skill.texts.map((t) => ({ slot: t.slot, dit: t.want, max_caracteres: t.max, obligatoire: t.required })),
+    textes: input.skill.texts.map((t) => ({ slot: t.slot, dit: t.want, max_caracteres: t.max, obligatoire: t.required || Boolean(input.wordsWanted) })),
     ...(input.current ? { textes_actuels: input.current } : {}),
     fichiers: input.files.map((f) =>
       f.photo

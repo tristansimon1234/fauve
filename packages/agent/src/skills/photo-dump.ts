@@ -38,7 +38,7 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
         h(Footage, { shot: cur, style: { left: 0, top: 0, width: w, height: hh } }))
     : null;
 
-  // Any text of the Reel (none in its slots): a plain line on a white pill above the pictures, so nothing she wrote is lost.
+  // Its optional title (and any other text of the Reel): a plain line on a white pill above the pictures, so nothing she wrote is lost.
   const extra = reelTexts.filter((t) => frame >= t.from && frame < t.to && frame < endAt).map((t, i) =>
     h(FitText, { key: "x" + i, style: { position: "absolute", left: 140, width: width - 280, top: 84 + i * 104, height: 96 }, innerStyle: { fontFamily: body, fontWeight: 600, fontSize: 50, lineHeight: 1.15, color: INK, textAlign: "center" } },
       h("span", { style: { background: "#ffffff", padding: "6px 20px", borderRadius: 40 } }, t.text)));
@@ -65,7 +65,7 @@ export const photoDump: MontageSkill = {
   files: [8, 20],
   how: "Ses photos et petits passages de vidéo, un à la fois, posés d'un coup au milieu d'une page gris très clair, chacun à sa forme sur la même largeur (de temps en temps un plus petit), sans bord, sans ombre ni texte, un nouveau tous les demi-temps, comme un carnet qu'on feuillette ; le dernier un peu plus long.",
   end: true,
-  texts: [],
+  texts: [{ slot: "titre", role: "hook", want: "facultatif : un titre court dans une pastille blanche au-dessus de la première image, comme sur Instagram (sa semaine, son nom, son moment), seulement quand le Reel a besoin de mots", max: 28, required: false }],
   timeline(n, { end }) {
     const spans = beatSpans(BPM, Array.from({ length: n }, (_, i) => (i < n - 1 ? EACH : LAST + (end ? CARD : 0))));
     const duration = spans.at(-1)!.end;
@@ -76,7 +76,7 @@ export const photoDump: MontageSkill = {
           ? "une photo ou un court passage de vidéo de sa semaine, chacun différent du précédent (un détail, un lieu, une personne, un geste)"
           : "la dernière image, un peu plus longue : une photo calme ou un passage qui finit bien",
     );
-    return { duration, shots: spans.map((s, i) => ({ ...s, want: wants[i]! })), texts: {}, marks: {} };
+    return { duration, shots: spans.map((s, i) => ({ ...s, want: wants[i]! })), texts: { titre: { from: 0, to: Math.min(duration, 2.6) } }, marks: {} };
   },
   code: CODE,
 };

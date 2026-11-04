@@ -20,12 +20,15 @@ const CARD = 3;
 const CARD_SECONDS = 1.6;
 
 /**
- * The gaps between two photos landing (beats): the model lays a photo every sixth of a beat; fewer photos land on a
- * slower subdivision so the pile still takes a few seconds to build, and the last ones land twice slower (it settles).
+ * How the photos land (beats): the model lays a photo every sixth of a beat; fewer photos land on a slower subdivision
+ * so the pile still takes a few seconds to build, and the last ones land twice slower (it settles).
  */
+function cadence(n: number): { step: number; slow: number } {
+  return { step: n <= 12 ? 1 / 2 : n <= 18 ? 1 / 3 : n <= 24 ? 1 / 4 : 1 / 6, slow: n < 10 ? 2 : 3 };
+}
+/** The gaps between two photos landing (beats), as its code lays them. */
 function gaps(n: number): number[] {
-  const step = n <= 12 ? 1 / 2 : n <= 18 ? 1 / 3 : n <= 24 ? 1 / 4 : 1 / 6;
-  const slow = n < 10 ? 2 : 3;
+  const { step, slow } = cadence(n);
   return Array.from({ length: Math.max(0, n - 1) }, (_, k) => (k >= n - 1 - slow ? 2 * step : step));
 }
 
@@ -34,8 +37,15 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const frame = useCurrentFrame();
   const mark = (k, d) => { const v = Number(texts && texts[k]); return Number.isFinite(v) ? v : d; };
   const n = shots.length;
-  const first = n ? shots[0].from : 0;
-  const lastAt = n ? shots[n - 1].from : 0;
+  // Where each photo lands (frames): every "step" beats, the last "slow" ones twice slower, the first at the first
+  // image. Each video plays its passage from the moment it lands (its slot is only how long it moves).
+  const BEAT = mark("beat", 16.36);
+  const STEP = mark("step", 0.5);
+  const SLOW = mark("slow", 3);
+  const landAt = [];
+  for (let k = 0, t = 0; k < n; k++) { landAt.push(Math.round(t * BEAT)); t += k >= n - 1 - SLOW ? 2 * STEP : STEP; }
+  const first = n ? landAt[0] : 0;
+  const lastAt = n ? landAt[n - 1] : 0;
   // A photo leaves this long after it landed; the words stay alone this long before the end (or the card).
   const SHIFT = mark("shift", lastAt - first + 9);
   const ALONE = mark("alone", 33);
@@ -47,9 +57,9 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   // A phone number or a date never breaks between its digits.
   const keep = (s) => String(s || "").replace(/(\d) (?=\d)/g, "$1\u00a0");
 
-  // 1. Her photos, each at its own shape (cropped between 3:4 and 7:5), landing at once where the model lays them: its
-  // zigzag down the page (the centres measured on it, in px of the frame), bigger when there are fewer of them. Each
-  // leaves at the same pace it came, the first laid first; squeezed if the Reel is shorter than planned.
+  // 1. Her photos, each at its own shape (cropped between a tall 0,72 and a wide 1,6), landing at once where the model
+  // lays them: its zigzag down the page (the centres measured on it, in px of the frame), bigger when there are fewer
+  // of them. Each leaves at the same pace it came, the first laid first; squeezed if the Reel is shorter than planned.
   const PX = [350, 424, 568, 722, 756, 618, 432, 362, 342, 477, 672, 732, 786, 624, 430, 298, 358, 540, 741, 766, 722, 516, 418, 303, 426, 586, 734, 816, 675, 470, 261, 309, 466, 668, 824];
   const PY = [512, 453, 426, 426, 528, 555, 588, 668, 756, 735, 759, 789, 848, 848, 897, 960, 1048, 992, 969, 1058, 1114, 1146, 1124, 1215, 1245, 1276, 1269, 1320, 1350, 1308, 1364, 1392, 1436, 1478, 1476];
   const along = (arr, t) => { const x = t * (arr.length - 1); const i = Math.max(0, Math.min(arr.length - 2, Math.floor(x))); return arr[i] + (arr[i + 1] - arr[i]) * (x - i); };
@@ -58,17 +68,17 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const L0 = Math.min(first + SHIFT, endAt - ALONE);
   const squeeze = Math.max(0, Math.min(1, (endAt - ALONE - L0) / span));
   const pile = shots.map((s, k) => {
-    const leave = Math.round(L0 + (s.from - first) * squeeze);
-    if (frame < s.from || frame >= leave) return null;
+    const leave = Math.round(L0 + (landAt[k] - first) * squeeze);
+    if (frame < landAt[k] || frame >= leave) return null;
     const a = Math.max(0.72, Math.min(1.6, Number(s.aspect) || 1));
-    const S = side * (0.88 + 0.24 * random("pile-size-" + k));
+    const S = side * (0.82 + 0.36 * random("pile-size-" + k));
     const w = Math.round(a >= 1 ? S : S * a);
     const hh = Math.round(a >= 1 ? S / a : S);
     const t = n > 1 ? k / (n - 1) : 0;
     const cx = Math.max(24 + w / 2, Math.min(width - 24 - w / 2, along(PX, t)));
     const cy = Math.max(150 + hh / 2, Math.min(1770 - hh / 2, along(PY, t)));
     return h("div", { key: "p" + k, style: { position: "absolute", left: Math.round(cx - w / 2), top: Math.round(cy - hh / 2), width: w, height: hh, overflow: "hidden" } },
-      h(Footage, { shot: k, style: { left: 0, top: 0, width: w, height: hh } }));
+      h(Footage, { shot: k, at: landAt[k], style: { left: 0, top: 0, width: w, height: hh } }));
   });
 
   // 2. Its words, in front of the pile: one per line, in pairs (a wider gap between two pairs), very condensed yellow
@@ -135,25 +145,33 @@ export const pile: MontageSkill = {
     },
   ],
   timeline(n, { end }) {
-    const between = gaps(n);
-    const build = between.reduce((a, b) => a + b, 0);
-    // The last photo laid stays to the end: the hold, the pile leaving at its own pace, the words alone, the card.
-    const tail = HOLD + build + (end ? ALONE_BEFORE_CARD + CARD : ALONE);
-    const spans = beatSpans(BPM, [...between, tail]);
+    const { step, slow } = cadence(n);
+    const build = gaps(n).reduce((a, b) => a + b, 0);
+    // The build, the full pile held, the pile leaving at the pace it came, the words alone (or a beat, then the card).
+    const beats = build + HOLD + build + (end ? ALONE_BEFORE_CARD + CARD : ALONE);
+    // Its code lays each photo on its own beat subdivision and plays a video from there: the slots only say how long
+    // each one moves, the same for all (no passage longer than the others, and an even montage if the code cannot run).
+    const spans = beatSpans(BPM, Array.from({ length: n }, () => beats / Math.max(1, n)));
     const duration = spans.at(-1)!.end;
     const wants = spans.map((_, i) =>
       i === 0
         ? "la première photo, posée en haut de la page : la plus forte de son travail"
         : i < spans.length - 1
-          ? "une photo ou un passage de son travail, posé d'un coup sur la pile"
-          : "la dernière posée, en bas de la pile, qui reste jusqu'à la fin (une photo, ou une vidéo d'au moins 3 s)",
+          ? "une photo ou un passage de son travail, posé d'un coup sur la pile (une vidéo bouge un instant juste après s'être posée)"
+          : "la dernière posée, en bas de la pile : elle reste la dernière avant que les mots finissent seuls",
     );
     return {
       duration,
       shots: spans.map((s, i) => ({ ...s, want: wants[i]! })),
       // Its words are there from the first image to the end, or to the card.
       texts: { mots: { from: 0, to: Math.round((end ? duration - CARD_SECONDS : duration) * 100) / 100 } },
-      marks: { shift: toFrame((build + HOLD) * BEAT), alone: toFrame((end ? ALONE_BEFORE_CARD : ALONE) * BEAT) },
+      marks: {
+        beat: BEAT * 30,
+        step,
+        slow,
+        shift: toFrame((build + HOLD) * BEAT),
+        alone: toFrame((end ? ALONE_BEFORE_CARD : ALONE) * BEAT),
+      },
     };
   },
   code: CODE,

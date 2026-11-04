@@ -1414,3 +1414,16 @@ test("the motion designer keeps a skill's code but for what her request needs", 
   assert.match(motionDesignerPrompt({ skill: true }).parts, /Never remove, shrink or tame its signature moment/);
   assert.doesNotMatch(motionDesignerPrompt({ example: true }).parts, /montage skill/);
 });
+
+test("a skill without words of its own writes its title when Edith picked the model", async () => {
+  const { mosaique } = await import("./skills/mosaique.ts");
+  const { readSkillFill, skillFillInput } = await import("./skills.ts");
+  const files = [{ id: "a", photo: true, seconds: 0 }];
+  const answer = { fits: true, missing: "", shots: [{ file: "a", at: 0 }], texts: [], end: null, why: "" };
+  // Her pick: as the model, no words.
+  assert.ok(readSkillFill(mosaique, files, 4, answer));
+  // Edith's pick: the form, never the silence.
+  assert.equal(readSkillFill(mosaique, files, 4, answer, { wordsWanted: true }), null);
+  const input = skillFillInput({ skill: mosaique, name: "Mosaïque", n: 4, files, business: {}, request: "", wordsWanted: true });
+  assert.equal(input.textes[0]!.obligatoire, true);
+});
