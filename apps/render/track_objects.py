@@ -7,8 +7,11 @@
 # SubjectBox, SubjectOutline or Outline given `object`); the engine reads the name there (objectsDrawn). On one of her
 # photos (`photo`), the object is found on the photo itself and cut out once (a glass on a table, the cup she holds),
 # as one still image the size of the photo: a word then runs round it or behind it on a photo as on a video.
+# « every window » follows each window seen (at most EVERY_MAX), together one object; an object in separate pieces (the
+# letters of a sign, the bulbs of a garland, each of « every … ») gives them in reading order (`parts`), so an
+# animation lights them one by one (Tristan: « enseigne, fenêtre, image qui a de quoi faire un effet stylé »).
 # Usage: python -I track_objects.py jobs.json → prints {"<id>": { still, frames, keys, people, top, boxes, contours,
-# found, uploaded } | { error }}. jobs.json: [{ id, url (the clip or the photo, signed) or src (a local file), from, to,
+# found, parts?, uploaded } | { error }}. jobs.json: [{ id, url (the clip or the photo, signed) or src (a local file), from, to,
 # name, photo?, upload?: { webm, png }, out? }]. DETECTOR_MODEL and TRACKER_MODEL: the models' folders; OBJECTS_CPU=1
 # runs on a CPU.
 import json
@@ -27,6 +30,11 @@ CPU = os.environ.get("OBJECTS_CPU") == "1"
 FOUND = 0.3
 # The images of the passage the detector looks at: its middle first, then around it.
 LOOKS = (0.5, 0.3, 0.7, 0.15, 0.85)
+# « every window », « every lamp »: each one seen is followed (at most this many), together one object in pieces.
+EVERY = "every "
+EVERY_MAX = 12
+# The most pieces an object is told in (the letters of a sign, the windows of a facade, the bulbs of a garland).
+PARTS_MAX = 24
 
 
 def models():
@@ -44,14 +52,42 @@ def models():
     return device, dtype, detector, tracker
 
 
+def phrase(name):
+    """What the detector reads for a name: lower case, ending with a full stop (Grounding DINO's way), without « every »."""
+    text = name.strip().lower()
+    if text.startswith(EVERY):
+        text = text[len(EVERY):]
+    return text.rstrip(".").strip() + "."
+
+
+def distinct(boxes, scores):
+    """The different things seen (box, score), surest first: a box mostly inside a surer one, or around it, is that one again."""
+    kept = []
+    for box, score in sorted(zip(boxes, scores), key=lambda b: -b[1]):
+        x1, y1, x2, y2 = box
+        area = max(1e-6, (x2 - x1) * (y2 - y1))
+        same = False
+        for other, _ in kept:
+            inter = max(0.0, min(x2, other[2]) - max(x1, other[0])) * max(0.0, min(y2, other[3]) - max(y1, other[1]))
+            if inter / area > 0.6 or inter / max(1e-6, (other[2] - other[0]) * (other[3] - other[1])) > 0.6:
+                same = True
+                break
+        if not same:
+            kept.append((box, score))
+    return kept
+
+
 def find(frames, name, detector, device):
-    """Where the object is seen best on a few images of the passage: (image, [x1, y1, x2, y2] px, score), or None."""
+    """
+    Where the object is seen best on a few images of the passage: (image, [[x1, y1, x2, y2] px], score), or None; for
+    « every … », every one seen on the image where most are (each window of a facade), surest first.
+    """
     import torch
     from PIL import Image
 
     processor, model = detector
-    # Grounding DINO reads a lower-case phrase ending with a full stop.
-    text = name.strip().lower().rstrip(".") + "."
+    every = name.strip().lower().startswith(EVERY)
+    text = phrase(name)
     best = None
     for share in LOOKS:
         k = min(len(frames) - 1, max(0, int(round(share * (len(frames) - 1)))))
@@ -60,34 +96,152 @@ def find(frames, name, detector, device):
         with torch.inference_mode():
             outputs = model(**inputs)
         found = processor.post_process_grounded_object_detection(outputs, inputs.input_ids, threshold=FOUND, text_threshold=0.25, target_sizes=[(h, w)])[0]
-        for box, score in zip(found["boxes"].tolist(), found["scores"].tolist()):
-            if best is None or score > best[2]:
-                best = (k, [float(v) for v in box], float(score))
-        # Clearly seen on the middle image: no need to look further.
-        if best and best[2] >= 0.5:
+        seen = distinct([[float(v) for v in b] for b in found["boxes"].tolist()], [float(s) for s in found["scores"].tolist()])
+        if not seen:
+            continue
+        kept = seen[:EVERY_MAX] if every else seen[:1]
+        rank = (len(kept), kept[0][1])
+        if best is None or rank > best[3]:
+            best = (k, [b for b, _ in kept], kept[0][1], rank)
+        # Clearly seen on the middle image: no need to look further (every one of them: all the images looked at).
+        if best[2] >= 0.5 and not every:
             break
-    return best
+    return best[:3] if best else None
 
 
-def track(frames, k, box, tracker, device, dtype, size):
-    """The object at every image, as a soft cut-out (0 to 1) at `size` (w, h), followed both ways from image k."""
+def track(frames, k, boxes, tracker, device, dtype, size):
+    """Each object at every image, as soft cut-outs (0 to 1) at `size` (w, h), followed both ways from image k: a list of images per box."""
     import cv2
     import numpy as np
     import torch
 
     processor, model = tracker
     session = processor.init_video_session(video=list(frames), inference_device=device, dtype=dtype)
-    processor.add_inputs_to_inference_session(inference_session=session, frame_idx=k, obj_ids=1, input_boxes=[[box]])
-    masks = {}
+    ids = list(range(1, len(boxes) + 1))
+    processor.add_inputs_to_inference_session(inference_session=session, frame_idx=k, obj_ids=ids if len(ids) > 1 else 1, input_boxes=[boxes])
+    masks = [{} for _ in ids]
     with torch.inference_mode():
         model(inference_session=session, frame_idx=k)
         for reverse in (False, True):
             for out in model.propagate_in_video_iterator(session, start_frame_idx=k, reverse=reverse):
                 logits = processor.post_process_masks([out.pred_masks.float()], original_sizes=[[session.video_height, session.video_width]], binarize=False)[0]
-                prob = torch.sigmoid(logits[0, 0]).cpu().numpy().astype(np.float32)
-                masks[out.frame_idx] = cv2.resize(prob, size, interpolation=cv2.INTER_LINEAR)
+                for j in range(len(ids)):
+                    prob = torch.sigmoid(logits[j, 0]).cpu().numpy().astype(np.float32)
+                    masks[j][out.frame_idx] = cv2.resize(prob, size, interpolation=cv2.INTER_LINEAR)
     empty = np.zeros((size[1], size[0]), np.float32)
-    return [masks.get(i, empty) for i in range(len(frames))]
+    return [[m.get(i, empty) for i in range(len(frames))] for m in masks]
+
+
+def reading_order(boxes):
+    """Boxes (x, y, w, h) in reading order: rows from the top (a box whose middle falls within a row joins it), each from the left."""
+    rows = []
+    for b in sorted(boxes, key=lambda b: b[1] + b[3] / 2):
+        mid = b[1] + b[3] / 2
+        for row in rows:
+            if min(r[1] for r in row) <= mid <= max(r[1] + r[3] for r in row):
+                row.append(b)
+                break
+        else:
+            rows.append([b])
+    return [b for row in rows for b in sorted(row, key=lambda b: b[0])]
+
+
+def pieces_inside(picture, whole):
+    """
+    The pieces an object in one piece draws inside its cut-out by their colours (a sign cut out with the sky between its
+    letters and its support, a window with its frame): its colours sorted in two or three groups, and of the groups
+    that make three pieces of a letter's shape or more (as tall as a good part of it, narrow, of a height), the one
+    whose colour stands furthest from what is around the object (the letters, not the sky seen between them) gives
+    them, in boxes (x, y, w, h) at the cut-out's size; none when no group does, or when its pieces are not evenly laid.
+    `picture`: the image at its own size (read at full size: a sign's letters are a few pixels wide at half).
+    """
+    import cv2
+    import numpy as np
+
+    mh, mw = whole.shape
+    ph, pw = picture.shape[:2]
+    full = cv2.resize(whole, (pw, ph), interpolation=cv2.INTER_LINEAR) if (pw, ph) != (mw, mh) else whole
+    inside = full > 0.5
+    ys, xs = np.nonzero(inside)
+    if len(xs) < 400:
+        return []
+    x0, y0, x1, y1 = int(xs.min()), int(ys.min()), int(xs.max()) + 1, int(ys.max()) + 1
+    lab_all = cv2.cvtColor(np.ascontiguousarray(picture), cv2.COLOR_RGB2LAB).astype(np.float32)
+    # What is around it: a ring just outside its cut-out.
+    ring = (cv2.dilate(inside.astype(np.uint8), np.ones((15, 15), np.uint8)) > 0) & ~inside
+    around = lab_all[ring].mean(axis=0) if ring.any() else None
+    keep = inside[y0:y1, x0:x1]
+    h, w = keep.shape
+    data = lab_all[y0:y1, x0:x1].reshape(-1, 3)[keep.reshape(-1)]
+    cv2.setRNGSeed(7)
+    best, best_rank = [], None
+    for groups in (2, 3):
+        _, labels, centres = cv2.kmeans(data, groups, None, (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 0.5), 3, cv2.KMEANS_PP_CENTERS)
+        sorted_into = np.full(keep.size, -1, np.int32)
+        sorted_into[keep.reshape(-1)] = labels.ravel()
+        sorted_into = sorted_into.reshape(h, w)
+        for g in range(groups):
+            layer = cv2.morphologyEx((sorted_into == g).astype(np.uint8), cv2.MORPH_OPEN, np.ones((3, 3), np.uint8))
+            _, _, stats, _ = cv2.connectedComponentsWithStats(layer, 8)
+            shaped = [s for s in stats[1:] if s[cv2.CC_STAT_HEIGHT] >= 0.3 * h and s[cv2.CC_STAT_WIDTH] <= 0.35 * w and s[cv2.CC_STAT_AREA] >= 0.003 * h * w]
+            if len(shaped) < 3:
+                continue
+            # Letters are of a height: the pieces far shorter than the group's tallest go (a bolt, a reflection).
+            tallest = max(s[cv2.CC_STAT_HEIGHT] for s in shaped)
+            shaped = sorted([s for s in shaped if s[cv2.CC_STAT_HEIGHT] >= 0.55 * tallest], key=lambda s: s[cv2.CC_STAT_LEFT])
+            if len(shaped) < 3:
+                continue
+            # Evenly laid along it, of like widths: a word, a row of panes; not a scatter of patches.
+            widths = np.array([s[cv2.CC_STAT_WIDTH] for s in shaped], np.float32)
+            mids = np.array([s[cv2.CC_STAT_LEFT] + s[cv2.CC_STAT_WIDTH] / 2 for s in shaped], np.float32)
+            steps = np.diff(mids)
+            if widths.std() > 0.6 * widths.mean() or (len(steps) > 1 and steps.std() > 0.7 * steps.mean()):
+                continue
+            apart = float(np.linalg.norm(centres[g] - around)) if around is not None else 0.0
+            rank = (apart, len(shaped))
+            if best_rank is None or rank > best_rank:
+                best_rank = rank
+                best = [(x0 + int(s[cv2.CC_STAT_LEFT]), y0 + int(s[cv2.CC_STAT_TOP]), int(s[cv2.CC_STAT_WIDTH]), int(s[cv2.CC_STAT_HEIGHT])) for s in shaped]
+    if len(best) < 3:
+        return []
+    # Back at the cut-out's size.
+    sx, sy = mw / pw, mh / ph
+    return [(int(round(x * sx)), int(round(y * sy)), max(1, int(round(bw * sx))), max(1, int(round(bh * sy)))) for x, y, bw, bh in best]
+
+
+def parts_of(each, k, picture=None):
+    """
+    The object's pieces on the image it was found on (the letters of a sign, the bulbs of a garland, each window of
+    « every window »), in reading order, as shares of its whole box there (x, y, w, h, flat): each one followed, else
+    the separate pieces of its cut-out, else those its colours draw inside it (`picture`: that image at the cut-out's
+    size); None when it is in one piece (an animation then cuts it in slices itself).
+    """
+    import cv2
+    import numpy as np
+
+    whole = np.maximum.reduce([e[k] for e in each]) if len(each) > 1 else each[0][k]
+    ys, xs = np.nonzero(whole > 0.5)
+    if not len(xs):
+        return None
+    wx, wy = int(xs.min()), int(ys.min())
+    ww, wh = int(xs.max()) - wx + 1, int(ys.max()) - wy + 1
+    boxes = []
+    if len(each) > 1:
+        for e in each:
+            py, px = np.nonzero(e[k] > 0.5)
+            if len(px):
+                boxes.append((int(px.min()), int(py.min()), int(px.max() - px.min()) + 1, int(py.max() - py.min()) + 1))
+    else:
+        count, _, stats, _ = cv2.connectedComponentsWithStats((whole > 0.5).astype(np.uint8), 8)
+        if count > 2:
+            areas = stats[1:, cv2.CC_STAT_AREA]
+            for s in stats[1:][areas >= 0.03 * areas.max()]:
+                boxes.append((int(s[cv2.CC_STAT_LEFT]), int(s[cv2.CC_STAT_TOP]), int(s[cv2.CC_STAT_WIDTH]), int(s[cv2.CC_STAT_HEIGHT])))
+        if len(boxes) < 2 and picture is not None:
+            boxes = pieces_inside(picture, whole)
+    if len(boxes) < 2:
+        return None
+    return [round(v, 3) for x, y, w, h in reading_order(boxes)[:PARTS_MAX] for v in ((x - wx) / ww, (y - wy) / wh, w / ww, h / wh)]
 
 
 def photo_frames(src, w, h):
@@ -104,6 +258,8 @@ def photo_frames(src, w, h):
 
 def follow(job, device, dtype, detector, tracker):
     """A passage's object found, followed and cut out (matte.py's finish), or an error that says why; on a photo, found and cut out once."""
+    import numpy as np
+
     import matte
 
     from portrait import log
@@ -124,17 +280,21 @@ def follow(job, device, dtype, detector, tracker):
     seen = find(frames, job["name"], detector, device)
     if not seen:
         raise RuntimeError(f"« {job['name']} » introuvable dans ce plan")
-    k, box, score = seen
-    log(f"« {job['name']} » found on image {k + 1}/{n} ({score:.2f}) at {[round(v) for v in box]}")
+    k, boxes, score = seen
+    log(f"« {job['name']} » found on image {k + 1}/{n} ({score:.2f}): {len(boxes)} at {[[round(v) for v in b] for b in boxes]}")
     tracked = time.time()
     mw, mh = max(2, ow // 2), max(2, oh // 2)
-    masks = [matte.main_subject(m) for m in track(frames, k, box, tracker, device, dtype, (mw, mh))]
+    each = [[matte.main_subject(m) for m in masks] for masks in track(frames, k, boxes, tracker, device, dtype, (mw, mh))]
+    # « every … »: all of them at every image, one object in pieces.
+    masks = [np.maximum.reduce([e[i] for e in each]) for i in range(n)] if len(each) > 1 else each[0]
+    # Its pieces where it was found (its letters, its bulbs, each window), placed later on its box at every image.
+    pieces = parts_of(each, k, frames[k])
     # A light smoothing over time, against a shimmer of the edges (as for her).
     masks = [masks[0]] + [0.6 * masks[i] + 0.2 * masks[i - 1] + 0.2 * masks[min(n - 1, i + 1)] for i in range(1, n)]
-    log(f"followed through {n} images in {time.time() - tracked:.1f} s")
+    log(f"followed through {n} images in {time.time() - tracked:.1f} s" + (f", in {len(pieces) // 4} pieces" if pieces else ""))
     # A photo's object: one still image (a PNG the size of the photo, laid exactly over it).
     r = matte.finish(job, frames, masks, photo, n, False, started, ow, oh)
-    return r | {"found": round(score, 2)}
+    return r | {"found": round(score, 2)} | ({"parts": pieces} if pieces else {})
 
 
 if __name__ == "__main__":

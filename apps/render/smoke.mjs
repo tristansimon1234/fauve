@@ -102,6 +102,8 @@ const scope = {
   // Nothing is cut out here: the scene must hold without a subject's box or outline.
   SubjectBox: () => null,
   SubjectOutline: () => null,
+  // An object's pieces (read on the card before the render): none here, the scene must stand without them.
+  SubjectParts: () => [],
   Outline: () => null,
   // What is said, written: the words themselves are what the check reads.
   Captions: ({ words = [] }) => React.createElement("div", null, (Array.isArray(words) ? words : []).map((w) => String(w?.w ?? "")).join(" ")),

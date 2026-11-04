@@ -1581,3 +1581,58 @@ test("a skill's settings: her words choose them, the code reads them, a correcti
   assert.match(input.reglages![0]!.choix[0]!, /par défaut/);
   assert.deepEqual(input.reglages_actuels, { cases: "6x8" });
 });
+
+test("a skill's objects: the filler names what lights up in her shot, the engine follows it, nothing named is none", async () => {
+  const { frappe } = await import("./skills/frappe.ts");
+  const { readSkillFill, skillPlan, skillObjectName, skillCode, skillFillInput } = await import("./skills.ts");
+  const { objectsDrawn, objectPassages, drawsSubject } = await import("./subject.ts");
+  // Plain English as the detector reads it; « none », empty or a word of one letter is no object.
+  assert.equal(skillObjectName(" Shop Sign "), "shop sign");
+  assert.equal(skillObjectName("every window"), "every window");
+  assert.equal(skillObjectName("string lights!"), "string lights");
+  assert.equal(skillObjectName("none"), null);
+  assert.equal(skillObjectName(""), null);
+  // Unnamed, its « @slot » is no object: nothing is followed, its code does without.
+  assert.deepEqual(objectsDrawn(frappe.code), []);
+  const named = skillCode(frappe, { lumieres: "shop sign", nuit: "neon sign" });
+  assert.deepEqual(objectsDrawn(named), [{ shot: 1, name: "shop sign" }, { shot: 3, name: "neon sign" }]);
+  // Its white passer-by is her subject: she is cut out too.
+  assert.ok(drawsSubject(named));
+  // The filler sees its object slots and what each looks for; its answer is kept by slot.
+  const files = Array.from({ length: 8 }, (_, i) => ({ id: `v${i}`, photo: false, seconds: 20, shows: i === 1 ? "la devanture avec son enseigne en lettres dorées" : "la rue" }));
+  const input = skillFillInput({ skill: frappe, name: "Lieu tapé", n: 15, files, business: {}, request: "" });
+  assert.deepEqual(input.objets?.map((o) => o.slot), ["lumieres", "nuit"]);
+  assert.equal(input.objets?.[0]?.case, 2);
+  const answer = {
+    fits: true,
+    missing: "",
+    shots: Array.from({ length: 15 }, (_, i) => ({ file: files[i % 8]!.id, at: 1 })),
+    texts: [{ slot: "lieu", text: "Farine" }],
+    end: null,
+    objets: [{ slot: "lumieres", name: "Bakery sign" }, { slot: "nuit", name: "" }],
+    why: "",
+  };
+  const fill = readSkillFill(frappe, files, 15, answer)!;
+  assert.deepEqual(fill.objects, { lumieres: "bakery sign" });
+  const plan = skillPlan({ skill: frappe, name: "Lieu tapé", files, fill });
+  const passages = objectPassages(plan, () => true);
+  assert.equal(passages.length, 1);
+  assert.equal(passages[0]!.name, "bakery sign");
+  // On the passage of its shot 2 (index 1): the closer shot.
+  const second = plan.segments[1] as ClipSegment;
+  assert.equal(passages[0]!.clip_id, second.clip_id);
+  assert.equal(passages[0]!.from, second.in);
+});
+
+test("« Lieu tapé » v2 cuts where its original does, on its own music (82,5 BPM)", async () => {
+  const { frappe } = await import("./skills/frappe.ts");
+  const line = frappe.timeline(15, { end: false });
+  // The original's cuts (s), measured image by image (docs/fiches/frappe.md): within two images each.
+  const original = [0, 1.6, 4.867, 7.867, 8.4, 8.6, 8.767, 8.967, 10.167, 11.6, 11.767, 11.933, 12.133, 12.267, 12.433];
+  line.shots.forEach((s, i) => assert.ok(Math.abs(s.start - original[i]!) <= 2 / 30 + 1e-6, `shot ${i + 1}: ${s.start} s, the original's ${original[i]} s`));
+  assert.ok(Math.abs(line.duration - 13.35) < 0.1, `${line.duration} s`);
+  // Everything lights up at once on the original's image 130, the night shot blinks on its image 241.
+  assert.ok(Math.abs(line.marks.flash! - 130) <= 1);
+  assert.ok(Math.abs(line.marks.blink! - 241) <= 1);
+  assert.equal(line.marks.type, 164);
+});

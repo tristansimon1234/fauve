@@ -52,6 +52,21 @@ export type SkillSetting = {
   choices: { value: string; says: string }[];
 };
 
+/**
+ * Something in one of its shots its code lights up, cuts out or follows (her sign, her windows, her lamps: Tristan,
+ * « enseigne, fenêtre, image qui a de quoi faire un effet stylé »): the filler names it as the eye sees it in the file it
+ * casts there, from what that file shows; its code writes it « @slot » where it names an object (Subject object,
+ * SubjectParts…), replaced by that name, or left as is when nothing in her shot fits (no object then: the code does
+ * without).
+ */
+export type SkillObject = {
+  slot: string;
+  /** The shot it is in (its index in the timeline's shots): the filler names it from the file cast there. */
+  shot: number;
+  /** What to look for there, in French for the filler: what can carry the effect, by kind. */
+  want: string;
+};
+
 export type MontageSkill = {
   /** The house model it plays (house-models.ts). */
   key: string;
@@ -77,6 +92,8 @@ export type MontageSkill = {
   tempo?: [number, number];
   /** What her words can change in it, as a template's variants (its grid, its pace, its order, its colour). */
   settings?: SkillSetting[];
+  /** What it lights up or cuts out in her shots (her sign, her windows), named by the filler from what each file shows. */
+  objects?: SkillObject[];
   /**
    * The most shots it takes for a length she asks for, past `shots[1]` (the most it takes from her files alone): a model
    * whose middle can repeat (more full frames after a title, more of the place's life, more of the day) reaches 30 s at
@@ -115,7 +132,30 @@ export type SkillFill = {
   end: { title: string; subtitle?: string } | null;
   /** The settings her words chose (only those, each a choice of the skill's); the others play their default. */
   settings?: Record<string, string>;
+  /** What its objects are in her shots, by slot (plain English, as the eye sees them); a slot left out: nothing fits. */
+  objects?: Record<string, string>;
 };
+
+/**
+ * An object's name as the filler gave it, kept to what the detector reads (plain English words, « every » for each one
+ * of them): lower case, letters, spaces, hyphens and apostrophes, 60 characters at most, a word of two letters at least;
+ * empty or « none » is no object.
+ */
+export function skillObjectName(name: string | undefined): string | null {
+  const kept = (name ?? "").toLowerCase().replace(/[^a-z' -]/g, " ").replace(/\s+/g, " ").trim().slice(0, 60).trim();
+  if (!/[a-z]{2}/.test(kept) || /^(none|nothing|no|n\/a|aucun|rien)$/.test(kept)) return null;
+  return kept;
+}
+
+/** Its code with its objects named: « @slot » replaced by what the filler saw in her shot, the others left (no object). */
+export function skillCode(skill: Pick<MontageSkill, "code" | "objects">, objects: Record<string, string> | undefined): string {
+  let code = skill.code;
+  for (const o of skill.objects ?? []) {
+    const name = skillObjectName(objects?.[o.slot]);
+    if (name) code = code.split(`"@${o.slot}"`).join(JSON.stringify(name));
+  }
+  return code;
+}
 
 /**
  * A correction's settings: those it had, with what her request asks now (a default asked again is the original's back:
@@ -257,7 +297,7 @@ export function fitWords(text: string, max: number): string {
  * replaced by her files in turn), a video's start inside it; each text cut to its place; the ending only when the
  * skill draws one. Null when a required text is missing (the filler failed: the editor makes the Reel).
  */
-export function readSkillFill(skill: Pick<MontageSkill, "texts" | "end" | "settings">, files: SkillFile[], n: number, answer: SkillFillAnswer, options: { wordsWanted?: boolean } = {}): SkillFill | null {
+export function readSkillFill(skill: Pick<MontageSkill, "texts" | "end" | "settings" | "objects">, files: SkillFile[], n: number, answer: SkillFillAnswer, options: { wordsWanted?: boolean } = {}): SkillFill | null {
   if (!files.length) return null;
   const known = new Map(files.map((f) => [f.id, f]));
   let turn = 0;
@@ -276,7 +316,12 @@ export function readSkillFill(skill: Pick<MontageSkill, "texts" | "end" | "setti
   const title = fitWords(answer.end?.title ?? "", 40);
   const end = skill.end && title ? { title, ...(answer.end?.subtitle?.trim() ? { subtitle: fitWords(answer.end.subtitle, 60) } : {}) } : null;
   const settings = skillSettings(skill, answer.settings);
-  return { shots, texts, end, ...(Object.keys(settings).length ? { settings } : {}) };
+  const objects: Record<string, string> = {};
+  for (const o of skill.objects ?? []) {
+    const name = skillObjectName(answer.objets?.find((x) => x.slot === o.slot)?.name);
+    if (name) objects[o.slot] = name;
+  }
+  return { shots, texts, end, ...(Object.keys(settings).length ? { settings } : {}), ...(Object.keys(objects).length ? { objects } : {}) };
 }
 
 /** The brief a skill's composition carries (what the motion designer reads if her request ever needs it changed). */
@@ -334,8 +379,9 @@ export function skillPlan(input: { skill: MontageSkill; name: string; files: Ski
         compose: true,
         motion: {
           brief: skillBrief(input.name),
-          code: skill.code,
-          js: skill.code,
+          // Its objects named for her shots (her sign, her windows): the engine follows them before the render.
+          code: skillCode(skill, fill.objects),
+          js: skillCode(skill, fill.objects),
           // Its marks (numbers) and its settings (her words' choices), read by its code by name.
           texts: { ...Object.fromEntries(Object.entries(line.marks).map(([k, v]) => [k, String(Math.round(v * 1000) / 1000)])), ...(chosen ?? {}) },
           draws_texts: true,
@@ -373,6 +419,15 @@ export const skillFillSchema = z.object({
     .array(z.object({ name: z.string().describe("The setting's name (« reglages »)"), value: z.string().describe("The value of the choice her request asks for") }))
     .optional()
     .describe("Only the settings her request asks for; none otherwise (each one plays the original's)"),
+  objets: z
+    .array(
+      z.object({
+        slot: z.string().describe("The model's object slot (« objets »)"),
+        name: z.string().describe("What it is in the file you cast on its slot, in plain English as the eye sees it (« shop sign », « neon sign », « every window », « string lights »), or empty when nothing there fits"),
+      }),
+    )
+    .optional()
+    .describe("Only when the model has objects (« objets »): one per object slot"),
   why: z.string().describe("One sentence in French for her (tu): why these shots in this model"),
 });
 export type SkillFillAnswer = z.infer<typeof skillFillSchema>;
@@ -394,6 +449,7 @@ Then write its texts, in French (what her customers read), each in its slot (« 
 - an optional slot (obligatoire false) is left empty unless her request or the Reel needs those words; a required one is always written.
 
 "settings": its settings (« reglages », when it has some), like the variants of a template: one only when her request asks for what it does (« plus de cases », « plus lent », « dans le désordre », « avec ma couleur »), with the value that does it; never to vary for its own sake; otherwise none, each one plays the original's. A request a setting answers fits.
+"objets": its objects (« objets », when it has some): what in the file you cast on that slot carries its effect (a sign whose letters light up one by one, windows that light up one after the other, lamps that flash), from what the file shows (« montre », « moments »): name it in plain English as the eye sees it, two to four words (« shop sign », « neon sign », « bakery sign », « every window », « string lights », « pendant lamps »); « every » before it when there are several to take one after the other (each window, each lamp); empty when nothing in that file fits (the model does without). Cast on that slot the file that has it, when one does.
 "end": only when the model has an ending (« fin ») and she has something to end on (an offer, an opening, a date, in her request or what we know): its title (40 characters at most) and a subtitle or empty; otherwise null.
 "why": one sentence for her in French (tu), what you chose and why, in plain words.`;
 
@@ -443,6 +499,7 @@ export function skillFillInput(input: {
     ...(input.skill.settings?.length
       ? { reglages: input.skill.settings.map((x) => ({ nom: x.name, change: x.want, choix: x.choices.map((c, i) => `${c.value} : ${c.says}${i === 0 ? " (celui de l'original, par défaut)" : ""}`) })) }
       : {}),
+    ...(input.skill.objects?.length ? { objets: input.skill.objects.map((o) => ({ slot: o.slot, case: o.shot + 1, cherche: o.want })) } : {}),
     ...(input.current ? { textes_actuels: input.current } : {}),
     ...(input.currentSettings && Object.keys(input.currentSettings).length ? { reglages_actuels: input.currentSettings } : {}),
     fichiers: input.files.map((f) =>

@@ -53,7 +53,7 @@ function toolProps(js: string, tools = "Subject|Outline"): string[] {
  */
 function subjectCalls(js: string): { shot: string; name?: string }[] {
   const out: { shot: string; name?: string }[] = [];
-  for (const m of js.matchAll(/\bSubject(?:Box|Outline)\(/g)) {
+  for (const m of js.matchAll(/\bSubject(?:Box|Outline|Parts)\(/g)) {
     const args: string[] = [];
     let arg = "";
     let depth = 0;
@@ -104,13 +104,16 @@ const SHOT_PROP = /\bshot\s*[:=]\s*\{?\s*((?:shots\s*\[\s*)?\d+)/;
  */
 export function drawsSubject(js: string | undefined): boolean {
   if (!js) return false;
-  const mentions = js.match(/\b(?:Subject|SubjectBox|SubjectOutline|Outline)\b/g)?.length ?? 0;
+  const mentions = js.match(/\b(?:Subject|SubjectBox|SubjectOutline|SubjectParts|Outline)\b/g)?.length ?? 0;
   const forObjects = toolProps(js).filter((props) => OBJECT_PROP.test(props)).length + subjectCalls(js).filter((c) => c.name).length;
   return mentions > forObjects;
 }
 
 /** An object's name as kept: lower case, its spaces single (« The coffee cup » and « the coffee cup » are one). */
 export const objectName = (name: string) => name.trim().toLowerCase().replace(/\s+/g, " ").slice(0, 60);
+
+/** What starts a skill's object name in its code (« @lumieres »), replaced by the name its filler gives for her shot. */
+export const SKILL_OBJECT = "@";
 
 /** The name of an object's passage: the passage's, then the object's. */
 export const objectKey = (clipId: string, from: number, to: number, name: string) => `${subjectKey(clipId, from, to)}#${objectName(name)}`;
@@ -121,15 +124,16 @@ export const ANY_SHOT = -1;
 /**
  * The objects a composition's code follows (a cup she lifts, a product she shows, a ball): by shot (its index in
  * shots, written as a number or shots[n]) and name, from Subject or Outline given `object` (compiled or as JSX), and
- * SubjectBox or SubjectOutline given a name last. A shot written as a variable (the same photo on two shots, switched
- * by the frame) is ANY_SHOT: the object is looked for on every shot under the animation.
+ * SubjectBox, SubjectOutline or SubjectParts given a name last. A shot written as a variable (the same photo on two
+ * shots, switched by the frame) is ANY_SHOT: the object is looked for on every shot under the animation. A skill's
+ * name left unfilled (« @lumieres »: nothing in her shot to light up) is no object: its code does without.
  */
 export function objectsDrawn(js: string | undefined): { shot: number; name: string }[] {
   if (!js) return [];
   const found = new Map<string, { shot: number; name: string }>();
   const add = (shot: string | undefined, name: string | undefined) => {
     const named = name ? objectName(name) : "";
-    if (!named) return;
+    if (!named || named.startsWith(SKILL_OBJECT)) return;
     const n = /^(?:shots\s*\[\s*)?(\d+)\s*\]?$/.exec((shot ?? "").trim());
     const at = n ? Number(n[1]) : ANY_SHOT;
     found.set(`${at}#${named}`, { shot: at, name: named });
@@ -348,6 +352,11 @@ export const mediaSubjectsSchema = z.record(
       contour: z.string().optional(),
       /** The object followed through the passage (a cup she lifts), when it is one and not her. */
       object: z.string().optional(),
+      /**
+       * Its pieces (the letters of a sign, each window of « every window »), in reading order, as shares of its box on the
+       * image it was found on (x, y, w, h, flat): SubjectParts places them on its box at every image.
+       */
+      parts: z.array(z.number()).optional(),
       /** Its depth at every image (a grey video, near white), not a cut-out: Depth draws it. */
       depth: z.boolean().optional(),
     }),

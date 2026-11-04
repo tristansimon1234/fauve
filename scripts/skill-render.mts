@@ -7,8 +7,12 @@
 //     [--module packages/agent/src/skills/<key>.ts]   (a skill not in the library yet: its module, exporting it)
 //     --words '{"surtitre":"un samedi dans","titre":"le marais"}' [--end '{"title":"…","subtitle":"…"}'] \
 //     [--shots 10] [--bpm 90] [--settings '{"cases":"6x8"}'] [--fonts "Open Sans,Inter"] [--name "Café des Arts"] [--out reel.mp4] [--no-render]
+//     [--named '{"lumieres":"shop sign"}'] [--objects '{"1":{"src":"sign.webm","result":"result.json","id":"sign"}}']
 //
 // --bpm plays it at another tempo than its own (a longer Reel, a music's tempo), as skillFit would.
+// --named names its objects as the filler would (its « @slot » in its code); --objects lays the cut-outs the card made of
+// them (apps/render/track_objects.py, run with OBJECTS_CPU=1), by shot: its file (webm) and its reading in that run's
+// printed result (its boxes, outline and pieces), on that shot's passage of the plan.
 // Clips are local files (videos or photos); they are normalized at 30 images a second into the bundle's public folder,
 // once per file (named after its path, size and date: another file at the same place in the list is normalized anew),
 // as the render workshop does. The browser is Playwright's Chromium (CHROME, default /opt/pw-browsers/…), whose fonts
@@ -16,12 +20,14 @@
 
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { basename, extname, resolve } from "node:path";
 import { parseArgs } from "node:util";
 import { buildReelProps } from "../packages/agent/src/motion.ts";
 import { HOUSE_MODELS } from "../packages/agent/src/house-models.ts";
 import { MONTAGE_SKILLS } from "../packages/agent/src/skill-library.ts";
+import { isClipSegment } from "../packages/agent/src/schemas.ts";
+import { objectKey } from "../packages/agent/src/subject.ts";
 import { skillLongest, skillPlan, skillShotCount, type MontageSkill, type SkillFile, type SkillFill } from "../packages/agent/src/skills.ts";
 
 const { values } = parseArgs({
@@ -34,6 +40,8 @@ const { values } = parseArgs({
     shots: { type: "string" },
     bpm: { type: "string" },
     settings: { type: "string" },
+    named: { type: "string" },
+    objects: { type: "string" },
     fonts: { type: "string", default: "" },
     name: { type: "string", default: "Studio Test" },
     out: { type: "string" },
@@ -92,16 +100,31 @@ const fill: SkillFill = {
   texts: JSON.parse(values.words ?? "{}"),
   end: values.end ? JSON.parse(values.end) : null,
   ...(values.settings ? { settings: JSON.parse(values.settings) as Record<string, string> } : {}),
+  ...(values.named ? { objects: JSON.parse(values.named) as Record<string, string> } : {}),
 };
 const bpm = values.bpm ? Math.round(Math.min(140, Math.max(60, Number(values.bpm)))) : undefined;
 const plan = skillPlan({ skill, name: model?.name ?? skill.key, files, fill, ...(bpm ? { bpm } : {}) });
 const fonts = (values.fonts || "").split(",").map((f) => f.trim()).filter(Boolean);
+// The cut-outs of its objects, laid on their shots' passages as the render workshop gets them (by passage and name).
+const subjects: Record<string, { src: string; boxes?: (number[] | null)[]; contours?: (number[] | null)[]; parts?: number[] }> = {};
+for (const [shot, o] of Object.entries(JSON.parse(values.objects ?? "{}") as Record<string, { src: string; result: string; id: string }>)) {
+  const segment = plan.segments.filter(isClipSegment)[Number(shot)];
+  const name = plan.layers?.[0]?.motion.js?.match(/object: "([^"@][^"]*)"/g)?.map((m) => m.slice(9, -1)).find((x) => plan.layers?.[0]?.motion.js?.includes(`shot: ${shot}, object: "${x}"`));
+  if (!segment || !name) throw new Error(`--objects: no named object on shot ${shot}`);
+  const reading = (JSON.parse(readFileSync(resolve(o.result), "utf8")) as Record<string, { boxes?: (number[] | null)[]; contours?: (number[] | null)[]; parts?: number[] }>)[o.id];
+  if (!reading) throw new Error(`--objects: no « ${o.id} » in ${o.result}`);
+  const target = `${media}/object-${shot}-${createHash("sha1").update(resolve(o.src)).digest("hex").slice(0, 8)}.webm`;
+  execFileSync("cp", [resolve(o.src), target]);
+  subjects[objectKey(segment.clip_id, segment.in, segment.out, name)] = { src: `/public/jobs/${job}/${basename(target)}`, ...(reading.boxes ? { boxes: reading.boxes } : {}), ...(reading.contours ? { contours: reading.contours } : {}), ...(reading.parts ? { parts: reading.parts } : {}) };
+  console.log(`object « ${name} » on shot ${shot}: ${reading.parts ? reading.parts.length / 4 : 0} pieces`);
+}
 const props = buildReelProps(plan, {
   template: "libre",
   clipUrls: Object.fromEntries(files.map((f) => [f.id, f.src])),
   photoIds: files.filter((f) => f.photo).map((f) => f.id),
   aspects: Object.fromEntries(files.map((f) => [f.id, f.aspect])),
   brand: { name: values.name ?? "", ...(fonts.length ? { fonts } : {}) },
+  ...(Object.keys(subjects).length ? { subjects } : {}),
 });
 const out = resolve(values.out ?? `${ROOT}/${skill.key}.mp4`);
 writeFileSync(`${out}.plan.json`, JSON.stringify(plan, null, 1));

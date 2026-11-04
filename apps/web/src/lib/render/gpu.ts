@@ -141,7 +141,8 @@ export const gpuReady = () => Boolean(env("MODAL_TOKEN_ID") && env("MODAL_TOKEN_
 /** A passage to cut out: its clip (signed), its seconds, and where its cut-out is sent (signed upload links). */
 export type GpuPassage = { key: string; url: string; from: number; to: number; upload: { webm: string; png: string } };
 /** A passage cut out on the card (its file already sent to its upload link). */
-export type GpuCut = { still: boolean; frames: number; keys: number; people: boolean; top?: number; boxes?: (number[] | null)[]; contours?: (number[] | null)[] };
+/** `parts`: an object's pieces (the letters of a sign, each window of « every window ») as shares of its box where it was found (x, y, w, h, flat). */
+export type GpuCut = { still: boolean; frames: number; keys: number; people: boolean; top?: number; boxes?: (number[] | null)[]; contours?: (number[] | null)[]; parts?: number[] };
 /** A photo to cut out: its media id, the photo (signed), and where its cut-out is sent (signed upload links, WebP and PNG). */
 export type GpuPhoto = { key: string; url: string; upload: { webp: string; png: string } };
 /** A photo cut out on the card (its file already sent), with what it is like, as the cut-out sandbox reads it. */
@@ -416,6 +417,7 @@ export async function objectsOnGpu(passages: GpuObjectPassage[], deadlineMs: num
             ...(typeof r.top === "number" ? { top: r.top } : {}),
             ...(Array.isArray(r.boxes) ? { boxes: r.boxes as (number[] | null)[] } : {}),
             ...(Array.isArray(r.contours) ? { contours: r.contours as (number[] | null)[] } : {}),
+            ...(Array.isArray(r.parts) && r.parts.length >= 8 && r.parts.every((v) => typeof v === "number") ? { parts: r.parts as number[] } : {}),
           };
   }
   return { results, seconds, gpu };

@@ -1,0 +1,69 @@
+# « Cadre dans le cadre » (`cadre`) : fiche de l'original
+
+> Fiche d'un original : ce qu'on y voit, mesuré image par image, et les effets qu'on veut savoir refaire sur les vidéos de n'importe quel commerce (la méthode : `docs/modeles.md`, « La chaîne des modèles »). Les temps sont en secondes de l'original ; « temps » compte les temps de sa musique depuis son premier temps.
+
+**L'original** : `house/originals/cadre.mp4`, 6,37 s (191 images), 720 × 1280, 30 i/s, **vertical 9:16** plein écran, avec son. Le modèle le prend en entier (pas d'entrée dans `HOUSE_PASSAGES`). C'est un diaporama : 19 photos fixes, aucune vidéo.
+**Sa musique** : un beat hip-hop lo-fi (basse ronde, accords tenus, charleston, claps ; « lo-fi / boom-bap chill » pour Gemini, plausible), **90 BPM** (un temps toutes les 0,667 s, soit 20 images ; des mesures de 4 temps à 0, 2,67 et 5,33 s ; la pulsation mesurée, 179,5, en est la croche ; Gemini disait 90 : juste). Sûr : ses attaques tombent sur une grille de 5 images (la double croche) du début à la fin, sans dériver. Le premier temps est à 0 s (les deux coups les plus forts, 2,67 et 5,33 s, ouvrent les mesures 2 et 3 ; le script disait 0,16 s, une double croche plus tard). La 1re mesure est douce, avec un roulement de claps au milieu (1,17 → 2,0 s). La 2e est plus chargée : des coups graves à chaque double croche de 2,67 à 3,67 s, des accords piqués de 3,33 à 3,83 s, le même roulement (3,83 → 4,67 s). Une basse grave (808) au premier temps de la 3e, à 5,33 s. Puis la musique est **coupée net à 5,80 s** (de pleine force au silence en 10 ms) : les 0,56 dernières secondes sont muettes.
+**Mesuré avec** : `scripts/fiche/measure.py` (tempo et coupes ; il ne voit que les 9 dernières, quand le cadre est assez grand, et prend celle de 5,03 s pour « même lieu » : deux photos sombres), la boîte du cadre mesurée à chaque image (chaque image comparée au fond figé), des planches à 30 i/s de chaque seconde, des agrandissements des étiquettes et des bords du cadre, un spectrogramme et les attaques par bande (graves, claps, charleston), et la lecture de Gemini (`house/breakdowns/cadre.json`).
+
+## Déroulé
+
+| De – à (s) | Temps | Ce qu'on voit | Effets |
+|---|---|---|---|
+| 0 – 1,33 | 0 – 2 | Le fond : une salle de chantier en noir et blanc, figée. Au centre, un **cadre debout (2:3)** sur une photo en couleur, à 15 % de la largeur dès la première image ; une photo toutes les 10 images, le cadre à 20, 25, puis 30 % | Cadre qui grandit par crans (1), fond figé (2), photos fixes (3), étiquettes (5), une coupe par croche (6) |
+| 1,33 – 2,70 | 2 – 4 | 35 → 50 % ; le cadre passe sous l'étiquette de gauche (1,33 s), puis sous celle de droite (2,03 s) ; le roulement de claps de la 1re mesure | — |
+| 2,70 – 4,03 | 4 – 6 | 55 → 70 % ; la coupe de 2,70 s sur le premier temps de la 2e mesure, plus chargée | — |
+| 4,03 – 5,37 | 6 – 8 | 75 → 90 % : les deux étiquettes sont entièrement sur les photos | — |
+| 5,37 – 5,70 | 8 – 8,5 | 95 % de la largeur (80 % de la hauteur), sur la basse grave de la 3e mesure | — |
+| 5,70 – 6,37 | 8,5 – 9,55 | La dernière photo **plein écran** d'un coup (un long couloir de béton sous une verrière), fixe ; la musique coupée net à 5,80 s (temps 8,7), la fin muette | Plein écran et silence (4) |
+
+## Effets (ce qu'on veut savoir refaire)
+
+### 1. Un cadre dans l'image, qui grandit d'un cran à chaque coupe
+- **Mesuré** : un rectangle debout 2:3 (sa hauteur fait 1,5 fois sa largeur), centré au pixel près (50 % / 50 %), découpé net dans le fond : ni bord, ni ombre, ni coins arrondis. Il est là dès la première image (rien ne s'ouvre), à 15 % de la largeur (12,7 % de la hauteur). À chaque coupe, il gagne 5 % de la largeur, d'un coup, en une image : 15, 20, 25 … 95 % (17 tailles ; la dernière fait 80 % de la hauteur). Puis la dernière photo prend tout l'écran, à 5,70 s. Ce n'est pas un zoom : la photo change en même temps que la taille, et rien ne bouge entre deux coupes (Tristan trouve cheap les zooms en transition et les poussées lentes). Le premier cadre est posé au bout de la salle, à peu près là où elle fuit : sa photo, un couloir clair, s'y lit comme une porte au fond.
+- **Sur quoi** : dans l'original, le fond d'une salle de chantier. Dans ses vidéos à elle : un plan large qui a de la profondeur et un cadre au milieu : le bout d'un couloir, une porte au fond de la salle, une fenêtre, un miroir (le premier cadre s'ouvre dans le miroir), un passe-plat, sa vitrine vue de la rue.
+- **Outil** : existant : le code du modèle (le v1 le fait déjà : une boîte par plan, de 15 à 95 %), ou `Window` (`reveal: "cut"`, un `moves` d'une image par cran, posé une image avant la coupe). Pour ouvrir le premier cadre sur sa porte, sa fenêtre ou son miroir : `SubjectBox(shots[n], frame, laid, "door")` (existant : l'objet trouvé par son nom dans son plan, une fois sur une photo), puis les crans de cette boîte au plein écran. Manquant : le point de fuite de son plan large (le bout du couloir, le fond de la salle), par exemple le point le plus loin de sa profondeur (`Depth`, sur une vidéo), pour y ouvrir le cadre quand aucun objet n'y est.
+- **Si rien ne s'y prête** : le cadre au centre exact, comme l'original.
+
+### 2. Son lieu figé, en noir et blanc
+- **Mesuré** : le fond est une seule image, identique au pixel de l'image 0 à l'image 170 : une photo, pas une vidéo. Gris pur (rouge = vert = bleu), sombre et contrasté : luminosité moyenne 25 %, la moitié de l'image sous 22 %, des noirs bouchés, des blancs à 85 % (les poteaux, la rambarde). C'est une autre photo que la dernière.
+- **Sur quoi** : son plan le plus large du lieu (une salle, un couloir, la devanture), figé sur sa meilleure image.
+- **Outil** : existant : `Footage` hors de son moment (il garde son image) avec `filter: grayscale(1) contrast(…) brightness(…)`.
+- **Si rien ne s'y prête** : son plan le plus large, quel qu'il soit.
+
+### 3. Ses images en couleur, fixes, une par croche
+- **Mesuré** : 18 photos (17 dans le cadre, la dernière en plein écran), toutes immobiles : aucune différence d'une image à l'autre dans un plan (ni vidéo, ni mouvement de caméra, ni zoom lent). Couleurs naturelles, peu saturées (du béton ; la couleur vient de la rouille, de l'herbe, des briques, d'un t-shirt vert). Chacune remplit le cadre, recadrée en 2:3. La moitié fuient vers le centre comme le fond (des couloirs, une allée, des rayonnages) : on avance dans le lieu.
+- **Sur quoi** : ses photos, ou des arrêts sur image de ses vidéos (trois moments d'une même vidéo au plus) : ce qui se fait (des gestes, des détails, l'équipe au travail, un produit), des coins du lieu, des plans qui fuient vers le centre.
+- **Outil** : existant : `Footage` (une photo reste fixe ; une vidéo hors de son moment garde l'image de départ de son passage) et plusieurs passages d'une vidéo (`skillPassages`).
+- **Si rien ne s'y prête** : avec peu d'images, moins de crans et plus grands (le v1 répartit 15 → 95 % sur ce qu'elle a).
+
+### 4. Le plein écran d'un coup, et la musique coupée net
+- **Mesuré** : à 5,70 s (image 171, un demi-temps après le premier temps de la 3e mesure), la dernière photo prend tout l'écran en une image (de 95 % en 2:3 au plein écran 9:16), sans zoom. Elle est tenue 20 images (0,67 s, un temps). La musique est coupée net 3 images plus tard (5,80 s) : les 0,56 dernières secondes sont muettes. Les étiquettes restent jusqu'au bout.
+- **Sur quoi** : sa plus belle image large (la salle prête, sa devanture, l'équipe).
+- **Outil** : la coupe : existant (le code du modèle). Le silence : manquant : couper la musique net à un instant du Reel et finir sans son, au lieu du fondu sur la dernière 0,8 s du mixage (`muxAudioInSandbox`) d'une musique composée sans arrêt.
+- **Si rien ne s'y prête** : la fin habituelle, la musique en fondu.
+
+### 5. Deux petites étiquettes fixes, sur la ligne du milieu
+- **Mesuré** : « WORK IN PROGRESS » à gauche, « ARTSIRI SPACE » à droite (ce qui se passe, puis le nom du lieu), de la première image à la dernière, immobiles, au-dessus de tout. Le cadre passe dessous à partir de 1,33 s (à gauche) et de 2,03 s (à droite) ; dès 4,03 s, elles sont entièrement sur les photos. Capitales d'une grotesque (de la famille d'Helvetica ou d'Inter), graisse moyenne, interlettrage normal (environ 0), blanc pur, sans ombre ni fond. Petites : des capitales de 0,9 % de la hauteur (17 px sur 1920, un corps d'environ 23 px à 1080 de large). Centrées sur la ligne du milieu (49,5 à 50,4 % de la hauteur). Celle de gauche va de 13,3 à 35,3 % de la largeur (calée à gauche), celle de droite de 71,0 à 87,1 % (calée à droite) : la même marge, 13 %, des deux bords. Celle de droite se perd en partie sur la rambarde blanche du fond pendant les deux premières secondes.
+- **Sur quoi** : ses mots : ce qui se passe, en 1 à 3 mots (« travaux en cours », « nouvelle carte », « bientôt »), et son nom.
+- **Outil** : existant : les textes du modèle, posés par son code. Mais le contrôle des scènes demande 48 px à un texte à lire (20 px seulement pour une petite étiquette à côté d'un titre qui se lit, `data-fauve-accent`) : la taille de l'original est refusée, et le v1 les met à 48 px. Celle de droite touche aussi la limite des boutons d'Instagram (rien à droite de 87 % sous le milieu) : juste au-dessus du milieu, elle passe.
+- **Si rien ne s'y prête** : sur un fond clair, une ombre légère (le v1 en met une) ; sans mots d'elle, son nom à droite et ce que montre le Reel à gauche.
+
+### 6. Une coupe par croche, d'un bout à l'autre
+- **Mesuré** : 17 coupes, toutes les 10 images (une croche à 90 BPM), de 0,33 à 5,70 s. À partir de la 5e (1,70 s), chacune tombe une image après sa croche (33 ms : imperceptible). Le montage ne suit pas les reliefs de la musique : la même cadence sur la mesure douce, la mesure chargée et la basse de la fin. Les coupes de 2,70 et 5,37 s tombent sur les deux coups les plus forts (les premiers temps des mesures 2 et 3).
+- **Outil** : existant : le déroulé du modèle (`timeline`, `beatSpans`), à 90 BPM, une case d'un demi-temps par photo.
+
+### 7. Étalonnage
+Le fond en noir et blanc sombre et contrasté ; les photos telles quelles, naturelles, neutres (du gris béton), à peine chaudes (Gemini les disait froides). Ni grain qui bouge, ni coins sombres, ni flash, ni clignotement (le script n'en trouve aucun), ni autre transition que la coupe.
+
+## Format
+L'original est vertical 9:16, plein écran ; le cadre est debout (2:3) et toutes ses photos sont verticales. Réglage « format » : `vertical` (par défaut, comme l'original : un cadre 2:3, une vidéo horizontale y est recadrée sur son sujet), `auto` (le cadre prend la forme de la plupart de ses images : 2:3 debout, ou 3:2 couché quand ses vidéos sont horizontales, mêmes crans en largeur ; le fond et la dernière image recadrés en 9:16 sur leur centre), `horizontal` (tout en 16:9 quand presque toutes ses vidéos le sont : fond horizontal, cadre 3:2 jusqu'au plein cadre, montré sur du noir dans un fil vertical).
+
+## Ce que Gemini a vu, et ce qu'il a raté
+Vu : le fond noir et blanc fixe, le cadre au centre qui grandit par crans, une photo toutes les 0,33 s (10 images) sur la musique, les deux étiquettes fixes (leurs mots, leur place à 13 et 70,5 % de la largeur, à mi-hauteur), le plein écran final (5,67 s ; 5,70 mesuré), le **tempo** (90 : juste, cette fois). Raté : le cadre grandit **à chaque coupe, de 5 % de la largeur** (il le voyait grandir à quatre moments, à 40, 60 et 80 %, et proposait 20, 35, 55, 75, 100 %) ; il est 2:3, sans bord ni ombre ; **tout est photo fixe** (il voyait un « léger travelling avant » sur la dernière et un ouvrier qui marche) ; les étiquettes : interlettrage normal (pas 0,15 em), graisse moyenne (pas semi-grasse), capitales de 0,9 % de la hauteur (pas 1,5 %) ; la musique **coupée net à 5,80 s** et la fin muette ; la mesure chargée et la basse de 5,33 s, sur les coupes de 2,70 et 5,37 s.
+
+## Ce que le modèle v1 ratait
+Ses mesures (`house-measures.ts`) avaient 4 coupes au lieu de 17 et 120 BPM au lieu de 90, d'où une musique « minimal electronic » à 120 au lieu d'un beat lo-fi à 90. Sa lecture (`house-models.ts`) faisait « s'ouvrir » le cadre à 0,4 s (il est là dès la première image) et remplir l'écran à 5,2 s (5,70 s), avec un interlettrage large (il est normal), du grain et des coins sombres (aucun), et « 3 à 6 autres plans » (l'original en fait passer 17 dans le cadre). Le skill v1 avait le bon cadre (2:3, centré, 15 → 95 % d'un cran par coupe, une coupe toutes les 0,33 s : par chance, deux tiers de temps à 120 valent une croche à 90). Mais ses étiquettes font 48 px avec une ombre (environ 23 px, sans ombre), au-dessus du milieu ; son fond est sa dernière vidéo figée, qui reprend vie en couleur à la fin (deux photos différentes dans l'original, et rien ne bouge) ; ses vidéos jouent dans le cadre (des photos fixes) ; sa fin dure 1,5 s et finit en fondu (0,67 s, la musique coupée net). La composition de référence (`J-cadre-dans-le-cadre`) ouvre le cadre en l'agrandissant, puis le fait grossir en continu pendant 3 s (une poussée lente, ce que Tristan trouve cheap ; l'original grandit par crans), change de photo toutes les 14 images et ne finit pas en plein écran.
+
+## Ce qu'il faut filmer
+Un plan large de son lieu qui fuit vers le centre, bien droit et tenu deux secondes (un couloir, la salle vue de l'entrée, une rangée de tables, de miroirs ou de machines, sa boutique vue de la porte), si possible avec un cadre au milieu : une porte au fond, une fenêtre, un miroir, un passe-plat, sa vitrine. Puis 10 à 17 images verticales de ce qui se fait, le sujet au centre (des gestes, des détails, l'équipe, des coins du lieu, des couloirs), en photos ou en courtes vidéos dont on prend plusieurs moments. Enfin une dernière image large et belle, verticale (la salle prête, sa devanture).

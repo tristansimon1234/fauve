@@ -289,14 +289,14 @@ async function readContour(path: string): Promise<(number[] | null)[] | undefine
 export async function subjectInputs(
   studioId: string,
   plan: Plan,
-): Promise<Record<string, { src: string; still?: boolean; top?: number; boxes?: (number[] | null)[]; contours?: (number[] | null)[] }>> {
+): Promise<Record<string, { src: string; still?: boolean; top?: number; boxes?: (number[] | null)[]; contours?: (number[] | null)[]; parts?: number[] }>> {
   const { passages: herPassages, rows, isVideo } = await planned(studioId, plan);
   // The objects its compositions follow too (a cup, a product, one found on a photo), kept the same way under their own keys, and the shots they show in depth.
   const passages = [...herPassages, ...objectPassages(plan, isVideo), ...depthPassages(plan, isVideo)];
   const found = passages.flatMap((p) => {
     const k = kept(rows.get(p.clip_id))[p.key];
     return k && "path" in k && k.path.startsWith(`${studioId}/`)
-      ? [{ key: p.key, path: k.path, still: k.still, top: k.top, boxes: k.boxes, contour: k.contour?.startsWith(`${studioId}/`) ? k.contour : undefined }]
+      ? [{ key: p.key, path: k.path, still: k.still, top: k.top, boxes: k.boxes, parts: k.parts, contour: k.contour?.startsWith(`${studioId}/`) ? k.contour : undefined }]
       : [];
   });
   if (!found.length) return {};
@@ -315,6 +315,7 @@ export async function subjectInputs(
                 ...(f.still ? { still: true } : {}),
                 ...(f.top !== undefined ? { top: f.top } : {}),
                 ...(f.boxes?.length ? { boxes: f.boxes } : {}),
+                ...(f.parts?.length ? { parts: f.parts } : {}),
                 ...(contours[i]?.length ? { contours: contours[i] } : {}),
               },
             ],
@@ -429,6 +430,7 @@ async function followObjects(studioId: string, postId: string, missing: ObjectPa
       object: p.name,
       ...(result.top !== undefined ? { top: result.top } : {}),
       ...(result.boxes?.length ? { boxes: result.boxes } : {}),
+      ...(result.parts?.length ? { parts: result.parts } : {}),
       ...(contour ? { contour } : {}),
     });
   }

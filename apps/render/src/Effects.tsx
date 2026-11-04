@@ -419,6 +419,41 @@ export function SubjectBox(shot: ComposeShot | undefined, frame: number, laid?: 
   return { x, y, w: Math.max(...xs) - x, h: Math.max(...ys) - y };
 }
 
+/**
+ * The pieces of an object followed through a shot at a frame of the composition (the letters of a sign, the bulbs of a
+ * garland, each window of « every window »), in reading order, in the box the shot was laid in, as Footage frames it:
+ * { x, y, w, h } px each, placed on the object's box at that frame, so they light up one by one where they are. An
+ * object in one piece (a board, a shop window) is cut in `slices` equal pieces along its length instead (none: no
+ * pieces); nothing when it was not followed there (the animation does without).
+ */
+export function SubjectParts(shot: ComposeShot | undefined, frame: number, laid?: Laid, object?: string, slices = 0): Box[] {
+  if (!shot || !object) return [];
+  const o = shot.objects?.[objectName(object)];
+  const b = nearest(o?.boxes, shot, frame);
+  if (!b) return [];
+  const flat = o?.parts && o.parts.length >= 8 ? o.parts : null;
+  const n = flat ? Math.min(24, Math.floor(flat.length / 4)) : Math.max(0, Math.min(24, Math.round(slices)));
+  if (!n) return [];
+  // In one piece: slices along its longer side (on the picture, its width and height in the same unit).
+  const along = b[2]! * (shot.aspect || 9 / 16) >= b[3]!;
+  const { at } = placer(shot, laid, frame);
+  const out: Box[] = [];
+  for (let i = 0; i < n; i++) {
+    const [rx, ry, rw, rh] = flat ? [flat[i * 4]!, flat[i * 4 + 1]!, flat[i * 4 + 2]!, flat[i * 4 + 3]!] : along ? [i / n, 0, 1 / n, 1] : [0, i / n, 1, 1 / n];
+    const x0 = b[0]! + rx * b[2]!;
+    const y0 = b[1]! + ry * b[3]!;
+    const x1 = x0 + rw * b[2]!;
+    const y1 = y0 + rh * b[3]!;
+    const corners = [at(x0, y0), at(x1, y0), at(x0, y1), at(x1, y1)];
+    const xs = corners.map((c) => c[0]);
+    const ys = corners.map((c) => c[1]);
+    const x = Math.min(...xs);
+    const y = Math.min(...ys);
+    out.push({ x, y, w: Math.max(...xs) - x, h: Math.max(...ys) - y });
+  }
+  return out;
+}
+
 // ——— Outline: a line along her edge ——————————————————————————————————————————————————————
 
 /**

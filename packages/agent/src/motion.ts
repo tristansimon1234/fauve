@@ -179,8 +179,8 @@ export type ComposeShot = ScenePhoto & {
   subjectBoxes?: (number[] | null)[];
   /** Its subject's outline at each image (64 points, x y shares, flat), from its cut-out: Outline and SubjectOutline draw it. */
   subjectContours?: (number[] | null)[];
-  /** The objects followed through it, by name: where each one is and its outline, image by image (SubjectBox, SubjectOutline, Outline given its name). */
-  objects?: Record<string, { boxes?: (number[] | null)[]; contours?: (number[] | null)[] }>;
+  /** The objects followed through it, by name: where each one is and its outline, image by image, and its pieces (the letters of a sign) on its box (SubjectParts). */
+  objects?: Record<string, { boxes?: (number[] | null)[]; contours?: (number[] | null)[]; parts?: number[] }>;
   /** A photo's framing and retouch, as the Reel draws it (Photo): what SubjectBox and SubjectOutline place its subject by. */
   edit?: PhotoEdit;
   /** How the Reel moves it as it draws it (set by the render: its camera move, a photo's slow zoom, the punch), so a box read on it lands where it is at each frame. */
@@ -200,7 +200,14 @@ export type ShotCamera = {
 };
 
 /** An animation's code that draws one of her shots or what is cut out of it (her, an object, its depth). */
-const DRAWS_SHOTS = /\b(?:Footage|Subject|SubjectBox|SubjectOutline|Outline|Depth)\b/;
+const DRAWS_SHOTS = /\b(?:Footage|Subject|SubjectBox|SubjectOutline|SubjectParts|Outline|Depth)\b/;
+
+/** What a composition reads of an object followed through a shot: its box and its outline at every image, its pieces. */
+const objectReading = (o: NonNullable<ReelInputs["subjects"]>[string]) => ({
+  ...(o.boxes?.length ? { boxes: o.boxes } : {}),
+  ...(o.contours?.length ? { contours: o.contours } : {}),
+  ...(o.parts && o.parts.length >= 8 ? { parts: o.parts } : {}),
+});
 
 /** The objects followed through a passage (keys `subjectKey#name` among the cut-outs), by name. */
 function passageObjects(subjects: ReelInputs["subjects"], key: string): [string, NonNullable<ReelInputs["subjects"]>[string]][] {
@@ -500,7 +507,7 @@ export type ReelInputs = {
   /** The moving photos whose depth the card read for their shot (reliefJobs: `{media}#{key}`), signed, with their length in images. */
   reliefs?: Record<string, { src: string; frames: number }>;
   /** The passages of her clips cut out at every image (subjectKey: clip, in, out), signed: what a composition's Subject draws. */
-  subjects?: Record<string, { src: string; still?: boolean; top?: number; boxes?: (number[] | null)[]; contours?: (number[] | null)[] }>;
+  subjects?: Record<string, { src: string; still?: boolean; top?: number; boxes?: (number[] | null)[]; contours?: (number[] | null)[]; parts?: number[] }>;
 };
 
 /** A clip's width / height as the Reel frames it, from its analysis (phones film 16:9 or 9:16). */
@@ -859,7 +866,7 @@ export function buildReelProps(plan: EditPlan, inputs: ReelInputs): ReelProps {
             ...(cut ? { subjectBoxes: [[cut.box.x, cut.box.y, cut.box.w, cut.box.h]] } : {}),
             ...(cut?.contour?.length ? { subjectContours: [cut.contour] } : {}),
             ...(found.length
-              ? { objects: Object.fromEntries(found.map(([name, o]) => [name, { ...(o.boxes?.length ? { boxes: o.boxes } : {}), ...(o.contours?.length ? { contours: o.contours } : {}) }])) }
+              ? { objects: Object.fromEntries(found.map(([name, o]) => [name, objectReading(o)])) }
               : {}),
           },
         ];
@@ -882,7 +889,7 @@ export function buildReelProps(plan: EditPlan, inputs: ReelInputs): ReelProps {
           ...(passageObjects(inputs.subjects, subjectKey(s.clip_id, s.in, s.out)).length
             ? {
                 objects: Object.fromEntries(
-                  passageObjects(inputs.subjects, subjectKey(s.clip_id, s.in, s.out)).map(([name, o]) => [name, { ...(o.boxes?.length ? { boxes: o.boxes } : {}), ...(o.contours?.length ? { contours: o.contours } : {}) }]),
+                  passageObjects(inputs.subjects, subjectKey(s.clip_id, s.in, s.out)).map(([name, o]) => [name, objectReading(o)]),
                 ),
               }
             : {}),

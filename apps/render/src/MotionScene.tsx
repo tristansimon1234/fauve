@@ -16,7 +16,7 @@ import { Fit } from "./Fit";
 import { makeKit } from "./Kit";
 import { makeType } from "./Type";
 import { makeGraphic } from "./Graphic";
-import { makeEffects, SubjectBox, SubjectOutline } from "./Effects";
+import { makeEffects, SubjectBox, SubjectOutline, SubjectParts } from "./Effects";
 import { objectName } from "./outline";
 import { Marker } from "./Marker";
 import { Captions } from "./Captions";
@@ -320,6 +320,7 @@ export const SCOPE = {
   Outline: effects.Outline,
   SubjectBox,
   SubjectOutline,
+  SubjectParts,
 };
 
 export type SceneComponent = (props: {
