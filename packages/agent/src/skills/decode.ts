@@ -32,8 +32,9 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const endAt = end ? end.from : durationInFrames + 1;
   // White on her footage, as the model: a light shade only, so it reads on a bright sky.
   const shade = "0 0 2px rgba(0,0,0,0.45), 0 2px 16px rgba(0,0,0,0.35)";
-  const TW = 880;
-  const TX = (width - TW) / 2;
+  // The title's box, centred and clear of the app's buttons: below the middle a text stays left of x = width - 140.
+  const TW = width - 280;
+  const TX = 140;
   const TY = Math.round(height / 2) - 72;
   const titleStyle = { fontFamily: display, fontWeight: 400, fontSize: 124, lineHeight: 1.1, letterSpacing: "0.02em", color: "#ffffff", whiteSpace: "nowrap", textAlign: "center", textShadow: shade };
   const smallStyle = { fontFamily: body, fontWeight: 500, fontSize: 24, letterSpacing: "0.32em", textTransform: "uppercase", color: "#ffffff", whiteSpace: "nowrap", textShadow: shade };
@@ -84,12 +85,14 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
     : null;
   // Any other text of the Reel (none in its slots): a plain line under the band, so nothing she wrote is lost.
   const extra = others.filter((t) => frame >= t.from && frame < t.to).map((t, i) =>
-    h(FitText, { key: "x" + i, style: { position: "absolute", left: 100, width: width - 200, top: 1260, height: 120 }, innerStyle: { fontFamily: body, fontWeight: 600, fontSize: 52, color: "#ffffff", textAlign: "center", textShadow: shade } }, t.text));
+    h(FitText, { key: "x" + i, style: { position: "absolute", left: 140, width: width - 280, top: 1260, height: 120 }, innerStyle: { fontFamily: body, fontWeight: 600, fontSize: 52, color: "#ffffff", textAlign: "center", textShadow: shade } }, t.text));
 
   // 4. Its ending card: black over the last shot, its title in the title's style, a line under it.
   const ending = end && frame >= endAt
     ? h(AbsoluteFill, { style: { backgroundColor: "rgba(0,0,0," + o(endAt, endAt + 8).toFixed(3) + ")" } },
-        h(FitText, { style: { position: "absolute", left: TX, top: TY, width: TW, height: 150 }, innerStyle: { ...titleStyle, opacity: o(endAt + 2, endAt + 8), transform: "translateY(" + (1 - o(endAt + 2, endAt + 12)) * 14 + "px)" } }, String(end.title || "").toUpperCase()),
+        // Its entrance moves a span inside the box: a transform on the box itself would undo FitText's own scale.
+        h(FitText, { style: { position: "absolute", left: TX, top: TY, width: TW, height: 150 }, innerStyle: titleStyle },
+          h("span", { style: { display: "inline-block", opacity: o(endAt + 2, endAt + 8), transform: "translateY(" + ((1 - o(endAt + 2, endAt + 12)) * 14).toFixed(1) + "px)" } }, String(end.title || "").toUpperCase())),
         end.subtitle
           ? h(FitText, { style: { position: "absolute", left: TX, top: TY + 168, width: TW, height: 70 }, innerStyle: { fontFamily: body, fontWeight: 400, fontSize: 48, color: "#ffffff", textAlign: "center", opacity: o(endAt + 6, endAt + 14) } }, end.subtitle)
           : null)
@@ -100,7 +103,7 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
 
 export const decode: MontageSkill = {
   key: "decode",
-  version: 1,
+  version: 2,
   bpm: BPM,
   shots: [7, 14],
   files: [3, 8],

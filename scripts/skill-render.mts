@@ -4,6 +4,7 @@
 //
 //   cd apps/render && npx remotion bundle src/index.ts --out-dir build        (once, and after a change in apps/render/src)
 //   node scripts/skill-render.mts --skill decode --clips a.mp4,b.mp4,c.mp4 \
+//     [--module packages/agent/src/skills/<key>.ts]   (a skill not in the library yet: its module, exporting it)
 //     --words '{"surtitre":"un samedi dans","titre":"le marais"}' [--end '{"title":"…","subtitle":"…"}'] \
 //     [--shots 10] [--fonts "Open Sans,Inter"] [--name "Café des Arts"] [--out reel.mp4] [--no-render]
 //
@@ -18,11 +19,12 @@ import { parseArgs } from "node:util";
 import { buildReelProps } from "../packages/agent/src/motion.ts";
 import { HOUSE_MODELS } from "../packages/agent/src/house-models.ts";
 import { MONTAGE_SKILLS } from "../packages/agent/src/skill-library.ts";
-import { skillPlan, skillShotCount, type SkillFile, type SkillFill } from "../packages/agent/src/skills.ts";
+import { skillPlan, skillShotCount, type MontageSkill, type SkillFile, type SkillFill } from "../packages/agent/src/skills.ts";
 
 const { values } = parseArgs({
   options: {
     skill: { type: "string" },
+    module: { type: "string" },
     clips: { type: "string" },
     words: { type: "string", default: "{}" },
     end: { type: "string" },
@@ -33,8 +35,10 @@ const { values } = parseArgs({
     "no-render": { type: "boolean", default: false },
   },
 });
-const skill = MONTAGE_SKILLS[values.skill ?? ""];
-if (!skill) throw new Error(`--skill: one of ${Object.keys(MONTAGE_SKILLS).join(", ")}`);
+// A skill of the library, or one being written (its module exports it, under any name).
+const loaded = values.module ? (Object.values(await import(resolve(values.module))) as MontageSkill[]).find((x) => x && typeof x === "object" && "timeline" in x) : undefined;
+const skill = loaded ?? MONTAGE_SKILLS[values.skill ?? ""];
+if (!skill) throw new Error(`--skill: one of ${Object.keys(MONTAGE_SKILLS).join(", ")}, or --module <its file>`);
 const model = HOUSE_MODELS.find((m) => m.key === skill.key);
 const ROOT = resolve(import.meta.dirname, "..");
 const RENDER = `${ROOT}/apps/render`;
@@ -121,7 +125,7 @@ console.log("scene check:", check.trim().split("\n").at(-1));
 if (!values["no-render"]) {
   execFileSync(
     "npx",
-    ["remotion", "render", "build", "Reel", out, `--props=${out}.props.json`, `--browser-executable=${CHROME}`, "--chrome-mode=chrome-for-testing", "--concurrency=4", "--codec=h264", "--crf=18", "--log=error"],
+    ["remotion", "render", "build", "Reel", out, `--props=${out}.props.json`, `--browser-executable=${CHROME}`, "--chrome-mode=chrome-for-testing", `--concurrency=${process.env.CONCURRENCY ?? 4}`, "--codec=h264", "--crf=18", "--log=error"],
     { cwd: RENDER, stdio: "inherit" },
   );
   console.log("rendered:", out);

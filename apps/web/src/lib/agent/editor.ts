@@ -424,7 +424,8 @@ export async function designEdit(params: {
   // whose motion designer starts from its code.
   const skill = skillCandidate(followed, params.contract, Boolean(voice));
   const previousSkill = previousPlan.success && previousPlan.data.skill?.key === skill?.key ? previousPlan.data : null;
-  if (skill && followed && (!correction || previousSkill)) {
+  // (Never in the director's look at a Reel it made: that step only looks at its own composition.)
+  if (skill && followed && !params.director && (!correction || previousSkill)) {
     const made = await designSkill({
       studioId: params.studioId,
       postId: params.postId,

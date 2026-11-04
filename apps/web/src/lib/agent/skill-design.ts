@@ -31,6 +31,7 @@ import {
   type MontageSkill,
   type ReelContract,
   type SkillFile,
+  type SkillFillAnswer,
 } from "@fauve/agent";
 import { outputFormat, readAnswer } from "@fauve/agent/answer";
 import { skillFor } from "@fauve/agent/skills";
@@ -118,21 +119,50 @@ export async function designSkill(params: {
     contract: contractLines(params.contract),
     ...(current && Object.keys(current).length ? { current } : {}),
   });
-  let answer;
-  try {
-    const response = await anthropic().beta.messages.parse({
-      model: CHAT_MODEL,
-      max_tokens: 6000,
-      output_config: { effort: "medium", format: outputFormat(skillFillSchema) },
-      system: SKILL_FILL_PROMPT,
-      messages: [{ role: "user", content: JSON.stringify(input) }],
-    });
-    await logClaudeCost(params.studioId, response.usage, "skill_fill", CHAT_MODEL);
-    answer = response.parsed_output ? readAnswer(skillFillSchema, response.parsed_output) : null;
-  } catch (error) {
-    console.warn("skill: its filling failed, the editor makes the Reel", params.postId, error);
-    return null;
-  }
+  // One small call fills it; `again`: its answer and what the check said of it, for a second try.
+  const fillIt = async (again?: { answer: SkillFillAnswer; note: string }): Promise<SkillFillAnswer | null> => {
+    try {
+      const response = await anthropic().beta.messages.parse({
+        model: CHAT_MODEL,
+        max_tokens: 6000,
+        output_config: { effort: "medium", format: outputFormat(skillFillSchema) },
+        system: SKILL_FILL_PROMPT,
+        messages: [
+          { role: "user", content: JSON.stringify(input) },
+          ...(again ? [{ role: "assistant" as const, content: JSON.stringify(again.answer) }, { role: "user" as const, content: again.note }] : []),
+        ],
+      });
+      await logClaudeCost(params.studioId, response.usage, "skill_fill", CHAT_MODEL);
+      return response.parsed_output ? readAnswer(skillFillSchema, response.parsed_output) : null;
+    } catch (error) {
+      console.warn("skill: its filling failed, the editor makes the Reel", params.postId, error);
+      return null;
+    }
+  };
+  const facts: MediaFacts = { clips: Object.fromEntries(params.clips.map((c) => [c.media_id, c.analysis])), photos: params.photos, tracks: {} };
+  // Her Reel from an answer: the plan by code, dressed as a model followed and finished as any montage, then checked.
+  const made = async (answer: SkillFillAnswer): Promise<{ plan: EditPlan; error?: string } | null> => {
+    const fill = readSkillFill(skill, files, n, answer);
+    if (!fill) return null;
+    const plan = skillPlan({ skill, name, files, fill });
+    // The model's lettering when she chose it (her charter's when Edith picked it), and its finish (its grade, its grain).
+    Object.assign(plan, followedLook(plan, params.followed));
+    Object.assign(plan, followedFilter(plan, params.followed));
+    if (!planLook(plan) && params.profile.look) plan.look = params.profile.look;
+    // Each shot framed on its subject and its light corrected, as any montage.
+    const durations = Object.fromEntries(files.map((f) => [f.id, f.photo ? plan.duration : f.seconds]));
+    Object.assign(plan, finishPlan(plan, facts, durations));
+    // Its composition checked as any composition, never written again.
+    const checked = await checkSkill(params.studioId, plan, facts, params.profile, params.studio.name ?? "", name, params.brief).catch((error: unknown) => ({
+      error: `le contrôle n'a pas pu tourner : ${error instanceof Error ? error.message : String(error)}`.slice(0, 600),
+    }));
+    if ("error" in checked) return { plan, error: checked.error };
+    const layer = plan.layers![0]!;
+    plan.layers = [{ ...layer, motion: { ...layer.motion, js: checked.js, ...(checked.fonts.length ? { fonts: checked.fonts } : {}) } }];
+    return { plan };
+  };
+
+  let answer = await fillIt();
   if (!answer) return null;
   if (!answer.fits) {
     console.log("skill: her request needs the editor", params.postId, skill.key, answer.missing);
@@ -140,27 +170,25 @@ export async function designSkill(params: {
     await noteGap({ studioId: params.studioId, postId: params.postId, source: "skill", label: answer.missing.trim().slice(0, 200) || `une demande hors du modèle « ${name} »`, request: params.brief });
     return null;
   }
-  const fill = readSkillFill(skill, files, n, answer);
-  if (!fill) return null;
-
-  const plan = skillPlan({ skill, name, files, fill });
-  // The model's lettering when she chose it (her charter's when Edith picked it), and its finish (its grade, its grain).
-  Object.assign(plan, followedLook(plan, params.followed));
-  Object.assign(plan, followedFilter(plan, params.followed));
-  if (!planLook(plan) && params.profile.look) plan.look = params.profile.look;
-  // Each shot framed on its subject and its light corrected, as any montage.
-  const durations = Object.fromEntries(files.map((f) => [f.id, f.photo ? plan.duration : f.seconds]));
-  const facts: MediaFacts = { clips: Object.fromEntries(params.clips.map((c) => [c.media_id, c.analysis])), photos: params.photos, tracks: {} };
-  Object.assign(plan, finishPlan(plan, facts, durations));
-
-  // Its composition checked as any composition, never written again: a failure leaves the Reel to the editor.
-  const checked = await checkSkill(params.studioId, plan, facts, params.profile, params.studio.name ?? "", name, params.brief).catch((error: unknown) => {
-    console.warn("skill: its check could not run", params.postId, error);
+  let result = await made(answer);
+  // Refused by the check (her words too long for their place, most often): filled once more with what it said, for a
+  // cent, before the whole chain takes the Reel (the director's 0,80 € for a title one word too long, on the first bench).
+  if (result?.error) {
+    console.warn("skill: the check refused it, filled again", params.postId, skill.key, result.error.slice(0, 300));
+    const again = await fillIt({
+      answer,
+      note: `Le contrôle des scènes a refusé ce Reel : ${result.error.slice(0, 600)} Garde les mêmes plans et raccourcis les mots qui débordent (moins de lettres, un mot plus court), sans changer leur sens. Réponds de nouveau en entier.`,
+    });
+    if (again?.fits) {
+      answer = again;
+      result = await made(again);
+    }
+  }
+  if (!result || result.error) {
+    if (result?.error) console.warn("skill: its composition did not pass the check, the editor makes the Reel", name, result.error.slice(0, 300));
     return null;
-  });
-  if (!checked) return null;
-  const layer = plan.layers![0]!;
-  plan.layers = [{ ...layer, motion: { ...layer.motion, js: checked.js, ...(checked.fonts.length ? { fonts: checked.fonts } : {}) } }];
+  }
+  const plan = result.plan;
 
   const row = await insertPlanVersion(params.studioId, params.postId, plan);
   await supabaseAdmin().from("posts").update({ edit_plan_id: row.id }).eq("id", params.postId);
@@ -172,7 +200,7 @@ export async function designSkill(params: {
   };
 }
 
-/** The scene check of a skill's composition on her Reel (its shots as grey cards, its texts and marks): its js, or null when it fails. */
+/** The scene check of a skill's composition on her Reel (its shots as grey cards, its texts and marks): its js, or what it refused. */
 async function checkSkill(
   studioId: string,
   plan: EditPlan,
@@ -181,9 +209,9 @@ async function checkSkill(
   business: string,
   name: string,
   asked?: string,
-): Promise<{ js: string; fonts: string[] } | null> {
+): Promise<{ js: string; fonts: string[] } | { error: string }> {
   const layer = plan.layers?.find((l) => l.compose);
-  if (!layer?.motion.code) return null;
+  if (!layer?.motion.code) return { error: "pas de composition" };
   const timeline = planTimeline(plan);
   const shots = plan.segments.flatMap((s, i) => {
     if (!isClipSegment(s)) return [];
@@ -206,10 +234,7 @@ async function checkSkill(
     keep: true,
   };
   const [result] = await designMotionScenes(studioId, [request], undefined, brand, [], { look: { template, ...(plan.tempo ? { tempo: plan.tempo } : {}) } });
-  if (!result?.js) {
-    console.warn("skill: its composition did not pass the check, the editor makes the Reel", name, result?.error);
-    return null;
-  }
+  if (!result?.js) return { error: result?.error ?? "le contrôle n'a rien rendu" };
   return { js: result.js, fonts: result.fonts ?? [] };
 }
 
