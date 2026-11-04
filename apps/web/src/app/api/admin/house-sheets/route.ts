@@ -10,7 +10,8 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 // from the database by net.http_post. A body { "originals": { "<key>": "lab/models/<uuid>.mp4" } } first copies the
 // bench's copy of an original (modelVideo) to its place. ?key=<key> makes one model's sheets, otherwise every model's
 // whose original is kept. ?drop=lab/models/<uuid>.mp4 removes a bench copy no model is made from (the two « ingénieurs
-// IA », which Tristan did not want kept).
+// IA », which Tristan did not want kept). ?links=1 only gives an hour's signed link to each original (or to ?key=), with
+// its passage, to download them where a model's montage skill is written by hand: nothing is made.
 
 export const maxDuration = 800;
 
@@ -34,6 +35,14 @@ export async function POST(request: Request) {
   }
   const only = new URL(request.url).searchParams.get("key");
   if (only && !HOUSE_MODELS.some((m) => m.key === only)) return Response.json({ error: `modèle inconnu : ${only}` }, { status: 400 });
+  if (new URL(request.url).searchParams.get("links") === "1") {
+    const storage = supabaseAdmin().storage.from("media");
+    const links = await Promise.all((only ? [only] : HOUSE_MODELS.map((m) => m.key)).map(async (key) => {
+      const signed = await storage.createSignedUrl(houseOriginalPath(key), 3600);
+      return { key, url: signed.data?.signedUrl ?? null, passage: HOUSE_PASSAGES[key] ?? null };
+    }));
+    return Response.json({ links, expires_in: 3600 });
+  }
   const body = bodySchema.safeParse(await request.json().catch(() => ({})));
   if (!body.success) return Response.json({ error: body.error.message }, { status: 400 });
   const db = supabaseAdmin();
