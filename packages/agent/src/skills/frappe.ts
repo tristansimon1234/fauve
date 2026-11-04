@@ -9,13 +9,16 @@ import { beatSpans, toFrame, type MontageSkill } from "../skills.ts";
 //   2,25 – 6,75 the same place closer: what can light up in it (her sign's letters, each window, a garland: named by
 //               the filler from what the file shows) lights up piece by piece, 2 or 3 images each, then all of it at
 //               once for 6 images on beat 6, its bright parts blooming;
-//   6,75 – 10,75 a fixed shot with sky beside a building: her name typed by hand in red-orange capitals (a character
-//               a third of a beat or so, a pause in the middle and before the last letter), then her logo drawing
-//               itself around it, the cut landing on her sign (the match cut);
+//   6,75 – 10,75 a fixed shot with sky beside a building: her name typed by hand in capitals of her colour (a
+//               character a third of a beat or so, a pause in the middle and before the last letter), then her logo
+//               wiping in above it when she has one, the cut landing on her sign (the match cut);
 //   10,75 – 11,5 her shop front at night or lit, its sign and lights blinking on for 3 images just after the cut;
 //   three flash shots, a wide shot of life, a front with cinema bars closing over it, a burst of six shots between the
 //   bars on the snare roll (a passer-by flashing white), black.
-// Played horizontal as the original when her videos are horizontal (or she asks), else full frame.
+// Played horizontal as the original when her videos are horizontal (or she asks), else full frame. What belongs to the
+// original's own brand is never copied (Tristan, of its yellow arrow redrawn over a bar's name: « le symbole à la fin a
+// été repris mais fait partie d'un visuel spécifique à la vidéo originale »): its arrow is In-N-Out's logo, its
+// red-orange and yellow are its colours; hers take their place (her logo, her colour), or nothing.
 
 const BPM = 82.5;
 /** Its sections, in beats of its music. */
@@ -80,10 +83,10 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const by = wide ? Math.round((height - bh) / 2) : 0;
   const laid = { left: 0, top: 0, width: bw, height: bh };
 
-  // Its colours: the original's red-orange and yellow, or hers.
-  const own = setting("couleur", "original") === "sienne";
-  const RED = own && brand.accent ? brand.accent : "#ff2b00";
-  const YELLOW = own ? ((brand.palette && brand.palette.light) || "#ffcc00") : "#ffcc00";
+  // Her colour for her name (a colour too pale to read on a sky falls back to a red-orange), or on her word the
+  // original's red-orange.
+  const pale = (c) => { const m = /^#?([0-9a-f]{6})$/i.exec(String(c || "")); if (!m) return true; const v = parseInt(m[1], 16); return (0.2126 * ((v >> 16) & 255) + 0.7152 * ((v >> 8) & 255) + 0.0722 * (v & 255)) / 255 > 0.72; };
+  const RED = setting("couleur", "sienne") !== "original" && brand.accent && !pale(brand.accent) ? brand.accent : "#ff2b00";
   const display = "'" + brand.displayFont + "', 'Montserrat', 'Poppins', 'Arial Black', sans-serif";
   const body = "'" + brand.bodyFont + "', 'Inter Tight', 'Inter', sans-serif";
   const keep = (s) => String(s || "").replace(/(\d) (?=\d)/g, "$1 ");
@@ -149,21 +152,13 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
         h("span", null, chars.map((c, i) => h("span", { key: i, style: { opacity: frame >= shows[i] ? 1 : 0 } }, c))))
     : null;
 
-  // 4. Its logo draws itself around the name, then the cut lands on her sign: her logo when she has one (wiped in),
-  // else a yellow stroke drawn as the original's arrow (up from under the name, over it to the right).
+  // 4. Her logo wipes in above her name, then the cut lands on her sign. Without a logo, nothing is drawn: the
+  // original's arrow is its own brand's mark, never hers.
   const strokeK = interpolate(frame, [STROKE_AT, Math.max(STROKE_AT + 1, REVEAL_AT - 1)], [0, 1], { ...clamp, easing: Easing.out(Easing.cubic) });
   const textW = Math.min(nw, Math.round(chars.length * nameSize * 0.68));
-  const logo = showing && frame >= STROKE_AT
-    ? brand.logoUrl
-      ? h("div", { style: { position: "absolute", left: nx, top: Math.round(ny - nameSize * 1.25), width: textW, height: Math.round(nameSize * 1.1), clipPath: "inset(0 " + Math.round((1 - strokeK) * 100) + "% 0 0)" } },
-          h(Img, { src: brand.logoUrl, style: { width: "100%", height: "100%", objectFit: "contain", objectPosition: "left center" } }))
-      : h("svg", { width: bw, height: bh, style: { position: "absolute", left: 0, top: 0, overflow: "visible" } },
-          h("path", {
-            d: "M " + (nx + textW * 0.3) + " " + (ny + nameSize * 1.15) + " L " + (nx + textW * 0.04) + " " + (ny - nameSize * 0.4) + " L " + (nx + textW * 1.02) + " " + (ny - nameSize * 0.4),
-            fill: "none", stroke: YELLOW, strokeWidth: Math.max(6, Math.round(nameSize * 0.16)), strokeLinejoin: "miter", strokeLinecap: "butt",
-            pathLength: 1, strokeDasharray: 1, strokeDashoffset: 1 - strokeK,
-            style: { filter: "drop-shadow(0 2px 3px rgba(0,0,0,0.3))" },
-          }))
+  const logo = showing && frame >= STROKE_AT && brand.logoUrl
+    ? h("div", { style: { position: "absolute", left: nx, top: Math.round(ny - nameSize * 1.25), width: textW, height: Math.round(nameSize * 1.1), clipPath: "inset(0 " + Math.round((1 - strokeK) * 100) + "% 0 0)" } },
+        h(Img, { src: brand.logoUrl, style: { width: "100%", height: "100%", objectFit: "contain", objectPosition: "left center" } }))
     : null;
 
   // 5. A passer-by flashing white for two images, on the first shot of the burst (her subject when one is cut out).
@@ -205,11 +200,12 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
 export const frappe: MontageSkill = {
   key: "frappe",
   // 2: written again on its original's fiche (its format, its music, its lights, its typing, its logo, its bars, its burst).
-  version: 2,
+  // 3: the original's own marks left to it (its arrow, its colours): her logo and her colour, or nothing.
+  version: 3,
   bpm: BPM,
   shots: [12, 18],
   files: [5, 12],
-  how: "Un plan large et ensoleillé de son lieu, puis le même plus serré, où ce qui peut s'allumer (les lettres de son enseigne, ses fenêtres, une guirlande) s'allume morceau par morceau puis d'un coup sur un temps ; un plan fixe avec du ciel à côté d'un bâtiment, où son nom se tape à la main en capitales rouge orangé, puis son logo (ou un trait jaune) se dessine autour, et la coupe tombe sur son enseigne de nuit, qui clignote ; trois plans éclair, un plan large, une façade sur laquelle des bandes de cinéma se ferment, six plans éclair entre les bandes, un passant qui flashe en blanc, et le noir. En horizontal comme l'original quand ses vidéos le sont.",
+  how: "Un plan large et ensoleillé de son lieu, puis le même plus serré, où ce qui peut s'allumer (les lettres de son enseigne, ses fenêtres, une guirlande) s'allume morceau par morceau puis d'un coup sur un temps ; un plan fixe avec du ciel à côté d'un bâtiment, où son nom se tape à la main en capitales de sa couleur, puis son logo apparaît au-dessus (si elle en a un), et la coupe tombe sur son enseigne de nuit, qui clignote ; trois plans éclair, un plan large, une façade sur laquelle des bandes de cinéma se ferment, six plans éclair entre les bandes, un passant qui flashe en blanc, et le noir. En horizontal comme l'original quand ses vidéos le sont.",
   end: true,
   texts: [
     {
@@ -236,10 +232,10 @@ export const frappe: MontageSkill = {
     },
     {
       name: "couleur",
-      want: "la couleur du nom tapé et de son trait",
+      want: "la couleur du nom tapé",
       choices: [
-        { value: "original", says: "rouge orangé et jaune, comme l'original" },
-        { value: "sienne", says: "ses couleurs à elle (celles de sa charte)" },
+        { value: "sienne", says: "sa couleur à elle (celle de sa charte ; un rouge orangé si elle est trop pâle)" },
+        { value: "original", says: "le rouge orangé de l'original" },
       ],
     },
   ],

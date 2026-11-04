@@ -47,7 +47,8 @@
 
 ### 5. Son logo qui se dessine, et le raccord sur son enseigne
 - **Mesuré** : de 7,40 à 7,87 s, une flèche jaune #FFCC00 se dessine trait par trait autour du nom (de sous le nom, vers le haut, puis par-dessus vers la droite) ; la coupe tombe sur l'enseigne réelle au même endroit de l'image.
-- **Outil** : son logo (balayé) quand elle en a un, sinon le trait jaune ; le raccord tient à ce qu'elle filme (son enseigne dans le haut de l'image).
+- **À l'original, jamais recopié** : cette flèche est le logo d'In-N-Out, et le rouge orangé et le jaune sont ses couleurs (Tristan, de la flèche redessinée sur le nom d'un bar : « le symbole à la fin a été repris mais fait partie d'un visuel spécifique à la vidéo originale »). L'effet, c'est « son logo à elle apparaît autour de son nom ».
+- **Outil** : son logo (balayé) quand elle en a un, sinon rien ; son nom dans sa couleur ; le raccord tient à ce qu'elle filme (son enseigne dans le haut de l'image).
 
 ### 6. Trois plans éclair, une rafale entre des bandes de cinéma, un passant qui flashe en blanc
 - **Mesuré** : voir le déroulé ; les bandes se ferment en 0,25 s environ (2,35:1) ; le passant flashe 2 images au début de la rafale.

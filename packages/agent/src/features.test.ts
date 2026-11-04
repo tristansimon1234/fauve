@@ -1624,7 +1624,7 @@ test("a skill's objects: the filler names what lights up in her shot, the engine
   assert.equal(passages[0]!.from, second.in);
 });
 
-test("« Lieu tapé » v2 cuts where its original does, on its own music (82,5 BPM)", async () => {
+test("« Lieu tapé » cuts where its original does, on its own music (82,5 BPM)", async () => {
   const { frappe } = await import("./skills/frappe.ts");
   const line = frappe.timeline(15, { end: false });
   // The original's cuts (s), measured image by image (docs/fiches/frappe.md): within two images each.
@@ -1635,4 +1635,6 @@ test("« Lieu tapé » v2 cuts where its original does, on its own music (82,5 B
   assert.ok(Math.abs(line.marks.flash! - 130) <= 1);
   assert.ok(Math.abs(line.marks.blink! - 241) <= 1);
   assert.equal(line.marks.type, 164);
+  // What belongs to the original's brand is left to it: no In-N-Out arrow, no yellow of its own.
+  assert.ok(!/ffcc00|strokeDasharray/i.test(frappe.code));
 });
