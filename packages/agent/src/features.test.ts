@@ -1236,8 +1236,8 @@ test("each of Edith's models shows its original's frames as a Reel she sends: sh
   const { houseSheets, sheetSpan, houseOriginalPath, HOUSE_PASSAGES, MODEL_SHEETS } = await import("./house-sheets.ts");
   const { HOUSE_MEASURES } = await import("./house-measures.ts");
   const { stolenStyleSchema } = await import("./steal.ts");
-  // A studio's row written before the sheets is rewritten.
-  assert.equal(HOUSE_VERSION, 6);
+  // A studio's row written before the sheets is rewritten (7: four models renamed after their originals).
+  assert.equal(HOUSE_VERSION, 7);
   for (const m of HOUSE_MODELS) {
     const sheets = houseSheets(m.key);
     const duration = HOUSE_MEASURES[m.key]!.duration;

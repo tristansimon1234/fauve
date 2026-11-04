@@ -18,7 +18,7 @@ import type { z } from "zod";
 /** The source of the inspiration row a house model is kept on, per studio (one per model, made when first used). */
 export const HOUSE_SOURCE = "house";
 /** The catalogue's version: a studio's row written by an older one is rewritten when the model is used again (3: its original's sheets; 4: no brand in a model's name; 5: Mots aux quatre coins as its original; 6: Plans fixes at 65 BPM). */
-export const HOUSE_VERSION = 6;
+export const HOUSE_VERSION = 7;
 
 export type HouseModel = {
   key: string;
@@ -534,9 +534,10 @@ export const HOUSE_MODELS: HouseModel[] = [
   }),
   model({
     key: "titre-derriere",
-    name: "Titre derrière toi",
-    pitch: "Un titre géant posé dans le décor, qui passe derrière toi quand tu marches devant, puis une rafale de plans.",
-    needs: "une vidéo où tu marches devant ton lieu (plan large, fixe), et 6 à 12 autres plans",
+    // Renamed on its original's fiche (Tristan: « ok »): the city passes in front of the title, not a person.
+    name: "Titre derrière le décor",
+    pitch: "Un titre géant posé dans ta rue ou ton paysage, derrière les toits, les arbres ou les collines, puis le décor qui devient papier morceau par morceau et une rafale de plans.",
+    needs: "un plan large et fixe de ta rue, de ta devanture, ou d'un paysage quand ça a du sens (tes vignes, ta montagne), avec du ciel en haut et quelqu'un qui y entre, et 8 à 15 autres plans",
     files: [5, 14],
     pair: "geante-script",
     example: "derriere",
@@ -673,9 +674,10 @@ export const HOUSE_MODELS: HouseModel[] = [
   }),
   model({
     key: "tourne",
-    name: "Noir et blanc tourné",
-    pitch: "Tes plans en noir et blanc très contrasté, tournés d'un quart de tour pour remplir l'écran, coupés vite.",
-    needs: "8 à 15 vidéos filmées en largeur, de ton lieu, de matières, de gestes",
+    // Renamed on its original's fiche (Tristan: « ok »): two tones (blue-green and cream), its colour kept where it counts.
+    name: "Quart de tour, deux tons",
+    pitch: "Tes plans en largeur tournés d'un quart de tour pour remplir l'écran, en deux tons bleu-vert et crème, la couleur gardée là où elle compte, coupés sur le rythme.",
+    needs: "15 à 25 vidéos filmées en largeur : ta route, ton lieu, ta rue, des matières, des gestes, et deux ou trois plans où la couleur compte",
     files: [6, 16],
     pair: "cinema",
     example: "T-tourne",
@@ -956,9 +958,11 @@ export const HOUSE_MODELS: HouseModel[] = [
   }),
   model({
     key: "detourages",
-    name: "Détourages qui surgissent",
-    pitch: "Tes plans de rue, et des objets ou des personnes détourés qui surgissent par-dessus, avec un petit mot manuscrit.",
-    needs: "6 à 12 vidéos de ta rue ou de ton lieu, et 3 à 6 photos d'objets ou de produits sur fond simple",
+    // Renamed on its original's fiche (Tristan: « ok »): no cut-out pops in it; a window opens on the place, the name
+    // blinks letter by letter behind its scenery, then a burst on the beat.
+    name: "Ton nom qui clignote",
+    pitch: "Une fenêtre s'ouvre sur ton lieu ou ton paysage, ton nom s'y allume lettre par lettre derrière le décor, puis une rafale de plans sur le rythme.",
+    needs: "un plan large et fixe de ton lieu, ou d'un paysage quand ça a du sens (ta plage, ta vallée), avec du ciel au-dessus, et 10 à 20 plans courts qui bougent (des gestes, des matières, ta rue)",
     files: [6, 16],
     pair: "feutre",
     example: "collage",
@@ -1013,9 +1017,10 @@ export const HOUSE_MODELS: HouseModel[] = [
   }),
   model({
     key: "silhouette",
-    name: "Silhouette et mot",
-    pitch: "Toi en silhouette noire sur un fond pâle, et un grand mot qui s'inverse quand tu passes dessous.",
-    needs: "une vidéo de toi ou de passants qui marchent, filmée fixe",
+    // Renamed on its original's fiche (Tristan: « ok »): a presentation, a word inside her head, her name behind her.
+    name: "Présente-toi",
+    pitch: "Ton profil en silhouette d'un seul ton, un mot dans ta tête, puis ton nom qui s'écrit derrière toi et ce que tu fais qui défile.",
+    needs: "une vidéo de toi de profil devant un fond clair, téléphone posé (5 s : tu baisses la tête puis tu la relèves), ton nom, ton métier en un mot et 3 à 5 choses que tu fais",
     files: [1, 4],
     pair: "grotesque",
     example: "silhouette",
@@ -1118,11 +1123,11 @@ export const HOUSE_WHEN: Record<string, { pour: string; pas_pour: string }> = {
   gaufre: { pour: "une annonce élégante, un nom, une nouvelle collection, comme un faire-part", pas_pour: "un Reel rythmé ou drôle" },
   "mot-cle": { pour: "quelqu'un qui parle face caméra (un conseil, une explication)", pas_pour: "des images sans parole" },
   frappe: { pour: "présenter un lieu au soleil, une terrasse, une saison", pas_pour: "un intérieur sombre, des produits seuls" },
-  "titre-derriere": { pour: "un nom de lieu en grand avec des gens qui passent devant, une rue vivante", pas_pour: "sans plan large où des gens passent" },
+  "titre-derriere": { pour: "un nom de lieu, de quartier ou de région en grand, une rue avec des toits, un paysage, un ciel", pas_pour: "sans plan large et fixe avec du ciel en haut" },
   journee: { pour: "raconter une journée du lieu, du matin au soir, son ambiance", pas_pour: "une offre, un produit seul" },
   "plans-fixes": { pour: "un lieu calme et beau, une ambiance, l'heure dorée", pas_pour: "un Reel rythmé, une annonce" },
   "coups-de-fouet": { pour: "l'énergie d'une rue, d'un quartier, d'un lieu animé", pas_pour: "un lieu calme, un long message" },
-  tourne: { pour: "des matières, des gestes, un savoir-faire, un look graphique", pas_pour: "ce dont la couleur compte (des plats, des fleurs)" },
+  tourne: { pour: "un savoir-faire, des matières, un lieu, un look graphique de cinéma", pas_pour: "sans vidéos filmées en largeur" },
   nike: { pour: "l'effort, le geste, l'énergie (sport, danse, un service en plein rush)", pas_pour: "un lieu calme, des produits" },
   eventail: { pour: "une ouverture graphique, un lieu, une marque qui ose", pas_pour: "un message à lire" },
   coulisses: { pour: "les coulisses, la préparation, les étapes d'un geste", pas_pour: "un lieu en plan large, une offre" },
@@ -1131,9 +1136,9 @@ export const HOUSE_WHEN: Record<string, { pour: string; pas_pour: string }> = {
   pixel: { pour: "une recette, une préparation en étapes, une ambiance chaleureuse", pas_pour: "un lieu, une rue" },
   "mots-meles": { pour: "un jeu, une devinette, un message caché, un lieu calme", pas_pour: "un Reel rythmé" },
   aplat: { pour: "présenter une personne (la patronne, l'équipe), une marque qui ose la couleur", pas_pour: "sans vidéo d'elle qui marche" },
-  detourages: { pour: "des produits ou des objets qui surgissent dans la rue, un ton joueur", pas_pour: "sans photos d'objets sur fond simple" },
+  detourages: { pour: "présenter un lieu, un paysage ou une sortie avec de l'élan, un nom à faire retenir", pas_pour: "sans plan large et fixe de son lieu ou de son paysage" },
   createur: { pour: "quelqu'un qui explique en parlant, avec des images de ce dont il parle", pas_pour: "des images sans parole" },
-  silhouette: { pour: "une personne qui passe, un mot fort, un ton graphique", pas_pour: "des produits" },
+  silhouette: { pour: "se présenter, présenter son métier ou quelqu'un de l'équipe", pas_pour: "des produits, un lieu sans personne" },
   vision: { pour: "un lieu fréquenté, un ton tech ou graphique", pas_pour: "un lieu vide" },
 };
 
