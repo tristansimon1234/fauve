@@ -1959,3 +1959,119 @@ test("the clear area follows the camera: the same place of the scene at every im
   const near = placeClear({ x: 0.45, y: 0.45, w: 0.1, h: 0.1 }, pushed);
   assert.ok(Math.abs(near.w - 0.12 * 1080) < 0.5 && Math.abs(near.x + near.w / 2 - 540) < 0.5, JSON.stringify(near));
 });
+
+// ——— « Une journée chez toi » v2, written again on its original's fiche (docs/fiches/journee.md) ———————————————————
+
+/** An element of a composition run outside the render: its type (a tag or a kit piece's name), its props, its children. */
+type Drawn = { type: unknown; props: Record<string, unknown>; children: unknown[] };
+
+/**
+ * A skill's composition run at one frame with a stand-in scope (each kit piece a named element, SubjectParts given), its
+ * tree returned: what its code lays and where, without a browser.
+ */
+function sceneAt(code: string, frame: number, props: Record<string, unknown>, parts: { x: number; y: number; w: number; h: number }[] = []): Drawn {
+  const h = (type: unknown, p: Record<string, unknown> | null, ...children: unknown[]): Drawn => ({ type, props: p ?? {}, children: children.flat() });
+  const interpolate = (x: number, [a, b]: number[], [c, d]: number[]) => c! + (d! - c!) * Math.min(1, Math.max(0, (x - a!) / (b! - a! || 1)));
+  const scope: Record<string, unknown> = { React: { createElement: h, Fragment: "Fragment" }, useCurrentFrame: () => frame, interpolate, AbsoluteFill: "AbsoluteFill", Footage: "Footage", FitText: "FitText", SubjectParts: () => parts };
+  const Scene = new Function(...Object.keys(scope), `${code}\nreturn Scene;`)(...Object.values(scope)) as (p: unknown) => Drawn;
+  return Scene({ width: 1080, height: 1920, durationInFrames: 451, brand: { displayFont: "Bodoni Moda", bodyFont: "Jost" }, reelTexts: [], end: null, ...props });
+}
+/** Every element of a tree, depth first. */
+const drawnIn = (node: unknown): Drawn[] => (node && typeof node === "object" && "children" in node ? [node as Drawn, ...(node as Drawn).children.flatMap(drawnIn)] : []);
+
+test("« Une journée chez toi » (v2) cuts where its original does, on its own music (136,8 BPM), with its clicks and its muffled night", async () => {
+  const { journee } = await import("./skills/journee.ts");
+  const line = journee.timeline(22, { end: false });
+  // The original's cuts (images at 30 i/s, docs/fiches/journee.md), the two under its bands where each band starts to
+  // leave: within two images each.
+  const original = [0, 5, 26, 44, 55, 75, 93, 106, 116, 135, 158, 191, 213, 240, 263, 273, 283, 293, 319, 344, 366, 393].map((f) => f / 30);
+  assert.equal(line.shots.length, original.length);
+  line.shots.forEach((s, i) => assert.ok(Math.abs(s.start - original[i]!) <= 2 / 30 + 1e-6, `shot ${i + 1}: ${s.start} s, the original's ${original[i]} s`));
+  assert.ok(Math.abs(line.duration - 15.02) < 0.1, `${line.duration} s`);
+  assert.equal(journee.bpm, 136.8);
+  // Its flashes and its burns on the original's cuts, its walk jerky from its image 301, its bands over its images 26 and 44.
+  assert.deepEqual([0, 1, 2, 3, 4].map((k) => line.marks[`flash_${k}`]), [93, 106, 263, 273, 283]);
+  assert.deepEqual([0, 1, 2].map((k) => line.marks[`burn_${k}`]), [191, 213, 293]);
+  assert.ok(Math.abs(line.marks.jerky! - 301) <= 1);
+  assert.deepEqual([line.marks.burst, line.marks.burst_to, line.marks.veil_a, line.marks.veil_b], [5, 19, 26, 44]);
+  // Its title from the image after the second band's cut to the cut on her day (images 45 to 75).
+  assert.deepEqual([line.texts.titre!.from, line.texts.titre!.to].map((t) => Math.round(t * 30)), [45, 75]);
+  assert.deepEqual(line.texts.surtitre, line.texts.titre);
+  // A shutter on the title and on each flash and burn, where the original's are heard (s), the second burn's the loudest.
+  const heard = [1.51, 3.1, 3.55, 6.23, 6.33, 6.43, 7.08, 8.75, 9.06, 9.42, 9.75];
+  assert.deepEqual(line.sounds!.map((s) => s.sound), heard.map(() => "camera shutter"));
+  line.sounds!.forEach((s, i) => assert.ok(Math.abs(s.at - heard[i]!) <= 2 / 30, `click ${i + 1}: ${s.at} s, the original's ${heard[i]} s`));
+  assert.ok(line.sounds![6]!.gain! > 0 && line.sounds![8]!.gain! < 0);
+  // Its music muffled from the beat after the cut on the night (12,25 – 12,33 s), faded out over its last 1,7 s.
+  const [muffled] = line.music!.filters!;
+  assert.equal(muffled!.kind, "muffled");
+  assert.ok(muffled!.from > 12.2 && muffled!.from <= 12.33 && muffled!.to === line.duration, JSON.stringify(muffled));
+  assert.ok(Math.abs(line.music!.end!.fade! - 1.7) < 0.02 && Math.abs(line.music!.end!.at - 15) < 0.05);
+  // At another tempo, all of it follows its beats.
+  const slower = journee.timeline(22, { end: false, bpm: 100 });
+  assert.ok(Math.abs(slower.marks.night! / line.marks.night! - 136.8 / 100) < 0.01);
+  // Fewer files drop the shots of its day with nothing at their cut first (every flash and burn stays down to 18 shots);
+  // more of them, moments held three beats, up to about 30 s.
+  const fewer = journee.timeline(18, { end: false });
+  assert.equal(Object.keys(fewer.marks).filter((k) => k.startsWith("flash_")).length, 5);
+  assert.equal(Object.keys(fewer.marks).filter((k) => k.startsWith("burn_")).length, 3);
+  assert.ok(Math.abs(journee.timeline(33, { end: false }).duration - 29.5) < 0.2);
+});
+
+test("« Une journée chez toi » (v2): horizontal 4:3 on black as its original when her videos are, her setting else", async () => {
+  const { journee } = await import("./skills/journee.ts");
+  const { skillCode } = await import("./skills.ts");
+  const { drawsSubject, objectsDrawn } = await import("./subject.ts");
+  const line = journee.timeline(22, { end: false });
+  const marks = Object.fromEntries(Object.entries(line.marks).map(([k, v]) => [k, String(v)]));
+  const shots = (aspect: number) => line.shots.map((s) => ({ from: Math.round(s.start * 30), durationInFrames: Math.round((s.end - s.start) * 30), kind: "video", aspect }));
+  const frameBox = (tree: Drawn) => tree.children[0] as Drawn;
+  const style = (d: Drawn) => d.props.style as Record<string, number | string>;
+  // Her videos in width (the Budapest bench: 16:9): its 4:3 frame, 1080 × 810 in the middle of the vertical frame.
+  const wide = style(frameBox(sceneAt(journee.code, 100, { shots: shots(16 / 9), texts: marks })));
+  assert.deepEqual([wide.top, wide.width, wide.height], [555, 1080, 810]);
+  // Upright videos: the whole frame; her setting prevails both ways.
+  const tall = style(frameBox(sceneAt(journee.code, 100, { shots: shots(9 / 16), texts: marks })));
+  assert.deepEqual([tall.top, tall.height], [0, 1920]);
+  const asked = style(frameBox(sceneAt(journee.code, 100, { shots: shots(9 / 16), texts: { ...marks, format: "horizontal" } })));
+  assert.deepEqual([asked.top, asked.height], [555, 810]);
+  const upright = style(frameBox(sceneAt(journee.code, 100, { shots: shots(16 / 9), texts: { ...marks, format: "vertical" } })));
+  assert.deepEqual([upright.top, upright.height], [0, 1920]);
+  assert.deepEqual(journee.settings?.[0]?.choices.map((c) => c.value), ["auto", "horizontal", "vertical"]);
+  // Its title red, centred a little under the middle of its frame (52 %), in it.
+  const titled = sceneAt(journee.code, 60, { shots: shots(16 / 9), texts: marks, reelTexts: [{ text: "Paris", role: "hook", from: 45, to: 75 }, { text: "une journée à", role: "caption", from: 45, to: 75 }] });
+  const fit = drawnIn(frameBox(titled)).find((d) => d.type === "FitText")!;
+  assert.ok(Math.abs(Number(style(fit).top) + Number(style(fit).height) / 2 - 0.52 * 810) <= 1, JSON.stringify(style(fit)));
+  assert.match(JSON.stringify(drawnIn((fit.children[0] as (scale: number) => Drawn)(1))), /#fa010c.*PARIS|PARIS.*#fa010c/s);
+  // Things alike in its burst shot, each brought to the same place and size, one a film image: 49 % across, 21,5 % down.
+  // Its 16:9 picture laid whole (1440 × 810 from 180 px left of the frame), so a piece off the 4:3 crop comes in too
+  // (the first one here); one whose picture would then leave much of the frame black is left out (the last one).
+  const parts = [...Array.from({ length: 10 }, (_, i) => ({ x: i ? 100 + i * 60 : -50, y: 160 + (i % 3) * 30, w: 60, h: 100 + (i % 2) * 20 })), { x: 1250, y: 700, w: 60, h: 100 }];
+  const laid = [5, 6, 8].map((f) => drawnIn(frameBox(sceneAt(journee.code, f, { shots: shots(16 / 9), texts: marks }, parts))).find((d) => d.type === "Footage")!);
+  const centres = laid.map((d, k) => {
+    const s = style(d);
+    const p = parts[k]!;
+    const z = Number(s.width) / 1440;
+    return [Number(s.left) + z * (p.x + p.w / 2 + 180), Number(s.top) + z * (p.y + p.h / 2), z * p.h];
+  });
+  for (const [x, y, size] of centres) {
+    assert.ok(Math.abs(x! - 0.49 * 1080) < 1 && Math.abs(y! - 0.215 * 810) < 1, JSON.stringify(centres));
+    assert.ok(Math.abs(size! - centres[0]![2]!) < 1, JSON.stringify(centres));
+  }
+  assert.deepEqual(laid.map((d) => d.props.shot), [1, 1, 1]);
+  // Its ten pieces kept over its fourteen images, every fifth image twice (one a film image).
+  const burst = Array.from({ length: 14 }, (_, i) => String(style(drawnIn(frameBox(sceneAt(journee.code, 5 + i, { shots: shots(16 / 9), texts: marks }, parts))).find((d) => d.type === "Footage")!).left));
+  assert.equal(new Set(burst).size, 10);
+  // Its objects: what repeats in its burst shot, named by the filler; nobody cut out (no one passes in front of its title).
+  assert.equal(drawsSubject(journee.code), false);
+  assert.deepEqual(objectsDrawn(journee.code), []);
+  assert.deepEqual(objectsDrawn(skillCode(journee, { pareilles: "every jar" })), [{ shot: 1, name: "every jar" }]);
+  // A flash overexposes the cut (never a white card), a burn lays its light in screen; no zoom, no grain, no dark corners.
+  const flash = drawnIn(frameBox(sceneAt(journee.code, 93, { shots: shots(16 / 9), texts: marks })));
+  assert.match(String(style(flash.find((d) => d.type === "Footage")!).filter), /brightness\(1\.35\)/);
+  assert.ok(flash.some((d) => style(d)?.mixBlendMode === "screen" && style(d)?.background === "#ffffff" && Number(style(d)?.opacity) < 0.3));
+  const burnt = drawnIn(frameBox(sceneAt(journee.code, 189, { shots: shots(16 / 9), texts: marks })));
+  assert.ok(burnt.some((d) => style(d)?.mixBlendMode === "screen" && /rgba\(255,96,64/.test(String(style(d)?.background))));
+  assert.ok(!/\b(Flash|Whip|ZoomThrough|Subject)\b|scale\(1\.0/.test(journee.code));
+  assert.deepEqual(journee.finish, { grain: 0, vignette: 0 });
+});
