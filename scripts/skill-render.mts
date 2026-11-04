@@ -6,13 +6,16 @@
 //   node scripts/skill-render.mts --skill decode --clips a.mp4,b.mp4,c.mp4 \
 //     [--module packages/agent/src/skills/<key>.ts]   (a skill not in the library yet: its module, exporting it)
 //     --words '{"surtitre":"un samedi dans","titre":"le marais"}' [--end '{"title":"…","subtitle":"…"}'] \
-//     [--shots 10] [--fonts "Open Sans,Inter"] [--name "Café des Arts"] [--out reel.mp4] [--no-render]
+//     [--shots 10] [--bpm 90] [--fonts "Open Sans,Inter"] [--name "Café des Arts"] [--out reel.mp4] [--no-render]
 //
+// --bpm plays it at another tempo than its own (a longer Reel, a music's tempo), as skillFit would.
 // Clips are local files (videos or photos); they are normalized at 30 images a second into the bundle's public folder,
+// once per file (named after its path, size and date: another file at the same place in the list is normalized anew),
 // as the render workshop does. The browser is Playwright's Chromium (CHROME, default /opt/pw-browsers/…), whose fonts
 // load through the machine's own certificates.
 
 import { execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, statSync, writeFileSync } from "node:fs";
 import { basename, extname, resolve } from "node:path";
 import { parseArgs } from "node:util";
@@ -29,6 +32,7 @@ const { values } = parseArgs({
     words: { type: "string", default: "{}" },
     end: { type: "string" },
     shots: { type: "string" },
+    bpm: { type: "string" },
     fonts: { type: "string", default: "" },
     name: { type: "string", default: "Studio Test" },
     out: { type: "string" },
@@ -61,8 +65,10 @@ const files: (SkillFile & { src: string; aspect: number })[] = (values.clips ?? 
   const source = resolve(path);
   const photo = PHOTO.test(source);
   const id = `f${i}`;
-  const target = `${media}/${id}${photo ? extname(source) : ".mp4"}`;
-  if (!existsSync(target) || statSync(target).mtimeMs < statSync(source).mtimeMs) {
+  const { size, mtimeMs } = statSync(source);
+  const stamp = createHash("sha1").update(`${source}:${size}:${mtimeMs}`).digest("hex").slice(0, 10);
+  const target = `${media}/${id}-${stamp}${photo ? extname(source) : ".mp4"}`;
+  if (!existsSync(target)) {
     if (photo) execFileSync("cp", [source, target]);
     else
       execFileSync("ffmpeg", ["-v", "error", "-y", "-i", source, "-an", "-vf", "scale='if(gt(iw,ih),min(iw,2560),-2)':'if(gt(iw,ih),-2,min(ih,2560))',fps=30,tpad=stop_mode=clone:stop_duration=2,format=yuv420p", "-c:v", "libx264", "-preset", "veryfast", "-crf", "18", "-movflags", "+faststart", target]);
@@ -85,7 +91,8 @@ const fill: SkillFill = {
   texts: JSON.parse(values.words ?? "{}"),
   end: values.end ? JSON.parse(values.end) : null,
 };
-const plan = skillPlan({ skill, name: model?.name ?? skill.key, files, fill });
+const bpm = values.bpm ? Math.round(Math.min(140, Math.max(60, Number(values.bpm)))) : undefined;
+const plan = skillPlan({ skill, name: model?.name ?? skill.key, files, fill, ...(bpm ? { bpm } : {}) });
 const fonts = (values.fonts || "").split(",").map((f) => f.trim()).filter(Boolean);
 const props = buildReelProps(plan, {
   template: "libre",
@@ -97,7 +104,7 @@ const props = buildReelProps(plan, {
 const out = resolve(values.out ?? `${ROOT}/${skill.key}.mp4`);
 writeFileSync(`${out}.plan.json`, JSON.stringify(plan, null, 1));
 writeFileSync(`${out}.props.json`, JSON.stringify(props));
-console.log(`${skill.key} v${skill.version}: ${n} shots, ${plan.duration} s, texts ${plan.texts.map((t) => `« ${t.text} » ${t.from}–${t.to} s`).join(", ")}`);
+console.log(`${skill.key} v${skill.version}: ${n} shots, ${plan.duration} s at ${plan.tempo ?? skill.bpm} BPM, texts ${plan.texts.map((t) => `« ${t.text} » ${t.from}–${t.to} s`).join(", ")}`);
 
 // The scene check, as the engine runs it on a composition (its marks as its slot texts).
 const layer = props.layers?.find((l) => l.compose);
@@ -119,8 +126,16 @@ writeFileSync(
     },
   ]),
 );
-const check = execFileSync("node", ["smoke.mjs", `${out}.scenes.json`, "./build"], { cwd: RENDER, env: { ...process.env, BROWSER_EXECUTABLE: CHROME }, encoding: "utf8" });
-console.log("scene check:", check.trim().split("\n").at(-1));
+// A crash of the check (« Target closed ») still prints what it said before it, and the Reel is rendered anyway.
+let check = "";
+try {
+  check = execFileSync("node", ["smoke.mjs", `${out}.scenes.json`, "./build"], { cwd: RENDER, env: { ...process.env, BROWSER_EXECUTABLE: CHROME }, encoding: "utf8" });
+} catch (error) {
+  const failed = error as { stdout?: string; stderr?: string; status?: number | null };
+  check = failed.stdout ?? "";
+  console.log(`scene check crashed (exit ${failed.status ?? "?"}):`, (failed.stderr ?? "").trim().split("\n").slice(-3).join(" | "));
+}
+console.log("scene check:", check.trim().split("\n").at(-1) ?? "(nothing)");
 
 if (!values["no-render"]) {
   execFileSync(
