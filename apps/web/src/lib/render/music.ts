@@ -11,6 +11,7 @@ import {
   musicTail,
   planBeat,
   planBpm,
+  readMusicShape,
   sfxLevelSchema,
   usdToEur,
   type EditPlan,
@@ -80,6 +81,15 @@ export const postMusicSchema = z.object({
 export type PostMusic = z.infer<typeof postMusicSchema>;
 
 export const readPostMusic = (value: unknown): PostMusic => postMusicSchema.catch({ mode: "on" }).parse(value ?? {});
+
+/**
+ * Whether a Reel gets Edith's music: on for the post, and not a model that plays without any (music-shape.ts `none`:
+ * its sounds are its soundtrack), unless she asked for a music for it (her wish, or « Une autre »).
+ */
+export function musicPlays(music: PostMusic, plan: Pick<EditPlan, "music_shape" | "duration">, fresh = false): boolean {
+  if (music.mode !== "on") return false;
+  return !readMusicShape(plan.music_shape, plan.duration)?.none || Boolean(music.wish) || fresh;
+}
 
 /**
  * How present a Reel's sound effects are: this Reel's choice, else her default (for all her Reels),
@@ -263,8 +273,9 @@ export async function withMusic(params: {
   const { data: post } = await db.from("posts").select("music").eq("id", params.postId).single();
   const music = readPostMusic(post?.music);
   const sounds = music.mode === "model" ? [] : (params.sounds ?? []);
-  if (music.mode !== "on") {
-    // No music of hers: the effects alone over its own sound (none on a Reel that takes the copied Reel's sound).
+  if (!musicPlays(music, params.plan, params.fresh)) {
+    // No music of hers, or a model that plays without any: the effects alone over its own sound (none on a Reel that
+    // takes the copied Reel's sound).
     if (!sounds.length) return { mp4: params.mp4, music: "none" };
     return { mp4: await muxAudioInSandbox(params.renderId, params.mp4, null, { sounds }), music: "none" };
   }
@@ -351,7 +362,16 @@ export async function withMusic(params: {
       .update({ music: { mode: "on", ...(music.wish ? { wish: music.wish } : {}), track: { path, signature, song_id: best!.songId, created_at: new Date().toISOString(), ...(music.wish ? { wish: music.wish } : {}) } } })
       .eq("id", params.postId);
   }
-  return { mp4: await muxAudioInSandbox(params.renderId, params.mp4, mp3, { voiceOver: Boolean(params.plan.voice), sounds, ambient: params.ambient }), music: made };
+  // Shaped as its model plays it (its pauses, its muffled passages, its end), whatever piece it got.
+  return {
+    mp4: await muxAudioInSandbox(params.renderId, params.mp4, mp3, {
+      voiceOver: Boolean(params.plan.voice),
+      sounds,
+      ambient: params.ambient,
+      ...(params.plan.music_shape ? { shape: params.plan.music_shape, duration: params.plan.duration } : {}),
+    }),
+    music: made,
+  };
 }
 
 /** Keeps what she asked for this Reel's music (her contract's): the composer's brief from now on, and a new piece. */

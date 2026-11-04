@@ -144,17 +144,25 @@ export async function playableSounds(sounds: Record<string, LibrarySound>): Prom
   );
 }
 
-/** The files of the sounds placed on a Reel, for the mix (a sound whose file is gone is left out). */
+/**
+ * The files of the sounds placed on a Reel, for the mix (a sound whose file is gone is left out): each file downloaded
+ * once, however many times it is placed (a skill's key click on each letter of her name).
+ */
 export async function soundFiles<P extends { key: string }>(placed: P[], sounds: Record<string, LibrarySound>): Promise<(P & { mp3: Uint8Array })[]> {
   const db = supabaseAdmin();
-  const files = await Promise.all(
-    placed.map(async (p) => {
-      const path = sounds[p.key]?.path;
-      const file = path ? await db.storage.from("media").download(path).catch(() => null) : null;
-      return file?.data ? [{ ...p, mp3: new Uint8Array(await file.data.arrayBuffer()) }] : [];
-    }),
+  const paths = [...new Set(placed.flatMap((p) => (sounds[p.key]?.path ? [sounds[p.key]!.path] : [])))];
+  const downloaded = new Map(
+    await Promise.all(
+      paths.map(async (path) => {
+        const file = await db.storage.from("media").download(path).catch(() => null);
+        return [path, file?.data ? new Uint8Array(await file.data.arrayBuffer()) : null] as const;
+      }),
+    ),
   );
-  return files.flat();
+  return placed.flatMap((p) => {
+    const mp3 = downloaded.get(sounds[p.key]?.path ?? "");
+    return mp3 ? [{ ...p, mp3 }] : [];
+  });
 }
 
 /** The sounds already made, the most recently used first: given to their writers, who reuse a name when one fits. */

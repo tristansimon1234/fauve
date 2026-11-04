@@ -1,7 +1,10 @@
 import { z } from "zod";
 import type { ReelLook } from "./looks.ts";
 import { REEL_FPS } from "./motion.ts";
-import type { EditPlan, PlanSegment } from "./schemas.ts";
+import { readMusicShape, type MusicShape } from "./music-shape.ts";
+import type { EditPlan, PlanSegment, SfxCue } from "./schemas.ts";
+import { soundSeconds } from "./sfx.ts";
+import { laterAudio } from "./sound-follow.ts";
 
 // Montage skills (Tristan: « edith pourrait choisir d'adapter ces modèles comme une librairie de "skills de montage" »,
 // « sur Edits d'Insta tu as des modèles où le texte est préposé et les photos et vidéos n'ont qu'à être changées »):
@@ -27,6 +30,14 @@ export type SkillText = {
 /** One of its shots for n shots: its span (seconds from the start) and what it wants (for the filler). */
 export type SkillShot = { start: number; end: number; want: string };
 
+/**
+ * One of its sounds, its original's own as its fiche measures them (a key click on each typed letter, a whoosh up to the
+ * drop, a shutter on each flash): what it is (a short generic description in English, the sound library's key with its
+ * length: « light click », « camera shutter »), when its loudest moment lands (s, on the Reel's clock: a whoosh that builds
+ * starts before), its length (0,5 to 3 s), how loud (dB from the Reel's level of sound effects, −24 to +6; its peak capped).
+ */
+export type SkillSound = { at: number; sound: string; seconds?: number; gain?: number };
+
 export type SkillTimeline = {
   /** The Reel's length (s). */
   duration: number;
@@ -35,6 +46,17 @@ export type SkillTimeline = {
   texts: Record<string, { from: number; to: number }>;
   /** What its code reads besides the Reel's texts and shots (its sections, in frames): given as the composition's slot texts. */
   marks: Record<string, number>;
+  /**
+   * Its sounds, played on their own moments as the model plays them (plan.sounds, `skill`: never moved onto a cut, all
+   * kept one frame apart at least, unless her sound effects are off); made once by the sound library and mixed after the render.
+   */
+  sounds?: SkillSound[];
+  /**
+   * How its music is shaped, on the Reel's clock from its beats (music-shape.ts): where it stops dead and comes back on a
+   * downbeat, where it plays muffled and when it opens, where it ends (cut dead, or faded), or no music at all (`none`).
+   * Applied by the mix to whatever music the Reel gets (plan.music_shape).
+   */
+  music?: MusicShape;
 };
 
 /**
@@ -84,10 +106,12 @@ export type MontageSkill = {
   /** Whether its code draws an ending card (an offer, an announcement) when the Reel has one. */
   end: boolean;
   /**
-   * For n shots: its length, each shot's span and want, its texts' moments and its code's marks; `bpm`, at another
-   * tempo than its own (a longer or shorter Reel, a music's tempo): every length it counts in beats follows it.
+   * For n shots: its length, each shot's span and want, its texts' moments and its code's marks, its sounds and its
+   * music's shape; `bpm`, at another tempo than its own (a longer or shorter Reel, a music's tempo): every length it
+   * counts in beats follows it; `words`, her words by slot when they are written (the plan's): what its sounds follow
+   * (a key click on each letter of her name as its code types it), never its lengths.
    */
-  timeline(n: number, options: { end: boolean; bpm?: number; settings?: Record<string, string> }): SkillTimeline;
+  timeline(n: number, options: { end: boolean; bpm?: number; settings?: Record<string, string>; words?: Record<string, string> }): SkillTimeline;
   /** The tempos it plays at (default: from 0,7 to 1,2 times its own, within 60 to 140). */
   tempo?: [number, number];
   /** What her words can change in it, as a template's variants (its grid, its pace, its order, its colour). */
@@ -337,7 +361,8 @@ export function skillPlan(input: { skill: MontageSkill; name: string; files: Ski
   const bpm = input.bpm && input.bpm !== skill.bpm ? input.bpm : undefined;
   const settings = skillSettings(skill, fill.settings);
   const chosen = Object.keys(settings).length ? settings : undefined;
-  const line = skill.timeline(fill.shots.length, { end: Boolean(fill.end), ...(bpm ? { bpm } : {}), ...(chosen ? { settings: chosen } : {}) });
+  // Her words too: its sounds may follow them (a key click on each letter its code types).
+  const line = skill.timeline(fill.shots.length, { end: Boolean(fill.end), ...(bpm ? { bpm } : {}), ...(chosen ? { settings: chosen } : {}), words: fill.texts });
   const files = new Map(input.files.map((f) => [f.id, f]));
   const taken = new Map<string, [number, number][]>();
   const segments = line.shots.map((span, i): PlanSegment => {
@@ -390,12 +415,68 @@ export function skillPlan(input: { skill: MontageSkill; name: string; files: Ski
         },
       },
     ],
+    // Its sounds and its music's shape, as its original plays them.
+    ...skillAudio(line),
     skill: { key: skill.key, version: skill.version, ...(chosen ? { settings: chosen } : {}) },
   };
 }
 
 /** A Reel made on a skill (its correction is filled again on the same skill). */
 export const skillOf = (plan: Pick<EditPlan, "skill">) => plan.skill ?? null;
+
+/** The most sounds a skill gives one Reel (the plan keeps 40). */
+const SKILL_SOUNDS = 40;
+const round3 = (n: number) => Math.round(n * 1000) / 1000;
+
+/**
+ * What its timeline gives the Reel's sound, as the plan keeps it: its sounds on their own moments (`skill`), within the
+ * Reel (none in its last 0,15 s), in order, 40 at most, each one's length as the library keeps it and its gain within
+ * −24 to +6 dB; its music's shape read against its length (music-shape.ts).
+ */
+export function skillAudio(line: Pick<SkillTimeline, "duration" | "sounds" | "music">): Pick<EditPlan, "sounds" | "music_shape"> {
+  const sounds = (line.sounds ?? [])
+    .filter((s) => Number.isFinite(s.at) && s.at >= 0 && s.at < line.duration - 0.15 && s.sound.trim().length >= 2)
+    .sort((a, b) => a.at - b.at)
+    .slice(0, SKILL_SOUNDS)
+    .map((s): SfxCue => {
+      const gain = Number.isFinite(s.gain) ? Math.round(Math.min(6, Math.max(-24, s.gain!)) * 10) / 10 : 0;
+      return { at: round3(s.at), sound: s.sound.trim().slice(0, 60), seconds: soundSeconds(s.seconds), skill: true, ...(gain ? { gain } : {}) };
+    });
+  const music = readMusicShape(line.music, line.duration);
+  return { ...(sounds.length ? { sounds } : {}), ...(music ? { music_shape: music } : {}) };
+}
+
+/** Its words by slot, read from a plan's texts: each slot the next text of its role, in the skill's order. */
+export function skillWordsOf(skill: Pick<MontageSkill, "texts">, texts: { text: string; style: string }[]): Record<string, string> {
+  return Object.fromEntries(
+    skill.texts.flatMap((t) => {
+      const same = texts.filter((x) => x.style === t.role);
+      const k = skill.texts.filter((x) => x.role === t.role).indexOf(t);
+      return same[k] ? [[t.slot, same[k]!.text] as const] : [];
+    }),
+  );
+}
+
+/**
+ * Its sounds and its music's shape again for a plan made on it whose words were changed by hand (her name typed again:
+ * a key click on each of its new letters): its timeline for the same shots, tempo, ending and settings, with the plan's
+ * words, later by the plan's lead. Null when another version of it made the plan, or when its length is no longer the
+ * timeline's (its cut changed: its marks, and its sounds with them, stay those it was made with).
+ */
+export function replaySkillAudio(skill: MontageSkill, plan: EditPlan): Pick<EditPlan, "sounds" | "music_shape"> | null {
+  if (plan.skill?.key !== skill.key || plan.skill.version !== skill.version) return null;
+  const lead = plan.beat_at ?? 0;
+  const bpm = plan.tempo && Math.abs(plan.tempo - skill.bpm) > 0.005 ? plan.tempo : undefined;
+  const settings = plan.skill.settings && Object.keys(plan.skill.settings).length ? plan.skill.settings : undefined;
+  const line = skill.timeline(plan.segments.length, {
+    end: Boolean(plan.end_card),
+    ...(bpm ? { bpm } : {}),
+    ...(settings ? { settings } : {}),
+    words: skillWordsOf(skill, plan.texts),
+  });
+  if (Math.abs(round(line.duration) + lead - plan.duration) > 1 / 30 + 0.005) return null;
+  return lead > 0 ? laterAudio(skillAudio(line), lead) : skillAudio(line);
+}
 
 // ——— The filler ———————————————————————————————————————————————————————————————————————————————————————————————————
 

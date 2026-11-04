@@ -1,7 +1,20 @@
 "use server";
 
 import { bakedReel, insertPlanVersion } from "@/lib/edit-plans";
-import { assertTransition, editPlanSchema, planMediaIds, postStatusSchema, slidesPlanSchema, slotTextLimit, type PostStatus, type SfxCue } from "@fauve/agent";
+import {
+  assertTransition,
+  editPlanSchema,
+  planMediaIds,
+  postStatusSchema,
+  replaySkillAudio,
+  slidesPlanSchema,
+  slotTextLimit,
+  type EditPlan,
+  type MusicShape,
+  type PostStatus,
+  type SfxCue,
+} from "@fauve/agent";
+import { skillFor } from "@fauve/agent/skills";
 import { revalidatePath } from "next/cache";
 import { after } from "next/server";
 import { z } from "zod";
@@ -203,11 +216,24 @@ export async function saveEditPlan(postId: string, input: unknown): Promise<Save
   };
   plan.segments = plan.segments.map((s) => ("motion" in s ? { ...s, motion: withKnownFonts(s.motion) } : s));
   if (plan.layers) plan.layers = plan.layers.map((l) => ({ ...l, motion: withKnownFonts(l.motion) }));
-  // The editor's sounds stay those of the version she edits, never the browser's.
+  // The editor's sounds and its music's shape stay those of the version she edits, never the browser's.
   const { data: current } = await db.from("posts").select("edit_plan_id").eq("id", postId).maybeSingle();
-  const edited = (versions ?? []).find((v) => v.id === current?.edit_plan_id)?.plan as { sounds?: SfxCue[] } | undefined;
+  const edited = (versions ?? []).find((v) => v.id === current?.edit_plan_id)?.plan as { sounds?: SfxCue[]; music_shape?: MusicShape; skill?: EditPlan["skill"] } | undefined;
   delete plan.sounds;
+  delete plan.music_shape;
   if (edited?.sounds?.length) plan.sounds = edited.sounds;
+  if (edited?.music_shape) plan.music_shape = edited.music_shape;
+  // A montage skill's follow her words (a key click on each letter of her name as its code types it): computed again on
+  // the words she wrote, for the skill of the version she edits, when its cut is the same.
+  const skill = skillFor(edited?.skill?.key);
+  const replayed = skill && edited?.skill ? replaySkillAudio(skill, { ...plan, skill: edited.skill }) : null;
+  if (replayed) {
+    const sounds = [...(plan.sounds ?? []).filter((c) => !c.skill), ...(replayed.sounds ?? [])].sort((a, b) => a.at - b.at).slice(0, 40);
+    if (sounds.length) plan.sounds = sounds;
+    else delete plan.sounds;
+    if (replayed.music_shape) plan.music_shape = replayed.music_shape;
+    else delete plan.music_shape;
+  }
 
   let row: { id: string; version: number };
   try {

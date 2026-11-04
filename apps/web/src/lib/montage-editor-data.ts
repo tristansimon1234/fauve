@@ -1,5 +1,5 @@
 import "server-only";
-import { readPostMusic, soundLevel } from "@/lib/render/music";
+import { musicPlays, readPostMusic, soundLevel } from "@/lib/render/music";
 import { playableSounds, soundsKnown } from "@/lib/render/sfx";
 import { dayIn, editPlanSchema, isClipSegment, motionTemplateSchema, planCues, planTimeline, type ReelInputs } from "@fauve/agent";
 import { loadMontageInputs } from "@/lib/render/render-post";
@@ -38,8 +38,9 @@ export async function loadEditorData(studioId: string, planId: string, extraMedi
   // Edith's music plays in the live preview too (the piece kept for this post).
   const { data: post } = data?.post_id ? await db.from("posts").select("music").eq("id", data.post_id).maybeSingle() : { data: null };
   const music = readPostMusic(post?.music);
+  // None for a model that plays without music (its sounds are its soundtrack), as its video.
   const soundtrack =
-    music.mode === "on" && music.track ? ((await db.storage.from("media").createSignedUrl(music.track.path, 3600)).data?.signedUrl ?? undefined) : undefined;
+    musicPlays(music, plan.data) && music.track ? ((await db.storage.from("media").createSignedUrl(music.track.path, 3600)).data?.signedUrl ?? undefined) : undefined;
   // Its sound effects as the video has them (the library's, never made here): placed by buildReelProps like the render's.
   const level = data?.post_id ? await soundLevel(studioId, data.post_id as string).catch(() => "off" as const) : "off";
   const cues = level === "off" ? [] : planCues(plan.data, planTimeline(plan.data).segments);

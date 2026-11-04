@@ -1,3 +1,4 @@
+import { shiftMusicShape } from "./music-shape.ts";
 import { isClipSegment, type EditPlan } from "./schemas.ts";
 
 // Following a sound she gives by a link (Tristan: « comment faire pour que Edith puisse caler un son sur une idée du
@@ -26,9 +27,9 @@ export function soundLead(offset: number, bpm: number): number {
 /**
  * A plan written from 0 (a montage skill's), held `lead` seconds on its first image, every later moment as late: its
  * cuts then fall on the beats of the sound she follows. The first shot lasts that much longer (its video from earlier
- * when it can), the texts, the logo and the animations come that much later, and a composition over the whole Reel
- * starts then, its first image held meanwhile (hold_first). The editor's plans get their lead from the tempo grid
- * instead (beat_at in snapToTempo).
+ * when it can), the texts, the logo, the animations, its sounds and its music's shape come that much later, and a
+ * composition over the whole Reel starts then, its first image held meanwhile (hold_first). The editor's plans get
+ * their lead from the tempo grid instead (beat_at in snapToTempo).
  */
 export function leadPlan(plan: EditPlan, lead: number): EditPlan {
   if (!(lead > 0) || !plan.segments.length || plan.beat_at) return plan;
@@ -51,5 +52,14 @@ export function leadPlan(plan: EditPlan, lead: number): EditPlan {
     texts: plan.texts.map(later),
     images: plan.images.map(later),
     ...(plan.layers ? { layers: plan.layers.map((l) => ({ ...later(l), ...(l.compose && l.from <= 0 ? { hold_first: true } : {}) })) } : {}),
+    ...laterAudio(plan, lead),
+  };
+}
+
+/** A plan's sounds and its music's shape `lead` seconds later (a plan held on its first image). */
+export function laterAudio(audio: Pick<EditPlan, "sounds" | "music_shape">, lead: number): Pick<EditPlan, "sounds" | "music_shape"> {
+  return {
+    ...(audio.sounds ? { sounds: audio.sounds.map((s) => ({ ...s, at: round(s.at + lead) })) } : {}),
+    ...(audio.music_shape ? { music_shape: shiftMusicShape(audio.music_shape, lead) } : {}),
   };
 }

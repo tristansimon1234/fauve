@@ -26,6 +26,7 @@ import {
   skillFit,
   skillFitAt,
   skillLengths,
+  skillWordsOf,
   mergeSkillSettings,
   leadPlan,
   soundLead,
@@ -129,11 +130,7 @@ export async function designSkill(params: {
   // A correction keeps its words but what her request changes: the words of its texts, by slot.
   // A correction keeps the settings it had (« plus de cases » once asked) but what her request changes.
   const previousSettings = params.previous?.skill?.key === skill.key ? params.previous.skill.settings : undefined;
-  const current = params.previous?.skill?.key === skill.key ? Object.fromEntries(skill.texts.flatMap((t) => {
-    const same = params.previous!.texts.filter((x) => x.style === t.role);
-    const k = skill.texts.filter((x) => x.role === t.role).indexOf(t);
-    return same[k] ? [[t.slot, same[k]!.text] as const] : [];
-  })) : undefined;
+  const current = params.previous?.skill?.key === skill.key ? skillWordsOf(skill, params.previous.texts) : undefined;
   const input = skillFillInput({
     skill,
     name,

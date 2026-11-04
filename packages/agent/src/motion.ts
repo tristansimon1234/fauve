@@ -5,6 +5,7 @@ import type { LogoOnDark } from "./logo.ts";
 import type { VoiceWord } from "./voice.ts";
 import type { BrandSignature } from "./signature.ts";
 import { previewMusic, speechWindows, type MixCase } from "./mix.ts";
+import { musicEnvelope } from "./music-shape.ts";
 import { placeSounds, planCues, type SoundFacts, type SoundPlacement } from "./sfx.ts";
 import type { SfxLevel } from "./schemas.ts";
 import { faceZone, layerTrack, sceneTrack, shotTrack, type FaceZone, type ShotTrack, type TrackPiece, type TracksByClip } from "./tracking.ts";
@@ -363,9 +364,10 @@ export type ReelProps = {
   endCard: { title: string; subtitle: string | null; from: number; logoNamed?: false } | null;
   /**
    * Edith's music, played in the live preview (the render gets it mixed in afterwards):
-   * its volume (0–1), and the lower one while someone speaks, in `duck.windows` (frames).
+   * its volume (0–1), and the lower one while someone speaks, in `duck.windows` (frames);
+   * `envelope`, its model's shape (music-shape.ts): points (frame, 0–1) to draw straight lines between.
    */
-  soundtrack?: { src: string; volume?: number; duck?: { volume: number; windows: [number, number][] } } | null;
+  soundtrack?: { src: string; volume?: number; duck?: { volume: number; windows: [number, number][] }; envelope?: [number, number][] } | null;
   /**
    * The sound effects (sfx.ts): each placed as the mix places it (`at`, `gain` in dB, the part of its file
    * played), and `from` its frame. Played by the live preview only: the render strips them and mixes them afterwards.
@@ -825,7 +827,9 @@ export function buildReelProps(plan: EditPlan, inputs: ReelInputs): ReelProps {
   const ambient = plan.finish?.video_sound === "all" && segments.some((s) => s.type === "clip" && s.speech);
   const mix: MixCase = voice ? "voice_over" : spoken.length ? "speech_in_clips" : ambient ? "ambient" : "music";
   const speech = speechWindows(spoken.filter((w) => w.from < durationInFrames), toFrames(0.5));
-  const music = previewMusic(mix, speech);
+  // Its model's shape on the music, as the mix sets it: silent in its pauses and after its end (its filters are the render's).
+  const envelope = musicEnvelope(plan.music_shape, plan.duration, fps);
+  const music = { ...previewMusic(mix, speech), ...(envelope.length ? { envelope } : {}) };
   // Its sound effects, placed once for the preview and the mix alike: at its level, never on top of what is said.
   const sfx =
     inputs.sfx && inputs.sfx.level !== "off"

@@ -1,3 +1,5 @@
+import { musicShapeGraph, readMusicShape, shapesMusic, type MusicShape } from "./music-shape.ts";
+
 // How Edith's music sits under what is said in a Reel. Loudness in LUFS (EBU R128,
 // measured by ffmpeg on the rendered video and on the music), turned into fixed
 // gains: what is said (her voice note, Edith's voice, someone speaking in a clip)
@@ -70,14 +72,34 @@ export function mixGains(loudness: { speech: number | null; music: number | null
   };
 }
 
+/** How long the mix fades over the end of a Reel (s). */
+export const MIX_FADE = 0.8;
+
+/** Its fade when the music ends by its own shape (s): the whole mix only loses its last 20 ms, never a click on the loop. */
+const MIX_EDGE = 0.02;
+
 /**
  * The ffmpeg filter graph of a mix: [0:a] the video's own sound, [1:a] the music,
  * out as [a], faded out over 0.8 s from `fadeAt` (s; null when the length is unknown: no fade).
+ * `shaped`: the music's shape (music-shape.ts: its pauses, its filtered passages, its end) and the Reel's length: the
+ * music is shaped before anything joins it; when it ends by its own shape, the mix only fades its last 20 ms.
  */
-export function mixFilter(gains: ReturnType<typeof mixGains>, fadeAt: number | null, sounds: SoundInMix[] = []): string {
-  const fade = fadeAt === null ? "" : `,afade=t=out:st=${Math.max(0, fadeAt).toFixed(2)}:d=0.8`;
+export function mixFilter(
+  gains: ReturnType<typeof mixGains>,
+  fadeAt: number | null,
+  sounds: SoundInMix[] = [],
+  shaped?: { shape: MusicShape | null | undefined; duration: number },
+): string {
+  const read = shaped ? readMusicShape(shaped.shape, shaped.duration) : null;
+  const shape = shapesMusic(read) ? read : null;
+  const fade =
+    fadeAt === null
+      ? ""
+      : shape?.end
+        ? `,afade=t=out:st=${Math.max(0, fadeAt + MIX_FADE - MIX_EDGE).toFixed(3)}:d=${MIX_EDGE}`
+        : `,afade=t=out:st=${Math.max(0, fadeAt).toFixed(2)}:d=${MIX_FADE}`;
   const limit = `alimiter=limit=${MIX_CEILING}:level=false`;
-  const music = `[1:a]${STEREO},volume=${gains.musicGain}dB`;
+  const music = `[1:a]${STEREO},volume=${gains.musicGain}dB${shape ? `[ms_in];${musicShapeGraph(shape, "ms_in", "ms_out", shaped!.duration)};[ms_out]anull` : ""}`;
   // The sound effects (inputs 2…), added to the mix before its limiter and its fade.
   const end = sounds.length ? `[pre];${soundChains(sounds, 2)};[pre]${sounds.map((_, i) => `[x${i}]`).join("")}amix=inputs=${sounds.length + 1}:duration=first:normalize=0,` : ",";
   // The ambience of her videos under the music, both as they are.

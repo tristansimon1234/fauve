@@ -493,17 +493,31 @@ function underStickers(props: ReelProps, t: ReelProps["texts"][number]): boolean
 /**
  * The music's volume at a frame of the live preview (the render mixes it afterwards,
  * measured): its level, and the lower one while someone speaks, reached in 3 frames
- * and left over 15, like the render's ducking.
+ * and left over 15, like the render's ducking; silent where its model's shape stops it
+ * (its pauses, after its end: `envelope`).
  */
 function musicVolume(track: NonNullable<ReelProps["soundtrack"]>, frame: number): number {
-  const volume = track.volume ?? 1;
+  const volume = (track.volume ?? 1) * shapeVolume(track.envelope, frame);
   if (!track.duck) return volume;
   let ducked = 0;
   for (const [from, to] of track.duck.windows) {
     if (frame < from - 3 || frame > to + 15) continue;
     ducked = Math.max(ducked, frame < from ? (frame - from + 3) / 3 : frame > to ? 1 - (frame - to) / 15 : 1);
   }
-  return volume + (track.duck.volume - volume) * ducked;
+  return volume + (track.duck.volume * shapeVolume(track.envelope, frame) - volume) * ducked;
+}
+
+/** Its shape's volume at a frame (0–1): straight lines between its points, full before the first, the last one's after. */
+function shapeVolume(envelope: [number, number][] | undefined, frame: number): number {
+  if (!envelope?.length) return 1;
+  if (frame <= envelope[0]![0]) return frame < envelope[0]![0] ? 1 : envelope[0]![1];
+  for (let i = 1; i < envelope.length; i++) {
+    const [b, vb] = envelope[i]!;
+    if (frame > b) continue;
+    const [a, va] = envelope[i - 1]!;
+    return b === a ? vb : va + ((vb - va) * (frame - a)) / (b - a);
+  }
+  return envelope.at(-1)![1];
 }
 
 /**

@@ -70,6 +70,7 @@ export * from "./hook.ts";
 export * from "./tempo.ts";
 export * from "./sound-follow.ts";
 export * from "./mix.ts";
+export * from "./music-shape.ts";
 export * from "./when.ts";
 export * from "./creation.ts";
 export * from "./fonts.ts";
