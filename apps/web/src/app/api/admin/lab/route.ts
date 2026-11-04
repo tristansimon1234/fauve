@@ -162,37 +162,12 @@ const CASES: Record<string, LabCase> = {
     // Public domain videos of the street Tristan uploaded with step=upload (2-le-procope-serveur.mp4: people walking past its front).
     own: ["2-le-procope-serveur.mp4", "1-terrasse-mariniere.mp4", "3-boulangerie-le-viennoise.mp4", "4-rue-passantes-graphic.mp4", "5-feu-pieton-affiches.mp4", "6-passage-pieton-rue.mp4"],
   },
-  // A place for a model made on a place (« Lieu tapé lettre à lettre », Tristan of its bench on unrelated clips: « pas sûr
-  // que les vidéos choisies correspondent bien », then « il faut que ce soit de beaux reels », « ça doit attirer l'œil, être
-  // en lien avec ce qu'on a, qui on vend »): a real neighbourhood café, its neon sign at night, its coffees, its quarter
-  // (the Seine, Notre-Dame, Saint-Michel) and its passers-by, in beautiful horizontal clips (Pexels, free licence),
-  // uploaded with step=upload. Its name is its sign's, so the name typed in the sky is the sign the cut lands on; its gold
-  // is its neon's, dark enough to read on a sky.
-  petitpont: {
-    name: "Le Petit Pont",
-    business: "café-restaurant",
-    facts: ["Café-restaurant face à Notre-Dame, Paris 5e", "Crêpes, fondues, pizzas et tapas, terrasse sous son enseigne au néon"],
-    brand: { colors: ["#E8A33A", "#F5F2EC", "#1E3B2A"], fonts: ["Playfair Display", "Inter Tight"], tone: "chaleureux, parisien, tutoiement" },
-    title: "Le Petit Pont",
-    idea: "Notre café face à Notre-Dame, de jour comme de nuit : ça doit donner envie de venir s'asseoir chez nous.",
-    own: [
-      "1-notre-dame-soleil.mp4",
-      "2-le-petit-pont-nuit.mp4",
-      "3-tour-eiffel-ciel.mp4",
-      "4-seine-couchant.mp4",
-      "5-bateau-seine.mp4",
-      "6-saint-michel-soir.mp4",
-      "7-bouquinistes.mp4",
-      "8-cafes-latte.mp4",
-      "9-latte-art.mp4",
-      "10-passante-beret.mp4",
-      "11-passante-champs.mp4",
-      "12-louvre-couchant.mp4",
-    ],
-  },
-  // Four more places for the models' benches, each one shoot of one person (Pexels, free licence, horizontal), found by
-  // an agent for their beauty (Tristan: « il faut que ce soit de beaux reels », « du vintage aussi »): a seaside pier
-  // whose name is its bulb sign at night (Lieu tapé), a grand café under a glass roof, a vintage clothes shop, a florist.
+  // Places for the models' benches, each one shoot of one person (Pexels, free licence, horizontal), found for their
+  // beauty (Tristan of a bench on unrelated clips: « pas sûr que les vidéos choisies correspondent bien », then « il faut
+  // que ce soit de beaux reels », « ça doit attirer l'œil, être en lien avec ce qu'on a, qui on vend », « du vintage
+  // aussi »): a seaside pier whose name is its bulb sign at night (Lieu tapé: the name typed in the sky is the sign the
+  // cut lands on), a grand café under a glass roof, a vintage clothes shop, a florist. A Paris café was taken out: Tristan
+  // did not want to promote it.
   brighton: {
     name: "Brighton Pier",
     business: "jetée de loisirs",

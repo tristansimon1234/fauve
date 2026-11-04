@@ -2,7 +2,7 @@ import { beatSpans, type MontageSkill } from "../skills.ts";
 
 // « Photo dump », written on its original (house/originals/photo-dump.mp4, 11,3 s, 32 pictures, looked at image by
 // image): on a very light grey page, one photo or video at a time, laid at once in the middle, at its own shape and
-// the same width (80 % of the frame: a portrait 3:4, a tall 9:16, a landscape, a wide 16:9), now and then a smaller one;
+// the same width (80 % of the frame: a portrait 3:4, a tall 9:16, a landscape 4:3; a wider video framed 4:3), now and then a smaller one;
 // no border, no shadow, no text, a new one on every half-beat (a picture every 0,35 s), the last one a little longer.
 // Its ending card (an offer, an announcement) is a plain line of text on the same grey, after the last picture.
 
@@ -25,11 +25,12 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const keep = (s) => String(s || "").replace(/(\d) (?=\d)/g, "$1\u00a0");
   const clamp = { extrapolateLeft: "clamp", extrapolateRight: "clamp" };
 
-  // 1. The picture of the moment, alone in the middle: 80 % of the frame's width at its own shape (between a tall
-  // 9:16 and a wide panorama), a smaller one now and then, as the model; it plays while it is on.
+  // 1. The picture of the moment, alone in the middle: 80 % of the frame's width at its own shape (between a tall 9:16
+  // and a 4:3, the widest of its original's pictures: a wider video is framed 4:3, else a 16:9 one was a thin strip on
+  // the page), a smaller one now and then, as the model; it plays while it is on.
   const cur = shots.reduce((k, s, i) => (s.from <= frame ? i : k), 0);
   const s = shots[cur];
-  const a = s ? Math.max(0.5625, Math.min(2.4, Number(s.aspect) || 0.75)) : 0.75;
+  const a = s ? Math.max(0.5625, Math.min(4 / 3, Number(s.aspect) || 0.75)) : 0.75;
   const small = cur > 0 && cur < n - 1 && cur % 11 === 6;
   const w = Math.round(width * 0.8 * (small ? 0.73 : 1));
   const hh = Math.round(w / a);
@@ -59,7 +60,9 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
 
 export const photoDump: MontageSkill = {
   key: "photo-dump",
-  version: 1,
+  // 2: a video wider than 4:3 (her horizontal clips) is framed 4:3, the widest of its original's pictures: at its own
+  // 16:9 it was a thin strip on the grey page (bench of a vintage shop).
+  version: 2,
   bpm: BPM,
   shots: [12, 32],
   files: [8, 20],

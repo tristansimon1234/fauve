@@ -1650,6 +1650,13 @@ test("« Lieu tapé » cuts where its original does, on its own music (82,5 BPM)
   assert.ok(/background: "#000000", opacity: dimK/.test(frappe.code));
 });
 
+test("« Photo dump » frames a video wider than 4:3 at 4:3, its original's widest picture", async () => {
+  const { photoDump } = await import("./skills/photo-dump.ts");
+  assert.equal(photoDump.version, 2);
+  assert.ok(/Math\.min\(4 \/ 3, Number\(s\.aspect\)/.test(photoDump.code));
+  assert.ok(!/Math\.min\(2\.4/.test(photoDump.code));
+});
+
 test("« Lieu tapé » in the catalogue: her colour, not its original's orange", async () => {
   const { houseModel } = await import("./house-models.ts");
   const model = houseModel("frappe")!;
