@@ -37,7 +37,8 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   // 1. Her shots, full frame; each change made of windows: the 3 × 3 cells of the frame turn to the next shot one or a
   // few at a time, every two images, from a little before the cut to a little after it (the last cells of the one
   // before lingering), in an order that changes from one cut to the next (from a corner, a band, the middle, scattered).
-  // Every fourth change, a window opens in the middle with the next shot a beat ahead, then the rest follows on the cut.
+  // After a shot held two beats, a window opens in the middle with the next shot almost a beat ahead, then the rest
+  // follows on the cut.
   const COLS = 3;
   const ROWS = 3;
   const cellW = width / COLS;
@@ -45,9 +46,9 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const step2 = (beats) => 2 * Math.round((beats * BEAT) / 2);
   const SPREAD = [-0.3, -0.2, -0.1, -0.1, 0, 0, 0.1, 0.2, 0.42];
   const LATE = [-0.06, 0, 0, 0.06, 0.1, 0.16, 0.26, 0.42];
-  const orderFor = (c) => {
+  const orderFor = (c, held) => {
     const cells = Array.from({ length: COLS * ROWS }, (_, k) => k);
-    const kind = c % 4;
+    const kind = held ? 3 : c % 3;
     const seed = "win-" + c;
     if (kind === 3) {
       // A window in the middle first, then the others scattered.
@@ -72,7 +73,7 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   // When each cell turns at each cut (frames): the cut's frame plus its offset in the order.
   const cuts = shots.slice(1).map((s) => s.from);
   const turns = cuts.map((at, c) => {
-    const { order, early } = orderFor(c);
+    const { order, early } = orderFor(c, shots[c].durationInFrames >= 1.5 * BEAT);
     const t = new Array(COLS * ROWS);
     order.forEach((cell, k) => {
       t[cell] = at + (early ? (k === 0 ? -step2(0.85) : step2(LATE[k - 1])) : step2(SPREAD[k]));
@@ -82,7 +83,7 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   // The loop: in the last shot's last beat, the first shot comes back through windows (the Reel starts again on it).
   const loopAt = LOOP && !end && n > 1 ? durationInFrames - Math.round(0.9 * BEAT) : -1;
   const loopTurns = loopAt >= 0 ? (() => {
-    const { order } = orderFor(cuts.length);
+    const { order } = orderFor(cuts.length, false);
     const t = new Array(COLS * ROWS);
     order.forEach((cell, k) => { t[cell] = loopAt + step2(SPREAD[k] + 0.3); });
     return t;
@@ -116,14 +117,15 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
       })
     : null;
 
-  // 2. Its two labels, fixed the whole Reel, just above the middle: one on the left, one on the right, small white
-  // condensed capitals (the frame's own edge of shade, so they read on a bright sky).
+  // 2. Its two labels, fixed the whole Reel, just above the middle (their letters' boxes above it, clear of the apps'
+  // buttons): one on the left, one on the right, small white condensed capitals, with a tight shade so they read on a
+  // bright sky.
   const hook = reelTexts.find((t) => t.role === "hook");
   const caption = reelTexts.find((t) => t.role === "caption");
   const others = reelTexts.filter((t) => t !== hook && t !== caption);
   const label = { fontFamily: display, fontWeight: 500, fontSize: 50, lineHeight: 1.05, letterSpacing: "0.04em", textTransform: "uppercase", color: "#ffffff", whiteSpace: "nowrap", textShadow: shade };
   const tag = (t, left, align, key) => t && frame >= t.from && frame < t.to
-    ? h(FitText, { key, style: { position: "absolute", left, top: 880, width: 470, height: 70 }, innerStyle: { ...label, alignItems: align } }, t.text)
+    ? h(FitText, { key, style: { position: "absolute", left, top: 852, width: 470, height: 76 }, innerStyle: { ...label, alignItems: align } }, t.text)
     : null;
   const labels = [tag(hook, 50, "flex-start", "left"), tag(caption, width - 520, "flex-end", "right")];
 
@@ -135,7 +137,7 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   // the typewriter, the labels still there between.
   const ending = end && frame >= endAt
     ? h(AbsoluteFill, { style: { backgroundColor: "rgba(0,0,0," + (0.5 * interpolate(frame, [endAt, endAt + 6], [0, 1], clamp)).toFixed(3) + ")" } },
-        h(FitText, { style: { position: "absolute", left: 140, top: 520, width: width - 280, height: 330 }, innerStyle: { justifyContent: "flex-end", fontFamily: display, fontWeight: 600, fontSize: 120, lineHeight: 1.0, letterSpacing: "0.01em", textTransform: "uppercase", color: "#ffffff", textAlign: "center", whiteSpace: "normal", textWrap: "balance", textShadow: shade } },
+        h(FitText, { style: { position: "absolute", left: 140, top: 470, width: width - 280, height: 340 }, innerStyle: { justifyContent: "flex-end", fontFamily: display, fontWeight: 600, fontSize: 120, lineHeight: 1.0, letterSpacing: "0.01em", textTransform: "uppercase", color: "#ffffff", textAlign: "center", whiteSpace: "normal", textWrap: "balance", textShadow: shade } },
           h("span", { style: { display: "inline-block", opacity: interpolate(frame, [endAt + 2, endAt + 8], [0, 1], clamp) } }, String(end.title || ""))),
         end.subtitle
           ? h(FitText, { style: { position: "absolute", left: 140, top: 1000, width: width - 280, height: 190 }, innerStyle: { justifyContent: "flex-start", fontFamily: body, fontWeight: 500, fontSize: 48, lineHeight: 1.2, letterSpacing: "0.06em", textTransform: "uppercase", color: "#ffffff", textAlign: "center", whiteSpace: "normal", textWrap: "balance", textShadow: shade } },
@@ -154,7 +156,7 @@ export const fenetres: MontageSkill = {
   // Up to 34 for a length she asks for: about 30 s at its own tempo (more of the journey, the same windows).
   long: 34,
   files: [5, 14],
-  how: "Deux petites étiquettes techniques en capitales blanches restent fixes à mi-hauteur, une à gauche, une à droite, tout le Reel ; ses plans changent à peu près à chaque temps, et chaque changement se fait par fenêtres : le plan suivant apparaît dans des rectangles posés sur les tiers de l'image (un coin, une bande, une case), quelques-uns de plus toutes les deux images, jusqu'à prendre tout l'écran ; de temps en temps une fenêtre s'ouvre au milieu avec le plan suivant un temps en avance ; à la fin, le premier plan revient par fenêtres et le Reel tourne en boucle.",
+  how: "Deux petites étiquettes techniques en capitales blanches restent fixes à mi-hauteur, une à gauche, une à droite, tout le Reel ; ses plans changent à peu près à chaque temps, et chaque changement se fait par fenêtres : le plan suivant apparaît dans des rectangles posés sur les tiers de l'image (un coin, une bande, une case), quelques-uns de plus toutes les deux images, jusqu'à prendre tout l'écran ; après un plan tenu deux temps, une fenêtre s'ouvre au milieu avec le plan suivant un temps en avance ; à la fin (sans carte de fin), le premier plan revient par fenêtres et le Reel tourne en boucle.",
   end: true,
   texts: [
     { slot: "gauche", role: "hook", want: "l'étiquette de gauche, comme une étiquette technique en capitales : ce qui situe, son quartier, sa rue ou sa ville quand on les sait, sinon son nom (une forme comme « PARIS 11E », « RUE DES MARTYRS »)", max: 20, required: true },
@@ -172,7 +174,7 @@ export const fenetres: MontageSkill = {
     const duration = spans.at(-1)!.end;
     const wants = spans.map((s, i) =>
       i === 0
-        ? "le plan qui ouvre le Reel, large et beau : un paysage, sa rue ou son lieu en mouvement ; il revient à la fin, par fenêtres, pour que le Reel tourne en boucle"
+        ? "le plan qui ouvre le Reel, large et beau : un paysage, sa rue ou son lieu en mouvement" + (end ? "" : " ; il revient à la fin, par fenêtres, pour que le Reel tourne en boucle")
         : i === spans.length - 1
           ? "un dernier plan large de son quartier ou de son lieu, tenu un peu plus longtemps"
           : s.end - s.start > 1.5 * beat

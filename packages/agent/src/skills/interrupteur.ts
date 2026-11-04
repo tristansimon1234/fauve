@@ -145,6 +145,8 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const hook = reelTexts.find((t) => t.role === "hook");
   const caption = reelTexts.find((t) => t.role === "caption");
   const others = reelTexts.filter((t) => t !== hook && t !== caption);
+  // Capitals, as the poster sets its line; an ordinal keeps its small letters (« LYON 2e », « 1er »).
+  const caps = (s) => String(s || "").toUpperCase().replace(/(\d)(ER|E)\b/g, (m, d, x) => d + x.toLowerCase());
   const plain = (s) => String(s || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
   const named = plain(brand.name);
   // Her name, as her logo already says it: never written twice under it.
@@ -183,7 +185,7 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
     h("span", { style: pop(at) }, ruled ? rule("a") : null, keep(text), ruled ? rule("b") : null));
   const posterLines = frame >= ON && frame < endAt
     ? lines.map((t, i) => (t === caption
-        ? lineBox("l" + i, linesY + i * LINE, LINE - 8, String(t.text).toUpperCase(), { fontWeight: 700, fontSize: 48, letterSpacing: "0.05em", lineHeight: 1.1, whiteSpace: "nowrap" }, ON + 2 + i * 2, Array.from(String(t.text)).length <= 14)
+        ? lineBox("l" + i, linesY + i * LINE, LINE - 8, caps(t.text), { fontWeight: 700, fontSize: 48, letterSpacing: "0.05em", lineHeight: 1.1, whiteSpace: "nowrap" }, ON + 2 + i * 2, Array.from(String(t.text)).length <= 14)
         : lineBox("l" + i, linesY + i * LINE, LINE - 8, t.text, { fontFamily: display, fontWeight: 800, fontSize: 64, letterSpacing: "-0.02em", lineHeight: 1.05, whiteSpace: "nowrap" }, ON + 2, false)))
     : null;
   const ending = end && frame >= endAt

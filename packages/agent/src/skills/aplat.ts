@@ -70,16 +70,21 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const keep = (s) => String(s || "").replace(/(\d) (?=\d)/g, "$1\u00a0");
 
   // Her title stacked very big in the colour's ink, a word a line (her name kept whole), and its small line above it
-  // in spaced capitals: small beside the title, at a size that reads when it stands alone.
+  // in spaced capitals: small beside the title (four words at most), at a size that reads otherwise, on two lines when
+  // it needs them, in the title's place when it stands alone.
+  const wordsIn = (s) => String(s || "").split(/[\s  ]+/).filter((w) => /[\p{L}\p{N}]/u.test(w)).length;
   const stack = (text) => String(text || "").split(/[ \t\n]+/).filter(Boolean).join("\n");
-  const titleBlock = (key, title, small) => h(React.Fragment, { key },
-    small
-      ? h(FitText, { style: { position: "absolute", left: 140, top: 128, width: 800, height: title ? 64 : 110 }, innerStyle: { fontFamily: body, fontWeight: 600, fontSize: title ? 30 : 52, lineHeight: 1.15, letterSpacing: "0.26em", textTransform: "uppercase", color: ON, whiteSpace: "nowrap" } },
-          title ? h("span", { "data-fauve-accent": "", style: { marginRight: "-0.26em" } }, keep(small)) : h("span", { style: { marginRight: "-0.26em" } }, keep(small)))
-      : null,
-    title
-      ? h(FitText, { style: { position: "absolute", left: 60, top: 210, width: 960, height: 660 }, innerStyle: { fontFamily: display, fontWeight: 400, fontSize: 300, lineHeight: 0.86, letterSpacing: "-0.01em", textTransform: "uppercase", color: ON, whiteSpace: "pre", textAlign: "center" } }, stack(keep(title)))
-      : null);
+  const titleBlock = (key, title, small) => {
+    const accent = Boolean(title) && wordsIn(small) <= 4;
+    return h(React.Fragment, { key },
+      small
+        ? h(FitText, { style: { position: "absolute", left: 140, top: title ? (accent ? 140 : 96) : 470, width: 800, height: accent ? 64 : 128 }, innerStyle: { fontFamily: body, fontWeight: 600, fontSize: accent ? 30 : 48, lineHeight: 1.18, letterSpacing: accent ? "0.26em" : "0.12em", textTransform: "uppercase", color: ON, whiteSpace: accent ? "nowrap" : "normal", textWrap: "balance", textAlign: "center" } },
+            h("span", accent ? { "data-fauve-accent": "", style: { marginRight: "-0.26em" } } : null, keep(small)))
+        : null,
+      title
+        ? h(FitText, { style: { position: "absolute", left: 60, top: 236, width: 960, height: 634 }, innerStyle: { fontFamily: display, fontWeight: 400, fontSize: 300, lineHeight: 0.86, letterSpacing: "-0.01em", textTransform: "uppercase", color: ON, whiteSpace: "pre", textAlign: "center" } }, stack(keep(title)))
+        : null);
+  };
 
   // 1. Her first shot. Her silhouette (her cut-out) alone on the flat colour: white and glowing for three images, then
   // in her own colours, a soft shadow cast from her feet. Without her cut-out: her shot in hard black and white
@@ -178,7 +183,7 @@ export const aplat: MontageSkill = {
   end: true,
   texts: [
     { slot: "titre", role: "hook", want: "facultatif : 1 à 3 mots empilés en très grand sur l'aplat, derrière toi, un par ligne en capitales : ce qu'on va voir, ou ton nom s'il est court (une forme comme « un samedi », « au marché », « chez Lou »)", max: 18, required: false },
-    { slot: "ligne", role: "caption", want: "facultatif : une petite ligne en capitales espacées au-dessus du titre : où, quand (une forme comme « au marché · samedi », « rue des Martyrs »)", max: 28, required: false },
+    { slot: "ligne", role: "caption", want: "facultatif : une petite ligne en capitales espacées au-dessus du titre, 2 à 4 mots : où, quand (une forme comme « au marché · samedi », « rue des Martyrs »)", max: 28, required: false },
   ],
   timeline(n, { end, bpm: tempo }) {
     // At another tempo (a longer Reel, or a music's own): every length in beats follows it.

@@ -127,17 +127,19 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
 
   // Its two words written by hand, white, on either side of the pile's middle (the first on the left, against it; her
   // name on the right), fading in on the bare table; they stay over the quick shots and go with the split screen.
-  // Above the middle, clear of the apps' buttons, a little over the pile's edges; a long one on two lines rather than smaller.
+  // Above the middle, clear of the apps' buttons, a long one over the pile's edge; on two lines rather than smaller (her
+  // name stays on one: the engine keeps it whole).
   const hook = reelTexts.find((t) => t.role === "hook");
   const lead = reelTexts.find((t) => t.role === "caption");
   const others = reelTexts.filter((t) => t !== hook && t !== lead);
-  const wordStyle = { fontFamily: hand, fontWeight: 400, fontSize: 66, lineHeight: 1.06, letterSpacing: "0.04em", color: "#ffffff", textShadow: shade, whiteSpace: "normal", textWrap: "balance" };
+  // (The hand's letters' boxes are a size and a half high: its box leaves them room for two lines.)
+  const wordStyle = { fontFamily: hand, fontWeight: 400, fontSize: 70, lineHeight: 1.0, letterSpacing: "0.03em", color: "#ffffff", textShadow: shade, whiteSpace: "normal", textWrap: "balance" };
   const unbroken = (text) => h("span", { style: { display: "block" } }, String(text || "").split(/(\s+)/).map((w, i) => (/^\s+$/.test(w) || !w ? w : h("span", { key: i, style: { whiteSpace: "nowrap" } }, w))));
   const written = (t, left, align, key) => t && frame >= t.from && frame < Math.min(t.to, endAt)
-    ? h(FitText, { key, style: { position: "absolute", left, top: 780, width: 330, height: 165 }, innerStyle: { ...wordStyle, alignItems: align, textAlign: align === "flex-end" ? "right" : "left" } },
+    ? h(FitText, { key, style: { position: "absolute", left, top: 746, width: 360, height: 200 }, innerStyle: { ...wordStyle, alignItems: align, textAlign: align === "flex-end" ? "right" : "left" } },
         h("span", { style: { display: "inline-block", opacity: o(t.from, t.from + Math.round(0.25 * BEAT)) } }, unbroken(t.text)))
     : null;
-  const words = [written(lead, 40, "flex-end", "lead"), written(hook, width - 370, "flex-start", "name")];
+  const words = [written(lead, 40, "flex-end", "lead"), written(hook, width - 400, "flex-start", "name")];
 
   // Any other text of the Reel (none in its slots): a plain line at the top, so nothing she wrote is lost.
   const extra = others.filter((t) => frame >= t.from && frame < Math.min(t.to, endAt)).map((t, i) =>

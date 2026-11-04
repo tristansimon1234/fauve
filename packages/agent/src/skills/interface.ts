@@ -191,13 +191,15 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const NAME = brand.name || (account ? account.text : "") || (hook ? hook.text : "");
   const who = handle || (account ? account.text : NAME);
   const listLine = items.map((i) => cap(parts[i]).replace(/[.!?…]+$/, "")).join(". ") + (items.length ? "." : "");
-  const content = k01(CARD - 2, CARD + 6) * (1 - k01(CLICK, CLICK + 8));
+  // Its content comes in out of the blur as the card opens, and goes as the card does.
+  const opened = ease(k01(CARD - 6, CARD + 4));
+  const content = opened * (1 - k01(CLICK, CLICK + 8));
   const icon = (key, x, kind) => h("svg", { key, width: 40, height: 40, viewBox: "0 0 24 24", style: { position: "absolute", left: x, top: CY + 44 } },
     kind === "plus"
       ? h("g", { fill: "none", stroke: INK, strokeWidth: 1.6, strokeLinecap: "round" }, h("rect", { x: 3.5, y: 3.5, width: 17, height: 17, rx: 5 }), h("path", { d: "M12 8 V16 M8 12 H16" }))
       : h("path", { d: "M4 7 H20 M4 12 H20 M4 17 H20", fill: "none", stroke: INK, strokeWidth: 1.6, strokeLinecap: "round" }));
   const card = content > 0
-    ? h("div", { key: "card", style: { ...full, opacity: content } },
+    ? h("div", { key: "card", style: { ...full, opacity: content, filter: opened < 0.995 ? "blur(" + ((1 - opened) * 10).toFixed(1) + "px)" : "none" } },
         h(FitText, { style: { position: "absolute", left: CX + 44, top: CY + 38, width: 560, height: 52 }, innerStyle: { alignItems: "flex-start", fontFamily: sans, fontWeight: 700, fontSize: 38, letterSpacing: "-0.02em", color: INK, whiteSpace: "nowrap" } },
           h("span", { "data-fauve-accent": "" }, who, h("svg", { width: 26, height: 26, viewBox: "0 0 24 24", style: { display: "inline-block", marginLeft: 10, verticalAlign: "middle" } }, h("path", { d: "M6 9 L12 15 L18 9", fill: "none", stroke: INK, strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round" })))),
         icon("plus", CX + CW - 144, "plus"),
@@ -226,8 +228,8 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
     y: frame < PILL ? mix(AV0.y, AV1.y, toFocus) : mix(AV1.y, AV2.y, toPill),
     s: frame < PILL ? mix(AV0.s, AV1.s, toFocus) : mix(AV1.s, AV2.s, toPill),
   };
-  const avShown = k01(CARD - 2, CARD + 6) * (1 - pillGone);
-  const avatar = n && frame >= CARD - 2 && frame < FIN
+  const avShown = opened * (1 - pillGone);
+  const avatar = n && frame >= CARD - 6 && frame < FIN
     ? h("div", { key: "avatar", style: { position: "absolute", left: Math.round(av.x), top: Math.round(av.y), width: Math.round(av.s), height: Math.round(av.s), borderRadius: "50%", overflow: "hidden", backgroundColor: "#e6e7ee", opacity: avShown } },
         h(Footage, { shot: 0, style: { left: 0, top: 0, width: Math.round(av.s), height: Math.round(av.s) } }))
     : null;
@@ -242,8 +244,8 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   };
   const clicked = frame >= clickAt + 2;
   const press = frame >= clickAt && frame < clickAt + 6 ? 1 - 0.05 * Math.sin(((frame - clickAt) / 6) * Math.PI) : 1;
-  const button = frame >= CARD - 2 && frame < FIN
-    ? h("div", { key: "button", style: { position: "absolute", left: Math.round(bt.x), top: Math.round(bt.y), width: Math.round(bt.w), height: Math.round(bt.h), borderRadius: Math.round(mix(22, bt.h / 2, toPill)), background: clicked ? "#ffffff" : "linear-gradient(100deg, " + BLUE + ", " + BLUE2 + ")", boxShadow: clicked ? "0 18px 44px rgba(20,24,60,0.12), 0 2px 6px rgba(20,24,60,0.06)" : "none", opacity: k01(CARD - 2, CARD + 6) * (1 - pillGone), transform: "scale(" + press.toFixed(4) + ")" } },
+  const button = frame >= CARD - 6 && frame < FIN
+    ? h("div", { key: "button", style: { position: "absolute", left: Math.round(bt.x), top: Math.round(bt.y), width: Math.round(bt.w), height: Math.round(bt.h), borderRadius: Math.round(mix(22, bt.h / 2, toPill)), background: clicked ? "#ffffff" : "linear-gradient(100deg, " + BLUE + ", " + BLUE2 + ")", boxShadow: clicked ? "0 18px 44px rgba(20,24,60,0.12), 0 2px 6px rgba(20,24,60,0.06)" : "none", opacity: opened * (1 - pillGone), transform: "scale(" + press.toFixed(4) + ")" } },
         frame < PILL + 6
           ? h("div", { style: { position: "absolute", left: 0, top: 0, width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: sans, fontWeight: 600, fontSize: Math.round(bt.f), letterSpacing: "-0.02em", color: clicked ? INK : "#ffffff", whiteSpace: "nowrap", opacity: 1 - k01(PILL, PILL + 6) } },
               h("span", { "data-fauve-accent": "" }, clicked ? "Abonné(e)" : "S'abonner"))

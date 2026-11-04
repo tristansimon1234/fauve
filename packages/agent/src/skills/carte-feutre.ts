@@ -2,7 +2,7 @@ import { beatSpans, toFrame, type MontageSkill } from "../skills.ts";
 
 // « Carte au feutre », written on its original (house/originals/carte-feutre.mp4, 9 s, looked at image by image): a
 // folded card of grey-white paper (its fold across the middle, its lower half a little darker) held in front of the
-// pictures, three quarters of the frame's width, at its middle; under it the pictures change every three images (an
+// pictures, some 70 % of the frame's width, at its middle; under it the pictures change every three images (an
 // eighth of a beat at 72 BPM: stop motion), some twenty of them coming back in a new order, and the card jumps a little
 // at each one (a few pixels, a degree or two, the angle of a hand that holds it). Blank for a beat, then the sentence is
 // written on it in red felt-tip capitals, tall and narrow, from its top left, a word more on each beat (a short word
@@ -61,12 +61,12 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
     ? h(Footage, { key: "s" + t, shot, at: startOf(t) - Math.round(cycle * TICK), style: { left: 0, top: 0, width, height } })
     : null;
 
-  // 2. The card: grey-white paper folded across the middle, three quarters of the frame's width, at its middle; at each
+  // 2. The card: grey-white paper folded across the middle, some 70 % of the frame's width, at its middle; at each
   // tick it moves a little, as held in front of the camera (a few pixels, its tilt and its angle to the lens).
-  const CW = 728;
-  const CH = 810;
+  const CW = 760;
+  const CH = 830;
   const CX = Math.round(width / 2);
-  const CY = 975;
+  const CY = 970;
   const L = CX - CW / 2;
   const T = CY - CH / 2;
   const jit = (k, a) => (random("card-" + k + "-" + t) * 2 - 1) * a;
@@ -85,16 +85,16 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   // a line that ends on a little word when another break is as good), every word laid from the start, unseen until its
   // beat, so the card's letters keep one size; a word lands on each beat (a word of one or two letters with the next),
   // faster when her sentence has more words than beats before the eighth.
-  const BX = L + 34;
-  const BY = T + 26;
-  const BW = CW - 34 - 26;
-  const BH = CH - 26 - 34;
+  const BX = L + 30;
+  const BY = T + 22;
+  const BW = CW - 30 - 22;
+  const BH = CH - 22 - 30;
   const MAXF = 200;
   const LINE = 0.86;
-  const keep = (s) => String(s || "").replace(/(\d) (?=\d)/g, "$1 ");
+  const keep = (s) => String(s || "").replace(/(\d) (?=\d)/g, "$1\u00a0");
   // The felt-tip's capitals, their advance in hundredths of the size (measured on it), to choose the lines; a letter
   // not listed counts as an average one (another font falling back only changes the guess: the box still fits it).
-  const ADV = { A: 36, B: 38, C: 40, D: 39, E: 36, F: 31, G: 42, H: 42, I: 32, J: 43, K: 36, L: 31, M: 47, N: 39, O: 39, P: 35, Q: 43, R: 38, S: 35, T: 33, U: 41, V: 35, W: 51, X: 32, Y: 29, Z: 31, "0": 33, "1": 19, "2": 29, "3": 33, "4": 28, "5": 32, "6": 30, "7": 24, "8": 33, "9": 30, "&": 29, "+": 26, "-": 21, "'": 9, "’": 9, ".": 11, ",": 11, "!": 17, "?": 31, ":": 15, ";": 15, "%": 47, "€": 32, " ": 15, " ": 15, Œ: 61, Æ: 57 };
+  const ADV = { A: 36, B: 38, C: 40, D: 39, E: 36, F: 31, G: 42, H: 42, I: 32, J: 43, K: 36, L: 31, M: 47, N: 39, O: 39, P: 35, Q: 43, R: 38, S: 35, T: 33, U: 41, V: 35, W: 51, X: 32, Y: 29, Z: 31, "0": 33, "1": 19, "2": 29, "3": 33, "4": 28, "5": 32, "6": 30, "7": 24, "8": 33, "9": 30, "&": 29, "+": 26, "-": 21, "'": 9, "’": 9, ".": 11, ",": 11, "!": 17, "?": 31, ":": 15, ";": 15, "%": 47, "€": 32, " ": 15, "\u00a0": 15, "\u202f": 8, Œ: 61, Æ: 57 };
   const emOf = (w) => Array.from(w).reduce((u, c) => u + (ADV[c] || ADV[c.normalize("NFD").charAt(0)] || 37) / 100, 0);
   // A line never ends on an article or a little preposition when another break is as good.
   const SHORT = /^(&|\+|À|A|AU|AUX|DE|DU|DES|D'|D’|L'|L’|LE|LA|LES|UN|UNE|EN|ET|OU|THE|TO|OF|AN)$/;

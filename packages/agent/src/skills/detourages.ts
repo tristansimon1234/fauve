@@ -4,14 +4,14 @@ import { beatSpans, toFrame, type MontageSkill } from "../skills.ts";
 // edge over a street shot, a word written with a marker) and on what its original shares with it (house/originals/
 // detourages.mp4, 16,5 s at 94 BPM, a travel edit looked at image by image: shots cut fast on the beat and the half
 // beat, a warm filmic grade, a last wide shot held; its own opening, a window widening on black and a title landing
-// letter by letter behind a house, is another model's). Here her street or her place, full frame, cut on the beat;
-// on the half beat before every third beat, one of her photos (an object, a product, someone) surges big over the
-// shot, cut out with a thick white scissor edge and a soft shadow, a little tilted, each time at another place, a small
-// word written with a white marker beside it; it stays the next shot and goes on the cut; the last one is laid on the
-// last shot, held to the end. The shot under a cut-out as it surges holds its image (the half beat of a pop); a video
-// given a cut-out's place is cut out the same way (her subject, still), and a file whose cut-out is missing pops as a
-// print with a white border instead. Its ending card (an offer, an announcement) is written with the same marker over
-// the last shot, softly darkened, the last cut-out above it.
+// letter by letter behind a house, is another model's). Here her street or her place, full frame, cut on the beat and
+// the half beat; every third beat, one of her photos (an object, a product, someone) surges big over the shot, cut
+// out with a thick white scissor edge and a soft shadow, a little tilted, each time at another place, a small word
+// written with a white marker against it; it stays the next shot and goes on the cut; the last one is laid on the last
+// shot, held to the end. The shot under a cut-out as it surges holds its last image (the half beat of a pop); a video
+// given a cut-out's place is cut out the same way (her subject from its whole picture, its last image held), and a file
+// whose cut-out is missing pops as a print with a white border instead. Its ending card (an offer, an announcement) is
+// written with the same marker over the last shot, softly darkened, the last cut-out above it.
 
 const BPM = 94;
 /** The first two shots (beats), then each round: a cut-out's half beat, the shot it stays on, a shot without. */
@@ -63,19 +63,29 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const pops = [];
   for (let i = 0; i < n; i++) if (isPop(i)) pops.push(i);
   const popNow = isPop(cur) ? cur : isPop(cur - 1) ? cur - 1 : -1;
-  // Each cut-out lands at another place: big in the middle first, then around (its target box, its word's box);
-  // the last one big in the middle, or above the ending card.
+  // Each cut-out lands at another place, a little tilted: big in the middle first, then around; the last one big in
+  // the middle, or above the ending card.
   const SPOTS = [
-    { cx: 540, cy: 850, w: 780, h: 860, tilt: -5, word: { left: 140, top: 1300, width: 800, height: 110 } },
-    { cx: 690, cy: 600, w: 640, h: 700, tilt: 6, word: { left: 50, top: 930, width: 420, height: 100 } },
-    { cx: 380, cy: 1110, w: 600, h: 640, tilt: -7, word: { left: 590, top: 700, width: 400, height: 100 } },
-    { cx: 390, cy: 600, w: 640, h: 700, tilt: -4, word: { left: 600, top: 840, width: 420, height: 100 } },
-    { cx: 640, cy: 1090, w: 560, h: 600, tilt: 7, word: { left: 60, top: 690, width: 420, height: 100 } },
+    { cx: 540, cy: 850, w: 780, h: 860, tilt: -5 },
+    { cx: 690, cy: 600, w: 640, h: 700, tilt: 6 },
+    { cx: 380, cy: 1110, w: 600, h: 640, tilt: -7 },
+    { cx: 390, cy: 600, w: 640, h: 700, tilt: -4 },
+    { cx: 640, cy: 1090, w: 560, h: 600, tilt: 7 },
   ];
-  const FINAL_SPOT = end
-    ? { cx: 540, cy: 560, w: 720, h: 680, tilt: -4, word: { left: 140, top: 900, width: 800, height: 100 } }
-    : { cx: 540, cy: 870, w: 820, h: 880, tilt: -4, word: { left: 140, top: 1330, width: 800, height: 110 } };
+  const FINAL_SPOT = end ? { cx: 540, cy: 560, w: 720, h: 680, tilt: -4 } : { cx: 540, cy: 870, w: 820, h: 860, tilt: -4 };
   const spotOf = (k, last) => (last ? FINAL_SPOT : k === 0 ? SPOTS[0] : SPOTS[1 + ((k - 1) % 4)]);
+  // Its word's box against the piece: under it, or over it when it has no room under it; always inside the safe zone
+  // (below the middle, clear of the apps' buttons).
+  const WORD_W = 620;
+  const WORD_H = 104;
+  const wordBox = (px, py, pw, ph) => {
+    let y = py + ph + 12;
+    if (y + WORD_H > 1436) y = py - WORD_H - 12;
+    y = Math.max(92, Math.min(1436 - WORD_H, y));
+    const right = y + WORD_H > 948 ? 940 : 1040;
+    const x = Math.max(40, Math.min(right - WORD_W, Math.round(px + pw / 2 - WORD_W / 2)));
+    return { left: x, top: Math.round(y), width: WORD_W, height: WORD_H };
+  };
 
   // 1. Her shots full frame, cut on the beat; under a cut-out as it surges, the shot before it holds its last image,
   // pushed in a little.
@@ -84,13 +94,13 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const film = n ? h(Footage, { key: "film", shot: Math.max(0, bg), style: { ...full, ...(held > 0 ? { transform: "scale(" + (1 + 0.035 * held).toFixed(4) + ")" } : {}) } }) : null;
 
   // 2. The cut-out of the moment: her photo's subject cut out with its white scissor edge and its shadow; a video's
-  // subject cut out (still, from the image it surges on); without a cut-out, the picture itself as a print with a white
-  // border. It surges from small with a bounce, turning to its tilt, then breathes a little.
+  // subject cut out (from its whole picture, at its own shape); without a cut-out, the picture itself as a print with a
+  // white border. It surges from small with a bounce, turning to its tilt, then breathes a little.
   let piece = null;
   let label = null;
   if (popNow >= 0) {
     const k = pops.indexOf(popNow);
-    const last = popNow === n - 2 || popNow === pops[pops.length - 1];
+    const last = popNow === pops[pops.length - 1] && popNow === n - 2;
     const spot = spotOf(k, last);
     const s = shots[popNow];
     const t = frame - s.from;
@@ -103,45 +113,51 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
     const X0 = Math.round(spot.cx - spot.w / 2);
     const Y0 = Math.round(spot.cy - spot.h / 2);
     const wrap = (child) => h("div", { style: { position: "absolute", left: X0, top: Y0, width: spot.w, height: spot.h, opacity: t < 0 ? 0 : interpolate(t, [0, 2], [0, 1], clamp), transformOrigin: "50% 50%", transform: "rotate(" + turn.toFixed(2) + "deg) scale(" + (grow * breath).toFixed(4) + ")" } }, child);
+    // Where the piece lies once landed (for its word).
+    let at = null;
     const sub = s.subject;
-    const boxes = s.subjectBoxes && s.subjectBoxes.some(Boolean);
+    const a = Math.max(0.3, Math.min(3.5, s.aspect || 0.8));
     if (s.kind === "photo" && s.cutout && sub && sub.w > 0 && sub.h > 0) {
       // Its subject's own shape, fitted to the spot; a subject cut by its photo's bottom edge stands on the frame's.
-      const ratio = (sub.w * (s.aspect || 1)) / sub.h;
+      const ratio = (sub.w * a) / sub.h;
       const hh = Math.min(spot.h, spot.w / Math.max(0.05, ratio));
       const ww = hh * ratio;
       const bottom = (s.cutEdges || []).indexOf("bottom") >= 0;
       const y = bottom ? height - hh : spot.cy - hh / 2;
-      piece = wrap(h(Cutout, { photo: s, x: Math.round(spot.cx - ww / 2) - X0, y: Math.round(y) - Y0, height: Math.round(hh), rim: 13, shadow: true }));
-    } else if (boxes) {
-      const b = SubjectBox(s, s.from, { left: 0, top: 0, width, height });
+      at = { x: spot.cx - ww / 2, y, w: ww, h: hh };
+      piece = wrap(h(Cutout, { photo: s, x: Math.round(at.x) - X0, y: Math.round(y) - Y0, height: Math.round(hh), rim: 13, shadow: true }));
+    } else if (s.subjectBoxes && s.subjectBoxes.some(Boolean)) {
+      // Her video's subject read in its whole picture (a box of its own shape), then fitted to the spot.
+      const whole = { left: 0, top: 0, width: Math.round(1000 * a), height: 1000 };
+      const b = SubjectBox(s, s.from, whole);
       if (b && b.w > 0 && b.h > 0) {
-        const k2 = Math.min(1.7, spot.w / b.w, spot.h / b.h);
-        const laid = { left: Math.round(spot.cx - k2 * (b.x + b.w / 2)) - X0, top: Math.round(spot.cy - k2 * (b.y + b.h / 2)) - Y0, width: Math.round(width * k2), height: Math.round(height * k2) };
+        const k2 = Math.min(spot.w / b.w, spot.h / b.h);
+        at = { x: spot.cx - (k2 * b.w) / 2, y: spot.cy - (k2 * b.h) / 2, w: k2 * b.w, h: k2 * b.h };
+        const laid = { left: Math.round(spot.cx - k2 * (b.x + b.w / 2)) - X0, top: Math.round(spot.cy - k2 * (b.y + b.h / 2)) - Y0, width: Math.round(whole.width * k2), height: Math.round(whole.height * k2) };
         piece = wrap(h(Subject, { shot: popNow, rim: 12, rimColor: PAPER, shadow: true, style: { position: "absolute", ...laid } }));
       }
     }
     if (!piece) {
       // The print: the picture at its own shape, fitted to the spot, a white border and a soft shadow.
-      const a = Math.max(0.4, Math.min(2.4, s.aspect || 0.8));
       const pw = Math.min(spot.w, spot.h * a) * 0.92;
       const ph = pw / a;
+      at = { x: spot.cx - pw / 2, y: spot.cy - ph / 2, w: pw, h: ph };
       piece = wrap(h("div", { style: { position: "absolute", left: Math.round((spot.w - pw) / 2), top: Math.round((spot.h - ph) / 2), width: Math.round(pw), height: Math.round(ph), backgroundColor: PAPER, boxShadow: "0 18px 36px rgba(20,12,4,0.38)" } },
         h(Footage, { shot: popNow, style: { position: "absolute", left: 14, top: 14, width: Math.round(pw) - 28, height: Math.round(ph) - 28 } })));
     }
-    // Its small word, written with the marker beside it, in at its third image (straight: text turned at an angle in
+    // Its small word, written with the marker against it, in at its third image (straight: text turned at an angle in
     // every image of the scene check is more than its browser holds); every word in the page all along (her separators
     // too), only this cut-out's seen.
     if (list && frame >= list.from && frame < Math.min(list.to, endAt)) {
       const parts = String(list.text).split(/[,;·|\/\n]/.test(list.text) ? /(\s*[,;·|\/\n]\s*)/ : /( +)/);
+      const box = wordBox(at.x, at.y, at.w, at.h);
+      const land = interpolate(t, [3, 8], [1.18, 1], { ...clamp, easing: pop });
       let index = -1;
       label = h("div", { key: "words", style: full },
         parts.map((p, i) => {
           if (i % 2 === 1 || !p.trim()) return h("span", { key: "s" + i, style: { position: "absolute", left: 0, top: 0, opacity: 0, fontSize: 1 } }, p);
           index += 1;
           const on = index === k && t >= 3;
-          const box = (index === k ? spot : spotOf(index, false)).word;
-          const land = interpolate(t, [3, 8], [1.18, 1], { ...clamp, easing: pop });
           return h(FitText, { key: "w" + i, style: { position: "absolute", ...box, opacity: on ? 1 : 0 }, innerStyle: { fontFamily: hand, fontWeight: 400, fontSize: 84, lineHeight: 1.05, color: "#ffffff", whiteSpace: "nowrap", textShadow: edge } },
             h("span", { style: { display: "inline-block", transform: "scale(" + (on ? land : 1).toFixed(3) + ")" } }, keep(p.trim())));
         }));
