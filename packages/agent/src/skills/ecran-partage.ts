@@ -54,13 +54,14 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const H = height - M * 2;
   const half = Math.round(W / 2);
   // Both halves of a pair play from its start at half speed (each passage lasts half the pair), so both move the whole
-  // time; an image between two of hers is the two blended, so the slow motion stays smooth.
+  // time; an image between two of hers is the two blended, so the slow motion stays smooth (the next image is always
+  // laid, unseen on the others, so the live preview does not open and close a video at every image).
   const rel = now ? Math.max(0, frame - now.from) : 0;
   const step = Math.floor(rel / 2);
   const between = rel % 2 === 1;
   const pane = (shot, x, w) => h("div", { key: "p" + x, style: { position: "absolute", left: x, top: 0, width: w, height: H, overflow: "hidden" } },
     h(Footage, { shot, at: frame - step, style: { left: 0, top: 0, width: w, height: H } }),
-    between && shots[shot] && shots[shot].kind === "video" ? h(Footage, { shot, at: frame - step - 1, style: { left: 0, top: 0, width: w, height: H, opacity: 0.5 } }) : null);
+    shots[shot] && shots[shot].kind === "video" ? h(Footage, { shot, at: frame - step - 1, style: { left: 0, top: 0, width: w, height: H, opacity: between ? 0.5 : 0 } }) : null);
   const inside = !now
     ? null
     : now.b < 0
