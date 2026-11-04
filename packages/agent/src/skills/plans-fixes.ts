@@ -40,11 +40,11 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   // White, as the model, with only a soft shade and a tight edge, so it still reads on a pale sky.
   const shade = "0 0 1px rgba(0,0,0,0.45), 0 1px 3px rgba(0,0,0,0.3), 0 2px 14px rgba(0,0,0,0.32)";
   // A phone number or a date never breaks between its digits.
-  const keep = (s) => String(s || "").replace(/(\d) (?=\d)/g, "$1 ");
+  const keep = (s) => String(s || "").replace(/(\d) (?=\d)/g, "$1\u00a0");
 
   // 1. Her still shots, full frame, cut on the beat, as filmed. A file seen again (a video given several shots) shows
-  // another frame of it, so two moments of one still camera never read as a missed cut: a video in width another part
-  // of its picture (the side farther from its subject first), else a closer frame. A photo that opens the Reel moves a
+  // another frame of it, so two moments of one still camera never read as a missed cut: a video in width the part of
+  // its picture next to the first one, else a closer frame, low then high. A photo that opens the Reel moves a
   // little over its four beats; the other photos stay still, as the model's shots.
   const again = (i) => {
     let k = 0;
@@ -55,11 +55,16 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
     const sh = shots[i];
     const k = sh ? again(i) : 0;
     const a = sh ? Number(sh.aspect) || 0.5625 : 0.5625;
-    if (k && a > 1.2) {
+    if (k && k <= 2 && a > 1.2) {
+      // Its first frame is the part around its subject; seen again, the part next to it (most of a frame over, toward
+      // the side with room, then the other), never a side so far it may be empty; no room there, a closer frame.
       const W = Math.round(height * a);
+      const room = W - width;
       const fx = sh.focus && Number.isFinite(sh.focus.x) ? sh.focus.x : 0.5;
-      const right = (fx < 0.5) === (k % 2 === 1);
-      return { style: { position: "absolute", left: right ? width - W : 0, top: 0, width: W, height }, scale: 1, origin: "50% 50%" };
+      const first = Math.max(0, Math.min(room, fx * W - width / 2));
+      const toward = first > room / 2 ? -1 : 1;
+      const left = Math.max(0, Math.min(room, first + (k === 1 ? toward : -toward) * 0.6 * width));
+      if (Math.abs(left - first) >= 0.3 * width) return { style: { position: "absolute", left: -Math.round(left), top: 0, width: W, height }, scale: 1, origin: "50% 50%" };
     }
     return { style: full, scale: k ? 1.35 : 1, origin: k % 2 ? "50% 64%" : "50% 30%" };
   };
@@ -74,13 +79,13 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
     : null;
 
   // 2. The small title at the middle, on two levels: its small sans words above, cut in on the half beats from half a
-  // beat in; its serif words under them, cut in a beat apart from half a beat after them, all of them in by the third
-  // beat (closer together when there are many). Each word is in the page from the start, unseen until its turn; a
-  // separator (« · », « — ») stays with the word before it.
+  // beat in; its serif words under them, the first on the next half beat, then a beat apart, all of them in by the
+  // third beat and a half (closer together when there are many). Each word is in the page from the start, unseen until
+  // its turn; a separator (« · », « — ») stays with the word before it.
   const split = (text) => {
     const out = [];
     String(text || "").split(/[ \t\n]+/).filter(Boolean).forEach((w) => {
-      if (out.length && !/[\p{L}\p{N}]/u.test(w)) out[out.length - 1] += " " + w;
+      if (out.length && !/[\p{L}\p{N}]/u.test(w)) out[out.length - 1] += "\u00a0" + w;
       else out.push(w);
     });
     return out;

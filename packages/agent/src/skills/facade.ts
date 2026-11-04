@@ -14,6 +14,8 @@ const BPM = 84;
 /** The beat the whole picture lands on, and how long her front then plays whole. */
 const BUILD = 9;
 const ALIVE = 4;
+/** How long her name and its line stay whole on her front, at the least (s): a line of five words read on a phone. */
+const READ = 2.4;
 /** Her other files after it: a shot of two beats each, the last one held three. */
 const SHOT = 2;
 const LAST = 3;
@@ -41,7 +43,7 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   // White on her front, with a tight dark edge and a soft shade, so it reads on a pale sky as on a dark wall.
   const shade = "0 1px 2px rgba(0,0,0,0.55), 0 0 1px rgba(0,0,0,0.4), 0 3px 22px rgba(0,0,0,0.38)";
   // A phone number or a date never breaks between its digits.
-  const keep = (s) => String(s || "").replace(/(\d) (?=\d)/g, "$1 ");
+  const keep = (s) => String(s || "").replace(/(\d) (?=\d)/g, "$1\u00a0");
 
   // 1. The pieces of her front, as the model lays them (fractions of the frame, and the beat each lands on): a door, a
   // window, an upper window, the awning, slowly; then the shop window, its sides, the pavement and the walls in a burst
@@ -68,8 +70,8 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
 
   // 2. Her shots: her front first (it plays from the first image, seen through its pieces, then whole); her other files
   // after it, full frame, cut on the beat. A file seen again (her only video, given several shots) shows another frame
-  // of it, so two moments of one still camera never read as a missed cut: a video in width another part of its picture
-  // (the side farther from its subject first), else a closer frame, high then low. A photo that plays whole moves a little.
+  // of it, so two moments of one still camera never read as a missed cut: a video in width the part of its picture next
+  // to the first one, else a closer frame, low then high. A photo that plays whole moves a little.
   const again = (i) => {
     let k = 0;
     for (let j = 0; j < i; j++) if (shots[i] && shots[i].src && shots[j].src === shots[i].src) k++;
@@ -79,11 +81,16 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
     const sh = shots[i];
     const k = sh ? again(i) : 0;
     const a = sh ? Number(sh.aspect) || 0.5625 : 0.5625;
-    if (k && a > 1.2) {
+    if (k && k <= 2 && a > 1.2) {
+      // Its first frame is the part around its subject; seen again, the part next to it (most of a frame over, toward
+      // the side with room, then the other), never a side so far it may be empty; no room there, a closer frame.
       const W = Math.round(height * a);
+      const room = W - width;
       const fx = sh.focus && Number.isFinite(sh.focus.x) ? sh.focus.x : 0.5;
-      const right = (fx < 0.5) === (k % 2 === 1);
-      return { style: { position: "absolute", left: right ? width - W : 0, top: 0, width: W, height }, scale: 1, origin: "50% 50%" };
+      const first = Math.max(0, Math.min(room, fx * W - width / 2));
+      const toward = first > room / 2 ? -1 : 1;
+      const left = Math.max(0, Math.min(room, first + (k === 1 ? toward : -toward) * 0.6 * width));
+      if (Math.abs(left - first) >= 0.3 * width) return { style: { position: "absolute", left: -Math.round(left), top: 0, width: W, height }, scale: 1, origin: "50% 50%" };
     }
     return { style: full, scale: k ? 1.35 : 1, origin: k % 2 ? "50% 64%" : "50% 30%" };
   };
@@ -144,14 +151,14 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const spaced = (text, at) => {
     const words = [];
     String(text || "").split(/[ \t\n]+/).filter(Boolean).forEach((w) => {
-      if (words.length && !/[\p{L}\p{N}]/u.test(w)) words[words.length - 1] += " " + w;
+      if (words.length && !/[\p{L}\p{N}]/u.test(w)) words[words.length - 1] += "\u00a0" + w;
       else words.push(w);
     });
     return words.flatMap((w, i) => [i ? " " : null, h("span", { key: i, "data-fauve-accent": "", style: { whiteSpace: "nowrap", opacity: frame >= at + i * 2 ? 1 : 0 } }, w)]);
   };
   const small = lineOn
     ? h(FitText, { key: "line", style: { position: "absolute", left: 140, top: 596, width: width - 280, height: 120 }, innerStyle: { justifyContent: "flex-start", fontFamily: body, fontWeight: 700, fontSize: 44, lineHeight: 1.25, letterSpacing: "0.2em", wordSpacing: "0.18em", textTransform: "uppercase", color: "#ffffff", textAlign: "center", textWrap: "balance", textShadow: shade, ...lining } },
-        h("span", null, spaced(line.text, line.from + 10)))
+        h("span", null, spaced(line.text, line.from + 4)))
     : null;
 
   // Any other text of the Reel (none in its slots): a plain white line, so nothing she wrote is lost.
@@ -179,7 +186,7 @@ export const facade: MontageSkill = {
   bpm: BPM,
   shots: [1, 3],
   files: [1, 3],
-  how: "Sur un écran noir, des morceaux de sa devanture apparaissent un à un, chacun d'un coup à sa place exacte, la vidéo jouant dedans : une porte, une fenêtre, une fenêtre en haut, l'enseigne, lentement ; puis une rafale de morceaux sur les quarts de temps, la rue, le ciel, et l'image entière au neuvième temps ; sa devanture joue alors en plein écran, la rue s'anime, et son nom s'y écrit lettre à lettre. Ses autres fichiers suivent en plein écran, coupés sur le temps.",
+  how: "Sur un écran noir, des morceaux de sa devanture apparaissent un à un, chacun d'un coup à sa place dans l'image, la vidéo jouant dedans : lentement d'abord (un morceau haut et étroit comme une porte, un autre comme une fenêtre, un en haut, une bande comme l'enseigne), puis en rafale sur les quarts de temps, puis la rue et le ciel, et l'image entière au neuvième temps ; sa devanture joue alors en plein écran, la rue s'anime, et son nom (facultatif) s'y écrit lettre à lettre. Ses autres fichiers suivent en plein écran, coupés sur le temps.",
   end: true,
   texts: [
     {
@@ -205,13 +212,15 @@ export const facade: MontageSkill = {
     const count = Math.max(1, Math.min(3, n));
     // Her front: its pieces, then whole; her other files two beats each, the last one three. With an ending card, the last
     // picture is held the card's 1.6 s more, from a beat (its pieces leave on it).
-    const beats = count === 1 ? [BUILD + ALIVE] : [BUILD + ALIVE, ...Array.from({ length: count - 2 }, () => SHOT), LAST];
+    // Her front plays whole four beats, or as many half beats more as her name and its line need to be read at a fast tempo.
+    const alive = Math.max(ALIVE, Math.ceil((READ / beat + 0.5) * 2) / 2);
+    const beats = count === 1 ? [BUILD + alive] : [BUILD + alive, ...Array.from({ length: count - 2 }, () => SHOT), LAST];
     const spans = beatSpans(bpm, beats);
     const cardAt = spans.at(-1)!.end;
     const duration = round(end ? onFrame(cardAt + END_CARD) : cardAt);
     spans[spans.length - 1] = { start: spans.at(-1)!.start, end: duration };
     const wholeAt = onFrame(BUILD * beat);
-    const frontEnd = onFrame((BUILD + ALIVE) * beat);
+    const frontEnd = onFrame((BUILD + alive) * beat);
     const wants = [
       "sa devanture filmée de face, fixe et bien droite (la vidéo la plus nette, avec un peu de vie : des passants, une porte qui s'ouvre) : elle se construit morceau par morceau sur le noir, puis joue en entier",
       ...Array.from({ length: count - 1 }, (_, i) =>

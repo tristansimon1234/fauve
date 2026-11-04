@@ -86,23 +86,28 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   // beat, so the card's letters keep one size; a word lands on each beat (a word of one or two letters with the next),
   // faster when her sentence has more words than beats before the eighth.
   const BX = L + 34;
-  const BY = T + 30;
+  const BY = T + 26;
   const BW = CW - 34 - 26;
-  const BH = CH - 30 - 50;
-  const MAXF = 196;
-  const LINE = 0.95;
+  const BH = CH - 26 - 34;
+  const MAXF = 200;
+  const LINE = 0.86;
   const keep = (s) => String(s || "").replace(/(\d) (?=\d)/g, "$1 ");
-  const unitsOf = (w) => Array.from(w).reduce((u, c) => u + (/[IJ1!.,:;'’|]/.test(c) ? 0.45 : /[MW]/.test(c) ? 1.35 : /\s/.test(c) ? 0.6 : 1), 0);
-  const SHORT = /^(&|\+|[A-ZÀ-Ü]{1,2}|LES|DES|AUX|TON|TES|MON|MES|SON|SES|NOS|VOS|POUR|PAR|SUR|CHEZ|DANS|AVEC|THE|AND)$/;
+  // The felt-tip's capitals, their advance in hundredths of the size (measured on it), to choose the lines; a letter
+  // not listed counts as an average one (another font falling back only changes the guess: the box still fits it).
+  const ADV = { A: 36, B: 38, C: 40, D: 39, E: 36, F: 31, G: 42, H: 42, I: 32, J: 43, K: 36, L: 31, M: 47, N: 39, O: 39, P: 35, Q: 43, R: 38, S: 35, T: 33, U: 41, V: 35, W: 51, X: 32, Y: 29, Z: 31, "0": 33, "1": 19, "2": 29, "3": 33, "4": 28, "5": 32, "6": 30, "7": 24, "8": 33, "9": 30, "&": 29, "+": 26, "-": 21, "'": 9, "’": 9, ".": 11, ",": 11, "!": 17, "?": 31, ":": 15, ";": 15, "%": 47, "€": 32, " ": 15, " ": 15, Œ: 61, Æ: 57 };
+  const emOf = (w) => Array.from(w).reduce((u, c) => u + (ADV[c] || ADV[c.normalize("NFD").charAt(0)] || 37) / 100, 0);
+  // A line never ends on an article or a little preposition when another break is as good.
+  const SHORT = /^(&|\+|À|A|AU|AUX|DE|DU|DES|D'|D’|L'|L’|LE|LA|LES|UN|UNE|EN|ET|OU|THE|TO|OF|AN)$/;
   const layout = (words, box) => {
-    const units = words.map(unitsOf);
+    const ems = words.map(emOf);
     let best = null;
     const tryLines = (cuts) => {
       const lines = [];
       for (let i = 0; i < cuts.length - 1; i++) lines.push([cuts[i], cuts[i + 1]]);
-      const widths = lines.map(([a, b]) => units.slice(a, b).reduce((x, y) => x + y, 0) + 0.6 * (b - a - 1));
-      let f = Math.min(MAXF, box.w / (0.36 * Math.max.apply(null, widths)), box.h / (LINE * lines.length));
-      lines.slice(0, -1).forEach(([a, b]) => { if (SHORT.test(words[b - 1])) f *= 0.93; });
+      const widths = lines.map(([a, b]) => ems.slice(a, b).reduce((x, y) => x + y, 0) + 0.15 * (b - a - 1));
+      // Its letters' boxes are a size high each, its lines LINE apart.
+      let f = Math.min(MAXF, box.w / Math.max.apply(null, widths), box.h / (LINE * (lines.length - 1) + 1));
+      lines.slice(0, -1).forEach(([a, b]) => { if (SHORT.test(words[b - 1])) f *= 0.95; });
       if (!best || f > best.f + 0.01) best = { f, lines };
     };
     const split = (start, left, cuts) => {
@@ -130,14 +135,17 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
     groups.forEach((g, k) => g.forEach((i) => { at[i] = startOf(t0 + k * step); }));
     return at;
   };
-  const writing = (text, from, until, box, key) => {
+  const writing = (text, from, until, box, key, atOnce) => {
     const words = keep(text).toUpperCase().split(/[ \t\n]+/).filter(Boolean);
     if (!words.length) return null;
     const lines = layout(words, box);
-    const at = landings(words, from, until);
+    const at = atOnce ? words.map(() => startOf(tickAt(from))) : landings(words, from, until);
     const style = { fontFamily: hand, fontWeight: 400, fontSize: MAXF, lineHeight: LINE, letterSpacing: "0.005em", color: ink, WebkitTextStroke: "2.6px " + ink, whiteSpace: "nowrap", textAlign: "left" };
+    // The lines move with the card: the card's own turn, about its centre, inside the box (so the box measures them
+    // still, at one size on every frame). The block is only as large as its lines: one as large as the box would be
+    // measured larger than it by the letters' boxes, taller than their lines, and the box would shrink to its least.
     return h(FitText, { key, style: { position: "absolute", left: box.x, top: box.y, width: box.w, height: box.h } }, (s) =>
-      h("div", { style: { position: "absolute", left: 0, top: 0, width: "100%", height: "100%", display: "flex", flexDirection: "column", alignItems: "flex-start", justifyContent: "flex-start", transformOrigin: ((CX - box.x) / s).toFixed(2) + "px " + ((CY - box.y) / s).toFixed(2) + "px", transform: turn(s) } },
+      h("div", { style: { position: "absolute", left: 0, top: 0, display: "flex", flexDirection: "column", alignItems: "flex-start", justifyContent: "flex-start", transformOrigin: ((CX - box.x) / s).toFixed(2) + "px " + ((CY - box.y) / s).toFixed(2) + "px", transform: turn(s) } },
         lines.map(([a, b], r) => h("div", { key: r, style }, words.slice(a, b).map((w, i) => h("span", { key: i, style: { opacity: frame >= at[a + i] ? 1 : 0 } }, (i ? " " : "") + w)))))
     );
   };
@@ -159,10 +167,10 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
     const tBox = sub ? { x: BX, y: BY, w: BW, h: Math.round(BH * 0.6) } : box;
     const later = startOf(tickAt(endAt) + 2);
     ending = h(React.Fragment, null,
-      writing(title, endAt, endAt, tBox, "end-title"),
+      writing(title, endAt, endAt, tBox, "end-title", true),
       sub
         ? h(FitText, { key: "end-sub", style: { position: "absolute", left: BX, top: BY + Math.round(BH * 0.62), width: BW, height: Math.round(BH * 0.38) } }, (s) =>
-            h("div", { style: { position: "absolute", left: 0, top: 0, width: "100%", height: "100%", display: "flex", flexDirection: "column", alignItems: "flex-start", justifyContent: "flex-start", transformOrigin: ((CX - BX) / s).toFixed(2) + "px " + ((CY - BY - Math.round(BH * 0.62)) / s).toFixed(2) + "px", transform: turn(s) } },
+            h("div", { style: { position: "absolute", left: 0, top: 0, width: "100%", display: "flex", flexDirection: "column", alignItems: "flex-start", justifyContent: "flex-start", transformOrigin: ((CX - BX) / s).toFixed(2) + "px " + ((CY - BY - Math.round(BH * 0.62)) / s).toFixed(2) + "px", transform: turn(s) } },
               h("div", { style: { fontFamily: hand, fontWeight: 400, fontSize: 112, lineHeight: 1, color: ink, WebkitTextStroke: "1.8px " + ink, textTransform: "uppercase", whiteSpace: "normal", textAlign: "left", width: "100%", opacity: frame >= later ? 1 : 0 } }, keep(sub))))
         : null);
   }

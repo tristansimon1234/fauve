@@ -33,7 +33,6 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const frame = useCurrentFrame();
   const mark = (k, d) => { const v = Number(texts && texts[k]); return Number.isFinite(v) ? v : d; };
   const BEAT = mark("beat", 18.75);
-  const LAND = mark("land", Math.round(BEAT / 2));
   const WAVE = mark("wave", Math.round(3.5 * BEAT));
   const n = shots.length;
   const cur = shots.reduce((k, s, i) => (s.from <= frame ? i : k), 0);
@@ -43,8 +42,9 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const display = "'" + brand.displayFont + "', 'Archivo Black', 'Arial Black', sans-serif";
   const hand = "'Caveat', '" + brand.bodyFont + "', cursive";
   const body = "'" + brand.bodyFont + "', 'Inter', sans-serif";
-  // The model's own colours, measured on its original: its deep red, and the warm white of its flashes.
-  const RED = "#6e0a0e";
+  // The model's own colours: its deep red (as read on its original, a touch brighter than its graded frames, so it holds
+  // on a darker wall), and the warm white of its flashes.
+  const RED = "#7a1414";
   const WHITE = "#fbf7f2";
   const box = { position: "absolute", left: 0, top: 0, width, height };
   const hook = reelTexts.find((t) => t.role === "hook");
@@ -52,14 +52,14 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const others = reelTexts.filter((t) => t !== hook && t !== small);
   const shade = "0 1px 2px rgba(0,0,0,0.5), 0 0 1px rgba(0,0,0,0.4), 0 2px 14px rgba(0,0,0,0.35)";
   // A phone number or a date never breaks between its digits.
-  const keep = (s) => String(s || "").replace(/(\d) (?=\d)/g, "$1 ");
+  const keep = (s) => String(s || "").replace(/(\d) (?=\d)/g, "$1\u00a0");
 
   // 1. Her shots full frame, cut on the beat; a photo that opens the Reel slowly pushed in (her cut-out with it). A few
-  // cuts between two shots of a beat or more push through the outgoing shot into the next one with a zoom blur: the
-  // second such cut, then every third.
+  // cuts between two shots of a beat or more push through the outgoing shot into the next one with a zoom blur: every
+  // second such cut.
   // A file seen again (a video given several shots) shows another frame of it, so two moments of one still camera never
-  // read as a missed cut: a video in width another part of its picture (the side farther from its subject first), else
-  // a closer frame, high then low. Her cut-out is drawn in the same place as her shot.
+  // read as a missed cut: a video in width the part of its picture next to the first one, else a closer frame, low then
+  // high. Her cut-out is drawn in the same place as her shot.
   const again = (i) => {
     let k = 0;
     for (let j = 0; j < i; j++) if (shots[i] && shots[i].src && shots[j].src === shots[i].src) k++;
@@ -69,11 +69,16 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
     const sh = shots[i];
     const k = sh ? again(i) : 0;
     const a = sh ? Number(sh.aspect) || 0.5625 : 0.5625;
-    if (k && a > 1.2) {
+    if (k && k <= 2 && a > 1.2) {
+      // Its first frame is the part around its subject; seen again, the part next to it (most of a frame over, toward
+      // the side with room, then the other), never a side so far it may be empty; no room there, a closer frame.
       const W = Math.round(height * a);
+      const room = W - width;
       const fx = sh.focus && Number.isFinite(sh.focus.x) ? sh.focus.x : 0.5;
-      const right = (fx < 0.5) === (k % 2 === 1);
-      return { style: { position: "absolute", left: right ? width - W : 0, top: 0, width: W, height }, scale: 1, origin: "50% 50%" };
+      const first = Math.max(0, Math.min(room, fx * W - width / 2));
+      const toward = first > room / 2 ? -1 : 1;
+      const left = Math.max(0, Math.min(room, first + (k === 1 ? toward : -toward) * 0.6 * width));
+      if (Math.abs(left - first) >= 0.3 * width) return { style: { position: "absolute", left: -Math.round(left), top: 0, width: W, height }, scale: 1, origin: "50% 50%" };
     }
     return { style: box, scale: k ? 1.35 : 1, origin: k % 2 ? "50% 64%" : "50% 30%" };
   };
@@ -92,7 +97,7 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   for (let k = 2; k < n; k++) {
     if (!long(k - 1) || !long(k)) continue;
     eligible++;
-    if (eligible % 3 === 2) zooms.push(k);
+    if (eligible % 2 === 0) zooms.push(k);
   }
   const ZOOM = 8;
   const zooming = zooms.find((k) => frame >= shots[k].from - ZOOM / 2 && frame < shots[k].from + ZOOM / 2);
@@ -130,22 +135,24 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
       return h("span", { key: i, style: { color: lit ? WHITE : RED } }, c);
     });
   };
-  const titleStyle = { fontFamily: display, fontWeight: 900, fontSize: 250, lineHeight: 1, letterSpacing: "-0.02em", textTransform: "uppercase", whiteSpace: "nowrap", color: RED, fontKerning: "none", fontVariantLigatures: "none", fontSynthesis: "none" };
+  // A very fine warm-white edge: unseen on a sky, it keeps the red word whole on a dark wall.
+  const titleStyle = { fontFamily: display, fontWeight: 900, fontSize: 250, lineHeight: 1, letterSpacing: "-0.02em", textTransform: "uppercase", whiteSpace: "nowrap", color: RED, textShadow: "0 0 1px rgba(251,247,242,0.55), 0 0 3px rgba(251,247,242,0.2)", fontKerning: "none", fontVariantLigatures: "none", fontSynthesis: "none" };
   const star = (k, size) => h("svg", { key: "st" + k, width: size, height: size, viewBox: "-1 -1 2 2", style: { display: "inline-block", verticalAlign: "middle", margin: "0 0.06em" } },
     h("path", { d: "M0 -1C0.12 -0.12 0.12 -0.12 1 0C0.12 0.12 0.12 0.12 0 1C-0.12 0.12 -0.12 0.12 -1 0C-0.12 -0.12 -0.12 -0.12 0 -1Z", fill: WHITE }));
+  // One box for both, its bottom fixed: a long title is smaller, its small words still just above it, at their size.
   const smallOn = small && frame >= small.from && frame < Math.min(small.to, endAt);
-  const line = smallOn
-    ? h(FitText, { key: "sur", style: { position: "absolute", left: 140, top: 400, width: width - 280, height: 110 }, innerStyle: { justifyContent: "flex-end", fontFamily: hand, fontWeight: 600, fontSize: 70, lineHeight: 1.1, color: WHITE, whiteSpace: "nowrap", textShadow: shade } },
-        h("span", { style: { display: "inline-flex", alignItems: "center", gap: 18, opacity: o(small.from, small.from + 4) } },
-          h("span", { style: { display: "inline-flex", alignItems: "center" } }, star(0, 26), star(1, 17)),
-          h("span", null, small.text),
-          h("span", { style: { display: "inline-flex", alignItems: "center" } }, star(2, 17), star(3, 26))))
-    : null;
   const title = titleOn
     ? h(React.Fragment, { key: "title" },
         blurDef(hook.from),
-        h(FitText, { style: { position: "absolute", left: 54, top: 500, width: width - 108, height: 260 }, innerStyle: titleStyle },
-          h("span", { style: drop(hook.from) }, waved(hook.text))))
+        h(FitText, { style: { position: "absolute", left: 54, top: 380, width: width - 108, height: 380 }, innerStyle: { justifyContent: "flex-end" } }, (scale) =>
+          h("div", { style: { display: "inline-flex", flexDirection: "column", alignItems: "center" } },
+            small
+              ? h("div", { style: { display: "inline-flex", alignItems: "center", gap: Math.round(18 / Math.max(0.45, scale)), marginBottom: Math.round(-6 / Math.max(0.45, scale)), fontFamily: hand, fontWeight: 600, fontSize: Math.round(74 / Math.max(0.45, scale)), lineHeight: 1.1, color: WHITE, whiteSpace: "nowrap", textShadow: shade, opacity: smallOn ? o(small.from, small.from + 4) : 0 } },
+                  h("span", { style: { display: "inline-flex", alignItems: "center" } }, star(0, Math.round(26 / Math.max(0.45, scale))), star(1, Math.round(17 / Math.max(0.45, scale)))),
+                  h("span", null, small.text),
+                  h("span", { style: { display: "inline-flex", alignItems: "center" } }, star(2, Math.round(17 / Math.max(0.45, scale))), star(3, Math.round(26 / Math.max(0.45, scale)))))
+              : null,
+            h("div", { style: titleStyle }, h("span", { style: drop(hook.from) }, waved(hook.text))))))
     : null;
   const subject = titleOn && !flashOn ? laid(Subject, 0) : null;
 
@@ -159,7 +166,7 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
     ? h(AbsoluteFill, null,
         h("div", { style: { ...box, backgroundColor: "rgba(0,0,0," + (0.42 * o(endAt, endAt + 6)).toFixed(3) + ")" } }),
         blurDef(endAt + 2),
-        h(FitText, { style: { position: "absolute", left: 54, top: end.subtitle ? 520 : 600, width: width - 108, height: 420 }, innerStyle: { ...titleStyle, fontSize: 150, lineHeight: 0.96, whiteSpace: "normal", textWrap: "balance", textAlign: "center", color: WHITE, justifyContent: end.subtitle ? "flex-end" : "center" } },
+        h(FitText, { style: { position: "absolute", left: 54, top: end.subtitle ? 520 : 600, width: width - 108, height: 420 }, innerStyle: { ...titleStyle, fontSize: 150, lineHeight: 0.96, whiteSpace: "normal", textWrap: "balance", textAlign: "center", color: WHITE, textShadow: shade, justifyContent: end.subtitle ? "flex-end" : "center" } },
           h("span", { style: drop(endAt + 2) }, keep(end.title))),
         end.subtitle
           ? h(FitText, { style: { position: "absolute", left: 140, top: 960, width: width - 280, height: 190 }, innerStyle: { justifyContent: "flex-start", fontFamily: hand, fontWeight: 600, fontSize: 64, lineHeight: 1.12, color: WHITE, textAlign: "center", textWrap: "balance", textShadow: shade } },
@@ -167,7 +174,7 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
           : null)
     : null;
 
-  return h(AbsoluteFill, { style: { backgroundColor: "#000000" } }, film, title, line, subject, flash, extra, ending);
+  return h(AbsoluteFill, { style: { backgroundColor: "#000000" } }, film, title, subject, flash, extra, ending);
 }`;
 
 export const titreDerriere: MontageSkill = {
@@ -233,8 +240,10 @@ export const titreDerriere: MontageSkill = {
         surtitre: { from: round(onFrame(LAND * beat + 2 / 30)), to: round(cut) },
         titre: { from: round(onFrame(LAND * beat)), to: round(cut) },
       },
-      marks: { beat: beat * 30, land: toFrame(LAND * beat), wave: toFrame(WAVE * beat) },
+      marks: { beat: beat * 30, wave: toFrame(WAVE * beat) },
     };
   },
   code: CODE,
+  // Its small words are always handwritten, the model's script, whatever her charter's fonts.
+  fonts: ["Caveat"],
 };
