@@ -1,5 +1,6 @@
 // Mirror of ReelProps in packages/agent/src/motion.ts (the web app builds them).
 // This package is shipped alone to the render sandbox, so it cannot import it.
+import type { ClearMap } from "./clear";
 import type { FaceZone, TrackPiece } from "./track";
 
 /** A passage of a shot at one speed (a speed ramp is several). Mirrors SpeedPiece in packages/agent/src/motion.ts. */
@@ -61,6 +62,8 @@ export type ComposeShot = ScenePhoto & {
   edit?: PhotoEdit;
   /** How the Reel moves it as it draws it (set by the render: its camera move, a photo's slow zoom, the punch), so a box read on it lands where it is at each frame. */
   camera?: ShotCamera;
+  /** Where a text can be set in it (its sky, an empty wall, any calm area) and how its camera moves, read before the render: ClearBox chooses its area on it. */
+  clear?: ClearMap;
 };
 /** How the Reel moves a shot as it draws it, so what is read on its picture follows it (mirror of packages/agent/src/motion.ts). */
 export type ShotCamera = {

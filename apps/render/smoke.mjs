@@ -104,6 +104,8 @@ const scope = {
   SubjectOutline: () => null,
   // An object's pieces (read on the card before the render): none here, the scene must stand without them.
   SubjectParts: () => [],
+  // Where a text can be set in a shot (its clear areas, read before the render): its fallback here, where the scene puts it without them.
+  ClearBox: (shot, frame, laid, options) => options?.fallback ?? null,
   Outline: () => null,
   // What is said, written: the words themselves are what the check reads.
   Captions: ({ words = [] }) => React.createElement("div", null, (Array.isArray(words) ? words : []).map((w) => String(w?.w ?? "")).join(" ")),

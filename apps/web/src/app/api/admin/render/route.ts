@@ -24,7 +24,8 @@ import { adminKeyAuthorized } from "@/lib/test-studio";
 // (« gpu subject »), to try the card without a whole Reel. And POST ?action=gpu-objects&…&name=<object>: the same for
 // an object followed by its name (« gpu object »). And POST ?action=gpu-relief&media=<photo>&move=in|out|left|right
 // &seconds=<s>: a photo drawn in relief by its depth (« gpu relief »). And POST ?action=gpu-slowmo&media=<video>&from=<s>
-// &seconds=<s>: a passage made at 60 i/s by RIFE (« gpu slowmo »).
+// &seconds=<s>: a passage made at 60 i/s by RIFE (« gpu slowmo »). And POST ?action=gpu-clear&media=…&from=<s>&to=<s>:
+// where a text can be set in it (ClearBox), on a machine without a card (« gpu clear »).
 
 export const maxDuration = 800;
 
@@ -244,6 +245,36 @@ export async function POST(request: NextRequest) {
       console.log(
         "gpu depth",
         JSON.stringify({ link: result && !(result instanceof Error) ? link.data?.signedUrl : null, media, gpu: used, card_seconds: Math.round(seconds), cost_eur: Math.round(cost * 1000) / 1000, result: result instanceof Error ? result.message : result }),
+      );
+    });
+    return Response.json({ ok: true, started: true }, { status: 202 });
+  }
+  // ?action=gpu-clear&media=<video or photo id>&from=<s>&to=<s>: where a text can be set in a passage (ClearBox:
+  // clear_area.py in the objects' machine, here without a card), its grid and the camera's move in the logs (« gpu clear »).
+  if (action === "gpu-clear") {
+    const media = request.nextUrl.searchParams.get("media") ?? "";
+    const from = Number(request.nextUrl.searchParams.get("from") ?? "0");
+    const to = Number(request.nextUrl.searchParams.get("to") ?? "3");
+    if (!/^[0-9a-f-]{36}$/.test(media) || !(from >= 0) || !(to >= from) || to - from > 30) return Response.json({ error: "media=<uuid>&from&to (30 s at most)" }, { status: 400 });
+    if (!gpuReady()) return Response.json({ error: "MODAL_TOKEN_ID / MODAL_TOKEN_SECRET not set" }, { status: 400 });
+    after(async () => {
+      const db = supabaseAdmin();
+      const { data: row } = await db.from("media_assets").select("studio_id, storage_path, kind").eq("id", media).maybeSingle();
+      if (!row?.storage_path) return console.error("gpu clear: no such media", media);
+      const file = await db.storage.from("media").createSignedUrl(row.storage_path, 3600);
+      if (!file.data?.signedUrl) return console.error("gpu clear: link refused");
+      const photo = row.kind === "image";
+      const { clears, seconds, gpu: used } = await objectsOnGpu([], 700_000, { startMs: 600_000 }, [{ key: "lab", url: file.data.signedUrl, from: photo ? 0 : from, to: photo ? 0 : to, ...(photo ? { photo: true as const } : {}) }]);
+      const result = clears.lab;
+      const cost = gpuCostEur(seconds, used);
+      if (seconds > 0) await db.from("cost_events").insert({ studio_id: row.studio_id, kind: "clear_area", provider: "modal", units: Math.round(seconds), cost_eur: cost, meta: { lab: true, media, from, to, gpu: used ?? "none" } });
+      // Its grid summed up (its sky and calm shares, a row of its cells every sixth), the camera's move at its last image.
+      const map = result && !(result instanceof Error) ? result.clear : null;
+      const share = (kind: string) => (map ? Math.round(((map.cells.split(kind).length - 1) / map.cells.length) * 100) : 0);
+      const rows = map ? Array.from({ length: Math.ceil(map.rows / 6) }, (_, i) => map.cells.slice(i * 6 * map.cols, i * 6 * map.cols + map.cols)) : [];
+      console.log(
+        "gpu clear",
+        JSON.stringify({ media, from, to, gpu: used ?? "none", seconds: Math.round(seconds), cost_eur: Math.round(cost * 10000) / 10000, sky: share("2"), calm: share("1"), moved: map?.motion?.slice(-3) ?? null, rows, error: result instanceof Error ? result.message : undefined }),
       );
     });
     return Response.json({ ok: true, started: true }, { status: 202 });

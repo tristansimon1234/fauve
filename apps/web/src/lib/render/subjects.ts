@@ -1,6 +1,8 @@
 import "server-only";
 import { createHash, randomUUID } from "node:crypto";
 import {
+  clearMapSchema,
+  clearPassages,
   depthPassages,
   isClipSegment,
   mediaSubjectsSchema,
@@ -10,8 +12,11 @@ import {
   PHOTO_OBJECT_MAX,
   photoKey,
   subjectPassages,
+  wantsClear,
   wantsDepth,
   wantsObjects,
+  type ClearMap,
+  type ClearPassage,
   type EditPlan,
   type MediaSubjects,
   type ObjectPassage,
@@ -273,6 +278,17 @@ async function cutInSandbox(studioId: string, postId: string, missing: SubjectPa
   }
 }
 
+/** A passage's clear areas, read from their file (nothing when it is missing or unreadable: ClearBox then gives its fallback). */
+async function readClear(path: string): Promise<ClearMap | undefined> {
+  const { data } = await supabaseAdmin().storage.from("media").download(path);
+  if (!data) return undefined;
+  try {
+    return clearMapSchema.safeParse(JSON.parse(await data.text())).data;
+  } catch {
+    return undefined;
+  }
+}
+
 /** A passage's outline at each image, read from its file (nothing when it is missing or unreadable). */
 async function readContour(path: string): Promise<(number[] | null)[] | undefined> {
   const { data } = await supabaseAdmin().storage.from("media").download(path);
@@ -285,43 +301,45 @@ async function readContour(path: string): Promise<(number[] | null)[] | undefine
   }
 }
 
-/** The cut-outs this plan can draw, signed for the render and the live preview (by passage, subjectKey), with their outlines. */
-export async function subjectInputs(
-  studioId: string,
-  plan: Plan,
-): Promise<Record<string, { src: string; still?: boolean; top?: number; boxes?: (number[] | null)[]; contours?: (number[] | null)[]; parts?: number[] }>> {
+/** What the render reads of a passage: its cut-out signed, its boxes, outline and pieces; or its clear areas (no file to draw). */
+type SubjectInput = { src: string; still?: boolean; top?: number; boxes?: (number[] | null)[]; contours?: (number[] | null)[]; parts?: number[]; clear?: ClearMap };
+
+/** The cut-outs this plan can draw, signed for the render and the live preview (by passage, subjectKey), with their outlines; and the clear areas its texts are set in (clearKey). */
+export async function subjectInputs(studioId: string, plan: Plan): Promise<Record<string, SubjectInput>> {
   const { passages: herPassages, rows, isVideo } = await planned(studioId, plan);
-  // The objects its compositions follow too (a cup, a product, one found on a photo), kept the same way under their own keys, and the shots they show in depth.
-  const passages = [...herPassages, ...objectPassages(plan, isVideo), ...depthPassages(plan, isVideo)];
+  // The objects its compositions follow too (a cup, a product, one found on a photo), kept the same way under their own keys, the shots they show in depth and those they set a text in the clear area of.
+  const passages = [...herPassages, ...objectPassages(plan, isVideo), ...depthPassages(plan, isVideo), ...clearPassages(plan, isVideo)];
   const found = passages.flatMap((p) => {
     const k = kept(rows.get(p.clip_id))[p.key];
     return k && "path" in k && k.path.startsWith(`${studioId}/`)
-      ? [{ key: p.key, path: k.path, still: k.still, top: k.top, boxes: k.boxes, parts: k.parts, contour: k.contour?.startsWith(`${studioId}/`) ? k.contour : undefined }]
+      ? [{ key: p.key, path: k.path, still: k.still, top: k.top, boxes: k.boxes, parts: k.parts, contour: k.contour?.startsWith(`${studioId}/`) ? k.contour : undefined, clear: k.clear === true }]
       : [];
   });
   if (!found.length) return {};
-  const [signed, contours] = await Promise.all([
+  const [signed, contours, clears] = await Promise.all([
     supabaseAdmin().storage.from("media").createSignedUrls(found.map((f) => f.path), 7200).then((r) => r.data ?? []),
     Promise.all(found.map((f) => (f.contour ? readContour(f.contour).catch(() => undefined) : undefined))),
+    Promise.all(found.map((f) => (f.clear ? readClear(f.path).catch(() => undefined) : undefined))),
   ]);
   return Object.fromEntries(
-    found.flatMap((f, i) =>
-      signed[i]?.signedUrl
-        ? [
-            [
-              f.key,
-              {
-                src: signed[i]!.signedUrl,
-                ...(f.still ? { still: true } : {}),
-                ...(f.top !== undefined ? { top: f.top } : {}),
-                ...(f.boxes?.length ? { boxes: f.boxes } : {}),
-                ...(f.parts?.length ? { parts: f.parts } : {}),
-                ...(contours[i]?.length ? { contours: contours[i] } : {}),
-              },
-            ],
-          ]
-        : [],
-    ),
+    found.flatMap((f, i): [string, SubjectInput][] => {
+      if (f.clear) return clears[i] ? [[f.key, { src: "", clear: clears[i] }]] : [];
+      const src = signed[i]?.signedUrl;
+      if (!src) return [];
+      return [
+        [
+          f.key,
+          {
+            src,
+            ...(f.still ? { still: true } : {}),
+            ...(f.top !== undefined ? { top: f.top } : {}),
+            ...(f.boxes?.length ? { boxes: f.boxes } : {}),
+            ...(f.parts?.length ? { parts: f.parts } : {}),
+            ...(contours[i]?.length ? { contours: contours[i] } : {}),
+          },
+        ],
+      ];
+    }),
   );
 }
 
@@ -337,21 +355,25 @@ const PHOTO_OBJECT_MS = 8_000;
  * Follows the objects a Reel's compositions name (Subject, SubjectBox, SubjectOutline or Outline given its name)
  * through their passages, on the rented card only (on the sandbox's CPUs it would take minutes a second): each found
  * by its name on one image, followed image by image, cut out like her, kept beside the clip (media_assets.subjects,
- * under `subjectKey#name`). Never fails a render: an object not followed is simply not drawn.
+ * under `subjectKey#name`). In the same machine, the clear areas of the shots its animations set a text in (ClearBox:
+ * clear_area.py, on its CPU; a machine without a card when no object is followed), kept the same way under
+ * `subjectKey~clear`. Never fails a render: an object not followed is simply not drawn, a text without its clear area
+ * takes its fallback place.
  */
 export async function ensureObjects(studioId: string, postId: string, plan: Plan): Promise<void> {
-  if (!gpuReady() || !wantsObjects(plan)) return;
+  if (!gpuReady() || (!wantsObjects(plan) && !wantsClear(plan))) return;
   const db = supabaseAdmin();
   const ids = [...new Set(plan.segments.flatMap((s) => (isClipSegment(s) ? [s.clip_id] : [])))];
   const { data } = await db.from("media_assets").select("id, kind, storage_path, subjects, tracks").eq("studio_id", studioId).in("id", ids);
   const rows = new Map(((data ?? []) as Row[]).map((r) => [r.id, r]));
-  // A video held as filmed (steady off) is followed on its steadied copy: not followed then. A photo is found on itself.
-  const missing = objectPassages(plan, (id) => plan.finish?.steady !== "off" && rows.get(id)?.kind === "video").filter((p) => {
+  const due = (p: SubjectPassage & { photo?: true }) => {
     if (p.photo && rows.get(p.clip_id)?.kind !== "image") return false;
     const k = kept(rows.get(p.clip_id))[p.key];
     return !k || ("failed_at" in k && Date.now() - Date.parse(k.failed_at) > RETRY_MS);
-  });
-  await followObjects(studioId, postId, missing, rows);
+  };
+  // A video held as filmed (steady off) is read on its steadied copy: not read then. A photo is read on itself.
+  const isVideo = (id: string) => plan.finish?.steady !== "off" && rows.get(id)?.kind === "video";
+  await followObjects(studioId, postId, objectPassages(plan, isVideo).filter(due), rows, clearPassages(plan, isVideo).filter(due));
 }
 
 /**
@@ -375,22 +397,39 @@ export async function ensurePhotoObjects(studioId: string, postId: string, items
   await followObjects(studioId, postId, passages, rows);
 }
 
-/** The objects of these passages followed (or found on her photos) on the card, kept on their media, the card's time billed. */
-async function followObjects(studioId: string, postId: string, missing: ObjectPassage[], rows: Map<string, Row>): Promise<void> {
-  if (!missing.length) return;
+/** Where a passage's clear areas are kept (beside its cut-outs, removed with the clip by the retention). */
+export const clearPath = (studioId: string, mediaId: string, key: string) => `${studioId}/subjects/${mediaId}-${createHash("sha1").update(key).digest("hex").slice(0, 12)}.clear.json`;
+
+/** A passage's clear areas: its clip or photo fetched (a second or two), then about 0.3 s of the machine's CPU a second of video. */
+const CLEAR_LOAD_MS = 20_000;
+const CLEAR_WORK_PER_SECOND = 1;
+
+/**
+ * The objects of these passages followed (or found on her photos) on the card, and the clear areas of `clears` read in
+ * the same machine (without a card when there is no object), kept on their media, the machine's time billed.
+ */
+async function followObjects(studioId: string, postId: string, missing: ObjectPassage[], rows: Map<string, Row>, clears: ClearPassage[] = []): Promise<void> {
+  if (!missing.length && !clears.length) return;
   const db = supabaseAdmin();
   const left = timeLeft();
   const budget = (Number.isFinite(left) ? left : 800_000) - RENDER_MARGIN_MS;
-  const work = missing.reduce((n, p) => n + (p.photo ? PHOTO_OBJECT_MS : (p.to - p.from) * OBJECT_WORK_PER_SECOND * 1000), 0);
-  const deadline = Math.min(budget, GPU_START_MS + OBJECT_LOAD_MS + 2 * work);
+  const work =
+    missing.reduce((n, p) => n + (p.photo ? PHOTO_OBJECT_MS : (p.to - p.from) * OBJECT_WORK_PER_SECOND * 1000), 0) +
+    clears.reduce((n, p) => n + Math.max(1, p.to - p.from) * CLEAR_WORK_PER_SECOND * 1000, 0);
+  const deadline = Math.min(budget, GPU_START_MS + (missing.length ? OBJECT_LOAD_MS : CLEAR_LOAD_MS) + 2 * work);
   if (deadline < GPU_START_MS) return;
-  const clips = [...new Set(missing.map((p) => p.clip_id))];
+  const clips = [...new Set([...missing, ...clears].map((p) => p.clip_id))];
   const clipPaths = clips.map((id) => rows.get(id)?.storage_path ?? "");
   const signed = (await db.storage.from("media").createSignedUrls(clipPaths.filter(Boolean), 3600)).data ?? [];
+  const clipUrl = (id: string) => signed.find((x) => x.path === clipPaths[clips.indexOf(id)])?.signedUrl;
+  const clearJobs = clears.flatMap((p) => {
+    const url = clipUrl(p.clip_id);
+    return url ? [{ key: p.key, url, from: p.from, to: p.to, ...(p.photo ? { photo: true as const } : {}) }] : [];
+  });
   const jobs = (
     await Promise.all(
       missing.map(async (p) => {
-        const url = signed.find((x) => x.path === clipPaths[clips.indexOf(p.clip_id)])?.signedUrl;
+        const url = clipUrl(p.clip_id);
         const [webm, png] = await Promise.all(
           [false, true].map((still) => db.storage.from("media").createSignedUploadUrl(subjectPath(studioId, p.clip_id, p.key, still), { upsert: true })),
         );
@@ -400,15 +439,34 @@ async function followObjects(studioId: string, postId: string, missing: ObjectPa
       }),
     )
   ).flat();
-  if (!jobs.length) return;
-  const { results, seconds, gpu } = await objectsOnGpu(jobs, deadline);
+  if (!jobs.length && !clearJobs.length) return;
+  const { results, clears: read, seconds, gpu } = await objectsOnGpu(jobs, deadline, {}, clearJobs);
   const at = new Date().toISOString();
   const updates = new Map<string, MediaSubjects>();
-  const record = (p: ObjectPassage, value: MediaSubjects[string]) => {
+  const record = (p: SubjectPassage, value: MediaSubjects[string]) => {
     const next = updates.get(p.clip_id) ?? {};
     next[p.key] = value;
     updates.set(p.clip_id, next);
   };
+  // Each passage's clear areas in their file beside its cut-outs (a few kilobytes: its grid and the camera's move).
+  let cleared = 0;
+  for (const p of clears) {
+    const result = read[p.key];
+    if (!result) continue;
+    if (result instanceof Error) {
+      console.warn("clear areas not read", p.key, result.message);
+      record(p, { failed_at: at, error: result.message.slice(0, 200) });
+      continue;
+    }
+    const path = clearPath(studioId, p.clip_id, p.key);
+    const saved = await db.storage.from("media").upload(path, JSON.stringify(result.clear), { contentType: "application/json", upsert: true });
+    if (saved.error) {
+      console.warn("clear areas not kept", p.key, saved.error.message);
+      continue;
+    }
+    cleared++;
+    record(p, { path, still: result.still, at, frames: result.frames, clear: true });
+  }
   let done = 0;
   for (const p of missing) {
     const result = results[p.key];
@@ -435,11 +493,11 @@ async function followObjects(studioId: string, postId: string, missing: ObjectPa
     });
   }
   await mergeSubjects(studioId, updates);
-  // The card's time, billed whether or not it followed them (none when no card was allotted).
+  // The machine's time, billed whether or not it read them (none when no machine came); clear areas alone are their own kind.
   if (seconds > 0)
     await db.from("cost_events").insert({
       studio_id: studioId,
-      kind: "matting",
+      kind: jobs.length ? "matting" : "clear_area",
       provider: "modal",
       units: Math.round(seconds),
       cost_eur: gpuCostEur(seconds, gpu),
@@ -447,9 +505,11 @@ async function followObjects(studioId: string, postId: string, missing: ObjectPa
         post_id: postId,
         objects: jobs.length,
         done,
-        gpu,
+        clears: clearJobs.length,
+        cleared,
+        gpu: gpu ?? "none",
         photos: missing.filter((p) => p.photo).length,
-        seconds_of_video: Math.round(missing.reduce((n, p) => n + p.to - p.from, 0) * 10) / 10,
+        seconds_of_video: Math.round([...missing, ...clears].reduce((n, p) => n + p.to - p.from, 0) * 10) / 10,
       }),
     });
 }

@@ -1,6 +1,6 @@
 import "server-only";
 import { randomUUID } from "node:crypto";
-import { modalCostUsd, usdToEur } from "@fauve/agent";
+import { clearMapSchema, modalCostUsd, usdToEur, type ClearMap } from "@fauve/agent";
 import { ModalClient, type Sandbox } from "modal";
 import { env } from "@/lib/env";
 import { REMOTION_SOURCE_FILES } from "./remotion-source.generated";
@@ -212,7 +212,7 @@ async function onCard(
   const started = Date.now();
   const at = () => `${((Date.now() - started) / 1000).toFixed(1)} s`;
   const say = (what: string) => console.log(`gpu ${at()}: ${what}`);
-  const files = ["portrait.py", "matte.py", "photo_cut.py", "track_objects.py", "relief.py", "rife.py", "upscale.py", "depth_video.py"].map((name) => ({ name, text: REMOTION_SOURCE_FILES[name] }));
+  const files = ["portrait.py", "matte.py", "photo_cut.py", "track_objects.py", "clear_area.py", "relief.py", "rife.py", "upscale.py", "depth_video.py"].map((name) => ({ name, text: REMOTION_SOURCE_FILES[name] }));
   const missing = files.find((f) => !f.text);
   if (missing) return { readings: new Error(`${missing.name} is missing from the render source`), seconds: 0, gpu };
 
@@ -319,13 +319,13 @@ async function onCard(
   }
 }
 
-/** A job's reading as given, or why it has none (its error, or nothing sent). */
-function readingOf(readings: Record<string, Record<string, unknown>> | Error, key: string): Record<string, unknown> | Error {
+/** A job's reading as given, or why it has none (its error, or nothing sent; `sent` false: a reading that has no file to send). */
+function readingOf(readings: Record<string, Record<string, unknown>> | Error, key: string, sent = true): Record<string, unknown> | Error {
   if (readings instanceof Error) return readings;
   const r = readings[key];
   if (!r) return new Error("nothing cut out");
   if (typeof r.error === "string") return new Error(r.error);
-  return r.uploaded ? r : new Error("cut-out not sent");
+  return r.uploaded || !sent ? r : new Error("cut-out not sent");
 }
 
 /**
@@ -387,22 +387,42 @@ export async function photosOnGpu(photos: GpuPhoto[], deadlineMs: number, option
 
 /** A passage where an object is followed: the passage's, and the object's name (as its animation gives it); `photo`: one of her photos, the object found on it once. */
 export type GpuObjectPassage = GpuPassage & { name: string; photo?: true };
+/** A passage whose clear areas are read (clear_area.py, in the same machine): its clip or photo (signed), its seconds; nothing to send. */
+export type GpuClearPassage = { key: string; url: string; from: number; to: number; photo?: true };
+/** Its clear areas: their grid and the camera's move, its images, whether the camera holds. */
+export type GpuClear = { clear: ClearMap; frames: number; still: boolean };
 
 /**
  * Follows each object through its passage on the card (the PyTorch machine: the detector finds it by its name, SAM 2
- * follows it both ways, matte.py's finish cuts it out with its boxes and outline). Never throws, like subjectsOnGpu.
+ * follows it both ways, matte.py's finish cuts it out with its boxes and outline), and reads the clear areas of
+ * `clears` in the same machine (clear_area.py: a few milliseconds an image on its CPU). With clear areas only, the
+ * machine comes without a card (unless options ask for one): nothing there needs it. Never throws, like subjectsOnGpu.
  */
-export async function objectsOnGpu(passages: GpuObjectPassage[], deadlineMs: number, options: CardOptions = {}): Promise<{ results: Record<string, GpuCut | Error>; seconds: number; gpu: string | null }> {
-  if (!passages.length) return { results: {}, seconds: 0, gpu: null };
-  const jobs = passages.map((p) => ({ id: p.key, url: p.url, from: p.from, to: p.to, name: p.name, ...(p.photo ? { photo: true } : {}), upload: p.upload }));
+export async function objectsOnGpu(
+  passages: GpuObjectPassage[],
+  deadlineMs: number,
+  options: CardOptions = {},
+  clears: GpuClearPassage[] = [],
+): Promise<{ results: Record<string, GpuCut | Error>; clears: Record<string, GpuClear | Error>; seconds: number; gpu: string | null }> {
+  if (!passages.length && !clears.length) return { results: {}, clears: {}, seconds: 0, gpu: null };
+  const jobs = [
+    ...passages.map((p) => ({ id: p.key, url: p.url, from: p.from, to: p.to, name: p.name, ...(p.photo ? { photo: true } : {}), upload: p.upload })),
+    ...clears.map((p) => ({ id: p.key, url: p.url, from: p.from, to: p.to, clear: true, ...(p.photo ? { photo: true } : {}) })),
+  ];
   const { readings, seconds, gpu } = await onCard(
     "track_objects.py",
     "torch",
     jobs,
     () => ({ DETECTOR_MODEL: "/models/grounding-dino-tiny", TRACKER_MODEL: "/models/sam2.1-hiera-tiny", OBJECTS_WORK: "/work", HDR_FILTER: HDR_TO_SDR }),
     deadlineMs,
-    options,
+    passages.length || options.gpu !== undefined ? options : { ...options, gpu: null },
   );
+  const read: Record<string, GpuClear | Error> = {};
+  for (const p of clears) {
+    const r = readingOf(readings, p.key, false);
+    const map = r instanceof Error ? undefined : clearMapSchema.safeParse(r.clear).data;
+    read[p.key] = r instanceof Error ? r : map ? { clear: map, frames: Number(r.frames) || 0, still: Boolean(r.still) } : new Error("clear areas unreadable");
+  }
   const results: Record<string, GpuCut | Error> = {};
   for (const p of passages) {
     const r = readingOf(readings, p.key);
@@ -420,7 +440,7 @@ export async function objectsOnGpu(passages: GpuObjectPassage[], deadlineMs: num
             ...(Array.isArray(r.parts) && r.parts.length >= 8 && r.parts.every((v) => typeof v === "number") ? { parts: r.parts as number[] } : {}),
           };
   }
-  return { results, seconds, gpu };
+  return { results, clears: read, seconds, gpu };
 }
 
 /** A photo shot to draw in relief (relief.py): the photo (signed), the shot as the plan has it, where its video is sent. */

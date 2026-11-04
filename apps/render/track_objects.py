@@ -13,7 +13,8 @@
 # Usage: python -I track_objects.py jobs.json → prints {"<id>": { still, frames, keys, people, top, boxes, contours,
 # found, parts?, uploaded } | { error }}. jobs.json: [{ id, url (the clip or the photo, signed) or src (a local file), from, to,
 # name, photo?, upload?: { webm, png }, out? }]. DETECTOR_MODEL and TRACKER_MODEL: the models' folders; OBJECTS_CPU=1
-# runs on a CPU.
+# runs on a CPU. A job with `clear` (and no name) reads the clear areas of its passage instead (clear_area.py, ClearBox:
+# { clear, frames, still }), in the same machine, without loading the models.
 import json
 import os
 import subprocess
@@ -329,15 +330,29 @@ if __name__ == "__main__":
     from portrait import fetch, log, send
 
     jobs = json.load(open(sys.argv[1]))
-    device, dtype, detector, tracker = models()
+    # The models load once, for the first object to follow: a run that only reads clear areas never loads them.
+    loaded = []
     work = os.environ.get("OBJECTS_WORK", "/tmp")
     results = {}
+    fetched = {}
     for i, job in enumerate(jobs):
         try:
             src = job.get("src")
             if not src:
-                src = os.path.join(work, f"clip{i}")
-                fetch(job["url"], src)
+                # A clip named twice (an object and its clear areas) is fetched once.
+                src = fetched.get(job["url"]) or os.path.join(work, f"clip{i}")
+                if job["url"] not in fetched:
+                    fetch(job["url"], src)
+                    fetched[job["url"]] = src
+            if job.get("clear"):
+                # Where a text can be set in it (ClearBox): read on the CPU, nothing to send.
+                import clear_area
+
+                results[job["id"]] = clear_area.read({**job, "src": src})
+                continue
+            if not loaded:
+                loaded.extend(models())
+            device, dtype, detector, tracker = loaded
             r = follow({**job, "src": src, "out": job.get("out") or os.path.join(work, f"object{i}")}, device, dtype, detector, tracker)
             if job.get("upload"):
                 send(r["file"], job["upload"]["png" if r["still"] else "webm"], "image/png" if r["still"] else "video/webm")
