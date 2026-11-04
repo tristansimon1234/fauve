@@ -45,6 +45,14 @@ export const FONT_PAIRS: FontPair[] = [
     fits: "des plans fixes de cinéma, un écran partagé titré, une table, un restaurant",
   },
   {
+    key: "serif-grasse",
+    name: "Serif grasse et petits mots espacés",
+    display: { family: "Lora", weight: 700, case: "normal", tracking: "tight" },
+    body: { family: "Poppins", weight: 600, case: "normal", tracking: "wide" },
+    how: "un ou deux mots en serif gras serrés sous trois petits mots sans serif très espacés, tout petit au centre",
+    fits: "des plans fixes de cinéma, un titre court posé au milieu d'un plan calme",
+  },
+  {
     key: "didone",
     name: "Didone de luxe",
     display: { family: "Bodoni Moda", weight: 700, case: "upper", tracking: "tight" },

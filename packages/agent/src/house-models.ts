@@ -17,8 +17,8 @@ import type { z } from "zod";
 
 /** The source of the inspiration row a house model is kept on, per studio (one per model, made when first used). */
 export const HOUSE_SOURCE = "house";
-/** The catalogue's version: a studio's row written by an older one is rewritten when the model is used again (3: its original's sheets; 4: no brand in a model's name; 5: Mots aux quatre coins as its original; 6: Plans fixes at 65 BPM; 7: four renamed; 8: Lieu tapé without its original's orange). */
-export const HOUSE_VERSION = 8;
+/** The catalogue's version: a studio's row written by an older one is rewritten when the model is used again (3: its original's sheets; 4: no brand in a model's name; 5: Mots aux quatre coins as its original; 6: Plans fixes at 65 BPM; 7: four renamed; 8: Lieu tapé without its original's orange; 9: Plans fixes on its fiche). */
+export const HOUSE_VERSION = 9;
 
 export type HouseModel = {
   key: string;
@@ -609,14 +609,16 @@ export const HOUSE_MODELS: HouseModel[] = [
   model({
     key: "plans-fixes",
     name: "Plans fixes de cinéma",
-    pitch: "Des plans fixes bien composés, à l'heure dorée, et un petit titre serif posé au centre au début.",
+    // 9: written again on its original's fiche (v3 of its skill): horizontal 4:3 on black when her videos are, its tempo, its
+    // bold serif under spaced small words, no warmth, grain nor vignette its original does not have.
+    pitch: "Des plans fixes, la caméra posée, coupés sur la musique, en horizontal comme au cinéma, et un petit titre qui arrive mot par mot au centre.",
     needs: "5 à 10 vidéos fixes (posées, sans bouger) de ton lieu et de ta rue, idéalement en fin de journée",
     files: [4, 10],
-    pair: "editorial",
+    pair: "serif-grasse",
     example: "D-fixes",
-    // Measured on its original: every cut (4,15 s, 0,92 s, 1,85 s) and every word on a beat or half beat at 65.
-    tempo: 65,
-    finish: { name: "Heure dorée", hint: "lumière chaude, contraste doux, grain fin, coins sombres", contrast: 0.08, saturation: 0.04, warmth: 0.22, vignette: 0.3, grain: 0.25, grain_size: "fine" },
+    // Measured on its original (docs/fiches/plans-fixes.md): every cut and every word on a beat or half beat at 64,6.
+    tempo: 64.6,
+    finish: { name: "Plans de cinéma", hint: "contrasté, couleurs riches, chaque plan dans sa lumière", contrast: 0.1, saturation: 0.08 },
     look: {
       name: "plans fixes et titre serif",
       format: "message",
@@ -624,16 +626,16 @@ export const HOUSE_MODELS: HouseModel[] = [
       text: {
         amount: "une ligne",
         composition: "un petit titre au centre en deux niveaux : trois petits mots sans serif au-dessus, un ou deux mots en serif dessous, blancs, sur le premier plan",
-        weight: "regular",
+        weight: "bold",
       },
-      layout: "plein cadre, des plans fixes l'un après l'autre",
+      layout: "plein cadre, des plans fixes l'un après l'autre, en 4:3 sur du noir quand ses vidéos sont horizontales",
       moments: [
-        { at: 0, what: "le premier plan fixe tenu 4 s, le petit titre apparaît en fondu au centre, mot par mot" },
-        { at: 4.2, what: "des plans fixes coupés toutes les secondes, de l'heure dorée à l'heure bleue" },
+        { at: 0, what: "le premier plan fixe tenu 4 s, le petit titre apparaît au centre, mot par mot" },
+        { at: 4.2, what: "des plans fixes coupés toutes les secondes" },
       ],
       camera: "fixe",
-      grade: "warm",
-      music: "cinematic ambient piano, slow and warm",
+      grade: "natural",
+      music: "mellow electric piano chords, slow tremolo, round bass on each beat, no drums",
       ending: "un plan de nuit, et tout petit au centre une invitation à suivre le compte",
       why: "La caméra ne bouge pas, le monde bouge : c'est calme, beau et on reste jusqu'au bout.",
     },
