@@ -1756,16 +1756,16 @@ test("a skill's sound effects: on their own moments, all kept a frame apart at a
   assert.deepEqual(placed.map((p) => [p.at, p.gain]), [[0.995, 2], [1.195, 2], [1.395, 2], [1.595, 2]]);
 });
 
-test("« Plans fixes de cinéma » (v2): a dry click on each word of its title as its code lays it, again on her words", async () => {
+test("« Plans fixes de cinéma » (v2, v3): a dry click on each word of its title as its code lays it, again on her words", async () => {
   const { plansFixes } = await import("./skills/plans-fixes.ts");
   const { skillPlan, replaySkillAudio, skillWordsOf } = await import("./skills.ts");
   const { leadPlan } = await import("./sound-follow.ts");
-  // The original's words land on its images 14, 26, 41, 59 and 83 (docs/fiches/plans-fixes.md): its code within 3 images,
-  // and a click on each.
+  // The original's words land on its images 14, 26, 41, 59 and 83 (docs/fiches/plans-fixes.md): its code within an
+  // image since v3 (three in v2), and a click on each.
   const line = plansFixes.timeline(10, { end: false, words: { accroche: "The power of", titre: "Static shot" } });
   const frames = (line.sounds ?? []).map((s) => Math.round(s.at * 30));
-  assert.deepEqual(frames, [14, 28, 42, 56, 83]);
-  [14, 26, 41, 59, 83].forEach((f, i) => assert.ok(Math.abs(frames[i]! - f) <= 3, `word ${i + 1}: image ${frames[i]}, the original's ${f}`));
+  assert.deepEqual(frames, [14, 26, 42, 59, 84]);
+  [14, 26, 41, 59, 83].forEach((f, i) => assert.ok(Math.abs(frames[i]! - f) <= 1, `word ${i + 1}: image ${frames[i]}, the original's ${f}`));
   assert.ok(line.sounds!.every((s) => s.sound === "light click" && s.seconds === 0.5));
   // Its lengths never follow her words; without them (its lengths, the filler's input), no sounds.
   const bare = plansFixes.timeline(10, { end: false });
@@ -1776,15 +1776,16 @@ test("« Plans fixes de cinéma » (v2): a dry click on each word of its title a
   const fill = { shots: files.map((f) => ({ file: f.id, at: 0 })), texts: { accroche: "un soir à", titre: "Belleville" }, end: null };
   const plan = skillPlan({ skill: plansFixes, name: "Plans fixes", files, fill });
   assert.ok(editPlanSchema.safeParse(plan).success);
-  assert.deepEqual(plan.sounds?.map((s) => [Math.round(s.at * 30), s.sound, s.skill]), [[14, "light click", true], [28, "light click", true], [42, "light click", true], [56, "light click", true]]);
-  assert.equal(plan.music_shape, undefined);
+  assert.deepEqual(plan.sounds?.map((s) => [Math.round(s.at * 30), s.sound, s.skill]), [[14, "light click", true], [26, "light click", true], [42, "light click", true], [59, "light click", true]]);
+  // Since v3, its music dies away over its last beat and stops with the picture, as its original's.
+  assert.deepEqual(plan.music_shape, { end: { at: plan.duration, fade: 0.93 } });
   const slower = skillPlan({ skill: plansFixes, name: "Plans fixes", files, fill, bpm: 60 });
-  assert.equal(Math.round(slower.sounds![1]!.at * 30), 30);
+  assert.equal(Math.round(slower.sounds![1]!.at * 30), 28);
   // Her words changed by hand: a click on each of the new ones; another version or another cut keeps its own.
   assert.deepEqual(skillWordsOf(plansFixes, plan.texts), { accroche: "un soir à", titre: "Belleville" });
   const edited = { ...plan, texts: plan.texts.map((t) => (t.style === "hook" ? { ...t, text: "le canal Saint-Martin" } : t)) };
   assert.equal(replaySkillAudio(plansFixes, edited)?.sounds?.length, 6);
-  assert.equal(replaySkillAudio(plansFixes, { ...edited, skill: { key: "plans-fixes", version: 1 } }), null);
+  assert.equal(replaySkillAudio(plansFixes, { ...edited, skill: { key: "plans-fixes", version: 2 } }), null);
   assert.equal(replaySkillAudio(plansFixes, { ...edited, duration: edited.duration + 1 }), null);
   // Held on its first image for a sound she follows: its clicks that much later, again the same on her words.
   const held = leadPlan(plan, 0.3);
@@ -1965,4 +1966,148 @@ test("the clear area follows the camera: the same place of the scene at every im
   const pushed = withCamera(place, [1.2, 0, 0]);
   const near = placeClear({ x: 0.45, y: 0.45, w: 0.1, h: 0.1 }, pushed);
   assert.ok(Math.abs(near.w - 0.12 * 1080) < 0.5 && Math.abs(near.x + near.w / 2 - 540) < 0.5, JSON.stringify(near));
+});
+
+// ——— « Plans fixes de cinéma » v3, written again on its original's fiche (docs/fiches/plans-fixes.md) ———————————————
+
+/** What a composition's Scene draws at a frame, run with a plain tree for React (no renderer): the kit's pieces as named nodes. */
+type Drawn = { type: unknown; props: Record<string, unknown>; children: unknown[] };
+function drawScene(code: string, frame: number, props: Record<string, unknown>): Drawn {
+  const React = { createElement: (type: unknown, p: Record<string, unknown> | null, ...children: unknown[]): Drawn => ({ type, props: p ?? {}, children }), Fragment: "Fragment" };
+  const interpolate = (x: number, [a, b]: [number, number], [y0, y1]: [number, number]) => y0 + (y1 - y0) * Math.min(1, Math.max(0, (x - a) / (b - a || 1)));
+  // ClearBox gives its fallback, as in the scene check (no clear area read here).
+  const scope: Record<string, unknown> = {
+    AbsoluteFill: "AbsoluteFill",
+    FitText: "FitText",
+    Footage: "Footage",
+    useCurrentFrame: () => frame,
+    interpolate,
+    ClearBox: (_shot: unknown, _frame: number, _laid: unknown, options?: { fallback?: unknown }) => options?.fallback ?? null,
+  };
+  const make = new Function("React", ...Object.keys(scope), `"use strict";\n${code}\nreturn Scene;`) as (...args: unknown[]) => (p: Record<string, unknown>) => Drawn;
+  return make(React, ...Object.values(scope))(props);
+}
+/** Every node of a drawn tree, depth first. */
+const drawnNodes = (node: unknown): Drawn[] => {
+  if (Array.isArray(node)) return node.flatMap(drawnNodes);
+  if (!node || typeof node !== "object" || !("children" in node)) return [];
+  const n = node as Drawn;
+  return [n, ...n.children.flatMap(drawnNodes)];
+};
+/** The words right under a node (its strings, at any depth of its arrays), and all those it holds. */
+const drawnText = (node: Drawn): string => (node.children.flat(Infinity) as unknown[]).filter((c): c is string => typeof c === "string").join("");
+const heldText = (node: Drawn): string => drawnNodes(node).map(drawnText).join(" ");
+const styleOf = (node: Drawn) => (node.props.style ?? {}) as Record<string, number | string>;
+
+/** Her shots as a composition gets them: n of that shape (width / height), a beat (27.864 images) each from image 125. */
+const composeShots = (aspects: number[]) => aspects.map((aspect, i) => ({ src: `/v${i}.mp4`, aspect, from: i ? 125 + (i - 1) * 28 : 0, durationInFrames: i ? 28 : 125, kind: "video", segment: i }));
+
+test("« Plans fixes de cinéma » (v3) cuts where its original does, on its own music (64,6 BPM), its words on its beats", async () => {
+  const { plansFixes, wordFrames } = await import("./skills/plans-fixes.ts");
+  const { clearsDrawn, objectsDrawn } = await import("./subject.ts");
+  assert.equal(plansFixes.version, 3);
+  assert.equal(plansFixes.bpm, 64.6);
+  const line = plansFixes.timeline(9, { end: false, words: { accroche: "The power of", titre: "Static shot" } });
+  // The original's nine shots, cut on its images 125, 155, 183, 210, 236, 265, 293 and 319 (measured image by image at
+  // 30 i/s): within two images each, on its own music's beats; its last shot held two beats, to its 12,5 s.
+  const original = [0, 125, 155, 183, 210, 236, 265, 293, 319];
+  assert.equal(line.shots.length, original.length);
+  line.shots.forEach((s, i) => assert.ok(Math.abs(Math.round(s.start * 30) - original[i]!) <= 2, `shot ${i + 1}: image ${Math.round(s.start * 30)}, the original's ${original[i]}`));
+  assert.ok(Math.abs(line.duration - 12.5) < 0.1, `${line.duration} s`);
+  // Its title from its music's first beat (image 14, half a beat in) to the first cut; a click on each word, within an
+  // image of the original's (14, 26, 41, 59 and 83).
+  assert.equal(Math.round(line.texts.accroche!.from * 30), 14);
+  assert.equal(line.texts.titre!.to, line.shots[1]!.start);
+  const clicks = (line.sounds ?? []).map((s) => Math.round(s.at * 30));
+  [14, 26, 41, 59, 83].forEach((f, i) => assert.ok(Math.abs(clicks[i]! - f) <= 1, `word ${i + 1}: image ${clicks[i]}, the original's ${f}`));
+  assert.deepEqual(wordFrames(3, 2, 14, 27.864), clicks);
+  // Its closing line fades in from the original's image 342 over its 19 images; its music dies away over the last beat.
+  assert.ok(Math.abs(line.marks.close! - 342) <= 1, `${line.marks.close}`);
+  assert.equal(line.marks.close_in, 19);
+  assert.deepEqual(line.music, { end: { at: line.duration, fade: 0.93 } });
+  // With an ending card, its last shot held whole beats longer (the card's 1,6 s), its cuts the same.
+  const ended = plansFixes.timeline(9, { end: true });
+  assert.deepEqual(ended.shots.slice(0, -1), plansFixes.timeline(9, { end: false }).shots.slice(0, -1));
+  assert.ok(ended.duration - line.duration >= 1.6 && Math.abs(((ended.duration - line.duration) * 64.6) / 60 - 2) < 0.05, `${ended.duration} s`);
+  // The camera never moves in these still shots: no push, no zoom, nothing turned (Tristan, of the light zooms: « cheap »).
+  assert.doesNotMatch(plansFixes.code, /transform|scale\(/);
+  // Its title is set on a calm area of her first shot (read there only); nothing is cut out.
+  assert.deepEqual(clearsDrawn(plansFixes.code), [0]);
+  assert.deepEqual(objectsDrawn(plansFixes.code), []);
+  // Its finish keeps each shot in the light of its hour: no warmth, grain nor corners laid over everything.
+  assert.deepEqual(plansFixes.finish, { contrast: 0.1, saturation: 0.08, warmth: 0, grain: 0, vignette: 0 });
+  // Its code lays each word on the frame its click lands on.
+  const reelTexts = [
+    { text: "The power of", role: "caption", from: 14, to: 125, emphasis: [] },
+    { text: "Static shot", role: "hook", from: 14, to: 125, emphasis: [] },
+  ];
+  const marks = { beat: "27.864", close: "343", close_in: "19" };
+  const shown = new Map<string, number>();
+  for (let f = 0; f < 125; f++) {
+    const tree = drawScene(plansFixes.code, f, { width: 1080, height: 1920, durationInFrames: 376, brand: { name: "Atelier Rose", displayFont: "Lora", bodyFont: "Poppins" }, shots: composeShots(Array(9).fill(16 / 9)), reelTexts, end: null, texts: marks });
+    for (const n of drawnNodes(tree)) if (n.type === "span" && styleOf(n).opacity === 1 && !shown.has(drawnText(n))) shown.set(drawnText(n), f);
+  }
+  assert.deepEqual(["The", "power", "of", "Static", "shot"].map((w) => shown.get(w)), clicks);
+});
+
+test("« Plans fixes de cinéma » (v3): horizontal 4:3 on black as its original when her files are, full frame otherwise or on her word", async () => {
+  const { plansFixes } = await import("./skills/plans-fixes.ts");
+  const { skillPlan, skillFillInput, skillSettings } = await import("./skills.ts");
+  const reelTexts = [
+    { text: "les bouquets du jour", role: "caption", from: 14, to: 125, emphasis: [] },
+    { text: "faits à la main", role: "hook", from: 14, to: 125, emphasis: [] },
+  ];
+  const draw = (aspects: number[], frame: number, extra: Record<string, unknown> = {}) =>
+    drawScene(plansFixes.code, frame, { width: 1080, height: 1920, durationInFrames: 460, brand: { name: "Atelier Rose", displayFont: "Lora", bodyFont: "Poppins" }, shots: composeShots(aspects), reelTexts, end: null, texts: { beat: "27.864", close: "400", close_in: "19" }, ...extra });
+  /** Its frame (the box its shots are laid in) and the shot laid in it. */
+  const frameOf = (tree: Drawn) => {
+    const box = drawnNodes(tree).find((n) => n.type === "div" && styleOf(n).overflow === "hidden")!;
+    const footage = drawnNodes(box).find((n) => n.type === "Footage")!;
+    return { top: styleOf(box).top, height: styleOf(box).height, shot: styleOf(footage) };
+  };
+  const wide = Array(12).fill(16 / 9);
+  const tall = Array(12).fill(9 / 16);
+  // Her files mostly horizontal: the original's 4:3 picture (1080 × 810) at the middle of the frame, on black; a 16:9
+  // video covers it (an eighth of each side cut, on its subject).
+  assert.deepEqual(frameOf(draw(wide, 60)), { top: 555, height: 810, shot: { position: "absolute", left: 0, top: 0, width: 1080, height: 810 } });
+  assert.equal(frameOf(draw([...Array(7).fill(16 / 9), ...Array(5).fill(9 / 16)], 60)).height, 810);
+  // Mostly vertical (half and half too): full frame.
+  assert.deepEqual(frameOf(draw(tall, 60)), { top: 0, height: 1920, shot: { position: "absolute", left: 0, top: 0, width: 1080, height: 1920 } });
+  assert.equal(frameOf(draw([...Array(6).fill(16 / 9), ...Array(6).fill(9 / 16)], 60)).height, 1920);
+  // On her word, the other format.
+  assert.equal(frameOf(draw(wide, 60, { texts: { beat: "27.864", close: "400", close_in: "19", format: "vertical" } })).height, 1920);
+  assert.equal(frameOf(draw(tall, 60, { texts: { beat: "27.864", close: "400", close_in: "19", format: "horizontal" } })).top, 555);
+  // Its title at the very middle of its picture in both formats (ClearBox's fallback: no clear area read here), its
+  // small words a label over its serif; its lines in the safe zone, left of the apps' buttons.
+  for (const aspects of [wide, tall]) {
+    const tree = draw(aspects, 100);
+    const { top } = frameOf(tree);
+    const boxes = drawnNodes(tree).filter((n) => n.type === "FitText").map((n) => n.props.style as { left: number; top: number; width: number; height: number });
+    assert.equal(boxes.length, 2);
+    const [kicker, serif] = boxes as [(typeof boxes)[number], (typeof boxes)[number]];
+    assert.ok(kicker.top + kicker.height <= serif.top, JSON.stringify(boxes));
+    assert.ok(Math.abs(kicker.left + kicker.width / 2 - 540) <= 1 && Math.abs(serif.left + serif.width / 2 - 540) <= 1, JSON.stringify(boxes));
+    assert.ok(Math.abs(Number(top) + (kicker.top + serif.top + serif.height) / 2 - 960) <= 2, JSON.stringify(boxes));
+    for (const b of boxes) assert.ok(b.left >= 140 && b.left + b.width <= 940, JSON.stringify(b));
+    assert.ok(drawnNodes(tree).some((n) => "data-fauve-accent" in n.props && heldText(n).includes("bouquets")));
+  }
+  // Its closing line: her name small at the middle of its last shot, fading in over 19 images, no veil; her ending
+  // card's words when she has some.
+  const closing = (tree: Drawn, words: string) => drawnNodes(tree).find((n) => n.type === "span" && drawnText(n) === words);
+  assert.equal(closing(draw(wide, 399), "Atelier Rose"), undefined);
+  assert.equal(styleOf(closing(draw(wide, 400), "Atelier Rose")!).opacity, 0);
+  assert.equal(styleOf(closing(draw(wide, 419), "Atelier Rose")!).opacity, 1);
+  assert.equal(drawnNodes(draw(wide, 430)).filter((n) => n.type === "div" && /rgba/.test(String(styleOf(n).backgroundColor ?? ""))).length, 0);
+  const card = draw(wide, 430, { end: { title: "Réserve ton bouquet", subtitle: null, from: 412 } });
+  assert.equal(styleOf(closing(card, "Réserve ton bouquet")!).opacity, 1);
+  assert.equal(closing(card, "Atelier Rose"), undefined);
+  // The setting: the filler sees it (the original's first, the default), the plan keeps a choice her words asked for.
+  assert.deepEqual(plansFixes.settings?.map((s) => [s.name, s.choices.map((c) => c.value)]), [["format", ["auto", "horizontal", "vertical"]]]);
+  assert.deepEqual(skillSettings(plansFixes, [{ name: "format", value: "auto" }]), {});
+  const files = Array.from({ length: 6 }, (_, i) => ({ id: `v${i}`, photo: false, seconds: 12 }));
+  const input = skillFillInput({ skill: plansFixes, name: "Plans fixes", n: 9, files, business: {}, request: "en vertical" });
+  assert.equal(input.reglages?.[0]?.nom, "format");
+  const plan = skillPlan({ skill: plansFixes, name: "Plans fixes", files, fill: { shots: Array.from({ length: 9 }, (_, i) => ({ file: files[i % 6]!.id, at: 1 })), texts: { accroche: "un soir à", titre: "Belleville" }, end: null, settings: { format: "vertical" } } });
+  assert.equal(plan.layers![0]!.motion.texts!.format, "vertical");
+  assert.deepEqual(plan.skill, { key: "plans-fixes", version: 3, settings: { format: "vertical" } });
 });
