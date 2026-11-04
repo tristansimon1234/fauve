@@ -31,7 +31,7 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const others = reelTexts.filter((t) => t !== hook && t !== kicker);
   const endAt = end ? end.from : durationInFrames + 1;
   // White on her footage, as the model: a light shade only, so it reads on a bright sky.
-  const shade = "0 0 2px rgba(0,0,0,0.45), 0 2px 16px rgba(0,0,0,0.35)";
+  const shade = "0 0 2px rgba(0,0,0,0.6), 0 1px 5px rgba(0,0,0,0.45), 0 2px 18px rgba(0,0,0,0.35)";
   // The title's box, centred and clear of the app's buttons: below the middle a text stays left of x = width - 140.
   const TW = width - 280;
   const TX = 140;
