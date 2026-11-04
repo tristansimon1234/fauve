@@ -162,6 +162,31 @@ const CASES: Record<string, LabCase> = {
     // Public domain videos of the street Tristan uploaded with step=upload (2-le-procope-serveur.mp4: people walking past its front).
     own: ["2-le-procope-serveur.mp4", "1-terrasse-mariniere.mp4", "3-boulangerie-le-viennoise.mp4", "4-rue-passantes-graphic.mp4", "5-feu-pieton-affiches.mp4", "6-passage-pieton-rue.mp4"],
   },
+  // One place for a model made on a place (« Lieu tapé lettre à lettre », Tristan of its bench on unrelated clips: « pas sûr
+  // que les vidéos choisies correspondent bien »): a street of cafés in Üsküdar (Istanbul), filmed the same winter day by
+  // the same person (Pexels, free licence), horizontal, uploaded with step=upload. Its name is its sign's (separate lit
+  // letters), so the name typed in the sky is the sign the cut lands on; its green is the sign's.
+  cayluk: {
+    name: "Çayluk Cafe",
+    business: "café",
+    facts: ["Café dans une rue piétonne de cafés, Üsküdar (Istanbul)", "Petit-déjeuner turc (menemen, muhlama), thé et café, terrasse"],
+    brand: { colors: ["#1FCB5A", "#F5F2EC", "#111111"], fonts: ["Rubik", "Inter Tight"], tone: "chaleureux, simple, tutoiement" },
+    title: "Çayluk Cafe",
+    idea: "Notre rue, notre enseigne, et l'envie de venir prendre le petit-déjeuner chez nous.",
+    own: [
+      "1-rue-cayluk.mp4",
+      "2-terrasse.mp4",
+      "3-cafes-eclaires.mp4",
+      "4-rue-fanions.mp4",
+      "5-rue-passantes.mp4",
+      "6-facade-passants.mp4",
+      "7-ciel-immeubles.mp4",
+      "8-kuruyemis.mp4",
+      "9-primeur.mp4",
+      "10-mosquee-ciel.mp4",
+      "11-rue-bus.mp4",
+    ],
+  },
   // The other Reels of the landing's wall, on their very clips (Tristan: « renvoie les mêmes photos et reproduis les
   // reels »): steal=https://edith-ai.app/landing/reels/<id>.mp4 copies the one made by hand, none lets Edith choose.
   meche: {
