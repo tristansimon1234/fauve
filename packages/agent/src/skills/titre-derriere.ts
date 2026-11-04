@@ -31,6 +31,8 @@ const round = (n: number) => Math.round(n * 100) / 100;
 const CODE = String.raw`function Scene({ width, height, durationInFrames, brand, shots, reelTexts, end, texts }) {
   const h = React.createElement;
   const frame = useCurrentFrame();
+  // Its blur filter's id, its own (two copies of the scene in one page never share one).
+  const BLUR = "vb" + String(React.useId ? React.useId() : "0").replace(/[^a-zA-Z0-9_-]/g, "");
   const mark = (k, d) => { const v = Number(texts && texts[k]); return Number.isFinite(v) ? v : d; };
   const BEAT = mark("beat", 18.75);
   const WAVE = mark("wave", Math.round(3.5 * BEAT));
@@ -119,11 +121,11 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const drop = (at) => {
     const p = interpolate(frame, [at, at + 4], [0, 1], clamp);
     const q = 1 - p;
-    return { display: "inline-block", opacity: frame >= at ? 1 : 0, transform: "translateY(" + (-90 * q * q).toFixed(1) + "px) scaleY(" + (1 + 0.32 * q).toFixed(3) + ")", transformOrigin: "50% 100%", filter: q > 0.02 ? "url(#fauve-vblur)" : "none" };
+    return { display: "inline-block", opacity: frame >= at ? 1 : 0, transform: "translateY(" + (-90 * q * q).toFixed(1) + "px) scaleY(" + (1 + 0.32 * q).toFixed(3) + ")", transformOrigin: "50% 100%", filter: q > 0.02 ? "url(#" + BLUR + ")" : "none" };
   };
   const blurOf = (at) => (1 - interpolate(frame, [at, at + 4], [0, 1], clamp)) * 16;
   const blurDef = (at) => h("svg", { key: "vb", width: 0, height: 0, style: { position: "absolute" }, "aria-hidden": "true" },
-    h("filter", { id: "fauve-vblur", x: "-10%", y: "-60%", width: "120%", height: "220%" }, h("feGaussianBlur", { stdDeviation: "0 " + blurOf(at).toFixed(2) })));
+    h("filter", { id: BLUR, x: "-10%", y: "-60%", width: "120%", height: "220%" }, h("feGaussianBlur", { stdDeviation: "0 " + blurOf(at).toFixed(2) })));
   const waved = (text) => {
     const chars = Array.from(text);
     const units = chars.map((c, i) => i).filter((i) => !/\s/.test(chars[i]));

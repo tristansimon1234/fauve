@@ -5,6 +5,7 @@ import { coupsDeFouet } from "./skills/coups-de-fouet.ts";
 import { decode } from "./skills/decode.ts";
 import { ecranPartage } from "./skills/ecran-partage.ts";
 import { eventail } from "./skills/eventail.ts";
+import { facade } from "./skills/facade.ts";
 import { frappe } from "./skills/frappe.ts";
 import { gaufre } from "./skills/gaufre.ts";
 import { journee } from "./skills/journee.ts";
@@ -13,7 +14,9 @@ import { nike } from "./skills/nike.ts";
 import { photoDump } from "./skills/photo-dump.ts";
 import { pile } from "./skills/pile.ts";
 import { pixel } from "./skills/pixel.ts";
+import { plansFixes } from "./skills/plans-fixes.ts";
 import { quatreCoins } from "./skills/quatre-coins.ts";
+import { titreDerriere } from "./skills/titre-derriere.ts";
 import { tourne } from "./skills/tourne.ts";
 
 // The montage skills written so far, by the key of the house model each one plays (skills.ts). Server side only
@@ -27,6 +30,7 @@ export const MONTAGE_SKILLS: Record<string, MontageSkill> = {
   decode,
   "ecran-partage": ecranPartage,
   eventail,
+  facade,
   frappe,
   gaufre,
   journee,
@@ -35,7 +39,9 @@ export const MONTAGE_SKILLS: Record<string, MontageSkill> = {
   "photo-dump": photoDump,
   pile,
   pixel,
+  "plans-fixes": plansFixes,
   "quatre-coins": quatreCoins,
+  "titre-derriere": titreDerriere,
   tourne,
 };
 

@@ -17,8 +17,8 @@ import type { z } from "zod";
 
 /** The source of the inspiration row a house model is kept on, per studio (one per model, made when first used). */
 export const HOUSE_SOURCE = "house";
-/** The catalogue's version: a studio's row written by an older one is rewritten when the model is used again (3: its original's sheets; 4: no brand in a model's name). */
-export const HOUSE_VERSION = 5;
+/** The catalogue's version: a studio's row written by an older one is rewritten when the model is used again (3: its original's sheets; 4: no brand in a model's name; 5: Mots aux quatre coins as its original; 6: Plans fixes at 65 BPM). */
+export const HOUSE_VERSION = 6;
 
 export type HouseModel = {
   key: string;
@@ -612,7 +612,8 @@ export const HOUSE_MODELS: HouseModel[] = [
     files: [4, 10],
     pair: "editorial",
     example: "D-fixes",
-    tempo: 80,
+    // Measured on its original: every cut (4,15 s, 0,92 s, 1,85 s) and every word on a beat or half beat at 65.
+    tempo: 65,
     finish: { name: "Heure dorée", hint: "lumière chaude, contraste doux, grain fin, coins sombres", contrast: 0.08, saturation: 0.04, warmth: 0.22, vignette: 0.3, grain: 0.25, grain_size: "fine" },
     look: {
       name: "plans fixes et titre serif",
