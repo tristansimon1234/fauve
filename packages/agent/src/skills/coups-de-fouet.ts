@@ -49,10 +49,12 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const way = {};
   for (let k = 1; k < n; k++) if (kind(k) === "whip") way[k] = whips++ % 2 ? "right" : "left";
 
-  // The name of the place on the title's shot: very condensed white capitals in the middle of the sky, there at once
-  // (the flash lights it), moving with its shot as the whip throws it out.
+  // The name of the place on the title's shot: very condensed white capitals in the middle of the sky, just above the
+  // middle (clear of the apps' buttons), there at once (the flash lights it), moving with its shot as the whip throws it
+  // out. Its size follows its length, so a long name in a wide face still fits its line without shrinking too far.
+  const titleSize = hook ? Math.min(230, Math.max(110, Math.round(2600 / Math.max(6, Array.from(hook.text).length)))) : 230;
   const title = (i) => hook && i === 1 && hook.to > (n > 1 ? shots[1].from : 0)
-    ? h(FitText, { key: "title", style: { position: "absolute", left: 140, top: 760, width: width - 280, height: 300 }, innerStyle: titleStyle }, hook.text)
+    ? h(FitText, { key: "title", style: { position: "absolute", left: 140, top: 680, width: width - 280, height: 280 }, innerStyle: { ...titleStyle, fontSize: titleSize } }, hook.text)
     : null;
   const shot = (i) => h(AbsoluteFill, { key: "s" + i }, h(Footage, { shot: i, style: full }), frame < endAt ? title(i) : null);
 

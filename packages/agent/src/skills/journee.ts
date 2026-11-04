@@ -123,6 +123,8 @@ export const journee: MontageSkill = {
   version: 1,
   bpm: BPM,
   shots: [10, 18],
+  // Up to 30 for a length she asks for: about 30 s at its own tempo.
+  long: 30,
   files: [6, 16],
   how: "Deux plans rapides de son lieu, puis un plan large où son nom s'allume lettre à lettre en rouge, géant, en didone capitales, avec trois petits mots écrits à la main au-dessus ; le titre reste sur le plan suivant, derrière les passants, et part à la coupe ; puis sa journée en plans courts sur le temps (des détails, des gestes, des gens) et un plan du soir tenu jusqu'à la fin, comme un film.",
   end: true,
@@ -135,9 +137,10 @@ export const journee: MontageSkill = {
     // At her music's tempo when one is given (slower: a longer, calmer Reel; faster: a shorter one), else the model's.
     const bpm = options.bpm ?? BPM;
     const beat = 60 / bpm;
-    const count = Math.max(10, Math.min(18, n));
-    // Two quick shots, the title's two shots, the day on the pattern, the evening shot held (longer under the ending card).
-    const day = Array.from({ length: count - 5 }, (_, i) => PATTERN[i % PATTERN.length]!);
+    const count = Math.max(10, Math.min(30, n));
+    // Two quick shots, the title's two shots, the day on the pattern, the evening shot held (longer under the ending card);
+    // past 18 shots (a length she asked for), the day goes on in moments held two beats.
+    const day = Array.from({ length: count - 5 }, (_, i) => (i >= 13 ? 2 : PATTERN[i % PATTERN.length]!));
     const beats = [1, 1, TITLE_SHOT, TITLE_SHOT, ...day, EVENING];
     const spans = beatSpans(bpm, beats);
     const eveningAt = spans.at(-1)!.start;

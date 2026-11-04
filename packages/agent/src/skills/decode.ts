@@ -105,6 +105,8 @@ export const decode: MontageSkill = {
   version: 2,
   bpm: BPM,
   shots: [7, 14],
+  // Up to 21 for a length she asks for: about 30 s at its own tempo.
+  long: 21,
   files: [3, 8],
   how: "Ses plans arrivent en bandes verticales l'une après l'autre, se replient en un trait ; sur le noir, de petits mots espacés et le titre brouillé qui se décode lettre à lettre ; une bande de vidéo s'ouvre derrière le titre, ses plans y défilent sur le temps de plus en plus vite ; la bande grandit jusqu'au plein écran et ses plus beaux plans larges finissent le Reel.",
   end: true,
@@ -116,8 +118,9 @@ export const decode: MontageSkill = {
     // At another tempo (a longer Reel, or a music's own): every length in beats follows it.
     const bpm = tempo ?? BPM;
     const beat = 60 / bpm;
-    // Full frame at the end: three shots for a long Reel, two otherwise; the band takes the others after the opening.
-    const tail = n >= 10 ? 3 : 2;
+    // Full frame at the end: three shots for a long Reel, two otherwise, and every shot past 14 one more (a length she
+    // asked for: its widest shots go on full frame, four beats each, as its original's end); the band takes the others.
+    const tail = n >= 10 ? 3 + Math.max(0, n - 14) : 2;
     const inBand = Math.max(1, n - 1 - tail);
     // In the band: two shots of two beats, two of one, then half-beats, faster and faster (the model's rapid cuts).
     const band = Array.from({ length: inBand }, (_, i) => (i < 2 ? 2 : i < 4 ? 1 : 0.5));

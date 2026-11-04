@@ -24,6 +24,7 @@ import {
   skillPlan,
   skillShotCount,
   skillFit,
+  skillLengths,
   type BrandProfile,
   type ClipAnalysis,
   type EditPlan,
@@ -35,7 +36,7 @@ import {
   type SkillFillAnswer,
 } from "@fauve/agent";
 import { outputFormat, readAnswer } from "@fauve/agent/answer";
-import { skillFor } from "@fauve/agent/skills";
+import { MONTAGE_SKILLS, skillFor } from "@fauve/agent/skills";
 import { insertPlanVersion } from "@/lib/edit-plans";
 import { usableFonts } from "@/lib/fonts";
 import { supabaseAdmin } from "@/lib/supabase/admin";
@@ -262,4 +263,25 @@ export async function skillWantsMore(studioId: string, postId: string, mediaIds:
   if (!skill) return null;
   const files = new Set(mediaIds.length ? mediaIds : ((post.media_ids as string[] | null) ?? [])).size;
   return fewFiles(skill, files) ? { name: houseModel(skill.key)?.name ?? skill.key, least: skill.files[0], files } : null;
+}
+
+/**
+ * The length she asked for is past what her model does (Tristan: « si un modèle fait 10 secondes mais qu'elle veut un
+ * Reel de 30 ? »): stretched further, a model made for a moment loses what makes it good, so Edith tells her first and
+ * offers its longest, or a model made to last. Its longest (s, rounded down) and the models that reach her length.
+ */
+export async function skillTooShort(studioId: string, postId: string, seconds: number): Promise<{ name: string; max: number; others: string[] } | null> {
+  const db = supabaseAdmin();
+  const { data: post } = await db.from("posts").select("inspiration_id").eq("id", postId).eq("studio_id", studioId).maybeSingle();
+  if (!post?.inspiration_id) return null;
+  const { data: inspiration } = await db.from("inspirations").select("source, external_id").eq("id", post.inspiration_id).maybeSingle();
+  const skill = inspiration?.source === "house" ? skillFor(inspiration.external_id as string | null) : undefined;
+  if (!skill) return null;
+  const { max } = skillLengths(skill);
+  if (seconds <= max + 1) return null;
+  const others = Object.values(MONTAGE_SKILLS)
+    .filter((s) => s.key !== skill.key && skillLengths(s).max + 1 >= seconds)
+    .flatMap((s) => houseModel(s.key)?.name ?? [])
+    .slice(0, 2);
+  return { name: houseModel(skill.key)?.name ?? skill.key, max: Math.floor(max), others };
 }

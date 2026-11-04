@@ -22,7 +22,7 @@ import { parseArgs } from "node:util";
 import { buildReelProps } from "../packages/agent/src/motion.ts";
 import { HOUSE_MODELS } from "../packages/agent/src/house-models.ts";
 import { MONTAGE_SKILLS } from "../packages/agent/src/skill-library.ts";
-import { skillPlan, skillShotCount, type MontageSkill, type SkillFile, type SkillFill } from "../packages/agent/src/skills.ts";
+import { skillLongest, skillPlan, skillShotCount, type MontageSkill, type SkillFile, type SkillFill } from "../packages/agent/src/skills.ts";
 
 const { values } = parseArgs({
   options: {
@@ -79,7 +79,7 @@ const files: (SkillFile & { src: string; aspect: number })[] = (values.clips ?? 
 if (!files.length) throw new Error("--clips: at least one file");
 
 // A fill made by hand, as the filler would: her files in turn, a video's later moments when it comes back.
-const n = values.shots ? Math.max(skill.shots[0], Math.min(skill.shots[1], Number(values.shots))) : skillShotCount(skill, files);
+const n = values.shots ? Math.max(skill.shots[0], Math.min(skillLongest(skill), Number(values.shots))) : skillShotCount(skill, files);
 const seen = new Map<string, number>();
 const fill: SkillFill = {
   shots: Array.from({ length: n }, (_, i) => {

@@ -106,6 +106,8 @@ export const quatreCoins: MontageSkill = {
   version: 1,
   bpm: BPM,
   shots: [6, 12],
+  // Up to 22 for a length she asks for: about 30 s at its own tempo.
+  long: 22,
   files: [4, 12],
   how: "Sur le premier plan du lieu, une phrase se pose mot à mot sur les bords du cadre, tous les mots à la même taille, en minuscules : ses premiers mots en haut (à gauche, au milieu, à droite), son nom au milieu du bord gauche et son quartier au milieu du bord droit, son adresse en bas ; ils partent sur la première coupe. Puis la vie du lieu en plein écran, coupée sur le temps ; puis sa devanture, tenue jusqu'à la fin, où son nom se pose seul au milieu.",
   end: true,
@@ -121,9 +123,10 @@ export const quatreCoins: MontageSkill = {
     // and calmer, a faster one shorter, its cuts still on the beats.
     const bpm = options.bpm ?? BPM;
     const beat = 60 / bpm;
-    // The life of the place between the first shot and its front: two quick shots, then a beat and a half or a beat and a quarter.
+    // The life of the place between the first shot and its front: two quick shots, then a beat and a half or a beat and a
+    // quarter; past the tenth (a length she asked for), moments held two beats.
     const middle = Math.max(1, n - 2);
-    const mids = Array.from({ length: middle }, (_, k) => (k < 2 ? 1 : k % 2 === 0 ? 1.5 : 1.25));
+    const mids = Array.from({ length: middle }, (_, k) => (k < 2 ? 1 : k >= 10 ? 2 : k % 2 === 0 ? 1.5 : 1.25));
     // At a fast tempo a section is never shorter than its words need to be read (the address, her name before the card),
     // in whole beats or half beats so its cut stays on one; at its own tempo, its beats as written.
     const opening = Math.max(OPENING_BEATS, Math.ceil((5 * WORD_BEATS * beat + ADDRESS_READ) / beat));

@@ -35,7 +35,8 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   // The model's own colours: a mint white title with a dark teal edge, warm white tiny lines.
   const MINT = "#d6f6ee";
   const WHITE = "#fff8ec";
-  const TITLE_SHADOW = "0 4px 0 rgba(28,74,68,0.9), 0 0 2px rgba(0,0,0,0.5), 0 2px 14px rgba(0,0,0,0.3)";
+  // Its pixel letters carry a thin dark teal edge all round and a hard drop under them, as the model's.
+  const TITLE_SHADOW = "0 4px 0 rgba(28,74,68,0.9), 2px 0 0 rgba(28,74,68,0.55), -2px 0 0 rgba(28,74,68,0.55), 0 -2px 0 rgba(28,74,68,0.45), 0 2px 14px rgba(0,0,0,0.3)";
   const SMALL_SHADOW = "0 1px 2px rgba(0,0,0,0.85), 0 0 3px rgba(0,0,0,0.65), 0 0 9px rgba(0,0,0,0.4)";
   const DROP = "drop-shadow(0 1px 1.5px rgba(0,0,0,0.6))";
   // A phone number or a date never breaks between its digits.
@@ -51,14 +52,14 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
 
   // Its drawings, decor: the kaomoji « (๑˃ᴗ˂) » and its calmer one « (˘ᴗ˘) », an outlined star.
   const stroke = { fill: "none", stroke: "#ffffff", strokeWidth: 3.2, strokeLinecap: "round", strokeLinejoin: "round" };
-  const kaomoji = (w, calm) => h("svg", { width: w, height: Math.round(w * 0.34), viewBox: "0 0 100 34", style: { display: "block", overflow: "visible", filter: DROP } },
+  const kaomoji = (w, calm) => h("svg", { width: w, height: Math.round((w * 34) / 70), viewBox: "0 0 70 34", style: { display: "block", overflow: "visible", filter: DROP } },
     h("g", stroke,
-      h("path", { d: "M9 3 Q2 17 9 31" }),
-      calm ? h("path", { d: "M27 13 Q32 19 37 13" }) : h("path", { d: "M25 13 Q24 8 19 8 Q13 8 13 15 Q13 22 19 22 Q25 22 25 17" }),
-      calm ? null : h("path", { d: "M34 11 L41 15.5 L34 20" }),
-      h("path", { d: "M45 19 Q51 27 57 19" }),
-      calm ? h("path", { d: "M63 13 Q68 19 73 13" }) : h("path", { d: "M68 11 L61 15.5 L68 20" }),
-      h("path", { d: "M89 3 Q96 17 89 31" })));
+      h("path", { d: "M7 3 Q1 17 7 31" }),
+      calm ? h("path", { d: "M17 12 Q21.5 17 26 12" }) : h("path", { d: "M22 12 Q21 7 16.5 7 Q12 7 12 13 Q12 20 17 20 Q22 20 22 15" }),
+      calm ? null : h("path", { d: "M27 9 L33 13 L27 17" }),
+      h("path", { d: "M36 16 Q41.5 23.5 47 16" }),
+      calm ? h("path", { d: "M52 12 Q56.5 17 61 12" }) : h("path", { d: "M57 9 L51 13 L57 17" }),
+      h("path", { d: "M63 3 Q69 17 63 31" })));
   const star = (s) => h("svg", { width: s, height: s, viewBox: "0 0 40 40", style: { display: "block", overflow: "visible", filter: DROP } },
     h("path", { d: "M20 3 L24.8 15 L37.5 15.4 L27.5 23.3 L31 35.6 L20 28.5 L9 35.6 L12.5 23.3 L2.5 15.4 L15.2 15 Z", fill: "none", stroke: "#ffffff", strokeWidth: 2.6, strokeLinejoin: "round" }));
   const decor = (key, left, y, child) => h("div", { key, "data-fauve-decor": "", style: { position: "absolute", left, top: y } }, child);
@@ -70,9 +71,9 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   // 2. The title in pixels on her first two shots, at the upper third, on two balanced lines, its kaomoji raised at its
   // start and its star after it; all cut in at once, as the model.
   const titleBlock = shown(hook)
-    ? h(FitText, { key: "title", style: { position: "absolute", left: 140, top: 486, width: 800, height: 330 }, innerStyle: { fontFamily: display, fontWeight: 500, fontSize: 92, lineHeight: 1.14, color: MINT, textShadow: TITLE_SHADOW, textAlign: "center", textWrap: "balance" } },
+    ? h(FitText, { key: "title", style: { position: "absolute", left: 140, top: 486, width: 800, height: 330 }, innerStyle: { fontFamily: display, fontWeight: 600, fontSize: 92, lineHeight: 1.14, color: MINT, textShadow: TITLE_SHADOW, textAlign: "center", textWrap: "balance" } },
         h("span", null,
-          h("span", { "data-fauve-decor": "", style: { display: "inline-block", verticalAlign: "top", marginRight: 12, marginTop: -6 } }, kaomoji(92, false)),
+          h("span", { "data-fauve-decor": "", style: { display: "inline-block", verticalAlign: "top", marginRight: 12, marginTop: -6 } }, kaomoji(78, false)),
           hook.text,
           h("span", { "data-fauve-decor": "", style: { display: "inline-block", verticalAlign: "baseline", marginLeft: 14 } }, star(42))))
     : null;
@@ -129,7 +130,7 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
         const box = SPOTS[((stepOf(k) % 3) + 3) % 3];
         return h("div", { key: "c" + i, style: { opacity: k === current ? 1 : 0 } }, tiny("t" + i, p.trim(), box));
       }),
-      current < 0 && step >= 0 && step < count ? decor("calm", spot.align === "right" ? 760 : spot.align === "left" ? 160 : 490, spot.top + 20, kaomoji(100, true)) : null,
+      current < 0 && step >= 0 && step < count ? decor("calm", spot.align === "right" ? 760 : spot.align === "left" ? 160 : 490, spot.top + 20, kaomoji(84, true)) : null,
       step >= 0 && step < count && step % 2 === 1 ? stars("st1", spot.align === "left" ? 820 : 150, spot.align === "left" ? 1220 : 420) : null,
       step >= 0 && step < count && step % 2 === 1 ? stars("st2", spot.align === "left" ? 150 : 830, spot.align === "left" ? 300 : 1230) : null);
   }
@@ -150,7 +151,7 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const ending = end && frame >= endAt
     ? h(React.Fragment, { key: "end" },
         h("div", { style: { position: "absolute", left: 0, top: 0, width, height, background: "linear-gradient(180deg, rgba(24,14,6," + (0.5 * veil).toFixed(3) + ") 0%, rgba(24,14,6," + (0.36 * veil).toFixed(3) + ") 55%, rgba(24,14,6," + (0.2 * veil).toFixed(3) + ") 100%)" } }),
-        h(FitText, { style: { position: "absolute", left: 140, top: 520, width: 800, height: 300 }, innerStyle: { fontFamily: display, fontWeight: 500, fontSize: 92, lineHeight: 1.14, color: MINT, textShadow: TITLE_SHADOW, textAlign: "center", textWrap: "balance" } },
+        h(FitText, { style: { position: "absolute", left: 140, top: 520, width: 800, height: 300 }, innerStyle: { fontFamily: display, fontWeight: 600, fontSize: 92, lineHeight: 1.14, color: MINT, textShadow: TITLE_SHADOW, textAlign: "center", textWrap: "balance" } },
           h("span", { style: { display: "inline-block", opacity: frame >= endAt + 2 ? 1 : 0 } },
             keep(end.title),
             h("span", { "data-fauve-decor": "", style: { display: "inline-block", verticalAlign: "baseline", marginLeft: 14 } }, star(42)))),

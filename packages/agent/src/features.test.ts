@@ -1341,11 +1341,12 @@ test("montage skills: each one's plan holds for every number of shots it takes, 
     assert.match(skill.code, /function Scene\s*\(/);
     assert.ok(skill.bpm >= 60 && skill.bpm <= 140, `${skill.key}: its tempo is one a plan takes`);
     assert.ok(skill.files[0] >= 1 && skill.files[0] <= skill.files[1] && skill.shots[0] <= skill.shots[1]);
-    const files = Array.from({ length: 4 }, (_, i) => ({ id: `v${i}`, photo: false, seconds: 12, moments: [{ start: 1, end: 4 }, { start: 6, end: 9 }] }));
-    for (let n = skill.shots[0]; n <= skill.shots[1]; n++) {
+    for (let n = skill.shots[0]; n <= Math.max(skill.shots[1], skill.long ?? 0); n++) {
+      // Enough footage for its count (a long version takes more of her files): each video three passages at most.
+      const files = Array.from({ length: Math.max(4, Math.ceil(n / 3)) }, (_, i) => ({ id: `v${i}`, photo: false, seconds: 16, moments: [{ start: 1, end: 4 }, { start: 6, end: 9 }, { start: 11, end: 14 }] }));
       for (const end of [false, true]) {
         const texts = Object.fromEntries(skill.texts.map((t) => [t.slot, "abc".repeat(Math.ceil(t.max / 3)).slice(0, t.max)]));
-        const plan = skillPlan({ skill, name: "Test", files, fill: { shots: Array.from({ length: n }, (_, i) => ({ file: files[i % 4]!.id, at: (i % 3) * 3 })), texts, end: end && skill.end ? { title: "Ouverture samedi" } : null } });
+        const plan = skillPlan({ skill, name: "Test", files, fill: { shots: Array.from({ length: n }, (_, i) => ({ file: files[i % files.length]!.id, at: Math.floor(i / files.length) * 5 })), texts, end: end && skill.end ? { title: "Ouverture samedi" } : null } });
         const parsed = editPlanSchema.safeParse(plan);
         assert.ok(parsed.success, `${skill.key} n=${n} end=${end}: ${parsed.success ? "" : parsed.error.message.slice(0, 300)}`);
         assert.equal(plan.segments.length, n);
@@ -1443,7 +1444,7 @@ test("a montage skill comes close to the length she asked for by its number of s
     assert.equal(skillFit(skill, 999).bpm, slow, skill.key);
     assert.equal(length(skillFit(skill, 999)), max, skill.key);
     // Inside its own lengths: its own tempo, the closest count.
-    const own = Array.from({ length: skill.shots[1] - skill.shots[0] + 1 }, (_, k) => skill.timeline(skill.shots[0] + k, { end: false }).duration);
+    const own = Array.from({ length: Math.max(skill.shots[1], skill.long ?? 0) - skill.shots[0] + 1 }, (_, k) => skill.timeline(skill.shots[0] + k, { end: false }).duration);
     const mid = (Math.min(...own) + Math.max(...own)) / 2;
     const fit = skillFit(skill, mid);
     const gap = Math.min(...own.map((d) => Math.abs(d - mid)));
@@ -1493,4 +1494,18 @@ test("still shots get none of the engine's slow pushes, in a montage skill (its 
   // The same shots in a plan of the editor's: as filmed too (Tristan, on the light zooms: « je trouve ça cheap »).
   const { skill: _skill, ...chain } = plan;
   assert.equal(moved(finishPlan(chain as typeof plan, facts, { v: 60 })), 0);
+});
+
+test("a model whose middle repeats reaches 30 s at its own tempo for a length she asks for, its default length unchanged", async () => {
+  const { MONTAGE_SKILLS } = await import("./skill-library.ts");
+  const { skillFit, skillShotCount } = await import("./skills.ts");
+  for (const key of ["decode", "quatre-coins", "journee"]) {
+    const skill = MONTAGE_SKILLS[key]!;
+    const fit = skillFit(skill, 30);
+    assert.equal(fit.bpm, skill.bpm, key);
+    assert.ok(Math.abs(skill.timeline(fit.n, { end: false }).duration - 30) <= 1, `${key}: ${skill.timeline(fit.n, { end: false }).duration} s`);
+    // From her files alone (no length asked for), never past its own most.
+    const many = Array.from({ length: 40 }, (_, i) => ({ id: `v${i}`, photo: false, seconds: 20 }));
+    assert.equal(skillShotCount(skill, many), skill.shots[1], key);
+  }
 });

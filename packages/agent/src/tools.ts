@@ -214,6 +214,11 @@ export const toolSpecs = {
         .boolean()
         .optional()
         .describe("true seulement quand elle t'a répondu de faire avec les fichiers qu'elle a donnés, après que montage t'a dit que ce modèle en prend plus (peu_de_fichiers) : tu coupes plusieurs passages dans ses vidéos"),
+      duree: z.number().min(3).max(90).optional().describe("La durée qu'elle a demandée pour ce Reel, en secondes, quand elle en a dit une (« 30 s », « une minute ») ; sinon rien"),
+      garde_la_duree: z
+        .boolean()
+        .optional()
+        .describe("true seulement quand, prévenue que son modèle ne va pas jusqu'à cette durée (trop_long), elle la garde : le monteur l'étire"),
       son: z
         .enum(["modele", "edith"])
         .optional()

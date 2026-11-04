@@ -60,6 +60,13 @@ export type MontageSkill = {
   timeline(n: number, options: { end: boolean; bpm?: number }): SkillTimeline;
   /** The tempos it plays at (default: from 0,7 to 1,2 times its own, within 60 to 140). */
   tempo?: [number, number];
+  /**
+   * The most shots it takes for a length she asks for, past `shots[1]` (the most it takes from her files alone): a model
+   * whose middle can repeat (more full frames after a title, more of the place's life, more of the day) reaches 30 s at
+   * its own tempo, like a verse added to a song, its opening and its ending as they are (Tristan: « si un modèle fait
+   * 10 secondes mais qu'elle veut un Reel de 30 ? »). Its timeline takes any count up to it.
+   */
+  long?: number;
   /** Its composition over the whole Reel: plain JS defining function Scene (h = React.createElement, no JSX), the kit's scope. */
   code: string;
   /** Google Fonts families its code brings besides the Reel's two. */
@@ -134,11 +141,14 @@ export function skillTempos(skill: Pick<MontageSkill, "bpm" | "tempo">): [number
 }
 
 /** Its lengths (s) at a tempo over all its numbers of shots, without its ending card (a pile's cadence changes with its count). */
-const lengthsAt = (skill: Pick<MontageSkill, "shots" | "timeline">, bpm?: number) =>
-  Array.from({ length: skill.shots[1] - skill.shots[0] + 1 }, (_, k) => ({ n: skill.shots[0] + k, duration: skill.timeline(skill.shots[0] + k, { end: false, ...(bpm ? { bpm } : {}) }).duration }));
+/** The most shots a skill takes for a length she asks for. */
+export const skillLongest = (skill: Pick<MontageSkill, "shots" | "long">) => Math.max(skill.shots[1], skill.long ?? 0);
+
+const lengthsAt = (skill: Pick<MontageSkill, "shots" | "long" | "timeline">, bpm?: number) =>
+  Array.from({ length: skillLongest(skill) - skill.shots[0] + 1 }, (_, k) => ({ n: skill.shots[0] + k, duration: skill.timeline(skill.shots[0] + k, { end: false, ...(bpm ? { bpm } : {}) }).duration }));
 
 /** The lengths a skill reaches (s): its fewest at its fastest tempo, its most at its slowest. */
-export function skillLengths(skill: Pick<MontageSkill, "shots" | "timeline" | "bpm" | "tempo">): { min: number; max: number } {
+export function skillLengths(skill: Pick<MontageSkill, "shots" | "long" | "timeline" | "bpm" | "tempo">): { min: number; max: number } {
   const [slow, fast] = skillTempos(skill);
   return { min: Math.min(...lengthsAt(skill, fast).map((l) => l.duration)), max: Math.max(...lengthsAt(skill, slow).map((l) => l.duration)) };
 }
@@ -149,7 +159,7 @@ export function skillLengths(skill: Pick<MontageSkill, "shots" | "timeline" | "b
  * prints, its tiles: the middle lasts longer, its opening and its ending stay); then, past its longest or under its
  * shortest, its tempo within its range (slower: longer and calmer, its music composed at it, its cuts on its beats).
  */
-export function skillFit(skill: Pick<MontageSkill, "shots" | "timeline" | "bpm" | "tempo">, seconds: number): { n: number; bpm: number } {
+export function skillFit(skill: Pick<MontageSkill, "shots" | "long" | "timeline" | "bpm" | "tempo">, seconds: number): { n: number; bpm: number } {
   const own = lengthsAt(skill);
   const closest = own.reduce((a, b) => (Math.abs(b.duration - seconds) < Math.abs(a.duration - seconds) - 0.01 ? b : a));
   if (Math.abs(closest.duration - seconds) <= 1) return { n: closest.n, bpm: skill.bpm };
@@ -162,7 +172,7 @@ export function skillFit(skill: Pick<MontageSkill, "shots" | "timeline" | "bpm" 
 }
 
 /** @deprecated The count alone: skillFit, which may also move its tempo. */
-export const skillShotsFor = (skill: Pick<MontageSkill, "shots" | "timeline" | "bpm" | "tempo">, seconds: number) => skillFit(skill, seconds).n;
+export const skillShotsFor = (skill: Pick<MontageSkill, "shots" | "long" | "timeline" | "bpm" | "tempo">, seconds: number) => skillFit(skill, seconds).n;
 
 /** Fewer distinct files than the skill wants: Edith asks her first whether she has others (Tristan: « tu n'as que 3 plans, en as-tu d'autres ? »). */
 export const fewFiles = (skill: Pick<MontageSkill, "files">, files: number) => files < skill.files[0];
