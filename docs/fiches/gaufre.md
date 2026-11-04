@@ -1,0 +1,78 @@
+# « Titre gaufré » (`gaufre`) : fiche de l'original
+
+> Fiche d'un original : ce qu'on y voit, mesuré image par image, et les effets qu'on veut savoir refaire sur les vidéos de n'importe quel commerce (la méthode : `docs/modeles.md`, « La chaîne des modèles »). Les temps sont en secondes de l'original ; « intro t. » compte les temps de son intro (0,44 s) depuis son premier accord, « temps » ceux de son groove (0,50 s) depuis la reprise (5,32 s = temps 0).
+
+**L'original** : `house/originals/gaufre.mp4`, 12,73 s, 720 × 1280, 30 i/s, **vertical 9:16** en plein cadre, avec son. C'est le même fichier que `facade.mp4` : « Façade qui se construit » en prend le début, « Titre gaufré » tout le Reel (`HOUSE_PASSAGES` donne 9,4 s à « Façade », mais le papier arrive à 9,00 s, image 270 : 0,4 s de trop).
+**Sa musique** : deux parties, deux tempos. Une intro sans batterie, à ≈ 136 BPM : trois accords qui montent (0,03 · 0,92 · 1,80 s, un tous les deux temps), une montée de notes rapides (une toutes les 0,11 s, en doubles croches, de 240 à 2 800 Hz, de 2,66 à 4,45 s), puis sa note du haut tenue, sans basse, jusqu'à 5,32 s. Puis la reprise : un groove à **≈ 120 BPM** (un temps toutes les 0,50 s depuis 5,32 s ; joué, pas quantifié : 0,45 à 0,61 s d'un temps à l'autre ; en triolets vers la fin), qui s'arrête à 11,95 s ; 0,3 s de silence ; une dernière note tenue (≈ 790 Hz) de 12,35 s à la fin. Le groove est sûr à 2 BPM près (autocorrélation, suivi des temps et `measure.py` disent 119 à 121) ; Gemini disait 115, le modèle v1 84. Le genre, d'après Gemini (la mesure ne le dit pas) : acoustique, bossa, indie pop.
+**Mesuré avec** : `scripts/fiche/measure.py` (ses « coupes » à 5,27 · 5,83 · 6,33 s sont trois grands morceaux qui arrivent ; son « noir de 0 à 2,67 s » est faux, les premiers morceaux sont petits ; aucun clignotement), chaque morceau relevé image par image (sa boîte, son image d'arrivée, ce qui bouge dedans), des planches à 30 i/s, les lettres en gros plan toutes les 2 images, des relevés de couleur et de relief, les attaques de la musique par bandes de fréquences, et la lecture de Gemini (`house/breakdowns/gaufre.json`).
+
+## Déroulé
+
+| De – à (s) | Temps | Ce qu'on voit | Effets |
+|---|---|---|---|
+| 0 – 0,03 | — | Noir (image 0) | — |
+| 0,03 – 2,67 | intro t. 0 – 6 | Sur du noir pur, trois morceaux de la devanture d'un café, chacun d'un coup à sa place : la vitre de gauche, où son nom « Still » et sa carte sont peints (image 1), une fenêtre à droite avec deux clients (25), la fenêtre cintrée de l'étage (53) | **Morceaux posés à leur place sur le noir**, un par accord (effets 1 et 2) |
+| 2,67 – 4,40 | intro t. 6 – 10 | Treize morceaux en 1,7 s, un toutes les 3 à 6 images : l'auvent (80), les clients de la terrasse un à un (85, 90), une passante (94), la vitrine en trois morceaux de droite à gauche (97, 100, 104), le chien (109), le trottoir (114), le mur de brique (118), les fenêtres puis le pignon de droite (124, 128), le bandeau de façade (132) | Sur la montée de notes ; la vidéo joue dans les morceaux : la passante marche, le chien avance puis s'assoit |
+| 4,40 – 5,27 | intro t. 10 – 12 | Plus rien n'arrive pendant 26 images ; 44 % de l'image est là | Sur la note tenue |
+| 5,27 · 5,83 · 6,33 | temps 0 · 1 · 2 | La rue (le bas de l'image, 29 %) sur la reprise, puis le haut à gauche (11 %), puis le reste du haut, ciel et arbre (16 %) : l'image est pleine | Les trois derniers morceaux, sur les temps |
+| 6,33 – 9,00 | 2 – 7,4 | Le plan entier, fixe et calme : la terrasse, le chien assis | — (ni zoom ni poussée : mesuré) |
+| 9,00 – 10,57 | 7,4 – 10,5 | **Coupe franche**, sur un coup de la musique, vers un papier pêche en plein cadre : « Still » pressé en creux au milieu, « IN THE MOMENT » dessous ; l'encre rouille est déjà dans le haut du S et le remplit (fini à 10,77 s) | Effets 3 à 6 |
+| 10,57 – 12,60 | 10,5 – 14,6 | Le t, le i, les deux l puis le point du i s'encrent, chacun en suivant son tracé, et se soulèvent ; la ligne s'encre de gauche à droite à partir de 10,83 s | Effets 5 à 7 |
+| 12,60 – 12,73 | 14,6 – 14,8 | Tout est encré, 4 images, sur la dernière note | Effet 8 |
+
+## Effets (ce qu'on veut savoir refaire)
+
+### 1. Une image qui se construit morceau par morceau sur du noir
+- **Mesuré** : une seule vidéo, fixe et de face, entourée de noir pur (#000000). 19 morceaux arrivent chacun en une image, entiers et à leur place exacte : ni fondu, ni glissé, ni zoom, un bord franc sans ombre ni liseré ; aucun ne repart. Chacun est un élément de la façade dans sa boîte, parfois découpé sur son contour (l'auvent en trapèze, le pignon en pentagone) : de 1 à 5 % de l'image, puis trois grands (28, 11 et 16 %). La vidéo joue dedans : ce sont des fenêtres sur une même vidéo, pas des photos. Le premier montre le nom du café peint sur sa vitre, dans la lettre du titre de la fin, semble-t-il : le Reel s'ouvre et finit sur son nom.
+- **Sur quoi** : un plan fixe fait d'éléments séparés. Sa devanture (fenêtres, porte, enseigne, auvent, terrasse, gens, vélos, plantes), mais aussi un comptoir, une étagère de produits (chaque bouteille, chaque pot), une salle avec ses miroirs et ses fauteuils, un cours avec chaque personne. En premier, ce qui porte son nom (son enseigne, sa vitrine).
+- **Outil** : existants : `SubjectParts(shot, frame, laid, "every window")` (chaque fenêtre suivie, 12 au plus), `SubjectBox` et `SubjectOutline` d'un objet nommé (« shop sign », « awning », « door », « dog »), et `Window fit="cut" reveal="cut"`, qui pose d'un coup le morceau de l'image entière à sa place ; mais quatre objets nommés par Reel au plus. Manque : **les morceaux d'un plan**, tout le plan coupé en ses éléments (la rue, le ciel et les murs compris), en boîtes qui couvrent l'image, dans un ordre (son nom d'abord, les grandes zones à la fin). Le skill de « Façade » (v1) pose 17 rectangles aux places de l'original, pas à celles de ses éléments. Un plan tenu à la main est d'abord stabilisé (existant, `stabilizeIfShaky`).
+- **Si rien ne s'y prête** : son plan arrive par carreaux (`Tiles`, du noir à son plan, `reveal="cut"`, `wave="random"`), ou ses plans calmes en plein cadre, coupés sur le temps.
+
+### 2. Un morceau par note, une pause, puis la rue sur la reprise
+- **Mesuré** : un morceau sur chacun des trois accords (images 1, 25 et 53, jusqu'à 3 images avant le son) ; treize sur la montée (13 de ses 17 notes environ, à une ou deux images près) ; aucun pendant la note tenue (26 images) ; la rue sur la reprise (image 158, 1,5 image avant le coup de 5,32 s), puis les deux derniers sur les deux temps suivants. L'image entière joue ensuite 2,67 s (5,3 temps).
+- **Sur quoi** : sa musique, quand elle a ce dessin.
+- **Outil** : manque : une musique d'Edith **composée sur un plan** (une intro sans batterie : des accords, une montée, un arrêt ; puis la reprise à un moment donné), dont on lit les notes et pas seulement les temps (`beatGrid` ne lit que les temps), pour y poser les morceaux.
+- **Si rien ne s'y prête** : les morceaux sur la grille du modèle, à 120 : trois tous les deux temps, treize en doubles croches, deux temps d'arrêt, les trois derniers sur les temps.
+
+### 3. Le papier
+- **Mesuré** : coupe franche à 9,00 s (image 270), sur un coup de la musique (9,02 s, entre deux temps, pas sur un temps). Un papier pêche #F5CCA4 (de #F0C79F à #F9D0A8) en plein cadre jusqu'à la fin (3,73 s) : des fibres courtes et bouclées, en relief, très douces (4 niveaux d'écart sur 255). Il ne bouge pas : ni zoom, ni glissé (mesuré image par image), ni vignette, ni dégradé (2 niveaux d'un coin à l'autre).
+- **Sur quoi** : rien à filmer : il est dessiné.
+- **Outil** : `Paper color grain fibers` (existant ; ses fibres sont longues et droites, celles de l'original courtes et bouclées : la texture éclairée du code v1 en est plus proche).
+
+### 4. Son nom pressé en creux
+- **Mesuré** : « Still », un seul mot (le nom du café), un serif de titre à fort contraste aux formes calligraphiques (pieds courbes, le second l recourbé en haut), une capitale puis des minuscules, centré : x 16,7 – 83,3 % (66,5 % de la largeur), y 42,1 – 58,7 % ; capitale 16,4 % de la hauteur, minuscules 11 %. Pressé dès la première image : dans chaque lettre, les parois du haut et de gauche dans l'ombre (#B78C64), celles du bas et de droite éclairées (#FFE0B8), environ 1 % de la largeur chacune : la lumière vient d'en haut à gauche ; le fond du creux a la couleur du papier.
+- **Sur quoi** : son nom (sinon 1 à 3 mots qui la disent), dans la police de son logo quand elle en a un (l'original reprend celle de sa vitre).
+- **Outil** : `Emboss mode="deboss"` (existant ; sa lumière vient d'en haut seulement : la gauche est à ajouter).
+
+### 5. L'encre qui suit le tracé de chaque lettre
+- **Mesuré** : l'encre entre dans chaque lettre en suivant son tracé, avec un front doux (10 à 20 % de la lettre). Le S part de sa courbe du haut, à gauche, descend son dos et finit par ses deux bouts (images 270 à 323, 9,00 à 10,77 s ; déjà entrée à la première image). Le t monte depuis son pied, sa barre se remplit quand l'encre la passe (317 – 339). Le i monte (330 – 349), puis le premier l (344 – 365), le second (355 – 374), et **le point du i en dernier** (359 – 374), comme une main qui met le point à la fin. Le S prend 1,8 s, les autres 0,5 à 0,7 s ; à partir du t, chacune part 0,4 s environ après la précédente : elles se chevauchent. Pas calé sur les temps : ça coule. L'encre arrive foncée (#7D2100), puis s'éclaircit en 1,5 à 3 s jusqu'au rouille (#B43C01) : elle sèche.
+- **Sur quoi** : n'importe quel mot.
+- **Outil** : `Emboss ink inkAt inkFrames stagger` (existant) change la couleur d'une lettre entière d'un coup. Manque : **l'encre qui suit le tracé** (d'un bout du trait à l'autre, front doux), foncée en arrivant puis qui sèche, la première lettre lente, le point d'un i ou un accent en dernier.
+
+### 6. La lettre encrée se soulève
+- **Mesuré** : là où l'encre arrive, la lettre passe de creusée à posée en 0,4 s environ : sa paroi éclairée, à droite, laisse place à une ombre douce en bas à droite (environ 2,5 % de la largeur, foncée au pied de la lettre), et son bord prend un fin liseré plus foncé. Même lumière, d'en haut à gauche. Encré, le mot semble posé sur le papier.
+- **Outil** : manque dans `Emboss` (creux ou relief, jamais l'un puis l'autre) : la lettre qui se soulève quand l'encre passe. Le code v1 en faisait une partie (une épaisseur et une ombre douce une fois encrée).
+
+### 7. La ligne sous le titre
+- **Mesuré** : « IN THE MOMENT », des capitales serif (pas une linéale, comme le disait Gemini), 2,7 % de la hauteur, espacées pour faire exactement la largeur du titre (x 17,2 – 83,5 %), leur haut 4 % sous le pied du titre. Pressée comme le titre dès la première image, puis encrée lettre à lettre de gauche à droite, front doux, de 10,83 s (image 325, quand le t commence) à 12,60 s (378) : elle finit avec le titre. Couleur finale #A04B20.
+- **Sur quoi** : une ligne courte : son métier et son quartier, une date, sa devise.
+- **Outil** : un second `Emboss`, petit (existant), mis à la largeur du titre (le code v1 le fait).
+
+### 8. La fin sur la dernière note
+- **Mesuré** : le groove s'arrête à 11,95 s, 0,3 s de silence, puis une dernière note tenue de 12,35 s à la fin ; l'encre finit à 12,60 s, la vidéo à 12,73 s : la carte entière ne se voit que 4 images. En boucle, le noir et le premier morceau reviennent.
+- **Outil** : le temps du modèle (son code). À voir avec Tristan : tenir la carte encrée une seconde de plus pour la lire, ou finir comme l'original.
+
+### 9. Étalonnage
+La vidéo : lumière du jour douce, couleurs naturelles peu saturées, blancs brûlés (le ciel) ; crème #EFE6CF, brique #CA956D, vitres #292924, rue #B0A69B. Le papier et l'encre restent dans ces tons chauds (pêche, rouille). Ni grain, ni flash, ni clignotement (mesuré). Pas de bruitage mesurable (un son aigu, 3,2 kHz, sous le premier accord : musique ou bruitage, pas clair).
+
+## Format
+L'original est vertical 9:16 en plein cadre : une vidéo filmée en hauteur (la façade sur toute la largeur, le ciel au-dessus, la rue en dessous) ; le papier est dessiné en plein cadre. Réglage « format » : `auto` (comme sa vidéo de devanture), `vertical` (sa vidéo en plein cadre, coupée en morceaux), `horizontal` (sa vidéo entière dans une bande 16:9 au milieu : la façade se construit dans la bande, sur le noir qui est déjà le fond ; le papier reste en plein cadre).
+
+## Ce que Gemini a vu, et ce qu'il a raté
+Vu : la façade reconstruite en blocs sur fond noir, calés sur les notes ; la coupe franche sur un carton texturé (il dit « crépi ») ; « Still » gravé puis rempli lettre par lettre de gauche à droite ; la place des deux textes (à 1 % près). Raté : le **tempo** (115 ; l'intro va à ≈ 136, le groove à ≈ 120) ; la **pause** sur la note tenue et la **rue sur la reprise** ; la vidéo qui **joue dans les morceaux** ; l'image pleine dès 6,33 s (il dit 7 s) ; le nom sur la vitre du premier morceau ; l'encre qui **suit le tracé** (les fûts de bas en haut), qui **sèche** (foncée puis rouille), le **point du i en dernier** ; les lettres qui **se soulèvent** une fois encrées ; la ligne, une serif **encrée elle aussi** (il la dit linéale et immobile).
+
+## Ce que le modèle v1 ratait
+Il demandait 2 à 6 fichiers (l'original n'a qu'une vidéo) et remplaçait la façade qui se construit par des plans calmes coupés sur le temps (avec une poussée lente sur une photo d'ouverture, que l'original n'a pas et que Tristan trouve cheap), à 84 BPM sur un « piano ambiant » ; sa lecture (`house-models.ts`) met le papier à 1 s. Son encre entrait par le coin haut gauche de chaque lettre, d'une seule couleur (#a8380a), à pas réguliers (le S aussi vite que les autres) ; sa lumière venait d'en haut seulement ; son encre finissait en 2,5 s et la carte encrée tenait 1 s (« tenu deux secondes » dans sa lecture), quand l'original encre jusqu'au bout (3,6 s).
+
+## Ce qu'il faut filmer
+Sa devanture de face, bien droite, le téléphone posé (pas à la main), 10 s au moins, de jour, en hauteur (un peu de ciel au-dessus, la rue en dessous) ou en largeur pour une longue façade ; de la vie devant (des gens assis ou qui passent, un chien, un vélo) ; son nom visible sur la vitrine ou l'enseigne. À l'intérieur, un plan fixe de son comptoir, d'une étagère ou de sa salle marche aussi. Pour le papier, rien à filmer : son nom (un mot court ; l'original en a 5 lettres) et une ligne courte.

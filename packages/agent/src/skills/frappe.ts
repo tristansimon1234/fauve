@@ -99,7 +99,7 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
 
   // 2. What lights up in the closer shot (her sign's letters, each window, a garland: what the filler saw there, cut
   // out at every image): its pieces one after the other, 2 or 3 images each, then dark, then all of it at once on the
-  // beat for 6 images, its bright parts blooming. Lit: its own picture brighter, paler, with a warm halo.
+  // beat for 6 images. Lit: its own picture brighter, paler, with a warm halo; the rest of the shot as it is.
   const litStyle = { position: "absolute", left: 0, top: 0, width: bw, height: bh, filter: "brightness(1.85) saturate(0.55) contrast(1.05) drop-shadow(0 0 " + Math.round(bh * 0.008) + "px rgba(255,238,205,0.95))" };
   // (Each object written with its shot as a number, so the engine follows it in that shot before the render.)
   const lit = (cutOut, clip) => h("div", { style: { ...litStyle, ...(clip ? { clipPath: clip } : {}) } }, cutOut);
@@ -116,11 +116,12 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   // The night shot's sign and lights blink on for 3 images just after its cut.
   const blinking = frame >= BLINK_AT && frame < BLINK_AT + 3 && frame < BLACK_AT;
   const nightLit = blinking && cur === 3 ? lit(night()) : null;
-  // Its bright parts bloom with them (a brightened, contrasted, blurred copy laid over in screen), its darks untouched.
-  const bloomK = flashing ? interpolate(frame, [FLASH, FLASH + 1, FLASH + 4, FLASH + 6], [0, 1, 0.85, 0], clamp) : blinking ? (frame === BLINK_AT + 1 ? 0.7 : 0.5) : 0;
-  const bloom = bloomK > 0
-    ? h("div", { style: { position: "absolute", left: 0, top: 0, width: bw, height: bh, mixBlendMode: "screen", opacity: 0.85 * bloomK, filter: "brightness(2.1) contrast(2.8) saturate(1.2) blur(" + Math.round(bh * 0.006) + "px)" } }, shot(cur))
-    : null;
+  // Nothing found to light in that shot (no sign, no lamp): the whole picture takes a short flash of light on the beat
+  // instead, three images (a bloom of its bright parts lit the sky of a sunny shot whole).
+  const missing = (flashing && cur === 1 && !SubjectBox(shots[1], frame, laid, "@lumieres")) || (blinking && cur === 3 && !SubjectBox(shots[3], frame, laid, "@nuit"));
+  const since = flashing ? frame - FLASH : frame - BLINK_AT;
+  const flashK = missing && since < 3 ? [0.32, 0.2, 0.1][since] : 0;
+  const bloom = flashK > 0 ? h("div", { style: { position: "absolute", left: 0, top: 0, width: bw, height: bh, background: "#fff6e4", mixBlendMode: "screen", opacity: flashK } }) : null;
 
   // 3. Her name typed by hand in the sky, a character on each step (its hyphens and spaces too, the whole name laid out
   // from the start so nothing moves as it types), a pause in the middle and before the last letter: extra-bold

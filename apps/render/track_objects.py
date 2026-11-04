@@ -152,8 +152,9 @@ def pieces_inside(picture, whole):
     letters and its support, a window with its frame): its colours sorted in two or three groups, and of the groups
     that make three pieces of a letter's shape or more (as tall as a good part of it, narrow, of a height), the one
     whose colour stands furthest from what is around the object (the letters, not the sky seen between them) gives
-    them, in boxes (x, y, w, h) at the cut-out's size; none when no group does, or when its pieces are not evenly laid.
-    `picture`: the image at its own size (read at full size: a sign's letters are a few pixels wide at half).
+    them, in boxes (x, y, w, h) at the cut-out's size, with its colours (the groups' centres and its own, Lab), so its
+    cut-out can be kept to them; none when no group does, or when its pieces are not evenly laid. `picture`: the image
+    at its own size (read at full size: a sign's letters are a few pixels wide at half).
     """
     import cv2
     import numpy as np
@@ -164,7 +165,7 @@ def pieces_inside(picture, whole):
     inside = full > 0.5
     ys, xs = np.nonzero(inside)
     if len(xs) < 400:
-        return []
+        return [], None
     x0, y0, x1, y1 = int(xs.min()), int(ys.min()), int(xs.max()) + 1, int(ys.max()) + 1
     lab_all = cv2.cvtColor(np.ascontiguousarray(picture), cv2.COLOR_RGB2LAB).astype(np.float32)
     # What is around it: a ring just outside its cut-out.
@@ -174,7 +175,7 @@ def pieces_inside(picture, whole):
     h, w = keep.shape
     data = lab_all[y0:y1, x0:x1].reshape(-1, 3)[keep.reshape(-1)]
     cv2.setRNGSeed(7)
-    best, best_rank = [], None
+    best, best_rank, colours = [], None, None
     for groups in (2, 3):
         _, labels, centres = cv2.kmeans(data, groups, None, (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 0.5), 3, cv2.KMEANS_PP_CENTERS)
         sorted_into = np.full(keep.size, -1, np.int32)
@@ -202,46 +203,67 @@ def pieces_inside(picture, whole):
             if best_rank is None or rank > best_rank:
                 best_rank = rank
                 best = [(x0 + int(s[cv2.CC_STAT_LEFT]), y0 + int(s[cv2.CC_STAT_TOP]), int(s[cv2.CC_STAT_WIDTH]), int(s[cv2.CC_STAT_HEIGHT])) for s in shaped]
+                colours = (centres.astype(np.float32), g)
     if len(best) < 3:
-        return []
+        return [], None
     # Back at the cut-out's size.
     sx, sy = mw / pw, mh / ph
-    return [(int(round(x * sx)), int(round(y * sy)), max(1, int(round(bw * sx))), max(1, int(round(bh * sy)))) for x, y, bw, bh in best]
+    return [(int(round(x * sx)), int(round(y * sy)), max(1, int(round(bw * sx))), max(1, int(round(bh * sy)))) for x, y, bw, bh in best], colours
+
+
+def keep_colours(picture, mask, colours):
+    """An object's cut-out at one image kept to its pieces' colours (a sign's letters, not the sky between them), softly."""
+    import cv2
+    import numpy as np
+
+    centres, g = colours
+    h, w = mask.shape
+    lab = cv2.cvtColor(cv2.resize(np.ascontiguousarray(picture), (w, h), interpolation=cv2.INTER_AREA), cv2.COLOR_RGB2LAB).astype(np.float32)
+    nearest = np.argmin(np.linalg.norm(lab[:, :, None, :] - centres[None, None, :, :], axis=3), axis=2)
+    mine = cv2.morphologyEx((nearest == g).astype(np.uint8), cv2.MORPH_CLOSE, np.ones((3, 3), np.uint8)).astype(np.float32)
+    return mask * cv2.GaussianBlur(mine, (3, 3), 0)
+
+
+def relative(boxes, whole):
+    """Pieces (x, y, w, h px) in reading order as shares of the object's box in that cut-out (flat), PARTS_MAX at most."""
+    import numpy as np
+
+    ys, xs = np.nonzero(whole > 0.5)
+    if len(boxes) < 2 or not len(xs):
+        return None
+    wx, wy = int(xs.min()), int(ys.min())
+    ww, wh = int(xs.max()) - wx + 1, int(ys.max()) - wy + 1
+    return [round(v, 3) for x, y, w, h in reading_order(boxes)[:PARTS_MAX] for v in ((x - wx) / ww, (y - wy) / wh, w / ww, h / wh)]
 
 
 def parts_of(each, k, picture=None):
     """
     The object's pieces on the image it was found on (the letters of a sign, the bulbs of a garland, each window of
-    « every window »), in reading order, as shares of its whole box there (x, y, w, h, flat): each one followed, else
-    the separate pieces of its cut-out, else those its colours draw inside it (`picture`: that image at the cut-out's
-    size); None when it is in one piece (an animation then cuts it in slices itself).
+    « every window »), in boxes (x, y, w, h px of the cut-out): each one followed, else the separate pieces of its
+    cut-out, else those its colours draw inside it (`picture`: that image at its own size; their colours come with
+    them); none when it is in one piece (an animation then cuts it in slices itself).
     """
     import cv2
     import numpy as np
 
     whole = np.maximum.reduce([e[k] for e in each]) if len(each) > 1 else each[0][k]
-    ys, xs = np.nonzero(whole > 0.5)
-    if not len(xs):
-        return None
-    wx, wy = int(xs.min()), int(ys.min())
-    ww, wh = int(xs.max()) - wx + 1, int(ys.max()) - wy + 1
+    if not (whole > 0.5).any():
+        return [], None
     boxes = []
     if len(each) > 1:
         for e in each:
             py, px = np.nonzero(e[k] > 0.5)
             if len(px):
                 boxes.append((int(px.min()), int(py.min()), int(px.max() - px.min()) + 1, int(py.max() - py.min()) + 1))
-    else:
-        count, _, stats, _ = cv2.connectedComponentsWithStats((whole > 0.5).astype(np.uint8), 8)
-        if count > 2:
-            areas = stats[1:, cv2.CC_STAT_AREA]
-            for s in stats[1:][areas >= 0.03 * areas.max()]:
-                boxes.append((int(s[cv2.CC_STAT_LEFT]), int(s[cv2.CC_STAT_TOP]), int(s[cv2.CC_STAT_WIDTH]), int(s[cv2.CC_STAT_HEIGHT])))
-        if len(boxes) < 2 and picture is not None:
-            boxes = pieces_inside(picture, whole)
-    if len(boxes) < 2:
-        return None
-    return [round(v, 3) for x, y, w, h in reading_order(boxes)[:PARTS_MAX] for v in ((x - wx) / ww, (y - wy) / wh, w / ww, h / wh)]
+        return boxes, None
+    count, _, stats, _ = cv2.connectedComponentsWithStats((whole > 0.5).astype(np.uint8), 8)
+    if count > 2:
+        areas = stats[1:, cv2.CC_STAT_AREA]
+        for s in stats[1:][areas >= 0.03 * areas.max()]:
+            boxes.append((int(s[cv2.CC_STAT_LEFT]), int(s[cv2.CC_STAT_TOP]), int(s[cv2.CC_STAT_WIDTH]), int(s[cv2.CC_STAT_HEIGHT])))
+    if len(boxes) >= 2 or picture is None:
+        return boxes, None
+    return pieces_inside(picture, whole)
 
 
 def photo_frames(src, w, h):
@@ -288,9 +310,14 @@ def follow(job, device, dtype, detector, tracker):
     # « every … »: all of them at every image, one object in pieces.
     masks = [np.maximum.reduce([e[i] for e in each]) for i in range(n)] if len(each) > 1 else each[0]
     # Its pieces where it was found (its letters, its bulbs, each window), placed later on its box at every image.
-    pieces = parts_of(each, k, frames[k])
+    found, colours = parts_of(each, k, frames[k])
+    if colours is not None:
+        # In one block, its letters drawn by their colours: its cut-out kept to them at every image (the sky seen between
+        # a sign's letters is not the sign), so what lights up is its letters, not their boxes.
+        masks = [keep_colours(frames[i], masks[i], colours) for i in range(n)]
     # A light smoothing over time, against a shimmer of the edges (as for her).
     masks = [masks[0]] + [0.6 * masks[i] + 0.2 * masks[i - 1] + 0.2 * masks[min(n - 1, i + 1)] for i in range(1, n)]
+    pieces = relative(found, masks[k])
     log(f"followed through {n} images in {time.time() - tracked:.1f} s" + (f", in {len(pieces) // 4} pieces" if pieces else ""))
     # A photo's object: one still image (a PNG the size of the photo, laid exactly over it).
     r = matte.finish(job, frames, masks, photo, n, False, started, ow, oh)
