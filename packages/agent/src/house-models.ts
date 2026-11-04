@@ -17,8 +17,8 @@ import type { z } from "zod";
 
 /** The source of the inspiration row a house model is kept on, per studio (one per model, made when first used). */
 export const HOUSE_SOURCE = "house";
-/** The catalogue's version: a studio's row written by an older one is rewritten when the model is used again (3: its original's sheets). */
-export const HOUSE_VERSION = 3;
+/** The catalogue's version: a studio's row written by an older one is rewritten when the model is used again (3: its original's sheets; 4: no brand in a model's name). */
+export const HOUSE_VERSION = 4;
 
 export type HouseModel = {
   key: string;
@@ -697,7 +697,7 @@ export const HOUSE_MODELS: HouseModel[] = [
   }),
   model({
     key: "nike",
-    name: "Montage façon Nike",
+    name: "Montage sport noir et blanc",
     pitch: "Noir et blanc contrasté, une touche de rouge, ralentis saccadés, images flash : l'énergie d'une pub de sport, avec tes images.",
     needs: "6 à 12 vidéos avec du mouvement (un geste, un service, un effort), filmées sans trop trembler",
     files: [5, 14],
@@ -706,7 +706,7 @@ export const HOUSE_MODELS: HouseModel[] = [
     tempo: 120,
     finish: { name: "Noir et blanc dur", hint: "noir et blanc très contrasté, grain fort", preset: "bw", saturation: -1, contrast: 0.4, grain: 0.5, grain_size: "medium", vignette: 0.35 },
     look: {
-      name: "montage façon Nike",
+      name: "montage sport noir et blanc",
       format: "autre",
       hook: { kind: "geste", what: "un geste fort en noir et blanc, figé une fraction de seconde, puis un flash" },
       text: { amount: "une ligne", composition: "un ou deux mots en capitales très condensées, un par plan, coupés sur le temps", case: "upper", weight: "black", tracking: "tight" },
