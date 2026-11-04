@@ -359,7 +359,9 @@ export async function withMusic(params: {
     if (music.track?.path) await db.storage.from("media").remove([music.track.path]).catch(() => {});
     await db
       .from("posts")
-      .update({ music: { mode: "on", ...(music.wish ? { wish: music.wish } : {}), track: { path, signature, song_id: best!.songId, created_at: new Date().toISOString(), ...(music.wish ? { wish: music.wish } : {}) } } })
+      // Everything else she set on this Reel's sound stays (its sound effects, the sound she follows, her own publishing):
+      // written without them, a new piece had put her sound effects back to her default.
+      .update({ music: { ...music, mode: "on", track: { path, signature, song_id: best!.songId, created_at: new Date().toISOString(), ...(music.wish ? { wish: music.wish } : {}) } } })
       .eq("id", params.postId);
   }
   // Shaped as its model plays it (its pauses, its muffled passages, its end), whatever piece it got.
