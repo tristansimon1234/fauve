@@ -77,8 +77,11 @@ export type SceneRequest = {
   model?: SceneFrame[];
   /** Whose frames `model` holds: a Reel she sent (copy), the original of one of Edith's models she chose (house), or of one Edith picked and dressed in her charter (dressed). */
   modelOf?: "copy" | "house" | "dressed";
-  /** One of Edith's models she chose: its reference composition (house-examples.ts), a worked example to make hers. */
-  example?: { name: string; code: string; frames: number; shots: number };
+  /**
+   * One of Edith's models she chose: its reference composition (house-examples.ts), a worked example to make hers; or,
+   * `skill`, its whole Reel coded once (a montage skill, skills.ts), kept as it is but for what her request needs.
+   */
+  example?: { name: string; code: string; frames: number; shots: number; skill?: boolean };
   /** The sound effects already made (the library's), reused by name when one fits. */
   readySounds?: string[];
   /** It draws the Reel's texts as the copied Reel does (its texts, frames from its start), over the montage. */
@@ -89,6 +92,8 @@ export type SceneRequest = {
   backdrop?: SceneBackdrop | null;
   /** Its code already written by the Reel's director (director.ts): checked as any, fixed by the motion designer only if it fails. */
   draft?: DraftScene;
+  /** A draft played as it is (a montage skill): checked, never rewritten; its notes are only logged, a failure leaves it out. */
+  keep?: boolean;
 };
 
 /** A composition the director wrote with its plan. */
@@ -268,7 +273,8 @@ async function writeScene(
     words: Boolean(request.words),
     correction: Boolean(seen) && !request.look,
     look: Boolean(seen) && Boolean(request.look),
-    example: Boolean(!fix && request.example),
+    example: Boolean(!fix && request.example && !request.example.skill),
+    skill: Boolean(!fix && request.example?.skill),
   };
   const text = fix
     ? `This code failed: ${fix.error}\nFix it, keeping the same intention${kept.length ? ` and ${kept.join(" and ")}` : ""}.\n\nBrief: ${request.brief}\n\nCode:\n${fix.code}`
@@ -325,7 +331,9 @@ async function writeScene(
           ? {
               model_code: {
                 model: request.example.name,
-                reference: `${request.example.frames} frames, ${request.example.shots} shots of the bench; its words and shots are placeholders`,
+                reference: request.example.skill
+                  ? "its whole Reel coded once (a montage skill): it lays the shots, writes reelTexts and draws its ending; marks (its sections, in frames) come as its slot texts"
+                  : `${request.example.frames} frames, ${request.example.shots} shots of the bench; its words and shots are placeholders`,
                 code: request.example.code,
               },
             }
@@ -564,8 +572,10 @@ async function checkScenes(
       return working.get(r.id) ?? { ...r, js: null, error: checks.errors[r.id]! };
     });
     if (round === 1) break;
-    for (const r of results) if (r.js && checks.faces[r.id]) working.set(r.id, r);
-    const toFix = results.filter((r) => (!r.js && r.code) || working.has(r.id));
+    // A draft played as it is (a montage skill) is never rewritten: what the check says of it is only logged.
+    for (const r of results) if (requestOf(r.id).keep && checks.faces[r.id]) console.log("motion: a kept draft's notes, left as they are", r.id, checks.faces[r.id]!.slice(0, 300));
+    for (const r of results) if (r.js && checks.faces[r.id] && !requestOf(r.id).keep) working.set(r.id, r);
+    const toFix = results.filter((r) => !requestOf(r.id).keep && ((!r.js && r.code) || working.has(r.id)));
     // A fix is a call and a check more: not without the time for both.
     if (!toFix.length || timeLeft() < SCENE_CALL_MS + SMOKE_MS) break;
     // One round of fixes, with the error (or the text to move off a face), for those scenes (they keep their photos).

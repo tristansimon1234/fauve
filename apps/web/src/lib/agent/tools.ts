@@ -80,6 +80,7 @@ import { correctionQuote, startMontage } from "@/lib/montage-start";
 import { bakedReel, insertPlanVersion } from "@/lib/edit-plans";
 import { effectRoute } from "@/lib/agent/effects-agent";
 import { fewSubjects } from "@/lib/agent/copy-design";
+import { skillWantsMore } from "@/lib/agent/skill-design";
 import { keepModelSound } from "@/lib/model-sound";
 import { queueRerender } from "@/lib/rerender";
 import { startEffectWords } from "@/lib/effect-words";
@@ -649,7 +650,7 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
       });
     },
 
-    async montage({ post_id, media_ids, brief, correction, max_new_scenes, variant, plan, effort, inspiration_id, modele_edith, son, anciens_fichiers, remplacer_fichiers }) {
+    async montage({ post_id, media_ids, brief, correction, max_new_scenes, variant, plan, effort, inspiration_id, modele_edith, son, anciens_fichiers, remplacer_fichiers, avec_ceux_la }) {
       const post = unwrap(await db.from("posts").select("id, title, edit_plan_id, media_ids").eq("id", post_id).eq("studio_id", studioId).single());
       // A correction's new files join the Reel's own, unless Edith read that she wants to start again from them alone:
       // given alone, Promo Edith 2's five new photos replaced its twenty files and it came back as 3 s.
@@ -694,6 +695,19 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
       // Her answer to « garder son son ? » for a Reel copied from Instagram: no music of Edith's, she posts it herself.
       const sound = son ? await keepModelSound(studioId, post_id, son === "modele").catch(() => null) : null;
       if ((correction || variant) && !post.edit_plan_id) return "Pas encore de montage pour cette publication : lance d'abord un montage (correction: false).";
+      // A model coded as a montage skill takes a few files at least: with fewer, she is asked first whether she has others
+      // (Tristan: « tu n'as que 3 plans, en as-tu d'autres pour moi ? », else she makes it with those), nothing launched meanwhile.
+      if (!correction && !variant && !avec_ceux_la) {
+        const short = await skillWantsMore(studioId, post_id, media_ids ?? []).catch(() => null);
+        if (short) {
+          return json({
+            possible: false,
+            peu_de_fichiers: short.files,
+            il_en_faut: short.least,
+            note: `Le modèle « ${short.name} » prend au moins ${short.least} photos ou vidéos, et elle en a donné ${short.files}. Demande-lui en une phrase si elle en a d'autres pour toi, avec les boutons « J'en envoie d'autres » et « Fais avec ceux-là » (reply_with). Sur « Fais avec ceux-là », relance montage avec avec_ceux_la true : tu coupes plusieurs passages dans ses vidéos. Rien n'est lancé d'ici là.`,
+          });
+        }
+      }
       // A variant of a Reel the effects agent drew: the agent makes another version of its effect (a correction).
       if (variant && (await bakedReel(studioId, post_id))) {
         brief = [variant.hook ? `Une variante de ce Reel, avec une autre accroche : « ${variant.hook} ».` : "Une variante de ce Reel.", brief].filter(Boolean).join(" ");

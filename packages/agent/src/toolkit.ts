@@ -9,7 +9,7 @@ import { motionSlotSchema } from "./motion-scene.ts";
 // tables (capability_gaps, tools, tool_versions, tool_uses, tool_settings) are read in apps/web/src/lib/toolkit.ts.
 
 /** Where a gap was seen: the copy remade by code, the effects workshop it needed, the editor, the chat. */
-export const GAP_SOURCES = ["copy", "effects", "editor", "chat"] as const;
+export const GAP_SOURCES = ["copy", "effects", "editor", "chat", "skill"] as const;
 export type GapSource = (typeof GAP_SOURCES)[number];
 
 export const TOOL_KINDS = ["scene", "layer", "carousel", "effect"] as const;
@@ -51,7 +51,7 @@ export function groupGaps(gaps: { label: string; source: GapSource }[]): { label
   return [...groups.values()].map((g) => ({ label: g.label, count: g.count, sources: [...g.sources] })).sort((a, b) => b.count - a.count);
 }
 
-const SOURCE_WORDS: Record<GapSource, string> = { copy: "recopie", effects: "atelier", editor: "monteur", chat: "chat" };
+const SOURCE_WORDS: Record<GapSource, string> = { copy: "recopie", effects: "atelier", editor: "monteur", chat: "chat", skill: "skill de montage" };
 /** The most gaps the weekly message lists. */
 const DIGEST_GAPS = 6;
 

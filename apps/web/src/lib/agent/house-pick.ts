@@ -11,9 +11,13 @@ import {
   type HousePickFile,
 } from "@fauve/agent";
 import { outputFormat, readAnswer } from "@fauve/agent/answer";
+import { MONTAGE_SKILLS } from "@fauve/agent/skills";
 import { houseInspiration } from "@/lib/house-models";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { anthropic, logClaudeCost } from "./run";
+
+/** The files each model coded as a montage skill wants at least: Edith picks one only when her files fill it. */
+const SKILL_LEAST: Record<string, number> = Object.fromEntries(Object.values(MONTAGE_SKILLS).map((s) => [s.key, s.files[0]]));
 
 // Edith's art direction by default (packages/agent/src/house-pick.ts): a new Reel with no model, no Reel to copy and no
 // form of her own is made in one of Edith's models, picked here once from her files, her request and her trade, and
@@ -46,10 +50,10 @@ export async function ensureEdithModel(input: { studioId: string; postId: string
       max_tokens: 1500,
       output_config: { effort: "low", format: outputFormat(housePickSchema) },
       system: HOUSE_PICK_PROMPT,
-      messages: [{ role: "user", content: housePickInput({ request: input.brief ?? "", business: (studio.data?.business_type as string | null) ?? null, files, voice, avoid }) }],
+      messages: [{ role: "user", content: housePickInput({ request: input.brief ?? "", business: (studio.data?.business_type as string | null) ?? null, files, voice, avoid, least: SKILL_LEAST }) }],
     });
     await logClaudeCost(input.studioId, response.usage, "house_pick", CHAT_MODEL);
-    const key = readHousePick(response.parsed_output ? readAnswer(housePickSchema, response.parsed_output) : null, files.length, avoid);
+    const key = readHousePick(response.parsed_output ? readAnswer(housePickSchema, response.parsed_output) : null, files.length, avoid, SKILL_LEAST);
     if (!key) return null;
     const house = await houseInspiration(input.studioId, key);
     if (!house) return null;

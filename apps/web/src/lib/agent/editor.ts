@@ -100,6 +100,8 @@ import { photoRegions } from "@/lib/video/regions";
 import { latestReport } from "@/lib/performance";
 import { judgeHooks } from "./hook-judge";
 import { copyCandidate, designCopy } from "./copy-design";
+import { designSkill, skillCandidate } from "./skill-design";
+import { skillFor } from "@fauve/agent/skills";
 import { recordToolUses } from "@/lib/tool-maker";
 import { designMotionScenes, type SceneRequest, type SceneResult } from "./motion-designer";
 import { askDirector, directorFirstTurn, directorLookTurn, type DirectorBlock, type DirectorParts, type SavedDirector } from "./director";
@@ -417,6 +419,28 @@ export async function designEdit(params: {
     });
     if (copied) return { editPlanId: copied.editPlanId, version: copied.version, plan: copied.plan, rationale: copied.rationale, newScenes: 0, reusedScenes: 0 };
   }
+  // A model coded as a whole Reel (a montage skill, like an Edits or CapCut template): filled by one small call and played
+  // as it is, no editor nor motion designer. Its correction too; a request it does not serve goes to the editor below,
+  // whose motion designer starts from its code.
+  const skill = skillCandidate(followed, params.contract, Boolean(voice));
+  const previousSkill = previousPlan.success && previousPlan.data.skill?.key === skill?.key ? previousPlan.data : null;
+  if (skill && followed && (!correction || previousSkill)) {
+    const made = await designSkill({
+      studioId: params.studioId,
+      postId: params.postId,
+      skill,
+      followed,
+      mediaIds,
+      clips,
+      photos: Object.fromEntries(photoIds.flatMap((id, i) => (photoReads[i] ? [[id, photoReads[i]!] as const] : []))),
+      brief: params.brief,
+      contract: params.contract,
+      previous: correction ? previousSkill : null,
+      studio: { name: studio.data?.name, business: studio.data?.business_type, memory: studio.data?.memory, booking: Boolean(studio.data?.booking_url) },
+      profile,
+    });
+    if (made) return { editPlanId: made.editPlanId, version: made.version, plan: made.plan, rationale: made.rationale, newScenes: 0, reusedScenes: 0 };
+  }
   // What moves in her videos, followed before the editor cuts: which gestures show their hands in the vertical
   // frame (the editor puts an animation that hangs on a gesture where it can be seen), where the faces really are
   // (the texts keep off them) and what the animations follow. Never more than a few minutes of waiting (a sandbox
@@ -545,7 +569,13 @@ export async function designEdit(params: {
   // it sees the original frame by frame and her files, and cuts and composes the Reel in one answer; its look at the
   // Reel, next to the original, is its own step. The editor cuts the others (a voice leads them, a correction, no model).
   const house = houseModel(followed?.house);
-  const example = house?.example ? HOUSE_EXAMPLES[house.example] : undefined;
+  // A model coded as a montage skill: its whole Reel is the example, kept as it is but for what her request needs.
+  const coded = skillFor(house?.key);
+  const example = coded
+    ? { code: coded.code, frames: 0, shots: coded.shots[0], photos: 0, skill: true as const }
+    : house?.example
+      ? HOUSE_EXAMPLES[house.example]
+      : undefined;
   const sheets = inspirationId ? await modelSheets(params.studioId, inspirationId).catch(() => []) : [];
   const originalLength = sheets.at(-1)?.to ?? followed?.measured?.duration ?? 0;
   // On the bench and the team's studio only, until it beats the editor and the motion designer (first bench: more
@@ -564,7 +594,19 @@ export async function designEdit(params: {
           params.studioId,
           sheets,
           [...clips.map((c) => ({ id: c.media_id, seconds: c.analysis.duration, photo: false })), ...photoIds.map((id) => ({ id, seconds: 0, photo: true }))],
-          house && example ? { ...input, model_code: { model: house.name, reference: `${example.frames} frames, ${example.shots} shots of the bench; its words and shots are placeholders`, code: example.code } } : input,
+          house && example
+            ? {
+                ...input,
+                model_code: {
+                  model: house.name,
+                  reference:
+                    "skill" in example && example.skill
+                      ? "its whole Reel coded once (a montage skill): it lays the shots, writes reelTexts and draws its ending; marks (its sections, in frames) come as its slot texts"
+                      : `${example.frames} frames, ${example.shots} shots of the bench; its words and shots are placeholders`,
+                  code: example.code,
+                },
+              }
+            : input,
         ));
       const looked = params.director && previousPlan.success ? previousPlan.data : null;
       const measured = params.director?.look.notes ?? [];

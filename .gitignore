@@ -9,3 +9,5 @@ supabase/.temp/
 supabase/.branches/
 .claude/worktrees/
 __pycache__/
+# The Remotion bundle, made locally to render a skill (scripts/skill-render.mts) or run the scene check
+apps/render/build/

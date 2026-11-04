@@ -1,5 +1,6 @@
 import "server-only";
 import { HOUSE_MODELS, HOUSE_SOURCE, HOUSE_VERSION, houseLines, houseModel, houseStyle, stolenStyleSchema } from "@fauve/agent";
+import { skillFor } from "@fauve/agent/skills";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
 // Edith's own models (packages/agent/src/house-models.ts) as a studio uses them: the Reel she makes « comme le modèle
@@ -7,12 +8,18 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 // its inspirations (source « house », external_id = the model's key), written from the catalogue when first used and
 // rewritten when the catalogue's version moves on. Never listed with her inspirations; never read by Gemini.
 
-/** A model for the Créer screen: what it is, what it wants, and its preview (a loop rendered from its reference composition). */
-export type HouseCard = { key: string; name: string; pitch: string; needs: string; video: string; poster: string };
+/**
+ * A model for the Créer screen: what it is, what it wants, and its preview (a loop rendered from its reference
+ * composition); `least`, for a model coded as a montage skill, the files it wants at least (fewer: she is asked first).
+ */
+export type HouseCard = { key: string; name: string; pitch: string; needs: string; video: string; poster: string; least?: number };
 
 /** The models, in the catalogue's order, for her to pick one. */
 export function houseCards(): HouseCard[] {
-  return HOUSE_MODELS.map((m) => ({ key: m.key, name: m.name, pitch: m.pitch, needs: m.needs, video: `/modeles/${m.key}.mp4`, poster: `/modeles/${m.key}.jpg` }));
+  return HOUSE_MODELS.map((m) => {
+    const skill = skillFor(m.key);
+    return { key: m.key, name: m.name, pitch: m.pitch, needs: m.needs, video: `/modeles/${m.key}.mp4`, poster: `/modeles/${m.key}.jpg`, ...(skill ? { least: skill.files[0] } : {}) };
+  });
 }
 
 /** The studio's row for a model (made, or rewritten from a newer catalogue), with what her Reel takes from it; null for an unknown key. */

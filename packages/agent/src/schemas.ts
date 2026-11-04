@@ -493,6 +493,8 @@ export const editPlanObjectSchema = z.object({
     .optional(),
   /** A simple copied Reel remade by code (copyLayerSchema): its cut-outs, its title and its ending, drawn over the shots. */
   copy: copyLayerSchema.optional(),
+  /** A Reel made on a montage skill (skills.ts): its model's key and the skill's version. Set by the engine; a correction is filled again on it. */
+  skill: z.object({ key: z.string().min(1).max(40), version: z.number().int().min(1) }).optional(),
   /** What she added on it (planOverlaySchema), over everything. */
   overlays: z.array(planOverlaySchema).max(MAX_OVERLAYS).optional(),
   /** Her videos kept whole and horizontal, on black above and below (her request, read by her contract): the engine draws it. */

@@ -195,7 +195,10 @@ function Create({
   // One of Edith's models she picked here: its key and the studio's row it is kept on.
   const [house, setHouse] = useState<{ key: string; id: string; needs: string } | null>(null);
   const [houseBusy, setHouseBusy] = useState<string | null>(null);
-  const [sheet, setSheet] = useState<"format" | "date" | "voice" | "nothing" | null>(null);
+  const [sheet, setSheet] = useState<"format" | "date" | "voice" | "nothing" | "more" | null>(null);
+  // A model coded as a montage skill takes a few files at least: with fewer, she is asked first whether she has
+  // others (Tristan: « tu n'as que 3 plans, en as-tu d'autres pour moi ? »); « Fais avec ceux-là » is kept.
+  const [fewOk, setFewOk] = useState(false);
   const [all, setAll] = useState(false);
   const [dragging, setDragging] = useState(false);
   const [pending, start] = useTransition();
@@ -262,6 +265,7 @@ function Create({
       .then((r) => {
         if (!r.ok) return setError(r.error);
         setHouse({ key: card.key, id: r.id, needs: card.needs });
+        setFewOk(false);
         setGiven(r.id);
         setCopyRead({ state: "read", name: r.name, lines: r.lines });
         setCopyChoice("copy");
@@ -408,6 +412,11 @@ function Create({
   };
 
   const launch = () => {
+    const least = kind === "reel" && houseOn ? (options?.house?.find((c) => c.key === houseOn)?.least ?? 0) : 0;
+    if (least > picked.length && !fewOk) {
+      setSheet("more");
+      return;
+    }
     if (kind === "reel" && !voiceAsked) {
       setLaunchOnVoice(true);
       setSheet("voice");
@@ -1053,6 +1062,45 @@ function Create({
               }
             }}
           />
+        </Sheet>
+      )}
+
+      {sheet === "more" && (
+        <Sheet label="Plus de fichiers" onClose={() => setSheet(null)}>
+          <SheetHead
+            title="Tu en as d’autres ?"
+            hint={`Ce modèle prend au moins ${options?.house?.find((c) => c.key === houseOn)?.least ?? 0} photos ou vidéos, tu m’en as donné ${picked.length}. Sinon, je coupe plusieurs passages dans tes vidéos.`}
+            onClose={() => setSheet(null)}
+          />
+          <div className="flex flex-col gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setSheet(null);
+                setStepAt(Math.max(0, steps.indexOf("files")));
+              }}
+              className="btn btn-primary h-[52px] text-[16px] font-extrabold"
+            >
+              Ajouter des fichiers
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setFewOk(true);
+                setSheet(null);
+                // Her answer launches it, as « C’est parti » would have (the voice is asked next when it has to be).
+                if (kind === "reel" && !voiceAsked) {
+                  setLaunchOnVoice(true);
+                  setSheet("voice");
+                  return;
+                }
+                go(chosenVoice);
+              }}
+              className="btn btn-secondary h-[52px] text-[16px] font-extrabold"
+            >
+              Fais avec ceux-là
+            </button>
+          </div>
         </Sheet>
       )}
 

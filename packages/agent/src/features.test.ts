@@ -1329,3 +1329,88 @@ test("a model Edith picked holds her floor: words on screen, an ambiance 15 s at
   // An end card is a word on screen.
   assert.equal(dressedFloorNote({ ...base, texts: [], end_card: { title: "Café Tolbiac" } } as unknown as typeof base, quiet), null);
 });
+
+test("montage skills: each one's plan holds for every number of shots it takes, with or without its ending", async () => {
+  const { MONTAGE_SKILLS } = await import("./skill-library.ts");
+  const { skillPlan, skillShotCount } = await import("./skills.ts");
+  const { checkMotionCode } = await import("./motion-scene.ts");
+  const { houseModel } = await import("./house-models.ts");
+  for (const skill of Object.values(MONTAGE_SKILLS)) {
+    assert.ok(houseModel(skill.key), `${skill.key}: a house model`);
+    assert.deepEqual(checkMotionCode(skill.code), [], `${skill.key}: its code passes the code check`);
+    assert.match(skill.code, /function Scene\s*\(/);
+    assert.ok(skill.bpm >= 60 && skill.bpm <= 140, `${skill.key}: its tempo is one a plan takes`);
+    assert.ok(skill.files[0] >= 1 && skill.files[0] <= skill.files[1] && skill.shots[0] <= skill.shots[1]);
+    const files = Array.from({ length: 4 }, (_, i) => ({ id: `v${i}`, photo: false, seconds: 12, moments: [{ start: 1, end: 4 }, { start: 6, end: 9 }] }));
+    for (let n = skill.shots[0]; n <= skill.shots[1]; n++) {
+      for (const end of [false, true]) {
+        const texts = Object.fromEntries(skill.texts.map((t) => [t.slot, "abc".repeat(Math.ceil(t.max / 3)).slice(0, t.max)]));
+        const plan = skillPlan({ skill, name: "Test", files, fill: { shots: Array.from({ length: n }, (_, i) => ({ file: files[i % 4]!.id, at: (i % 3) * 3 })), texts, end: end && skill.end ? { title: "Ouverture samedi" } : null } });
+        const parsed = editPlanSchema.safeParse(plan);
+        assert.ok(parsed.success, `${skill.key} n=${n} end=${end}: ${parsed.success ? "" : parsed.error.message.slice(0, 300)}`);
+        assert.equal(plan.segments.length, n);
+        assert.ok(plan.duration <= 45, `${skill.key}: ${plan.duration} s`);
+        const marks = plan.layers![0]!.motion.texts!;
+        for (const v of Object.values(marks)) assert.ok(Number.isFinite(Number(v)), `${skill.key}: marks are numbers`);
+        assert.equal(plan.skill?.key, skill.key);
+        assert.equal(plan.layers![0]!.compose, true);
+        assert.equal(plan.texts.length, skill.texts.length);
+        // A video's passages never overlap: the same picture twice reads as a missed cut.
+        const byFile = new Map<string, [number, number][]>();
+        for (const s of plan.segments) {
+          if (!("clip_id" in s)) continue;
+          for (const [a, b] of byFile.get(s.clip_id) ?? []) assert.ok(s.in >= b - 0.01 || s.out <= a + 0.01, `${skill.key} n=${n}: ${s.clip_id} ${s.in}–${s.out} overlaps ${a}–${b}`);
+          byFile.set(s.clip_id, [...(byFile.get(s.clip_id) ?? []), [s.in, s.out]]);
+        }
+      }
+    }
+    assert.equal(skillShotCount(skill, [{ id: "p", photo: true, seconds: 0 }]), skill.shots[0]);
+  }
+});
+
+test("montage skills: the filler's answer is read against the skill and her files", async () => {
+  const { decode } = await import("./skills/decode.ts");
+  const { readSkillFill, fitWords, fewFiles } = await import("./skills.ts");
+  const files = [
+    { id: "a", photo: false, seconds: 10 },
+    { id: "b", photo: true, seconds: 0 },
+  ];
+  const read = readSkillFill(decode, files, 3, {
+    fits: true,
+    missing: "",
+    shots: [{ file: "a", at: 40 }, { file: "inconnu", at: 2 }],
+    texts: [
+      { slot: "surtitre", text: "un samedi tranquille au cœur de" },
+      { slot: "titre", text: "le marais" },
+    ],
+    end: { title: "", subtitle: "" },
+    why: "",
+  })!;
+  assert.equal(read.shots.length, 3);
+  // A start past its video is brought back into it; an unknown file is one of hers.
+  assert.equal(read.shots[0]!.at, 10);
+  assert.ok(["a", "b"].includes(read.shots[1]!.file));
+  // Cut at the last word that fits its place, never in the middle of one.
+  assert.equal(read.texts.surtitre, "un samedi tranquille au");
+  assert.equal(read.end, null);
+  assert.equal(fitWords("bonjour à tous", 9), "bonjour à");
+  // A required text missing: the editor makes the Reel.
+  assert.equal(readSkillFill(decode, files, 3, { fits: true, missing: "", shots: [], texts: [{ slot: "surtitre", text: "un" }], end: null, why: "" }), null);
+  assert.equal(fewFiles(decode, 2), true);
+  assert.equal(fewFiles(decode, 3), false);
+});
+
+test("Edith picks a model coded as a skill only when her files fill it", async () => {
+  const { readHousePick, housePickInput } = await import("./house-pick.ts");
+  assert.equal(readHousePick({ key: "decode", why: "" }, 2, [], { decode: 3 }), null);
+  assert.equal(readHousePick({ key: "decode", why: "" }, 3, [], { decode: 3 }), "decode");
+  const shown = JSON.parse(housePickInput({ request: "", business: null, files: [], voice: false, avoid: [], least: { decode: 5 } })) as { modeles: { key: string; fichiers: number[] }[] };
+  assert.deepEqual(shown.modeles.find((m) => m.key === "decode")!.fichiers, [5, 8]);
+});
+
+test("the motion designer keeps a skill's code but for what her request needs", async () => {
+  const { motionDesignerPrompt } = await import("./motion-scene.ts");
+  assert.match(motionDesignerPrompt({ skill: true }).parts, /montage skill/);
+  assert.match(motionDesignerPrompt({ skill: true }).parts, /Never remove, shrink or tame its signature moment/);
+  assert.doesNotMatch(motionDesignerPrompt({ example: true }).parts, /montage skill/);
+});

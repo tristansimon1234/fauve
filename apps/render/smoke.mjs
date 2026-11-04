@@ -42,7 +42,8 @@ const scope = {
   spring,
   Easing,
   random,
-  FitText: ({ style, innerStyle, children }) => React.createElement("div", { style }, React.createElement("div", { style: innerStyle }, children)),
+  // Its content may be a function of the scale, as in Fit.tsx: drawn at its full size here.
+  FitText: ({ style, innerStyle, children }) => React.createElement("div", { style }, React.createElement("div", { style: innerStyle }, typeof children === "function" ? children(1) : children)),
   Cutout: ({ photo, x, y, height, style }) =>
     photo?.cutout && photo.subject ? React.createElement("img", { src: photo.cutout, style: { position: "absolute", left: x, top: y, height, ...style } }) : null,
   // One of her shots in a collage's composition: a grey card stands in.

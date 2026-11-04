@@ -132,7 +132,7 @@ const bodySchema = z.object({
   spokenKept: z.boolean().optional(),
   /** The voice step is done: the design goes on (in its own invocation when a voice was recorded). */
   voiced: z.boolean().optional(),
-  /** A simple copied Reel remade by code (copy.ts): rendered and delivered as it is, no second take nor critic. */
+  /** A simple copied Reel remade by code (copy.ts), or a Reel made on a montage skill (skills.ts): rendered and delivered as it is, no second take nor critic. */
   copied: z.boolean().optional(),
   /** Edith chose a key message with the music over a voice for this Reel (her setting is « auto »). */
   format: reelFormatSchema.optional(),
@@ -625,8 +625,9 @@ async function design(job: Job) {
   if (await voiceFirst(job)) return;
   const edit = await designEdit({ ...designInput(job), effort: job.editorEffort ?? EFFORTS[job.effort!].editorEffort });
   const versions: Version[] = [{ planId: edit.editPlanId, rationale: edit.rationale.slice(0, 600) }];
-  // A copy remade by code is the model's own cuts: a second take or a critic's correction would only undo them.
-  const copied = Boolean(edit.plan.copy);
+  // A copy remade by code is the model's own cuts, and a Reel made on a montage skill is its model played as it is: a
+  // second take or a critic's correction would only undo them.
+  const copied = Boolean(edit.plan.copy || edit.plan.skill);
   const two = !copied && effortVersions(job.effort!, Boolean(job.correction)) > 1;
   const then = two ? "alternative" : "render";
   const patch = { versions, newScenes: edit.newScenes, round: 0, fixes: 0, ...(copied ? { copied } : {}) };

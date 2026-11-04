@@ -75,12 +75,16 @@ export const FootageContext = createContext<FootageSource | null>(null);
 
 const px = (v: unknown) => (typeof v === "number" && Number.isFinite(v) && v > 0 ? v : null);
 
+/** When a shot plays: at its own moment, or from `at` (a frame of the composition) when it is shown early or again. */
+const startOf = (info: ComposeShot, at: number | undefined) => (typeof at === "number" && Number.isFinite(at) ? Math.round(at) : info.from);
+
 /**
  * One of her shots where a composition puts it (`style`: its box, px): as filmed and
  * retouched, framed on its subject in the box; a video plays in time while its shot is on
- * and holds its nearest image before and after it.
+ * and holds its nearest image before and after it. `at`: it plays from that frame instead
+ * of its own moment (a shot seen early or again, in a band or a tile, while another plays).
  */
-function Footage({ shot, style, hold }: { shot: number; style?: CSSProperties; hold?: number }) {
+function Footage({ shot, style, hold, at }: { shot: number; style?: CSSProperties; hold?: number; at?: number }) {
   const source = useContext(FootageContext);
   const frame = useCurrentFrame();
   const { width, height } = useVideoConfig();
@@ -88,14 +92,15 @@ function Footage({ shot, style, hold }: { shot: number; style?: CSSProperties; h
   const info = source?.shots[shot];
   if (!source || !info) return <div style={{ background: "linear-gradient(160deg, #9a9490, #5f5a57)", ...box }} />;
   const media = source.draw(info, { width: px(style?.width) ?? width, height: px(style?.height) ?? height });
-  const local = frame - info.from;
+  const start = startOf(info, at);
+  const local = frame - start;
   return (
     <div style={box}>
       {local >= 0 && local < info.durationInFrames && hold && hold > 1 ? (
         // Each image held `hold` frames: the jerky, frame-sampled slow motion of the « Nike » edit, or stop motion.
         <Freeze frame={Math.floor(local / Math.round(hold)) * Math.round(hold)}>{media}</Freeze>
       ) : local >= 0 && local < info.durationInFrames ? (
-        <Sequence from={info.from} durationInFrames={info.durationInFrames} layout="none">
+        <Sequence from={start} durationInFrames={info.durationInFrames} layout="none">
           {media}
         </Sequence>
       ) : (
@@ -112,7 +117,7 @@ function Footage({ shot, style, hold }: { shot: number; style?: CSSProperties; h
  * Reel; over its Footage (mixBlendMode, opacity) a fog or a light that falls with distance. Nothing when the shot has
  * none (a photo, a passage at another speed, the card unavailable): the composition must still work.
  */
-function Depth({ shot, style, invert = false, hold }: { shot: number; style?: CSSProperties; invert?: boolean; hold?: number }) {
+function Depth({ shot, style, invert = false, hold, at }: { shot: number; style?: CSSProperties; invert?: boolean; hold?: number; at?: number }) {
   const source = useContext(FootageContext);
   const frame = useCurrentFrame();
   const { width, height } = useVideoConfig();
@@ -120,7 +125,8 @@ function Depth({ shot, style, invert = false, hold }: { shot: number; style?: CS
   if (!info) return null;
   const media = source?.depth?.(info, { width: px(style?.width) ?? width, height: px(style?.height) ?? height });
   if (!media) return null;
-  const local = frame - info.from;
+  const start = startOf(info, at);
+  const local = frame - start;
   const step = hold && hold > 1 ? Math.round(hold) : 0;
   const filter = [style?.filter, invert ? "invert(1)" : ""].filter(Boolean).join(" ") || undefined;
   return (
@@ -128,7 +134,7 @@ function Depth({ shot, style, invert = false, hold }: { shot: number; style?: CS
       {local >= 0 && local < info.durationInFrames && step ? (
         <Freeze frame={Math.floor(local / step) * step}>{media}</Freeze>
       ) : local >= 0 && local < info.durationInFrames ? (
-        <Sequence from={info.from} durationInFrames={info.durationInFrames} layout="none">
+        <Sequence from={start} durationInFrames={info.durationInFrames} layout="none">
           {media}
         </Sequence>
       ) : (
@@ -155,8 +161,11 @@ function Subject({
   tint,
   hold,
   object,
+  at,
 }: {
   shot: number;
+  /** It plays from that frame instead of its shot's own moment, as Footage at={…} does (the same box, the same frame). */
+  at?: number;
   /** An object followed through the shot instead of her (a cup she lifts, a product she shows), by the name its code gives it. */
   object?: string;
   style?: CSSProperties;
@@ -179,7 +188,8 @@ function Subject({
   if (!info) return null;
   const media = name ? source?.object?.(info, name, size) : source?.subject?.(info, size);
   if (!media) return null;
-  const local = frame - info.from;
+  const start = startOf(info, at);
+  const local = frame - start;
   const r = Math.max(0, rim);
   const filtered = r > 0 || shadow || Boolean(fill) || Boolean(tint);
   const body = fill ? "sil" : tint ? "tinted" : "SourceGraphic";
@@ -224,7 +234,7 @@ function Subject({
         {local >= 0 && local < info.durationInFrames && step ? (
           <Freeze frame={Math.floor(local / step) * step}>{media}</Freeze>
         ) : local >= 0 && local < info.durationInFrames ? (
-          <Sequence from={info.from} durationInFrames={info.durationInFrames} layout="none">
+          <Sequence from={start} durationInFrames={info.durationInFrames} layout="none">
             {media}
           </Sequence>
         ) : (

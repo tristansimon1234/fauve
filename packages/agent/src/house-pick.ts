@@ -36,8 +36,11 @@ export type HousePick = z.infer<typeof housePickSchema>;
 /** One of her files as the picker reads it. */
 export type HousePickFile = { kind: "video" | "photo"; seconds?: number; shows: string; speaks?: boolean; people?: boolean };
 
-/** What the picker reads: her request, her trade, her files, whether a voice is wanted, and the models of her last Reels. */
-export function housePickInput(input: { request: string; business: string | null; files: HousePickFile[]; voice: boolean; avoid: string[] }): string {
+/**
+ * What the picker reads: her request, her trade, her files, whether a voice is wanted, and the models of her last Reels;
+ * `least`, by model, the files a model coded as a montage skill wants at least (its slots), instead of its catalogue's.
+ */
+export function housePickInput(input: { request: string; business: string | null; files: HousePickFile[]; voice: boolean; avoid: string[]; least?: Record<string, number> }): string {
   return JSON.stringify({
     demande: input.request.slice(0, 4000),
     metier: input.business ?? "commerce",
@@ -50,18 +53,21 @@ export function housePickInput(input: { request: string; business: string | null
     })),
     voix_off: input.voice,
     derniers_modeles: input.avoid,
-    modeles: HOUSE_MODELS.map((m) => ({ key: m.key, nom: m.name, ce_que_ca_fait: m.pitch, il_faut: m.needs, fichiers: m.files })),
+    modeles: HOUSE_MODELS.map((m) => ({ key: m.key, nom: m.name, ce_que_ca_fait: m.pitch, il_faut: m.needs, fichiers: input.least?.[m.key] ? [input.least[m.key], m.files[1]] : m.files })),
   });
 }
 
 /**
  * The model to make the Reel in, from the picker's answer: a model of the catalogue that is not one of her last
  * Reels', and whose number of files hers can fill (a model asking for 10 files is not made with 3); null for none.
+ * A model coded as a montage skill (`least`, by model) takes at least the files its slots want: Edith, who picks it
+ * while the Reel is made, never asks her for more.
  */
-export function readHousePick(answer: HousePick | null | undefined, files: number, avoid: string[]): string | null {
+export function readHousePick(answer: HousePick | null | undefined, files: number, avoid: string[], least: Record<string, number> = {}): string | null {
   const model = houseModel(answer?.key?.trim().toLowerCase());
   if (!model || avoid.includes(model.key)) return null;
+  if (least[model.key]) return files >= least[model.key]! ? model.key : null;
   // A model made of photos only (an interface with her logo) takes no files: any count fits.
-  const [least] = model.files;
-  return files >= Math.min(least, Math.max(1, least - 2)) ? model.key : null;
+  const [fewest] = model.files;
+  return files >= Math.min(fewest, Math.max(1, fewest - 2)) ? model.key : null;
 }
