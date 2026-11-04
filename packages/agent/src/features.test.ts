@@ -1476,3 +1476,21 @@ test("a montage skill played at another tempo keeps its cuts on that tempo's bea
     assert.ok(Math.abs(plan.duration - slower.duration) < 0.05, `${skill.key}: ${plan.duration} s`);
   }
 });
+
+test("a montage skill's still shots get none of the engine's slow pushes: its code moves them", async () => {
+  const { skillFor } = await import("./skill-library.ts");
+  const { skillPlan } = await import("./skills.ts");
+  const { finishPlan } = await import("./finish.ts");
+  const skill = skillFor("decode")!;
+  const n = skill.shots[0];
+  const files = [{ id: "v", photo: false, seconds: 60 }];
+  const fill = { shots: Array.from({ length: n }, (_, i) => ({ file: "v", at: i * 6 })), texts: { surtitre: "un samedi dans", titre: "le marais" }, end: null };
+  const plan = skillPlan({ skill, name: "Chez Lou", files, fill });
+  const still = { start: 0, end: 60, description: "", subject: "", energy: 1, hook_score: 3, quality: { blurry: false, dark: false, shaky: false }, faces_visible: false, camera: "static" };
+  const facts = { clips: { v: { duration: 60, orientation: "landscape", summary: "", setting: "", lighting: "ok", shots: [still], best_moments: [], transcript: "", issues: [] } }, photos: {} } as never;
+  const moved = (p: typeof plan) => p.segments.filter((s) => "move" in s && s.move && s.move !== "none").length;
+  assert.equal(moved(finishPlan(plan, facts, { v: 60 })), 0);
+  // The same shots in a plan of the editor's: one long still shot in two gets its slow push.
+  const { skill: _skill, ...chain } = plan;
+  assert.ok(moved(finishPlan(chain as typeof plan, facts, { v: 60 })) > 0);
+});

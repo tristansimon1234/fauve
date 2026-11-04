@@ -232,6 +232,9 @@ export function finishPlan(plan: EditPlan, facts: MediaFacts, clipDurations: Rec
   const photoMove = photoMoves(plan, facts.photos);
   // A composed Reel lays its shots itself, at their own pace: no ramp there; nor when she wants plain slow motion.
   const composed = Boolean(plan.layers?.some((l) => l.compose)) || plan.finish?.ramp === "off";
+  // A model of Edith's coded as a whole Reel (a skill) moves its shots itself, as its original does: none of the engine's
+  // slow pushes on its still shots (Tristan, on the light zooms: « je trouve ça cheap »).
+  const ownMoves = Boolean(plan.skill);
   const segments = plan.segments.map((s, i): PlanSegment => {
     if (isMotionSegment(s)) {
       const over = footageUnder(plan, i, facts, clipDurations);
@@ -254,7 +257,7 @@ export function finishPlan(plan: EditPlan, facts: MediaFacts, clipDurations: Rec
     const filmedStill = isStill(shot) && !s.speed;
     // A shot filmed still gets a slow move, one in two at most (in, then out): a push on every shot gets boring.
     const move: CameraMove | undefined =
-      (s.move ?? (s.zoom === "light" ? "in" : "none")) === "none" && filmedStill && segmentSeconds(s) >= 1.5 ? (["in", "none", "out", "none"] as const)[still++ % 4] : s.move;
+      !ownMoves && (s.move ?? (s.zoom === "light" ? "in" : "none")) === "none" && filmedStill && segmentSeconds(s) >= 1.5 ? (["in", "none", "out", "none"] as const)[still++ % 4] : s.move;
     const { adjust: _carried, ...rest } = s;
     const finished: ClipSegment = {
       ...rest,
