@@ -55,7 +55,7 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const BW = "grayscale(1) contrast(1.3) brightness(0.95)";
   const hook = reelTexts.find((t) => t.role === "hook");
   const others = reelTexts.filter((t) => t !== hook);
-  const keep = (s) => String(s || "").replace(/(\d) (?=\d)/g, "$1 ");
+  const keep = (s) => String(s || "").replace(/(\d) (?=\d)/g, "$1\u00a0");
   const cutAt = (k) => (shots[k] ? shots[k].from : durationInFrames + 1);
 
   // Each shot turned: one filmed in width a quarter, one way then the other, so it fills the vertical frame; one filmed
@@ -91,9 +91,10 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const flash = white > 0 && frame < BLACK_AT ? h("div", { style: { position: "absolute", left: 0, top: 0, width, height, background: "#ffffff", opacity: white } }) : null;
 
   // 3. Its optional title, turned a quarter like the shots: very condensed white capitals along the middle of the frame,
-  // reading upward, on and off on a cut.
+  // reading upward, on and off on a cut; its size follows its length, so a long one in a wide face still fits.
+  const titleSize = hook ? Math.min(260, Math.max(120, Math.round(4200 / Math.max(6, Array.from(hook.text).length)))) : 260;
   const title = hook && frame >= hook.from && frame < Math.min(hook.to, endAt, BLACK_AT)
-    ? h(FitText, { style: { position: "absolute", left: Math.round(width / 2 - 620), top: 760 - 140, width: 1240, height: 280, transform: "rotate(-90deg)", transformOrigin: "50% 50%" }, innerStyle: { fontFamily: display, fontWeight: 800, fontSynthesis: "none", fontSize: 260, lineHeight: 1, letterSpacing: "0.01em", textTransform: "uppercase", color: "#ffffff", whiteSpace: "nowrap", textShadow: "0 0 2px rgba(0,0,0,0.55), 0 1px 5px rgba(0,0,0,0.4), 0 2px 18px rgba(0,0,0,0.32)" } }, hook.text)
+    ? h(FitText, { style: { position: "absolute", left: Math.round(width / 2 - 620), top: 760 - 140, width: 1240, height: 280, transform: "rotate(-90deg)", transformOrigin: "50% 50%" }, innerStyle: { fontFamily: display, fontWeight: 800, fontSynthesis: "none", fontSize: titleSize, lineHeight: 1, letterSpacing: "0.01em", textTransform: "uppercase", color: "#ffffff", whiteSpace: "nowrap", textShadow: "0 0 2px rgba(0,0,0,0.55), 0 1px 5px rgba(0,0,0,0.4), 0 2px 18px rgba(0,0,0,0.32)" } }, hook.text)
     : null;
 
   // Any other text of the Reel (none in its slots): a plain white line, upright, so nothing she wrote is lost.

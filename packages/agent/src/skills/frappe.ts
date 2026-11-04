@@ -51,7 +51,7 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const hook = reelTexts.find((t) => t.role === "hook");
   const others = reelTexts.filter((t) => t !== hook);
   // A phone number or a date never breaks between its digits.
-  const keep = (s) => String(s || "").replace(/(\d) (?=\d)/g, "$1 ");
+  const keep = (s) => String(s || "").replace(/(\d) (?=\d)/g, "$1\u00a0");
   const letters = (s) => (typeof Intl !== "undefined" && Intl.Segmenter ? Array.from(new Intl.Segmenter("fr", { granularity: "grapheme" }).segment(s), (x) => x.segment) : Array.from(s));
 
   // A text typed by a hand: each letter shows at once on its own frame, the first at "from", the last at "to", the gaps
@@ -74,8 +74,10 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const film = frame < BLACK_AT ? h(Footage, { shot: cur, style: { left: 0, top: 0, width, height } }) : null;
 
   // 2. The name of her place, typed letter by letter in orange in the sky of its shot, then cut on the place itself.
+  // Its size follows its length, so a long name in a wide face still fits its line without shrinking too far.
+  const nameSize = hook ? Math.min(128, Math.max(64, Math.round(2300 / Math.max(6, letters(hook.text).length)))) : 128;
   const name = hook && frame >= hook.from && frame < Math.min(hook.to, REVEAL_AT, BLACK_AT)
-    ? h(FitText, { style: { position: "absolute", left: 140, top: 500, width: width - 280, height: 180 }, innerStyle: nameStyle },
+    ? h(FitText, { style: { position: "absolute", left: 140, top: 500, width: width - 280, height: 180 }, innerStyle: { ...nameStyle, fontSize: nameSize } },
         h("span", null, typed(hook.text, Math.max(hook.from, TYPE_AT), Math.max(Math.max(hook.from, TYPE_AT) + 4, Math.min(TYPED_AT, REVEAL_AT - 6)), "frappe")))
     : null;
 

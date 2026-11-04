@@ -160,7 +160,7 @@ export const eventail: MontageSkill = {
     return {
       duration,
       shots: spans.map((s, i) => ({ ...s, want: wants[i]! })),
-      // Its words are only at the end, on the black: the credit, then its red line two beats later.
+      // Its words are only at the end, on the black: the credit, then its red line two beats later (one before a card).
       texts: { signature: { from: black, to: until }, ligne: { from: lineAt, to: until } },
       marks: { beat: beat * 30, reveal: toFrame(OPENING * beat), black: toFrame(black) },
     };

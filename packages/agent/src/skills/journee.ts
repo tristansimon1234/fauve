@@ -130,7 +130,7 @@ export const journee: MontageSkill = {
   end: true,
   texts: [
     { slot: "surtitre", role: "caption", want: "2 ou 3 petits mots écrits à la main au-dessus du titre, qui l'amènent (une forme comme « une journée à », « un samedi chez », « le matin au »)", max: 20, required: true },
-    { slot: "titre", role: "hook", want: "le titre rouge géant, sur une ligne en capitales : un seul mot de préférence (son quartier, sa rue, son nom s'il est court), plus il est court plus il est grand", max: 12, required: true },
+    { slot: "titre", role: "hook", want: "le titre rouge géant, sur une ligne en capitales : un seul mot de préférence (son quartier, sa rue, son nom s'il est court, sinon le mot de son nom qui la distingue : « Farine » pour « Maison Farine »), plus il est court plus il est grand", max: 14, required: true },
   ],
   timeline(n, options: { end: boolean; bpm?: number }) {
     const { end } = options;
