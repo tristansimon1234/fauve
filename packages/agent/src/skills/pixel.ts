@@ -36,7 +36,7 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const MINT = "#d6f6ee";
   const WHITE = "#fff8ec";
   const TITLE_SHADOW = "0 4px 0 rgba(28,74,68,0.9), 0 0 2px rgba(0,0,0,0.5), 0 2px 14px rgba(0,0,0,0.3)";
-  const SMALL_SHADOW = "0 1px 2px rgba(0,0,0,0.8), 0 0 5px rgba(0,0,0,0.45)";
+  const SMALL_SHADOW = "0 1px 2px rgba(0,0,0,0.85), 0 0 3px rgba(0,0,0,0.65), 0 0 9px rgba(0,0,0,0.4)";
   const DROP = "drop-shadow(0 1px 1.5px rgba(0,0,0,0.6))";
   // A phone number or a date never breaks between its digits.
   const keep = (s) => String(s || "").replace(/(\d) (?=\d)/g, "$1 ");
@@ -82,7 +82,7 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const tiny = (key, text, box) => {
     const small = wordsIn(text) <= 4;
     const at = small ? box : { ...box, top: box.top - (box.align === "center" ? 40 : 0), width: Math.max(box.width, 700), left: box.align === "right" ? box.left + box.width - Math.max(box.width, 700) : box.left, height: 130 };
-    return h(FitText, { key, style: { position: "absolute", left: at.left, top: at.top, width: at.width, height: at.height }, innerStyle: { alignItems: box.align === "left" ? "flex-start" : box.align === "right" ? "flex-end" : "center", textAlign: box.align, fontFamily: body, fontWeight: 400, fontSize: small ? 30 : 48, lineHeight: 1.3, letterSpacing: "0.01em", color: WHITE, textShadow: SMALL_SHADOW } },
+    return h(FitText, { key, style: { position: "absolute", left: at.left, top: at.top, width: at.width, height: at.height }, innerStyle: { alignItems: box.align === "left" ? "flex-start" : box.align === "right" ? "flex-end" : "center", textAlign: box.align, fontFamily: body, fontWeight: 400, fontSize: small ? 32 : 48, lineHeight: 1.3, letterSpacing: "0.01em", color: WHITE, textShadow: SMALL_SHADOW } },
       small ? h("span", { "data-fauve-accent": "" }, text) : text);
   };
   // Where the tiny lines sit, as on the model: under the gesture, in the upper left, on the right (clear of the apps' buttons).

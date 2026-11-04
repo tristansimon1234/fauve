@@ -412,10 +412,13 @@ export async function designEdit(params: {
       ? ensureCutouts(params.studioId, photoIds.slice(0, MAX_OFFERED_PHOTOS)).catch((e: unknown) => console.warn("cut-outs: not ready", e))
       : null;
   const profile = brandProfileSchema.partial().catch({}).parse(brand.data?.[0]?.profile ?? {});
+  // A model of Edith's coded as a whole Reel (a montage skill) is played by its skill, else by the editor from its code: never
+  // remade as a simple copy of its cuts (a reading of « Mots aux quatre coins » without « posés sur » had made it one).
+  const skill = skillCandidate(followed, params.contract, Boolean(voice));
   // A simple Reel she copies is remade by code (copy.ts: the model's own cuts, her photos' subjects laid over, its title, its
   // ending): no editor nor motion designer, one small call writes its words. Its correction too; anything it cannot do, the editor.
   const previousCopy = previousPlan.success && previousPlan.data.copy ? previousPlan.data : null;
-  if ((!correction || previousCopy) && copyCandidate(followed, params.contract, Boolean(voice))) {
+  if (!skill && (!correction || previousCopy) && copyCandidate(followed, params.contract, Boolean(voice))) {
     const copied = await designCopy({
       studioId: params.studioId,
       postId: params.postId,
@@ -433,7 +436,6 @@ export async function designEdit(params: {
   // A model coded as a whole Reel (a montage skill, like an Edits or CapCut template): filled by one small call and played
   // as it is, no editor nor motion designer. Its correction too; a request it does not serve goes to the editor below,
   // whose motion designer starts from its code.
-  const skill = skillCandidate(followed, params.contract, Boolean(voice));
   const previousSkill = previousPlan.success && previousPlan.data.skill?.key === skill?.key ? previousPlan.data : null;
   // (Never in the director's look at a Reel it made: that step only looks at its own composition.)
   if (skill && followed && !params.director && (!correction || previousSkill)) {
