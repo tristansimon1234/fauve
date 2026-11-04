@@ -10,6 +10,24 @@
 4. **Plus de marque dans le nom d'un modèle** : « Montage façon Nike » s'appelle « Montage sport noir et blanc » (sa clé reste `nike` ; `HOUSE_VERSION` 4 réécrit les modèles en base).
 5. **CLAUDE.md allégé** (4 novembre) : 37 700 caractères au lieu de 424 000 (environ 10 000 jetons au lieu de 115 000). Il garde le produit, la stack, les conventions, les règles de travail avec Tristan, des règles transverses et l'index des sujets ; le détail de chaque fonction est dans 31 fichiers `docs/<sujet>.md`, déplacé mot pour mot par script (aucune ligne perdue ni doublée).
 
+## Skills de montage : où on en est (4 novembre, après-midi)
+
+Fait et en ligne (le détail : `docs/modeles.md`, « Skills de montage ») : le moteur (`packages/agent/src/skills.ts`, la librairie `@fauve/agent/skills`, le remplissage par un appel court dans `lib/agent/skill-design.ts`, le contrôle des scènes sans réécriture, la relance du remplissage quand le contrôle refuse), la question « tu en as d'autres ? » quand elle a moins de fichiers que le skill n'en prend (outil `montage` et écran « Créer » ; Edith, quand c'est lui qui choisit, ne prend qu'un skill que ses fichiers remplissent), `Footage at`, l'outil de rendu local `scripts/skill-render.mts`, et le premier skill, « Titre qui se décode » (`skills/decode.ts`, version 2).
+
+Banc en prod, cas café (rushes libres), modèle « Titre qui se décode » choisi par elle :
+
+| | Chaîne (le réalisateur, le contrôle ayant refusé le skill v1) | Skill v2 |
+|---|---|---|
+| Coût | 0,93 € | 0,11 € (remplissage 1,4 c, contrat 0,7 c, légende 0,3 c, musique 4,7 c, rendu 3,9 c) |
+| Montage | plusieurs minutes, deux appels du réalisateur et une reprise du motion designer | environ 20 s |
+| Reel | 2 versions | 15,7 s, 14 plans, le modèle de bout en bout (bandes, repli, titre qui se décode, bande, plein écran) |
+
+En cours : les 9 autres skills des 10 premiers (Mots aux quatre coins, Mosaïque qui change, Pile de photos, Photo dump, Écran partagé titré, Cadre dans le cadre, Titre gaufré, Montage sport noir et blanc, Une journée chez toi), chacun écrit sur son original et rendu en local, puis inscrit dans `skill-library.ts` et passé au banc (`/api/admin/lab?case=…&model=<clé>&reset=1&idea=…`, une demande simple pour ne pas partir à l'atelier d'effets).
+
+Leçons du banc : tester chaque skill avec ses textes les plus longs et une carte de fin (le remplissage écrit des mots longs) ; une boîte de texte centrée tient entre x 140 et 940 dès qu'elle passe sous le milieu (les boutons des applis) ; jamais de `transform` dans l'`innerStyle` de `FitText` (il remplace sa réduction).
+
+Question de Tristan (4 novembre), à reprendre : le contrôle des scènes est-il trop strict, faut-il un contrôleur à part ? Pour les skills, il est gardé (un centime, il a trouvé deux vrais défauts) mais un refus relance d'abord le remplissage au lieu de toute la chaîne. Pour la chaîne habituelle, chaque remarque du contrôle (contraste, temps de lecture, taille) déclenche une reprise payante du motion designer (7 à 15 c) : à mesurer (combien, et si ça améliore) avant de décider. Et un Reel qu'elle envoie ne devient pas un skill tout seul : noté comme candidat, écrit à la main quand une forme revient ou qu'un Reel est remarquable, validé par Tristan sur des images libres (chantier 3).
+
 ## Banc du réalisateur (3 novembre, soir)
 
 Mêmes rushes, modèle choisi par Edith, comparé à la chaîne monteur + motion designer (qui voit déjà l'original) :
@@ -26,7 +44,7 @@ Pistes : il écrit plan et code en un appel, en effort medium, avec un très lon
 ## Prochains chantiers (dans l'ordre)
 
 1. ~~Alléger CLAUDE.md~~ : fait le 4 novembre (voir « Fait »).
-2. **Une librairie de « skills de montage »** (plan validé avec Tristan le 4 novembre, détail ci-dessous).
+2. **Une librairie de « skills de montage »** (plan validé avec Tristan le 4 novembre, détail ci-dessous) : en cours, le moteur et le premier skill en ligne (voir « Skills de montage : où on en est »).
 3. **Ajouter des skills au fil de l'eau** : un outil d'admin « nouveau skill depuis un lien » (original et planches, lecture, skill écrit sur des plans du banc, aperçu à valider par Tristan avant d'entrer dans la librairie).
 4. **Recopie fidèle des 9 Reels de la landing** par la chaîne, avant/après.
 
