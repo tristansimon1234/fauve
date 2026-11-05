@@ -4744,7 +4744,7 @@ test("« Coulisses façon fiche » (v2) cuts where its original does, names each
   const { skillPlan, skillShotCount } = await import("./skills.ts");
   const { readMusicShape } = await import("./music-shape.ts");
   const { SFX_MAX_NEW, soundKey, pickCues } = await import("./sfx.ts");
-  assert.equal(coulisses.version, 2);
+  assert.equal(coulisses.version, 3);
   assert.equal(coulisses.bpm, 120);
   const line = coulisses.timeline(28, { end: false });
   // Its 28 shots (a burst of six shots of one to three images, a shot seen again, three cut in silence), each within two
@@ -4805,7 +4805,7 @@ test("« Coulisses façon fiche » (v2) cuts where its original does, names each
   assert.equal(plan.sounds?.length, 40);
   assert.ok(plan.sounds!.every((s) => s.skill));
   assert.deepEqual(plan.music_shape, readMusicShape({ none: true }, plan.duration));
-  assert.deepEqual(plan.skill, { key: "coulisses", version: 2 });
+  assert.deepEqual(plan.skill, { key: "coulisses", version: 3 });
 });
 
 test("« Coulisses façon fiche » (v2): its 16:9 card for her horizontal videos as the original's, square for vertical ones or on her word, the sheet centred", async () => {
@@ -4849,7 +4849,7 @@ test("« Coulisses façon fiche » (v2): its 16:9 card for her horizontal videos
   assert.deepEqual(input.objets?.map((o) => [o.slot, o.case]), [["plat", 15], ["main", 22]]);
   const plan = skillPlan({ skill: coulisses, name: "Coulisses façon fiche", files, fill: { shots: Array.from({ length: 28 }, (_, i) => ({ file: files[i % 10]!.id, at: Math.floor(i / 10) * 4 })), texts: CF_WORDS, end: null, settings: { format: "vertical" } } });
   assert.equal(plan.layers![0]!.motion.texts!.format, "vertical");
-  assert.deepEqual(plan.skill, { key: "coulisses", version: 2, settings: { format: "vertical" } });
+  assert.deepEqual(plan.skill, { key: "coulisses", version: 3, settings: { format: "vertical" } });
 });
 
 test("« Coulisses façon fiche » (v2): her video's title in three times, two loadings tile by tile, its cut-outs before their cuts, its flashes and stutters", async () => {

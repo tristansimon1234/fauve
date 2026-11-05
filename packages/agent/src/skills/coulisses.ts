@@ -350,8 +350,9 @@ export const coulisses: MontageSkill = {
   // (40, on their effects), the name of each sound under the card as it is heard, the title of her video in three times
   // (a fall, a flicker, three pops), two loadings tile by tile, a burst on a ratchet, two cut-outs before their cuts,
   // three flashes, three stutters, this Reel's own timeline and playhead, its format (16:9 or square), no ending card
-  // unless she has one.
-  version: 2,
+  // unless she has one. 3: its small words and its big one read as one phrase, as the original's « SOUND EFFECTS
+  // BREAKDOWN » (its first bench wrote « les bouquets du » over « coulisses »).
+  version: 3,
   bpm: BPM,
   shots: [CUTS.length, CUTS.length],
   files: [6, 16],
@@ -361,14 +362,14 @@ export const coulisses: MontageSkill = {
     {
       slot: "surtitre",
       role: "caption",
-      want: "2 petits mots posés au-dessus des deux bouts du grand titre, le premier à gauche, le second à droite : de quoi ou chez qui (une forme comme « le son / du fournil », « chez / lino », « bruitages / maison »)",
-      max: 18,
+      want: "2 ou 3 petits mots posés au-dessus des deux bouts du grand titre (le premier à gauche, le reste à droite), lus avant lui : avec lui, une seule phrase, comme « SOUND EFFECTS » puis « BREAKDOWN » dans l'original (une forme comme « bruitages en » + « coulisses », « le son des » + « coulisses », « les coulisses du » + « fournil », « le son de l' » + « atelier »)",
+      max: 20,
       required: true,
     },
     {
       slot: "titre",
       role: "hook",
-      want: "le grand titre en capitales grasses posé sur la carte, aussi large qu'elle, un mot de préférence : ce que montre la fiche (une forme comme « coulisses », « bruitages », « making-of »)",
+      want: "le grand titre en capitales grasses posé sur la carte, aussi large qu'elle : un seul mot, qui termine la phrase de ses petits mots, « coulisses » ou son lieu (une forme comme « coulisses », « fournil », « atelier », « boutique »)",
       max: 14,
       required: true,
     },
