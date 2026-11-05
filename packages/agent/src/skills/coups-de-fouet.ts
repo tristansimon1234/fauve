@@ -303,6 +303,8 @@ export const coupsDeFouet: MontageSkill = {
   bpm: BPM,
   shots: [12, 23],
   files: [6, 16],
+  // Her camera's own whips, sweeps and rushes in, measured on her videos (video_read.py): its slots that want one get a real one.
+  reads: ["moves"],
   how: "Une ville en coups de fouet, en horizontal 4:3 comme l'original quand ses vidéos le sont : un plan qui défile déjà, un flash blanc, puis son nom en capitales blanches très condensées posé, immobile, dans le ciel d'un plan large qui avance doucement ; puis des plans d'une seconde environ, enchaînés par des coupes franches, des flashs blancs et des fouets éclair (deux images floues et claires de son ciel) : une contre-plongée en noir et blanc, un plan qui arrive en filant et freine sur un détail, la musique qui repart sur un détail de couleur, quelqu'un qui passe en noir et blanc avec des images fantômes, sa rue calme sous la musique étouffée, un tram qui file quand elle revient, un fouet saccadé, un balayage du ciel de plus en plus vite ; et un dernier plan large et calme tenu jusqu'à la fin, le son qui s'éteint.",
   end: true,
   texts: [

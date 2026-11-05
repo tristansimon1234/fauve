@@ -4093,3 +4093,266 @@ test("« Écran partagé titré » (v2): its layout as a setting her words ask, 
   // Its music shaped on the plan: without its bass to the third bar, cut dead at the end.
   assert.deepEqual(plan.music_shape, { filters: [{ kind: "thin", from: 0, to: 4, open: 0.02 }], end: { at: plan.duration, fade: 0.012 } });
 });
+
+// ——— What else is read on her shots (shot_read.py, depth_video.py) and her files (video_read.py), for any skill ——————————
+
+test("readings of her shots: the tools a composition names ask for them, a photo once, a video at its own pace, a ground within its budget", async () => {
+  const { ANY_SHOT, drawsSubject, groundKey, GROUND_MAX, GROUND_MAX_SECONDS, objectsDrawn, readKey, readPassages, readsDrawn, wantsReads } = await import("./subject.ts");
+  // As kept (compiled by sucrase) and as JSX; each tool reads its own thing; a variable is every shot under the animation.
+  const code = `React.createElement(Skyline, { shot: 1, style: laid }); const y = SkylineAt(shots[2], frame, laid, { from: 0, to: 540 });
+    const v = VanishingPoint(shots[1], frame, laid, { fallback: null }); const l = LightUnder( 3 , frame, laid, box); <Skyline shot={shots[2]} />`;
+  assert.deepEqual(readsDrawn(code), [
+    { shot: 1, kinds: ["ground", "vanish"] },
+    { shot: 2, kinds: ["ground", "sky"] },
+    { shot: 3, kinds: ["light"] },
+  ]);
+  assert.deepEqual(readsDrawn(`LightUnder(shots[k], frame, laid)`), [{ shot: ANY_SHOT, kinds: ["light"] }]);
+  assert.deepEqual(readsDrawn(`ClearBox(shots[1], frame, laid)`), []);
+  // Never her cut-out nor an object: Skyline is not Subject.
+  assert.equal(drawsSubject(code), false);
+  assert.deepEqual(objectsDrawn(code), []);
+  const plan = {
+    segments: [
+      { clip_id: "v0", in: 0, out: 2 },
+      { clip_id: "v1", in: 1, out: 4 },
+      { clip_id: "photo1", in: 0, out: 2, photo: { source: { width: 4, height: 3 } } },
+      { clip_id: "v2", in: 0, out: 3, speed: 0.5 },
+    ],
+    layers: [{ from: 0, to: 10, brief: "", compose: true, motion: { js: code } }],
+  } as never;
+  assert.equal(wantsReads(plan), true);
+  assert.equal(wantsReads({ layers: [{ from: 0, to: 2, brief: "", motion: { js: `SubjectBox(shots[0], f)` } }] } as never), false);
+  // Its photo once (from 0 to 0), the shot at half speed left out (the tools give their fallback there).
+  assert.deepEqual(readPassages(plan, (id) => id.startsWith("v")), [
+    { clip_id: "v1", from: 1, to: 4, key: readKey("v1", 1, 4), kinds: ["ground", "vanish"] },
+    { clip_id: "photo1", from: 0, to: 0, key: readKey("photo1", 0, 0), kinds: ["ground", "sky"], photo: true },
+  ]);
+  assert.match(readKey("v1", 1, 4), /^v1@1\.00-4\.00~read$/);
+  assert.match(groundKey("v1", 1, 4), /^v1@1\.00-4\.00~ground$/);
+  // Past its budget, a ground is its skyline only: SkylineAt still reads it, Skyline draws nothing.
+  const long = {
+    segments: Array.from({ length: 6 }, (_, i) => ({ clip_id: `v${i}`, in: 0, out: 6 })),
+    layers: [{ from: 0, to: 36, brief: "", compose: true, motion: { js: Array.from({ length: 6 }, (_, i) => `<Skyline shot={${i}} />`).join("") } }],
+  } as never;
+  const kinds = readPassages(long, () => true).map((p) => p.kinds.join(","));
+  const grounds = kinds.filter((k) => k.includes("ground")).length;
+  assert.ok(grounds <= GROUND_MAX && grounds * 6 <= GROUND_MAX_SECONDS && grounds >= 1, kinds.join(" | "));
+  assert.ok(kinds.slice(grounds).every((k) => k === "sky"), kinds.join(" | "));
+});
+
+test("readings of her shots: kept as a file beside the clip and its ground as a cut-out, given to the render on their shot", async () => {
+  const { groundKey, mediaSubjectsSchema, readKey, shotReadingSchema, subjectFiles, fileKey } = await import("./subject.ts");
+  const reading = {
+    motion: [1, 0, 0, 1, -0.01, 0],
+    sky: { share: 0.4, profile: Array.from({ length: 64 }, (_, i) => (i < 32 ? 0.5 : 0.3)) },
+    vanish: { x: 0.6, y: 0.5, strength: 0.7 },
+    light: { cols: 2, rows: 2, cells: "ff800000", mean: 0.4, high: 0.9 },
+  };
+  assert.ok(shotReadingSchema.safeParse(reading).success);
+  assert.equal(shotReadingSchema.safeParse({ ...reading, light: { ...reading.light, cells: "ff80" } }).success, false);
+  // Its entries are readings like the others (the retention removes their files); a file's own readings have no file.
+  const kept = {
+    [readKey("v1", 1, 4)]: { path: "s/subjects/v1-a.read.json", still: false, at: "x", frames: 90, read: true },
+    [groundKey("v1", 1, 4)]: { path: "s/subjects/v1-b.webm", still: false, at: "x", frames: 90, ground: true },
+    [fileKey("v1")]: { file: { moves: [{ from: 1, to: 1.3, kind: "whip", towards: "right", speed: 0.2 }], covered: [], colour: { score: 40, words: "colorée" } }, at: "x" },
+  };
+  assert.ok(mediaSubjectsSchema.safeParse(kept).success);
+  assert.deepEqual(subjectFiles(kept), ["s/subjects/v1-a.read.json", "s/subjects/v1-b.webm"]);
+  const plan = {
+    format: "9:16",
+    duration: 3,
+    template: "libre",
+    segments: [{ clip_id: "v1", in: 1, out: 4, zoom: "none" }],
+    texts: [],
+    images: [],
+    transitions: "cut",
+    subtitles: false,
+    music: null,
+    layers: [{ from: 0, to: 3, brief: "", compose: true, motion: { js: `function Scene({ shots }) { return h(Skyline, { shot: 0 }); }` } }],
+  } as never;
+  const props = buildReelProps(plan, {
+    template: "libre",
+    clipUrls: { v1: "https://x/v1.mp4" },
+    brand: { name: "Studio" },
+    subjects: { [readKey("v1", 1, 4)]: { src: "", reading }, [groundKey("v1", 1, 4)]: { src: "https://x/v1-ground.webm" } },
+  } as never);
+  assert.deepEqual(props.layers?.[0]?.shots?.[0]?.read, reading);
+  const segment = props.segments[0] as { ground?: unknown; subject?: unknown; objects?: unknown };
+  assert.deepEqual(segment.ground, { src: "https://x/v1-ground.webm" });
+  assert.equal(segment.subject, undefined);
+  assert.equal(segment.objects, undefined);
+  // A shot at another speed has none (its images are not those read).
+  const slow = buildReelProps({ ...(plan as object), segments: [{ clip_id: "v1", in: 1, out: 4, zoom: "none", speed: 0.5 }] } as never, {
+    template: "libre",
+    clipUrls: { v1: "https://x/v1.mp4" },
+    brand: { name: "Studio" },
+    subjects: { [readKey("v1", 1, 4)]: { src: "", reading }, [groundKey("v1", 1, 4)]: { src: "https://x/v1-ground.webm" } },
+  } as never);
+  assert.equal(slow.layers?.[0]?.shots?.[0]?.read, undefined);
+  assert.equal((slow.segments[0] as { ground?: unknown }).ground, undefined);
+});
+
+test("her skyline, her vanishing point, her light: placed where the Reel draws the shot, moving with its camera", async () => {
+  const { affineOf, withCamera } = await import("../../../apps/render/src/clear.ts");
+  const { lightIn, movedAt, readingPlace, skylineIn, vanishIn } = await import("../../../apps/render/src/reading.ts");
+  // A 16:9 shot laid in a 1080 × 608 box: its sky ends at 50 % of its height on the left half, 30 % on the right.
+  const reading = {
+    sky: { share: 0.4, profile: Array.from({ length: 64 }, (_, i) => (i < 32 ? 0.5 : 0.3)) },
+    vanish: { x: 0.6, y: 0.5, strength: 0.7 },
+    light: { cols: 2, rows: 2, cells: "ff800000", mean: 0.4, high: 0.9 },
+  };
+  const place = affineOf(cover(16 / 9, WIDE));
+  assert.equal(Math.round(skylineIn(reading, place, 0, 500)!), 304);
+  assert.equal(Math.round(skylineIn(reading, place)!), Math.round(0.3 * 608));
+  assert.equal(skylineIn(reading, place, 2000, 3000), null);
+  assert.equal(skylineIn({ ...reading, sky: { share: 0, profile: reading.sky.profile } }, place), null);
+  const point = vanishIn(reading, place)!;
+  assert.ok(Math.abs(point.x - 0.6 * 1080) < 0.5 && Math.abs(point.y - 304) < 0.5, JSON.stringify(point));
+  assert.equal(vanishIn(reading, place, 0.8), null);
+  assert.equal(vanishIn({ vanish: null }, place), null);
+  // Its light: the top left cell white, the top right half grey, the bottom black; under a box, its cells' mean.
+  assert.deepEqual(lightIn(reading, place, { x: 0, y: 0, w: 540, h: 304 }), { mean: 1, high: 1 });
+  assert.equal(lightIn(reading, place, null, WIDE)!.mean, Math.round(((255 + 128) / 4 / 255) * 1000) / 1000);
+  assert.equal(lightIn(reading, place, { x: 2000, y: 0, w: 10, h: 10 }), null);
+  // The camera pans right (the scene moves left by 10 % of the picture over 31 images): its point follows the scene.
+  const moving = { ...reading, motion: Array.from({ length: 31 }, (_, t) => [1, (-0.1 * t) / 30, 0]).flat() };
+  assert.deepEqual(movedAt(moving.motion, 30), [1, -0.1, 0]);
+  const first = vanishIn(moving, readingPlace(moving, place, 0))!;
+  const last = vanishIn(moving, readingPlace(moving, place, 30))!;
+  assert.ok(Math.abs(first.x - last.x - 108) < 0.5 && Math.abs(first.y - last.y) < 0.01, JSON.stringify([first, last]));
+  assert.deepEqual(readingPlace(moving, place, 30), withCamera(place, [1, -0.1, 0]));
+});
+
+/** Tracks of a face whose nose drops against its ears from image 10 to 20, rises back from 40 to 50, and turns right from 70 to 80 (body points, facing the camera). */
+function headTracks() {
+  const frames = Array.from({ length: 100 }, (_, t) => {
+    const down = t < 10 ? 0 : t < 20 ? (t - 10) / 10 : t < 40 ? 1 : t < 50 ? 1 - (t - 40) / 10 : 0;
+    const turn = t < 70 ? 0 : t < 80 ? (t - 70) / 10 : 1;
+    const points = Array.from({ length: 33 }, () => [500, 500, 0]);
+    // Its ears level, 100 thousandths apart; its nose 20 below them, 50 more when lowered, 60 to the right when turned.
+    points[7] = [550, 300, 95];
+    points[8] = [450, 300, 95];
+    points[0] = [500 + 60 * turn, 320 + 50 * down, 95];
+    return { b: [[1, ...points.flat()]] };
+  });
+  return { fps: 30, w: 1000, h: 1000, from: 0, n: frames.length, frames };
+}
+
+test("a head gesture measured and named: lowered, raised, turned, the same for the designer, the filler and a composition", async () => {
+  const { headMoveFrames, headMoves } = await import("./tracking.ts");
+  const { headMovesOf } = await import("../../../apps/render/src/reading.ts");
+  const file = headTracks();
+  const frames = headMoveFrames(file.frames, 1);
+  assert.deepEqual(frames.map((m) => m.what), ["down", "up", "right"]);
+  assert.ok(frames[0]!.from >= 8 && frames[0]!.from <= 14 && frames[0]!.to >= 18 && frames[0]!.to <= 22, JSON.stringify(frames[0]));
+  assert.ok(frames[1]!.from >= 38 && frames[1]!.to <= 52, JSON.stringify(frames[1]));
+  assert.ok(frames[2]!.from >= 68 && frames[2]!.to <= 82, JSON.stringify(frames[2]));
+  // The render's mirror reads the same moves (a composition times its effect on them with HeadMoves).
+  assert.deepEqual(headMovesOf(file.frames, 1, 30), frames);
+  // In words and seconds, like the hands' moves.
+  const words = headMoves({ fps: 30, from: 0, frames: file.frames, aspect: 1 });
+  assert.deepEqual(words.map((m) => m.what), ["la tête se baisse", "la tête se relève", "la tête tourne vers la droite de l'image"]);
+  assert.ok(Math.abs(words[0]!.start - frames[0]!.from / 30) < 0.06, JSON.stringify(words[0]));
+  // A still head says nothing; a head seen from behind (its ears hidden) neither.
+  const still = { frames: file.frames.map(() => ({ b: [[1, ...Array.from({ length: 33 }, (_, k) => (k === 0 ? [500, 320, 95] : k === 7 ? [550, 300, 95] : k === 8 ? [450, 300, 95] : [500, 500, 0])).flat()]] })) };
+  assert.deepEqual(headMoveFrames(still.frames, 1), []);
+  const behind = { frames: file.frames.map((row) => ({ b: row.b.map((b) => b.map((v, i) => (i === 3 + 3 * 7 || i === 3 + 3 * 8 ? 10 : v))) })) };
+  assert.deepEqual(headMoveFrames(behind.frames, 1), []);
+});
+
+test("a head gesture: HeadMoves gives a composition its frames, the shot's own moment and speed taken in", async () => {
+  const { shotHeadMoves: HeadMoves } = await import("../../../apps/render/src/reading.ts");
+  const file = headTracks();
+  // The shot shows the clip from its image 30 at its own speed, from frame 100 of the composition, for 60 frames.
+  const shot = {
+    src: "/v.mp4",
+    aspect: 1,
+    segment: 0,
+    from: 100,
+    durationInFrames: 60,
+    kind: "video" as const,
+    track: { startFrom: 30, look: { aspect: 1 }, tracks: { fps: 30, from: 0, aspect: 1, frames: file.frames } },
+  };
+  const moves = HeadMoves(shot);
+  // Its raise (images 40 to 50 of the clip) at frames 110 to 120, its turn (70 to 80) at 140 to 150; its lowering, before the shot, left out.
+  assert.deepEqual(moves.map((m) => m.what), ["up", "right"]);
+  assert.ok(moves[0]!.from >= 108 && moves[0]!.to <= 122, JSON.stringify(moves));
+  assert.ok(moves[1]!.from >= 138 && moves[1]!.to <= 152, JSON.stringify(moves));
+  assert.deepEqual(HeadMoves({ ...shot, track: undefined }), []);
+});
+
+test("her depth as a mask: the shots a composition rebuilds with Near, read on the card, given to the render on their shot", async () => {
+  const { DEPTH_MAX, depthsDrawn, nearKey, nearPassages, nearsDrawn, NEAR_MAX_SECONDS, wantsNear } = await import("./subject.ts");
+  const code = `React.createElement(Near, { shot: 1, depth: interpolate(frame, [0, 30], [0, 1]), style: laid }) <Near shot={shots[2]} depth={0.4} />`;
+  assert.deepEqual(nearsDrawn(code).sort(), [1, 2]);
+  assert.deepEqual(nearsDrawn(`<Near shot={i} />`), []);
+  // Not the grey pass: Depth is read on its own.
+  assert.deepEqual(depthsDrawn(code), []);
+  const plan = {
+    segments: [
+      { clip_id: "photo1", in: 0, out: 2 },
+      { clip_id: "v1", in: 1, out: 4 },
+      { clip_id: "v2", in: 0, out: 3, speed: 0.5 },
+    ],
+    layers: [{ from: 0, to: 9, brief: "", compose: true, motion: { js: code } }],
+  } as never;
+  assert.equal(wantsNear(plan), true);
+  assert.deepEqual(nearPassages(plan, (id) => id.startsWith("v")), [{ clip_id: "v1", from: 1, to: 4, key: nearKey("v1", 1, 4) }]);
+  assert.match(nearKey("v1", 1, 4), /^v1@1\.00-4\.00~near$/);
+  assert.ok(DEPTH_MAX >= 2 && NEAR_MAX_SECONDS >= 6);
+  const props = buildReelProps(
+    { format: "9:16", duration: 3, template: "libre", segments: [{ clip_id: "v1", in: 1, out: 4, zoom: "none" }], texts: [], images: [], transitions: "cut", subtitles: false, music: null } as never,
+    { template: "libre", clipUrls: { v1: "https://x/v1.mp4" }, brand: { name: "Studio" }, subjects: { [nearKey("v1", 1, 4)]: { src: "https://x/v1-near.webm" } } } as never,
+  );
+  const shot = props.segments[0] as { near?: unknown; depthMap?: unknown };
+  assert.deepEqual(shot.near, { src: "https://x/v1-near.webm" });
+  assert.equal(shot.depthMap, undefined);
+});
+
+test("what the filler reads on her files: her camera's fast moves, her lens covered, her colours, her gestures, in its words", async () => {
+  const { coveredWords, measuredFiles, moveWords, skillFillInput, SKILL_FILL_PROMPT } = await import("./skills.ts");
+  const { fileReadingSchema } = await import("./subject.ts");
+  const { coupsDeFouet } = await import("./skills/coups-de-fouet.ts");
+  const { journee } = await import("./skills/journee.ts");
+  const { tourne } = await import("./skills/tourne.ts");
+  // The models whose slots want them ask for them.
+  assert.deepEqual([coupsDeFouet.reads, journee.reads, tourne.reads], [["moves"], ["covered"], ["colour"]]);
+  assert.equal(moveWords({ kind: "whip", towards: "right", speed: 0.23, from: 4.4, to: 4.8 }), "un fouet de la caméra vers la droite, flou (0,4 s, jusqu'à 23 % de l'image par image)");
+  assert.equal(moveWords({ kind: "rush", towards: "in", speed: 0.05, from: 1, to: 1.5 }), "la caméra fonce en avant (0,5 s)");
+  assert.match(coveredWords({ peak: 0.8, share: 0.98, enters: "right" }), /^quelque chose passe tout près de l'objectif et cache toute l'image, entre par la droite, le plus couvert à 0,8 s/);
+  // As video_read.py prints them (its colour, and its moments in seconds of the file).
+  const reading = fileReadingSchema.parse({
+    seconds: 15,
+    moves: [{ from: 4.43, to: 4.83, kind: "whip", towards: "left", speed: 0.17 }],
+    covered: [{ from: 0.67, to: 0.93, peak: 0.8, share: 0.98, colour: "#775c49", dark: false, enters: "right" }],
+    colour: { score: 64, words: "très colorée", best: { from: 2, to: 3, score: 80 } },
+  });
+  const files = [
+    { id: "v1", photo: false, seconds: 15, shows: "sa rue", moments: [{ start: 0, end: 2, what: "la rue" }] },
+    { id: "p1", photo: true, seconds: 0, shows: "ses fleurs" },
+    { id: "v2", photo: false, seconds: 8 },
+  ];
+  const measured = measuredFiles(files, { v1: reading, p1: { moves: [], covered: [], colour: { score: 12, words: "presque sans couleur" } } }, { v2: [{ start: 1, end: 1.5, what: "la tête se baisse" }] });
+  const input = skillFillInput({ skill: coupsDeFouet, name: "Ville en coups de fouet", n: 12, files: measured, business: {}, request: "" });
+  const [v1, p1, v2] = input.fichiers as Record<string, unknown>[];
+  assert.deepEqual(v1!.mouvements_rapides, [{ de: 4.43, a: 4.83, quoi: "un fouet de la caméra vers la gauche, flou (0,4 s, jusqu'à 17 % de l'image par image)" }]);
+  assert.match(String((v1!.objectif_couvert as { quoi: string }[])[0]!.quoi), /cache toute l'image, entre par la droite, le plus couvert à 0,8 s/);
+  assert.equal(v1!.couleur, "très colorée (64), la plus colorée de 2 à 3 s");
+  assert.equal(p1!.couleur, "presque sans couleur (12)");
+  assert.deepEqual(v2!.gestes_mesures, [{ de: 1, a: 1.5, quoi: "la tête se baisse" }]);
+  // A file nothing was measured on is told as before; the filler is told what they are for.
+  assert.deepEqual(measuredFiles(files, {}), files);
+  assert.match(SKILL_FILL_PROMPT, /mouvements_rapides/);
+  assert.match(SKILL_FILL_PROMPT, /objectif_couvert/);
+  assert.match(SKILL_FILL_PROMPT, /couleur/);
+});
+
+test("the kit tells the motion designer the new readings, and every scope has them (carousels without Skyline nor Near)", async () => {
+  const { MOTION_DESIGNER_PROMPT, MOTION_SCOPE } = await import("./motion-scene.ts");
+  const { CAROUSEL_SCOPE } = await import("./carousel.ts");
+  for (const name of ["Skyline", "SkylineAt", "Near", "VanishingPoint", "LightUnder", "HeadMoves"]) {
+    assert.ok((MOTION_SCOPE as readonly string[]).includes(name), name);
+    assert.match(MOTION_DESIGNER_PROMPT, new RegExp(`\\b${name}\\b`), name);
+  }
+  assert.ok(!CAROUSEL_SCOPE.includes("Skyline") && !CAROUSEL_SCOPE.includes("Near"));
+});

@@ -285,6 +285,8 @@ export const tourne: MontageSkill = {
   bpm: BPM,
   shots: [20, 28],
   files: [6, 16],
+  // How colourful each of her files is (video_read.py): its slots left in colour get her most colourful ones.
+  reads: ["colour"],
   how: "Tous ses plans filmés en largeur tournés d'un quart de tour, toujours dans le sens des aiguilles d'une montre, pour remplir l'écran en entier, en deux tons bleu-vert et crème, la couleur gardée sur cinq plans où elle compte : quatre plans qui filent sous un stroboscope ; sept plans d'une à deux secondes sur une musique étouffée, les deux premiers en couleur, une vidéo debout retournée la tête en bas, un flou de passage, un plan en couleur qui se floute dans un flash blanc ; puis, quand la musique s'ouvre, une rafale de seize plans sur le rythme avec un zoom coup de poing, un flash, deux plans en couleur, quelque chose qui tourne, un filé, et le dernier qui se floute dans un dernier flash ; le dernier plan tenu jusqu'à la fin, la musique coupée avec l'image. Sans texte, avec des bords d'objectif en haut et en bas.",
   end: true,
   texts: [

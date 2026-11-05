@@ -42,7 +42,9 @@ import {
   voiceTranscriptSchema,
   wantsClear,
   wantsDepth,
+  wantsNear,
   wantsObjects,
+  wantsReads,
   wantsSubjects,
 } from "@fauve/agent";
 import { z } from "zod";
@@ -55,6 +57,7 @@ import { usableFonts } from "@/lib/fonts";
 import { makeSceneSprite } from "./scene-sprite";
 import { copyCutoutInputs, ensureCutoutContours, ensureCutouts, overlayPhotoInputs, sceneCutoutInputs, stickerInputs } from "./cutout";
 import { ensureDepths, ensureObjects, ensureSubjects, subjectInputs } from "./subjects";
+import { ensureShotReadings } from "./readings";
 import { ensureReliefs, reliefInputs } from "./relief";
 import { smoothSlowMotion } from "./smooth";
 import { ensureCleanCopies } from "@/lib/video/speech";
@@ -183,8 +186,10 @@ export async function loadMontageInputs(
   const depth = moving.length ? await sceneCutoutInputs(studioId, moving).catch(() => ({})) : undefined;
   // The same photos with their depth read on the card for their shots (relief.py), when it was.
   const reliefs = moving.length ? await reliefInputs(studioId, plan).catch(() => ({})) : undefined;
-  // Her subject cut out at every image, for the compositions that draw it (Subject), and the clear areas their texts are set in (ClearBox).
-  const subjects = wantsSubjects(plan) || wantsObjects(plan) || wantsDepth(plan) || wantsClear(plan) ? await subjectInputs(studioId, plan).catch(() => ({})) : undefined;
+  // Her subject cut out at every image, for the compositions that draw it (Subject), the clear areas their texts are set in (ClearBox), and what
+  // else they read on her shots (their sky, their lines, their light, their depth as a mask).
+  const subjects =
+    wantsSubjects(plan) || wantsObjects(plan) || wantsDepth(plan) || wantsClear(plan) || wantsReads(plan) || wantsNear(plan) ? await subjectInputs(studioId, plan).catch(() => ({})) : undefined;
   // Each photo's shape, from its reading.
   const photoAspects = Object.fromEntries(
     assets.flatMap((a) => {
@@ -374,7 +379,9 @@ export async function prepareRenderAssets(studioId: string, postId: string, plan
   await Promise.all([
     wantsSubjects(plan) ? ensureSubjects(studioId, postId, plan) : null,
     wantsObjects(plan) || wantsClear(plan) ? ensureObjects(studioId, postId, plan) : null,
-    wantsDepth(plan) ? ensureDepths(studioId, postId, plan) : null,
+    wantsDepth(plan) || wantsNear(plan) ? ensureDepths(studioId, postId, plan) : null,
+    // What else its compositions read on her shots (their sky and its matte, their vanishing point, their light), on the cut-out sandbox's CPUs.
+    wantsReads(plan) ? ensureShotReadings(studioId, postId, plan) : null,
     depthPhotoIds(plan).length ? ensureReliefs(studioId, postId, plan).catch((e: unknown) => console.warn("reliefs unavailable", e instanceof Error ? e.message : e)) : null,
   ]);
 }

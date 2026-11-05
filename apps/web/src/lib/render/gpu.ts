@@ -469,8 +469,11 @@ export async function reliefsOnGpu(shots: GpuRelief[], deadlineMs: number, optio
   return { results, seconds, gpu };
 }
 
-/** A passage of her video to read in depth (depth_video.py): the clip (signed), its seconds in the clip, where its grey video is sent. */
-export type GpuDepthVideo = { key: string; url: string; from: number; to: number; upload: { mp4: string } };
+/**
+ * A passage of her video to read in depth (depth_video.py): the clip (signed), its seconds in the clip, where its grey
+ * video is sent (mp4), or its nearness (webm: her shot at the cut-out's size, its depth as its transparency, for Near).
+ */
+export type GpuDepthVideo = { key: string; url: string; from: number; to: number; upload: { mp4: string } | { webm: string } };
 /** A passage read in depth on the card (its grey video already sent): its images and its size. */
 export type GpuDepthVideoDone = { frames: number; w: number; h: number };
 
@@ -484,7 +487,7 @@ export async function depthVideosOnGpu(
   options: CardOptions = {},
 ): Promise<{ results: Record<string, GpuDepthVideoDone | Error>; seconds: number; gpu: string | null }> {
   if (!passages.length) return { results: {}, seconds: 0, gpu: null };
-  const jobs = passages.map((p) => ({ id: p.key, url: p.url, from: p.from, to: p.to, upload: p.upload }));
+  const jobs = passages.map((p) => ({ id: p.key, url: p.url, from: p.from, to: p.to, upload: p.upload, ...("webm" in p.upload ? { near: true } : {}) }));
   const { readings, seconds, gpu } = await onCard("depth_video.py", "torch", jobs, () => ({ DEPTH_MODEL: `/models/${DEPTH_MODEL.dir}`, DEPTH_WORK: "/work", HDR_FILTER: HDR_TO_SDR }), deadlineMs, options);
   const results: Record<string, GpuDepthVideoDone | Error> = {};
   for (const p of passages) {
