@@ -1247,7 +1247,7 @@ test("each of Edith's models shows its original's frames as a Reel she sends: sh
   const { HOUSE_MEASURES } = await import("./house-measures.ts");
   const { stolenStyleSchema } = await import("./steal.ts");
   // A studio's row written before the sheets is rewritten (11: ten models written again on their originals' fiches).
-  assert.equal(HOUSE_VERSION, 15);
+  assert.equal(HOUSE_VERSION, 16);
   for (const m of HOUSE_MODELS) {
     const sheets = houseSheets(m.key);
     // A model written as a design has no original, so no sheets (its row names none).
@@ -7725,4 +7725,449 @@ test("« Interrupteur » (v2): upright as her video, a horizontal one cropped on
   assert.doesNotMatch(interrupteur.code, /transform|scale\(/);
   assert.equal(drawnNodes(bare(100, props(9 / 16))).filter((n) => n.type === "Subject").length, 0);
   assert.equal(drawnNodes(bare(103, props(9 / 16))).filter((n) => n.type === "Subject").length, 1);
+});
+
+// ——— « Fenêtres et étiquettes » v2, written on its original's fiche (docs/fiches/fenetres.md) —————————————————————
+
+/** The original's main line (its images at 30 i/s, measured cell by cell): where each shot first shows, its first cell or its cut. */
+const FE_CUTS = [0, 4, 24, 40, 54, 101, 120, 136, 146, 156, 180, 194, 203, 265, 286, 305, 325, 340, 347, 365, 384];
+/** Its shot by day, laid beside the night from this image to the night's end; its last image (13,8 s). */
+const FE_DAY = 216;
+const FE_END = 414;
+/** Its composition's props on its timeline for n shots (its marks as its slot texts), all its shots of that shape; its two labels. */
+async function fenetresAt(n: number, options: { end?: boolean; aspect?: number; settings?: Record<string, string> } = {}) {
+  const { fenetres } = await import("./skills/fenetres.ts");
+  const line = fenetres.timeline(n, { end: Boolean(options.end) });
+  const durationInFrames = Math.round(line.duration * 30);
+  const props = {
+    width: 1080,
+    height: 1920,
+    durationInFrames,
+    brand: { name: "Le Kiosque", displayFont: "Oswald", bodyFont: "IBM Plex Mono" },
+    shots: decodeShots(line, () => options.aspect ?? 16 / 9),
+    reelTexts: [
+      { text: "OUVERT DÈS 8 H", role: "hook", from: 0, to: durationInFrames, emphasis: [] },
+      { text: "50.8164° N, 0.1366° O", role: "caption", from: 0, to: durationInFrames, emphasis: [] },
+    ],
+    end: options.end ? { title: "Ouvert ce dimanche", subtitle: "de 9 h à 19 h", from: durationInFrames - 48 } : null,
+    texts: { ...Object.fromEntries(Object.entries(line.marks).map(([k, v]) => [k, String(v)])), ...(options.settings ?? {}) },
+  };
+  const at = (f: number) => drawDecode(fenetres.code, f, props);
+  return { fenetres, line, props, at, durationInFrames };
+}
+/** What a frame lays in its frame box: each shot drawn (its index, from where it plays, the rectangles it is cut to, its filter), each cut-out (its shot, its fill). */
+const fenetresLayers = (tree: Drawn) => {
+  const nodes = drawnNodes(tree);
+  const rectsOf = (clip: unknown) => [...String(clip ?? "").matchAll(/M(-?\d+) (-?\d+)h(-?\d+)v(-?\d+)/g)].map((m) => m.slice(1).map(Number) as [number, number, number, number]);
+  return {
+    shots: nodes.filter((x) => x.type === "Footage").map((x) => ({ shot: x.props.shot as number, at: x.props.at as number | undefined, rects: rectsOf(styleOf(x).clipPath), filter: styleOf(x).filter as string | undefined })),
+    cutouts: nodes.filter((x) => x.type === "Subject").map((x) => ({ shot: x.props.shot as number, at: x.props.at as number | undefined, fill: x.props.fill as string | undefined })),
+    washes: nodes.filter((x) => x.type === "div" && x.props.key === "wash").map((x) => ({ background: String(styleOf(x).background), opacity: Number(styleOf(x).opacity), blend: styleOf(x).mixBlendMode })),
+  };
+};
+
+test("« Fenêtres et étiquettes » (v2) cuts where its original does, on its own music (92,9 BPM), its music stopped in the intro's hole", async () => {
+  const { fenetres, line } = await fenetresAt(22);
+  const { skillPlan, skillFillInput } = await import("./skills.ts");
+  assert.equal(fenetres.version, 2);
+  assert.equal(fenetres.bpm, 92.9);
+  // Its 21 shots one after the other, each where the original's first shows (its first cell, or its cut), within two
+  // images; its shot by day laid beside the night from image 216 to the night's end; 13,8 s.
+  const main = line.shots.filter((s) => !s.beside);
+  assert.equal(line.shots.length, 22);
+  assert.equal(main.length, FE_CUTS.length);
+  main.forEach((s, i) => assert.ok(Math.abs(Math.round(s.start * 30) - FE_CUTS[i]!) <= 2, `shot ${i + 1}: image ${Math.round(s.start * 30)}, the original's ${FE_CUTS[i]}`));
+  const day = line.shots.findIndex((s) => s.beside);
+  assert.equal(day, 13);
+  assert.ok(Math.abs(Math.round(line.shots[day]!.start * 30) - FE_DAY) <= 2);
+  assert.equal(line.shots[day]!.end, line.shots[day - 1]!.end);
+  assert.ok(Math.abs(line.duration * 30 - FE_END) <= 2, `${line.duration} s`);
+  // From the mirror on, a shot a beat of its music (the original's beats 13 to 19 from its first, at 0,53 s).
+  const beat = 60 / 92.9;
+  for (const i of [14, 15, 16, 18, 19, 20]) {
+    const b = (main[i]!.start - 0.53) / beat;
+    assert.ok(Math.abs(b - Math.round(b)) < 0.11, `shot ${i + 1} on beat ${b}`);
+  }
+  // Its music on its first beat, stopped after the intro's third kick and back with the drums on beat 4, the kick
+  // ringing out; no sound effect (its original has none on its windows).
+  assert.deepEqual(line.music, { downbeat: 0.53, pauses: [{ from: 2, to: 3.113, tail: 0.5 }] });
+  assert.equal(line.sounds, undefined);
+  // Its labels the whole Reel; the right one her place's coordinates, written by the engine.
+  assert.deepEqual(line.texts, { gauche: { from: 0, to: line.duration }, droite: { from: 0, to: line.duration } });
+  assert.equal(fenetres.texts.find((t) => t.slot === "droite")?.fact, "coordinates");
+  // With an ending card, its cuts the same, its last shot held whole beats longer (the card's 1,6 s).
+  const ended = fenetres.timeline(22, { end: true });
+  assert.deepEqual(ended.shots.slice(0, -1), line.shots.slice(0, -1));
+  assert.ok(ended.duration - line.duration >= 1.6 && Math.abs(((ended.duration - line.duration) * 92.9) / 60 - 3) < 0.05, `${ended.duration} s`);
+  // At another tempo, all of it follows its beats.
+  const slower = fenetres.timeline(22, { end: false, bpm: 80 });
+  assert.ok(Math.abs(slower.duration / line.duration - 92.9 / 80) < 0.01, `${slower.duration} s`);
+  // Fewer shots: the moments without a signature go first, their time to the shot before them (or a beat less in its
+  // last section): its cuts on the original's images still, the last section a shot a beat. More: shots held two beats
+  // before the night. On the plan, for every count it takes, with or without its card: valid, 30 s at most.
+  for (let n = fenetres.shots[0]; n <= fenetres.long!; n++) {
+    const l = fenetres.timeline(n, { end: false });
+    assert.equal(l.shots.length, n);
+    const starts = l.shots.filter((s) => !s.beside).map((s) => Math.round(s.start * 30));
+    if (n <= 22) for (const f of starts.slice(0, 7)) assert.ok(FE_CUTS.some((c) => Math.abs(c - f) <= 2), `${n} shots: ${starts.join(" ")}`);
+    const last = l.shots.filter((s) => !s.beside).slice(-4);
+    for (const s of last) {
+      const b = (s.start - 0.53) / ((60 / 92.9) * 1);
+      assert.ok(Math.abs(b - Math.round(b)) < 0.15 || Math.abs(b - Math.round(b) - 0.73) < 0.15 || Math.abs(b - Math.round(b) + 0.27) < 0.15, `${n} shots: ${s.start} s on beat ${b}`);
+    }
+    assert.ok(l.duration <= 30, `${n} shots: ${l.duration} s`);
+    for (const end of [false, true]) {
+      const files = Array.from({ length: 12 }, (_, i) => ({ id: `v${i}`, photo: false, seconds: 16 }));
+      const plan = skillPlan({ skill: fenetres, name: "Fenêtres et étiquettes", files, fill: { shots: Array.from({ length: n }, (_, i) => ({ file: files[i % 12]!.id, at: Math.floor(i / 12) * 5 })), texts: { gauche: "OUVERT DÈS 8 H", droite: "PARIS 9E" }, end: end ? { title: "Ouvert dimanche" } : null } });
+      const parsed = editPlanSchema.safeParse(plan);
+      assert.ok(parsed.success, `n=${n} end=${end}: ${parsed.success ? "" : parsed.error.message.slice(0, 300)}`);
+      assert.equal(plan.segments.length, n);
+      assert.ok(plan.segments.filter((s) => "beside" in s && s.beside).length === 1);
+      assert.deepEqual(plan.music_shape?.pauses?.length, 1);
+    }
+  }
+  assert.ok(Math.abs(fenetres.timeline(34, { end: false }).duration - 29.3) < 0.05);
+  assert.ok(fenetres.timeline(11, { end: false }).duration < line.duration);
+  // The filler sees which slot plays beside the night, and each slot's want.
+  const files = Array.from({ length: 12 }, (_, i) => ({ id: `v${i}`, photo: false, seconds: 12, aspect: 16 / 9 }));
+  const input = skillFillInput({ skill: fenetres, name: "Fenêtres et étiquettes", n: 22, files, business: {}, request: "" });
+  assert.equal(input.cases[13]!.en_meme_temps_que, 13);
+  assert.match(input.cases[12]!.veut, /le soir ou la nuit/);
+  assert.match(input.cases[18]!.veut, /debout/);
+});
+
+test("« Fenêtres et étiquettes » (v2): cells in a snake, jumping windows, a window behind her, silhouettes, a split screen, squares, her subject before its place, the loop", async () => {
+  const { at, line, durationInFrames } = await fenetresAt(22);
+  const seen = Array.from({ length: durationInFrames }, (_, f) => fenetresLayers(at(f)));
+  const bw = 1080;
+  const bh = 608;
+  // The next shot takes the 3 × 3 cells of the frame over the one before, already playing, a cell or two every two
+  // images: from the top right (its first row right to left), then from the bottom left; a cell on each kick of the
+  // intro (images 16, 36, 54); the shot alone once all are taken.
+  const cells = (f: number, shot: number) => seen[f]!.shots.find((s) => s.shot === shot && !s.at)?.rects ?? [];
+  assert.deepEqual(cells(4, 1), [[720, 0, 360, 203]]);
+  assert.deepEqual(cells(6, 1).map((r) => r.slice(0, 2)), [[720, 0], [360, 0]]);
+  assert.equal(cells(8, 1)[2]![0], 0);
+  assert.deepEqual(cells(24, 2)[0], [0, 405, 360, 203]);
+  for (const [f, shot] of [[16, 1], [36, 2], [54, 4]] as const) assert.ok(cells(f, shot).length > cells(f - 1, shot).length || (f === 54 && cells(54, 4).length > 0), `a cell on image ${f}`);
+  assert.equal(seen[23]!.shots.length, 1);
+  assert.ok(seen[5]!.shots.some((s) => s.shot === 0) && seen[5]!.shots.some((s) => s.shot === 1));
+  // Windows of the frame's shape on the next shot, played from where they start (image 74), at its place: one of 21 %,
+  // then two of 21 and 28 %, then two or three of a third, jumping every two images; then the cut, its white silhouette
+  // just before it (97 to 100).
+  const wins = (f: number) => seen[f]!.shots.find((s) => s.shot === 5 && s.at === 74)?.rects ?? [];
+  assert.deepEqual([wins(73).length, wins(74).length, wins(83).length, wins(84).length, wins(89).length], [0, 1, 1, 2, 2]);
+  assert.ok([90, 95, 100].every((f) => wins(f).length >= 2 && wins(f).every((r) => Math.abs(r[2] - 0.33 * bw) <= 1)));
+  assert.ok(Math.abs(wins(74)[0]![2] - 0.21 * bw) <= 1 && Math.abs(wins(74)[0]![3] - 0.21 * bh) <= 1);
+  assert.notDeepEqual(wins(74), wins(76));
+  assert.equal(wins(101).length, 0);
+  // The middle cell onto the waterfall from image 110, in negative 110 to 114 and 116 to 117, the cell above it taken
+  // from 115; the person of the shot in front of it.
+  const mid = (f: number) => seen[f]!.shots.find((s) => s.shot === 6 && s.at === 110);
+  assert.deepEqual(mid(110)!.rects, [[360, 203, 360, 203]]);
+  assert.deepEqual([110, 114, 115, 116, 117, 118, 119].map((f) => mid(f)!.filter ?? "colour"), ["invert(1)", "invert(1)", "colour", "invert(1)", "invert(1)", "colour", "colour"]);
+  assert.equal(mid(115)!.rects.length, 2);
+  assert.ok(seen[112]!.cutouts.some((c) => c.shot === 5 && !c.fill));
+  // Its silhouettes, white or cream, two to four images before what comes (the 4x4's on its first cells), as the original's.
+  const sils = new Map<number, number[]>();
+  seen.forEach((s, f) => s.cutouts.filter((c) => c.fill).forEach((c) => sils.set(c.shot, [...(sils.get(c.shot) ?? []), f])));
+  assert.deepEqual(Object.fromEntries(sils), { 2: [22, 23], 3: [40, 41], 5: [97, 98, 99, 100], 7: [132, 133, 134, 135], 10: [184, 185], 11: [192, 193], 14: [263, 264], 18: [329, 330] });
+  const fills = (shot: number) => seen[sils.get(shot)![0]!]!.cutouts.find((c) => c.shot === shot)!.fill;
+  assert.deepEqual([2, 3, 5, 7, 10, 11, 14, 18].map(fills), ["#fbf2db", "#fcf9fd", "#fcf9fd", "#fcf9fd", "#fbf2db", "#fbf2db", "#fcf9fd", "#fbf2db"]);
+  // The valley cut in twice in the creek, 182 to 185 and 193.
+  const back = seen.flatMap((s, f) => (s.shots.some((x) => x.shot === 9 && !x.rects.length) && f >= 180 ? [f] : []));
+  assert.deepEqual(back, [182, 183, 184, 185, 193]);
+  // The day slides in from the left over the night (21, 30, 37, 43, 47, then 50 %), then the middle block's halves swap,
+  // a checkerboard, then its flashes, an image each: the day in negative, the night, the negative, the night, the day.
+  const dayRects = (f: number) => seen[f]!.shots.find((s) => s.shot === 13 && !s.filter)!.rects;
+  assert.deepEqual([216, 217, 218, 219, 220, 221, 230].map((f) => dayRects(f)[0]![2]), [227, 324, 400, 464, 508, 540, 540]);
+  assert.deepEqual(dayRects(235), [[0, 0, 270, 608], [270, 0, 270, 152], [270, 456, 270, 152]]);
+  assert.ok(dayRects(240).some((r) => r[0] === 540 && r[1] === 152));
+  assert.deepEqual([256, 257, 258, 259, 260].map((f) => seen[f]!.shots.some((s) => s.shot === 13 && s.filter === "invert(1)")), [true, false, true, false, false]);
+  assert.ok(dayRects(260).some((r) => r[0] === 270 && r[1] === 152));
+  // Small squares lit one by one in reading order on her other shots, at their place (5 × 3), across the cut, 286 to 323.
+  const square = (f: number) => seen[f]!.shots.filter((s) => s.rects.length === 1 && Math.abs(s.rects[0]![2] - 216) <= 1);
+  assert.ok(Array.from({ length: 38 }, (_, k) => 286 + k).every((f) => square(f).length === 1), "a square at each image");
+  assert.equal(square(324).length + square(285).length, 0);
+  const order = [286, 287, 289, 293, 296, 299, 301, 305, 307, 308, 312, 315, 317, 319].map((f) => square(f)[0]!.rects[0]!);
+  assert.deepEqual(order.slice(0, 4).map((r) => [r[0], r[1]]), [[0, 0], [216, 0], [432, 0], [864, 0]]);
+  assert.ok(order.every((r, k) => k === 0 || r[1] > order[k - 1]![1] || r[0] > order[k - 1]![0]), "in reading order");
+  assert.ok(seen[290]!.shots.every((s) => s.shot !== 15 || !s.rects.length) && square(290)[0]!.shot !== 15 && square(290)[0]!.shot !== 16);
+  // The three shots after the next in turn, each on its first image (played from after the Reel's end): three images to
+  // read for its fourteen squares, not a seek in another video each (its passage rendered 3 times slower than plans-fixes).
+  const squared = Array.from({ length: 38 }, (_, k) => square(286 + k)[0]!);
+  assert.deepEqual([...new Set(squared.map((s) => s.shot))].sort((a, b) => a - b), [17, 18, 19]);
+  assert.ok(squared.every((s) => s.at! > durationInFrames));
+  // Her subject before its place: its cream silhouette on the truck (329, 330), then her in colour on it while her own
+  // place comes round her by big rectangles (the truck's bottom right last), then her shot alone at 340.
+  const decor = (f: number) => seen[f]!.shots.find((s) => s.shot === 18 && s.at === 329)?.rects.length ?? 0;
+  assert.deepEqual([330, 331, 333, 335, 336, 339, 340].map(decor), [0, 2, 3, 4, 5, 5, 0]);
+  assert.ok([331, 335, 339].every((f) => seen[f]!.cutouts.some((c) => c.shot === 18 && !c.fill && c.at === 329)));
+  assert.ok(seen[340]!.cutouts.length === 0 && seen[340]!.shots.some((s) => s.shot === 18 && !s.rects.length));
+  // Light on its cuts: washed white (146 to 148), a light flash on the friends' cut (304, 305), a warm burn on the peak
+  // (347, 348), cream (365, 366, 384).
+  const washed = seen.flatMap((s, f) => (s.washes.length ? [f] : []));
+  assert.deepEqual(washed, [146, 147, 148, 304, 305, 347, 348, 365, 366, 384]);
+  assert.deepEqual([365, 366, 384].map((f) => seen[f]!.washes[0]!.background), ["#faf2dc", "#cfc7b4", "#faf2dc"]);
+  assert.deepEqual([146, 147, 148].map((f) => seen[f]!.washes[0]!.opacity), [0.75, 0.5, 0.25]);
+  assert.ok(seen[347]!.washes[0]!.blend === "screen" && /linear-gradient/.test(seen[347]!.washes[0]!.background));
+  // The loop: the first shot back on the last through two or three windows of 28 %, held on its first image (played
+  // from after the Reel's end), then alone, the Reel's last image its first one.
+  const loop = (f: number) => seen[f]!.shots.find((s) => s.shot === 0);
+  assert.ok([384, 395, 407].every((f) => loop(f)!.at! > durationInFrames && loop(f)!.rects.length >= 2 && loop(f)!.rects.every((r) => Math.abs(r[2] - 0.28 * bw) <= 1)));
+  assert.ok([408, 413].every((f) => loop(f)!.at! > durationInFrames && !loop(f)!.rects.length));
+  assert.equal(line.shots.length, 22);
+});
+
+test("« Fenêtres et étiquettes » (v2): horizontal 16:9 on black as its original when her videos are, full frame otherwise or on her word; its labels fixed; cut out only where drawn", async () => {
+  const { fenetres } = await import("./skills/fenetres.ts");
+  const { skillSettings, skillPlan } = await import("./skills.ts");
+  const frameOf = (tree: Drawn) => {
+    const box = drawnNodes(tree).find((n) => n.type === "div" && styleOf(n).overflow === "hidden")!;
+    return { top: styleOf(box).top, height: styleOf(box).height };
+  };
+  const wide = await fenetresAt(22);
+  const tall = await fenetresAt(22, { aspect: 9 / 16 });
+  assert.deepEqual(frameOf(wide.at(60)), { top: 656, height: 608 });
+  assert.deepEqual(frameOf(tall.at(60)), { top: 0, height: 1920 });
+  assert.equal(frameOf((await fenetresAt(22, { settings: { format: "vertical" } })).at(60)).height, 1920);
+  assert.equal(frameOf((await fenetresAt(22, { aspect: 9 / 16, settings: { format: "horizontal" } })).at(60)).top, 656);
+  assert.deepEqual(fenetres.settings?.map((s) => [s.name, s.choices.map((c) => c.value)]), [["format", ["auto", "horizontal", "vertical"]]]);
+  assert.deepEqual(skillSettings(fenetres, [{ name: "format", value: "auto" }]), {});
+  // Upright: its cells and windows of the frame's shape (a third of it each), its squares 3 × 5.
+  const tallCells = fenetresLayers(tall.at(6)).shots.find((s) => s.shot === 1)!.rects;
+  assert.deepEqual(tallCells[0], [720, 0, 360, 640]);
+  assert.deepEqual(fenetresLayers(tall.at(286)).shots.find((s) => s.rects.length === 1 && s.rects[0]![2] === 360)?.rects[0], [0, 0, 360, 384]);
+  // Its two labels at the original's distance from the edges (10,3 % and 89,9 % of the width), just above the middle,
+  // clear of the apps' buttons; thin white capitals as tall as the original's, decor (Tristan's exception for its tiny
+  // type), no shadow; the same box at every image, over everything, both formats; never animated.
+  const labels = (tree: Drawn) => drawnNodes(tree).filter((n) => n.type === "FitText" && /OUVERT|50\.8164/.test(heldText(n))).map((n) => n.props.style as { left: number; top: number; width: number; height: number });
+  for (const { at } of [wide, tall]) {
+    const first = labels(at(0));
+    assert.equal(first.length, 2);
+    assert.equal(first[0]!.left, 111);
+    assert.equal(first[1]!.left + first[1]!.width, 971);
+    assert.ok(first.every((b) => b.top + b.height <= 940 && b.top >= 820), JSON.stringify(first));
+    for (const f of [100, 220, 300, 413]) assert.deepEqual(labels(at(f)), first);
+  }
+  const style = drawnNodes(wide.at(0)).find((n) => n.type === "FitText")!.props.innerStyle as Record<string, unknown>;
+  assert.deepEqual([style.color, style.textShadow, style.textTransform, style.fontSize, style.fontWeight], ["#f1f2f4", undefined, "uppercase", 40, 300]);
+  assert.ok(drawnNodes(wide.at(0)).filter((n) => "data-fauve-decor" in n.props).map(heldText).join(" ").includes("OUVERT DÈS 8 H"));
+  const kids = drawnNodes(wide.at(100))[0]!.children as Drawn[];
+  assert.ok(kids.findIndex((k) => k && k.type === "FitText") > kids.findIndex((k) => k && styleOf(k).overflow === "hidden"));
+  // Its ending card over the first shot held, darkened: its title and its line, the labels still there.
+  const ended = await fenetresAt(22, { end: true });
+  const card = ended.at(ended.durationInFrames - 20);
+  assert.ok(heldText(card).includes("Ouvert ce dimanche") && heldText(card).includes("de 9 h à 19 h") && labels(card).length === 2);
+  // Light to render: at most three of her shots and two cut-outs at once; she is cut out only on the shots its code
+  // draws her on, as its timeline says them, for every count it plays (with an ending card too): 4,5 s of video at most.
+  for (const [n, end] of [[11, false], [16, false], [22, false], [22, true], [28, false], [34, false]] as const) {
+    const run = await fenetresAt(n, { end });
+    const drawn = await cutoutsDrawn(fenetres.code, run.props, Array.from({ length: run.durationInFrames }, (_, f) => f));
+    assert.deepEqual([...drawn].sort((a, b) => a - b), run.line.cutouts, `${n} shots${end ? ", an ending card" : ""}`);
+    const most = Math.max(...Array.from({ length: run.durationInFrames }, (_, f) => fenetresLayers(run.at(f))).map((l) => l.shots.length + 2 * l.cutouts.length));
+    assert.ok(most <= 5, `${n} shots: ${most}`);
+    const seconds = run.line.cutouts!.reduce((s, k) => s + run.line.shots[k]!.end - run.line.shots[k]!.start, 0);
+    assert.ok(run.line.cutouts!.length <= 8 && seconds <= 4.5, `${n} shots: ${run.line.cutouts!.length} cut out, ${seconds} s`);
+  }
+  const files = Array.from({ length: 12 }, (_, i) => ({ id: `v${i}`, photo: false, seconds: 16 }));
+  const plan = skillPlan({ skill: fenetres, name: "Fenêtres et étiquettes", files, fill: { shots: Array.from({ length: 22 }, (_, i) => ({ file: files[i % 12]!.id, at: 1 })), texts: { gauche: "OUVERT DÈS 8 H", droite: "PARIS 9E" }, end: null, settings: { format: "vertical" } } });
+  assert.deepEqual(plan.layers![0]!.motion.drawn, { shots: 22, subjects: [2, 3, 5, 7, 10, 11, 14, 18] });
+  assert.equal(plan.layers![0]!.motion.texts!.format, "vertical");
+  assert.deepEqual(plan.skill, { key: "fenetres", version: 2, settings: { format: "vertical" } });
+  // Its look is its model's (no grain, no corners on the black); its code within a plan's 24 000 characters; no zoom,
+  // nothing of its original's (its altitude, its coordinates, its pass).
+  assert.deepEqual(fenetres.finish, { grain: 0, vignette: 0 });
+  assert.ok(fenetres.code.length <= 24000, `${fenetres.code.length}`);
+  assert.doesNotMatch(fenetres.code, /scale\(|FEET|32\.9585|Shinkun/i);
+});
+
+// ——— « Interface minimaliste » v2, written on its original's fiche (docs/fiches/interface.md) ———————————————————————
+
+/** Its original's moments (its images at 30 i/s, measured image by image), before the two holds its model lengthens. */
+const IF_AT = { hook: 4, out: 44, list: 51, line: 95, ann: 121, erase: 165, type: 172, icon: 217, card: 234, zoom: 270, click: 295, pill: 305, at: 332, end: 381 };
+/** Her words, as the filler writes them for « Atelier Argile ». */
+const IF_WORDS: Record<string, string> = { accroche: "Un nouveau départ", liste: "tournage, émail, cuisson", etiquette: "ce que je fais", annonce: "j'ouvre ma page pour montrer mes pièces", promesse: "des pièces qui durent", metier: "céramiste", compte: "@atelier.argile" };
+/** Its composition at a frame on its timeline, her words at their moments, her photo (or none), as turnedAt runs it. */
+async function interfaceAt(options: { end?: boolean; photo?: boolean; words?: Record<string, string>; settings?: Record<string, string>; brand?: Record<string, unknown> } = {}) {
+  const { interfaceSkill } = await import("./skills/interface.ts");
+  const words = options.words ?? IF_WORDS;
+  const line = interfaceSkill.timeline(1, { end: Boolean(options.end), words });
+  const durationInFrames = Math.round(line.duration * 30);
+  const reelTexts = interfaceSkill.texts.flatMap((t) => (words[t.slot] && line.texts[t.slot] ? [{ text: words[t.slot]!, role: t.role, from: Math.round(line.texts[t.slot]!.from * 30), to: Math.round(line.texts[t.slot]!.to * 30), emphasis: [] }] : []));
+  const props = {
+    durationInFrames,
+    brand: { name: "Atelier Argile", displayFont: "Inter Tight", bodyFont: "Inter Tight", accent: "#b5543a", ...options.brand },
+    shots: options.photo === false ? [] : [{ src: "/her.jpg", aspect: 9 / 16, from: 0, durationInFrames, kind: "photo", segment: 0 }],
+    reelTexts,
+    end: options.end ? { title: "Atelier ouvert samedi", subtitle: "de 10 h à 18 h", from: durationInFrames - 48 } : null,
+    texts: { ...Object.fromEntries(Object.entries(line.marks).map(([k, v]) => [k, String(v)])), ...(options.settings ?? {}) },
+  };
+  return { interfaceSkill, line, durationInFrames, at: (f: number) => turnedAt(interfaceSkill.code, f, props) };
+}
+/** The nodes of a tree whose style matches, and a node's words. */
+const ifFind = (tree: Drawn, test: (n: Drawn) => boolean) => drawnNodes(tree).filter(test);
+const ifSeen = (n: Drawn) => Number(styleOf(n).opacity ?? 1);
+
+test("« Interface minimaliste » (v2) lays its moments where its original does, on its own music (110,5 BPM), two holds lengthened for a phone", async () => {
+  const { interfaceSkill, interfaceImages } = await import("./skills/interface.ts");
+  assert.equal(interfaceSkill.version, 2);
+  assert.equal(interfaceSkill.bpm, 110.5);
+  const line = interfaceSkill.timeline(1, { end: false, words: IF_WORDS });
+  // Each moment on the original's image, within two, its announcement held two beats longer and its typed promise one
+  // (the engine reads a sentence in 0,8 s and 0,3 s a word: the original holds them 0,8 and 0,5 s).
+  const beat = (30 * 60) / 110.5;
+  for (const [k, f] of Object.entries(IF_AT)) {
+    const more = (f >= IF_AT.erase ? 2 * beat : 0) + (f >= IF_AT.icon ? beat : 0);
+    if (k !== "end") assert.ok(Math.abs(line.marks[k]! - (f + more)) <= 2, `${k}: image ${line.marks[k]}, the original's ${f} + ${Math.round(more)}`);
+  }
+  assert.deepEqual(interfaceImages().end, IF_AT.end + 3 * beat);
+  assert.ok(Math.abs(line.duration * 30 - (IF_AT.end + 3 * beat)) <= 1, `${line.duration} s`);
+  // Its one shot, her photo, the whole Reel long; each of her texts in its moment.
+  assert.deepEqual(line.shots.map((s) => [s.start, s.end]), [[0, line.duration]]);
+  assert.deepEqual(Object.keys(line.texts), ["accroche", "liste", "etiquette", "annonce", "promesse", "metier", "compte"]);
+  assert.ok(line.texts.accroche!.to <= line.texts.liste!.from && line.texts.annonce!.from < line.texts.promesse!.from && line.texts.compte!.to === line.duration);
+  // Its sounds, its original's: a soft key click every other letter of her promise as the caret types it (38 a second),
+  // a double click on « Suivre », the second just after its beat.
+  const [typing, click1, click2] = line.sounds!;
+  assert.ok(Math.abs(typing!.at - line.marks.type! / 30) < 1 / 30);
+  assert.equal(typing!.burst!.times.length, Math.ceil(Array.from(IF_WORDS.promesse!).length / 2));
+  assert.ok(Math.abs(typing!.burst!.times[1]! - 2 / 38) < 0.002);
+  assert.ok(click1!.at < line.marks.click! / 30 && click2!.at > line.marks.click! / 30 && Math.abs(click2!.at - click1!.at - 0.09) < 0.002);
+  assert.equal(line.sounds!.length, 3);
+  // Its music soft (10 dB under) until the icon lands, open on a downbeat of its bars (from its first beat at 0,04 s),
+  // fading over its last second.
+  const music = line.music!;
+  assert.equal(music.downbeat, 0.04);
+  const opens = music.filters![0]!;
+  assert.deepEqual([opens.kind, opens.db, opens.from], ["soft", -10, 0]);
+  const bars = (opens.to - 0.04) / (60 / 110.5) / 4;
+  assert.ok(Math.abs(bars - Math.round(bars)) < 0.02 && Math.abs(opens.to * 30 - (line.marks.icon! - 4.3)) < 0.5, `${opens.to} s`);
+  assert.deepEqual(music.end, { at: line.duration, fade: 1 });
+  // With an ending card, its moments the same, the card's 1,6 s after her account; at another tempo all of it follows.
+  const ended = interfaceSkill.timeline(1, { end: true, words: IF_WORDS });
+  assert.deepEqual(ended.marks, line.marks);
+  assert.ok(ended.duration - line.duration >= 1.6 && ended.texts.compte!.to === line.duration);
+  const slower = interfaceSkill.timeline(1, { end: false, bpm: 92 });
+  assert.ok(Math.abs(slower.marks.pill! / line.marks.pill! - 110.5 / 92) < 0.01 && Math.abs(slower.duration / line.duration - 110.5 / 92) < 0.01);
+});
+
+test("« Interface minimaliste » (v2): each element becomes the next, through the blur, on the original's places and sizes", async () => {
+  const { line, at } = await interfaceAt();
+  const m = line.marks as Record<string, number>;
+  // Her first words a letter an image from image 4, at the middle, its last word in the serif italic.
+  const letters = (f: number) => ifFind(at(f), (n) => n.type === "span" && styleOf(n).display === "inline-block" && styleOf(n).whiteSpace === "pre" && ifSeen(n) > 0.05).map(drawnText).join("");
+  assert.equal(letters(3), "");
+  assert.ok(letters(8).length >= 3 && letters(8).length < letters(14).length, `${letters(8)} / ${letters(14)}`);
+  assert.equal(letters(30).replace(/\s/g, ""), "Unnouveaudépart");
+  const italic = ifFind(at(30), (n) => n.type === "span" && styleOf(n).fontStyle === "italic")[0]!;
+  assert.equal(heldText(italic).replace(/\s/g, ""), "départ");
+  assert.match(String(styleOf(italic).fontFamily), /Instrument Serif/);
+  // Its last word rises into the label's place, halved and grey; the label in small spaced capitals (an accent) takes
+  // its place letter by letter.
+  const moved = ifFind(at(m.out! + 12), (n) => n.type === "span" && styleOf(n).fontStyle === "italic")[0]!;
+  assert.match(String(styleOf(moved).transform), /scale\(0\.500\)/);
+  assert.equal(styleOf(moved).color, "#87888e");
+  const label = ifFind(at(m.list! + 20), (n) => n.type === "div" && styleOf(n).letterSpacing === "0.4em")[0]!;
+  assert.equal(heldText(label).replace(/\s/g, ""), "cequejefais");
+  assert.deepEqual([styleOf(label).fontSize, styleOf(label).top, styleOf(label).textTransform], [21, 806, "uppercase"]);
+  assert.ok(drawnNodes(label).some((n) => "data-fauve-accent" in n.props));
+  // Her list through the middle line: the item there sharp and black, its neighbours 75 px above and below, pale and
+  // blurred; a step a beat; the last underlined by a tapering stroke in the blue's gradient, drawn from the left.
+  const items = (f: number) => ifFind(at(f), (n) => n.type === "FitText" && (n.props.style as { height: number }).height === 75).map((n) => ({ text: heldText(n).trim(), top: (n.props.style as { top: number }).top, opacity: Number((n.props.innerStyle as Record<string, unknown>).opacity), filter: String((n.props.innerStyle as Record<string, unknown>).filter) }));
+  const settled = items(m.list! + 26);
+  const middle = settled.find((x) => x.top === 922)!;
+  assert.equal(middle.text, "Émail");
+  assert.ok(middle.opacity === 1 && middle.filter === "none");
+  assert.ok(settled.filter((x) => x.top !== 922).every((x) => Math.abs(x.top - 922) === 75 && x.opacity <= 0.15 && /blur/.test(x.filter)), JSON.stringify(settled));
+  const stroke = ifFind(at(m.line! + 12), (n) => /polygon\(0% 8%, 100% 50%/.test(String(styleOf(n).clipPath)))[0]!;
+  assert.match(String(styleOf(stroke).background), /#1051c4, #222853/);
+  assert.equal(items(m.line! + 12).find((x) => x.top === 922)!.text, "Cuisson");
+  // Her announcement on two lines rising word by word, its two last words italic, then erased from the left.
+  const ann = ifFind(at(m.ann! + 30), (n) => n.type === "FitText" && n.props.key === "ann")[0]!;
+  assert.equal(drawnNodes(ann).filter((n) => n.type === "div" && n.props.key !== undefined).length, 2);
+  assert.equal(drawnNodes(ann).filter((n) => n.type === "span" && styleOf(n).fontStyle === "italic").map((n) => heldText(n).replace(/\s/g, "")).join(" "), "mes pièces");
+  const erased = (f: number) => drawnNodes(ifFind(at(f), (n) => n.type === "FitText" && n.props.key === "ann")[0]).filter((n) => n.type === "span" && styleOf(n).opacity === 0).length;
+  assert.ok(erased(m.erase! + 3) > 0 && erased(m.erase! + 3) < erased(m.erase! + 7));
+  // Her promise typed from the type mark, 38 letters a second, behind a blue caret that never blinks and fades after it.
+  const typedCount = (f: number) => drawnNodes(ifFind(at(f), (n) => n.type === "FitText" && n.props.key === "typed")[0]).filter((n) => n.type === "span" && styleOf(n).opacity === 1 && !styleOf(n).position).map(drawnText).join("").length;
+  assert.ok(Math.abs(typedCount(m.type! + 8) - Math.floor((8 * 38) / 30 + 1)) <= 1, `${typedCount(m.type! + 8)}`);
+  assert.equal(typedCount(m.type! - 1), 0);
+  const caret = (f: number) => ifFind(at(f), (n) => n.type === "span" && styleOf(n).width === 3)[0];
+  assert.ok([m.type! + 5, m.type! + 9, m.type! + 13, m.type! + 20].every((f) => styleOf(caret(f)!).opacity === 1), "never blinks");
+  assert.equal(styleOf(caret(m.icon! + 2)!).opacity, 0);
+  assert.equal(styleOf(caret(m.type! + 5)!).background, "#1051c4");
+  // The app's icon lands on her last word, glides to the middle; it opens into her card (768 × 485 at the middle).
+  const plate = (f: number) => ifFind(at(f), (n) => n.type === "div" && n.props.key === "shape")[0];
+  const p0 = styleOf(plate(m.icon! + 1)!);
+  assert.ok(Number(p0.left) + Number(p0.width) / 2 > 600 && Number(p0.width) === 119, JSON.stringify(p0));
+  const p1 = styleOf(plate(m.icon! + 15)!);
+  assert.ok(Math.abs(Number(p1.left) + Number(p1.width) / 2 - 540) < 1, JSON.stringify(p1));
+  const open = ["left", "top", "width", "height"].map((k) => Number(styleOf(plate(m.card! + 20)!)[k]));
+  assert.ok([156, 718, 768, 485].every((v, i) => Math.abs(open[i]! - v) <= 1), open.join(" "));
+  const card = at(m.card! + 25);
+  for (const w of ["atelier.argile", "Atelier Argile", "Céramiste", "Message", "Suivre"]) assert.ok(heldText(card).includes(w), w);
+  assert.ok(ifFind(card, (n) => "data-fauve-decor" in n.props).some((n) => heldText(n).includes("Tournage. Émail. Cuisson.")));
+  // The zoom as a camera: « Suivre » to the middle 1,5 times larger, the card gone but her photo and the button.
+  const btn = (f: number) => styleOf(ifFind(at(f), (n) => n.type === "div" && n.props.key === "btn")[0]!);
+  const zoomed = btn(m.zoom! + 24);
+  assert.ok(Math.abs(Number(zoomed.left) + Number(zoomed.width) / 2 - 540) < 1 && Math.abs(Number(zoomed.top) + Number(zoomed.height) / 2 - 960) < 1 && Math.abs(Number(zoomed.width) - 505.5) < 1, JSON.stringify(zoomed));
+  assert.equal(plate(m.zoom! + 10), undefined);
+  // An arrow, no ring, from the bottom right in an arc onto its right part; the blue fades, « Suivi(e) » rises.
+  const arrow = (f: number) => styleOf(ifFind(at(f), (n) => n.props.key === "arrow")[0]!);
+  assert.deepEqual([Number(arrow(m.zoom! + 1).left) + 3, Number(arrow(m.zoom! + 1).top) + 3], [702, 1651]);
+  assert.deepEqual([Number(arrow(m.zoom! + 23).left) + 3, Number(arrow(m.zoom! + 23).top) + 3], [648, 979]);
+  assert.ok(!drawnNodes(at(m.click!)).some((n) => n.type === "Cursor"));
+  assert.ok(heldText(at(m.click! + 9)).includes("Suivi(e)"));
+  // Folded into a white pill with her account and a tick, round at its ends; then her account alone in the gradient
+  // with its « @ », « À SUIVRE » over it.
+  const pill = btn(m.pill! + 14);
+  assert.ok(Number(pill.height) === 96 && Number(pill.borderRadius) === 48 && Math.abs(Number(pill.left) + Number(pill.width) / 2 - 540) < 1, JSON.stringify(pill));
+  assert.ok(heldText(at(m.pill! + 14)).includes("atelier.argile"));
+  const fin = at(m.at! + 30);
+  assert.ok(heldText(fin).includes("@") && heldText(fin).includes("atelier.argile") && heldText(fin).replace(/\s/g, "").includes("ÀSUIVRE"));
+  assert.ok(ifFind(fin, (n) => /#0c3a83, #181744/.test(String(styleOf(n).backgroundImage))).length === 2);
+});
+
+test("« Interface minimaliste » (v2): her photo in the round, her colour on her word, her name without « @ » when her account is not known, nothing of its original's", async () => {
+  const { interfaceSkill, line, at } = await interfaceAt();
+  const m = line.marks as Record<string, number>;
+  // Her photo in its round, in black and white, on her face (the upper middle of an upright one).
+  const face = ifFind(at(m.card! + 25), (n) => n.type === "Footage")[0]!;
+  assert.match(String(styleOf(face).filter), /grayscale\(1\)/);
+  assert.ok(Number(styleOf(face).width) > 134 && Number(styleOf(face).top) < 0, JSON.stringify(styleOf(face)));
+  // No photo: her initial on her colour.
+  const none = (await interfaceAt({ photo: false })).at(m.card! + 25);
+  assert.ok(!drawnNodes(none).some((n) => n.type === "Footage") && drawnNodes(none).some((n) => drawnText(n) === "A" && /rgb\(181,84,58\)/.test(String(styleOf(n).background))));
+  // Her colour on her word (the blue when hers is too pale to read on the ground).
+  const hers = (await interfaceAt({ settings: { couleur: "sienne" } })).at(m.line! + 12);
+  assert.ok(ifFind(hers, (n) => /rgb\(181,84,58\)/.test(String(styleOf(n).background))).length > 0);
+  const pale = (await interfaceAt({ settings: { couleur: "sienne" }, brand: { accent: "#f4efe6" } })).at(m.line! + 12);
+  assert.ok(ifFind(pale, (n) => /#1051c4/.test(String(styleOf(n).background))).length > 0);
+  assert.deepEqual(interfaceSkill.settings?.map((s) => [s.name, s.choices.map((c) => c.value)]), [["couleur", ["bleu", "sienne"]]]);
+  // Her account not known: her name, without « @ ».
+  const named = (await interfaceAt({ words: { ...IF_WORDS, compte: "Atelier Argile" } })).at(m.at! + 30);
+  assert.ok(heldText(named).includes("Atelier Argile") && !heldText(named).includes("@"));
+  // Its ending card, out of the blur after her account.
+  const ended = await interfaceAt({ end: true });
+  const card = ended.at(ended.durationInFrames - 10);
+  assert.ok(heldText(card).includes("Atelier ouvert samedi") && heldText(card).includes("de 10 h à 18 h") && !heldText(card).includes("SUIVRE"));
+  // Its words where they read, a little over the engine's 48 px; its labels and its card as accents (20 px at least) or decor.
+  const sizes = drawnNodes(at(m.list! + 26)).flatMap((n) => (n.type === "FitText" ? [Number((n.props.innerStyle as Record<string, unknown>).fontSize)] : []));
+  assert.ok(sizes.every((s) => s === 50), sizes.join(" "));
+  // Its pale ground as it is; Instrument Serif brought; its code within a plan's 24 000 characters; nothing of its
+  // original's words, handle or name; no flash, no grain.
+  assert.deepEqual(interfaceSkill.finish, { contrast: 0, saturation: 0, warmth: 0, grain: 0, vignette: 0, fade: 0 });
+  assert.deepEqual(interfaceSkill.fonts, ["Instrument Serif"]);
+  assert.ok(interfaceSkill.code.length <= 24000, `${interfaceSkill.code.length}`);
+  assert.doesNotMatch(interfaceSkill.code + JSON.stringify(interfaceSkill.texts), /Follow|tejya|Tejas|WHAT I DO|Giving brands|Editor\b|beginning/);
+  // On her plan: valid, its one shot her photo, its sounds and its music.
+  const { skillPlan } = await import("./skills.ts");
+  const files = [{ id: "her", photo: true, seconds: 0, aspect: 9 / 16 }];
+  const plan = skillPlan({ skill: interfaceSkill, name: "Interface minimaliste", files, fill: { shots: [{ file: "her", at: 0 }], texts: IF_WORDS, end: null } });
+  assert.ok(editPlanSchema.safeParse(plan).success);
+  assert.deepEqual(plan.skill, { key: "interface", version: 2 });
+  assert.equal(plan.texts.length, 7);
+  assert.equal(plan.sounds?.length, 3);
+  assert.equal(plan.music_shape?.filters?.[0]?.kind, "soft");
 });

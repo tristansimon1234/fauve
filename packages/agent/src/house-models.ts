@@ -17,8 +17,8 @@ import type { z } from "zod";
 
 /** The source of the inspiration row a house model is kept on, per studio (one per model, made when first used). */
 export const HOUSE_SOURCE = "house";
-/** The catalogue's version: a studio's row written by an older one is rewritten when the model is used again (3: its original's sheets; 4: no brand in a model's name; 5: Mots aux quatre coins as its original; 6: Plans fixes at 65 BPM; 7: four renamed; 8: Lieu tapé without its original's orange; 9: Plans fixes on its fiche; 10: Une journée chez toi on its fiche; 11: ten models on their fiches; 12: Façade qui se construit and Coulisses façon fiche on their fiches; 13: Recette cosy on its fiche; 14: Titre gaufré on its fiche; 15: Mots mêlés and Interrupteur on their fiches). */
-export const HOUSE_VERSION = 15;
+/** The catalogue's version: a studio's row written by an older one is rewritten when the model is used again (3: its original's sheets; 4: no brand in a model's name; 5: Mots aux quatre coins as its original; 6: Plans fixes at 65 BPM; 7: four renamed; 8: Lieu tapé without its original's orange; 9: Plans fixes on its fiche; 10: Une journée chez toi on its fiche; 11: ten models on their fiches; 12: Façade qui se construit and Coulisses façon fiche on their fiches; 13: Recette cosy on its fiche; 14: Titre gaufré on its fiche; 15: Mots mêlés and Interrupteur on their fiches; 16: Interface minimaliste and Fenêtres et étiquettes on theirs). */
+export const HOUSE_VERSION = 16;
 
 export type HouseModel = {
   key: string;
@@ -458,34 +458,44 @@ export const HOUSE_MODELS: HouseModel[] = [
   model({
     key: "fenetres",
     name: "Fenêtres et étiquettes",
+    // 15: written on its original's fiche (v2 of its skill): 92,9 BPM, horizontal 16:9 on black when her videos are, its
+    // cells, windows, silhouettes, split screen, squares and loop, its teal and orange without grain (« Voyage » was
+    // desaturated with grain, « pov » vertical, an indie electronic music).
     pitch: "Des fenêtres s'ouvrent sur tes plans pendant que deux étiquettes techniques restent fixes, comme un carnet de voyage.",
-    needs: "6 à 12 vidéos de route, de paysage ou de ton quartier",
+    needs: "10 à 14 vidéos de ton lieu, de ta rue ou de ton quartier, en largeur de préférence : un beau plan large pour ouvrir (il revient à la fin), quelqu'un debout au milieu, le même endroit le jour et la nuit, des plans larges et courts",
     files: [5, 14],
     pair: "technique",
     example: "P-fenetres-etiquettes",
-    finish: { name: "Voyage", hint: "couleurs un peu désaturées, contraste doux, grain", contrast: 0.06, saturation: -0.08, warmth: 0.06, grain: 0.25, grain_size: "fine", vignette: 0.2 },
+    // Its music's tempo, measured on its original (docs/fiches/fenetres.md: its kicks and snares on its grid, 93 rounded).
+    tempo: 92.9,
+    finish: { name: "Teal et orange", hint: "ciels cyan, terres ocre, ombres un peu vertes, contrasté, saturé sans excès, sans grain ni coins sombres", contrast: 0.12, saturation: 0.08, shadows: "#0e1f24", highlights: "#f2d3a2", split: 0.3 },
     look: {
       name: "fenêtres et étiquettes",
       format: "pov",
-      hook: { kind: "pov", what: "un paysage avec deux étiquettes fixes à mi-hauteur, une à gauche et une à droite" },
+      hook: { kind: "pov", what: "un beau plan large, deux petites étiquettes fixes à mi-hauteur, et le plan suivant qui prend l'image case par case" },
       text: {
         amount: "une ligne",
-        composition: "deux petites étiquettes techniques en capitales condensées (une altitude, des coordonnées, une heure), fixes à mi-hauteur à gauche et à droite pendant tout le Reel",
+        composition: "deux petites étiquettes techniques en capitales blanches fines et condensées (un repère du lieu à gauche, ses coordonnées à droite), fixes à mi-hauteur à 10 % des bords, sans ombre, du début à la fin",
         case: "upper",
         weight: "regular",
         tracking: "normal",
       },
-      layout: "plein cadre, avec des fenêtres posées par-dessus qui montrent un autre plan et deux étiquettes fixes",
+      layout: "une image 16:9 sur du noir (plein écran en vertical) : le plan suivant entre par une grille 3 × 3, des fenêtres qui sautent, une fenêtre derrière quelqu'un ; jour et nuit côte à côte puis en damier",
       moments: [
-        { at: 0, what: "deux étiquettes à mi-hauteur, à gauche et à droite, qui ne bougent plus de tout le Reel" },
-        { at: 1.6, what: "une fenêtre rectangulaire s'ouvre dans le plan avec un autre plan dedans, puis prend tout le cadre à la coupe suivante" },
-        { at: 4, what: "les plans coupent toutes les 0,7 s sur le temps, les étiquettes restent" },
+        { at: 0, what: "cinq plans coulent l'un dans l'autre : le suivant, qui joue déjà, prend les 3 × 3 cases de l'image une ou deux à la fois toutes les deux images, en serpentin depuis un coin" },
+        { at: 2.47, what: "dans le creux de la musique, des fenêtres aux proportions de l'image s'ouvrent d'un coup sur le plan suivant et sautent, de plus en plus grandes et nombreuses ; la silhouette blanche de ce qui arrive, puis la coupe" },
+        { at: 3.67, what: "la case du milieu s'ouvre derrière la personne du plan sur le plan suivant, en négatif puis en couleur, et prend la case du dessus" },
+        { at: 4.4, what: "des silhouettes blanches ou crème de ce qui arrive, 2 à 4 images avant les coupes ; une coupe délavée de blanc ; le plan d'avant revient deux fois en éclair" },
+        { at: 7.2, what: "le même endroit de jour glisse depuis la gauche sur le plan de nuit jusqu'au milieu, en écran partagé, puis le bloc du milieu échange ses moitiés en damier et clignote en négatif" },
+        { at: 9.53, what: "un plan par temps : de petits carrés s'allument un par un sur d'autres plans à travers une coupe ; une personne détourée arrive sur le plan d'avant, puis son décor se pose autour par grands rectangles ; des éclats chauds et crème sur les coupes" },
+        { at: 12.8, what: "le premier plan revient par fenêtres, figé sur sa première image : le Reel tourne en boucle" },
       ],
       camera: "à la main",
       grade: "natural",
-      music: "uplifting indie electronic, driving beat",
-      ending: "un dernier plan large, les étiquettes toujours là",
-      why: "Les étiquettes fixes donnent un air de film documentaire et situent le lieu, pendant que les fenêtres font avancer le voyage.",
+      transitions: "effets",
+      music: "lo-fi hip-hop beat, dusty kick and snare, warm pad, spoken film dialogue sample",
+      ending: "le premier plan revient par fenêtres, figé sur sa première image, les étiquettes toujours là : la boucle",
+      why: "Les étiquettes fixes donnent un air de carnet de voyage et situent le lieu, pendant que chaque coupe se fait par une fenêtre différente : on ne voit pas le temps passer, et la boucle fait revoir le Reel.",
     },
   }),
   model({
@@ -1034,36 +1044,44 @@ export const HOUSE_MODELS: HouseModel[] = [
   model({
     key: "interface",
     name: "Interface minimaliste",
-    pitch: "Des mots qui sortent du flou sur fond clair, une liste qui défile, puis ton profil et un curseur qui clique « S'abonner ».",
-    needs: "ta photo de profil ou ton logo, et ce que tu fais en trois mots",
+    // 15: written on its original's fiche (v2 of its skill): 110,5 BPM (it played at 100), its moments on its images
+    // with two holds lengthened for a phone, « Suivre » (Instagram's French), its pale ground as it is, no grain.
+    pitch: "Des mots qui sortent du flou sur fond clair, une liste qui défile, ta phrase tapée, puis ton profil et un curseur qui clique « Suivre ».",
+    needs: "ta photo de profil ou ton logo (ou 2 à 3 s de toi qui regardes l'objectif), ton compte Instagram, ce que tu fais en trois mots et ta promesse en une phrase",
     files: [0, 2],
     pair: "grotesque",
     example: "AB-interface",
-    tempo: 100,
-    finish: { name: "Net", hint: "image propre", contrast: 0.02 },
+    // Its music's tempo, measured on its original (docs/fiches/interface.md: its entrances and its click on its grid).
+    tempo: 110.5,
+    finish: { name: "Net", hint: "son fond clair uni tel quel, sans grain ni coins sombres" },
     look: {
       name: "interface minimaliste",
       format: "autre",
-      hook: { kind: "promesse", what: "deux mots qui sortent du flou au centre d'un écran blanc cassé" },
+      hook: { kind: "promesse", what: "trois mots qui sortent du flou lettre à lettre au centre d'un fond gris-bleu très clair, le dernier en serif italique" },
       text: {
         amount: "plusieurs",
-        composition: "des mots sans serif petits et nets au centre d'un fond clair, un mot en serif italique dans une phrase, puis une liste qui défile comme une machine à sous",
-        weight: "regular",
+        composition: "des mots petits au centre d'un grand vide clair, une grotesque grasse et un mot en serif italique ; une étiquette minuscule en capitales espacées sur une liste qui défile ; une phrase tapée ; une carte de profil",
+        weight: "bold",
         tracking: "tight",
         stress: "serif",
       },
-      layout: "pur motion design sur un fond clair : des mots, une carte de profil et un curseur",
+      colors: ["#1051c4", "#222853"],
+      layout: "pur motion design sur un fond gris-bleu clair uni, sans coupe : chaque élément devient le suivant (le dernier mot l'étiquette, la phrase avalée par une icône qui s'ouvre en carte de profil)",
       moments: [
-        { at: 0, what: "deux mots sortent du flou au centre" },
-        { at: 2, what: "une liste de trois savoir-faire défile verticalement, celui du milieu net, les autres flous" },
-        { at: 5.5, what: "une phrase, un mot en serif italique" },
-        { at: 8, what: "une carte de profil s'ouvre au centre ; un curseur arrive et clique sur « S'abonner », qui devient « Abonné »" },
-        { at: 11, what: "le nom du compte seul, au centre" },
+        { at: 0.13, what: "trois mots sortent du flou lettre à lettre au centre, une lettre par image, petits, le dernier en serif italique" },
+        { at: 1.47, what: "les premiers partent dans le flou ; le dernier monte, rapetisse de moitié, grise, puis se change lettre à lettre en une petite étiquette en capitales espacées ; une liste de trois mots monte d'en bas et défile sur la ligne du milieu, un cran par temps, celui du milieu net et noir, ses voisins pâles et flous" },
+        { at: 3.17, what: "le dernier mot de la liste souligné d'un trait bleu roi à indigo qui s'effile, tracé de gauche à droite en un tiers de seconde" },
+        { at: 4.03, what: "la liste part vers le haut dans le flou ; une annonce de deux lignes monte mot à mot, ses deux derniers mots en italique ; puis elle s'efface lettre à lettre depuis la gauche" },
+        { at: 6.83, what: "un curseur bleu qui ne clignote pas tape une phrase, 38 lettres par seconde, chaque lettre floue une image ; ses derniers mots en italique" },
+        { at: 8.87, what: "l'icône d'Instagram se pose sur le dernier mot, glisse au centre et avale la phrase ; elle s'ouvre en carte de profil blanche aux coins arrondis : son compte, sa photo ronde en noir et blanc, son nom, son métier en italique gris, sa bio, « Suivre » qui passe au bleu, « Message »" },
+        { at: 10.63, what: "toute la carte grossit 1,5 fois vers « Suivre », le reste de la carte part ; une flèche noire arrive d'en bas à droite en arc et clique, sans anneau : le bleu s'éteint, « Suivi(e) » monte" },
+        { at: 11.8, what: "la photo et le bouton se replient en pastille blanche avec le compte et une coche ; puis la pastille s'efface, la photo devient le @ du compte, en dégradé bleu, « À SUIVRE » au-dessus lettre à lettre" },
       ],
+      camera: "fixe",
       motion: "epure",
-      music: "minimal ambient electronic, soft clicks",
-      ending: "le nom du compte au centre d'un écran clair",
-      why: "Propre comme une appli : on comprend ce que fait la personne et le Reel finit sur le geste qu'on attend, s'abonner.",
+      music: "light minimal electronic, soft plucks, opening up with a bright held note",
+      ending: "son compte au centre en dégradé bleu, « À SUIVRE » au-dessus en minuscules capitales grises, tenu jusqu'au bout",
+      why: "Propre comme une appli : chaque élément devient le suivant sans une coupe, on comprend ce que fait la personne, et le Reel finit sur le geste qu'on attend, la suivre.",
     },
   }),
   model({
@@ -1336,7 +1354,7 @@ export const HOUSE_WHEN: Record<string, { pour: string; pas_pour: string }> = {
   table: { pour: "des plats ou des produits présentés comme des tirages posés sur sa table, un moment chaleureux", pas_pour: "un lieu, une rue" },
   "ecran-partage": { pour: "le geste et le résultat côte à côte (l'artisan et sa pièce, la coiffeuse et la coupe, le chef et l'assiette)", pas_pour: "un seul sujet, un lieu" },
   cadre: { pour: "faire entrer dans un lieu (un couloir, une salle), une ouverture, des travaux", pas_pour: "sans plan large de son lieu, des produits seuls en gros plan" },
-  fenetres: { pour: "une sortie, un quartier, un voyage, des lieux qui défilent", pas_pour: "des produits, une offre" },
+  fenetres: { pour: "une sortie, un quartier, un voyage, des lieux qui défilent, son lieu de jour et de nuit", pas_pour: "des produits seuls, une offre à lire, quelqu'un qui parle" },
   facade: { pour: "une ouverture, un lancement, présenter sa devanture", pas_pour: "sans vidéo fixe de la devanture filmée de face" },
   gaufre: { pour: "une annonce élégante, un nom, une nouvelle collection, comme un faire-part", pas_pour: "un Reel rythmé ou drôle" },
   "mot-cle": { pour: "quelqu'un qui parle face caméra (un conseil, une explication)", pas_pour: "des images sans parole" },
@@ -1351,7 +1369,7 @@ export const HOUSE_WHEN: Record<string, { pour: string; pas_pour: string }> = {
   eventail: { pour: "une ouverture graphique, un lieu, une marque qui ose", pas_pour: "un message à lire" },
   coulisses: { pour: "montrer son lieu et ses gestes comme un créateur montre ses coulisses : chaque bruitage nommé, la timeline du montage", pas_pour: "une offre à lire, quelqu'un qui parle, une ambiance calme" },
   interrupteur: { pour: "présenter sa marque, un lancement, une soirée, son logo qui s'allume", pas_pour: "sans vidéo d'elle qui saute ou tend le bras vers un point d'un mur clair, filmée fixe" },
-  interface: { pour: "faire suivre son compte, une app, un service en ligne", pas_pour: "montrer un lieu ou des produits" },
+  interface: { pour: "faire suivre son compte, une nouvelle page, un lancement, ce qu'on fait en trois mots", pas_pour: "montrer son lieu ou ses produits en vidéo (une seule photo, petite et ronde), quelqu'un qui parle" },
   pixel: { pour: "une recette, une préparation en étapes, une ambiance chaleureuse", pas_pour: "un lieu, une rue, quelqu'un qui parle, des vidéos filmées à la main" },
   "mots-meles": { pour: "un jeu, une devinette, un message caché, un lieu calme : quelqu'un qui fait une chose simple", pas_pour: "un Reel rythmé, plusieurs plans, une vidéo qui bouge" },
   aplat: { pour: "présenter une personne (la patronne, l'équipe), une marque qui ose la couleur", pas_pour: "sans vidéo d'elle qui marche" },

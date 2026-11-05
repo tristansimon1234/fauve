@@ -6,9 +6,11 @@ import { decode } from "./skills/decode.ts";
 import { ecranPartage } from "./skills/ecran-partage.ts";
 import { eventail } from "./skills/eventail.ts";
 import { facade } from "./skills/facade.ts";
+import { fenetres } from "./skills/fenetres.ts";
 import { frappe } from "./skills/frappe.ts";
 import { gaufre } from "./skills/gaufre.ts";
 import { interrupteur } from "./skills/interrupteur.ts";
+import { interfaceSkill } from "./skills/interface.ts";
 import { journee } from "./skills/journee.ts";
 import { monTravail } from "./skills/mon-travail.ts";
 import { mosaique } from "./skills/mosaique.ts";
@@ -35,9 +37,11 @@ export const MONTAGE_SKILLS: Record<string, MontageSkill> = {
   "ecran-partage": ecranPartage,
   eventail,
   facade,
+  fenetres,
   frappe,
   gaufre,
   interrupteur,
+  interface: interfaceSkill,
   journee,
   "mon-travail": monTravail,
   mosaique,
