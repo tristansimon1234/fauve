@@ -214,10 +214,10 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
     : null;
   const frameBox = h("div", { key: "front", style: { position: "absolute", left: 0, top: by, width: bw, height: bh, overflow: "hidden", backgroundColor: "#000000" } }, defs, film);
 
-  // 4. Her optional name (and its line) in white on a piece of the black that stays while her front builds, gone with
-  // the last piece: nothing is written on her front. Over the band on the black; full frame, where the black stays
-  // longest (each piece it would hide counted for as long as it would hide it): in the upper half, or under the middle
-  // over her street (which lands last) when it holds left of the apps' buttons.
+  // 4. Her optional name (and its line) in white on a piece of the black that stays while her front builds, gone when a
+  // piece lands under it: nothing is written on her front. Over the band on the black; full frame, where the black
+  // stays longest (each piece it would hide counted for as long as it would hide it): in the upper half, or under the
+  // middle over her street (which lands last) when it holds left of the apps' buttons.
   const title = word("nom");
   const line = word("ligne");
   const display = "'" + brand.displayFont + "', 'DM Serif Display', Georgia, serif";
@@ -241,8 +241,12 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const spot = band
     ? (() => { const s = sized(bw - 100); return { ...s, x: Math.round((bw - s.w) / 2), y: Math.max(90, Math.round(by / 2 - s.h / 2)) }; })()
     : [...[0.12, 0.2, 0.28, 0.36].map((c) => at(c, bw - 100)), ...(lineW <= 800 ? [0.56, 0.62].map((c) => at(c, 800)) : [])].reduce((m, b) => (hidden(b) < hidden(m) ? b : m));
-  const nameOn = Boolean(title) && frame >= AT[0] && frame < WHOLE;
-  const lineOn = Boolean(line) && frame >= (title ? AT[1] : AT[0]) && frame < WHOLE;
+  // Gone as soon as a piece lands under it (never a black band over her front), 1,5 s after it shows at the earliest,
+  // with the last piece at the latest.
+  const under = pieces.filter((p) => inter(spot, p) > 0.05 * spot.w * spot.h).map((p) => p.at);
+  const gone = Math.min(WHOLE, Math.max(Math.min(...under, WHOLE), AT[0] + 45));
+  const nameOn = Boolean(title) && frame >= AT[0] && frame < gone;
+  const lineOn = Boolean(line) && frame >= (title ? AT[1] : AT[0]) && frame < gone;
   const lineStyle = accent
     ? { position: "absolute", left: 20, width: spot.w - 40, bottom: 26, height: capH, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: body, fontWeight: 600, fontSize: LS, letterSpacing: "0.2em", textTransform: "uppercase", color: "#ffffff", whiteSpace: "nowrap" }
     : { position: "absolute", left: 20, width: spot.w - 40, bottom: 26, height: capH, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: body, fontWeight: 600, fontSize: LS, lineHeight: 1.1, color: "#ffffff", whiteSpace: "nowrap" };
@@ -270,13 +274,13 @@ export const facade: EffectPiece = {
   texts: [
     {
       slot: "nom",
-      want: "facultatif : son nom (ou le mot de son nom qui la distingue : « Farine » pour « Maison Farine »), en blanc sur un morceau du noir pendant que sa devanture se construit, parti avec le dernier morceau ; rien ne s'écrit sur sa devanture entière",
+      want: "son nom (ou le mot de son nom qui la distingue : « Farine » pour « Maison Farine »), en blanc sur un morceau du noir pendant que sa devanture se construit, parti au plus tard avec le dernier morceau ; rien ne s'écrit sur sa devanture entière",
       max: 20,
       required: false,
     },
     {
       slot: "ligne",
-      want: "facultatif : 2 à 4 petits mots en capitales espacées sous son nom, sur le même noir : son métier et son quartier, une date (une forme comme « librairie · brick lane », « depuis 1998 »)",
+      want: "2 à 4 petits mots en capitales espacées sous son nom, sur le même noir : son métier et son quartier, une date (une forme comme « librairie · brick lane », « depuis 1998 »)",
       max: 28,
       required: false,
     },
