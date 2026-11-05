@@ -281,8 +281,10 @@ export const interrupteur: MontageSkill = {
   // 4: she is gone when her cut-out is (else her track, when it saw her at the flip), eight images in a row: v3 read her
   // track alone and froze a Reel where she never left. 5: gone under a quarter of her cut-out at the flip (her hand
   // coming back into the picture is not her). 6: gone only when nothing of her is left (a fiftieth): v5 froze her two
-  // hands at the edge of its friperie's wall, where she never quite left; there her shot now plays to the end.
-  version: 6,
+  // hands at the edge of its friperie's wall, where she never quite left; there her shot now plays to the end. 7: her
+  // passage ends on her wall alone, a second at least after she has left (Tristan on v6: « bizarre que la main reste »:
+  // its filler had set her highest reach on the flip, and her video's 3 s of empty wall came after the Reel's end).
+  version: 7,
   bpm: BPM,
   shots: [1, 1],
   files: [1, 2],
@@ -343,7 +345,7 @@ export const interrupteur: MontageSkill = {
       duration,
       shots: spans.map((s) => ({
         ...s,
-        want: `sa vidéo filmée téléphone posé, en vertical de préférence, devant un mur clair et uni (un mur, une porte, une vitrine vue de dedans, le côté d'un comptoir) avec de la place au-dessus de sa tête, d'au moins ${comma(duration)} s à vitesse réelle : un peu de mur vide, elle entre, lève la main vers un point du mur au-dessus d'elle sans l'atteindre, saute (ou tend le bras) et le touche au plus haut, retombe et s'en va, puis le mur vide ; le passage commence ${comma(flip)} s avant que sa main soit au plus haut (un interrupteur dessiné y bascule à cet instant et son affiche s'allume dessous)`,
+        want: `sa vidéo filmée téléphone posé, en vertical de préférence, devant un mur clair et uni (un mur, une porte, une vitrine vue de dedans, le côté d'un comptoir) avec de la place au-dessus de sa tête, d'au moins ${comma(duration)} s à vitesse réelle : un peu de mur vide, elle entre, lève la main vers un point du mur au-dessus d'elle sans l'atteindre, saute (ou tend le bras) et le touche au plus haut, retombe et s'en va, puis le mur vide. Le passage finit sur son mur vide, une fois qu'elle est sortie du cadre, avec au moins une seconde de mur vide comme l'original (quitte à prendre un geste un peu moins haut ; sinon ses mains restent au bord de l'image jusqu'à la fin) : il commence ${comma(flip)} s avant le moment où sa main est le plus haut parmi ceux qui laissent sa sortie dans le passage (un interrupteur dessiné y bascule à cet instant et son affiche s'allume dessous)`,
       })),
       // Her poster's words light up with the switch and stay on the wall (her name and her line give way to the card).
       texts: { nom: { from: round(flip), to: poster }, ligne: { from: round(flip), to: poster }, detail: { from: round(flip), to: poster } },
