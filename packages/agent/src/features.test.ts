@@ -3749,3 +3749,170 @@ test("« Ville en coups de fouet » (v2): horizontal 4:3 on black as its origina
   assert.equal(plan.layers![0]!.motion.texts!.format, "vertical");
   assert.deepEqual(plan.skill, { key: "coups-de-fouet", version: 2, settings: { format: "vertical" } });
 });
+
+// ——— « Quart de tour, deux tons » v2 (`tourne`), written again on its original's fiche (docs/fiches/tourne.md) ——————
+
+/** Its composition run at one frame with a stand-in scope (Turn, Flash, Footage and FitText as named elements), as sceneAt does. */
+function turnedAt(code: string, frame: number, props: Record<string, unknown>): Drawn {
+  const h = (type: unknown, p: Record<string, unknown> | null, ...children: unknown[]): Drawn => ({ type, props: p ?? {}, children: children.flat() });
+  const interpolate = (x: number, [a, b]: number[], [c, d]: number[]) => c! + (d! - c!) * Math.min(1, Math.max(0, (x - a!) / (b! - a! || 1)));
+  const scope: Record<string, unknown> = {
+    React: { createElement: h, Fragment: "Fragment" },
+    useCurrentFrame: () => frame,
+    interpolate,
+    Easing: { bezier: () => (t: number) => t },
+    AbsoluteFill: "AbsoluteFill",
+    Footage: "Footage",
+    FitText: "FitText",
+    Turn: "Turn",
+    Flash: "Flash",
+  };
+  const Scene = new Function(...Object.keys(scope), `${code}\nreturn Scene;`)(...Object.values(scope)) as (p: unknown) => Drawn;
+  return Scene({ width: 1080, height: 1920, durationInFrames: 384, brand: { displayFont: "Big Shoulders Display", bodyFont: "Inter" }, reelTexts: [], end: null, ...props });
+}
+
+test("« Quart de tour, deux tons » (v2) cuts where its original does, on its own music (118,3 BPM), its strobe, its hits and its muffled pad", async () => {
+  const { tourne, burstFor } = await import("./skills/tourne.ts");
+  const { skillPlan } = await import("./skills.ts");
+  assert.equal(tourne.version, 2);
+  assert.equal(tourne.bpm, 118.3);
+  const line = tourne.timeline(28, { end: false });
+  // The original's 28 shots, cut on its images (measured at 30 i/s; a white flash on the first image of the shot it
+  // opens): within two images each, its burst on the quarters of its beat from beat 13.
+  const original = [0, 6, 11, 16, 24, 55, 69, 98, 124, 151, 183, 198, 209, 223, 228, 231, 235, 244, 254, 258, 261, 266, 270, 285, 293, 304, 309, 319];
+  assert.equal(line.shots.length, original.length);
+  line.shots.forEach((s, i) => assert.ok(Math.abs(Math.round(s.start * 30) - original[i]!) <= 2, `shot ${i + 1}: image ${Math.round(s.start * 30)}, the original's ${original[i]}`));
+  assert.ok(Math.abs(line.duration - 12.8) < 0.05, `${line.duration} s`);
+  const quarter = 60 / 118.3 / 4;
+  line.shots.slice(11).forEach((s) => assert.ok(Math.abs(s.start / quarter - Math.round(s.start / quarter)) * quarter * 30 < 0.75, `${s.start} s on a quarter of its beat`));
+  // Its strobe on the original's images 3 to 23, its five shots in colour, its upright one, its zoom, its whip.
+  assert.deepEqual(Array.from({ length: 9 }, (_, k) => line.marks[`strobe_${k}`]), [3, 5, 8, 10, 11, 12, 15, 19, 23]);
+  assert.deepEqual(Array.from({ length: 5 }, (_, k) => line.marks[`colour_${k}`]), [4, 5, 8, 17, 22]);
+  assert.deepEqual([line.marks.flip, line.marks.zoom, line.marks.zoom_in, line.marks.whip], [6, 12, 8, 24]);
+  // Its white flashes on the first images of the shots the original's open (151, 223, 319), its passage blurs into them.
+  [line.marks.flash_0!, line.marks.flash_1!, line.marks.flash_2!].forEach((k, i) => assert.ok(Math.abs(Math.round(line.shots[k]!.start * 30) - [151, 223, 319][i]!) <= 1));
+  assert.deepEqual([line.marks.soft_0, line.marks.soft_1, line.marks.soft_2], [7, 9, 27]);
+  // Its music muffled on its pad, open at once on the burst's first image, muffled again from the last flash, cut dead
+  // with the picture: three bars of pad, two of beat, one of pad.
+  assert.deepEqual(line.music, {
+    filters: [
+      { kind: "muffled", from: 0, to: line.shots[11]!.start },
+      { kind: "muffled", from: line.shots[27]!.start, to: line.duration },
+    ],
+    end: { at: line.duration },
+  });
+  assert.ok(Math.abs(line.shots[11]!.start - 6.6) < 0.04);
+  // Its own sounds: its rising roll under the strobe, its two big hits on the cuts to the camels and the walker, the
+  // second the loudest.
+  assert.deepEqual(line.sounds!.map((s) => [s.sound, s.at]), [["fast snare drum roll building up", 0.609], ["deep cinematic impact hit", line.shots[5]!.start], ["deep cinematic impact hit", line.shots[6]!.start]]);
+  assert.ok(line.sounds![2]!.gain! > (line.sounds![1]!.gain ?? 0));
+  // Its optional title over the opening and the first colour shot.
+  assert.deepEqual(line.texts.titre, { from: 0, to: line.shots[5]!.start });
+  // Fewer of her shots: its burst keeps its 8 beats, its zoom, flash, colours and whip, the Reel its length.
+  for (const n of [20, 24]) {
+    const fewer = tourne.timeline(n, { end: false });
+    assert.equal(fewer.shots.length, n);
+    assert.ok(Math.abs(fewer.duration - line.duration) < 0.01, `${n}: ${fewer.duration} s`);
+    assert.deepEqual(fewer.shots.slice(0, 13), line.shots.slice(0, 13));
+    assert.equal(Object.keys(fewer.marks).filter((k) => k.startsWith("colour_")).length, 5);
+    assert.ok(fewer.marks.whip! > fewer.marks.zoom! && fewer.marks.flash_2 === n - 1);
+  }
+  assert.equal(burstFor(8).length, 8);
+  assert.equal(burstFor(8).reduce((a, b) => a + b.q, 0), 32);
+  assert.deepEqual(burstFor(16).map((b) => b.q), [3, 4, 1, 1, 1, 2, 3, 1, 1, 1, 1, 4, 2, 3, 1, 3]);
+  // At another tempo, all of it follows its beats; with an ending card, its black after the last shot carries the card.
+  const slower = tourne.timeline(28, { end: false, bpm: 100 });
+  assert.ok(Math.abs(slower.duration / line.duration - 118.3 / 100) < 0.01);
+  const ended = tourne.timeline(28, { end: true });
+  assert.deepEqual(ended.shots.slice(0, -1), line.shots.slice(0, -1));
+  assert.ok(ended.duration - ended.marks.black! / 30 >= 1.6 && Math.abs(ended.marks.black! - Math.round(line.duration * 30)) <= 1, JSON.stringify(ended.marks));
+  // On the plan: its sounds and its music's shape, valid.
+  const files = Array.from({ length: 10 }, (_, i) => ({ id: `v${i}`, photo: false, seconds: 12 }));
+  const plan = skillPlan({ skill: tourne, name: "Quart de tour", files, fill: { shots: Array.from({ length: 28 }, (_, i) => ({ file: files[i % 10]!.id, at: Math.floor(i / 10) * 4 })), texts: {}, end: null } });
+  assert.ok(editPlanSchema.safeParse(plan).success);
+  assert.deepEqual(plan.sounds?.map((s) => s.skill), [true, true, true]);
+  assert.deepEqual(plan.music_shape?.filters?.map((f) => f.kind), ["muffled", "muffled"]);
+  // Nothing of its model's finish over the Reel (its code draws its tones and its colour shots): no grain, no dark corners.
+  assert.deepEqual(tourne.finish, { exposure: 0, contrast: 0, saturation: 0, warmth: 0, split: 0, grain: 0, vignette: 0, fade: 0 });
+});
+
+test("« Quart de tour, deux tons » (v2): every shot in width turned a quarter clockwise, its upright one upside down, two tones but where colour counts, its settings", async () => {
+  const { tourne } = await import("./skills/tourne.ts");
+  const { skillPlan, skillFillInput, skillSettings } = await import("./skills.ts");
+  const line = tourne.timeline(28, { end: false });
+  const marks = Object.fromEntries(Object.entries(line.marks).map(([k, v]) => [k, String(v)]));
+  const shots = (aspect: (i: number) => number) => line.shots.map((s, i) => ({ from: Math.round(s.start * 30), durationInFrames: Math.round((s.end - s.start) * 30), kind: "video", aspect: aspect(i) }));
+  const wide = shots(() => 16 / 9);
+  /** What its code lays at a frame: its shot's picture (the first one with its tones) and what turns it. */
+  const at = (frame: number, props: Record<string, unknown> = {}) => {
+    const nodes = drawnIn(turnedAt(tourne.code, frame, { shots: wide, texts: marks, ...props }));
+    const picture = nodes.find((d) => /url\(#tourne-(duo|lit|colour)\)/.test(String(styleOf(d).filter ?? "")));
+    return { nodes, filter: String(styleOf(picture!).filter), turn: nodes.find((d) => d.type === "Turn") };
+  };
+  // Her shots in width turned a quarter, always clockwise (the top of the scene on the right), drawn whole at the
+  // frame's height by its width; one way then the other on her word.
+  for (const f of [2, 30, 100, 240, 350]) assert.equal(at(f).turn?.props.angle, 90, `image ${f}`);
+  const drawnShot = (turn: Drawn) => (turn.props.draw as (size: { width: number; height: number }) => Drawn)({ width: 1920, height: 1080 });
+  assert.deepEqual(styleOf(drawnShot(at(100).turn!)), { position: "absolute", left: 0, top: 0, width: 1920, height: 1080 });
+  assert.deepEqual([60, 30].map((f) => at(f, { texts: { ...marks, sens: "alterne" } }).turn?.props.angle), [-90, 90]);
+  // An upright video plays upright; in its slot for one (a silhouette on the sky), a half turn, unless she wants them upright.
+  const upright = shots((i) => (i === 6 || i === 7 ? 9 / 16 : 16 / 9));
+  const turnedBack = (frame: number, texts = marks) => drawnIn(turnedAt(tourne.code, frame, { shots: upright, texts })).find((d) => styleOf(d).transform === "rotate(180deg)");
+  assert.equal(drawnIn(turnedBack(80)!).find((d) => d.type === "Footage")?.props.shot, 6);
+  assert.equal(drawnIn(turnedAt(tourne.code, 80, { shots: upright, texts: marks })).find((d) => d.type === "Turn"), undefined);
+  assert.equal(turnedBack(80, { ...marks, format: "droit" }), undefined);
+  assert.equal(turnedBack(110), undefined);
+  // Two tones on all but its colour shots, the strobe's images overexposed; all in two tones on her word.
+  assert.match(at(2).filter, /^url\(#tourne-duo\)$/);
+  assert.match(at(3).filter, /^url\(#tourne-lit\)$/);
+  assert.match(at(30).filter, /^url\(#tourne-colour\)$/);
+  assert.match(at(250).filter, /^url\(#tourne-colour\)$/);
+  assert.match(at(30, { texts: { ...marks, couleur: "aucune" } }).filter, /^url\(#tourne-duo\)$/);
+  // Its lens edges on the shots in two tones, at the top and the bottom of the frame, none on a colour shot.
+  const edges = (f: number) => at(f).nodes.filter((d) => /url\(#tourne-edge-(top|bottom)\)/.test(String(styleOf(d).filter ?? ""))).map((d) => [styleOf(d).top, styleOf(d).height]);
+  assert.deepEqual(edges(100), [[0, 480], [1440, 480]]);
+  assert.deepEqual(edges(30), []);
+  // Its passage blur into the close detail (the walker's last images, the cactus's first), its white flashes over the
+  // first images of the shots they open, the shot under them overexposed.
+  assert.match(at(97).filter, /blur\(14px\)/);
+  assert.match(at(98).filter, /blur\(10px\)/);
+  assert.doesNotMatch(at(99).filter, /blur/);
+  const flash = (f: number) => at(f).nodes.find((d) => d.type === "Flash")?.props;
+  assert.deepEqual(flash(151), { key: "w9", at: 151, frames: 2, color: "rgba(250,248,251,0.9)" });
+  assert.match(at(152).filter, /brightness\(1\.6\)/);
+  assert.equal(flash(153), undefined);
+  assert.equal(flash(Math.round(line.shots[13]!.start * 30))?.frames, 1);
+  assert.equal(flash(320)?.color, "rgba(250,248,251,0.9)");
+  // Its punch zoom in one shot: its first image wide, then ×2,3 about the middle, held (no zoom blur once it has landed).
+  const zoomFrom = Math.round(line.shots[12]!.start * 30);
+  const scales = (f: number) => at(f).nodes.map((d) => /^scale\(([\d.]+)\)$/.exec(String(styleOf(d).transform ?? ""))?.[1]).filter(Boolean).map(Number);
+  assert.deepEqual(scales(zoomFrom), []);
+  assert.ok(Math.abs(scales(zoomFrom + 2)[0]! - 1.2) < 0.01, JSON.stringify(scales(zoomFrom + 2)));
+  assert.ok(scales(zoomFrom + 4).length >= 4, "a zoom blur while it rushes");
+  assert.deepEqual(scales(zoomFrom + 10).filter((s) => s > 1.5), [2.3, 2.3, 2.3]);
+  // Its filés: the opening's over all its images, its burst's whip on its first image and its last four, then a hard cut.
+  const streaked = (f: number) => at(f).nodes.some((d) => styleOf(d).filter === "url(#tourne-streak)");
+  assert.deepEqual([10, 11, 13, 15, 16].map(streaked), [false, true, true, true, false]);
+  const whipFrom = Math.round(line.shots[24]!.start * 30);
+  const whipTo = Math.round(line.shots[25]!.start * 30);
+  assert.deepEqual([whipFrom, whipFrom + 1, whipTo - 5, whipTo - 4, whipTo - 1, whipTo].map(streaked), [true, false, false, true, true, false]);
+  // Its optional title, turned a quarter like the shots, in its cream capitals; no text of its own otherwise.
+  assert.equal(at(20).nodes.find((d) => d.type === "FitText"), undefined);
+  const titled = at(20, { reelTexts: [{ text: "Brighton", role: "hook", from: 0, to: 55 }] }).nodes.find((d) => d.type === "FitText")!;
+  assert.equal(styleOf(titled).transform, "rotate(90deg)");
+  assert.equal((titled.props.innerStyle as Record<string, unknown>).color, "#E8E5DA");
+  // Its ending card on the black after the last shot, only when the Reel has one.
+  const ended = tourne.timeline(28, { end: true });
+  const black = turnedAt(tourne.code, ended.marks.black! + 2, { shots: wide, texts: Object.fromEntries(Object.entries(ended.marks).map(([k, v]) => [k, String(v)])), end: { title: "Ouvert dimanche", subtitle: null, from: ended.marks.black! + 2 }, durationInFrames: Math.round(ended.duration * 30) });
+  assert.equal(drawnIn(black).find((d) => d.type === "Turn"), undefined);
+  assert.ok(drawnIn(black).some((d) => d.type === "span" && d.children.includes("Ouvert dimanche")));
+  // Its settings: the filler sees them (the original's first, the default), the plan keeps a choice her words asked for.
+  assert.deepEqual(tourne.settings?.map((s) => [s.name, s.choices.map((c) => c.value)]), [["format", ["auto", "droit"]], ["sens", ["horaire", "alterne"]], ["couleur", ["auto", "aucune"]]]);
+  assert.deepEqual(skillSettings(tourne, [{ name: "format", value: "auto" }, { name: "couleur", value: "aucune" }]), { couleur: "aucune" });
+  const files = Array.from({ length: 10 }, (_, i) => ({ id: `v${i}`, photo: false, seconds: 12 }));
+  const input = skillFillInput({ skill: tourne, name: "Quart de tour", n: 28, files, business: {}, request: "garde mes vidéos droites" });
+  assert.deepEqual(input.reglages?.map((r) => r.nom), ["format", "sens", "couleur"]);
+  const plan = skillPlan({ skill: tourne, name: "Quart de tour", files, fill: { shots: Array.from({ length: 28 }, (_, i) => ({ file: files[i % 10]!.id, at: 1 })), texts: {}, end: null, settings: { format: "droit" } } });
+  assert.equal(plan.layers![0]!.motion.texts!.format, "droit");
+  assert.deepEqual(plan.skill, { key: "tourne", version: 2, settings: { format: "droit" } });
+});
