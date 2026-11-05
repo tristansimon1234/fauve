@@ -6,6 +6,7 @@ import { costMeta } from "@/lib/cost-scope";
 import { timeLeft } from "@/lib/step-clock";
 import { GPU_START_MS, gpuCostEur, gpuReady, smoothOnGpu } from "./gpu";
 import { slowPassages, type SmoothFiles } from "./sandbox";
+import { retryDue } from "./retry";
 
 // Slow motion made smooth on the rented card (apps/render/rife.py): the passage a slowed shot plays, at 60 images a
 // second, its images in between drawn by RIFE (a video filmed fast keeps its own), made just before the render and
@@ -20,8 +21,6 @@ const SMOOTH_LOAD_MS = 30_000;
 const SMOOTH_WORK_PER_SECOND = 4_000;
 /** What the step keeps for the render after them (a Reel renders at 4 to 7 s a second of video). */
 const RENDER_MARGIN_MS = 330_000;
-/** A passage that failed is tried again after this long. */
-const RETRY_MS = 6 * 3600_000;
 /** The files kept beside a clip (its newest passages): an older one is removed. */
 const KEEP = 4;
 
@@ -64,7 +63,7 @@ export async function smoothSlowMotion(studioId: string, postId: string, plan: P
   const rows = new Map(((data ?? []) as Row[]).map((r) => [r.id, r]));
   const missing = passages.filter((p) => {
     const k = kept(rows.get(p.media))[p.key];
-    return !k || ("failed_at" in k && Date.now() - Date.parse(k.failed_at) > RETRY_MS);
+    return !k || ("failed_at" in k && retryDue(k));
   });
   const updates = new Map<string, MediaSmooth>();
   if (missing.length) {

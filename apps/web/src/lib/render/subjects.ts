@@ -35,6 +35,7 @@ import { costMeta } from "@/lib/cost-scope";
 import { timeLeft } from "@/lib/step-clock";
 import { depthVideosOnGpu, GPU_START_MS, gpuCostEur, gpuReady, objectsOnGpu, pieceOutlines, subjectsOnGpu, type PieceOutlines } from "./gpu";
 import { cutoutCostEur, subjectsInSandbox } from "./sandbox";
+import { retryDue } from "./retry";
 
 // Her subject cut out at every image of the passages a composition draws it on (Subject), made in the cut-out
 // sandbox just before the render (apps/render/matte.py) and kept beside the clip in Storage
@@ -50,8 +51,6 @@ const WORK_PER_SECOND = 60;
 const PERSON_WORK_PER_SECOND = 10;
 /** What the step keeps for the render after the cut-outs (a Reel renders at 4 to 7 s a second of video). */
 const RENDER_MARGIN_MS = 330_000;
-/** A passage whose cut-out failed is tried again after this long. */
-const RETRY_MS = 6 * 3600_000;
 
 /** Where a passage's cut-out is kept. */
 export const subjectPath = (studioId: string, mediaId: string, key: string, still: boolean) =>
@@ -123,7 +122,7 @@ export async function ensureSubjects(studioId: string, postId: string, plan: Pla
   const { passages, rows } = await planned(studioId, plan, options.anticipate);
   const missing = passages.filter((p) => {
     const k = kept(rows.get(p.clip_id))[p.key];
-    return !k || ("failed_at" in k && Date.now() - Date.parse(k.failed_at) > RETRY_MS);
+    return !k || ("failed_at" in k && retryDue(k));
   });
   if (!missing.length) return;
   // Outside a step (no deadline known), as if a step of Vercel's 800 s had just begun.
@@ -406,7 +405,7 @@ export async function ensureObjects(studioId: string, postId: string, plan: Plan
   const due = (p: SubjectPassage & { photo?: true }) => {
     if (p.photo && rows.get(p.clip_id)?.kind !== "image") return false;
     const k = kept(rows.get(p.clip_id))[p.key];
-    return !k || ("failed_at" in k && Date.now() - Date.parse(k.failed_at) > RETRY_MS);
+    return !k || ("failed_at" in k && retryDue(k));
   };
   // A video held as filmed (steady off) is read on its steadied copy: not read then. A photo is read on itself.
   const isVideo = (id: string) => plan.finish?.steady !== "off" && rows.get(id)?.kind === "video";
@@ -428,7 +427,7 @@ export async function ensurePhotoObjects(studioId: string, postId: string, items
     const key = objectKey(mediaId, 0, 0, name);
     if (rows.get(mediaId)?.kind !== "image" || passages.some((p) => p.key === key) || passages.length >= PHOTO_OBJECT_MAX) continue;
     const k = kept(rows.get(mediaId))[key];
-    if (k && !("failed_at" in k && Date.now() - Date.parse(k.failed_at) > RETRY_MS)) continue;
+    if (k && !("failed_at" in k && retryDue(k))) continue;
     passages.push({ clip_id: mediaId, from: 0, to: 0, key, name, photo: true });
   }
   await followObjects(studioId, postId, passages, rows);
@@ -615,7 +614,7 @@ export async function ensureDepths(studioId: string, postId: string, plan: Plan)
   const isVideo = (id: string) => rows.get(id)?.kind === "video";
   const due = (p: SubjectPassage) => {
     const k = kept(rows.get(p.clip_id))[p.key];
-    return !k || ("failed_at" in k && Date.now() - Date.parse(k.failed_at) > RETRY_MS);
+    return !k || ("failed_at" in k && retryDue(k));
   };
   const missing = [...depthPassages(plan, isVideo).map((p) => ({ ...p, near: false })), ...nearPassages(plan, isVideo).map((p) => ({ ...p, near: true }))].filter(due);
   if (!missing.length) return;

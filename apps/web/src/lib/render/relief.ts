@@ -5,6 +5,7 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 import { costMeta } from "@/lib/cost-scope";
 import { timeLeft } from "@/lib/step-clock";
 import { GPU_START_MS, gpuCostEur, gpuReady, reliefsOnGpu } from "./gpu";
+import { retryDue } from "./retry";
 
 // A moving photo in relief, its depth read on the rented card (apps/render/relief.py): before the render, each photo
 // shot that moves gets the video of every pixel moved by its own depth, made for the shot as the plan has it and kept
@@ -19,8 +20,6 @@ const RELIEF_LOAD_MS = 30_000;
 const RELIEF_SHOT_MS = 20_000;
 /** What the step keeps for the render after the reliefs (a Reel renders at 4 to 7 s a second of video). */
 const RENDER_MARGIN_MS = 330_000;
-/** A shot whose relief failed is tried again after this long. */
-const RETRY_MS = 6 * 3600_000;
 /** The reliefs kept on a photo (its newest shots): an older one is removed with its video. */
 const KEEP = 3;
 
@@ -53,7 +52,7 @@ export async function ensureReliefs(studioId: string, postId: string, plan: Plan
     const row = rows.get(j.media_id);
     if (!row?.storage_path?.startsWith(`${studioId}/`)) return false;
     const k = kept(row)[j.key];
-    return !k || ("failed_at" in k && Date.now() - Date.parse(k.failed_at) > RETRY_MS);
+    return !k || ("failed_at" in k && retryDue(k));
   });
   if (!missing.length) return;
   const left = timeLeft();

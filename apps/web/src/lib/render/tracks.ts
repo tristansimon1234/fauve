@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { clipAnalysisSchema, mediaTracksSchema, TRACK_MODEL, tracksFileSchema, trackWorthy, type MediaTracks, type TracksByClip, type TracksFile } from "@fauve/agent";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { cutoutCostEur, tracksInSandbox } from "./sandbox";
+import { retryDue } from "./retry";
 import { costMeta } from "@/lib/cost-scope";
 
 // What moves in her videos (hands, faces, bodies, image by image), read once per clip in the
@@ -11,8 +12,6 @@ import { costMeta } from "@/lib/cost-scope";
 
 /** The most video followed in one go, in seconds (about 2.5 s of work for each, four clips at a time). */
 const MAX_SECONDS = 150;
-/** A clip whose reading failed is tried again after this long. */
-const RETRY_MS = 6 * 3600_000;
 
 /** Where a clip's tracks are kept. */
 export const tracksPath = (studioId: string, mediaId: string) => `${studioId}/tracks/${mediaId}.json`;
@@ -40,7 +39,7 @@ export async function ensureTracks(studioId: string, mediaIds: string[]): Promis
     const a = (assets ?? []).find((x) => x.id === id);
     if (!a || a.kind !== "video" || !a.storage_path || !worthy.has(id)) return [];
     const kept = mediaTracksSchema.safeParse(a.tracks);
-    if (kept.success && kept.data.model === TRACK_MODEL && ("path" in kept.data || Date.now() - Date.parse(kept.data.failed_at) < RETRY_MS)) return [];
+    if (kept.success && kept.data.model === TRACK_MODEL && ("path" in kept.data || !retryDue(kept.data))) return [];
     const seconds = Math.min(60, Number(a.duration) || 30);
     if (seconds > budget) return [];
     budget -= seconds;

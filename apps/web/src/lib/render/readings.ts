@@ -20,6 +20,7 @@ import { costMeta } from "@/lib/cost-scope";
 import { timeLeft } from "@/lib/step-clock";
 import { cutoutCostEur, fileReadsInSandbox, shotReadsInSandbox } from "./sandbox";
 import { mergeSubjects } from "./subjects";
+import { retryDue } from "./retry";
 
 // What else is read on her media, with no model, on the cut-out sandbox's CPUs, kept beside her cut-outs
 // (media_assets.subjects, removed with the media by the retention):
@@ -33,8 +34,6 @@ import { mergeSubjects } from "./subjects";
 type Plan = Pick<EditPlan, "segments" | "layers"> & { finish?: EditPlan["finish"] };
 type Row = { id: string; kind: string; storage_path: string | null; subjects: unknown };
 
-/** A reading that failed is tried again after this long. */
-const RETRY_MS = 6 * 3600_000;
 /** What the step keeps for the render after the readings (a Reel renders at 4 to 7 s a second of video). */
 const RENDER_MARGIN_MS = 330_000;
 /** The sandbox's work: its start and the files fetched, then a second of video read (its grid, its lines, its light), and a second made into a ground (each image at 1920 px, encoded). */
@@ -49,7 +48,7 @@ const FILE_MAX = 16;
 const FILE_WAIT_MS = 150_000;
 
 const kept = (row: Row | undefined): MediaSubjects => mediaSubjectsSchema.safeParse(row?.subjects ?? {}).data ?? {};
-const due = (k: MediaSubjects[string] | undefined) => !k || ("failed_at" in k && Date.now() - Date.parse(k.failed_at) > RETRY_MS);
+const due = (k: MediaSubjects[string] | undefined) => !k || ("failed_at" in k && retryDue(k));
 
 /** Where a passage's readings and its ground are kept (beside its cut-outs, removed with the clip by the retention). */
 const readFile = (studioId: string, mediaId: string, key: string, ext: string) => `${studioId}/subjects/${mediaId}-${createHash("sha1").update(key).digest("hex").slice(0, 12)}.${ext}`;
@@ -120,7 +119,7 @@ export async function ensureShotReadings(studioId: string, postId: string, plan:
       }
       record(p.clip_id, p.key, { path, still: result.still, at, frames: result.frames, read: true });
       const key = groundKey(p.clip_id, p.from, p.to);
-      // Asked and not made: no sky in this shot (Skyline draws nothing there); not asked again before RETRY_MS.
+      // Asked and not made: no sky in this shot (Skyline draws nothing there); not asked again for six hours (retryDue).
       if (!result.ground && p.kinds.includes("ground")) record(p.clip_id, key, { failed_at: at, error: "aucun ciel" });
       if (result.ground) {
         const file = readFile(studioId, p.clip_id, key, result.ground.still ? "png" : "webm");
