@@ -116,3 +116,5 @@ Son entrée (`house-models.ts`) : vertical (« pov »), une musique « indie él
 
 ## Ce qu'il faut filmer
 Un beau plan large pour ouvrir (il revient à la fin) ; 10 à 20 plans courts de son lieu, de sa rue, de son quartier, plutôt larges (l'original en a 22 en 13,8 s) ; 3 ou 4 plans avec un sujet net au milieu, presque immobile (elle, un client, un plat, une bouteille) ; deux plans du même endroit à deux moments (de jour et de nuit, vide et plein) ; un plan en mouvement (en marchant, à vélo) ; en largeur si elle peut. Et deux repères vrais pour les étiquettes : son adresse, l'heure ou l'année d'ouverture.
+
+**Version 3** (5 novembre, sur un Reel du compte de Tristan fait par ce modèle : « ce qui est écrit se voit moyen », « à la fin le texte n'est pas sur un écran noir mais au-dessus de tout le reste ») : ses deux étiquettes un peu plus grasses et plus grandes que les capitales fines de l'original (graisse 500, 44 px au lieu de 300 et 40), avec une ombre sombre douce, pour se lire sur n'importe quel plan ; sa carte de fin sur du noir (le noir posé en 6 images sur son dernier plan, au lieu de l'assombrir de moitié).

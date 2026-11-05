@@ -28,6 +28,7 @@ import { SceneView } from "./Scene";
 import type { Theme } from "./theme";
 import { footageTrack, type TrackFn, type TrackPiece } from "./track";
 import type { ComposeEnd, ComposeShot, ComposeText, ReelProps, Scene, ScenePhoto } from "./types";
+import { titleFonts } from "./title-fonts";
 
 // Free motion-design scene: plain JS written by the motion designer (checked and
 // smoke-rendered before reaching here). It only sees this scope; any error at
@@ -546,7 +547,7 @@ export function MotionScene(p: {
       height={p.props.height}
       fps={fps}
       durationInFrames={p.durationInFrames}
-      brand={{ ...p.props.brand, ink: "#1C1530", cream: "#FBF7F4" }}
+      brand={{ ...titleFonts(p.props.brand), ink: "#1C1530", cream: "#FBF7F4" }}
       texts={p.texts}
       photos={p.photos ?? []}
       cuts={p.cuts ?? []}

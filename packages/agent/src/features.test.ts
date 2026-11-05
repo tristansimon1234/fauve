@@ -7808,7 +7808,7 @@ const fenetresLayers = (tree: Drawn) => {
 test("« Fenêtres et étiquettes » (v2) cuts where its original does, on its own music (92,9 BPM), its music stopped in the intro's hole", async () => {
   const { fenetres, line } = await fenetresAt(22);
   const { skillPlan, skillFillInput } = await import("./skills.ts");
-  assert.equal(fenetres.version, 2);
+  assert.equal(fenetres.version, 3);
   assert.equal(fenetres.bpm, 92.9);
   // Its 21 shots one after the other, each where the original's first shows (its first cell, or its cut), within two
   // images; its shot by day laid beside the night from image 216 to the night's end; 13,8 s.
@@ -7990,7 +7990,8 @@ test("« Fenêtres et étiquettes » (v2): horizontal 16:9 on black as its origi
     for (const f of [100, 220, 300, 413]) assert.deepEqual(labels(at(f)), first);
   }
   const style = drawnNodes(wide.at(0)).find((n) => n.type === "FitText")!.props.innerStyle as Record<string, unknown>;
-  assert.deepEqual([style.color, style.textShadow, style.textTransform, style.fontSize, style.fontWeight], ["#f1f2f4", undefined, "uppercase", 40, 300]);
+  // v3: a little heavier and larger than the original's thin capitals, with a soft dark shadow (« ce qui est écrit se voit moyen »).
+  assert.deepEqual([style.color, style.textShadow, style.textTransform, style.fontSize, style.fontWeight], ["#f1f2f4", "0 0 12px rgba(0,0,0,0.6), 0 1px 3px rgba(0,0,0,0.7)", "uppercase", 44, 500]);
   assert.ok(drawnNodes(wide.at(0)).filter((n) => "data-fauve-decor" in n.props).map(heldText).join(" ").includes("OUVERT DÈS 8 H"));
   const kids = drawnNodes(wide.at(100))[0]!.children as Drawn[];
   assert.ok(kids.findIndex((k) => k && k.type === "FitText") > kids.findIndex((k) => k && styleOf(k).overflow === "hidden"));
@@ -8013,7 +8014,7 @@ test("« Fenêtres et étiquettes » (v2): horizontal 16:9 on black as its origi
   const plan = skillPlan({ skill: fenetres, name: "Fenêtres et étiquettes", files, fill: { shots: Array.from({ length: 22 }, (_, i) => ({ file: files[i % 12]!.id, at: 1 })), texts: { gauche: "OUVERT DÈS 8 H", droite: "PARIS 9E" }, end: null, settings: { format: "vertical" } } });
   assert.deepEqual(plan.layers![0]!.motion.drawn, { shots: 22, subjects: [2, 3, 5, 7, 10, 11, 14, 18] });
   assert.equal(plan.layers![0]!.motion.texts!.format, "vertical");
-  assert.deepEqual(plan.skill, { key: "fenetres", version: 2, settings: { format: "vertical" } });
+  assert.deepEqual(plan.skill, { key: "fenetres", version: 3, settings: { format: "vertical" } });
   // Its look is its model's (no grain, no corners on the black); its code within a plan's 24 000 characters; no zoom,
   // nothing of its original's (its altitude, its coordinates, its pass).
   assert.deepEqual(fenetres.finish, { grain: 0, vignette: 0 });
@@ -10338,5 +10339,29 @@ test("the model picker reads her taste: her moodboard, her art direction, the Re
   // The rule: between the models her files and request allow, the one in that spirit; never against them.
   assert.match(HOUSE_PICK_PROMPT, /ses_gouts/);
   assert.match(HOUSE_PICK_PROMPT, /never against her files or her request/);
+});
+
+test("« Fenêtres et étiquettes » (v3): its labels read over any shot, its ending card on black", async () => {
+  const ended = await fenetresAt(22, { end: true });
+  const card = ended.at(ended.durationInFrames - 20);
+  // On black once its 6 images of fade are past (it was the last shot darkened by half).
+  assert.ok(drawnNodes(card).some((n) => styleOf(n).backgroundColor === "rgba(0,0,0,1.000)"));
+  // Its labels heavier and larger than the original's thin capitals, a soft dark shadow under them.
+  const label = drawnNodes(ended.at(100)).find((n) => n.type === "FitText" && /OUVERT|50\.8164/.test(heldText(n)))!;
+  const inner = (label.props as { innerStyle: Record<string, unknown> }).innerStyle;
+  assert.deepEqual([inner.fontWeight, inner.fontSize], [500, 44]);
+  assert.match(String(inner.textShadow), /rgba\(0,0,0,0\.6\)/);
+});
+
+test("a composition's titles in the font her signature gives titles; the other kept as its accent", async () => {
+  const { titleFonts } = await import("../../../apps/render/src/title-fonts.ts");
+  const brand = { displayFont: "Instrument Serif", bodyFont: "Inter Tight" };
+  // Tristan's account: titles in its text font (Inter Tight, bold and tight), a key word in Instrument Serif italic.
+  assert.deepEqual(titleFonts({ ...brand, signature: { titles: { font: "body" as const } } }), { ...brand, displayFont: "Inter Tight", accentFont: "Instrument Serif", signature: { titles: { font: "body" } } });
+  // Titles in its display font, or no signature: as before, its display font also its accent.
+  assert.equal(titleFonts({ ...brand, signature: { titles: { font: "display" as const } } }).displayFont, "Instrument Serif");
+  assert.deepEqual(titleFonts(brand), { ...brand, accentFont: "Instrument Serif" });
+  // A monospace text font is never a title's.
+  assert.equal(titleFonts({ displayFont: "Anton", bodyFont: "IBM Plex Mono", signature: { titles: { font: "body" as const } } }).displayFont, "Anton");
 });
 

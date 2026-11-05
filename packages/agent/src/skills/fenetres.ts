@@ -246,7 +246,9 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const hook = reelTexts.find((t) => t.role === "hook"), cap = reelTexts.find((t) => t.role === "caption");
   const others = reelTexts.filter((t) => t !== hook && t !== cap);
   const display = "'" + brand.displayFont + "', 'Oswald', 'Arial Narrow', sans-serif";
-  const LBL = { fontFamily: display, fontWeight: 300, fontSize: 40, lineHeight: 1.1, letterSpacing: "0.02em", textTransform: "uppercase", color: "#f1f2f4", whiteSpace: "nowrap" };
+  // Read over any shot (Tristan, on a Reel of busy streets: « ce qui est écrit se voit moyen »): a little heavier and
+  // larger than the original's thin capitals, with a soft dark shadow under them.
+  const LBL = { fontFamily: display, fontWeight: 500, fontSize: 44, lineHeight: 1.1, letterSpacing: "0.02em", textTransform: "uppercase", color: "#f1f2f4", whiteSpace: "nowrap", textShadow: "0 0 12px rgba(0,0,0,0.6), 0 1px 3px rgba(0,0,0,0.7)" };
   const ly = by + R(bh / 2) - 76;
   const label = (t, left, w, align) => (t && frame >= t.from && frame < t.to ? h(FitText, { key: "l" + left, style: { position: "absolute", left, top: ly, width: w, height: 52 }, innerStyle: { ...LBL, alignItems: align } }, h("span", { "data-fauve-decor": "" }, String(t.text))) : null);
 
@@ -254,9 +256,10 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const extra = others.filter((t) => frame >= t.from && frame < mn(t.to, endAt)).map((t, i) =>
     h(FitText, { key: "x" + i, style: { position: "absolute", left: 140, width: 800, top: 170 + i * 130, height: 120 }, innerStyle: { ...LBL, fontWeight: 400, fontSize: 56, color: "#ffffff", textAlign: "center", whiteSpace: "normal" } }, t.text));
 
-  // 9. Its ending card: the first shot held and darkened, its title in the labels' capitals above them, its line under them.
+  // 9. Its ending card on black (Tristan: « à la fin le texte n'est pas sur un écran noir mais au-dessus de tout le
+  // reste »): the black over her last shot in 6 images, its title in the labels' capitals above them, its line under them.
   const ending = end && frame >= endAt
-    ? h(AbsoluteFill, { style: { backgroundColor: "rgba(0,0,0," + (0.5 * interpolate(frame, [endAt, endAt + 6], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" })).toFixed(3) + ")" } },
+    ? h(AbsoluteFill, { style: { backgroundColor: "rgba(0,0,0," + interpolate(frame, [endAt, endAt + 6], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" }).toFixed(3) + ")" } },
         h(FitText, { style: { position: "absolute", left: 140, top: 470, width: 800, height: 340 }, innerStyle: { ...LBL, justifyContent: "flex-end", fontWeight: 500, fontSize: 118, lineHeight: 1.0, color: "#ffffff", textAlign: "center", whiteSpace: "normal", textWrap: "balance" } },
           h("span", { style: { opacity: frame >= endAt + 3 ? 1 : 0 } }, String(end.title || ""))),
         end.subtitle
@@ -272,7 +275,9 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
 
 export const fenetres: MontageSkill = {
   key: "fenetres",
-  version: 2,
+  // 3: its labels read over any shot (heavier, larger, a soft shadow) and its ending card on black (Tristan, on a Reel
+  // of his account: « ce qui est écrit se voit moyen », « le texte n'est pas sur un écran noir »).
+  version: 3,
   bpm: BPM,
   // Its original's 22 (21 one after the other, the shot by day beside the night); 11 at least (its signature moments).
   shots: [11, 22],
