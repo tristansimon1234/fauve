@@ -164,6 +164,10 @@ export const HOUSE_EFFECTS: Record<string, HouseEffect> = {
     effet: "la bande-annonce de sa journée en ouverture : un éclair de ses plans toutes les cinq images, sous son titre tapé lettre à lettre avec son curseur, une petite ligne fine dessous",
     il_faut: "des plans variés de sa journée (sa préparation, son lieu, ses gens) et un titre de 2 à 4 mots",
   },
+  nuit: {
+    effet: "son enseigne sous quatre à six angles, au même endroit et à la même taille, coupée de plus en plus vite sur un roulement, puis un flash, le noir et une brûlure de pellicule",
+    il_faut: "quatre à six plans du même objet (son enseigne, son néon, sa porte) pris de différents endroits",
+  },
 };
 
 /** The most of Edith's models one Reel borrows from: one charter, one music, never a patchwork. */
