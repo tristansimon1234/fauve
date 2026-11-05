@@ -17,8 +17,8 @@ import type { z } from "zod";
 
 /** The source of the inspiration row a house model is kept on, per studio (one per model, made when first used). */
 export const HOUSE_SOURCE = "house";
-/** The catalogue's version: a studio's row written by an older one is rewritten when the model is used again (3: its original's sheets; 4: no brand in a model's name; 5: Mots aux quatre coins as its original; 6: Plans fixes at 65 BPM; 7: four renamed; 8: Lieu tapé without its original's orange; 9: Plans fixes on its fiche; 10: Une journée chez toi on its fiche; 11: ten models on their fiches; 12: Façade qui se construit and Coulisses façon fiche on their fiches; 13: Recette cosy on its fiche; 14: Titre gaufré on its fiche; 15: Mots mêlés and Interrupteur on their fiches; 16: Interface minimaliste and Fenêtres et étiquettes on theirs; 17: Mot clé en grand and Face caméra et références on theirs; 18: Photos posées sur la table and Carte au feutre on theirs). */
-export const HOUSE_VERSION = 18;
+/** The catalogue's version: a studio's row written by an older one is rewritten when the model is used again (3: its original's sheets; 4: no brand in a model's name; 5: Mots aux quatre coins as its original; 6: Plans fixes at 65 BPM; 7: four renamed; 8: Lieu tapé without its original's orange; 9: Plans fixes on its fiche; 10: Une journée chez toi on its fiche; 11: ten models on their fiches; 12: Façade qui se construit and Coulisses façon fiche on their fiches; 13: Recette cosy on its fiche; 14: Titre gaufré on its fiche; 15: Mots mêlés and Interrupteur on their fiches; 16: Interface minimaliste and Fenêtres et étiquettes on theirs; 17: Mot clé en grand and Face caméra et références on theirs; 18: Photos posées sur la table and Carte au feutre on theirs; 19: « S'abonner » in Interface minimaliste). */
+export const HOUSE_VERSION = 19;
 
 export type HouseModel = {
   key: string;
@@ -1069,8 +1069,8 @@ export const HOUSE_MODELS: HouseModel[] = [
     key: "interface",
     name: "Interface minimaliste",
     // 15: written on its original's fiche (v2 of its skill): 110,5 BPM (it played at 100), its moments on its images
-    // with two holds lengthened for a phone, « Suivre » (Instagram's French), its pale ground as it is, no grain.
-    pitch: "Des mots qui sortent du flou sur fond clair, une liste qui défile, ta phrase tapée, puis ton profil et un curseur qui clique « Suivre ».",
+    // with two holds lengthened for a phone, « S'abonner » (Tristan's word), its pale ground as it is, no grain.
+    pitch: "Des mots qui sortent du flou sur fond clair, une liste qui défile, ta phrase tapée, puis ton profil et un curseur qui clique « S'abonner ».",
     needs: "ta photo de profil ou ton logo (ou 2 à 3 s de toi qui regardes l'objectif), ton compte Instagram, ce que tu fais en trois mots et ta promesse en une phrase",
     files: [0, 2],
     pair: "grotesque",
@@ -1097,8 +1097,8 @@ export const HOUSE_MODELS: HouseModel[] = [
         { at: 3.17, what: "le dernier mot de la liste souligné d'un trait bleu roi à indigo qui s'effile, tracé de gauche à droite en un tiers de seconde" },
         { at: 4.03, what: "la liste part vers le haut dans le flou ; une annonce de deux lignes monte mot à mot, ses deux derniers mots en italique ; puis elle s'efface lettre à lettre depuis la gauche" },
         { at: 6.83, what: "un curseur bleu qui ne clignote pas tape une phrase, 38 lettres par seconde, chaque lettre floue une image ; ses derniers mots en italique" },
-        { at: 8.87, what: "l'icône d'Instagram se pose sur le dernier mot, glisse au centre et avale la phrase ; elle s'ouvre en carte de profil blanche aux coins arrondis : son compte, sa photo ronde en noir et blanc, son nom, son métier en italique gris, sa bio, « Suivre » qui passe au bleu, « Message »" },
-        { at: 10.63, what: "toute la carte grossit 1,5 fois vers « Suivre », le reste de la carte part ; une flèche noire arrive d'en bas à droite en arc et clique, sans anneau : le bleu s'éteint, « Suivi(e) » monte" },
+        { at: 8.87, what: "l'icône d'Instagram se pose sur le dernier mot, glisse au centre et avale la phrase ; elle s'ouvre en carte de profil blanche aux coins arrondis : son compte, sa photo ronde en noir et blanc, son nom, son métier en italique gris, sa bio, « S'abonner » qui passe au bleu, « Message »" },
+        { at: 10.63, what: "toute la carte grossit 1,5 fois vers « S'abonner », le reste de la carte part ; une flèche noire arrive d'en bas à droite en arc et clique, sans anneau : le bleu s'éteint, « Abonné(e) » monte" },
         { at: 11.8, what: "la photo et le bouton se replient en pastille blanche avec le compte et une coche ; puis la pastille s'efface, la photo devient le @ du compte, en dégradé bleu, « À SUIVRE » au-dessus lettre à lettre" },
       ],
       camera: "fixe",
