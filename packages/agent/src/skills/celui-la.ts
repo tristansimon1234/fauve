@@ -109,23 +109,31 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const CREAM = "#fffcc0";
   const DEEP = "#2b2118";
   const HERS = colour === "blanc" ? "#ffffff" : colour === "sa-couleur" && lum(brand.accent) >= 0 ? brand.accent : CREAM;
-  const edgeOf = (ink) => (lum(ink) >= 0.3 ? "0 0 1px rgba(38,30,18,0.62), 0 0 3px rgba(38,30,18,0.36)" : "0 0 1px rgba(255,250,236,0.6), 0 0 3px rgba(255,250,236,0.34)");
+  // Its edge: thin where its ink was chosen on its own shot's light; firmer (still tight, never a haze) where it was not
+  // (a shot past the Reel's reads, a passage at another speed, her series taking her display's light).
+  const edgeOf = (ink, sure) =>
+    lum(ink) >= 0.3
+      ? sure ? "0 0 1px rgba(38,30,18,0.62), 0 0 3px rgba(38,30,18,0.36)" : "0 0 2px rgba(38,30,18,0.8), 0 1px 4px rgba(38,30,18,0.5)"
+      : sure ? "0 0 1px rgba(255,250,236,0.6), 0 0 3px rgba(255,250,236,0.34)" : "0 0 2px rgba(255,250,236,0.8), 0 1px 4px rgba(255,250,236,0.5)";
   const lightOn = (k, b) => {
     if (k < 0 || k >= n) return null;
     const area = { x: b.left, y: b.top, w: b.width, h: b.height };
     const read = LightUnder(shots[k], frame, box, area);
-    return read || (k === n - 1 && n > 1 ? LightUnder(shots[0], frame, box, area) : null);
+    if (read) return { mean: read.mean, own: true };
+    const shown = k === n - 1 && n > 1 ? LightUnder(shots[0], frame, box, area) : null;
+    return shown ? { mean: shown.mean, own: false } : null;
   };
+  // Its ink on shot k under box b: { ink, sure } (sure: told from that shot's own light).
   const inkOn = (k, b) => {
     const read = lightOn(k, b);
-    if (!read) return HERS;
+    if (!read) return { ink: HERS, sure: false };
     const under = lin(read.mean);
     const other = lum(HERS) >= 0.3 ? DEEP : CREAM;
     const mine = ratio(lum(HERS), under);
-    return mine >= 2.4 || ratio(lum(other), under) <= mine ? HERS : other;
+    return { ink: mine >= 2.4 || ratio(lum(other), under) <= mine ? HERS : other, sure: read.own };
   };
   const S = Math.round(height * 0.087);
-  const type = (size, ink, x) => ({ fontFamily: display, fontWeight: 400, fontSize: size, lineHeight: 1.12, letterSpacing: "-0.005em", color: ink, textShadow: edgeOf(ink), whiteSpace: "nowrap", ...x });
+  const type = (size, choice, x) => ({ fontFamily: display, fontWeight: 400, fontSize: size, lineHeight: 1.12, letterSpacing: "-0.005em", color: choice.ink, textShadow: edgeOf(choice.ink, choice.sure), whiteSpace: "nowrap", ...x });
   const letters = (s) => Array.from(String(s || ""));
 
   // A word's box at its place (its centre, as shares of the frame), sized on its letters and kept in the safe zone:
@@ -201,8 +209,8 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   // Any other text of the Reel (none in its slots): a plain line, so nothing she wrote is lost.
   const extra = others.filter((t) => frame >= t.from && frame < Math.min(t.to, endAt)).map((t, i) => {
     const b = { position: "absolute", left: 140, top: 1240 - i * 120, width: width - 280, height: 110 };
-    const ink = inkOn(cur, b);
-    return h(FitText, { key: "x" + i + "-" + keep(t.text), style: b, innerStyle: { fontFamily: body, fontWeight: 600, fontSize: 52, color: ink, textShadow: edgeOf(ink), textAlign: "center" } }, keep(t.text));
+    const choice = inkOn(cur, b);
+    return h(FitText, { key: "x" + i + "-" + keep(t.text), style: b, innerStyle: { fontFamily: body, fontWeight: 600, fontSize: 52, color: choice.ink, textShadow: edgeOf(choice.ink, choice.sure), textAlign: "center" } }, keep(t.text));
   });
 
   return h(AbsoluteFill, { style: { backgroundColor: "#000000" } }, film, words, ending, extra);

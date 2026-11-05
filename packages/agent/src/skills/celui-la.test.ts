@@ -219,13 +219,19 @@ test("« Celui-là » (v1): its ink, the original's cream where it reads on her 
     const draw = scene(() => (light === null ? null : { mean: light, high: light }));
     return wordsAt(draw(f, { ...props, texts: { ...props.texts, ...settings } }))[0]!.type;
   };
-  // Not read (the check, a passage at another speed): the cream, its thin dark edge.
+  // Not read (the check, a passage at another speed): the cream, its firmer dark edge (still tight: no haze).
   assert.equal(ink(null).color, "#fffcc0");
-  assert.match(String(ink(null).textShadow), /rgba\(38,30,18/);
-  // On a dark picture the cream; on a white plate or a pastel wall, the deep ink with a light edge.
+  assert.equal(ink(null).textShadow, "0 0 2px rgba(38,30,18,0.8), 0 1px 4px rgba(38,30,18,0.5)");
+  // On a dark picture the cream, its thin edge; on a white plate or a pastel wall, the deep ink with a thin light edge.
   assert.equal(ink(0.3).color, "#fffcc0");
+  assert.equal(ink(0.3).textShadow, "0 0 1px rgba(38,30,18,0.62), 0 0 3px rgba(38,30,18,0.36)");
   assert.equal(ink(0.8).color, "#2b2118");
-  assert.match(String(ink(0.8).textShadow), /rgba\(255,250,236/);
+  assert.match(String(ink(0.8).textShadow), /^0 0 1px rgba\(255,250,236/);
+  // Her series past the Reel's reads: her display's light, its firmer edge (it may be another place).
+  const series = scene((shot) => ((shot as { from: number }).from === props.shots.at(-1)!.from ? null : { mean: 0.85, high: 0.9 }));
+  const last = wordsAt(series(props.durationInFrames - 5, props))[0]!.type;
+  assert.equal(last.color, "#2b2118");
+  assert.match(String(last.textShadow), /^0 0 2px rgba\(255,250,236,0\.8\)/);
   // White or her colour, as her words ask, the deep ink where they would not read either.
   assert.equal(ink(0.3, { couleur: "blanc" }).color, "#ffffff");
   assert.equal(ink(0.85, { couleur: "blanc" }).color, "#2b2118");
