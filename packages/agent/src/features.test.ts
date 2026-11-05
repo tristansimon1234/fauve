@@ -2111,3 +2111,184 @@ test("« Plans fixes de cinéma » (v3): horizontal 4:3 on black as its original
   assert.equal(plan.layers![0]!.motion.texts!.format, "vertical");
   assert.deepEqual(plan.skill, { key: "plans-fixes", version: 3, settings: { format: "vertical" } });
 });
+
+// ——— « Ville en coups de fouet » v2, written again on its original's fiche (docs/fiches/coups-de-fouet.md) ——————————
+
+/** Its shots as a composition gets them, on its timeline for n shots: each of that shape (width / height), or a photo. */
+async function fouetShots(n: number, aspect = 16 / 9, photos: number[] = []) {
+  const { coupsDeFouet } = await import("./skills/coups-de-fouet.ts");
+  const line = coupsDeFouet.timeline(n, { end: false });
+  const shots = line.shots.map((s, i) => ({
+    src: `/v${i}.mp4`,
+    aspect,
+    from: Math.round(s.start * 30),
+    durationInFrames: Math.round((s.end - s.start) * 30),
+    kind: photos.includes(i) ? "photo" : "video",
+    segment: i,
+  }));
+  const marks = Object.fromEntries(Object.entries(line.marks).map(([k, v]) => [k, String(v)]));
+  return { code: coupsDeFouet.code, line, shots, marks, durationInFrames: Math.round(line.duration * 30) };
+}
+
+test("« Ville en coups de fouet » (v2) cuts where its original does, on its own music (84 BPM), its percussion on its cuts", async () => {
+  const { coupsDeFouet, fouetRoles } = await import("./skills/coups-de-fouet.ts");
+  const { skillPlan } = await import("./skills.ts");
+  const { clearsDrawn, objectsDrawn, drawsSubject } = await import("./subject.ts");
+  assert.equal(coupsDeFouet.version, 2);
+  assert.equal(coupsDeFouet.bpm, 84);
+  assert.deepEqual(coupsDeFouet.shots, [12, 23]);
+  // The original's 23 shots, cut on its images 20, 55 … 595 (measured image by image at 30 i/s; a whip flash's cut on its
+  // second image): within two images each, the last held to its 23,3 s.
+  const line = coupsDeFouet.timeline(23, { end: false });
+  const original = [0, 20, 55, 86, 106, 133, 160, 189, 226, 257, 274, 298, 330, 366, 390, 413, 438, 466, 494, 513, 543, 571, 595];
+  assert.equal(line.shots.length, original.length);
+  line.shots.forEach((s, i) => assert.ok(Math.abs(Math.round(s.start * 30) - original[i]!) <= 2, `shot ${i + 1}: image ${Math.round(s.start * 30)}, the original's ${original[i]}`));
+  assert.ok(Math.abs(line.duration - 23.3) < 0.05, `${line.duration} s`);
+  // Fewer shots leave out shots of its middle, never its opening, its name, its signature shots nor its last; the four cuts
+  // the original lays on a beat (the colour detail as its percussion comes in, the light, people passing, the jerky whip)
+  // stay on a beat of its music (to the frame).
+  const beat = 60 / 84;
+  for (let n = 12; n <= 23; n++) {
+    const l = coupsDeFouet.timeline(n, { end: false });
+    const roles = fouetRoles(n);
+    assert.equal(l.shots.length, n);
+    for (const r of [0, 1, 2, 5, 6, 9, 10, 12, 14, 19, 21, 22]) assert.ok(roles.includes(r), `n=${n}: role ${r}`);
+    for (const r of [9, 13, 18, 19]) {
+      const k = roles.indexOf(r);
+      if (k < 0) continue;
+      const on = Math.round(l.shots[k]!.start / beat);
+      assert.ok(Math.abs(l.shots[k]!.start - on * beat) <= 0.5 / 30 + 0.006, `n=${n}: role ${r} at ${l.shots[k]!.start} s`);
+    }
+    assert.equal(l.texts.titre!.from, l.shots[1]!.start);
+  }
+  assert.deepEqual(fouetRoles(12), [0, 1, 2, 5, 6, 9, 10, 12, 14, 19, 21, 22]);
+  // Her name from the white flash to the first whip flash (the original's images 20 to 53).
+  assert.deepEqual([Math.round(line.texts.titre!.from * 30), Math.round(line.texts.titre!.to * 30)], [20, 54]);
+  // Its music muffled where the original's percussion is silent: until the colour detail (on beat 12, 8,57 s; the
+  // original's 8,62), then from the calm street to the tram (13,0 s); dying away over the last second, the picture held.
+  assert.equal(Math.round(line.shots[9]!.start * 30), 257);
+  assert.deepEqual(line.music, {
+    filters: [
+      { kind: "muffled", from: 0, to: line.shots[9]!.start },
+      { kind: "muffled", from: line.shots[12]!.start, to: line.shots[14]!.start },
+    ],
+    end: { at: line.duration, fade: 1 },
+  });
+  // Its original's sounds only: a dull thud as its name appears, a whoosh into its first whip flash (none on the others).
+  assert.deepEqual(line.sounds?.map((s) => [Math.round(s.at * 30), s.sound]), [[20, "deep soft thud"], [54, "quick air whoosh"]]);
+  // On the plan: its shape and its sounds, its marks (each shot's role) for its code.
+  const files = Array.from({ length: 8 }, (_, i) => ({ id: `v${i}`, photo: false, seconds: 20 }));
+  const plan = skillPlan({ skill: coupsDeFouet, name: "Ville en coups de fouet", files, fill: { shots: Array.from({ length: 23 }, (_, i) => ({ file: files[i % 8]!.id, at: Math.floor(i / 8) * 6 })), texts: { titre: "Belleville" }, end: null } });
+  assert.ok(editPlanSchema.safeParse(plan).success);
+  assert.deepEqual(plan.music_shape?.filters?.map((f) => [f.kind, f.from, f.to]), [["muffled", 0, 8.57], ["muffled", 11, 13]]);
+  assert.deepEqual(plan.music_shape?.end, { at: 23.3, fade: 1 });
+  assert.equal(plan.sounds?.length, 2);
+  const marks = plan.layers![0]!.motion.texts!;
+  assert.deepEqual(Array.from({ length: 23 }, (_, i) => marks[`r${i}`]), Array.from({ length: 23 }, (_, i) => String(i)));
+  const fewer = skillPlan({ skill: coupsDeFouet, name: "Ville en coups de fouet", files, fill: { shots: Array.from({ length: 12 }, (_, i) => ({ file: files[i % 8]!.id, at: 1 })), texts: { titre: "Belleville" }, end: null } });
+  assert.deepEqual(Array.from({ length: 12 }, (_, i) => Number(fewer.layers![0]!.motion.texts![`r${i}`])), fouetRoles(12));
+  // Her name set in the clear area of her name's shot (read there only); nothing cut out nor followed.
+  assert.deepEqual(clearsDrawn(coupsDeFouet.code), [1]);
+  assert.deepEqual(objectsDrawn(coupsDeFouet.code), []);
+  assert.equal(drawsSubject(coupsDeFouet.code), false);
+  // Its finish: no grain (its original has none); its code holds the whites low itself. Nothing of its original's own.
+  assert.deepEqual(coupsDeFouet.finish, { grain: 0 });
+  assert.doesNotMatch(coupsDeFouet.code, /NEW YORK|NYC/);
+});
+
+test("« Ville en coups de fouet » (v2): its whip flashes made of her sky, its white flashes, its fades, frame by frame", async () => {
+  const { code, shots, marks, durationInFrames } = await fouetShots(23);
+  const reelTexts = [{ text: "Belleville", role: "hook", from: 20, to: 54, emphasis: [] }];
+  const draw = (frame: number, extra: Record<string, unknown> = {}) =>
+    drawScene(code, frame, { width: 1080, height: 1920, durationInFrames, brand: { name: "Chez Lou", displayFont: "Big Shoulders Display", bodyFont: "Inter" }, shots, reelTexts, end: null, texts: marks, ...extra });
+  const footages = (tree: Drawn) => drawnNodes(tree).filter((n) => n.type === "Footage").map((n) => n.props as { shot: number; at?: number; style: Record<string, unknown> });
+  const white = (tree: Drawn) => drawnNodes(tree).find((n) => n.type === "div" && styleOf(n).background === "#ffffff");
+  const blurs = (tree: Drawn) => drawnNodes(tree).filter((n) => n.type === "feGaussianBlur");
+  const title = (tree: Drawn) => drawnNodes(tree).find((n) => n.type === "FitText" && heldText(n).includes("BELLEVILLE"));
+  // The flash into her name's shot: the opening lit up (image 19), a plain white image over her name's shot with her name
+  // on it (image 20), her name's shot at its light (image 21).
+  assert.equal(styleOf(white(draw(19))!).opacity, 0.3);
+  assert.equal(styleOf(white(draw(20))!).opacity, 0.9);
+  assert.ok(title(draw(20)));
+  assert.equal(white(draw(21)), undefined);
+  // Her name still from image 20 to 53, gone with the whip flash; at the middle of its picture without a clear area.
+  assert.deepEqual(styleOf(title(draw(21))!), styleOf(title(draw(53))!));
+  assert.equal(title(draw(54)), undefined);
+  // Each whip flash: the same two images of her name's shot (its image 10), smeared, lit up: images 54 and 55 (the first),
+  // 256 to 258 (the second, one image doubled), 389 and 390 (the third), 569 to 573 (the last, under a white).
+  for (const f of [54, 55, 256, 257, 258, 389, 390, 569, 570, 571, 572, 573]) {
+    const tree = draw(f);
+    assert.deepEqual(footages(tree).map((p) => [p.shot, p.at]), [[1, f - 10]], `image ${f}`);
+    assert.equal(blurs(tree).length, 1, `image ${f}`);
+  }
+  for (const f of [53, 56, 255, 259, 388, 391, 568, 574]) assert.ok(!footages(draw(f)).some((p) => p.shot === 1 && p.at !== undefined), `image ${f}`);
+  // The last one comes after the façade whitens over its last four images (the original's 565 to 568).
+  assert.deepEqual([565, 566, 567, 568].map((f) => styleOf(white(draw(f))!).opacity), [0.1, 0.2, 0.32, 0.45]);
+  // The white flashes of three images: the shot before lit up twice, then the white over the next one.
+  assert.deepEqual([296, 297, 298].map((f) => styleOf(white(draw(f))!).opacity), [0.2, 0.38, 0.9]);
+  // The jerky whip faded in from the shot before over two images (514, 515), its images held 3, 5, 3… images, blurred.
+  const fade = drawnNodes(draw(514)).find((n) => n.type === "div" && styleOf(n).opacity === 1 / 3);
+  assert.ok(fade && footages(fade).some((p) => p.shot === 19));
+  const held = [514, 515, 516, 517, 518, 519, 520, 521, 522].map((f) => footages(draw(f)).find((p) => p.shot === 19)!.at);
+  assert.deepEqual(held.map((at, i) => 514 + i - at!), [0, 0, 0, 3, 3, 3, 3, 3, 8]);
+  assert.ok(blurs(draw(520)).length >= 1);
+  // Its black and white (the low angle, someone passing) and the ghost images of what passes: its images of 3, 6 and 9
+  // images before, under it.
+  assert.equal(footages(draw(70)).find((p) => p.shot === 2)!.style.filter, "grayscale(1) contrast(1.3)");
+  const ghosts = footages(draw(285)).filter((p) => p.shot === 10);
+  assert.deepEqual(ghosts.map((p) => [285 - p.at!, p.style.opacity]), [[2, 1], [5, 0.565], [8, 0.49], [11, 0.55]]);
+  assert.equal(drawnNodes(draw(285)).find((n) => n.type === "div" && styleOf(n).filter === "grayscale(1) contrast(1.3)")?.type, "div");
+  // Its pushes on her videos, steady from the centre (×1,11 behind her name); a photo stays still.
+  const scale = (tree: Drawn, shot: number) => Number(/scale\(([\d.]+)\)/.exec(String(footages(tree).find((p) => p.shot === shot)?.style.transform ?? ""))?.[1] ?? 1);
+  assert.ok(scale(draw(40), 1) > scale(draw(25), 1) && scale(draw(25), 1) > 1 && scale(draw(53), 1) <= 1.11);
+  const still = await fouetShots(23, 16 / 9, [1, 2]);
+  const drawStill = (frame: number) => drawScene(still.code, frame, { width: 1080, height: 1920, durationInFrames: still.durationInFrames, brand: { name: "Chez Lou", displayFont: "Inter", bodyFont: "Inter" }, shots: still.shots, reelTexts, end: null, texts: still.marks });
+  assert.equal(scale(drawStill(40), 1), 1);
+  assert.equal(scale(drawStill(70), 2), 1);
+  // Its ending card, only when she has one: its words in the name's capitals over her last shot.
+  const ending = draw(durationInFrames - 10, { end: { title: "Ouvert dimanche", subtitle: null, from: durationInFrames - 48 } });
+  assert.ok(drawnNodes(ending).some((n) => n.type === "FitText" && heldText(n).includes("Ouvert dimanche")));
+  assert.ok(!drawnNodes(draw(durationInFrames - 10)).some((n) => n.type === "FitText"));
+});
+
+test("« Ville en coups de fouet » (v2): horizontal 4:3 on black as its original when her files are, full frame otherwise or on her word", async () => {
+  const { coupsDeFouet } = await import("./skills/coups-de-fouet.ts");
+  const { skillPlan, skillFillInput, skillSettings } = await import("./skills.ts");
+  const reelTexts = [{ text: "Belleville", role: "hook", from: 20, to: 54, emphasis: [] }];
+  const frameOf = async (aspect: number, format?: string, wideOnes?: number) => {
+    const { code, shots, marks, durationInFrames } = await fouetShots(23, aspect);
+    const mixed = wideOnes === undefined ? shots : shots.map((s, i) => ({ ...s, aspect: i < wideOnes ? 16 / 9 : 9 / 16 }));
+    const tree = drawScene(code, 30, { width: 1080, height: 1920, durationInFrames, brand: { name: "Chez Lou", displayFont: "Big Shoulders Display", bodyFont: "Inter" }, shots: mixed, reelTexts, end: null, texts: { ...marks, ...(format ? { format } : {}) } });
+    const box = drawnNodes(tree).find((n) => n.type === "div" && styleOf(n).overflow === "hidden")!;
+    const name = drawnNodes(box).find((n) => n.type === "FitText")!;
+    return { top: styleOf(box).top, height: styleOf(box).height, name: name.props.style as { left: number; top: number; width: number; height: number } };
+  };
+  // Her files mostly horizontal: the original's 4:3 picture (1080 × 810) at the middle of the frame, on black; mostly
+  // vertical (half and half too): full frame.
+  const wide = await frameOf(16 / 9);
+  assert.deepEqual([wide.top, wide.height], [555, 810]);
+  assert.equal((await frameOf(16 / 9, undefined, 12)).height, 810);
+  assert.equal((await frameOf(9 / 16)).height, 1920);
+  assert.equal((await frameOf(16 / 9, undefined, 11)).height, 1920);
+  // On her word, the other format.
+  assert.equal((await frameOf(16 / 9, "vertical")).height, 1920);
+  assert.equal((await frameOf(9 / 16, "horizontal")).top, 555);
+  // Her name at the middle of its picture when her sky has no room (the clear area's fallback), above the middle in the
+  // vertical frame, in the safe zone and left of the apps' buttons, 800 px wide at most.
+  for (const f of [wide, await frameOf(9 / 16)]) {
+    const n = f.name;
+    assert.ok(Math.abs(n.left + n.width / 2 - 540) <= 1 && n.left >= 140 && n.left + n.width <= 940, JSON.stringify(n));
+    const middle = Number(f.top) + n.top + n.height / 2;
+    assert.ok(middle >= 600 && middle <= 960, `${middle}`);
+  }
+  // The setting: the filler sees it (the original's first, the default), the plan keeps a choice her words asked for.
+  assert.deepEqual(coupsDeFouet.settings?.map((s) => [s.name, s.choices.map((c) => c.value)]), [["format", ["auto", "horizontal", "vertical"]]]);
+  assert.deepEqual(skillSettings(coupsDeFouet, [{ name: "format", value: "auto" }]), {});
+  const files = Array.from({ length: 8 }, (_, i) => ({ id: `v${i}`, photo: false, seconds: 20 }));
+  const input = skillFillInput({ skill: coupsDeFouet, name: "Ville en coups de fouet", n: 23, files, business: {}, request: "en vertical" });
+  assert.equal(input.reglages?.[0]?.nom, "format");
+  assert.equal(input.cases.length, 23);
+  const plan = skillPlan({ skill: coupsDeFouet, name: "Ville en coups de fouet", files, fill: { shots: Array.from({ length: 23 }, (_, i) => ({ file: files[i % 8]!.id, at: Math.floor(i / 8) * 6 })), texts: { titre: "Belleville" }, end: null, settings: { format: "vertical" } } });
+  assert.equal(plan.layers![0]!.motion.texts!.format, "vertical");
+  assert.deepEqual(plan.skill, { key: "coups-de-fouet", version: 2, settings: { format: "vertical" } });
+});
