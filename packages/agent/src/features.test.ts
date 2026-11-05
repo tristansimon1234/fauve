@@ -2111,3 +2111,190 @@ test("« Plans fixes de cinéma » (v3): horizontal 4:3 on black as its original
   assert.equal(plan.layers![0]!.motion.texts!.format, "vertical");
   assert.deepEqual(plan.skill, { key: "plans-fixes", version: 3, settings: { format: "vertical" } });
 });
+
+// ——— « Pile de photos » v2, written again on its original's fiche (docs/fiches/pile.md) ——————————————————————————
+
+/** The original's 37 photos as its fiche measured them, image by image at 30 i/s: when each one lands. */
+const PILE_LANDS = [3, 5, 7, 10, 13, 15, 18, 21, 24, 26, 29, 32, 35, 37, 40, 42, 43, 48, 51, 54, 56, 59, 62, 65, 67, 70, 73, 76, 80, 85, 89, 95, 101, 107, 114, 123, 130];
+/** Its shots as its composition gets them, from its timeline: each one's span in frames, of that shape. */
+const pileShots = (line: { shots: { start: number; end: number }[] }, aspect = 16 / 9, kind = "video") =>
+  line.shots.map((s, i) => ({ src: `/f${i}.mp4`, aspect, from: Math.round(s.start * 30), durationInFrames: Math.round((s.end - s.start) * 30), kind, segment: i }));
+/** What its code lays at a frame: each photo's shot, its box and where its Footage plays from, in drawing order; and its words. */
+const pileDrawn = (code: string, frame: number, props: Record<string, unknown>) => {
+  const tree = drawScene(code, frame, { width: 1080, height: 1920, brand: { name: "La Fripe Rétro", displayFont: "Anton", bodyFont: "Inter Tight", accent: "#2f6b4f" }, reelTexts: [], end: null, ...props });
+  const photos = drawnNodes(tree).flatMap((n) => {
+    const footage = n.type === "div" && styleOf(n).overflow === "hidden" ? drawnNodes(n).find((c) => c.type === "Footage") : undefined;
+    return footage ? [{ shot: footage.props.shot as number, at: footage.props.at as number, box: styleOf(n) as { left: number; top: number; width: number; height: number } }] : [];
+  });
+  return { tree, photos };
+};
+
+test("« Pile de photos » (v2) lays its photos where and when its original does, within two images", async () => {
+  const { pile, pileLandings } = await import("./skills/pile.ts");
+  assert.equal(pile.version, 2);
+  assert.equal(pile.bpm, 120);
+  const line = pile.timeline(37, { end: false });
+  // Each photo lands on its shot's first image (the first a little in): the original's 37, within two images; its burst
+  // at 2 or 3 images, its nine last on the original's own slowing gaps.
+  const lands = [line.marks.first!, ...line.shots.slice(1).map((s) => Math.round(s.start * 30))];
+  assert.deepEqual(lands, pileLandings(37).map((b) => Math.round(b * 15)));
+  lands.forEach((f, k) => assert.ok(Math.abs(f - PILE_LANDS[k]!) <= 2, `photo ${k + 1}: image ${f}, the original's ${PILE_LANDS[k]}`));
+  const gaps = lands.slice(1).map((f, k) => f - lands[k]!);
+  assert.ok(gaps.slice(0, 27).every((g) => g === 2 || g === 3), gaps.join(" "));
+  assert.deepEqual(gaps.slice(27), [4, 5, 4, 6, 6, 6, 7, 9, 7]);
+  // 9,13 s (274 images), its second-last leaving on its hit (image 239), its last 5 images after, its words alone then.
+  assert.ok(Math.abs(Math.round(line.duration * 30) - 274) <= 2, `${line.duration} s`);
+  assert.ok(Math.abs(line.marks.hit! - 239) <= 2 && line.marks.last! - line.marks.hit! === 5, JSON.stringify(line.marks));
+  assert.equal(line.marks.stay, 120);
+  assert.deepEqual(line.texts, { mots: { from: 0, to: line.duration } });
+  // Its code: each photo lands on its image, at once, and leaves 120 images later (the pile empties from the top at the
+  // pace it was made, no full pile held), the second-last on the hit, the last after; nothing but its words after them.
+  const shots = pileShots(line);
+  const marks = Object.fromEntries(Object.entries(line.marks).map(([k, v]) => [k, String(v)]));
+  const on = (f: number) => new Set(pileDrawn(pile.code, f, { durationInFrames: 275, shots, texts: marks }).photos.map((p) => p.shot));
+  const seen = Array.from({ length: 276 }, (_, f) => on(f));
+  for (let k = 0; k < 37; k++) {
+    const from = seen.findIndex((s) => s.has(k));
+    const to = seen.findIndex((s, f) => f > from && !s.has(k));
+    assert.equal(from, lands[k], `photo ${k + 1} lands`);
+    if (k < 35) assert.ok(Math.abs(to - (PILE_LANDS[k]! + 120)) <= 2 || (k === 16 || k === 30), `photo ${k + 1} leaves at ${to}, the original's ${PILE_LANDS[k]! + 120}`);
+    if (k < 35) assert.ok(to <= lands[k]! + 120 && to < line.marks.hit!, `photo ${k + 1} leaves at ${to}`);
+  }
+  assert.equal(seen.findIndex((s, f) => f > lands[35]! && !s.has(35)), line.marks.hit);
+  assert.equal(seen.findIndex((s, f) => f > lands[36]! && !s.has(36)), line.marks.last);
+  // The top already leaves while the last two land (its image 123): the full pile is never held.
+  assert.equal(seen.findIndex((s, f) => f > 3 && !s.has(0)), 123);
+  assert.ok(lands[35]! <= 123 && lands[36]! > 123);
+  assert.ok(!seen.some((s) => s.size === 37));
+  assert.ok(seen.slice(line.marks.last!).every((s) => s.size === 0));
+  assert.equal(seen[0]!.size, 0);
+  // With an ending card, its cuts the same, the last shot longer for the engine's 1,6 s and its words up to the card.
+  const ended = pile.timeline(37, { end: true });
+  assert.deepEqual(ended.shots.slice(0, -1), line.shots.slice(0, -1));
+  assert.ok(ended.duration - line.duration >= 1, `${ended.duration} s`);
+  assert.equal(ended.texts.mots!.to, Math.round((ended.duration - 1.6) * 100) / 100);
+  // At another tempo, every length in beats follows it.
+  const slower = pile.timeline(37, { end: false, bpm: 100 });
+  assert.equal(slower.marks.stay, 144);
+  assert.ok(Math.abs(slower.duration / line.duration - 1.2) < 0.01, `${slower.duration} s`);
+});
+
+test("« Pile de photos » (v2): the original's boxes cropped square but three, her photos still, her videos playing while on top", async () => {
+  const { pile } = await import("./skills/pile.ts");
+  const line = pile.timeline(37, { end: false });
+  const marks = Object.fromEntries(Object.entries(line.marks).map(([k, v]) => [k, String(v)]));
+  const shots = pileShots(line);
+  const draw = (f: number, extra: Record<string, unknown> = {}) => pileDrawn(pile.code, f, { durationInFrames: 275, shots, texts: marks, ...extra });
+  const lands = (k: number) => (k ? Math.round(line.shots[k]!.start * 30) : line.marks.first!);
+  // The pile as the last one lands (its first three already gone, as the original's at its image 130): later ones on top.
+  const full = draw(lands(36)).photos;
+  assert.deepEqual(full.map((p) => p.shot), Array.from({ length: 34 }, (_, i) => i + 3));
+  // In the original's boxes (centres and sides measured at 1080 × 1920, within a few pixels): its 27th a big 2:3 portrait,
+  // its 35th a 4:5, the others square, no turn, no border, no shadow.
+  const box = (k: number) => draw(lands(k)).photos.find((p) => p.shot === k)!.box;
+  const measured: Record<number, [number, number, number, number]> = { 0: [349, 511, 308, 458], 2: [568, 426, 477, 474], 14: [432, 897, 366, 372], 26: [734, 1269, 446, 660], 34: [824, 1477, 339, 424], 36: [584, 1503, 363, 360] };
+  for (const [k, [cx, cy, w, hh]] of Object.entries(measured)) {
+    const b = box(Number(k));
+    assert.ok(Math.abs(b.left + b.width / 2 - cx) <= 6 && Math.abs(b.top + b.height / 2 - cy) <= 6, `photo ${Number(k) + 1}: ${JSON.stringify(b)}`);
+    assert.ok(Math.abs(b.width - w) <= 8 && Math.abs(b.height - hh) <= 8, `photo ${Number(k) + 1}: ${JSON.stringify(b)}`);
+  }
+  const shapes = Array.from({ length: 37 }, (_, k) => Math.round((box(k).width / box(k).height) * 100) / 100);
+  assert.deepEqual(shapes.flatMap((a, k) => (a !== 1 ? [[k, a]] : [])), [[0, 0.67], [26, 0.67], [34, 0.8]]);
+  assert.ok(!drawnNodes(draw(130).tree).some((n) => /rotate|scale/.test(String(styleOf(n).transform ?? "none")) && n.type === "div" && styleOf(n).overflow === "hidden"));
+  assert.doesNotMatch(pile.code, /boxShadow|border:/);
+  // Each shot plays from its photo's landing (a video while it lies on top, until the next one lands, then it holds; a
+  // photo stays still); her last one plays its whole stay.
+  for (const p of full) assert.equal(p.at, lands(p.shot));
+  for (let k = 1; k < 36; k++) assert.equal(Math.round(line.shots[k]!.end * 30), lands(k + 1), `shot ${k + 1}`);
+  assert.ok(line.shots.at(-1)!.end - line.shots.at(-1)!.start > (line.marks.last! - lands(36)) / 30);
+  // Fewer photos: bigger squares on the same surface, the first still in portrait; on her word, each at its own shape or
+  // all in portrait 4:5.
+  const few = pile.timeline(12, { end: false });
+  const fewShots = pileShots(few, 3 / 4, "photo");
+  const fewMarks = Object.fromEntries(Object.entries(few.marks).map(([k, v]) => [k, String(v)]));
+  const fewBox = (f: number, settings: Record<string, string> = {}) => pileDrawn(pile.code, f, { durationInFrames: Math.round(few.duration * 30), shots: fewShots, texts: { ...fewMarks, ...settings } }).photos.at(-1)!.box;
+  const third = Math.round(few.shots[3]!.start * 30);
+  assert.ok(fewBox(third).width >= 480 && fewBox(third).width === fewBox(third).height, JSON.stringify(fewBox(third)));
+  assert.ok(Math.abs(fewBox(third, { format: "forme" }).width / fewBox(third, { format: "forme" }).height - 0.75) < 0.01);
+  assert.ok(Math.abs(fewBox(third, { format: "portrait" }).width / fewBox(third, { format: "portrait" }).height - 0.8) < 0.01);
+  assert.deepEqual(pile.settings?.map((s) => [s.name, s.choices.map((c) => c.value)]), [["format", ["carre", "forme", "portrait"]]]);
+  // The page stays white, without grade: her photos keep their colours.
+  assert.deepEqual(pile.finish, { contrast: 0, saturation: 0, warmth: 0, grain: 0, vignette: 0, fade: 0 });
+  assert.equal(styleOf(draw(0).tree).backgroundColor, "#fdfdfd");
+  // 20 files at least before Edith asks for more (under 20, no burst), 40 at most.
+  assert.deepEqual([pile.files, pile.shots], [[20, 40], [8, 40]]);
+});
+
+test("« Pile de photos » (v2): her words in front, as tall and condensed as its original's, in her colour, never its yellow", async () => {
+  const { pile } = await import("./skills/pile.ts");
+  const line = pile.timeline(37, { end: false });
+  const marks = Object.fromEntries(Object.entries(line.marks).map(([k, v]) => [k, String(v)]));
+  const reelTexts = [{ text: "La\u00a0Fripe\u00a0Rétro", role: "hook", from: 0, to: 275, emphasis: [] }];
+  const draw = (f: number, brand: Record<string, unknown> = {}, extra: Record<string, unknown> = {}) =>
+    pileDrawn(pile.code, f, { durationInFrames: 275, shots: pileShots(line), texts: marks, reelTexts, brand: { name: "La Fripe Rétro", displayFont: "Anton", bodyFont: "Inter Tight", accent: "#2f6b4f", ...brand }, ...extra }).tree;
+  const words = (tree: Drawn) => drawnNodes(tree).filter((n) => n.type === "div" && styleOf(n).height === 211);
+  // Her name split one word a line (its no-break spaces too), in two pairs, from the first image to the last, in front of
+  // the photos (drawn after them).
+  for (const f of [0, 130, 274]) assert.deepEqual(words(draw(f)).map(drawnText), ["LA", "FRIPE", "RÉTRO"]);
+  assert.deepEqual(words(draw(0)).map((n) => styleOf(n).marginTop), [0, 0, 74]);
+  const kids = drawnNodes(draw(130))[0]!.children.flat(Infinity) as Drawn[];
+  assert.ok(kids.findIndex((n) => n && heldText(n).includes("FRIPE")) > kids.findIndex((n) => n && Array.isArray(n.children) && drawnNodes(n).some((c) => c.type === "Footage")));
+  // Capitals of 140 px (Anton's 132 at 154 px, its bars thickened by four copies of its own colour 2 and 4 px above and
+  // under it), squeezed to two thirds: within 140 to 940 px once squeezed.
+  const wrap = drawnNodes(draw(0)).find((n) => /scaleX/.test(String(styleOf(n).transform ?? "")))!;
+  assert.equal(styleOf(wrap).transform, "scaleX(0.66)");
+  const w = Number(styleOf(wrap).width);
+  assert.ok(Math.abs(Number(styleOf(wrap).left) + w / 2 - 540) <= 1 && Math.abs(w * 0.66 - 800) <= 1, JSON.stringify(styleOf(wrap)));
+  assert.equal(styleOf(words(draw(0))[0]!).fontSize, 154);
+  assert.equal(styleOf(words(draw(0))[0]!).textShadow, "0 2px 0 #2f6b4f, 0 -2px 0 #2f6b4f, 0 4px 0 #2f6b4f, 0 -4px 0 #2f6b4f");
+  // Her own face is never squeezed nor thickened.
+  assert.ok(!drawnNodes(draw(0, { displayFont: "Playfair Display" })).some((n) => /scaleX/.test(String(styleOf(n).transform ?? ""))));
+  assert.equal(styleOf(words(draw(0, { displayFont: "Playfair Display" }))[0]!).textShadow, undefined);
+  // Her colour; one too pale for the white page (paler than the original's yellow there), her dark one, else ink.
+  assert.equal(styleOf(words(draw(0))[0]!).color, "#2f6b4f");
+  assert.equal(styleOf(words(draw(0, { accent: "#f3efe6", palette: { dark: "#3a2a1f" } }))[0]!).color, "#3a2a1f");
+  assert.equal(styleOf(words(draw(0, { accent: "#ffffff" }))[0]!).color, "#161616");
+  assert.ok(!/fbd201|ffe100/i.test(pile.code) && !/THIS|WORK/.test(pile.code));
+  // More than four words: four lines at most, none ending on a word that belongs to the next.
+  const long = draw(0, {}, { reelTexts: [{ text: "nos pièces uniques chinées à la main", role: "hook", from: 0, to: 275, emphasis: [] }] });
+  const set = words(long).map(drawnText);
+  assert.ok(set.length <= 4 && !set.slice(0, -1).some((l) => /(^| )(À|LA)$/.test(l)), set.join(" / "));
+  // Its ending card, after the pile: its title in the same capitals, a line under it.
+  const ended = pile.timeline(37, { end: true });
+  const endFrom = Math.round(ended.duration * 30) - 48;
+  const card = drawScene(pile.code, endFrom + 5, { width: 1080, height: 1920, durationInFrames: Math.round(ended.duration * 30), brand: { name: "La Fripe Rétro", displayFont: "Anton", bodyFont: "Inter Tight", accent: "#2f6b4f" }, shots: pileShots(ended), texts: Object.fromEntries(Object.entries(ended.marks).map(([k, v]) => [k, String(v)])), reelTexts, end: { title: "Vide-dressing samedi", subtitle: "de 10 h à 18 h", from: endFrom } });
+  assert.deepEqual(words(card).map(drawnText), ["VIDE-DRESSING", "SAMEDI"]);
+  assert.ok(heldText(card).includes("de 10 h à 18 h") && !heldText(card).includes("FRIPE"));
+});
+
+test("« Pile de photos » (v2): its clicks slowing down on its measured moments, a dry knock as the pile empties, its music lighter after", async () => {
+  const { pile } = await import("./skills/pile.ts");
+  const { skillPlan } = await import("./skills.ts");
+  const line = pile.timeline(37, { end: false });
+  // The original's clicks from 1,6 s (images, measured on its sound) and its hit at 7,962 s: each within two images.
+  const original = [48, 50.1, 52.1, 54.2, 56.5, 58.9, 61, 63.7, 66.7, 69.6, 72.8, 75.6, 79.4, 83, 86.7, 90.9, 95.6, 100.4, 105.5, 111.1, 117.4, 124, 131.3, 139.7, 148.7, 159.1, 170.8, 184.1, 199.6, 218.2, 238.9];
+  const sounds = line.sounds!;
+  assert.equal(sounds.length, original.length);
+  sounds.forEach((s, i) => assert.ok(Math.abs(s.at * 30 - original[i]!) <= 2, `sound ${i + 1}: image ${s.at * 30}, the original's ${original[i]}`));
+  assert.ok(sounds.slice(0, -1).every((s) => s.sound === "light click" && s.seconds === 0.5 && s.gain! < 6 && s.gain! >= -12));
+  // The knock on the hit, the loudest, where the second-last leaves; no paper sound on each photo (its original has none).
+  assert.deepEqual(sounds.at(-1), { at: line.marks.hit! / 30, sound: "dry knock", seconds: 0.5, gain: 6 });
+  assert.ok(!sounds.some((s) => /paper|whoosh|pop/.test(s.sound)));
+  // Its music lighter from the hit (without its bass) to its end, which it reaches without fading.
+  assert.deepEqual(line.music, { filters: [{ kind: "thin", from: line.marks.hit! / 30, to: line.duration }], end: { at: line.duration, fade: 0.02 } });
+  // On her plan, valid: its sounds (under the 40 a Reel takes) and its music's shape, as its original plays them; at
+  // another tempo, they follow its beats.
+  const files = Array.from({ length: 37 }, (_, i) => ({ id: `p${i}`, photo: true, seconds: 0 }));
+  const fill = { shots: files.map((f) => ({ file: f.id, at: 0 })), texts: { mots: "La Fripe Rétro" }, end: null };
+  const plan = skillPlan({ skill: pile, name: "Pile de photos", files, fill });
+  assert.ok(editPlanSchema.safeParse(plan).success);
+  assert.equal(plan.sounds?.length, 31);
+  assert.ok(plan.sounds!.every((s) => s.skill));
+  assert.deepEqual(plan.music_shape, { filters: [{ kind: "thin", from: 8, to: plan.duration, open: 0.02 }], end: { at: plan.duration, fade: 0.02 } });
+  assert.deepEqual(plan.skill, { key: "pile", version: 2 });
+  const slower = skillPlan({ skill: pile, name: "Pile de photos", files, fill, bpm: 100 });
+  assert.ok(Math.abs(slower.sounds!.at(-1)!.at - 9.6) < 0.01, `${slower.sounds!.at(-1)!.at}`);
+  // Fewer photos: the same clicks counted back from its hit, none before the first photo.
+  const few = pile.timeline(8, { end: false });
+  assert.ok(few.sounds!.every((s) => s.at >= few.marks.first! / 30) && few.sounds!.at(-1)!.at === few.marks.hit! / 30);
+});
