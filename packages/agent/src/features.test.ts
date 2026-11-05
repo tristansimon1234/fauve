@@ -10216,3 +10216,60 @@ test("« Interrupteur » (v6): held only once nothing of her is left in her cut-
   const held = await Promise.all([215, 240, 272].map(async (f) => f - ((await wallAt(back, f)) ?? f)));
   assert.ok(held.every((h) => h === held[0]) && held[0]! >= 201 && held[0]! <= 207, held.join(" "));
 });
+
+/**
+ * The parameters an answer's schema leaves optional, as the API counts them for its grammar (a property its object does
+ * not require, every reference followed): past 24 in a request, Claude refuses it with a 400.
+ */
+function optionalParameters(schema: Record<string, unknown>): number {
+  type N = Record<string, unknown>;
+  let count = 0;
+  const walk = (node: unknown, depth: number): void => {
+    if (!node || typeof node !== "object" || depth > 40) return;
+    const n = node as N;
+    if (typeof n.$ref === "string") {
+      let target: unknown = schema;
+      for (const k of n.$ref.replace(/^#\//, "").split("/")) target = (target as N | undefined)?.[k];
+      return walk(target, depth + 1);
+    }
+    if (n.properties && typeof n.properties === "object") {
+      const required = new Set((n.required as string[] | undefined) ?? []);
+      for (const [k, v] of Object.entries(n.properties as N)) {
+        if (!required.has(k)) count++;
+        walk(v, depth + 1);
+      }
+    }
+    for (const key of ["items", "anyOf", "oneOf", "allOf", "additionalProperties"]) {
+      const v = n[key];
+      if (Array.isArray(v)) v.forEach((x) => walk(x, depth + 1));
+      else if (v && typeof v === "object") walk(v, depth + 1);
+    }
+  };
+  walk(schema, 0);
+  return count;
+}
+
+test("the answers' schemas stay within the API's optional parameters: the editor's gave 25 on 5 November (its texts' own font)", async () => {
+  const { outputFormat } = await import("./answer.ts");
+  const { editorOutputSchema } = await import("./editor.ts");
+  const { directorOutputSchema } = await import("./director.ts");
+  const { skillFillSchema } = await import("./skills.ts");
+  const { motionSceneOutputSchema } = await import("./motion-scene.ts");
+  const { reelContractSchema } = await import("./contract.ts");
+  const { montageReviewSchema } = await import("./critic.ts");
+  const { voiceOverDecisionSchema, voiceOverScriptSchema } = await import("./voice-over.ts");
+  const optional = (schema: unknown) => optionalParameters((outputFormat(schema as never) as unknown as { schema: Record<string, unknown> }).schema);
+  // The API counted 4 more than this for the editor's (25 for 21 here, 24 for 20 when it last passed, on 3 November):
+  // 20 here at most for any of them, and the editor's under it, so one more field on a plan's texts never breaks it.
+  const counts = { editorOutputSchema, directorOutputSchema, skillFillSchema, motionSceneOutputSchema, reelContractSchema, montageReviewSchema, voiceOverDecisionSchema, voiceOverScriptSchema };
+  for (const [name, schema] of Object.entries(counts)) assert.ok(optional(schema) <= 20, `${name}: ${optional(schema)} optional parameters`);
+  assert.ok(optional(editorOutputSchema) <= 19, `the editor's: ${optional(editorOutputSchema)}`);
+  // Its texts never carry a font of their own (a skill filler's); its fonts, when it gives them, both faces.
+  const text = (editorOutputSchema.shape.plan.shape.texts.element as unknown as { shape: Record<string, unknown> }).shape;
+  assert.equal("font" in text, false);
+  const fonts = editorOutputSchema.shape.plan.shape.fonts;
+  assert.equal(fonts.safeParse({ display: "Anton" }).success, false);
+  assert.equal(fonts.safeParse({ display: "Anton", body: "Inter" }).success, true);
+  assert.equal(fonts.safeParse(undefined).success, true);
+});
+

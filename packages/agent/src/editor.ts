@@ -107,9 +107,12 @@ const editorMotionSegmentSchema = z.object({
 /**
  * A text as the editor writes it: a saved look is named (look_name), never copied
  * out in full. The full look schema (fonts, colours, backgrounds, lists) made the
- * structured-output grammar too large for the API; the look is put back after.
+ * structured-output grammar too large for the API; the look is put back after. Its own
+ * font (`font`) is a skill filler's, never the editor's: on 5 November it took the
+ * editor's answer to 25 optional parameters, past the API's 24, and every Reel the
+ * editor cut (a voice leading it, a correction, no model) failed with a 400.
  */
-const editorTextSchema = editPlanTextSchema.omit({ look: true, detail_look: true, x: true, y: true, scale: true, backdrop: true }).extend({
+const editorTextSchema = editPlanTextSchema.omit({ look: true, detail_look: true, x: true, y: true, scale: true, backdrop: true, font: true }).extend({
   look_name: z.string().optional().describe("Exact name of a style from brand.text_looks to apply to this text; otherwise nothing (her charter applies)"),
 });
 
@@ -200,7 +203,8 @@ export const editorOutputSchema = z.object({
       .describe(
         "How what is said is written, when there are subtitles: native (the apps' own captions, the default, right for a voice telling a story over her images), kinetic (each phrase placed around the person, its strong word big in another face, sometimes behind them: a creator talking to camera with energy; the words become the design, so fewer other texts), stickers (each word on a small label near the person: a playful tone). Her request or the Reel she copies decides first. A correction keeps the previous one unless you write another",
       ),
-    fonts: z.object({ display: z.string().optional(), body: z.string().optional() }).optional(),
+    // Both faces when it gives them (the same family twice when one is enough): two optional parameters less for the API's 24.
+    fonts: z.object({ display: z.string(), body: z.string() }).optional(),
     colors: z
       .array(z.string())
       .optional()
