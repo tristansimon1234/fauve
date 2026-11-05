@@ -25,6 +25,7 @@ import {
   type CaptionStyle,
   type EditPlan,
   type MotionTemplate,
+  type PlanLayer,
   type PlanSegment,
 } from "./schemas.ts";
 import type { SavedLook } from "./text-look.ts";
@@ -561,7 +562,14 @@ const END_CARD_HOLD = 2.2;
  * `speech`: what was measured of the speech in her videos (speech.ts): the hesitations and long
  * pauses are cut out of the passages where someone speaks, and those cuts never move onto the beat.
  */
-export function normalizeEditPlan(plan: EditPlan, clipDurations: Record<string, number>, maxFreeScenes = MAX_FREE_SCENES, speech?: Record<string, SpeechFacts>): EditPlan {
+export function normalizeEditPlan(
+  plan: EditPlan,
+  clipDurations: Record<string, number>,
+  maxFreeScenes = MAX_FREE_SCENES,
+  speech?: Record<string, SpeechFacts>,
+  /** A layer the budget does not count: an effect of the bank the engine plays as it is (pieces.ts), no motion designer. */
+  uncounted?: (layer: PlanLayer) => boolean,
+): EditPlan {
   let freeScenes = 0;
   const shownTemplates = new Set<string>();
   const segments = plan.segments.flatMap((s): PlanSegment[] => {
@@ -631,7 +639,7 @@ export function normalizeEditPlan(plan: EditPlan, clipDurations: Record<string, 
     if (l.compose) return [l];
     const from = round(Math.max(0, l.from));
     const to = round(Math.min(duration, l.to));
-    if (to - from < 1 || (!l.motion.js && freeScenes++ >= maxFreeScenes)) return [];
+    if (to - from < 1 || (!l.motion.js && !uncounted?.(l) && freeScenes++ >= maxFreeScenes)) return [];
     return [{ ...l, from, to }];
   });
 

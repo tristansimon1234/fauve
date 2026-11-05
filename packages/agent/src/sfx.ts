@@ -175,7 +175,12 @@ export function planCues(
     if (!isMotionSegment(s) || !span) return;
     for (const c of s.motion.sounds ?? []) if (c.at < span.length) add(c, span.start + c.at, "animation");
   });
-  for (const l of plan.layers ?? []) for (const c of l.motion.sounds ?? []) if (l.from + c.at < l.to) add(c, l.from + c.at, "animation");
+  for (const l of plan.layers ?? [])
+    for (const c of l.motion.sounds ?? []) {
+      // An effect of the bank's sound on her gesture (pieces.ts): where her hand does it in its shot, else its own moment.
+      const at = c.skill && c.hand ? (handCueAt(plan, starts, c.hand, tracks) ?? l.from + c.at) : l.from + c.at;
+      if (at < l.to) add(c, at, "animation");
+    }
   return cues.filter((c) => c.at >= 0 && c.at < plan.duration - 0.15).sort((a, b) => a.at - b.at);
 }
 

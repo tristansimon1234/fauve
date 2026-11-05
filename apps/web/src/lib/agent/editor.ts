@@ -51,7 +51,10 @@ import {
   memoryLines,
   resolveReelBrand,
   type EditPlan,
+  type PlanLayer,
   openingCandidates,
+  layerPiece,
+  MAX_PIECES,
   pieceLayers,
   pieceShots,
   planHook,
@@ -112,7 +115,7 @@ import { skillFor } from "@fauve/agent/skills";
 import { recordToolUses } from "@/lib/tool-maker";
 import { designMotionScenes, type SceneRequest, type SceneResult } from "./motion-designer";
 import { lendEffects, lendingFor } from "./borrowed-effects";
-import { playPieces } from "./pieces";
+import { playPieces, recentPieces } from "./pieces";
 import { askDirector, directorFirstTurn, directorLookTurn, type DirectorBlock, type DirectorParts, type SavedDirector } from "./director";
 import { reelStills, showReel } from "./reel-canvas";
 import { ensureInspirationRead } from "@/lib/inspirations";
@@ -525,6 +528,10 @@ export async function designEdit(params: {
     director: Boolean(params.director),
     shots: pieceShots(clips, Object.fromEntries(photoIds.flatMap((id, i) => (photoReads[i] ? [[id, photoReads[i]!] as const] : [])))),
     files: new Set(mediaIds).size,
+    // Never the same few for every Reel: one her request names first, those her latest Reels played last, ties by this Reel.
+    ...(params.brief ? { request: params.brief } : {}),
+    avoid: followed ? [] : await recentPieces(params.studioId, params.postId).catch(() => []),
+    seed: params.postId,
   });
   const input = {
     studio: {
@@ -769,7 +776,11 @@ export async function designEdit(params: {
     const allowed = Math.min(MAX_FREE_SCENES, (params.maxNewScenes ?? MAX_FREE_SCENES) + replacedAnimations(drafted, params.fresh ? null : base));
     // A clip whose passages look alike shows twice at most, whatever its passages.
     const capped = spreadRepeats(drafted, alike, files, still);
-    return carryRetouch(carryTextStyle(normalizeEditPlan(capped, durations, allowed, speech), params.fresh ? null : base), base);
+    // The effect of the bank it lays is played by the engine (next to nothing): not one of its animations.
+    const offeredPieces = lending?.pieces ? [...lending.pieces.keys()] : [];
+    let piecesLeft = MAX_PIECES;
+    const uncounted = (l: PlanLayer) => Boolean(offeredPieces.length && piecesLeft > 0 && layerPiece(l, offeredPieces) && piecesLeft--);
+    return carryRetouch(carryTextStyle(normalizeEditPlan(capped, durations, allowed, speech, uncounted), params.fresh ? null : base), base);
   };
   let plan = toPlan(output);
   // Her videos whole and horizontal on black (her contract): the engine draws it on every version.
@@ -1208,6 +1219,12 @@ export async function designEdit(params: {
       requestFor: (index) => requestFor({ id: `l${index}`, brief: layers[index]!.motion.brief }),
       brand: sceneBrand,
       context: sceneContext,
+      // Her photos in this Reel, for an effect that lays some (her work, what she names), cut out first for its check.
+      photos: photoIds.map((id, i) => ({ id, shows: photoReads[i]?.detection.notes ?? "" })),
+      photoOffers: async (ids) => {
+        await ensureCutouts(params.studioId, ids).catch((e: unknown) => console.warn("cut-outs: not ready", e));
+        return photoOffers(params.studioId, ids);
+      },
     });
     const left = outcome.unplayed.map((u) => requestFor({ id: `l${u.index}`, brief: layers[u.index]!.motion.brief }));
     if (left.length) {

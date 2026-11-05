@@ -10615,8 +10615,9 @@ function pieceRun(n: number, options: { lead?: number; photo?: boolean } = {}) {
 
 test("the bank of effects: each piece comes from a model, passes the code check, and holds over every count of shots and length it takes", async () => {
   const { EFFECT_PIECES } = await import("./piece-library.ts");
-  const { pieceTestPlan, layerShots } = await import("./pieces.ts");
+  const { pieceTestPlan, layerShots, pieceMusicShape } = await import("./pieces.ts");
   const { checkMotionCode } = await import("./motion-scene.ts");
+  const { subjectShots } = await import("./subject.ts");
   const { houseModel } = await import("./house-models.ts");
   const { HOUSE_EFFECTS } = await import("./house-effects.ts");
   const { SLOT_NAME } = await import("./schemas.ts");
@@ -10651,6 +10652,13 @@ test("the bank of effects: each piece comes from a model, passes the code check,
         assert.deepEqual(layerShots(plan, layer), Array.from({ length: n }, (_, i) => i + 1));
         assert.equal(Number(layer.motion.texts!.beat), 18, `${key}: a beat at 100 BPM is 18 frames`);
         for (const [slot, w] of Object.entries(words)) assert.equal(layer.motion.texts![slot], w);
+        // What it cuts out of her shots is what its timeline declares (motion.drawn), never read in its code: a cut-out
+        // drawn there and not declared would have every shot under it cut out (on a rented card), for nothing.
+        const cutOut = subjectShots(plan);
+        assert.deepEqual([...cutOut].sort((a, b) => a - b), [...new Set(layer.motion.drawn?.subjects ?? [])].sort((a, b) => a - b), `${key} n=${n}: its cut-outs declared`);
+        // Its music shaped within its span only, read as the mix reads it.
+        const shape = pieceMusicShape({ piece, fill: { texts: words, objects: {}, settings: {} }, plan, layer, bpm: 100 });
+        for (const x of [...(shape?.pauses ?? []), ...(shape?.filters ?? [])]) assert.ok(x.from >= span[0] - 1e-6 && x.to <= span[1] + 1e-6, `${key} n=${n}: its music shaped within its span`);
       }
     }
   }
@@ -10718,6 +10726,44 @@ test("an effect of the bank is offered only when her files can carry it, the bes
   assert.equal(PIECES_OFFERED, 5);
   const many = Array.from({ length: 8 }, (_, i) => ({ ...cadre, key: `k${i}` }));
   assert.equal(piecesOffered(many, wide, 5).length, 5);
+  // Filmed in width: a video seen in landscape, a photo wider than high; an effect that asks for it, never on upright ones.
+  const turned = { ...cadre, key: "turned", require: { files: 1, shot: { video: true, wide: true } } };
+  assert.deepEqual(wide.map((s) => s.wide), [true]);
+  const upright = pieceShots([{ media_id: "b", analysis: { ...(clip("wide") as object), orientation: "portrait" } as never }], {});
+  assert.deepEqual(upright.map((s) => s.wide), [false]);
+  assert.deepEqual(piecesOffered([turned], wide, 1).map((p) => p.key), ["turned"]);
+  assert.deepEqual(piecesOffered([turned], upright, 1), []);
+  const photos = pieceShots([], { p: { width: 1600, height: 1200, detection: { regions: [] } }, q: { width: 1200, height: 1600, detection: { regions: [] } } } as never);
+  assert.deepEqual(photos.map((s) => s.wide), [true, false]);
+});
+
+test("an effect of the bank is not one of the editor's animations: laid beside its own, never instead of them", async () => {
+  const { normalizeEditPlan } = await import("./editor.ts");
+  const { BORROW_PIECES, layerPiece } = await import("./pieces.ts");
+  const plan: EditPlan = editPlanSchema.parse({
+    format: "9:16",
+    duration: 6,
+    template: "libre",
+    segments: [{ clip_id: "a", in: 0, out: 3, zoom: "none" }, { clip_id: "b", in: 0, out: 3, zoom: "none" }],
+    texts: [],
+    images: [],
+    transitions: "cut",
+    subtitles: false,
+    music: null,
+    layers: [
+      { from: 0, to: 2.5, motion: { brief: "[borrow: cadre] Her room opening frame after frame" } },
+      { from: 3, to: 5, motion: { brief: "The number moment: « 1909 » very large" } },
+    ],
+  });
+  // One animation allowed: without the exemption the second is dropped; the bank's effect does not count.
+  assert.equal(normalizeEditPlan(plan, { a: 3, b: 3 }, 1).layers?.length, 1);
+  const kept = normalizeEditPlan(plan, { a: 3, b: 3 }, 1, undefined, (l) => layerPiece(l, ["cadre"]) !== undefined);
+  assert.deepEqual(kept.layers?.map((l) => l.motion.brief.slice(0, 16)), ["[borrow: cadre] ", "The number momen"]);
+  // None allowed: the effect alone.
+  assert.equal(normalizeEditPlan(plan, { a: 3, b: 3 }, 0, undefined, (l) => layerPiece(l, ["cadre"]) !== undefined).layers?.length, 1);
+  // Its rule says so, and lays one whenever her videos carry one.
+  assert.match(BORROW_PIECES, /not one of your animations/);
+  assert.match(BORROW_PIECES, /never instead of it/);
 });
 
 test("an effect of the bank: the editor names it in its layer's brief, one per Reel, and the engine builds its layer from it", async () => {
@@ -10760,7 +10806,148 @@ test("an effect of the bank: the editor names it in its layer's brief, one per R
   // The editor's line and rule: one at most, laid in « layers », named in its brief.
   assert.match(pieceLine(cadre), /^cadre — Cadre dans le cadre : .* Il faut : .* Se pose : .*\(2 à 8 s\)\. Ses mots : .*16 signes au plus, facultatif/);
   const offered = piecesForEditor([cadre])!;
-  assert.match(offered.rule, /lay ONE, never more/);
+  assert.match(offered.rule, /lay ONE of them, never more/);
   assert.match(offered.rule, /\[borrow: <key>\]/);
   assert.equal(piecesForEditor([]), undefined);
+});
+
+test("an effect of the bank may be timed on what she says, lay her photos, write her coordinates and click on her gesture", async () => {
+  const { cadre } = await import("./pieces/cadre.ts");
+  const { pieceMotion, pieceFillInput, pieceFillSchemaFor, pieceFillSchema, readPieceFill, saidUnder } = await import("./pieces.ts");
+  const { outputFormat } = await import("./answer.ts");
+  const piece = {
+    ...cadre,
+    key: "test",
+    spoken: true,
+    photos: { want: "ce qu'elle nomme", most: 2 },
+    texts: [
+      { slot: "mot", want: "un mot qu'elle dit", max: 20, required: true },
+      { slot: "lieu", want: "ses coordonnées, sinon son quartier", max: 30, required: false, fact: "coordinates" as const },
+    ],
+    timeline: () => ({ sounds: [{ at: 1, sound: "light switch click", hand: { shot: 0, moment: "highest" as const, within: [0.5, 2] as [number, number] } }] }),
+  };
+  const plan: Pick<EditPlan, "segments" | "tempo"> = {
+    tempo: 100,
+    segments: [
+      { clip_id: "intro", in: 0, out: 1, zoom: "none" },
+      { motion: { brief: "an animation" }, duration: 1 },
+      { clip_id: "talk", in: 2, out: 6, zoom: "none" },
+    ],
+  };
+  const layer = { from: 2, to: 5, motion: { brief: "[borrow: test]" } };
+  // What she says under it, on the Reel's clock: her words of the passage under the span, in order.
+  const clips = { talk: { words: [{ w: "avant", start: 1, end: 1.5 }, { w: "Ici", start: 2.1, end: 2.3 }, { w: "brioches", start: 3, end: 3.5 }, { w: "après", start: 5.5, end: 5.8 }] } } as never;
+  assert.equal(saidUnder(plan, clips, layer), "Ici brioches");
+  // Its coordinates are the engine's; her photos are chosen among those offered, as many as it takes.
+  const schema = pieceFillSchemaFor(piece);
+  assert.notEqual(schema, pieceFillSchema);
+  assert.equal(pieceFillSchemaFor(cadre), pieceFillSchema);
+  const json = (outputFormat(schema as never) as unknown as { schema: { required?: string[] } }).schema;
+  assert.ok(json.required?.includes("photos"), "its photos are required: no optional parameter for the API");
+  const answer = { fits: true, missing: "", texts: [{ slot: "mot", text: "brioches" }, { slot: "lieu", text: "48.8° N" }], objects: [], settings: [], photos: ["p2", "x", "p1", "p3"] };
+  const read = readPieceFill(piece, answer, { photos: ["p1", "p2", "p3"], facts: { coordinates: "48.8772° N, 2.3394° E" } })!;
+  assert.deepEqual(read.photos, ["p2", "p1"]);
+  assert.equal(read.texts.lieu, "48.8772° N, 2.3394° E");
+  // Without coordinates known, its filler's fallback words stand.
+  assert.equal(readPieceFill(piece, answer, { photos: [] })!.texts.lieu, "48.8° N");
+  const input = pieceFillInput({ piece, under: [{ id: "talk", photo: false, shows: "elle parle face caméra" }], brief: "", request: "", business: {}, said: "Ici brioches", photos: [{ id: "p1", shows: "une brioche" }], facts: { coordinates: "48.8772° N, 2.3394° E" } });
+  assert.equal(input.ce_qu_elle_dit, "Ici brioches");
+  assert.deepEqual(input.ses_photos, [{ id: "p1", montre: "une brioche" }]);
+  assert.equal(input.effet.ses_mots[1]!.ecrit_par_le_moteur, true);
+  // Its layer: timed on what she says (its code gets her words), her photos, its click on her gesture in its shot (the
+  // plan's third segment, its window on the Reel's clock).
+  const motion = pieceMotion({ piece, fill: read, plan, layer, bpm: 100 });
+  assert.equal(motion.times_spoken, true);
+  assert.deepEqual(motion.photos, ["p2", "p1"]);
+  assert.deepEqual(motion.sounds?.[0]?.hand, { shot: 2, moment: "highest", within: [2.5, 4] });
+});
+
+test("a sound of an effect laid over the montage lands on her gesture, read on her hands, else on its own moment", async () => {
+  const { planCues } = await import("./sfx.ts");
+  const plan = {
+    duration: 6,
+    texts: [],
+    segments: [{ clip_id: "v", in: 0, out: 6, zoom: "none" as const }],
+    layers: [{ from: 1, to: 5, motion: { brief: "[borrow: interrupteur]", sounds: [{ at: 1, sound: "light switch click", skill: true, hand: { shot: 0, moment: "highest" as const } }] } }],
+  };
+  // No tracks: its own moment, from the layer's start.
+  assert.deepEqual(planCues(plan, [{ start: 0, length: 6 }]).map((c) => c.at), [2]);
+});
+
+test("the effects offered change from one Reel to the next: the one she names first, those of her latest Reels last", async () => {
+  const { cadre } = await import("./pieces/cadre.ts");
+  const { piecesOffered } = await import("./pieces.ts");
+  const shot = { id: "a", photo: false, framing: "wide" as const, still: true, outdoors: false, indoors: true, person: false, beauty: 3 };
+  const bank = ["un", "deux", "trois", "quatre", "cinq", "six", "sept", "huit"].map((k) => ({ ...cadre, key: k, name: `Effet ${k}` }));
+  const keys = (options: Parameters<typeof piecesOffered>[4]) => piecesOffered(bank, [shot], 5, 3, options).map((p) => p.key);
+  // A tie is broken by the Reel, never by the bank's order: two Reels see different effects.
+  const seen = new Set(["p1", "p2", "p3", "p4", "p5", "p6"].map((seed) => keys({ seed }).join(",")));
+  assert.ok(seen.size > 1, "the same three for every Reel");
+  // The one her request names comes first; those of her latest Reels come last.
+  assert.equal(keys({ seed: "p1", request: "Je voudrais l'effet quatre sur mes photos" })[0], "quatre");
+  const avoided = keys({ seed: "p1", avoid: ["un", "deux", "trois", "quatre", "cinq"] });
+  assert.ok(avoided.every((k) => ["six", "sept", "huit"].includes(k)), avoided.join(","));
+  // The real names: « mosaïque » asks for « Mosaïque qui change ».
+  const { mosaique } = await import("./pieces/mosaique.ts");
+  assert.equal(piecesOffered([cadre, mosaique], [shot, { ...shot, framing: "close" }], 5, 2, { request: "une mosaique de mes plats" })[0]!.key, "mosaique");
+});
+
+test("an effect names in its code only the objects on a shot under it: one for a shot it does not have is never looked for", async () => {
+  const { cadre } = await import("./pieces/cadre.ts");
+  const { pieceMotion } = await import("./pieces.ts");
+  const piece = { ...cadre, objects: [{ slot: "porte", shot: 0, want: "" }, { slot: "enseigne", shot: -2, want: "" }], code: cadre.code.replace('"@porte"', '"@porte" || "@enseigne"') };
+  const plan: Pick<EditPlan, "segments" | "tempo"> = { tempo: 100, segments: [{ clip_id: "wide", in: 0, out: 4, zoom: "none" }] };
+  const motion = pieceMotion({ piece, fill: { texts: {}, objects: { porte: "back door", enseigne: "shop sign" }, settings: {} }, plan, layer: { from: 0, to: 4, motion: { brief: "" } }, bpm: 100 });
+  // One shot under it: its sign (the shot before the last) is not there, its door is.
+  assert.ok(motion.code!.includes('"back door"'));
+  assert.ok(!motion.code!.includes('"shop sign"') && motion.code!.includes('"@enseigne"'));
+  assert.deepEqual(motion.drawn, { shots: 1, objects: [{ shot: 0, name: "back door" }] });
+});
+
+test("an effect's settings: named in the editor's line, kept by a correction but what her request changes", async () => {
+  const { mosaique } = await import("./pieces/mosaique.ts");
+  const { pieceLine, pieceSettingsOf } = await import("./pieces.ts");
+  const { mergeSkillSettings } = await import("./skills.ts");
+  const papier = mosaique.settings!.find((s) => s.name === "papier")!;
+  const noir = papier.choices.find((c) => c.value !== papier.choices[0]!.value)!.value;
+  assert.match(pieceLine(mosaique), new RegExp(`Réglages : .*papier \\(${papier.choices.map((c) => c.value).join(", ")}\\)`));
+  // The version corrected had one asked: kept when her request changes nothing of it, its default asked again takes it off.
+  const earlier = { texts: { papier: noir, beat: "18", titre: "les rolls du midi" } };
+  assert.deepEqual(pieceSettingsOf(mosaique, earlier), { papier: noir });
+  assert.deepEqual(mergeSkillSettings(mosaique, pieceSettingsOf(mosaique, earlier), []), { papier: noir });
+  assert.deepEqual(mergeSkillSettings(mosaique, pieceSettingsOf(mosaique, earlier), [{ name: "papier", value: papier.choices[0]!.value }]), {});
+});
+
+test("an effect of the bank: its shots counted by the engine, a burst of sounds, the music shaped during it", async () => {
+  const { cadre } = await import("./pieces/cadre.ts");
+  const { pieceMotion, pieceMusicShape } = await import("./pieces.ts");
+  const piece = {
+    ...cadre,
+    timeline: () => ({
+      sounds: [{ at: 0.2, sound: "light click", burst: { times: [0, 0.05, 0.1, 9], gains: [0, -3, -6, 0] } }],
+      music: { filters: [{ kind: "muffled" as const, from: 0, to: 1.5, open: 0.2 }], pauses: [{ from: 2.5, to: 3.5 }, { from: 9, to: 10 }] },
+    }),
+  };
+  const plan: Pick<EditPlan, "segments" | "tempo" | "duration"> = {
+    tempo: 100,
+    duration: 8,
+    segments: [
+      { clip_id: "lead", in: 0, out: 2, zoom: "none" },
+      { clip_id: "a", in: 0, out: 2, zoom: "none" },
+      { clip_id: "b", in: 0, out: 2, zoom: "none" },
+      { clip_id: "after", in: 0, out: 2, zoom: "none" },
+    ],
+  };
+  const layer = { from: 2, to: 6, motion: { brief: "" } };
+  const fill = { texts: {}, objects: {}, settings: {} };
+  const motion = pieceMotion({ piece, fill, plan, layer, bpm: 100 });
+  // Its shots as the engine counts them, the same indices its code finds in `shots`.
+  assert.equal(motion.texts!.mine, "1,2");
+  // Its burst within its span.
+  assert.deepEqual(motion.sounds?.[0]?.burst, { times: [0, 0.05, 0.1], gains: [0, -3, -6] });
+  // Its music shaped on the Reel's clock, within its span; a model's own shape wins.
+  assert.deepEqual(pieceMusicShape({ piece, fill, plan, layer, bpm: 100 }), { filters: [{ kind: "muffled", from: 2, to: 3.5, open: 0.2 }], pauses: [{ from: 4.5, to: 5.5 }] });
+  const shaped = { ...plan, music_shape: { end: { at: 7 } } };
+  assert.deepEqual(pieceMusicShape({ piece, fill, plan: shaped, layer, bpm: 100 }), { end: { at: 7 } });
+  assert.equal(pieceMusicShape({ piece: cadre, fill, plan, layer, bpm: 100 }), undefined);
 });
