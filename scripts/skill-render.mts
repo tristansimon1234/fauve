@@ -40,7 +40,13 @@
 // "ideas": [{ from, to, key, text, font, items: [{ word, text, font }] }] }, word numbers). Her other clips are her other
 // angles of the same take: --takes '{"f1": 1.25}' gives each one's offset (s: its time = the first's + offset), or
 // --takes sync measures them on their sound as the sandbox does (ffmpeg decodes them, takeOffset correlates them). Her
-// sound is kept in the render, and the engine's subtitles of what she says are drawn.
+// sound is kept in the render, and the engine's subtitles of what she says are drawn. Her other clips that are not her
+// takes (her photos, her videos of what she names) are what a skill that lays her images on what she says casts (--said:
+// an idea's « files » and a name's « file », by their ids f1, f2…), and --said's « name » marks her business's name.
+// --tracks '{"0": "her-tracks.json"}' gives a clip's tracks (track.py's file: her face, hands and body at every image),
+// as the render gets them for track(frame) and for framing her face.
+// What its code reads on her shots besides their clear areas (LightUnder, VanishingPoint, SkylineAt: shot_read.py, by
+// PYTHON) is read here too, on her own files, as the engine reads it (never a ground: Skyline draws nothing here).
 
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -52,7 +58,8 @@ import { HOUSE_MODELS, houseStyle } from "../packages/agent/src/house-models.ts"
 import { MONTAGE_SKILLS } from "../packages/agent/src/skill-library.ts";
 import { isClipSegment } from "../packages/agent/src/schemas.ts";
 import { followedFrom, signatureOf } from "../packages/agent/src/steal.ts";
-import { clearPassages, layerObjects, objectKey, objectPassages, subjectKey, subjectShots, type ClearMap } from "../packages/agent/src/subject.ts";
+import { clearPassages, layerObjects, objectKey, objectPassages, readPassages, shotReadingSchema, subjectKey, subjectShots, type ClearMap, type ShotReading } from "../packages/agent/src/subject.ts";
+import { tracksFileSchema, type TracksByClip } from "../packages/agent/src/tracking.ts";
 import {
   dressSkillPlan,
   readSaid,
@@ -92,6 +99,7 @@ const { values } = parseArgs({
     talk: { type: "string" },
     said: { type: "string" },
     takes: { type: "string" },
+    tracks: { type: "string" },
   },
 });
 /** A JSON option given as text or as the path of a file. */
@@ -191,7 +199,9 @@ if (skill.voice) {
   });
   talk = skillTalk({ clip: main.id, seconds: main.seconds, words: given.words, speech: { source: "scribe", cleaned: false, floor: null, fillers: given.fillers ?? [], pauses: given.pauses ?? [] } }, { takes }) ?? undefined;
   if (!talk) throw new Error("--talk: fewer than three words in her first clip");
-  const said = readSaid(skill.voice, talk, json<SkillFillAnswer["voice"]>(values.said));
+  // Her images of what she names: her clips that are neither her talking video nor one of its takes.
+  const refFiles = files.filter((f) => f.id !== main.id && !takes.some((t) => t.clip === f.id)).map((f) => f.id);
+  const said = readSaid(skill.voice, talk, json<SkillFillAnswer["voice"]>(values.said), refFiles);
   if (!said) throw new Error("--said: no idea read in what she says (word numbers in her words, after her « euh » are cut)");
   fill.shots = [];
   fill.said = said;
@@ -212,7 +222,7 @@ const cut = [...subjectShots(plan)];
 const followedObjects = objectPassages(plan, (id) => !files.find((f) => f.id === id)?.photo);
 if (cut.length || followedObjects.length) console.log(`cut out: shots ${cut.join(", ") || "none"}; objects: ${followedObjects.map((p) => `« ${p.name} » ${p.clip_id} ${p.from}–${p.to} s`).join(", ") || "none"}`);
 // The cut-outs of its objects, laid on their shots' passages as the render workshop gets them (by passage and name).
-const subjects: Record<string, { src: string; boxes?: (number[] | null)[]; contours?: (number[] | null)[]; parts?: number[]; pieces?: ((number[] | null)[] | null)[]; clear?: ClearMap }> = {};
+const subjects: Record<string, { src: string; boxes?: (number[] | null)[]; contours?: (number[] | null)[]; parts?: number[]; pieces?: ((number[] | null)[] | null)[]; clear?: ClearMap; reading?: ShotReading }> = {};
 type ObjectRun = { src?: string; result: string; id: string; name?: string };
 for (const [shot, given] of Object.entries(JSON.parse(values.objects ?? "{}") as Record<string, ObjectRun | ObjectRun[]>)) {
   const segment = plan.segments.filter(isClipSegment)[Number(shot)];
@@ -271,6 +281,34 @@ if (clears.length) {
     console.log("clear areas not read (PYTHON: a Python with OpenCV and numpy):", error instanceof Error ? error.message.split("\n")[0] : error);
   }
 }
+// What else its code reads on her shots (its light, its vanishing point, its skyline): read on her own files as the
+// engine reads them, never a ground (a sky matte video).
+const reads = readPassages(plan, (id) => !files.find((f) => f.id === id)?.photo).map((p) => ({ ...p, kinds: p.kinds.map((k) => (k === "ground" ? ("sky" as const) : k)) }));
+if (reads.length) {
+  const jobs = reads.map((p) => ({ id: p.key, src: files.find((f) => f.id === p.clip_id)!.path, from: p.from, to: p.to, read: [...new Set(p.kinds)], ...(p.photo ? { photo: true } : {}) }));
+  writeFileSync(`${media}/read-jobs.json`, JSON.stringify(jobs));
+  try {
+    const printed = execFileSync(process.env.PYTHON ?? "python3", ["-I", `${RENDER}/shot_read.py`, `${media}/read-jobs.json`], { encoding: "utf8" });
+    const read = JSON.parse(printed.trim().split("\n").at(-1) ?? "{}") as Record<string, Record<string, unknown>>;
+    for (const p of reads) {
+      const r = read[p.key];
+      const reading = r && !r.error ? shotReadingSchema.safeParse({ motion: r.motion, sky: r.sky, vanish: r.vanish, light: r.light }).data : undefined;
+      if (reading) subjects[p.key] = { ...(subjects[p.key] ?? { src: "" }), reading };
+      console.log(`readings of ${p.clip_id} (${p.from}–${p.to} s): ${reading ? `${p.kinds.join(", ")}${reading.light ? `, light ${reading.light.mean} (high ${reading.light.high})` : ""}` : String(r?.error ?? "none")}`);
+    }
+  } catch (error) {
+    console.log("shots not read (PYTHON: a Python with OpenCV and numpy):", error instanceof Error ? error.message.split("\n")[0] : error);
+  }
+}
+// Her tracks by clip (track.py's files), as the render gets them.
+const tracks: TracksByClip = Object.fromEntries(
+  Object.entries(json<Record<string, string>>(values.tracks) ?? {}).flatMap(([k, path]) => {
+    const f = files[Number(k)];
+    const parsed = f ? tracksFileSchema.safeParse(JSON.parse(readFileSync(resolve(path), "utf8"))) : null;
+    if (f && parsed?.success) console.log(`tracks of ${f.id}: ${parsed.data.frames.length} images`);
+    return f && parsed?.success ? [[f.id, parsed.data]] : [];
+  }),
+);
 const props = buildReelProps(plan, {
   template: "libre",
   clipUrls: Object.fromEntries(files.map((f) => [f.id, f.src])),
@@ -282,6 +320,7 @@ const props = buildReelProps(plan, {
   brand: { name: values.name ?? "", ...(fonts.length ? { fonts } : {}), ...(followed ? { signature: signatureOf({ followed }) } : {}), ...(values.accent ? { accent: values.accent } : {}) },
   ...(Object.keys(subjects).length ? { subjects } : {}),
   ...(Object.keys(sceneCutouts).length ? { sceneCutouts } : {}),
+  ...(Object.keys(tracks).length ? { tracks } : {}),
   // Her words in each clip (on her voice): her subtitles, and what its code reads of what she says (`spoken`).
   ...(Object.keys(spoken).length ? { words: spoken } : {}),
 });

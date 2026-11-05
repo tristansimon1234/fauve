@@ -123,6 +123,18 @@ Une version doit tenir :
 - l'accroche en bandeaux mot à mot, puis de petits sous-titres au milieu ;
 - pas de musique, ou à peine.
 
+## Le modèle v1 (5 novembre)
+Écrit sur cette fiche (`packages/agent/src/skills/createur.ts`, version 1), calé sur sa voix, avec trois outils ajoutés au moteur pour lui (`docs/modeles.md`, « Skills calés sur sa voix ») : ses photos et vidéos de ce dont elle parle posées sur sa parole (`refs`), le nom de son commerce repéré dans ses mots (`name`), le cadre qui change sur le premier mot de l'idée suivante (`cut: "attack"`). Vérifié sur les mots des 15 premières secondes de l'original (ses coupes à deux images près, `features.test.ts`) et rendu en local sur une vidéo libre (Pexels 4962724) et les photos de la céramiste :
+- **Coupes** : sur l'attaque du premier mot de chaque idée (4,03 · 9,67 · 12,07 s) et sur chaque nom qu'elle cite (6,87 · 7,80 · 8,67 s) ; un autre cadre une idée sur deux (effet 9 : son autre prise, sinon plus serré).
+- **Moitié du haut** (effet 1) : l'image d'une idée en haut, elle en bas cadrée sur son visage, coupé net ; deux ou trois images l'une après l'autre ; pour sa première idée, une photo d'objet détourée sur son mur au-dessus de sa tête quand il y a la place.
+- **Une image par nom** (effets 3 et 8) : plein cadre de l'instant où elle le nomme jusqu'au nom suivant ; un nom sans image écrit en grand sur elle.
+- **Logo** (effet 4) : une carte blanche grandit du milieu en 14 images, floue au début, sur son buste sous son visage (au-dessus de sa tête quand son visage est bas), son logo dessus (sinon son nom), un carillon, 2,5 s au plus, sans sous-titres dessous ; puis au-dessus de sa tête l'idée suivante quand il y a la place.
+- **Mur d'images** (effet 7) : quatre images ou plus pour une idée, deux colonnes qui glissent des deux bords en 7 images, elle détourée devant (seulement sur ces plans-là), sinon le mur au-dessus de sa tête.
+- **Sous-titres** (effet 10) : sa première phrase sur des bandeaux noirs, mot à mot (`Captions` « bands »), puis de petits sous-titres blancs, une phrase à la fois (neuf mots au plus), aucun mot en couleur, au milieu de l'image (sur la ligne de partage, sous son visage), écrits par son code (`subtitles: "own"`) : ceux du moteur s'effacent, rien en double sous ses bandeaux.
+- **Son** : aucune musique (`music: { none: true }`) ; le carillon sous son logo.
+- **Format** : réglage `format` (`auto` ; `partage`, moitié-moitié tout du long, comme pour sa vidéo horizontale ; `plein`). Ses photos restent fixes, ses vidéos jouent ; aucun étalonnage commun.
+- **Ce qui manque** : son mur recoloré à la couleur de l'image du haut (effet 2 : il faudrait lire la couleur d'une image) ; le carton-blague de vieille cassette (effet 5 : il faudrait une pause dans sa parole pour y poser un plan) ; le mot écrit à la main qui continue tapé (effet 6 : une case pour le mot que ses mains écrivent) ; la palette posée sur le mur (30,80 s) ; au catalogue (`models-v2/createur/catalogue-change.ts`) : sa phrase (« à côté de toi » : l'original pose ses images au-dessus de lui), sa paire, sa finition, ses 19 coupes, ses moments, sa musique (aucune).
+
 ## Ce qu'il faut filmer
 - Une vidéo face caméra, téléphone fixe, avec de la place au-dessus de sa tête (la tête vers le milieu de l'image), devant un mur uni, de couleur si possible. Qu'elle commence en se tournant vers la caméra et parle d'un trait.
 - La même prise de plus près ou de côté (un second téléphone), ou une seconde prise plus serrée.

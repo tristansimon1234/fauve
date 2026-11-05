@@ -22,9 +22,11 @@ import { followedFilter, followedLook, type FollowedStyle } from "./steal.ts";
 // A skill can also be timed on her voice (`voice`, SkillVoice: « Mot clé en grand », « Face caméra et références »): its
 // Reel is her talking video cut by the engine (skillTalk), her other angles of the same take synced on their sound
 // (takes.ts), its words chosen by the filler in what she says, each at the instant she says it (SkillSaid, given to its
-// timeline as `said` and to its code as `spoken` and reelTexts). A text of it may take a font that evokes its word
-// (`font`, WORD_FONTS of font-pairs.ts: reelTexts[i].font), or be written by the engine from what it knows (`fact`:
-// her place's coordinates, geo.ts). Each is rendered locally by scripts/skill-render.mts (--talk, --said, --takes).
+// timeline as `said` and to its code as `spoken` and reelTexts), her photos and videos of what she names laid beside her
+// talk from the instant she names it (`refs`), the moment she says her business's name marked (`name`: her logo pops
+// there). A text of it may take a font that evokes its word (`font`, WORD_FONTS of font-pairs.ts: reelTexts[i].font), or
+// be written by the engine from what it knows (`fact`: her place's coordinates, geo.ts). Each is rendered locally by
+// scripts/skill-render.mts (--talk, --said, --takes, --tracks).
 
 /** One of its texts: what the filler writes in it and where its code finds it among the Reel's texts (by role, in order). */
 export type SkillText = {
@@ -78,8 +80,11 @@ export type SkillWord = { w: string; start: number; end: number };
  * Its timeline and its code get her words with their times (SkillSaid; `spoken` in its code, each word in frames).
  */
 export type SkillVoice = {
-  /** What its hook is, in French for the filler (« ses deux ou trois premiers mots quand ils annoncent déjà quelque chose »). */
-  hook: string;
+  /**
+   * What its hook is, in French for the filler (« ses deux ou trois premiers mots quand ils annoncent déjà quelque chose »);
+   * none: its code writes her first phrase itself from what she says (« Face caméra et références »: on bands, word by word).
+   */
+  hook?: string;
   /** What carries each idea, in French (« le mot qui porte l'idée, dit tôt : SOINS, BRUSHING, PAINS »). */
   key: string;
   /** How many ideas it takes, at least and at most. */
@@ -87,7 +92,28 @@ export type SkillVoice = {
   /** A list she says inside an idea, in French (« ses produits, des étapes : chaque nom au moment où elle le dit »); none without. */
   items?: string;
   /** The most characters of its hook, of a keyword, of a name of its list, where its code sets them. */
-  max: { hook: number; key: number; item?: number };
+  max: { hook?: number; key: number; item?: number };
+  /**
+   * Where the frame changes between two ideas: in the middle of the breath between them (« breath », the default: « Mot
+   * clé en grand » cuts there), or on the first word of the next idea (« attack »: « Face caméra et références », whose
+   * cuts fall on the attack of the word that opens the next phrase); on a cut of her pauses within a fifth of a second.
+   */
+  cut?: "breath" | "attack";
+  /**
+   * Her photos and videos of what she names, laid on what she says (« Face caméra et références »: an image for each name
+   * she cites, the top half for what an idea is about): what they are, in French for the filler (« une photo ou une vidéo
+   * de chaque chose qu'elle nomme »). Its filler casts her other files (never her talking video nor another take of her)
+   * on her ideas (`files`) and on the names of her lists (`file`), each file once; the plan lays each one beside her talk
+   * (SkillShot.beside) from where its idea begins, or from the instant she says its name, to the next one of that idea
+   * (or its end), after her talk's shots (SkillSaid.refs; `said_refs`, `said_ref1_idea`, `said_ref1_item`… for its code).
+   */
+  refs?: string;
+  /**
+   * When she says her business's name, what shows then, in French for the filler (« son logo surgit sur son nom »): the
+   * filler marks it in her words (`name`), the first time she says it; its timeline and its code get it (SkillSaid.name,
+   * `said_name_from`, `said_name_to`) for her logo and its sound.
+   */
+  name?: string;
   /** Which of its words get a font that evokes them (WORD_FONTS), picked by its filler: its keywords, the names of its lists. */
   fonts?: ("key" | "item")[];
   /**
@@ -120,11 +146,22 @@ export type SkillTalk = {
 /**
  * What the filler chose in what she says (word numbers in SkillTalk.words): her hook's first and last word and its text,
  * each idea's first and last word, its keyword (its number and how it is written on screen), the names of a list she
- * says in it (each one's word and text) and the font each one evokes (WORD_FONTS, when the skill asks for it).
+ * says in it (each one's word and text) and the font each one evokes (WORD_FONTS, when the skill asks for it); on a
+ * skill that lays her images on what she says, each idea's own images and the image of each name (her files' ids); the
+ * first and last word of her business's name, when the skill wants it and she says it.
  */
 export type SkillPicks = {
   hook: { from: number; to: number; text: string } | null;
-  ideas: { from: number; to: number; key: number; text: string; font?: string; items: { word: number; text: string; font?: string }[] }[];
+  ideas: {
+    from: number;
+    to: number;
+    key: number;
+    text: string;
+    font?: string;
+    files?: string[];
+    items: { word: number; text: string; font?: string; file?: string }[];
+  }[];
+  name?: { from: number; to: number } | null;
 };
 
 /**
@@ -135,14 +172,30 @@ export type SkillPicks = {
  * take or a tighter frame for every other idea). Its texts' default moments are in `texts`, by the slots the engine
  * names them: « accroche » (role hook), « idee1 », « idee2 »… (each keyword, role band), « idee1_1 »… (each name of a
  * list, role caption); its timeline may move any of them (its `texts`), as it times its sounds and its music on them.
+ * Her images on what she says (`refs`, SkillVoice.refs): each one's file, its span on the Reel (an idea's own from where
+ * the idea begins to its first name that has one, or its end; a name's from the instant she says it to the next name
+ * that has one, or its idea's end), its idea (from 0) and its item (0: the idea's own; j: the j-th name of its list),
+ * laid in this order after her talk's shots. `name`: her business's name said (s), the first time.
  */
 export type SkillSaid = {
   words: SkillWord[];
   duration: number;
   hook: { text: string; words: [number, number]; from: number; to: number } | null;
-  ideas: { text: string; font?: string; words: [number, number]; key: number; from: number; to: number; at: number; items: { text: string; font?: string; word: number; at: number }[] }[];
+  ideas: {
+    text: string;
+    font?: string;
+    words: [number, number];
+    key: number;
+    from: number;
+    to: number;
+    at: number;
+    files?: string[];
+    items: { text: string; font?: string; word: number; at: number; file?: string }[];
+  }[];
   shots: { start: number; end: number; idea: number; take: number; punch: boolean }[];
   texts: Record<string, { from: number; to: number }>;
+  refs: { file: string; from: number; to: number; idea: number; item: number }[];
+  name: { from: number; to: number } | null;
 };
 
 /**
@@ -437,14 +490,16 @@ export function skillCode(skill: Pick<MontageSkill, "code" | "objects">, objects
  * What a skill's code draws of her shots for its timeline's count, as the plan keeps it (motion.drawn): the shots it
  * cuts her out on (its timeline's `cutouts`) and each object it named on its shot (its slot's shot for that count, the
  * filler's name), so the engine cuts out and follows only those, even where its code writes the shot as a variable.
- * Nothing when its timeline says neither.
+ * Nothing when its timeline says neither. `shots`: the plan's shots when it has more than its timeline's (on her voice,
+ * her images laid beside her talk after its shots): the engine reads the drawn shots only on a plan of that count.
  */
 export function skillDrawn(
   skill: Pick<MontageSkill, "objects">,
   line: Pick<SkillTimeline, "shots" | "cutouts" | "objects">,
   named: Record<string, string> | undefined,
+  shots?: number,
 ): MotionDrawn | undefined {
-  const count = line.shots.length;
+  const count = Math.max(line.shots.length, shots ?? 0);
   const subjects = line.cutouts ? [...new Set(line.cutouts.filter((k) => Number.isInteger(k) && k >= 0 && k < count))].sort((a, b) => a - b) : undefined;
   const objects = (skill.objects ?? []).flatMap((o) => {
     const shot = skillObjectShot(o, line);
@@ -641,7 +696,9 @@ export function readSkillFill(
     const font = t.font ? wordFont(asked?.font)?.family : undefined;
     if (font && fitted) fonts[t.slot] = font;
   }
-  const said = skill.voice ? readSaid(skill.voice, options.talk!, answer.voice) : undefined;
+  // Her images on what she says: any of her files but her talking video and her other takes of it.
+  const talking = options.talk ? new Set([options.talk.clip, ...options.talk.takes.map((t) => t.clip)]) : new Set<string>();
+  const said = skill.voice ? readSaid(skill.voice, options.talk!, answer.voice, files.filter((f) => !talking.has(f.id)).map((f) => f.id)) : undefined;
   if (skill.voice && !said) return null;
   const title = fitWords(answer.end?.title ?? "", 40);
   const end = skill.end && title ? { title, ...(answer.end?.subtitle?.trim() ? { subtitle: fitWords(answer.end.subtitle, 60) } : {}) } : null;
@@ -694,11 +751,13 @@ export function skillPlan(input: { skill: MontageSkill; name: string; files: Ski
     words: said ? { ...fill.texts, ...saidWords(said) } : fill.texts,
     ...(said ? { said } : {}),
   });
-  const segments = said ? talkSegments(input.talk!, said, line) : castSegments(input.files, fill, line);
-  // What its code draws of her shots for this count (her cut-out, its objects): only those are made before the render.
-  const drawn = skillDrawn(skill, line, fill.objects);
+  const talked = said ? talkSegments(input.talk!, said, line) : null;
   // Its length: its timeline's; on her voice, her shots' (her last one running on for an ending, as far as her video goes).
-  const duration = said ? round(segments.reduce((sum, s) => sum + ("clip_id" in s ? s.out - s.in : 0), 0)) : round(line.duration);
+  const duration = talked ? round(talked.reduce((sum, s) => sum + (s.out - s.in), 0)) : round(line.duration);
+  // On her voice, her images of what she names after her talk's shots, each beside it from its moment (never heard).
+  const segments: PlanSegment[] = talked ? [...talked, ...refSegments(input.files, said!, duration)] : castSegments(input.files, fill, line);
+  // What its code draws of her shots for this count (her cut-out, its objects): only those are made before the render.
+  const drawn = skillDrawn(skill, line, fill.objects, segments.length);
   const texts = [
     ...skill.texts.flatMap((t) => {
       const words = fill.texts[t.slot];
@@ -817,6 +876,33 @@ function pieceAt(talk: SkillTalk, shot: { start: number; end: number }): { in: n
   return { in: round(p.in + (shot.start - p.start)), out: round(p.in + (Math.min(shot.end, p.end) - p.start)) };
 }
 
+/** An image of what she names shorter than this on the Reel is left out (it would only flash). */
+const REF_MIN = 0.2;
+
+/**
+ * Her images of what she names as the plan lays them (SkillSaid.refs, in order, after her talk's shots: the n-th one is
+ * the composition's shot said_shots + n): each one beside her talk from its moment on the Reel's clock, within the Reel;
+ * a photo held, a video from its best moment (a video shorter than its span all of it, slowed down to half speed at
+ * most, then held), never the same passage twice.
+ */
+function refSegments(files: SkillFile[], said: SkillSaid, duration: number): ClipSegment[] {
+  const byId = new Map(files.map((f) => [f.id, f]));
+  const taken = new Map<string, [number, number][]>();
+  return said.refs.flatMap((r): ClipSegment[] => {
+    const file = byId.get(r.file);
+    if (!file) return [];
+    const length = round(Math.max(REF_MIN, Math.min(r.to, duration) - r.from));
+    const beside = { beside: { at: round(r.from) } };
+    if (file.photo) return [{ clip_id: file.id, in: 0, out: length, zoom: "none", ...beside }];
+    if (file.seconds < length + 0.05) {
+      const speed = Math.max(0.5, Math.min(1, file.seconds / length));
+      return [{ clip_id: file.id, in: 0, out: round(Math.min(file.seconds, length * speed)), zoom: "none", speed: round(speed), ...beside }];
+    }
+    const at = passage(file, length, file.moments?.[0]?.start ?? 0, taken);
+    return [{ clip_id: file.id, in: at, out: round(at + length), zoom: "none", ...beside }];
+  });
+}
+
 /** Her own words as the plan's texts, in the order she says them, at their moments (the engine's, or its timeline's). */
 function saidTexts(said: SkillSaid, line: SkillTimeline, duration: number): EditPlan["texts"] {
   const at = (slot: string) => line.texts[slot] ?? said.texts[slot];
@@ -918,6 +1004,12 @@ const TALK_MIN_PIECE = 0.25;
 const HOOK_HOLD = 1;
 /** A keyword stays this much after its idea's last word (s), never into the next idea. */
 const KEY_HOLD = 0.1;
+/** On its attack (SkillVoice.cut), the frame changes this long before the next idea's first word (s): as it starts. */
+const ATTACK_LEAD = 0;
+/** An idea's beginning this close to a cut of her pauses (s) is moved onto it. */
+const SNAP = 0.2;
+/** The most images of her own an idea takes (four or more make a wall behind her: « Face caméra et références »). */
+const REFS_PER_IDEA = 8;
 
 /**
  * Her talking video cut as a creator cuts it, for a skill timed on her voice: from just before her first word to just
@@ -987,15 +1079,27 @@ export function saidLines(words: SkillWord[]): string[] {
  * words, six at most, cut to its place (null when it is not); her ideas in order, never overlapping, as many as the
  * skill takes at most (the first ones), each keyword inside its idea and written as the filler wrote it (her word itself
  * when it wrote none), each name of a list inside its idea, in order, once; a font only where the skill asks for one and
- * of WORD_FONTS. Null when no idea is left (the filler failed: the editor makes the Reel).
+ * of WORD_FONTS; her images only on a skill that lays them (SkillVoice.refs), each one of `refFiles` (her files but her
+ * talking video and her other takes), each file once in the Reel, REFS_PER_IDEA at most for an idea's own; her
+ * business's name only where the skill wants it, six words at most. Null when no idea is left (the filler failed: the
+ * editor makes the Reel).
  */
-export function readSaid(voice: SkillVoice, talk: Pick<SkillTalk, "words">, answer: SkillFillAnswer["voice"]): SkillPicks | null {
+export function readSaid(voice: SkillVoice, talk: Pick<SkillTalk, "words">, answer: SkillFillAnswer["voice"], refFiles: string[] = []): SkillPicks | null {
   const n = talk.words.length;
   if (!answer || !n) return null;
   const index = (k: unknown) => (typeof k === "number" && Number.isFinite(k) ? Math.max(0, Math.min(n - 1, Math.round(k))) : null);
   const plain = (k: number) => talk.words[k]!.w.replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, "");
   const keyFonts = voice.fonts?.includes("key");
   const itemFonts = voice.fonts?.includes("item");
+  // Her images: only her own files that are not her talk, each once in the Reel.
+  const usable = new Set(voice.refs ? refFiles : []);
+  const used = new Set<string>();
+  const take = (id: unknown): string | undefined => {
+    const k = typeof id === "string" ? id.trim() : "";
+    if (!k || !usable.has(k) || used.has(k)) return undefined;
+    used.add(k);
+    return k;
+  };
   const ideas: SkillPicks["ideas"] = [];
   const sorted = [...(answer.ideas ?? [])].sort((a, b) => (index(a.from) ?? 0) - (index(b.from) ?? 0));
   for (const idea of sorted) {
@@ -1011,6 +1115,12 @@ export function readSaid(voice: SkillVoice, talk: Pick<SkillTalk, "words">, answ
     const text = fitWords(idea.text ?? "", voice.max.key) || fitWords(plain(key), voice.max.key);
     if (!text) continue;
     const font = keyFonts ? wordFont(idea.font)?.family : undefined;
+    const files: string[] = [];
+    for (const f of idea.files ?? []) {
+      if (files.length >= REFS_PER_IDEA) break;
+      const id = take(f);
+      if (id) files.push(id);
+    }
     const items: SkillPicks["ideas"][number]["items"] = [];
     if (voice.items) {
       for (const item of [...(idea.items ?? [])].sort((a, b) => (index(a.word) ?? 0) - (index(b.word) ?? 0))) {
@@ -1018,27 +1128,33 @@ export function readSaid(voice: SkillVoice, talk: Pick<SkillTalk, "words">, answ
         if (word === null || word < from || word > to || items.some((x) => x.word === word)) continue;
         const named = fitWords(item.text ?? "", voice.max.item ?? voice.max.key) || fitWords(plain(word), voice.max.item ?? voice.max.key);
         const itemFont = itemFonts ? wordFont(item.font)?.family : undefined;
-        if (named) items.push({ word, text: named, ...(itemFont ? { font: itemFont } : {}) });
+        const file = named ? take(item.file) : undefined;
+        if (named) items.push({ word, text: named, ...(itemFont ? { font: itemFont } : {}), ...(file ? { file } : {}) });
       }
     }
-    ideas.push({ from, to, key, text, ...(font ? { font } : {}), items });
+    ideas.push({ from, to, key, text, ...(font ? { font } : {}), ...(files.length ? { files } : {}), items });
     if (ideas.length >= voice.ideas[1]) break;
   }
   if (!ideas.length) return null;
   const hookFrom = index(answer.hook?.from);
   const hookTo = index(answer.hook?.to);
-  const hookText = fitWords(answer.hook?.text ?? "", voice.max.hook);
+  const hookText = voice.hook ? fitWords(answer.hook?.text ?? "", voice.max.hook ?? 0) : "";
   const hook = answer.hook && hookFrom !== null && hookTo !== null && hookFrom <= 2 && hookTo >= hookFrom && hookTo - hookFrom < 6 && hookText ? { from: hookFrom, to: hookTo, text: hookText } : null;
-  return { hook, ideas };
+  const nameFrom = index(answer.name?.from);
+  const nameTo = index(answer.name?.to);
+  const name = voice.name && nameFrom !== null && nameTo !== null && nameTo >= nameFrom && nameTo - nameFrom < 6 ? { from: nameFrom, to: nameTo } : null;
+  return { hook, ideas, ...(voice.name ? { name } : {}) };
 }
 
 /**
  * Her talk and what the filler chose in it, as a skill timed on her voice gets them (SkillSaid): each idea on the Reel's
- * clock, its pieces cut again where an idea ends inside one (between its last word and the next idea's first), each shot
- * the idea it belongs to and its angle (with her other take, every other idea on it, when it has her picture there;
- * else, unless the skill keeps one frame, every other idea framed tighter), its texts' default moments.
+ * clock, beginning in the breath before its first word (SkillVoice.cut: its middle, or the word's attack; on a cut of her
+ * pauses there when one is within SNAP), its pieces cut again where an idea begins inside one, each shot the idea its
+ * middle belongs to and its angle (with her other take, every other idea on it, when it has her picture there; else,
+ * unless the skill keeps one frame, every other idea framed tighter), its texts' default moments, her images' spans
+ * (SkillVoice.refs) and her business's name said.
  */
-export function skillSaid(talk: SkillTalk, picks: SkillPicks, voice: Pick<SkillVoice, "angles">): SkillSaid {
+export function skillSaid(talk: SkillTalk, picks: SkillPicks, voice: Pick<SkillVoice, "angles" | "cut">): SkillSaid {
   const words = talk.words;
   const ideas = picks.ideas.map((idea) => ({
     text: idea.text,
@@ -1048,10 +1164,20 @@ export function skillSaid(talk: SkillTalk, picks: SkillPicks, voice: Pick<SkillV
     from: words[idea.from]!.start,
     to: words[idea.to]!.end,
     at: words[idea.key]!.start,
-    items: idea.items.map((item) => ({ text: item.text, ...(item.font ? { font: item.font } : {}), word: item.word, at: words[item.word]!.start })),
+    ...(idea.files?.length ? { files: idea.files } : {}),
+    items: idea.items.map((item) => ({ text: item.text, ...(item.font ? { font: item.font } : {}), word: item.word, at: words[item.word]!.start, ...(item.file ? { file: item.file } : {}) })),
   }));
-  // Where each idea begins on the Reel: halfway between the idea before it and its first word.
-  const starts = ideas.map((idea, k) => (k === 0 ? 0 : round((ideas[k - 1]!.to + idea.from) / 2)));
+  // Where each idea begins on the Reel: in the breath between the idea before it and its first word (its middle, or the
+  // attack of that word), on a cut of her pauses when one is there (the frame changing just after a jump cut reads as a
+  // slip), never into a word.
+  const joins = talk.pieces.slice(1).map((p) => p.start);
+  const starts = ideas.map((idea, k) => {
+    if (k === 0) return 0;
+    const before = ideas[k - 1]!.to;
+    const at = voice.cut === "attack" ? Math.max(before, idea.from - ATTACK_LEAD) : (before + idea.from) / 2;
+    const join = joins.find((j) => Math.abs(j - at) <= SNAP && j >= before - 0.01 && j <= idea.from + 0.01);
+    return round(join ?? at);
+  });
   const pieces: (SkillTalk["pieces"][number] & { idea: number })[] = [];
   for (const p of talk.pieces) {
     let piece = { ...p };
@@ -1064,7 +1190,8 @@ export function skillSaid(talk: SkillTalk, picks: SkillPicks, voice: Pick<SkillV
     }
     pieces.push({ ...piece, idea: 0 });
   }
-  for (const p of pieces) p.idea = Math.max(0, starts.filter((s) => s <= p.start + 0.01).length - 1);
+  // Each piece the idea of its middle (an idea beginning a breath after a jump cut leaves that piece its own).
+  for (const p of pieces) p.idea = Math.max(0, starts.filter((s) => s <= (p.start + p.end) / 2).length - 1);
   const angles = voice.angles !== false;
   const shots = pieces.map((p) => {
     // Her other take for every other idea, when it has the picture of that moment (two phones rarely start together).
@@ -1087,7 +1214,17 @@ export function skillSaid(talk: SkillTalk, picks: SkillPicks, voice: Pick<SkillV
     texts[`idee${k + 1}`] = { from: round(idea.at), to: until };
     idea.items.forEach((item, j) => (texts[`idee${k + 1}_${j + 1}`] = { from: round(item.at), to: until }));
   });
-  return { words, duration: talk.duration, hook, ideas, shots, texts };
+  // Her images on what she says: an idea's own from where it begins to its first name that has one (or where the next
+  // idea begins), each name's from the instant she says it to the next name that has one (or its idea's end).
+  const ends = ideas.map((_, k) => (k + 1 < ideas.length ? starts[k + 1]! : talk.duration));
+  const refs = ideas.flatMap((idea, k) => {
+    const named = idea.items.flatMap((item, j) => (item.file ? [{ file: item.file, at: item.at, item: j + 1 }] : []));
+    const own = (idea.files ?? []).map((file) => ({ file, from: starts[k]!, to: named[0]?.at ?? ends[k]!, idea: k, item: 0 }));
+    const names = named.map((x, i) => ({ file: x.file, from: x.at, to: named[i + 1]?.at ?? ends[k]!, idea: k, item: x.item }));
+    return [...own, ...names].filter((r) => r.to - r.from >= REF_MIN).map((r) => ({ ...r, from: round(r.from), to: round(r.to) }));
+  });
+  const name = picks.name ? { from: words[picks.name.from]!.start, to: words[picks.name.to]!.end } : null;
+  return { words, duration: talk.duration, hook, ideas, shots, texts, refs, name };
 }
 
 /**
@@ -1123,17 +1260,31 @@ export function saidWords(said: Pick<SkillSaid, "hook" | "ideas">): Record<strin
 
 /**
  * The marks a skill timed on her voice gets besides its own (frames, read by its code by name): how many ideas
- * (said_ideas), each idea's first word, keyword and last word (said_idea1_from, said_idea1_key, said_idea1_to…), and
- * the end of her hook (said_hook_to) and of her last word (said_end).
+ * (said_ideas), each idea's first word, keyword and last word (said_idea1_from, said_idea1_key, said_idea1_to…), the
+ * end of her hook (said_hook_to) and of her last word (said_end); how many of its shots are her talk (said_shots: her
+ * images come after them) and how many images of hers it lays on what she says (said_refs), each one's idea (from 1),
+ * item (0 the idea's own, j its j-th name) and span (said_ref1_idea, said_ref1_item, said_ref1_from, said_ref1_to…: a
+ * video slowed down to half speed may end its shot before its span, held then); her business's name said
+ * (said_name_from, said_name_to).
  */
 export function saidMarks(said: SkillSaid): Record<string, number> {
-  const marks: Record<string, number> = { said_ideas: said.ideas.length, said_end: toFrame(said.words.at(-1)?.end ?? said.duration) };
+  const marks: Record<string, number> = { said_ideas: said.ideas.length, said_end: toFrame(said.words.at(-1)?.end ?? said.duration), said_shots: said.shots.length, said_refs: said.refs.length };
   if (said.hook) marks.said_hook_to = toFrame(said.hook.to);
   said.ideas.slice(0, 20).forEach((idea, k) => {
     marks[`said_idea${k + 1}_from`] = toFrame(idea.from);
     marks[`said_idea${k + 1}_key`] = toFrame(idea.at);
     marks[`said_idea${k + 1}_to`] = toFrame(idea.to);
   });
+  said.refs.slice(0, 40).forEach((r, i) => {
+    marks[`said_ref${i + 1}_idea`] = r.idea + 1;
+    marks[`said_ref${i + 1}_item`] = r.item;
+    marks[`said_ref${i + 1}_from`] = toFrame(r.from);
+    marks[`said_ref${i + 1}_to`] = toFrame(r.to);
+  });
+  if (said.name) {
+    marks.said_name_from = toFrame(said.name.from);
+    marks.said_name_to = toFrame(said.name.to);
+  }
   return marks;
 }
 
@@ -1190,18 +1341,28 @@ export const skillFillSchema = z.object({
             key: z.number().describe("The number of its keyword, the one word that carries it"),
             text: z.string().describe("Its keyword as written on screen, as she says it, spelled right"),
             font: z.string().describe("The family of « polices » that evokes it, when the model asks for one; empty otherwise"),
+            files: z
+              .array(z.string())
+              .optional()
+              .describe("Only when the model lays her images on what she says (« images »): the ids of her files that show what this idea is about, best first (never her talking video); empty otherwise"),
             items: z
               .array(
                 z.object({
                   word: z.number().describe("The number of the word that names it"),
                   text: z.string().describe("That name as written on screen, as she says it"),
                   font: z.string().describe("The family of « polices » that evokes it, when the model asks for one; empty otherwise"),
+                  file: z.string().optional().describe("Only when the model lays her images on what she says (« images »): the id of her file that shows this name (never her talking video); empty otherwise"),
                 }),
               )
               .describe("The names of a list she says in this idea, in order, when the model takes one (« liste »); empty otherwise"),
           }),
         )
         .describe("Her ideas in order (« idees »), each a run of her words"),
+      name: z
+        .object({ from: z.number().describe("The number of the first word of her business's name"), to: z.number().describe("The number of its last word") })
+        .nullable()
+        .optional()
+        .describe("Only when the model shows something when she names her business (« son_nom »): her business's name the first time she says it; null when she never says it"),
     })
     .optional()
     .describe("Only for a model timed on her voice (« voix »): what you choose in what she says (« ce_qu_elle_dit »)"),
@@ -1250,6 +1411,8 @@ Then write its texts, in French (what her customers read), each in its slot (« 
 A model timed on her voice (« voix »): her talking video is the Reel, cut by the engine (her « euh » and long pauses out), so there are no slots to cast (« cases » empty: "shots" empty) and its words are her own, chosen in what she says (« ce_qu_elle_dit »: her words numbered, phrase by phrase). Her voice and the subtitles of what she says are this model's (they fit), its length is hers (« longueurs »). Answer "voice":
 - "hook" (« accroche »): her first words written big from the first image, as the model wants them, by their numbers (from her first three words) and their text as she says them; null when her start announces nothing (« Bonjour, je suis… »): her first idea's keyword opens then;
 - "ideas" (« idees »): her ideas in order, as many as the model takes, each from its first word to its last (it ends when its last word is said, the next starts with the next word), its keyword ("key": the number of the one word that carries it, said early; "text": that word as written on screen, as she says it, a name of two or three words kept whole, within its most characters), and the names of a list she says in it ("items", only when the model takes a list: each name's number and text, in order);
+- "files" of an idea and "file" of each name of its list, only when the model lays her images on what she says (« images »): her files that show what the idea is about or what the name is, as their « montre » says (never her talking video nor another take of her, « sa_video »), each file once in the Reel; an idea's own images show while it is said, a name's from the instant she says it; empty when none of her files shows it;
+- "name", only when the model shows something when she names her business (« son_nom »): the numbers of the first and last words of her business's name (« commerce.nom », or what she calls it) the first time she says it; null when she never says it;
 - every text is words she says, at their numbers, spelled right (a word the transcript misheard set right: « sois » for « soins »); never a word she does not say.
 
 "settings": its settings (« reglages », when it has some), like the variants of a template: one only when her request asks for what it does (« plus de cases », « plus lent », « dans le désordre », « avec ma couleur »), with the value that does it; never to vary for its own sake; otherwise none, each one plays the original's. A request a setting answers fits.
@@ -1319,9 +1482,12 @@ export function skillFillInput(input: {
     ...(voice && input.talk
       ? {
           voix: {
-            accroche: `${voice.hook} (${voice.max.hook} caractères au plus)`,
+            accroche: voice.hook ? `${voice.hook} (${voice.max.hook ?? 0} caractères au plus)` : "aucune : son code écrit lui-même sa première phrase (null)",
             idees: `de ${voice.ideas[0]} à ${voice.ideas[1]} ; chacune : ${voice.key} (${voice.max.key} caractères au plus)${voice.fonts?.includes("key") ? " ; police : oui" : ""}`,
             liste: voice.items ? `${voice.items} (${voice.max.item ?? voice.max.key} caractères au plus par nom)${voice.fonts?.includes("item") ? " ; police : oui, une différente par nom" : ""}` : "aucune",
+            // Her images on what she says: her other files, never her talking video nor another take of her.
+            ...(voice.refs ? { images: `${voice.refs} ; chaque fichier une seule fois`, sa_video: [input.talk.clip, ...input.talk.takes.map((t) => t.clip)] } : {}),
+            ...(voice.name ? { son_nom: voice.name } : {}),
           },
           ce_qu_elle_dit: saidLines(input.talk.words),
           ...(input.currentSaid?.length ? { voix_actuelle: input.currentSaid } : {}),

@@ -1347,6 +1347,12 @@ test("montage skills: each one's plan holds for every number of shots it takes, 
     assert.match(skill.code, /function Scene\s*\(/);
     assert.ok(skill.bpm >= 60 && skill.bpm <= 140, `${skill.key}: its tempo is one a plan takes`);
     assert.ok(skill.files[0] >= 1 && skill.files[0] <= skill.files[1] && skill.shots[0] <= skill.shots[1]);
+    // A skill timed on her voice plays her talk (its own tests): without one, it makes no Reel.
+    if (skill.voice) {
+      const files = [{ id: "v0", photo: false, seconds: 16 }];
+      assert.throws(() => skillPlan({ skill, name: "Test", files, fill: { shots: [], texts: {}, end: null } }), /se cale sur sa voix/, skill.key);
+      continue;
+    }
     for (let n = skill.shots[0]; n <= Math.max(skill.shots[1], skill.long ?? 0); n++) {
       // Enough footage for its count (a long version takes more of her files): each video three passages at most.
       const files = Array.from({ length: Math.max(4, Math.ceil(n / 3)) }, (_, i) => ({ id: `v${i}`, photo: false, seconds: 16, moments: [{ start: 1, end: 4 }, { start: 6, end: 9 }, { start: 11, end: 14 }] }));
@@ -1437,8 +1443,13 @@ test("a skill without words of its own writes its title when Edith picked the mo
 
 test("a montage skill comes close to the length she asked for by its number of shots, then by its tempo", async () => {
   const { MONTAGE_SKILLS } = await import("./skill-library.ts");
-  const { skillFit, skillLengths, skillTempos } = await import("./skills.ts");
+  const { skillFit, skillLengths, skillTempos, TALK_MAX_SECONDS } = await import("./skills.ts");
   for (const skill of Object.values(MONTAGE_SKILLS)) {
+    // A skill timed on her voice takes her length (45 s at most), never a count of shots or a tempo for it.
+    if (skill.voice) {
+      assert.deepEqual(skillLengths(skill), { min: 3, max: TALK_MAX_SECONDS }, skill.key);
+      continue;
+    }
     const [slow, fast] = skillTempos(skill);
     assert.ok(slow >= 60 && slow <= skill.bpm && fast <= 140 && fast >= skill.bpm, skill.key);
     const length = (fit: { n: number; bpm: number }) => skill.timeline(fit.n, { end: false, bpm: fit.bpm }).duration;
@@ -1470,6 +1481,8 @@ test("a montage skill played at another tempo keeps its cuts on that tempo's bea
   const { MONTAGE_SKILLS } = await import("./skill-library.ts");
   const { skillPlan } = await import("./skills.ts");
   for (const skill of Object.values(MONTAGE_SKILLS)) {
+    // A skill timed on her voice keeps its own tempo under her voice (its music only; her cuts are hers).
+    if (skill.voice) continue;
     const n = skill.shots[0];
     const bpm = Math.max(60, Math.round(skill.bpm * 0.8));
     const own = skill.timeline(n, { end: false });
@@ -7315,4 +7328,544 @@ test("kit: the hand-made pieces are in the scope and told to the motion designer
   }
   // A pictogram goes with its word, never an icon floating on its own (what looks cheap).
   assert.match(MOTION_DESIGNER_PROMPT, /never an icon floating on its own/);
+});
+
+// ---------------------------------------------------------------------------
+// « Mot clé en grand » and « Face caméra et références », the two models timed on her voice, and the voice tools their
+// fiches found missing: her images on what she says, her business's name said, the frame changing on a word's attack.
+// ---------------------------------------------------------------------------
+
+/** A voice skill's answer from the filler, as readSkillFill takes it. */
+const voiceAnswer = (voice: Record<string, unknown>) => ({ fits: true, missing: "", shots: [], texts: [], end: null, why: "", voice }) as unknown as import("./skills.ts").SkillFillAnswer;
+
+test("a skill timed on her voice: her images of what she names laid beside her talk from the instant she names them, her name marked", async () => {
+  const { skillTalk, readSkillFill, skillPlan, skillFillInput, SKILL_FILL_PROMPT, skillFillSchema } = await import("./skills.ts");
+  const base = await voicedSkill();
+  const skill = { ...base, voice: { ...base.voice!, refs: "une photo ou une vidéo de ce qu'elle nomme", name: "son logo sur son nom" } };
+  const talk = skillTalk(talkFacts)!;
+  const files = [
+    { id: "talk", photo: false, seconds: 10 },
+    { id: "hiver", photo: true, seconds: 0 },
+    { id: "gommage", photo: true, seconds: 0 },
+    // A video shorter than its span: all of it, slowed down; one longer: from its best moment.
+    { id: "masque", photo: false, seconds: 0.5 },
+    { id: "huile", photo: false, seconds: 6, moments: [{ start: 2, end: 4 }] },
+  ];
+  const [first, second, third] = talkAnswer.ideas;
+  const answer = voiceAnswer({
+    ...talkAnswer,
+    ideas: [
+      // Her talking video is never one of her images, nor a file she does not have; each file once in the Reel.
+      { ...first, files: ["hiver", "talk", "nope"] },
+      { ...second, items: second!.items.map((item, j) => ({ ...item, file: ["gommage", "masque", "huile"][j] })) },
+      { ...third, files: ["hiver"] },
+    ],
+    name: { from: 16, to: 16 },
+  });
+  const fill = readSkillFill(skill, files, 4, answer, { talk })!;
+  assert.deepEqual(fill.said!.ideas.map((i) => i.files ?? []), [["hiver"], [], []]);
+  assert.deepEqual(fill.said!.ideas[1]!.items.map((i) => i.file), ["gommage", "masque", "huile"]);
+  assert.deepEqual(fill.said!.name, { from: 16, to: 16 });
+  // A skill that lays no images keeps none, nor her name.
+  const plain = readSkillFill(base, files, 4, answer, { talk })!;
+  assert.ok(plain.said!.ideas.every((i) => !i.files && i.items.every((x) => !x.file)) && plain.said!.name === undefined);
+
+  const plan = skillPlan({ skill, name: "Mot clé", files, fill, talk });
+  assert.ok(editPlanSchema.safeParse(plan).success);
+  // Her talk's four shots, then her images beside it, each from its moment: the idea's own from where it begins to the
+  // next idea, each name's from the instant she says it to the next one, never heard; her talk alone makes its length.
+  assert.equal(plan.duration, 7.95);
+  assert.deepEqual(plan.segments.slice(4).map((s) => ("clip_id" in s ? [s.clip_id, s.in, s.out, s.speed ?? 1, s.beside?.at] : [])), [
+    ["hiver", 0, 3.68, 1, 0],
+    ["gommage", 0, 0.8, 1, 3.97],
+    ["masque", 0, 0.5, 0.63, 4.77],
+    ["huile", 2, 2.69, 1, 5.57],
+  ]);
+  assert.ok(plan.segments.slice(0, 4).every((s) => "clip_id" in s && s.clip_id === "talk" && !s.beside));
+  // Its code finds them by marks: how many of its shots are her talk, each image's idea, item and span; her name said.
+  const marks = plan.layers![0]!.motion.texts!;
+  assert.equal(marks.said_shots, "4");
+  assert.equal(marks.said_refs, "4");
+  assert.deepEqual([marks.said_ref1_idea, marks.said_ref1_item, marks.said_ref1_from, marks.said_ref1_to], ["1", "0", "0", "110"]);
+  assert.deepEqual([marks.said_ref3_idea, marks.said_ref3_item, marks.said_ref3_from, marks.said_ref3_to], ["2", "2", "143", "167"]);
+  assert.deepEqual([marks.said_name_from, marks.said_name_to], ["192", "203"]);
+  // The composition gets them after her talk, each on its frame.
+  const props = buildReelProps(editPlanSchema.parse(plan), { template: "libre", clipUrls: Object.fromEntries(files.map((f) => [f.id, `https://x/${f.id}`])), photoIds: ["hiver", "gommage"], brand: { name: "Lune" }, words: { talk: talkFacts.words } });
+  assert.deepEqual(props.layers![0]!.shots!.map((s) => [s.kind, s.from]), [["video", 0], ["video", 35], ["video", 110], ["video", 187], ["photo", 0], ["photo", 119], ["video", 143], ["video", 167]]);
+  // The filler is told what her images are, which video is hers, and to mark her name.
+  const input = skillFillInput({ skill, name: "Mot clé", n: 4, files, business: { name: "Lune" }, request: "", talk }) as unknown as { voix: Record<string, unknown> };
+  assert.match(String(input.voix.images), /de ce qu'elle nomme ; chaque fichier une seule fois/);
+  assert.deepEqual(input.voix.sa_video, ["talk"]);
+  assert.equal(input.voix.son_nom, "son logo sur son nom");
+  assert.match(SKILL_FILL_PROMPT, /"files" of an idea and "file" of each name/);
+  assert.ok(skillFillSchema.shape.voice.unwrap().shape.name);
+  // A skill whose code writes her first phrase itself asks for no hook, and keeps none.
+  const own = { ...skill, voice: { ...skill.voice, hook: undefined } };
+  assert.match(String((skillFillInput({ skill: own, name: "Créateur", n: 4, files, business: {}, request: "", talk }) as unknown as { voix: { accroche: string } }).voix.accroche), /^aucune/);
+  assert.equal(readSkillFill(own, files, 4, answer, { talk })!.said!.hook, null);
+});
+
+test("a skill timed on her voice: the frame changes on the next idea's first word when it says so, on a cut of her pauses when one is near", async () => {
+  const { skillTalk, readSaid, skillSaid } = await import("./skills.ts");
+  const skill = await voicedSkill();
+  const talk = skillTalk(talkFacts)!;
+  const picks = readSaid(skill.voice!, talk, talkAnswer)!;
+  // One piece of talk: in the middle of the breath by default, on the attack of the next idea's first word.
+  const joined = { ...talk, pieces: [{ in: 0.15, out: 9.5, start: 0, end: 9.35 }], words: talkFacts.words.map((w) => ({ ...w, start: w.start - 0.15, end: w.end - 0.15 })), duration: 9.35 };
+  assert.deepEqual(skillSaid(joined, picks, {}).shots.map((s) => s.start), [0, 4.5, 7.57]);
+  assert.deepEqual(skillSaid(joined, picks, { cut: "attack" }).shots.map((s) => s.start), [0, 5.05, 7.8]);
+  // Cut by her pauses: an idea that begins within a fifth of a second of a cut begins on it (no sliver of the other frame).
+  const cut = skillSaid(talk, picks, { cut: "attack" });
+  assert.deepEqual(cut.shots.map((s) => [s.start, s.idea]), [
+    [0, 0],
+    [1.17, 0],
+    [3.68, 1],
+    [6.26, 2],
+  ]);
+  // Each piece the idea of its middle: an idea beginning just after a cut leaves that piece its own.
+  const late = { ...talk, words: talk.words.map((w, i) => (i === 10 ? { ...w, start: 3.75 } : w)) };
+  assert.equal(skillSaid(late, picks, {}).shots.find((s) => s.start === 3.68)!.idea, 1);
+});
+
+// ——— « Mot clé en grand » v1, written on its original's fiche (docs/fiches/mot-cle.md) ——————————————————————————————
+
+/** Its original's words as Scribe would time them, on its fiche's instants (each small word, each name, « forty-one ») and its voice's pauses: 23,43 s. */
+const MC_WORDS = (
+  "So,:0.34:0.48 today:0.5:0.86 I'm:0.88:0.94 going:0.95:1 to:1.01:1.05 show:1.07:1.21 you:1.23:1.33 a:1.35:1.4 couple:1.43:1.6 of:1.63:1.7 " +
+  "fonts:1.73:2.1 you:2.27:2.4 can:2.43:2.6 pair:2.63:2.8 together:2.83:3.3 in:3.5:3.64 your:3.67:3.84 videos:3.87:4.4 to:4.5:4.58 have:4.6:4.75 " +
+  "an:4.77:4.85 amazing:4.88:5.2 look.:5.22:5.5 So:6:6.12 you:6.14:6.24 can:6.26:6.38 decide:6.4:6.7 to:6.72:6.78 pair:6.8:7.05 Inter:7.1:7.4 " +
+  "with:7.45:7.75 Tempting,:7.8:8.4 Avant:8.47:8.7 Garde:8.72:9.05 with:9.1:9.5 Cooper,:9.57:10.1 Impact:10.23:10.7 with:10.75:11.25 " +
+  "Poppins,:11.33:11.9 Helvetica:12.03:12.7 with:12.75:13.15 Courier:13.2:13.55 New,:13.57:13.95 Bebas:14.03:14.4 Neue:14.42:14.8 with:14.85:15.4 " +
+  "Montserrat.:15.47:16.5 So:16.86:17 this:17.02:17.15 is:17.17:17.26 day:17.28:17.55 forty-one:17.6:18.1 of:18.15:18.25 my:18.27:18.4 " +
+  "sixty:18.42:18.75 days:18.77:19.05 challenge:19.1:19.6 of:19.65:19.75 being:19.78:20 consistent,:20.02:20.55 creative,:20.6:21 copycat.:21.05:21.5 " +
+  "Thank:21.62:21.85 you:21.87:22 for:22.02:22.12 watching:22.15:22.5 and:22.56:22.7 see:22.72:22.8 you:22.82:22.85 soon.:22.9:23.3"
+)
+  .split(" ")
+  .map((s) => {
+    const [w, a, b] = s.split(":");
+    return word(w!, Number(a), Number(b));
+  });
+const MC_TALK = { clip: "orig", seconds: 23.43, words: MC_WORDS, speech: { source: "scribe" as const, cleaned: false, floor: -50, fillers: [], pauses: [{ start: 0, end: 0.32 }, { start: 5.52, end: 5.98 }, { start: 16.52, end: 16.84 }, { start: 23.32, end: 23.43 }] } };
+/** What its filler would choose in it: « So, today », « fonts », its five pairs of names (each in a font it evokes), « 41 » and its three words. */
+const MC_SAID = {
+  hook: { from: 0, to: 1, text: "So, today" },
+  ideas: [
+    { from: 2, to: 22, key: 10, text: "fonts", font: "", items: [] },
+    {
+      from: 23,
+      to: 46,
+      key: 29,
+      text: "inter",
+      font: "",
+      items: [
+        [29, "inter", ""],
+        [31, "Tempting", "Great Vibes"],
+        [32, "avant garde", ""],
+        [35, "cooper", "Fraunces"],
+        [36, "impact", "Anton"],
+        [38, "poppins", ""],
+        [39, "Helvetica", ""],
+        [41, "courier new", "Courier Prime"],
+        [43, "BEBAS NUEUE", "Bebas Neue"],
+        [46, "montserrat", ""],
+      ].map(([w, text, font]) => ({ word: w as number, text: text as string, font: font as string })),
+    },
+    { from: 47, to: 61, key: 51, text: "41", font: "", items: [59, 60, 61].map((w, j) => ({ word: w, text: ["consistent", "creative", "copycat"][j]!, font: "" })) },
+  ],
+};
+/** Its original's two cuts and texts, measured image by image (s): each name on its word, a pair gone on the next one's first. */
+const MC_ORIGINAL = { cuts: [5.67, 16.7], hook: [1 / 30, 32 / 30], fonts: [52 / 30, 5.4], names: [7.1, 7.8, 8.47, 9.57, 10.23, 11.33, 12.03, 13.2, 14.03, 15.47], number: [17.6, 21.6] };
+
+/** « Mot clé en grand » made on its original's own talk, as the engine makes it: its plan, its talk, and the composition's props. */
+const motCleOnOriginal = async () => {
+  const { motCle } = await import("./skills/mot-cle.ts");
+  const { skillTalk, readSkillFill, skillPlan } = await import("./skills.ts");
+  const talk = skillTalk(MC_TALK)!;
+  const files = [{ id: "orig", photo: false, seconds: 23.43, aspect: 9 / 16 }];
+  const fill = readSkillFill(motCle, files, talk.pieces.length, voiceAnswer(MC_SAID), { talk })!;
+  const plan = editPlanSchema.parse(skillPlan({ skill: motCle, name: "Mot clé en grand", files, fill, talk }));
+  const props = buildReelProps(plan, { template: "libre", clipUrls: { orig: "https://x/o.mp4" }, aspects: { orig: 9 / 16 }, brand: { name: "Fonts" }, words: { orig: MC_WORDS } });
+  return { motCle, talk, plan, layer: props.layers![0]! };
+};
+/** A time on the Reel's clock on her video's (through her talk's pieces): where the original's own times are. */
+const onHerVideo = (talk: { pieces: { in: number; start: number; end: number }[] }, t: number) => {
+  const p = talk.pieces.find((x) => t >= x.start - 0.005 && t < x.end + 0.005) ?? talk.pieces.at(-1)!;
+  return p.in + (t - p.start);
+};
+const within2 = (a: number, b: number, what: string) => assert.ok(Math.abs(a - b) <= 2 / 30 + 0.001, `${what}: ${a.toFixed(3)} s, the original's ${b} s`);
+
+/** What a voice skill's Scene draws at a frame, every piece of the kit a named node: her face where `face` says (track), her wall's light, her cut-out's box by shot. */
+async function drawVoiced(code: string, frame: number, props: Record<string, unknown>, read: { face?: { x: number; y: number; width: number; height: number } | null; light?: { mean: number; high: number } | null; boxes?: Record<number, TdBox> } = {}): Promise<Drawn> {
+  const { MOTION_SCOPE } = await import("./motion-scene.ts");
+  const React = { createElement: (type: unknown, p: Record<string, unknown> | null, ...children: unknown[]): Drawn => ({ type, props: p ?? {}, children }), Fragment: "Fragment" };
+  const scope: Record<string, unknown> = Object.fromEntries(MOTION_SCOPE.filter((n) => n !== "React").map((n) => [n, n]));
+  Object.assign(scope, {
+    useCurrentFrame: () => frame,
+    useVideoConfig: () => ({ width: 1080, height: 1920, fps: 30, durationInFrames: props.durationInFrames }),
+    interpolate: (x: number, [a, b]: [number, number], [y0, y1]: [number, number]) => y0 + (y1 - y0) * Math.min(1, Math.max(0, (x - a) / (b - a || 1))),
+    spring: () => 1,
+    random: () => 0.5,
+    SubjectBox: (shot: { segment?: number } | undefined) => read.boxes?.[shot?.segment ?? -1] ?? null,
+    SubjectOutline: () => null,
+    SubjectParts: () => [],
+    ClearBox: (_s: unknown, _f: number, _l: unknown, options?: { fallback?: unknown }) => options?.fallback ?? null,
+    LightUnder: () => read.light ?? null,
+  });
+  const make = new Function("React", ...Object.keys(scope), `"use strict";\n${code}\nreturn Scene;`) as (...args: unknown[]) => (p: Record<string, unknown>) => Drawn;
+  const track = () => ({ hands: [], faces: read.face ? [{ id: 0, ...read.face, points: {} }] : [], bodies: [] });
+  return make(React, ...Object.values(scope))({ width: 1080, height: 1920, brand: { name: "Atelier Argile", displayFont: "Poppins", bodyFont: "Poppins", accent: "#b5543a" }, track, ...props });
+}
+/** A drawn layer's props from a Reel's composition layer. */
+const sceneProps = (layer: { durationInFrames: number; shots?: unknown[]; texts?: Record<string, string>; reelTexts?: unknown[]; spoken?: unknown[] }) => ({ durationInFrames: layer.durationInFrames, shots: layer.shots ?? [], texts: layer.texts ?? {}, reelTexts: layer.reelTexts ?? [], spoken: layer.spoken ?? [] });
+
+test("« Mot clé en grand » (v1) cuts where its original does, between its ideas, its words on its words, within two images", async () => {
+  const { motCle, talk, plan } = await motCleOnOriginal();
+  assert.equal(motCle.version, 1);
+  assert.equal(motCle.bpm, 108);
+  assert.ok(motCle.voice && !motCle.voice.cut && motCle.voice.fonts?.includes("item") && motCle.voice.row === 0.75);
+  // Its frame changes only between its ideas, in the breath between them: the original's two cuts, on her video's clock
+  // (her pause of 0,46 s shortened as everywhere), within two images; one take, every other idea framed tighter.
+  const shots = plan.segments.filter((s): s is ClipSegment => "clip_id" in s);
+  const frames = shots.slice(1).map((s, i) => [shots[i]!.out, s.in]);
+  assert.equal(frames.length, 2);
+  within2(frames[0]![0]!, MC_ORIGINAL.cuts[0]!, "its first cut");
+  within2(frames[1]![1]!, MC_ORIGINAL.cuts[1]!, "its second cut");
+  assert.deepEqual(shots.map((s) => s.move ?? "none"), ["none", "punch", "none"]);
+  // (Its first cut is also her pause, shortened as everywhere; its second only a new frame at the same moment.)
+  assert.ok(frames[0]![1]! - frames[0]![0]! > 0.15);
+  assert.equal(frames[1]![0], frames[1]![1]);
+  // Her hook from the first image until she says the word after it; « fonts » on its word, gone on its idea's last one.
+  const at = (style: string, text: string) => plan.texts.find((t) => t.style === style && t.text === text)!;
+  within2(at("hook", "So, today").from, MC_ORIGINAL.hook[0]!, "its hook in");
+  within2(at("hook", "So, today").to, MC_ORIGINAL.hook[1]!, "its hook out");
+  within2(at("band", "fonts").from, MC_ORIGINAL.fonts[0]!, "« FONTS » in");
+  within2(at("band", "fonts").to, MC_ORIGINAL.fonts[1]!, "« FONTS » out");
+  // Its ten names each on its word; a pair gone when the next one's first is said, the last with the cut.
+  const names = plan.texts.filter((t) => t.style === "caption" && !["consistent", "creative", "copycat"].includes(t.text));
+  assert.equal(names.length, 10);
+  names.forEach((t, j) => within2(onHerVideo(talk, t.from), MC_ORIGINAL.names[j]!, `« ${t.text} » in`));
+  names.forEach((t, j) => {
+    const next = j % 2 === 0 ? names[j + 2] : names[j + 1];
+    if (next) assert.equal(t.to, next.from, `« ${t.text} » goes with the next pair`);
+  });
+  within2(onHerVideo(talk, names.at(-1)!.to), MC_ORIGINAL.cuts[1]!, "its last pair out");
+  // No keyword before its list: its first name is its keyword. Each name in the font it evokes, or hers.
+  assert.equal(plan.texts.filter((t) => t.style === "band").length, 2);
+  assert.deepEqual(names.map((t) => t.font ?? ""), ["", "Great Vibes", "", "Fraunces", "Anton", "", "", "Courier Prime", "Bebas Neue", ""]);
+  // « 41 » on « forty-one », its three words with it, all held to its idea's end.
+  const number = at("band", "41");
+  within2(onHerVideo(talk, number.from), MC_ORIGINAL.number[0]!, "« 41 » in");
+  within2(onHerVideo(talk, number.to), MC_ORIGINAL.number[1]!, "« 41 » out");
+  for (const w of ["consistent", "creative", "copycat"]) assert.deepEqual([at("caption", w).from, at("caption", w).to], [number.from, number.to], w);
+  // Its music (108 BPM) waits for « fonts », comes in on its beat 5 (2,82 s, its beat 0 at 0,04 s), loses its bass from its
+  // beat 21 to its beat 37 (11,71 and 20,61 s), and is cut with the picture.
+  const beat = 60 / 108;
+  within2(plan.music_shape!.pauses![0]!.to + 0.04, 2.82, "its music in");
+  const thin = plan.music_shape!.filters![0]!;
+  assert.equal(thin.kind, "thin");
+  within2(thin.from + 0.04, 11.71, "its bass out");
+  within2(thin.to + 0.04, 20.61, "its bass back");
+  assert.ok(Math.abs((thin.to - thin.from) / beat - 16) < 0.01);
+  assert.equal(plan.music_shape!.end!.at, plan.duration);
+  // A low whoosh on each word that slides in, at its loudest on its bounce (the original's 0,16 and 1,80 s).
+  assert.deepEqual(plan.sounds!.map((s) => s.sound), ["low whoosh", "low whoosh"]);
+  within2(plan.sounds![0]!.at, 0.16, "its hook's whoosh");
+  within2(plan.sounds![1]!.at, 1.8, "« FONTS »'s whoosh");
+  // The engine's subtitles of what is said stay under it, on her chest.
+  assert.equal(plan.subtitles, true);
+  assert.equal(plan.layers![0]!.motion.writes_spoken, false);
+  assert.equal(plan.layers![0]!.motion.subtitle_y, 0.75);
+});
+
+test("« Mot clé en grand » (v1): its words slide in as the original's, above her head, her words one by one, a list two by two, a number and its words", async () => {
+  const { SLIDE } = await import("./skills/mot-cle.ts");
+  const { motCle, layer } = await motCleOnOriginal();
+  const props = sceneProps(layer);
+  // Her head where the original's is (its top at 42 % of the height): every word in the original's place.
+  const low = { x: 540, y: 1000, width: 160, height: 200 };
+  const draw = (f: number, read: Parameters<typeof drawVoiced>[3] = { face: low }) => drawVoiced(motCle.code, f, props, read);
+  const slides = (tree: Drawn) => drawnNodes(tree).filter((n) => n.type === "div" && "transform" in styleOf(n) && drawnNodes(n).some((c) => c.type === "FitText"));
+  // Its hook on the first image, from the left: three images fast and blurred, past its place, back, set on the sixth.
+  for (let f = 0; f <= 5; f++) {
+    const s = slides(await draw(f))[0]!;
+    const dx = f < 5 ? Math.round(SLIDE[f]! * 1080) : 0;
+    assert.equal(styleOf(s).transform, dx ? `translateX(${dx}px)` : undefined, `image ${f}`);
+    assert.equal(Boolean(styleOf(s).filter), f < 3, `image ${f}'s blur`);
+  }
+  const hookFit = drawnNodes(await draw(10)).find((n) => n.type === "FitText")!;
+  assert.equal(drawnText(hookFit), "SO, TODAY");
+  assert.equal((hookFit.props.innerStyle as Record<string, unknown>).fontWeight, 700);
+  // « FONTS » in its place (its box from 26,6 % of the height), the small line of her words above it, each word in place
+  // from the start of its line, seen from the image it is said: « to » as the hook goes, « show », then « you »,
+  // « couple », « of » (« a » and « fonts » left out), very spaced.
+  const key = (tree: Drawn) => slides(tree).find((n) => drawnText(drawnNodes(n).find((c) => c.type === "FitText")!) === "FONTS");
+  const line = (tree: Drawn) => drawnNodes(tree).find((n) => n.type === "div" && styleOf(n).display === "flex" && styleOf(n).alignItems === "flex-end");
+  const at50 = await draw(56);
+  assert.equal(styleOf(key(at50)!).top, Math.round(0.266 * 1920));
+  const words = (tree: Drawn) => drawnNodes(line(tree)!).filter((n) => n.type === "span").map((n) => [drawnText(n), styleOf(n).opacity]);
+  assert.deepEqual(words(at50), [["to", 1], ["show", 1], ["you", 1], ["couple", 1], ["of", 1]]);
+  assert.deepEqual(words(await draw(33)), [["to", 1], ["show", 1], ["you", 0], ["couple", 0], ["of", 0]]);
+  assert.ok(Number(styleOf(line(at50)!).gap) >= 0.05 * 1080 && Number(styleOf(line(at50)!).top) < Number(styleOf(key(at50)!).top));
+  // Her head higher: the whole block moved up; no room left above it: before her chest, never on her face.
+  const high = await draw(56, { face: { x: 540, y: 700, width: 160, height: 200 } });
+  assert.ok(Number(styleOf(key(high)!).top) < Math.round(0.266 * 1920) - 150, String(styleOf(key(high)!).top));
+  const none = await draw(56, { face: { x: 540, y: 420, width: 160, height: 200 } });
+  assert.ok(Number(styleOf(key(none)!).top) >= 420 + 150, String(styleOf(key(none)!).top));
+  // White on a dark wall, in ink on a light one.
+  const color = (tree: Drawn) => (drawnNodes(tree).find((n) => n.type === "FitText")!.props.innerStyle as Record<string, unknown>).color;
+  assert.equal(color(at50), "#ffffff");
+  assert.equal(color(await draw(56, { face: low, light: { mean: 0.8, high: 0.9 } })), "#161616");
+  // Its list two names at a time, the first small on top, the second big under it, each in its font; « inter » alone first.
+  const fits = (tree: Drawn) => drawnNodes(tree).filter((n) => n.type === "FitText").map((n) => [drawnText(n), (n.props.innerStyle as Record<string, unknown>).fontFamily, styleOf(n).top] as const);
+  const reel = (s: number) => Math.round(s * 30);
+  const inter = layer.reelTexts!.find((t) => t.text === "inter")!;
+  const tempting = layer.reelTexts!.find((t) => t.text === "Tempting")!;
+  assert.deepEqual((await fits(await draw(inter.from + 3))).map((x) => x[0]), ["inter"]);
+  const pair = fits(await draw(tempting.from + 3));
+  assert.deepEqual(pair.map((x) => x[0]), ["inter", "Tempting"]);
+  assert.match(String(pair[1]![1]), /^'Great Vibes', /);
+  assert.ok(Number(pair[0]![2]) < Number(pair[1]![2]));
+  assert.ok(reel(7.1) - 12 <= inter.from && inter.from <= reel(7.1));
+  // « 41 » very condensed (Anton), its three words stacked at its right, all at once.
+  const number = layer.reelTexts!.find((t) => t.text === "41")!;
+  const block = drawnNodes(await draw(number.from + 5)).find((n) => n.type === "div" && styleOf(n).display === "flex" && styleOf(n).alignItems === "center")!;
+  assert.match(String(styleOf(drawnNodes(block)[1]!).fontFamily), /^'Anton', /);
+  assert.equal(drawnText(drawnNodes(block)[1]!), "41");
+  assert.deepEqual(drawnNodes(block).filter((n) => n.type === "div" && !n.children.some((c) => typeof c !== "string")).slice(1).map(drawnText), ["consistent", "creative", "copycat"]);
+  assert.deepEqual(motCle.fonts, ["Anton"]);
+  // Nothing above her head while she says goodbye.
+  const bye = await draw(layer.durationInFrames - 10);
+  assert.equal(drawnNodes(bye).filter((n) => n.type === "FitText" || n.type === "span").length, 0);
+});
+
+test("« Mot clé en grand » (v1): full frame for her vertical video, a 16:9 band on black for a horizontal one or on her word; light to render", async () => {
+  const { motCle, plan, layer } = await motCleOnOriginal();
+  const props = sceneProps(layer);
+  const footage = (tree: Drawn) => drawnNodes(tree).filter((n) => n.type === "Footage").map((n) => styleOf(n));
+  // Its format: as her video, full frame (the original's) or her horizontal video whole on black, its words above it.
+  assert.deepEqual(motCle.settings?.map((s) => [s.name, s.choices.map((c) => c.value)]), [["format", ["auto", "vertical", "horizontal"]]]);
+  const box = (f: Record<string, number | string>) => [f.left, f.top, f.width, f.height];
+  assert.deepEqual(box(footage(await drawVoiced(motCle.code, 100, props))[0]!), [0, 0, 1080, 1920]);
+  const wideShots = (props.shots as { aspect: number }[]).map((s) => ({ ...s, aspect: 16 / 9 }));
+  const wide = await drawVoiced(motCle.code, 100, { ...props, shots: wideShots });
+  assert.deepEqual(box(footage(wide)[0]!), [0, 656, 1080, 608]);
+  const words = drawnNodes(wide).filter((n) => n.type === "div" && "transform" in styleOf(n));
+  assert.ok(words.every((n) => Number(styleOf(n).top) + Number(styleOf(n).height) <= 656), JSON.stringify(words.map((n) => styleOf(n).top)));
+  assert.deepEqual(box(footage(await drawVoiced(motCle.code, 100, { ...props, shots: wideShots, texts: { ...props.texts, format: "vertical" } }))[0]!), [0, 0, 1080, 1920]);
+  assert.deepEqual(box(footage(await drawVoiced(motCle.code, 100, { ...props, texts: { ...props.texts, format: "horizontal" } }))[0]!), [0, 656, 1080, 608]);
+  // Light: one shot of hers mounted at a time; nothing of her cut out (her face followed), her wall's light read on her
+  // first shot only.
+  const { subjectShots, readsDrawn } = await import("./subject.ts");
+  for (const f of [0, 60, 250, 500, 680]) assert.equal(footage(await drawVoiced(motCle.code, f, props)).length, 1, `image ${f}`);
+  assert.deepEqual([...subjectShots(plan)], []);
+  assert.deepEqual(plan.layers![0]!.motion.drawn, { shots: 3, subjects: [] });
+  assert.deepEqual(readsDrawn(motCle.code), [{ shot: 0, kinds: ["light"] }]);
+  assert.doesNotMatch(motCle.code, /\bSubject\b|SubjectBox|Depth|Skyline/);
+  // Its lengths are hers (45 s at most); its finish is its model's (« Studio »).
+  assert.equal(motCle.finish, undefined);
+});
+
+// ——— « Face caméra et références » v1, written on its original's fiche (docs/fiches/createur.md) ————————————————————
+
+/** Its original's first 15 s as Scribe would time them, on its fiche's instants (each name's attack, each phrase's first word) and its voice's breaths. */
+const CR_WORDS = (
+  "Avoir:0.13:0.22 une:0.23:0.45 très:0.47:0.65 bonne:0.67:0.81 culture:0.83:1.1 visuelle,:1.13:1.55 je:1.6:1.7 pense:1.72:1.92 que:1.95:2.02 " +
+  "c'est:2.04:2.18 un:2.2:2.28 des:2.3:2.42 points:2.45:2.72 les:2.75:2.86 plus:2.9:3.02 importants:3.05:3.42 en:3.45:3.52 réalisation.:3.55:3.9 " +
+  "Les:4.02:4.12 clips:4.15:4.38 de:4.4:4.48 Théodora:4.5:5 qui:5.05:5.12 nous:5.15:5.22 ont:5.25:5.32 tous:5.35:5.45 marqués,:5.5:5.85 on:5.95:6.02 " +
+  "peut:6.05:6.18 y:6.2:6.26 trouver:6.3:6.48 des:6.5:6.58 références:6.6:6.82 à:6.84:6.87 Jean-Paul:6.88:7.3 Goude,:7.32:7.6 à:7.66:7.75 " +
+  "Lotte:7.78:8.05 Reiniger:8.08:8.5 ou:8.52:8.6 à:8.62:8.66 Saul:8.67:8.95 Bass.:8.97:9.36 Derrière:9.64:9.98 un:10:10.08 clip:10.1:10.35 " +
+  "iconique,:10.38:10.95 il:11:11.04 y:11.04:11.08 a:11.1:11.14 des:11.16:11.24 références:11.26:11.5 iconiques.:11.52:11.72 Un:12.05:12.14 de:12.16:12.22 " +
+  "mes:12.24:12.36 outils:12.38:12.62 préférés:12.64:12.98 à:13:13.04 moi:13.06:13.2 pour:13.22:13.3 trouver:13.32:13.5 des:13.52:13.6 " +
+  "bonnes:13.62:13.75 Flim.:13.83:14.2"
+)
+  .split(" ")
+  .map((s) => {
+    const [w, a, b] = s.split(":");
+    return word(w!, Number(a), Number(b));
+  });
+const CR_TALK = { clip: "orig", seconds: 14.97, words: CR_WORDS, speech: { source: "scribe" as const, cleaned: false, floor: -50, fillers: [], pauses: [{ start: 3.9, end: 4.02 }, { start: 9.36, end: 9.64 }, { start: 11.72, end: 12.05 }, { start: 14.2, end: 14.97 }] } };
+/** What its filler would cast: an image for each idea it shows in the top half, one for each name he cites, the tool's name (« Flim »). */
+const CR_SAID = {
+  hook: null,
+  ideas: [
+    { from: 0, to: 17, key: 4, text: "culture", font: "", files: ["planete"], items: [] },
+    {
+      from: 18,
+      to: 42,
+      key: 21,
+      text: "Théodora",
+      font: "",
+      files: ["lune"],
+      items: [
+        { word: 34, text: "Jean-Paul Goude", font: "", file: "goude" },
+        { word: 37, text: "Lotte Reiniger", font: "", file: "reiniger" },
+        { word: 41, text: "Saul Bass", font: "", file: "bass" },
+      ],
+    },
+    { from: 43, to: 52, key: 46, text: "iconique", font: "", files: ["cerise"], items: [] },
+    { from: 53, to: 64, key: 64, text: "Flim", font: "", items: [] },
+  ],
+  name: { from: 64, to: 64 },
+};
+/** Its original's cuts in that passage (s, measured image by image), and when its card starts growing. */
+const CR_ORIGINAL = { split: 4.03, names: [6.87, 7.8, 8.67], next: 9.67, frame: 12.07, card: 13.83, chime: 13.96 };
+const CR_FILES = [
+  { id: "orig", photo: false, seconds: 14.97, aspect: 9 / 16 },
+  { id: "planete", photo: true, seconds: 0, aspect: 1 },
+  { id: "lune", photo: false, seconds: 8, aspect: 9 / 16 },
+  { id: "goude", photo: true, seconds: 0, aspect: 9 / 16 },
+  { id: "reiniger", photo: true, seconds: 0, aspect: 9 / 16 },
+  { id: "bass", photo: true, seconds: 0, aspect: 2 / 3 },
+  { id: "cerise", photo: false, seconds: 5, aspect: 16 / 9 },
+];
+const createurOnOriginal = async (said: Record<string, unknown> = CR_SAID, files = CR_FILES) => {
+  const { createur } = await import("./skills/createur.ts");
+  const { skillTalk, readSkillFill, skillPlan } = await import("./skills.ts");
+  const talk = skillTalk(CR_TALK)!;
+  const fill = readSkillFill(createur, files, talk.pieces.length, voiceAnswer(said), { talk })!;
+  const plan = editPlanSchema.parse(skillPlan({ skill: createur, name: "Face caméra et références", files, fill, talk }));
+  const props = buildReelProps(plan, {
+    template: "libre",
+    clipUrls: Object.fromEntries(files.map((f) => [f.id, `https://x/${f.id}`])),
+    photoIds: files.filter((f) => f.photo).map((f) => f.id),
+    aspects: Object.fromEntries(files.map((f) => [f.id, f.aspect])),
+    photoAspects: Object.fromEntries(files.filter((f) => f.photo).map((f) => [f.id, f.aspect])),
+    sceneCutouts: { planete: { src: "https://x/planete-cut.png", box: { x: 0.2, y: 0.1, w: 0.6, h: 0.8 } } },
+    brand: { name: "Flim" },
+    words: { orig: CR_WORDS },
+  });
+  return { createur, talk, plan, layer: props.layers![0]! };
+};
+
+test("« Face caméra et références » (v1) cuts where its original does: on the first word of an idea, on each name he cites, within two images", async () => {
+  const { createur, plan } = await createurOnOriginal();
+  assert.equal(createur.version, 1);
+  assert.equal(createur.voice?.cut, "attack");
+  assert.equal(createur.voice?.subtitles, "own");
+  assert.equal(createur.voice?.hook, undefined);
+  // Its talk: no pause of his long enough to cut, so the Reel's clock is the original's.
+  assert.equal(plan.duration, 14.7);
+  const shots = plan.segments.filter((s): s is ClipSegment => "clip_id" in s);
+  const talkShots = shots.filter((s) => !s.beside);
+  const refs = shots.filter((s) => s.beside);
+  // The frame changes on the first word of each idea (4,03 s: the split; 9,67 s: the cherry; 12,07 s: another frame),
+  // her images on the names he cites (6,87 · 7,80 · 8,67 s), within two images.
+  const starts = talkShots.slice(1).map((s) => s.in);
+  within2(starts[0]!, CR_ORIGINAL.split, "the split");
+  within2(starts[1]!, CR_ORIGINAL.next, "the next idea");
+  within2(starts[2]!, CR_ORIGINAL.frame, "another frame");
+  assert.deepEqual(talkShots.map((s) => s.move ?? "none"), ["none", "punch", "none", "punch"]);
+  assert.deepEqual(refs.map((s) => s.clip_id), ["planete", "lune", "goude", "reiniger", "bass", "cerise"]);
+  within2(refs[1]!.beside!.at, CR_ORIGINAL.split, "its top half");
+  refs.slice(2, 5).forEach((s, j) => within2(s.beside!.at, CR_ORIGINAL.names[j]!, `« ${s.clip_id} »`));
+  within2(refs[5]!.beside!.at, CR_ORIGINAL.next, "the cherry");
+  // Each name's image until the next one, the last to the next idea; its own image the idea until its first name.
+  assert.ok(Math.abs(refs[1]!.beside!.at + (refs[1]!.out - refs[1]!.in) - refs[2]!.beside!.at) < 0.011);
+  assert.ok(Math.abs(refs[4]!.beside!.at + (refs[4]!.out - refs[4]!.in) - refs[5]!.beside!.at) < 0.011);
+  // Its card on his tool's name with its chime (13,83 and 13,96 s); no music (his voice alone); nothing written big
+  // (its keywords and the names it shows are its images).
+  within2(plan.sounds![0]!.at, CR_ORIGINAL.chime, "its chime");
+  assert.equal(plan.sounds![0]!.sound, "sparkle chime");
+  within2(Number(plan.layers![0]!.motion.texts!.said_name_from) / 30, CR_ORIGINAL.card, "its card");
+  assert.deepEqual(plan.music_shape, { none: true });
+  assert.deepEqual(plan.texts, []);
+  // What he says, written by its code (its first phrase on bands, then its small subtitles): the engine's step aside.
+  assert.equal(plan.layers![0]!.motion.writes_spoken, true);
+});
+
+test("« Face caméra et références » (v1): its images where the original puts them, its hook on bands, its small subtitles, its card", async () => {
+  const { createur, layer } = await createurOnOriginal();
+  const props = sceneProps(layer);
+  const face = { x: 540, y: 1150, width: 170, height: 220 };
+  const brand = { name: "Flim", displayFont: "Inter Tight", bodyFont: "Inter Tight" };
+  const draw = (f: number, read: Parameters<typeof drawVoiced>[3] = { face }) => drawVoiced(createur.code, f, { ...props, brand }, read);
+  const laid = (tree: Drawn) => drawnNodes(tree).filter((n) => n.type === "Footage" || n.type === "Cutout").map((n) => [n.type, n.props.shot ?? (n.props.photo as { segment: number }).segment, styleOf(n).top ?? n.props.y, styleOf(n).height ?? n.props.height]);
+  // Its first idea: its photo of an object cut out on his wall above his head (his head low, room above), his shot full
+  // frame; then, his head higher, the top half (his the bottom half, framed on his face).
+  const first = laid(await draw(30));
+  assert.deepEqual(first[0], ["Footage", 0, 0, 1920]);
+  assert.equal(first[1]![0], "Cutout");
+  assert.ok(Number(first[1]![2]) + Number(first[1]![3]) <= 1150 - 0.95 * 220 - 0.02 * 1920 + 1);
+  const cutout = drawnNodes(await draw(30)).find((n) => n.type === "Cutout")!;
+  assert.deepEqual([cutout.props.rim, cutout.props.shadow], [0, false]);
+  assert.deepEqual(laid(await draw(30, { face: { ...face, y: 600 } })).map((x) => [x[0], x[2], x[3]]), [["Footage", 960, 960], ["Footage", 0, 960]]);
+  // Its second idea's clip in the top half; then each name's image full frame from the instant he names it.
+  const split = laid(await draw(Math.round(5 * 30)));
+  assert.deepEqual(split.map((x) => [x[1], x[2], x[3]]), [[1, 960, 960], [5, 0, 960]]);
+  for (const [s, shot] of [[7.2, 6], [8.2, 7], [9.0, 8]] as const) assert.deepEqual(laid(await draw(Math.round(s * 30))), [["Footage", shot, 0, 1920]], `${s} s`);
+  // Its hook: his first phrase on black bands from its first word, then small sober subtitles, one phrase at a time,
+  // white, no word in colour, in the middle (on the split's line).
+  const bands = drawnNodes(await draw(20)).find((n) => n.type === "Captions")!;
+  assert.equal(bands.props.style, "bands");
+  assert.deepEqual((bands.props.words as { w: string }[]).map((w) => w.w).join(" "), CR_WORDS.slice(0, 18).map((w) => w.w).join(" "));
+  const subtitle = (tree: Drawn) => drawnNodes(tree).find((n) => n.type === "div" && styleOf(n).fontWeight === 600);
+  const at46 = await draw(Math.round(4.6 * 30));
+  const sub = subtitle(at46)!;
+  assert.equal(drawnText(sub), "Les clips de Théodora qui nous ont tous marqués,");
+  assert.equal(styleOf(sub).color, "#ffffff");
+  assert.ok(Number(styleOf(sub).fontSize) >= 48);
+  const subBox = drawnNodes(at46).find((n) => n.type === "div" && styleOf(n).justifyContent === "center" && drawnNodes(n).includes(sub))!;
+  assert.equal(Number(styleOf(subBox).top) + Number(styleOf(subBox).height) / 2, 960);
+  // His tool named: a white card grows from the middle onto his chest under his face in 14 images, blurred at first,
+  // his name on it (no logo), and no subtitles under it.
+  const nameAt = Number(props.texts.said_name_from);
+  const card = (tree: Drawn) => drawnNodes(tree).find((n) => n.type === "div" && styleOf(n).background === "#ffffff");
+  const start = card(await draw(nameAt))!;
+  const grown = card(await draw(nameAt + 14))!;
+  assert.ok(Number(styleOf(start).width) < 200 && String(styleOf(start).filter).startsWith("blur"));
+  assert.deepEqual([styleOf(grown).width, styleOf(grown).left, styleOf(grown).filter], [Math.round(1080 * 0.74), Math.round((1080 - Math.round(1080 * 0.74)) / 2), undefined]);
+  // (His face low in the picture: above his head; higher, on his chest under it.)
+  assert.ok(Number(styleOf(grown).top) + Number(styleOf(grown).height) <= 1150 - 0.95 * 220, String(styleOf(grown).top));
+  const chest = card(await draw(nameAt + 14, { face: { ...face, y: 560 } }))!;
+  assert.ok(Number(styleOf(chest).top) >= 560 + 0.75 * 220 && Number(styleOf(chest).top) + Number(styleOf(chest).height) <= 0.75 * 1920, String(styleOf(chest).top));
+  assert.equal(drawnText(drawnNodes(grown).find((n) => n.type === "FitText")!), "Flim");
+  assert.equal(subtitle(await draw(nameAt + 14)), undefined);
+});
+
+test("« Face caméra et références » (v1): a wall of her images behind her cut out on those shots only, its format, no music", async () => {
+  const { createur, plan, layer } = await createurOnOriginal({
+    ...CR_SAID,
+    ideas: [CR_SAID.ideas[0], CR_SAID.ideas[1], { ...CR_SAID.ideas[2], files: ["cerise", "w1", "w2", "w3", "w4", "w5"] }, CR_SAID.ideas[3]],
+  }, [...CR_FILES, ...["w1", "w2", "w3", "w4", "w5"].map((id) => ({ id, photo: true, seconds: 0, aspect: 4 / 5 }))]);
+  const props = sceneProps(layer);
+  const face = { x: 540, y: 1150, width: 170, height: 220 };
+  const wallFrom = Math.round(CR_ORIGINAL.next * 30);
+  // Her cut-out on the shots of that idea only (her other shots are never cut out), declared for the engine.
+  const wallShot = plan.segments.filter((s): s is ClipSegment => "clip_id" in s && !s.beside).findIndex((s) => s.in > 9.5);
+  assert.deepEqual(plan.layers![0]!.motion.drawn, { shots: 15, subjects: [wallShot] });
+  const { subjectShots } = await import("./subject.ts");
+  assert.deepEqual([...subjectShots(plan)], [wallShot]);
+  const drawn = await cutoutsDrawn(createur.code, { width: 1080, height: 1920, brand: { name: "Flim", displayFont: "Inter Tight", bodyFont: "Inter Tight" }, ...props }, Array.from({ length: props.durationInFrames }, (_, f) => f));
+  assert.deepEqual([...drawn], [wallShot]);
+  // Its six thumbnails in two columns sliding in from both edges in 7 images, posed, her cut out in front of them.
+  const wall = (tree: Drawn) => drawnNodes(tree).filter((n) => n.type === "div" && styleOf(n).overflow === "hidden" && String(styleOf(n).boxShadow).length > 4);
+  const her = { [wallShot]: { x: 300, y: 700, w: 480, h: 1220 } };
+  const posed = wall(await drawVoiced(createur.code, wallFrom + 10, props, { face, boxes: her }));
+  assert.equal(posed.length, 6);
+  assert.ok(posed.every((n) => !styleOf(n).transform));
+  assert.deepEqual([...new Set(posed.map((n) => Number(styleOf(n).left) < 540))], [true, false]);
+  assert.ok(Math.max(...posed.map((n) => Number(styleOf(n).top) + Number(styleOf(n).height))) <= 0.73 * 1920 + 1);
+  const sliding = wall(await drawVoiced(createur.code, wallFrom + 1, props, { face, boxes: her }));
+  assert.ok(sliding.some((n) => String(styleOf(n).transform).startsWith("translateX(-")) && sliding.some((n) => /^translateX\(\d/.test(String(styleOf(n).transform))));
+  const order = drawnNodes(await drawVoiced(createur.code, wallFrom + 10, props, { face, boxes: her })).filter((n) => n.type === "Subject" || (n.type === "div" && styleOf(n).boxShadow)).map((n) => n.type);
+  assert.equal(order.at(-1), "Subject");
+  // Without her cut-out, the wall stops above her head.
+  const above = wall(await drawVoiced(createur.code, wallFrom + 10, props, { face }));
+  assert.ok(above.length >= 2 && above.every((n) => Number(styleOf(n).top) + Number(styleOf(n).height) <= 1150 - 0.95 * 220 - 0.02 * 1920 + 1));
+  // Its format: as her video; split all along on her word, or full frame all along; her horizontal video split.
+  assert.deepEqual(createur.settings?.map((s) => [s.name, s.choices.map((c) => c.value)]), [["format", ["auto", "partage", "plein"]]]);
+  const boxes = async (f: number, extra: Record<string, unknown>) => drawnNodes(await drawVoiced(createur.code, f, { ...props, ...extra }, { face })).filter((n) => n.type === "Footage").map((n) => [styleOf(n).top, styleOf(n).height]);
+  assert.deepEqual(await boxes(Math.round(7.2 * 30), { texts: { ...props.texts, format: "partage" } }), [[960, 960], [0, 960]]);
+  assert.deepEqual(await boxes(Math.round(5 * 30), { texts: { ...props.texts, format: "plein" } }), [[0, 1920]]);
+  const wideShots = (props.shots as { aspect: number; kind: string }[]).map((s, i) => (i < 4 ? { ...s, aspect: 16 / 9 } : s));
+  assert.deepEqual(await boxes(Math.round(7.2 * 30), { shots: wideShots }), [[960, 960], [0, 960]]);
+  // No music, no grade (the images she shows as they are); 2 to 10 files.
+  assert.deepEqual(plan.music_shape, { none: true });
+  assert.deepEqual(createur.finish, { contrast: 0, saturation: 0, warmth: 0, grain: 0, vignette: 0, fade: 0 });
+  assert.deepEqual(createur.files, [2, 10]);
+  // Light: the images of one moment only are mounted (a name's one, an idea's one, or the wall's six), never all of them.
+  for (const f of [30, 150, 216, 250, wallFrom + 10, 380]) {
+    const n = drawnNodes(await drawVoiced(createur.code, f, props, { face, boxes: her })).filter((x) => x.type === "Footage" || x.type === "Cutout").length;
+    assert.ok(n <= 7, `image ${f}: ${n}`);
+  }
 });
