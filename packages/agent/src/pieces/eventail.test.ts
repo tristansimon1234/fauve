@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { checkMotionCode } from "../motion-scene.ts";
-import { pieceTestPlan, readPieceFill } from "../pieces.ts";
+import { pieceMusicShape, pieceTestPlan, readPieceFill } from "../pieces.ts";
 import { editPlanSchema, type EditPlan } from "../schemas.ts";
 import { ANY_SHOT, readsDrawn } from "../subject.ts";
 import { eventail, starFrames } from "./eventail.ts";
@@ -66,7 +66,7 @@ const planOf = (seconds: number[], options: { bpm?: number; texts?: Record<strin
     bpm: options.bpm ?? 100,
   });
 
-test("« Éventail de bandes » (effect v1): its star on the beats of its first shot, on the half beats or the quarters when shorter, its heart named on that shot", () => {
+test("« Éventail de bandes » (effect v2): its star on the beats of its first shot, on the half beats or the quarters when shorter, its heart named on that shot", () => {
   assert.deepEqual(checkMotionCode(eventail.code), []);
   // Its star's shot six seconds (ten beats), then one of her shots: a band on each of the beats 1 to 6, the whole shot on beat 7.
   const plan = planOf([6, 1.2], { objects: { coeur: "pendant lamp" } });
@@ -91,9 +91,20 @@ test("« Éventail de bandes » (effect v1): its star on the beats of its first 
   const filled = readPieceFill(eventail, { fits: true, missing: "", texts: [{ slot: "titre", text: "Chez Lino" }], objects: [{ slot: "coeur", name: "none" }], settings: [{ name: "fond", value: "accent" }, { name: "format", value: "vertical" }] })!;
   assert.deepEqual([filled.texts, filled.objects, filled.settings], [{ titre: "Chez Lino" }, {}, { fond: "accent" }]);
   assert.equal(motion.sounds, undefined);
+  // Its music through a small speaker until the whole shot, a hit of it on each step (the square and each band, on its
+  // beats), silent after each one to the next step; all of it on the whole shot.
+  const fill = { texts: {}, objects: { coeur: "pendant lamp" }, settings: {} };
+  const shape = pieceMusicShape({ piece: eventail, fill, plan, layer: plan.layers![0]!, bpm: 100 })!;
+  const steps = [0, 18, 36, 54, 72, 90, 108, 126];
+  assert.deepEqual(shape.pauses, steps.slice(0, -1).map((f, k) => ({ from: Math.round((1.2 + (f + 0.56 * 18) / 30) * 1000) / 1000, to: Math.round((1.2 + steps[k + 1]! / 30) * 1000) / 1000 })));
+  assert.deepEqual(shape.filters!.map((f) => [f.kind, f.from, f.to]), [["radio", 1.2, 5.4]]);
+  // On the half beats: its speaker only, its silences would end off the beat.
+  const halfShape = pieceMusicShape({ piece: eventail, fill: { texts: {}, objects: {}, settings: {} }, plan: planOf([3.6]), layer: planOf([3.6]).layers![0]!, bpm: 100 })!;
+  assert.equal(halfShape.pauses, undefined);
+  assert.deepEqual(halfShape.filters!.map((f) => [f.kind, f.from, f.to]), [["radio", 1.2, 3.3]]);
 });
 
-test("« Éventail de bandes » (effect v1): her shot through a star of windows on its ground, whole on the seventh step in a thin frame, her next shot after it", () => {
+test("« Éventail de bandes » (effect v2): her shot through a star of windows on its ground, whole on the seventh step in a thin frame, her next shot after it", () => {
   const layer = layerOf(planOf([6, 1.2]));
   const at = (f: number, brand: Record<string, unknown> = {}, reads = {}, l = layer) => nodes(sceneAt(f, l, brand, reads));
   // Before the whole shot: its star of windows onto its first shot, turned a quarter (the frame stands), on its marks.
@@ -119,7 +130,7 @@ test("« Éventail de bandes » (effect v1): her shot through a star of windows 
   assert.equal(ground({ palette: { secondary: "#b5543a", light: "#ffffff", dark: "#1b2a5c" } }, { fond: "bordeaux" }), "#440a0b");
 });
 
-test("« Éventail de bandes » (effect v1): its centre on her shot's heart, else where its lines run, within an eighth of the middle; 16:9 and her colours on her word; its title", () => {
+test("« Éventail de bandes » (effect v2): its centre on her shot's heart, else where its lines run, within an eighth of the middle; 16:9 and her colours on her word; its title", () => {
   const layer = layerOf(planOf([6]));
   const centre = (reads: { heart?: Box; vanish?: { x: number; y: number } }) => nodes(sceneAt(30, layer, {}, reads)).find((n) => n.type === "WindowStar")!.props.center;
   // A small heart found: on it; a large one (it fills the picture): where the lines run; nothing read: the middle.

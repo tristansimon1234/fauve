@@ -62,7 +62,8 @@ export type PieceFraming = "wide" | "medium" | "close" | "detail";
  */
 export type PieceNeeds = {
   files?: number;
-  shot?: { framing?: PieceFraming[]; still?: boolean; outdoors?: boolean; indoors?: boolean; person?: boolean; video?: boolean };
+  /** `wide`: filmed in width (a video Gemini saw in landscape, a photo wider than high). */
+  shot?: { framing?: PieceFraming[]; still?: boolean; outdoors?: boolean; indoors?: boolean; person?: boolean; video?: boolean; wide?: boolean };
 };
 
 /**
@@ -143,6 +144,8 @@ export type PieceShot = {
   indoors: boolean;
   person: boolean;
   beauty: number;
+  /** Filmed in width: her video in landscape, her photo wider than high. */
+  wide?: boolean;
 };
 
 const OUTDOORS = /ext[ée]rieur|\brue\b|trottoir|terrasse|fa[çc]ade|devanture|\bciel\b|\btoits?\b|plage|\bmer\b|\bparc\b|jardin|paysage|\bplace\b|quartier|\bville\b|jet[ée]e|plein air|montagne|colline|for[êe]t|\bchamps?\b|\bquai\b|\bport\b|\bpont\b|outdoor|street|\bsky\b/i;
@@ -164,6 +167,7 @@ export function pieceShots(clips: { media_id: string; analysis: ClipAnalysis }[]
           indoors: INDOORS.test(analysis.setting) && !OUTDOORS.test(analysis.setting),
           person: s.faces_visible || PERSON.test(s.subject) || PERSON.test(s.description),
           beauty: s.beauty ?? 3,
+          wide: analysis.orientation === "landscape",
         };
       }),
   );
@@ -177,6 +181,7 @@ export function pieceShots(clips: { media_id: string; analysis: ClipAnalysis }[]
       indoors: INDOORS.test(notes) && !OUTDOORS.test(notes),
       person: p.detection.regions.some((r) => r.kind === "face") || PERSON.test(notes),
       beauty: 3,
+      wide: p.width > p.height * 1.1,
     };
   });
   return [...fromClips, ...fromPhotos];
@@ -200,6 +205,7 @@ function carries(need: NonNullable<PieceNeeds["shot"]>, shot: PieceShot): number
   if (need.outdoors && !shot.outdoors) return null;
   if (need.indoors && !shot.indoors) return null;
   if (need.person && !shot.person) return null;
+  if (need.wide && !shot.wide) return null;
   return score;
 }
 

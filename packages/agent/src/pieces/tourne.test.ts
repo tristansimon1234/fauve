@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { checkMotionCode } from "../motion-scene.ts";
-import { pieceTestPlan, readPieceFill } from "../pieces.ts";
+import { pieceMusicShape, pieceTestPlan, readPieceFill } from "../pieces.ts";
 import { editPlanSchema, type EditPlan } from "../schemas.ts";
 import { colourRanks, tourne } from "./tourne.ts";
 
@@ -59,7 +59,7 @@ const run = (beats: number[]) => [
 const planOf = (beats: number[], texts: Record<string, string> = {}, settings: Record<string, string> = {}) =>
   pieceTestPlan({ piece: tourne, shots: run(beats), span: [1.2, 1.2 + 0.6 * beats.reduce((a, b) => a + b, 0)], fill: { texts, objects: {}, settings }, bpm: 100 });
 
-test("« Quart de tour, deux tons » (effect v1): its colour on the shot held longest, its last flash, its two hits within its span", () => {
+test("« Quart de tour, deux tons » (effect v2): its colour on the shot held longest, its last flash, its two hits within its span", () => {
   assert.deepEqual(checkMotionCode(tourne.code), []);
   const plan = planOf([1, 2, 1, 1]);
   assert.ok(editPlanSchema.safeParse(plan).success);
@@ -75,6 +75,8 @@ test("« Quart de tour, deux tons » (effect v1): its colour on the shot held lo
     { at: 0, sound: "deep cinematic impact hit", seconds: 1.5, skill: true },
     { at: 0.6, sound: "deep cinematic impact hit", seconds: 1.5, gain: 4, skill: true },
   ]);
+  // Her music muffled as through a wall until the cut into its colour shot, open at once on it.
+  assert.deepEqual(pieceMusicShape({ piece: tourne, fill: { texts: {}, objects: {}, settings: {} }, plan, layer: plan.layers![0]!, bpm: 100 })!.filters!.map((f) => [f.kind, f.from, f.to]), [["muffled", 1.2, 1.8]]);
   // Equal shots: its second; seven and more: two, never side by side, held longest; a shot past its end counts as seen.
   const cut = (lengths: number[]) => lengths.map((frames, k) => ({ from: lengths.slice(0, k).reduce((a, b) => a + b, 0), frames }));
   assert.deepEqual(colourRanks([0, 18, 36, 54].map((from) => ({ from, frames: 18 })), 72), [1]);
@@ -99,7 +101,7 @@ test("« Quart de tour, deux tons » (effect v1): its colour on the shot held lo
   assert.deepEqual([filled.texts, filled.settings], [{}, { couleur: "aucune" }]);
 });
 
-test("« Quart de tour, deux tons » (effect v1): her shots in width turned a quarter clockwise, upright ones upright, two tones but where colour counts, its lens edges", () => {
+test("« Quart de tour, deux tons » (effect v2): her shots in width turned a quarter clockwise, upright ones upright, two tones but where colour counts, its lens edges", () => {
   // Its third shot filmed upright.
   const layer = layerOf(planOf([1, 2, 1, 1]), [16 / 9, 16 / 9, 16 / 9, 9 / 16, 16 / 9, 16 / 9]);
   const at = (f: number, l = layer) => nodes(sceneAt(f, l));
@@ -124,7 +126,7 @@ test("« Quart de tour, deux tons » (effect v1): her shots in width turned a qu
   assert.match(String(style(at(30, { ...layer, texts: { ...layer.texts, couleur: "aucune" } }).find((n) => /url\(#tourne-piece/.test(String(style(n).filter ?? "")))).filter), /tourne-piece-duo/);
 });
 
-test("« Quart de tour, deux tons » (effect v1): its last shot through the original's last flash, its optional title turned a quarter", () => {
+test("« Quart de tour, deux tons » (effect v2): its last shot through the original's last flash, its optional title turned a quarter", () => {
   const layer = layerOf(planOf([1, 2, 1, 1]));
   // Its last shot (rank 3) from image 72: the shot before it blurred over its last five images, a flash on its first
   // image (overexposed, not blurred), its second image still blurred, then sharp.

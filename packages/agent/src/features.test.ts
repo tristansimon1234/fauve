@@ -10718,6 +10718,15 @@ test("an effect of the bank is offered only when her files can carry it, the bes
   assert.equal(PIECES_OFFERED, 5);
   const many = Array.from({ length: 8 }, (_, i) => ({ ...cadre, key: `k${i}` }));
   assert.equal(piecesOffered(many, wide, 5).length, 5);
+  // Filmed in width: a video seen in landscape, a photo wider than high; an effect that asks for it, never on upright ones.
+  const turned = { ...cadre, key: "turned", require: { files: 1, shot: { video: true, wide: true } } };
+  assert.deepEqual(wide.map((s) => s.wide), [true]);
+  const upright = pieceShots([{ media_id: "b", analysis: { ...(clip("wide") as object), orientation: "portrait" } as never }], {});
+  assert.deepEqual(upright.map((s) => s.wide), [false]);
+  assert.deepEqual(piecesOffered([turned], wide, 1).map((p) => p.key), ["turned"]);
+  assert.deepEqual(piecesOffered([turned], upright, 1), []);
+  const photos = pieceShots([], { p: { width: 1600, height: 1200, detection: { regions: [] } }, q: { width: 1200, height: 1600, detection: { regions: [] } } } as never);
+  assert.deepEqual(photos.map((s) => s.wide), [true, false]);
 });
 
 test("an effect of the bank: the editor names it in its layer's brief, one per Reel, and the engine builds its layer from it", async () => {

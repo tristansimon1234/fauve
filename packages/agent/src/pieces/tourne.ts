@@ -10,11 +10,12 @@ import type { EffectPiece, PieceTimeline } from "../pieces.ts";
 // shots, graded as the original's colour shots. Its last shot arrives through the original's last flash: the shot
 // before it blurring over its last five images, a white flash on its first image, its second still blurred. Its two
 // big hits: one as it comes in, the louder on the cut into its colour shot (the original's on the cuts into its first
-// colour shots). Then the montage takes over, upright and in colour. Its optional title is turned a quarter like the
+// colour shots), her music muffled as through a wall until that cut and open at once on it (v2, its skill's pad then
+// its burst). Then the montage takes over, upright and in colour. Its optional title is turned a quarter like the
 // shots, in cream capitals along the middle of the frame, over its first shot. It leaves the rest of its Reel: its
 // opening strobe and its filé, its burst on the quarter beats and its punch zoom, its upside-down upright video (a
-// slot of its own), its muffled music, its last shot held and its ending card. Nothing of the original's own (its
-// places are Egypt's): her shots, her words.
+// slot of its own), its last shot held and its ending card. Nothing of the original's own (its places are Egypt's):
+// her shots, her words.
 
 const CODE = String.raw`function Scene({ width, height, durationInFrames, brand, shots, texts }) {
   const h = React.createElement;
@@ -133,14 +134,14 @@ export function colourRanks(shots: { from: number; frames: number }[], frames: n
 
 export const tourne: EffectPiece = {
   key: "tourne",
-  version: 1,
+  version: 2,
   name: "Quart de tour, deux tons",
   how: "ses plans filmés en largeur tournés d'un quart de tour, dans le sens des aiguilles d'une montre, pour remplir l'écran en entier, en deux tons bleu-vert et crème, avec des bords d'objectif en haut et en bas ; la couleur gardée sur le plan où elle compte (celui qui dure le plus) ; son dernier plan arrive par un flou et un flash blanc ; un grand coup sourd quand il arrive, un plus fort sur le plan en couleur ; puis le montage reprend, droit et en couleur.",
   needs: "des vidéos filmées en largeur (le téléphone couché) : des lignes, des matières, des gestes, et un plan où la couleur compte (ses fleurs, ses fruits, un mur peint, la mer).",
   lays: "sur 2 à 6 de ses plans filmés en largeur, coupés d'un ou deux temps chacun ; le plan où la couleur compte tenu le plus longtemps, jamais le premier (il reste en couleur)",
   shots: [2, 8],
   seconds: [2, 8],
-  require: { files: 2, shot: { video: true } },
+  require: { files: 2, shot: { video: true, wide: true } },
   texts: [
     {
       slot: "titre",
@@ -172,12 +173,15 @@ export const tourne: EffectPiece = {
     const flash = shots.length >= 2 ? shots.length - 1 : -1;
     // Its hits: as it comes in, and the louder on the cut into its first shot in colour.
     const into = colours[0] !== undefined ? shots[colours[0]]!.from / 30 : -1;
+    const cut = Math.round(into * 1000) / 1000;
     return {
       marks: {
         ...Object.fromEntries(colours.map((r, k) => [`colour_${k}`, r])),
         ...(flash > 0 ? { flash } : {}),
       },
-      sounds: [{ at: 0, ...HIT }, ...(into > 0 ? [{ at: Math.round(into * 1000) / 1000, ...HIT, gain: 4 }] : [])],
+      sounds: [{ at: 0, ...HIT }, ...(into > 0 ? [{ at: cut, ...HIT, gain: 4 }] : [])],
+      // Her music muffled as through a wall until that cut, open at once on it (its skill's pad, then its burst).
+      ...(into > 0.3 ? { music: { filters: [{ kind: "muffled" as const, from: 0, to: cut }] } } : {}),
     };
   },
   code: CODE,

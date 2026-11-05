@@ -14,9 +14,11 @@ import type { EffectPiece, PieceTimeline } from "../pieces.ts";
 // the half beats (or the quarters), so the whole shot always lands on the music's grid with a beat or more to show.
 // Full frame (its star turned a quarter) or, on her word, in 16:9 on black as the original; her shots in colour on her
 // word. Its optional title is a small white line in her title face at the top, over the ground, while the star opens
-// (the original's signature, moved from its black to its ground). It leaves the rest of its Reel: its split screen, its
-// two-beat shots and their echo, its signature and red line on the blue black, its music's hits alone before the drop
-// (a piece has no music of its own: its bands land on the beats of hers), its ending card.
+// (the original's signature, moved from its black to its ground). Its music (v2), as its skill's: through a small
+// speaker until the whole shot, a hit of it on each step (the square and each band, on whole beats), silent after each
+// one; all of it, open, on the whole shot: the drop. On half or quarter beats, its speaker only (a silence ending off
+// the beat would move her music off the cuts). It leaves the rest of its Reel: its split screen, its two-beat shots and
+// their echo, its signature and red line on the blue black, its ending card.
 
 const CODE = String.raw`function Scene({ width, height, durationInFrames, brand, shots, texts }) {
   const h = React.createElement;
@@ -122,6 +124,9 @@ const HOLD = 24;
  * shot under it lasts that long; on the half beats, then the quarters, when it is shorter, the whole shot still held a
  * beat (or 0,8 s) at least; shorter still, its seven steps squeezed before that hold.
  */
+/** How much of each step its music plays before falling silent to the next one (its skill's 0,56 beat, the original's hit). */
+const MUSIC_HIT = 0.56;
+
 export function starFrames(room: number, beat: number): { bands: number[]; whole: number } {
   for (const step of [1, 0.5, 0.25]) {
     const s = step * beat;
@@ -133,7 +138,7 @@ export function starFrames(room: number, beat: number): { bands: number[]; whole
 
 export const eventail: EffectPiece = {
   key: "eventail",
-  version: 1,
+  version: 2,
   name: "Éventail de bandes",
   how: "sur un fond de couleur profonde (sa couleur foncée, sinon le bordeaux de l'original), un petit carré au cœur de son plan, puis une bande par temps, posée d'un coup, toutes des fenêtres sur ce même plan en noir et blanc, en étoile autour du carré ; au septième temps le plan entier apparaît d'un coup, dans un fin cadre de la couleur du fond ; puis ses plans suivants dans le même cadre, et le montage reprend.",
   needs: "un plan avec un centre et des lignes qui en partent, filmé téléphone posé : une table, une assiette ou une pizza vue d'en haut, un plafond ou une suspension vus d'en bas, une allée ou un couloir en perspective ; son cœur au milieu de l'image.",
@@ -188,7 +193,21 @@ export const eventail: EffectPiece = {
     // Its star on its first shot under it, to that shot's end (or its own).
     const room = shots.length ? Math.min(frames, shots[0]!.from + shots[0]!.frames) : frames;
     const { bands, whole } = starFrames(room, beat);
-    return { marks: { whole, ...Object.fromEntries(bands.map((f, k) => [`band_${k}`, f])) } };
+    // Through a small speaker until the whole shot; on whole beats, a hit of it on each step, silent after each one.
+    const seconds = (f: number) => Math.round((f / 30) * 1000) / 1000;
+    const steps = [0, ...bands, whole];
+    const onBeats = Math.abs((bands[0] ?? 0) - beat) <= 0.5;
+    const pauses = onBeats
+      ? steps.slice(0, -1).flatMap((f, k) => {
+          const next = steps[k + 1]!;
+          const from = f + MUSIC_HIT * (next - f);
+          return next - from >= 2 ? [{ from: seconds(from), to: seconds(next) }] : [];
+        })
+      : [];
+    return {
+      marks: { whole, ...Object.fromEntries(bands.map((f, k) => [`band_${k}`, f])) },
+      music: { ...(pauses.length ? { pauses } : {}), filters: [{ kind: "radio", from: 0, to: seconds(whole) }] },
+    };
   },
   code: CODE,
 };
