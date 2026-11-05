@@ -18,8 +18,10 @@ import { pixel } from "./skills/pixel.ts";
 import { plansFixes } from "./skills/plans-fixes.ts";
 import { quatreCoins } from "./skills/quatre-coins.ts";
 import { rallume } from "./skills/rallume.ts";
+import { silhouette } from "./skills/silhouette.ts";
 import { titreDerriere } from "./skills/titre-derriere.ts";
 import { tourne } from "./skills/tourne.ts";
+import { vision } from "./skills/vision.ts";
 
 // The montage skills written so far, by the key of the house model each one plays (skills.ts). Server side only
 // (@fauve/agent/skills): their code stays out of the pages. Each one is written by hand on its model's original,
@@ -45,8 +47,10 @@ export const MONTAGE_SKILLS: Record<string, MontageSkill> = {
   "plans-fixes": plansFixes,
   "quatre-coins": quatreCoins,
   rallume,
+  silhouette,
   "titre-derriere": titreDerriere,
   tourne,
+  vision,
 };
 
 /** The skill of a house model, when it has one. */
