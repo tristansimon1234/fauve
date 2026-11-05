@@ -47,7 +47,7 @@ Rien d'autre ne s'allume ni ne clignote : les 15 « clignotements » de `measure
 ### 3. La pile s'efface par la lumière
 - **Mesuré** : à 1,80 s (image 54, sur le temps 3, juste après un coup fort), toute la pile part en 4 images, et pas d'un bloc : le sombre d'abord. Image 54 : ses parties les plus sombres sont à moitié parties (47 % encore là), les plus claires entières. Image 55 : le sombre à 16 %, le clair à 97 %. Images 56 et 57 : ne reste que le blanc de l'assiette du dessus (83 %), un fantôme sur la table. Image 58 : plus rien. Puis la table nue 3 images, et la coupe.
 - **Sur quoi** : n'importe quelle pile de ses photos : ce qu'elles ont de clair (une assiette, une tasse, une fleur blanche) part en dernier.
-- **Outil** : **manquant** : un fondu par la lumière (« luma fade ») : chaque point s'efface quand sa luminosité passe sous un seuil qui monte. Une sortie de `Stack` (`exit.to = "luma"`) ou un calque à poser sur n'importe quel élément (un filtre SVG). `Stack` sort aujourd'hui ses photos une à une, la dernière d'abord ; v1 fait un fondu ordinaire.
+- **Outil** : existant depuis le 5 novembre : `LumaFade` (kit d'image), autour de la pile. Il manquait un fondu par la lumière (« luma fade ») : chaque point s'efface quand sa luminosité passe sous un seuil qui monte. Une sortie de `Stack` (`exit.to = "luma"`) ou un calque à poser sur n'importe quel élément (un filtre SVG). `Stack` sort aujourd'hui ses photos une à une, la dernière d'abord ; v1 fait un fondu ordinaire.
 - **Si rien ne s'y prête** : toujours possible ; des photos toutes sombres partent presque d'un coup.
 
 ### 4. Deux plans éclair, saccadés

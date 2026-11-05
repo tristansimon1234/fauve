@@ -92,6 +92,17 @@ const scope = {
   // Nobody is seen here: no box; a sketch draws what it wraps.
   Detect: () => null,
   Sketch: ({ children }) => React.createElement("div", null, children),
+  // The picture kit (Picture.tsx): what each piece shows is drawn, an echo its element; a burn, a shadow and a dot grid carry nothing to read.
+  Burn: () => null,
+  LensEdges: ({ children }) => React.createElement("div", null, drawn(children, config)),
+  Smear: ({ children }) => React.createElement("div", null, drawn(children, config)),
+  Punch: ({ children }) => React.createElement("div", null, drawn(children, config)),
+  WindowStar: ({ children, box }) => React.createElement("div", null, drawn(children, { width: box?.w ?? config.width, height: box?.h ?? config.height })),
+  LumaFade: ({ children }) => React.createElement("div", null, children),
+  Echo: ({ draw }) => React.createElement("div", null, typeof draw === "function" ? draw(frame, 0) : null),
+  CastShadow: () => null,
+  DotGrid: () => null,
+  Ascii: ({ children }) => React.createElement("div", null, children),
   // The effects kit (Effects.tsx): what it wraps is drawn, its labels written.
   Letterbox: () => null,
   ColorPop: ({ children }) => React.createElement("div", null, children),

@@ -57,8 +57,10 @@ export type ComposeShot = ScenePhoto & {
    * The objects followed through it, by name: where each one is and its outline, image by image (SubjectBox, SubjectOutline,
    * Outline given its name), and its pieces (the letters of a sign, each window of « every window ») as shares of its box
    * on the image it was found on (x, y, w, h, flat, in reading order): SubjectParts places them on its box at every image.
+   * `pieces`: the outline of each of them at every image (as `contours`), in the same order, when the card read them
+   * apart (each of « every … » that overlaps another), null for a piece its box is enough for: Subject part draws one alone.
    */
-  objects?: Record<string, { boxes?: (number[] | null)[]; contours?: (number[] | null)[]; parts?: number[] }>;
+  objects?: Record<string, { boxes?: (number[] | null)[]; contours?: (number[] | null)[]; parts?: number[]; pieces?: ((number[] | null)[] | null)[] }>;
   /** A photo's framing and retouch, as the Reel draws it (Photo): what SubjectBox and SubjectOutline place its subject by. */
   edit?: PhotoEdit;
   /** How the Reel moves it as it draws it (set by the render: its camera move, a photo's slow zoom, the punch), so a box read on it lands where it is at each frame. */

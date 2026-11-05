@@ -123,27 +123,24 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
     return box(-Math.max(0, Math.min(m.W - bw, m.fx * m.W - ex)), 0, m.W, bh);
   })();
 
-  // 2. A flash: the picture overexposed as by a camera's flash, never a white card: the last film image of the shot
-  // that goes and the first two of the one that comes, the first of them brightest ([brightness, white laid in screen]).
-  const LIFT = { "-2": [1.2, 0.14], "-1": [1.2, 0.14], 0: [1.35, 0.18], 1: [1.18, 0.13] };
-  const fc = flashes.find((c) => frame >= c - 2 && frame <= c + 1);
-  const lift = fc === undefined ? null : LIFT[frame - fc];
-  // 3. A film burn: coloured light laid on the picture in screen, image by image around its cut ([image from the cut,
-  // its light, how much, the picture's own filter]): red-orange from the left then a cold white; cream from the top
-  // right corner, all of it, a yellow rest low on the right; cream from the right, then the same.
+  // 2. A flash on each of its cuts (the picture kit's Flash expose): the picture overexposed as by a camera's flash,
+  // never a white card, the last film image of the shot that goes (two images: its film runs at 24 a second) and the
+  // first two of the one that comes, the first of them brightest (×1,35 and white laid in screen).
+  // 3. A film burn on each of its three cuts (the picture kit's Burn): coloured light laid on the picture in screen,
+  // image by image around its cut as measured ([image from the cut, its light, how much, a filter on the picture under
+  // it]): red-orange from the left then a cold white; cream from the top right corner, all of it, a yellow rest low on
+  // the right; cream from the right, then the same.
   const BURNS = [
     [[-3, "#56637a", 0.5, "saturate(0.5) brightness(1.08)"], [-2, "radial-gradient(ellipse 80% 110% at 0% 55%, rgba(255,96,64,0.95), rgba(255,96,64,0) 100%)", 1], [-1, "#aab2b9", 0.85]],
     [[-4, "radial-gradient(circle at 100% 0%, rgba(248,236,170,0.95), rgba(248,236,170,0) 55%)", 1], [-3, "radial-gradient(circle at 100% 0%, rgba(248,236,170,0.95), rgba(248,236,170,0.3) 70%, rgba(248,236,170,0.1))", 1], [-2, "#efe9b4", 0.86], [-1, "#efe9b4", 0.9], [0, "#eee6b0", 0.55], [1, "radial-gradient(circle at 100% 100%, rgba(244,212,120,0.85), rgba(244,212,120,0) 55%)", 1]],
     [[-4, "radial-gradient(ellipse 45% 90% at 100% 55%, rgba(240,218,158,0.9), rgba(240,218,158,0) 100%)", 1], [-3, "radial-gradient(ellipse 75% 110% at 100% 55%, rgba(240,218,158,0.95), rgba(240,218,158,0) 100%)", 1], [-2, "linear-gradient(to left, rgba(240,220,160,0.95), rgba(240,220,160,0.45) 60%, rgba(240,220,160,0.15))", 1], [-1, "#eee3b0", 0.78], [0, "#eeeab6", 0.72], [1, "radial-gradient(circle at 100% 100%, rgba(240,212,130,0.8), rgba(240,212,130,0) 55%)", 1]],
   ];
-  const burn = burns.flatMap((c, b) => (Number.isFinite(c) ? BURNS[b].filter((k) => frame === c + k[0]) : []));
-  const tone = [lift ? "brightness(" + lift[0] + ")" : "", ...burn.map((k) => k[3] || "")].filter(Boolean).join(" ");
   // Under the first burn, the shot jumps on a third of a second, as the original's ride (image 188).
   const jump = s && frame >= burns[0] - 3 && frame < burns[0] && s.from + s.durationInFrames === burns[0] ? { at: s.from - 8 } : {};
-  const film = n ? h(Footage, { shot: cur, ...jump, ...(J !== null && frame >= J ? { hold: 4 } : {}), style: { ...(nightBox || full), ...(tone ? { filter: tone } : {}) } }) : null;
+  const film = n ? h(Footage, { shot: cur, ...jump, ...(J !== null && frame >= J ? { hold: 4 } : {}), style: nightBox || full }) : null;
   const light = [
-    lift ? h("div", { key: "f", style: { ...full, background: "#ffffff", mixBlendMode: "screen", opacity: lift[1] } }) : null,
-    ...burn.map((k, i) => h("div", { key: "b" + i, style: { ...full, background: k[1], mixBlendMode: "screen", opacity: k[2] } })),
+    flashes.length ? h(Flash, { key: "f", at: flashes, expose: true, before: 2 }) : null,
+    ...burns.map((c, b) => (Number.isFinite(c) ? h(Burn, { key: "b" + b, at: c, steps: BURNS[b] }) : null)),
   ];
 
   // 4. The burst: things alike side by side in her shot (what the filler named, each one found), one a film image (24 a

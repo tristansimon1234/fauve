@@ -16,12 +16,14 @@ import { Fit } from "./Fit";
 import { makeKit } from "./Kit";
 import { makeType } from "./Type";
 import { makeGraphic } from "./Graphic";
-import { ClearBox, HeadMoves, LightUnder, makeEffects, SkylineAt, SubjectBox, SubjectOutline, SubjectParts, VanishingPoint } from "./Effects";
+import { ClearBox, HeadMoves, LightUnder, makeEffects, SkylineAt, SubjectBox, SubjectOutline, SubjectParts, SubjectPiece, VanishingPoint } from "./Effects";
 import { objectName } from "./outline";
 import { Marker } from "./Marker";
 import { Captions } from "./Captions";
 import { PaperCutout, type RimSpec } from "./PaperCutout";
 import { makeLooks, PassageLooksContext } from "./PassageLook";
+import { makePicture } from "./Picture";
+import { pieceInset } from "./picture-kit";
 import { SceneView } from "./Scene";
 import type { Theme } from "./theme";
 import { footageTrack, type TrackFn, type TrackPiece } from "./track";
@@ -242,12 +244,20 @@ function Subject({
   hold,
   object,
   at,
+  part,
+  slices,
 }: {
   shot: number;
   /** It plays from that frame instead of its shot's own moment, as Footage at={…} does (the same box, the same frame). */
   at?: number;
   /** An object followed through the shot instead of her (a cup she lifts, a product she shows), by the name its code gives it. */
   object?: string;
+  /**
+   * One piece of that object alone (the k-th of SubjectParts, in reading order: one window, one tower, one letter): its
+   * own outline when the card read its pieces apart, else its box (`slices`: of an object in one piece, that many slices).
+   */
+  part?: number;
+  slices?: number;
   style?: CSSProperties;
   rim?: number;
   rimColor?: string;
@@ -274,8 +284,17 @@ function Subject({
   const filtered = r > 0 || shadow || Boolean(fill) || Boolean(tint);
   const body = fill ? "sil" : tint ? "tinted" : "SourceGraphic";
   const step = hold && hold > 1 ? Math.round(hold) : 0;
+  // One piece alone (picture kit): its outline, else its box and a pad round it, in this box's own px; not there: nothing.
+  let clip: string | undefined;
+  if (name && typeof part === "number") {
+    const laid = { left: typeof style?.left === "number" ? style.left : 0, top: typeof style?.top === "number" ? style.top : 0, width: size.width, height: size.height };
+    const piece = SubjectPiece(info, frame, laid, name, part, slices ?? 0, true);
+    if (!piece) return null;
+    clip = "path" in piece ? `path('${piece.path}')` : (pieceInset(piece.box, { left: 0, top: 0, width: laid.width, height: laid.height }, Math.max(2, Math.round(laid.height * 0.012))) ?? undefined);
+    if (!clip) return null;
+  }
   return (
-    <div style={{ position: "absolute", overflow: "hidden", ...style }}>
+    <div style={{ position: "absolute", overflow: "hidden", ...style, ...(clip ? { clipPath: clip } : {}) }}>
       {filtered ? (
         <svg width={0} height={0} style={{ position: "absolute" }} aria-hidden="true">
           <filter id={`s${id}`} x="-10%" y="-10%" width="120%" height="120%">
@@ -335,6 +354,9 @@ function Subject({
 // materials kit (Type.tsx), with the timings of the reference Reels.
 const kit = makeKit({ useCurrentFrame, useVideoConfig });
 const type = makeType({ useCurrentFrame, useVideoConfig });
+// Burn, LensEdges, Smear, Punch, WindowStar, LumaFade, Echo, CastShadow, DotGrid, Ascii: the picture kit (Picture.tsx),
+// image effects measured on the models' originals; Flash expose, Turn 180, Tiles reading and land, Subject part with them.
+const picture = makePicture({ useCurrentFrame, useVideoConfig });
 // Cursor, Toggle, Button, ProfileCard, WordList, Timeline, Grid, Fan, Turn, Whip, ZoomThrough, Through, Flash, Tint: the
 // interface, graphics and transitions kit (Graphic.tsx).
 const graphic = makeGraphic({ useCurrentFrame, useVideoConfig });
@@ -392,6 +414,16 @@ export const SCOPE = {
   Tint: graphic.Tint,
   Detect: graphic.Detect,
   Sketch: graphic.Sketch,
+  Burn: picture.Burn,
+  LensEdges: picture.LensEdges,
+  Smear: picture.Smear,
+  Punch: picture.Punch,
+  WindowStar: picture.WindowStar,
+  LumaFade: picture.LumaFade,
+  Echo: picture.Echo,
+  CastShadow: picture.CastShadow,
+  DotGrid: picture.DotGrid,
+  Ascii: picture.Ascii,
   Captions,
   Letterbox: effects.Letterbox,
   ColorPop: effects.ColorPop,

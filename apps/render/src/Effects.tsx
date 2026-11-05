@@ -456,6 +456,31 @@ export function SubjectParts(shot: ComposeShot | undefined, frame: number, laid?
   return out;
 }
 
+/**
+ * One piece of an object followed through a shot (the k-th of SubjectParts, in reading order) where the shot is laid:
+ * its own outline at that frame when the card read its pieces apart (two towers or two gondolas that overlap, each its
+ * own; `pieces` of the reading), else its box (picture kit, `Subject part`). `local`: in the laid box's own px instead
+ * of the frame's. Null when it is not there.
+ */
+export function SubjectPiece(shot: ComposeShot | undefined, frame: number, laid: Laid | undefined, object: string | undefined, k: number, slices = 0, local = false): { path: string } | { box: Box } | null {
+  if (!shot || !object || !Number.isFinite(k)) return null;
+  const L = laid ?? { left: 0, top: 0, width: 1080, height: 1920 };
+  const dx = local ? L.left : 0;
+  const dy = local ? L.top : 0;
+  const own = shot.objects?.[objectName(object)]?.pieces?.[Math.round(k)];
+  const c = own?.length ? nearest(own, shot, frame) : null;
+  if (c) {
+    const { at } = placer(shot, L, frame);
+    const d = outlinePath(c, (x, y) => {
+      const p = at(x, y);
+      return [p[0] - dx, p[1] - dy] as const;
+    });
+    if (d) return { path: d };
+  }
+  const box = SubjectParts(shot, frame, L, object, slices)[Math.round(k)];
+  return box ? { box: { ...box, x: box.x - dx, y: box.y - dy } } : null;
+}
+
 // ——— ClearBox: where a text can be set in her shot ———————————————————————————————————————————
 
 /** The areas chosen, by a shot's grid and the way it is laid and asked for: chosen once, the same at every frame. */

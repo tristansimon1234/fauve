@@ -212,7 +212,7 @@ const cut = [...subjectShots(plan)];
 const followedObjects = objectPassages(plan, (id) => !files.find((f) => f.id === id)?.photo);
 if (cut.length || followedObjects.length) console.log(`cut out: shots ${cut.join(", ") || "none"}; objects: ${followedObjects.map((p) => `« ${p.name} » ${p.clip_id} ${p.from}–${p.to} s`).join(", ") || "none"}`);
 // The cut-outs of its objects, laid on their shots' passages as the render workshop gets them (by passage and name).
-const subjects: Record<string, { src: string; boxes?: (number[] | null)[]; contours?: (number[] | null)[]; parts?: number[]; clear?: ClearMap }> = {};
+const subjects: Record<string, { src: string; boxes?: (number[] | null)[]; contours?: (number[] | null)[]; parts?: number[]; pieces?: ((number[] | null)[] | null)[]; clear?: ClearMap }> = {};
 type ObjectRun = { src?: string; result: string; id: string; name?: string };
 for (const [shot, given] of Object.entries(JSON.parse(values.objects ?? "{}") as Record<string, ObjectRun | ObjectRun[]>)) {
   const segment = plan.segments.filter(isClipSegment)[Number(shot)];
@@ -223,7 +223,7 @@ for (const [shot, given] of Object.entries(JSON.parse(values.objects ?? "{}") as
     const layer = plan.layers?.[0];
     const name = o.name ?? (layer ? layerObjects(plan, layer).filter((x) => x.shot === Number(shot))[k]?.name : undefined);
     if (!segment || !name) throw new Error(`--objects: no named object on shot ${shot}`);
-    const reading = (JSON.parse(readFileSync(resolve(o.result), "utf8")) as Record<string, { boxes?: (number[] | null)[]; contours?: (number[] | null)[]; parts?: number[] }>)[o.id];
+    const reading = (JSON.parse(readFileSync(resolve(o.result), "utf8")) as Record<string, { boxes?: (number[] | null)[]; contours?: (number[] | null)[]; parts?: number[]; pieces?: ((number[] | null)[] | null)[] }>)[o.id];
     if (!reading) throw new Error(`--objects: no « ${o.id} » in ${o.result}`);
     // Its cut-out, when its code draws it (Subject object): a reading alone serves SubjectBox, SubjectOutline and SubjectParts.
     let src = "";
@@ -232,7 +232,7 @@ for (const [shot, given] of Object.entries(JSON.parse(values.objects ?? "{}") as
       execFileSync("cp", [resolve(o.src), target]);
       src = `/public/jobs/${job}/${basename(target)}`;
     }
-    subjects[objectKey(segment.clip_id, segment.in, segment.out, name)] = { src, ...(reading.boxes ? { boxes: reading.boxes } : {}), ...(reading.contours ? { contours: reading.contours } : {}), ...(reading.parts ? { parts: reading.parts } : {}) };
+    subjects[objectKey(segment.clip_id, segment.in, segment.out, name)] = { src, ...(reading.boxes ? { boxes: reading.boxes } : {}), ...(reading.contours ? { contours: reading.contours } : {}), ...(reading.parts ? { parts: reading.parts } : {}), ...(reading.pieces ? { pieces: reading.pieces } : {}) };
     console.log(`object « ${name} » on shot ${shot}: ${reading.parts ? reading.parts.length / 4 : 0} pieces`);
   });
 }

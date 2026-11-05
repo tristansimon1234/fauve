@@ -202,10 +202,10 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
 
   // 3. The scenery in white paper, piece by piece: one piece of what was named in the shot (each one of « every … »,
   // else slices of it) a silhouette of paper white at a time, 2 to 3 images each, the others themselves; at its depth
-  // (over the title, under her). Nothing in pieces: what is cut out in the shot turns white at once for 3 images.
-  const pad = Math.max(2, Math.round(bh * 0.012));
-  const inset = (p) => "inset(" + [p.y - pad, bw - p.x - p.w - pad, bh - p.y - p.h - pad, p.x - pad].map((v) => Math.max(0, Math.round(v)) + "px").join(" ") + ")";
-  const whiteIn = (node, p) => h("div", { style: { ...box, clipPath: inset(p) } }, node);
+  // (over the title, under her). Nothing in pieces: what is cut out in the shot turns white at once for 3 images. A
+  // piece alone is the picture kit's Subject part (the k-th of SubjectParts): cut to its own outline when the card read
+  // it apart (two towers that overlap no longer whiten together), else to its box and a pad of 1,2 % of the height.
+  const paperPiece = (shot, object, all, p, slices) => h(Subject, { shot, object, part: all.indexOf(p), slices, fill: PAPER, style: box });
   // Its middle one (the hub of a wheel, the poster in the middle of a wall): the piece nearest the middle of them all.
   const middle = (parts) => {
     const cx = parts.reduce((a, p) => a + p.x + p.w / 2, 0) / parts.length;
@@ -220,9 +220,10 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
     return i < parts.length ? parts[i] : hold ? parts[parts.length - 1] : null;
   };
   // On her first shot from the music's return: left to right, then the wave five images later.
-  const parts0 = cur === 0 && frame >= CHASE && frame < WAVE ? SubjectParts(shots[0], frame, laid, "@decor", 5).slice().sort((a, b) => a.x - b.x).slice(0, 6) : [];
+  const all0 = cur === 0 && frame >= CHASE && frame < WAVE ? SubjectParts(shots[0], frame, laid, "@decor", 5) : [];
+  const parts0 = all0.slice().sort((a, b) => a.x - b.x).slice(0, 6);
   const p0 = at(parts0, CHASE, parts0.length ? Math.max(2, Math.min(3, (WAVE - 5 - CHASE) / parts0.length)) : 3, false);
-  const paper0 = p0 ? whiteIn(h(Subject, { shot: 0, object: "@decor", fill: PAPER, style: box }), p0) : null;
+  const paper0 = p0 ? paperPiece(0, "@decor", all0, p0, 5) : null;
   const plain0 = cur === 0 && !parts0.length && frame >= CHASE && frame < CHASE + 3 ? h(Subject, { shot: 0, fill: PAPER, style: box }) : null;
   // Her, cut out, in front of the title and of the white scenery when her head rises into it, never when she towers over it.
   const her0 = cur === 0 ? SubjectBox(shots[0], LAND, laid) : null;
@@ -231,12 +232,12 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const parts5 = cur === 5 && frame >= PIECES ? SubjectParts(shots[5], frame, laid, "@morceaux", 0) : [];
   const up5 = parts5.length > 2 ? [...parts5.filter((p) => p !== middle(parts5)).sort((a, b) => b.y + b.h - (a.y + a.h)).slice(0, 3), middle(parts5)] : parts5;
   const p5 = at(up5, PIECES, Math.max(2, (cutOf(5) - PIECES) / Math.max(1, up5.length)), true);
-  const paper5 = p5 ? whiteIn(h(Subject, { shot: 5, object: "@morceaux", fill: PAPER, style: box }), p5) : cur === 5 && frame >= PIECES && frame < PIECES + 3 ? h(Subject, { shot: 5, object: "@morceaux", fill: PAPER, style: box }) : null;
+  const paper5 = p5 ? paperPiece(5, "@morceaux", parts5, p5, 0) : cur === 5 && frame >= PIECES && frame < PIECES + 3 ? h(Subject, { shot: 5, object: "@morceaux", fill: PAPER, style: box }) : null;
   // On the wall from its cut: its frames one at a time in reading order, then the middle one again, 2,5 images each.
   const parts9 = cur === 9 ? SubjectParts(shots[9], frame, laid, "@cadres", 0).slice(0, 5) : [];
   const walk9 = parts9.length > 2 ? [...parts9, middle(parts9)] : parts9;
   const p9 = shots[9] ? at(walk9, shots[9].from, 2.5, false) : null;
-  const paper9 = p9 ? whiteIn(h(Subject, { shot: 9, object: "@cadres", fill: PAPER, style: box }), p9) : null;
+  const paper9 = p9 ? paperPiece(9, "@cadres", parts9, p9, 0) : null;
   const plain9 = cur === 9 && !parts9.length && frame >= shots[9].from && frame < shots[9].from + 3 ? h(Subject, { shot: 9, fill: PAPER, style: box }) : null;
 
   // 4. Her sign blinks white one image in two over its last eight images, as the music stops (the original's 1 0 1 0 1 1
