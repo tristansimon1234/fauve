@@ -7371,7 +7371,7 @@ test("kit: the hand-made pieces are in the scope and told to the motion designer
 // ——— « Mots mêlés » v2 and « Interrupteur » v2, written again on their originals' fiches (docs/fiches/mots-meles.md, interrupteur.md) ———
 
 /** What the kit's stand-ins read: her shot's light (LightUnder), her cut-out's outline (SubjectOutline) and her tracks, by frame. */
-type KitReads = { light?: { mean: number; high: number } | null; outline?: (frame: number) => string | null; track?: (frame: number, box: { left: number; top: number; width: number; height: number }) => unknown };
+type KitReads = { light?: { mean: number; high: number } | null; outline?: (frame: number) => string | null; track?: (frame: number, box: { left: number; top: number; width: number; height: number }) => unknown; box?: (frame: number) => { x: number; y: number; w: number; h: number } | null };
 /**
  * A skill's Scene drawn at a frame as drawCutOuts draws it, with the scope its code also needs: its hooks (useMemo run at
  * once), Remotion's seeded random, Scribble with its hand's pace (Scribble.frames: the length of the kit's own ring,
@@ -7398,6 +7398,7 @@ async function kitScene(code: string, read: KitReads = {}) {
     random: chance,
     LightUnder: () => read.light ?? null,
     SubjectOutline: (_shot: unknown, f: number) => read.outline?.(f) ?? null,
+    ...(read.box ? { SubjectBox: (_shot: unknown, f: number) => read.box!(f) } : {}),
   };
   const make = new Function("React", ...Object.keys(scope), `"use strict";\n${code}\nreturn Scene;`) as (...args: unknown[]) => (p: Record<string, unknown>) => Drawn;
   const Scene = make(React, ...Object.values(scope));
@@ -7601,7 +7602,7 @@ test("« Mots mêlés » (v2): its picture darkened to its own light, as filmed,
 test("« Interrupteur » (v2): one shot of 9,1 s on its original's grid (143,7 BPM, one beat in two), its music stopped dead and back as she lands, its beep", async () => {
   const { interrupteur } = await import("./skills/interrupteur.ts");
   const { skillPlan } = await import("./skills.ts");
-  assert.equal(interrupteur.version, 5);
+  assert.equal(interrupteur.version, 6);
   assert.equal(interrupteur.bpm, 71.85);
   const line = interrupteur.timeline(1, { end: false });
   // One fixed shot, no cut (the original has none): its 275 images less its last two, a rest of its edit.
@@ -9174,7 +9175,7 @@ test("« Photos posées sur la table » (v2): horizontal 4:3 on black when her t
 
 test("« Interrupteur » (v4): once she has left, her wall held on that image to the end, nothing of hers coming back; never frozen when nothing says she was there", async () => {
   const { interrupteur } = await import("./skills/interrupteur.ts");
-  assert.equal(interrupteur.version, 5);
+  assert.equal(interrupteur.version, 6);
   const line = interrupteur.timeline(1, { end: false });
   const marks = Object.fromEntries(Object.entries(line.marks).map(([k, v]) => [k, String(v)]));
   const brand = { name: "Atelier Rose", displayFont: "Inter Tight", bodyFont: "Inter Tight", accent: "#7a2e3b", palette: { secondary: "#2c4a3e", light: "#f4efe9", dark: "#1d1d1b" } };
@@ -10192,4 +10193,24 @@ test("« Présente-toi » (v3): nobody in profile, what the filler named there t
   assert.match(String(styleOf(await print()).filter), /brightness\(1\.35\)/);
   const blends = drawnNodes(await drawKit(silhouette.code, 40, props, {})).filter((n) => styleOf(n).mixBlendMode);
   assert.deepEqual(blends.map((n) => [styleOf(n).background, styleOf(n).mixBlendMode]), [["#f3f4f9", "darken"], ["#0f0f1c", "lighten"]]);
+});
+
+test("« Interrupteur » (v6): held only once nothing of her is left in her cut-out; her hands still at the edge play on to the end", async () => {
+  const { interrupteur } = await import("./skills/interrupteur.ts");
+  const line = interrupteur.timeline(1, { end: false });
+  const marks = Object.fromEntries(Object.entries(line.marks).map(([k, v]) => [k, String(v)]));
+  const brand = { name: "Atelier Rose", displayFont: "Inter Tight", bodyFont: "Inter Tight", accent: "#7a2e3b", palette: { secondary: "#2c4a3e", light: "#f4efe9", dark: "#1d1d1b" } };
+  const reelTexts = [{ text: "Atelier Rose", role: "hook", from: 123, to: 273, emphasis: [] }];
+  const props = { width: 1080, height: 1920, durationInFrames: 273, brand, shots: rallumeShots(line, 9 / 16), reelTexts, end: null, texts: marks };
+  const body = { x: 420, y: 300, w: 560, h: 1500 };
+  const hands = { x: 960, y: 1300, w: 120, h: 520 };
+  const wallAt = async (box: (f: number) => typeof body | null, f: number) => drawnNodes((await kitScene(interrupteur.code, { box })).draw(f, props)).find((n) => n.props.key === "wall")!.props.at as number | undefined;
+  // Her body gone from 201, her two hands left at the picture's edge (a tenth of her): she is still there, never frozen.
+  const edge = (f: number) => (f <= 200 ? body : hands);
+  assert.equal(await wallAt(edge, 230), undefined);
+  assert.equal(await wallAt(edge, 272), undefined);
+  // Nothing of her from 201, her hand back on 240: held from her leaving, her hand never seen.
+  const back = (f: number) => (f <= 200 ? body : f >= 240 ? hands : null);
+  const held = await Promise.all([215, 240, 272].map(async (f) => f - ((await wallAt(back, f)) ?? f)));
+  assert.ok(held.every((h) => h === held[0]) && held[0]! >= 201 && held[0]! <= 207, held.join(" "));
 });

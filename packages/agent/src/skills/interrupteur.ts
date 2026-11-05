@@ -248,13 +248,13 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
     const atFlip = cut(ON);
     const byCut = Boolean(atFlip && atFlip.w * atFlip.h > 0);
     if (!byCut && tracked(ON) !== true) return null;
-    // Gone when what her cut-out holds is under a quarter of what it held at the flip: her hand coming back into the
-    // picture (the bench's) is not her.
+    // Gone when nothing of her is left in her cut-out (under a fiftieth of what it held at the flip): her hands still at
+    // the picture's edge are her (v5 froze them there, on its second bench); a hand coming back once she has gone is not.
     const her = byCut ? atFlip.w * atFlip.h : 0;
     const seenAt = (f) => {
       if (!byCut) return tracked(f) !== false;
       const b = cut(f);
-      return Boolean(b && b.w * b.h > her * 0.25);
+      return Boolean(b && b.w * b.h > her * 0.02);
     };
     let run = 0;
     for (let f = ON + 6; f < until; f++) {
@@ -280,8 +280,9 @@ export const interrupteur: MontageSkill = {
   // 3: once she has left, her wall held on that image to the end (a hand had come back into the picture at its bench).
   // 4: she is gone when her cut-out is (else her track, when it saw her at the flip), eight images in a row: v3 read her
   // track alone and froze a Reel where she never left. 5: gone under a quarter of her cut-out at the flip (her hand
-  // coming back into the picture is not her).
-  version: 5,
+  // coming back into the picture is not her). 6: gone only when nothing of her is left (a fiftieth): v5 froze her two
+  // hands at the edge of its friperie's wall, where she never quite left; there her shot now plays to the end.
+  version: 6,
   bpm: BPM,
   shots: [1, 1],
   files: [1, 2],
