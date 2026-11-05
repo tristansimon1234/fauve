@@ -1,4 +1,4 @@
-import type { EffectPiece, PieceTimelineInput } from "../pieces.ts";
+import type { EffectPiece, PieceTimeline, PieceTimelineInput } from "../pieces.ts";
 
 // « Ville en coups de fouet », the effect (docs/fiches/coups-de-fouet.md, effects 1, 2 and 3; its whole Reel is
 // skills/coups-de-fouet.ts): over a run of her shots, the first one, her wide calm shot with sky, lands on a white flash
@@ -12,7 +12,8 @@ import type { EffectPiece, PieceTimelineInput } from "../pieces.ts";
 // images, the cut on the second, the same light), its white flash (its two images and their light), its thud and its
 // whoosh. Left: its format (the piece plays in the Reel's frame), its 23 roles and their beats, its black and white, its
 // ghost images, its rush in, its jerky whip and its sweep out (they need her camera's own whips, measured on her videos:
-// not for a piece), its film grade (her Reel has its own look), its music's shape. Her real whips are not measured for a
+// not for a piece), its film grade (her Reel has its own look). Its music (v2): muffled under her name, open at once on
+// the whip that takes it away (its skill's pad, then its percussion). Her real whips are not measured for a
 // piece: the effect draws its whips itself, at the cuts under it. Its lettering is its own, a very condensed face (League
 // Gothic, the original's extra-condensed capitals: Big Shoulders Display, its skill's, writes a name twice as wide), in
 // white, a tight shade dosed to the light of her sky (LightUnder) so it reads on a pale one. Nothing of the original's own:
@@ -125,7 +126,7 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
 
 export const coupsDeFouet: EffectPiece = {
   key: "coups-de-fouet",
-  version: 1,
+  version: 2,
   name: "Ville en coups de fouet",
   how: "son plan large et calme arrive sur un flash blanc, son nom en capitales blanches très condensées posé immobile dans son ciel pendant que l'image avance doucement derrière ; un fouet éclair l'emporte dans le plan suivant, puis ses plans d'un temps environ s'enchaînent en flashs blancs et fouets éclair, une coupe sur deux ; puis le montage reprend.",
   needs: "un plan large et calme de sa rue, de sa façade ou de son quartier, avec du ciel au-dessus des toits (son nom s'y pose), puis des plans vivants de son quartier ou de son lieu (des passants, un vélo, un tram, sa devanture, un détail de couleur).",
@@ -141,9 +142,12 @@ export const coupsDeFouet: EffectPiece = {
       required: true,
     },
   ],
-  timeline({ frames, shots }) {
+  timeline({ frames, shots }): PieceTimeline {
     const cuts = fouetCuts(shots, frames);
+    // Her music muffled under her name (its skill's pad before its percussion), open at once on the whip that takes it away.
+    const whip = cuts.find((c) => c.kind === "whip");
     return {
+      ...(whip && whip.at >= 9 ? { music: { filters: [{ kind: "muffled" as const, from: 0, to: round3(whip.at / 30) }] } } : {}),
       // Its original's own: a dull thud as her name lands, a whoosh rising into each whip flash (softer after the first).
       sounds: [
         { at: 0, sound: "deep soft thud", seconds: 0.6 },

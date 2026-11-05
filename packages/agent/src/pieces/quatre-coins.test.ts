@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { checkMotionCode } from "../motion-scene.ts";
-import { pieceTestPlan } from "../pieces.ts";
+import { pieceMusicShape, pieceTestPlan } from "../pieces.ts";
 import { editPlanSchema } from "../schemas.ts";
 import { quatreCoins, quatreCoinsLandings, quatreCoinsPieces } from "./quatre-coins.ts";
 
@@ -19,7 +19,7 @@ function placePlan(seconds: number, bpm: number, texts: Record<string, string> =
   return pieceTestPlan({ piece: quatreCoins, shots, span: [1.2, 1.2 + seconds], fill: { texts, objects: {}, settings }, bpm });
 }
 
-test("« Mots aux quatre coins » (effect v1): its layer over her place, its words and their landings, nothing cut out", () => {
+test("« Mots aux quatre coins » (effect v2): its layer over her place, its words and their landings, nothing cut out", () => {
   // The original's opening: 5,5 s at its 92 BPM.
   const plan = placePlan(5.5, 92);
   assert.ok(editPlanSchema.safeParse(plan).success);
@@ -38,6 +38,11 @@ test("« Mots aux quatre coins » (effect v1): its layer over her place, its wor
   assert.equal(motion.texts!.nom, "Farine");
   // Nothing moves when a word lands, and no word fades: each one is cut in.
   assert.doesNotMatch(quatreCoins.code, /interpolate\(|spring\(/);
+  // Her music holds its breath (its bass and kick out) half a beat after her sentence is whole, to the cut.
+  const shape = pieceMusicShape({ piece: quatreCoins, fill: { texts: WORDS, objects: {}, settings: {} }, plan, layer: plan.layers![0]!, bpm: 92 })!;
+  const layer = plan.layers![0]!;
+  assert.deepEqual(shape.filters!.map((f) => [f.kind, f.to]), [["thin", layer.to]]);
+  assert.ok(Math.abs(shape.filters![0]!.from - (layer.from + (Math.round(4.25 * beat) + beat / 2) / 30)) < 0.002, String(shape.filters![0]!.from));
 });
 
 test("« Mots aux quatre coins »: its words tighter on its beats when its span is short, the sentence always read whole before the cut", () => {

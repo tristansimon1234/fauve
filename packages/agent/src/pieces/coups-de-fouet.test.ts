@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { editPlanSchema } from "../schemas.ts";
-import { pieceTestPlan, readPieceFill } from "../pieces.ts";
+import { pieceMusicShape, pieceTestPlan, readPieceFill } from "../pieces.ts";
 import { coupsDeFouet, fouetCut, fouetCuts } from "./coups-de-fouet.ts";
 
 // « Ville en coups de fouet », the effect of the bank (coups-de-fouet.ts): its own checks, beside the bank's (features.test.ts).
@@ -14,7 +14,7 @@ const run = (n: number) => [
   { file: "after", at: 2, seconds: 1.8 },
 ];
 
-test("« Ville en coups de fouet » (effect v1): a whip flash first, then white flashes and whip flashes every other cut", () => {
+test("« Ville en coups de fouet » (effect v2): a whip flash first, then white flashes and whip flashes every other cut", () => {
   assert.deepEqual(
     Array.from({ length: 9 }, (_, k) => fouetCut(k)),
     ["whip", "flash", "cut", "whip", "cut", "flash", "cut", "whip", "cut"],
@@ -35,7 +35,7 @@ test("« Ville en coups de fouet » (effect v1): a whip flash first, then white 
   ]);
 });
 
-test("« Ville en coups de fouet » (effect v1): its layer over her wide shot and five more, her name kept, its thud and its whooshes inside its span", () => {
+test("« Ville en coups de fouet » (effect v2): its layer over her wide shot and five more, her name kept, its thud and its whooshes inside its span", () => {
   const plan = pieceTestPlan({ piece: coupsDeFouet, shots: run(5), span: [1.2, 5.4], fill: { texts: { nom: "Belleville" }, objects: {}, settings: {} }, bpm: 100 });
   assert.ok(editPlanSchema.safeParse(plan).success);
   const motion = plan.layers![0]!.motion;
@@ -55,13 +55,16 @@ test("« Ville en coups de fouet » (effect v1): its layer over her wide shot an
     ],
   );
   assert.ok(motion.sounds!.every((s) => s.at < 4.2 && s.skill));
+  // Her music muffled under her name, open at once on the whip that takes it away (its first cut, 36 images in).
+  const shape = pieceMusicShape({ piece: coupsDeFouet, fill: { texts: { nom: "Belleville" }, objects: {}, settings: {} }, plan, layer: plan.layers![0]!, bpm: 100 })!;
+  assert.deepEqual(shape.filters!.map((f) => [f.kind, f.from, f.to]), [["muffled", 1.2, 2.4]]);
   // Its code: the kit's Whip between her shots, her name in its sky (ClearBox), its light read under it (LightUnder).
   assert.match(coupsDeFouet.code, /h\(Whip, /);
   assert.match(coupsDeFouet.code, /ClearBox\(shots\[ground\], 0, laid/);
   assert.match(coupsDeFouet.code, /LightUnder\(/);
 });
 
-test("« Ville en coups de fouet » (effect v1): her name is required, cut to its place", () => {
+test("« Ville en coups de fouet » (effect v2): her name is required, cut to its place", () => {
   assert.equal(readPieceFill(coupsDeFouet, { fits: true, missing: "", texts: [], objects: [], settings: [] }), null);
   const read = readPieceFill(coupsDeFouet, { fits: true, missing: "", texts: [{ slot: "nom", text: "Le Marais, Paris troisième" }], objects: [], settings: [] })!;
   assert.equal(read.texts.nom, "Le Marais, Paris");

@@ -1,4 +1,4 @@
-import type { EffectPiece, PieceTimelineInput } from "../pieces.ts";
+import type { EffectPiece, PieceTimeline, PieceTimelineInput } from "../pieces.ts";
 
 // « Mots aux quatre coins », the effect (docs/fiches/quatre-coins.md, effect 1; its whole Reel is skills/quatre-coins.ts):
 // over one still, lively shot of her place, a sentence lands a piece at a time on the frame's edges, each piece cut in
@@ -13,10 +13,9 @@ import type { EffectPiece, PieceTimelineInput } from "../pieces.ts";
 // display face); tighter on its beats when its span is short (half beats, then quarters), so the sentence is always
 // read whole before the cut; its middle row moved to the nearest share clear of a face seen there; its halo dosed by
 // the light read under each word (none on a dark edge, as the original's letters; a soft dark one on a bright edge, its
-// fiche's fallback). Left to its Reel: its music holding its
-// breath (bass and kick out) from the whole sentence to the cut, which an effect cannot do (it plays on the Reel's
-// music as it is), its ten shots of the place's life, her front and her name alone at the end. Nothing of the original's
-// own (its café's name, its ®, its address).
+// fiche's fallback). Its music (v2), as its skill's: holding its breath (bass and kick out) from half a beat after the
+// whole sentence to the cut, whole again with the montage. Left to its Reel: its ten shots of the place's life, her
+// front and her name alone at the end. Nothing of the original's own (its café's name, its ®, its address).
 
 /** The original's grid (beats from its start): its words every three quarters of a beat, the first two half a beat apart; its sentence read 2,4 s whole before the cut. */
 const GRIDS = [
@@ -197,7 +196,7 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
 
 export const quatreCoins: EffectPiece = {
   key: "quatre-coins",
-  version: 1,
+  version: 2,
   name: "Mots aux quatre coins",
   how: "sur un plan fixe et vivant de son lieu, une phrase se pose mot à mot sur les bords du cadre, un mot tous les trois quarts de temps, en petites minuscules crème toutes à la même taille, sans ombre : ses premiers mots en haut (à gauche, au tiers, à droite), son nom au milieu à gauche et son quartier au milieu à droite, une ligne en bas (son adresse) ; toute la phrase reste, puis part d'un coup sur la coupe ; posée en 16:9 sur du noir quand sa vidéo est horizontale.",
   needs: "un plan fixe et vivant de son lieu, téléphone posé, assez large (quelqu'un au travail un peu à gauche du centre), aux bords calmes et plutôt sombres (un mur, une étagère, une vitre) où les mots se posent, 4 s au moins ; pas un grand ciel clair.",
@@ -222,9 +221,16 @@ export const quatreCoins: EffectPiece = {
       ],
     },
   ],
-  timeline({ frames, bpm, words }: PieceTimelineInput) {
+  timeline({ frames, bpm, words }: PieceTimelineInput): PieceTimeline {
     const at = quatreCoinsLandings(frames, bpm, quatreCoinsPieces(words).length);
-    return { marks: Object.fromEntries(at.map((f, k) => [`t${k}`, f])) };
+    // Her music holds its breath (its bass and kick out) half a beat after her sentence is whole, back on the cut.
+    const beat = (60 / Math.min(140, Math.max(60, bpm))) * 30;
+    const from = (at.at(-1) ?? frames) + beat / 2;
+    const s = (f: number) => Math.round((f / 30) * 1000) / 1000;
+    return {
+      marks: Object.fromEntries(at.map((f, k) => [`t${k}`, f])),
+      ...(frames - from >= 9 ? { music: { filters: [{ kind: "thin" as const, from: s(from), to: s(frames) }] } } : {}),
+    };
   },
   code: CODE,
 };

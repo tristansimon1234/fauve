@@ -1,4 +1,4 @@
-import type { EffectPiece, PieceTimelineInput } from "../pieces.ts";
+import type { EffectPiece, PieceTimeline, PieceTimelineInput } from "../pieces.ts";
 
 // « Façade qui se construit », the effect (docs/fiches/facade.md, effects 1 to 4; its whole Reel is skills/facade.ts):
 // over one still shot of her front, the screen goes black and her front is built on it piece by piece, each piece at
@@ -16,8 +16,9 @@ import type { EffectPiece, PieceTimelineInput } from "../pieces.ts";
 // the original's (four lone notes about 0,9 s apart, a burst a sixteenth or so apart, a second of silence, three big
 // pieces on its music's beats, her front whole about 30 % of the time) set on the Reel's beats, made tighter when its
 // span is short (the pause, then the slow notes, then the burst, then the big pieces on half beats) so her front always
-// lives a second whole. Left to its Reel: its music's silence while it builds and its entry on the first big piece (an
-// effect cannot shape the Reel's music: it plays on under the build), her other files after it, its ending card.
+// lives a second whole. Its music (v2), as its skill's: silent while it builds (its notes alone), in on its first big
+// piece that falls on a beat of the Reel (on half beats, the second or the third). Left to its Reel: her other files
+// after it, its ending card.
 // Nothing of the original's own (its café, its words, the embossed title that follows it: « Titre gaufré »).
 
 /** The original's pace at its 30 images a second: frames between its slow pieces (images 1, 25, 53, 80). */
@@ -263,7 +264,7 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
 
 export const facade: EffectPiece = {
   key: "facade",
-  version: 1,
+  version: 2,
   name: "Façade qui se construit",
   how: "l'écran passe au noir et sa devanture s'y construit morceau par morceau, chaque morceau d'un coup à sa place, sa vidéo jouant dedans, un par note : son enseigne d'abord, trois éléments loin l'un de l'autre, une rafale de douze, une courte pause, puis les trois grands sur le temps, et sa devanture entière s'anime, caméra fixe, sans texte, jusqu'à la coupe ; posée en entier dans une bande au milieu du noir quand sa vidéo est horizontale.",
   needs: "une vidéo fixe de sa devanture filmée de face, de l'autre côté de la rue, 5 s au moins : toute la façade dans l'image, son enseigne ou sa porte à son nom bien visible, faite d'éléments qu'on reconnaît seuls (fenêtres, vitrine, store, tables), un peu de vie devant.",
@@ -308,10 +309,16 @@ export const facade: EffectPiece = {
       ],
     },
   ],
-  timeline({ frames, bpm }: PieceTimelineInput) {
+  timeline({ frames, bpm }: PieceTimelineInput): PieceTimeline {
     const at = facadeLandings(frames, bpm);
     const s = (f: number) => Math.round((f / 30) * 1000) / 1000;
+    // Her music silent while it builds, in on its first big piece that falls on a whole beat of the Reel (a silence ending
+    // off the beat would move her music off the cuts: on half beats, the second or the third), else on the beat before it.
+    const beat = (60 / Math.min(140, Math.max(60, bpm))) * 30;
+    const onBeat = (f: number) => Math.abs(f - Math.round(f / beat) * beat) <= 0.6;
+    const back = at.slice(16).find(onBeat) ?? Math.floor(at[16]! / beat) * beat;
     return {
+      ...(back > at[15]! && back >= 15 ? { music: { pauses: [{ from: 0, to: s(back) }] } } : {}),
       marks: Object.fromEntries(at.map((f, i) => [`piece_${i}`, f])),
       // A note on each piece as it lands (the original's four lone notes rising, then its arpeggio, louder as it climbs);
       // its three big pieces fall on the Reel's music, as the original's on its first chords.

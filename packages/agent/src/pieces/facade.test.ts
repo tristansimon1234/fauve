@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { checkMotionCode } from "../motion-scene.ts";
-import { pieceTestPlan } from "../pieces.ts";
+import { pieceMusicShape, pieceTestPlan } from "../pieces.ts";
 import { editPlanSchema } from "../schemas.ts";
 import { facade, facadeLandings } from "./facade.ts";
 
@@ -17,7 +17,7 @@ function frontPlan(seconds: number, bpm: number, fill: { texts?: Record<string, 
   return pieceTestPlan({ piece: facade, shots, span: [1.2, 1.2 + seconds], fill: { texts: fill.texts ?? {}, objects: fill.objects ?? {}, settings: fill.settings ?? {} }, bpm });
 }
 
-test("« Façade qui se construit » (effect v1): its layer over her front, her front's elements and her sign named for that shot only", () => {
+test("« Façade qui se construit » (effect v2): its layer over her front, her front's elements and her sign named for that shot only", () => {
   const plan = frontPlan(6, 100, { objects: { morceaux: "every window", enseigne: "shop sign" }, settings: { format: "horizontal" } });
   assert.ok(editPlanSchema.safeParse(plan).success);
   const motion = plan.layers![0]!.motion;
@@ -87,4 +87,28 @@ test("« Façade qui se construit »: its marks, its sixteen notes inside its sp
   const bare = frontPlan(6, 100).layers![0]!.motion;
   assert.equal(bare.texts!.nom, undefined);
   assert.equal(bare.texts!.ligne, undefined);
+});
+
+test("« Façade qui se construit » (effect v2): her music silent while her front builds, in on its first big piece on a whole beat", () => {
+  for (const bpm of [70, 90, 100, 120, 128, 140])
+    for (const seconds of [5, 6, 7.5, 9]) {
+      const frames = Math.round(seconds * 30);
+      const at = facadeLandings(frames, bpm);
+      const line = facade.timeline!({ frames, bpm, shots: [{ from: 0, frames }], words: {}, settings: {} });
+      const beat = (60 / bpm) * 30;
+      const where = `${bpm} BPM, ${seconds} s`;
+      const pause = line.music?.pauses?.[0];
+      assert.ok(pause, where);
+      assert.equal(pause.from, 0, where);
+      const back = pause.to * 30;
+      assert.ok(Math.abs(back / beat - Math.round(back / beat)) * beat < 0.6, `${where}: back on a beat (${back})`);
+      assert.ok(at.slice(16).some((f) => Math.abs(f - back) < 0.05) || (back <= at[16]! && back > at[15]!), `${where}: ${back} on a big piece (${at.slice(16)})`);
+      // On its first big piece when it falls on a beat.
+      if (Math.abs(at[16]! / beat - Math.round(at[16]! / beat)) * beat <= 0.6) assert.ok(Math.abs(back - at[16]!) < 0.05, `${where}: ${back}`);
+    }
+  // On the Reel's clock: from the start of its span to its first big piece (here on the beat).
+  const plan = frontPlan(6, 100);
+  const shape = pieceMusicShape({ piece: facade, fill: { texts: {}, objects: {}, settings: {} }, plan, layer: plan.layers![0]!, bpm: 100 })!;
+  const layer = plan.layers![0]!;
+  assert.deepEqual(shape.pauses, [{ from: layer.from, to: Math.round((layer.from + facadeLandings(180, 100)[16]! / 30) * 1000) / 1000 }]);
 });
