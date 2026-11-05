@@ -2394,7 +2394,7 @@ test("« Mosaïque qui change » (v3): vertical full frame as its original, her 
 test("« Mots aux quatre coins » (v2) cuts where its original does, on its own music (92 BPM), its words and its pause on its beats", async () => {
   const { quatreCoins } = await import("./skills/quatre-coins.ts");
   const { clearsDrawn, objectsDrawn } = await import("./subject.ts");
-  assert.equal(quatreCoins.version, 2);
+  assert.equal(quatreCoins.version, 3);
   assert.equal(quatreCoins.bpm, 92);
   const line = quatreCoins.timeline(12, { end: false });
   const f = (s: number) => Math.round(s * 30);
@@ -2536,7 +2536,7 @@ test("« Mots aux quatre coins » (v2): horizontal 16:9 on black as its original
   const plan = skillPlan({ skill: quatreCoins, name: "Mots aux quatre coins", files, fill });
   assert.ok(editPlanSchema.safeParse(plan).success);
   assert.equal(plan.layers![0]!.motion.texts!.format, "vertical");
-  assert.deepEqual(plan.skill, { key: "quatre-coins", version: 2, settings: { format: "vertical" } });
+  assert.deepEqual(plan.skill, { key: "quatre-coins", version: 3, settings: { format: "vertical" } });
   const { readMusicShape } = await import("./music-shape.ts");
   assert.deepEqual(plan.music_shape, readMusicShape(line.music, line.duration));
   assert.equal(plan.sounds, undefined);
@@ -2737,7 +2737,7 @@ const drawnDeep = (node: unknown): Drawn[] => drawnNodes(node).flatMap((n) => (n
 test("« Titre qui se décode » (v3) cuts and lands where its original does, on its own music (122 BPM), with its sounds and its music's shape", async () => {
   const { decode, decodeParts } = await import("./skills/decode.ts");
   const { objectsDrawn, drawsSubject, clearsDrawn, depthsDrawn } = await import("./subject.ts");
-  assert.equal(decode.version, 3);
+  assert.equal(decode.version, 4);
   assert.equal(decode.bpm, 122);
   const line = decode.timeline(16, { end: false });
   // The original's 22,64 s (679 images), its last image black.
@@ -2934,7 +2934,7 @@ test("« Titre qui se décode » (v3): its bands, its fold, its title, its band 
   assert.equal(input.cases.length, 16);
   const plan = skillPlan({ skill: decode, name: "Titre qui se décode", files, fill: { shots: Array.from({ length: 16 }, (_, i) => ({ file: files[i % 8]!.id, at: 0 })), texts: { surtitre: "un matin chez", titre: "Atelier Rose" }, end: null, settings: { format: "vertical" } } });
   assert.equal(plan.layers![0]!.motion.texts!.format, "vertical");
-  assert.deepEqual(plan.skill, { key: "decode", version: 3, settings: { format: "vertical" } });
+  assert.deepEqual(plan.skill, { key: "decode", version: 4, settings: { format: "vertical" } });
   assert.ok(editPlanSchema.safeParse(plan).success);
   assert.equal(plan.sounds?.length, line.sounds!.length);
   const { readMusicShape } = await import("./music-shape.ts");
@@ -3133,7 +3133,7 @@ const pileDrawn = (code: string, frame: number, props: Record<string, unknown>) 
 
 test("« Pile de photos » (v2) lays its photos where and when its original does, within two images", async () => {
   const { pile, pileLandings } = await import("./skills/pile.ts");
-  assert.equal(pile.version, 2);
+  assert.equal(pile.version, 3);
   assert.equal(pile.bpm, 120);
   const line = pile.timeline(37, { end: false });
   // Each photo lands on its shot's first image (the first a little in): the original's 37, within two images; its burst
@@ -3275,7 +3275,8 @@ test("« Pile de photos » (v2): its clicks slowing down on its measured moments
   const line = pile.timeline(37, { end: false });
   // The original's clicks from 1,6 s (images, measured on its sound) and its hit at 7,962 s: each within two images.
   const original = [48, 50.1, 52.1, 54.2, 56.5, 58.9, 61, 63.7, 66.7, 69.6, 72.8, 75.6, 79.4, 83, 86.7, 90.9, 95.6, 100.4, 105.5, 111.1, 117.4, 124, 131.3, 139.7, 148.7, 159.1, 170.8, 184.1, 199.6, 218.2, 238.9];
-  const sounds = line.sounds!;
+  // (Those laid one by one; its denser clicking before, one burst since v3.)
+  const sounds = line.sounds!.filter((s) => !s.burst);
   assert.equal(sounds.length, original.length);
   sounds.forEach((s, i) => assert.ok(Math.abs(s.at * 30 - original[i]!) <= 2, `sound ${i + 1}: image ${s.at * 30}, the original's ${original[i]}`));
   assert.ok(sounds.slice(0, -1).every((s) => s.sound === "light click" && s.seconds === 0.5 && s.gain! < 6 && s.gain! >= -12));
@@ -3290,10 +3291,10 @@ test("« Pile de photos » (v2): its clicks slowing down on its measured moments
   const fill = { shots: files.map((f) => ({ file: f.id, at: 0 })), texts: { mots: "La Fripe Rétro" }, end: null };
   const plan = skillPlan({ skill: pile, name: "Pile de photos", files, fill });
   assert.ok(editPlanSchema.safeParse(plan).success);
-  assert.equal(plan.sounds?.length, 31);
+  assert.equal(plan.sounds?.length, 32);
   assert.ok(plan.sounds!.every((s) => s.skill));
   assert.deepEqual(plan.music_shape, { filters: [{ kind: "thin", from: 8, to: plan.duration, open: 0.02 }], end: { at: plan.duration, fade: 0.02 } });
-  assert.deepEqual(plan.skill, { key: "pile", version: 2 });
+  assert.deepEqual(plan.skill, { key: "pile", version: 3 });
   const slower = skillPlan({ skill: pile, name: "Pile de photos", files, fill, bpm: 100 });
   assert.ok(Math.abs(slower.sounds!.at(-1)!.at - 9.6) < 0.01, `${slower.sounds!.at(-1)!.at}`);
   // Fewer photos: the same clicks counted back from its hit, none before the first photo.
@@ -3591,7 +3592,7 @@ test("« Ville en coups de fouet » (v2) cuts where its original does, on its ow
   const { coupsDeFouet, fouetRoles } = await import("./skills/coups-de-fouet.ts");
   const { skillPlan } = await import("./skills.ts");
   const { clearsDrawn, objectsDrawn, drawsSubject } = await import("./subject.ts");
-  assert.equal(coupsDeFouet.version, 2);
+  assert.equal(coupsDeFouet.version, 3);
   assert.equal(coupsDeFouet.bpm, 84);
   assert.deepEqual(coupsDeFouet.shots, [12, 23]);
   // The original's 23 shots, cut on its images 20, 55 … 595 (measured image by image at 30 i/s; a whip flash's cut on its
@@ -3747,7 +3748,7 @@ test("« Ville en coups de fouet » (v2): horizontal 4:3 on black as its origina
   assert.equal(input.cases.length, 23);
   const plan = skillPlan({ skill: coupsDeFouet, name: "Ville en coups de fouet", files, fill: { shots: Array.from({ length: 23 }, (_, i) => ({ file: files[i % 8]!.id, at: Math.floor(i / 8) * 6 })), texts: { titre: "Belleville" }, end: null, settings: { format: "vertical" } } });
   assert.equal(plan.layers![0]!.motion.texts!.format, "vertical");
-  assert.deepEqual(plan.skill, { key: "coups-de-fouet", version: 2, settings: { format: "vertical" } });
+  assert.deepEqual(plan.skill, { key: "coups-de-fouet", version: 3, settings: { format: "vertical" } });
 });
 
 // ——— « Quart de tour, deux tons » v2 (`tourne`), written again on its original's fiche (docs/fiches/tourne.md) ——————
@@ -5821,4 +5822,333 @@ test("her address as coordinates: a skill's label written by the engine when the
   assert.equal((skillFillInput({ skill, name: "Fenêtres", n: 1, files, business: {}, request: "" }) as { textes: Record<string, unknown>[] }).textes[1]!.dit, "ses coordonnées, sinon sa ville");
   // Longer than its place: not written by the engine (never cut in the middle of a number).
   assert.equal(readSkillFill({ ...skill, texts: [skill.texts[0]!, { ...skill.texts[1]!, max: 12 }] }, files, 1, { ...answer, texts: [{ slot: "gauche", text: "Pigalle" }, { slot: "droite", text: "Paris 9e" }] }, { facts })!.texts.droite, "Paris 9e");
+});
+
+// The music and sound tools the models' fiches found missing: the piece set on the model's beats (its first strong
+// beat on beat 0 or on a mark), a pause that leaves its tail, an end on a hit ringing, a tape stop, a build-up, bursts,
+// a shot's own sound, a sound on her gesture.
+// ---------------------------------------------------------------------------
+
+/**
+ * Bass levels every 10 ms of a groove from `first` s at `beat` s a beat: a kick on the beats of each bar listed in
+ * `kicks` (−10 dB, then −18, then gone), a bass note on each bar's 1 (−17 dB, held a bar, `ripple` dB up every other
+ * window as a held 55 Hz note beats with them), `pickup` beats before the first bar with only a soft tick (−30 dB).
+ */
+function groove(o: { beat: number; first: number; seconds: number; kicks: number[]; pickup?: number; ripple?: number; bass?: boolean }): number[] {
+  let seed = 11;
+  const noise = () => ((seed = (seed * 16807) % 2147483647) / 2147483647) * 1.5;
+  return Array.from({ length: Math.round(o.seconds / 0.01) }, (_, i) => {
+    const t = (i + 0.5) * 0.01;
+    let power = 10 ** ((-42 + noise()) / 10);
+    const n = Math.floor((t - o.first) / o.beat + 1e-9);
+    const since = t - (o.first + n * o.beat);
+    if (n >= 0 && o.kicks.includes(((n % 4) + 4) % 4)) power += 10 ** ((since < 0.02 ? -10 : since < 0.1 ? -18 : -60) / 10);
+    if (n < 0 && n >= -(o.pickup ?? 0)) power += 10 ** ((since < 0.02 ? -30 : -60) / 10);
+    if (o.bass !== false && n >= 0) {
+      const bar = Math.floor(n / 4);
+      const sinceBar = t - (o.first + bar * 4 * o.beat);
+      power += 10 ** ((sinceBar < 0.03 ? -15 : -17 + (i % 2 ? (o.ripple ?? 0) : 0)) / 10);
+    }
+    return 10 * Math.log10(power);
+  });
+}
+
+test("the composed piece set on the model's beats: its first strong beat on beat 0, a late start's end or the model's mark", async () => {
+  const { beatGrid, firstDownbeat, musicStart, musicSetting, ATTACK_LEAD } = await import("./mix.ts");
+  const { musicDownbeat, musicHeard, shiftMusicShape } = await import("./music-shape.ts");
+  const beat = 60 / 120;
+  // A beat of pickup (a soft tick, no kick) before its first bar at 0,5 s, its kicks on 1 and 3, its bass on each 1: its
+  // grid may start on the pickup, its first strong beat is its first bar's.
+  const pickup = groove({ beat, first: 0.5, seconds: 20, kicks: [0, 2], pickup: 1 });
+  const grid = beatGrid(pickup, beat)!;
+  assert.ok(grid && Math.abs(grid.period - beat) < 0.002, JSON.stringify(grid));
+  assert.ok(Math.abs(firstDownbeat(pickup, grid)! - 0.5) <= 0.01, `${firstDownbeat(pickup, grid)}`);
+  // Its bars tell their 1 when it is the strongest beat of four by a quarter: kicks on every beat from 0,3 s over its pad
+  // (a rise of 6 dB), but its bass note starts on the third (its bars from 1,3 s, a rise of 12): the composer's start is a
+  // half-bar pickup.
+  const late = Array.from({ length: 2000 }, (_, i) => {
+    const t = (i + 0.5) * 0.01;
+    const since = (t - 0.3 + 40 * beat) % beat;
+    const sinceBar = (t - 1.3 + 40 * beat) % (4 * beat);
+    if (t >= 1.3 && sinceBar < 0.02) return -10;
+    return t >= 0.3 && since < 0.02 ? -16 : -22;
+  });
+  const four = beatGrid(late, beat)!;
+  assert.ok(Math.abs(firstDownbeat(late, four)! - 1.3) <= 0.01, `${firstDownbeat(late, four)}`);
+  // Four on the floor, every beat alike: the composer's first kick stays its beat 0.
+  const floor = groove({ beat, first: 0.2, seconds: 20, kicks: [0, 1, 2, 3], bass: false });
+  assert.ok(Math.abs(firstDownbeat(floor, beatGrid(floor, beat)!)! - 0.2) <= 0.01);
+  // A held bass rippling 2 dB from a window to the next under the kicks: its grid is still found (before, never).
+  const held = groove({ beat, first: 0.1, seconds: 20, kicks: [0, 2], ripple: 2.4 });
+  assert.ok(beatGrid(held, beat), "the grid under a held bass");
+
+  // Where it starts: cut to its first strong beat (its attack 5 ms after the mark, as on every cut), on its own clock
+  // before its tempo moves; a mark in music already heard takes it from a later bar (a pickup plays before, never a
+  // silence); a late start holds it back (silence where it is not heard anyway).
+  assert.equal(ATTACK_LEAD, 0.005);
+  assert.deepEqual(musicStart({ downbeat: 0.5, tempo: 1, bar: 2, mark: 0, heard: 0 }), { trim: 0.495, delay: 0 });
+  assert.deepEqual(musicStart({ downbeat: 0.5, tempo: 1, bar: 2, mark: 0.25, heard: 0 }), { trim: 0.245, delay: 0 });
+  assert.deepEqual(musicStart({ downbeat: 0.5, tempo: 1, bar: 2, mark: 0.75, heard: 0 }), { trim: 1.745, delay: 0 });
+  assert.deepEqual(musicStart({ downbeat: 0.5, tempo: 1, bar: 2, mark: 5.78, heard: 5.78 }), { trim: 0, delay: 5.285 });
+  // A hair is not worth a cut; held to a tempo 2 % faster, its silence is on the Reel's clock.
+  assert.deepEqual(musicStart({ downbeat: 0.012, tempo: 1, bar: 2, mark: 0, heard: 0 }), { trim: 0, delay: 0 });
+  assert.deepEqual(musicStart({ downbeat: 0.51, tempo: 1.02, bar: 2, mark: 1, heard: 1 }), { trim: 0, delay: 0.505 });
+  // On the piece itself: its grid, its first strong beat, its tempo; without a grid, held back only for a late start.
+  const set = musicSetting(pickup, beat, 0, 0);
+  assert.ok(set.aligned && Math.abs(set.trim - 0.495) <= 0.01 && Math.abs(set.tempo - 1) < 0.005, JSON.stringify(set));
+  const quiet = Array.from({ length: 1500 }, () => -50);
+  assert.deepEqual(musicSetting(quiet, beat, 0, 0), { trim: 0, delay: 0, tempo: 1, aligned: false });
+  assert.deepEqual(musicSetting(quiet, beat, 5.78, 5.78), { trim: 0, delay: 5.785, tempo: 1, aligned: false });
+
+  // Its mark: the model's downbeat, else where a late start ends (it comes in on its downbeat), else 0; later with a lead.
+  assert.equal(musicDownbeat({ pauses: [{ from: 0, to: 5.78 }, { from: 8, to: 9 }] }, 20), 5.78);
+  assert.equal(musicHeard({ pauses: [{ from: 0, to: 5.78 }] }, 20), 5.78);
+  assert.equal(musicDownbeat({ downbeat: 0.33, pauses: [{ from: 0, to: 2 }] }, 20), 0.33);
+  assert.equal(musicDownbeat({ pauses: [{ from: 1, to: 2 }] }, 20), 0);
+  assert.equal(musicDownbeat(null, 20), 0);
+  assert.deepEqual(shiftMusicShape({ downbeat: 0.33 }, 0.2), { downbeat: 0.53 });
+});
+
+test("a gap the Reel never lets be heard is not composed again: a wanted break, a late start, after its end", async () => {
+  const { heardGaps } = await import("./mix.ts");
+  // Its beat holds but for 2 s from 6 s (the bass 30 dB down): a gap, until a pause, a late start or the end hides it.
+  const levels = Array.from({ length: 2400 }, (_, i) => (i >= 600 && i < 800 ? -48 : -15));
+  const none = { trim: 0, delay: 0, tempo: 1 };
+  assert.deepEqual(heardGaps(levels, 20, none), [{ from: 6, to: 8 }]);
+  assert.deepEqual(heardGaps(levels, 20, none, { pauses: [{ from: 5.5, to: 8.5 }] }), []);
+  // Half of it under a late start: what is left heard is under a second; a second of it still heard is one.
+  assert.deepEqual(heardGaps(levels, 20, none, { pauses: [{ from: 0, to: 7.2 }] }), []);
+  assert.deepEqual(heardGaps(levels, 20, none, { end: { at: 6.8 } }), []);
+  assert.deepEqual(heardGaps(levels, 20, none, { end: { at: 7 } }), [{ from: 6, to: 7 }]);
+  // Held back 3 s (its late start), the piece's gap is heard 3 s later; cut 2 s, 2 s earlier.
+  assert.deepEqual(heardGaps(levels, 20, { trim: 0, delay: 3, tempo: 1 }), [{ from: 9, to: 11 }]);
+  assert.deepEqual(heardGaps(levels, 20, { trim: 2, delay: 0, tempo: 1 }), [{ from: 4, to: 6 }]);
+});
+
+test("a pause that leaves its tail, an end on its hit ringing, a tape stop, a soft build-up: read, drawn on their own samples", async () => {
+  const { readMusicShape, musicShapeGraph, musicEnvelope, pauseShifts, TAIL_GRAB } = await import("./music-shape.ts");
+  // A tail dies within its pause (never in a late start); an end has one way of ending: a stop, else a tail, else a fade.
+  assert.deepEqual(readMusicShape({ pauses: [{ from: 0, to: 1, tail: 1 }, { from: 4, to: 4.5, tail: 2 }] }, 8), {
+    pauses: [{ from: 0, to: 1 }, { from: 4, to: 4.5, tail: 0.5 }],
+  });
+  assert.deepEqual(readMusicShape({ end: { at: 7, tail: 3, fade: 1 } }, 8), { end: { at: 7, tail: 1 } });
+  assert.deepEqual(readMusicShape({ end: { at: 7, stop: 1.5, tail: 1 } }, 8), { end: { at: 7, stop: 1.5 } });
+  assert.deepEqual(readMusicShape({ end: { at: 7.98, tail: 1 } }, 8), { end: { at: 7.98, fade: 0.012 } });
+  assert.deepEqual(readMusicShape({ filters: [{ kind: "soft", from: 2, to: 6, open: 4 }] }, 8), { filters: [{ kind: "soft", from: 2, to: 6, open: 4, db: -8 }] });
+  // Its tail: the reverb of its last quarter of a second before the stop, a room of noise falling 60 dB over the tail,
+  // at 0,7 of the music, from the stop (fading in over the dry's last 5 ms) to its end, mixed back with the music gated.
+  const graph = musicShapeGraph({ pauses: [{ from: 4, to: 5, tail: 0.5 }] }, "in", "out", 8);
+  assert.equal(TAIL_GRAB, 0.25);
+  assert.match(graph, /\[ms_pt0\]atrim=start_sample=165375:end_sample=176400,asetpts=PTS-STARTPTS,afade=t=in:ns=441,apad=pad_dur=0\.550\[ms_tail0_x\]/);
+  assert.match(graph, /aevalsrc=exprs='\(2\*random\(0\)-1\)\*exp\(-6\.9\*t\/0\.500\)\|\(2\*random\(1\)-1\)\*exp\(-6\.9\*t\/0\.500\)':s=44100:d=0\.500,lowpass=f=6000\[ms_tail0_ir\]/);
+  assert.match(graph, /\[ms_tail0_x\]\[ms_tail0_ir\]afir=irnorm=2:wet=0\.7\[ms_tail0_w\]/);
+  assert.match(graph, /adelay=176180S:all=1\[ms_tail0\]/);
+  assert.match(graph, /\[ms_pgk\]\[ms_tail0\]amix=inputs=2:duration=first:normalize=0\[ms_paused\]/);
+  // An end on its last hit: the music cut dead at it, its tail after it.
+  const ring = musicShapeGraph({ end: { at: 6, tail: 1.4 } }, "in", "out", 8);
+  assert.match(ring, /\[ms_eg\]afade=t=out:ss=264071:ns=529\[ms_egk\]/);
+  assert.match(ring, /exp\(-6\.9\*t\/1\.400\)/);
+  assert.match(ring, /\[ms_egk\]\[ms_etail\]amix=inputs=2:duration=first:normalize=0\[ms_ended\]/);
+  // A tape stop over 1,5 s ending at 6 s: 50 steps of 30 ms, each at its speed (falling evenly to nothing), its sound
+  // fading over its last 0,6 s, silent to the end.
+  const stop = musicShapeGraph({ end: { at: 6, stop: 1.5 } }, "in", "out", 8);
+  assert.match(stop, /^\[in\]asplit=51\[ms_ended_h\]/);
+  assert.match(stop, /\[ms_ended_h\]atrim=end_sample=198450,asetpts=PTS-STARTPTS\[ms_ended_head\]/);
+  assert.match(stop, /asetrate=43659,aresample=44100/);
+  assert.match(stop, /asetrate=441,aresample=44100/);
+  assert.match(stop, /concat=n=51:v=0:a=1,afade=t=out:ss=238140:ns=26460,apad=whole_len=374850\[ms_ended\]/);
+  // A build-up: 12 dB softer from 2 s, its level rising back over 4 s, the same sound (no filter to hollow it).
+  const soft = musicShapeGraph({ filters: [{ kind: "soft", from: 2, to: 6, open: 4, db: -12 }, { kind: "soft", from: 7, to: 7.5, db: -6 }] }, "in", "out", 8);
+  assert.match(soft, /^\[in\]asplit=3\[ms_dry\]\[ms_soft120\]\[ms_soft60\];/);
+  assert.match(soft, /\[ms_soft120\]volume=-12dB\[ms_soft120f\]/);
+  assert.match(soft, /\[ms_soft60\]volume=-6dB\[ms_soft60f\]/);
+  // A passage still filtered as the music stops opens in the silence, on its return (never 20 ms before the stop).
+  const radio = musicShapeGraph({ pauses: [{ from: 4, to: 5 }], filters: [{ kind: "radio", from: 1, to: 4 }] }, "in", "out", 8);
+  assert.match(radio, /\[ms_dryk_s1\]atrim=start_sample=219618,/);
+  // Its returns on the music's beats once it is set on the cuts: « Titre qui se décode » comes in on its downbeat with its
+  // band (11,75 beats), and back after its breath on the Reel's beat 30, a quarter beat later on the music's own grid.
+  const beat = 60 / 122;
+  const r3 = (n: number) => Math.round(n * 1000) / 1000;
+  const open = r3(11.75 * beat);
+  const pauses = [{ from: 0, to: open }, { from: r3(27 * beat + 0.1), to: r3(30 * beat) }];
+  assert.deepEqual(pauseShifts(pauses, { beat, downbeat: open }, 22.6), [0, 0.123]);
+  assert.deepEqual(pauseShifts(pauses, null, 22.6), [0, 0]);
+  assert.deepEqual(pauseShifts([{ from: 2, to: 3 }], { beat: 0.5, downbeat: 0 }, 8), [0]);
+  const shifted = musicShapeGraph({ pauses }, "in", "out", 22.6, { beat, downbeat: open });
+  // (The part after the return plays from 123 ms earlier in the piece: its beat 18 on the Reel's beat 30.)
+  assert.match(shifted, /\[ms_paused_s1\]atrim=start_sample=645007,/);
+  assert.match(musicShapeGraph({ pauses }, "in", "out", 22.6), /\[ms_paused_s1\]atrim=start_sample=650431,/);
+  // The live preview: a tail fades over half of it, a soft passage is lower then rises, a tape stop fades over its stop.
+  assert.deepEqual(musicEnvelope({ pauses: [{ from: 2, to: 3, tail: 0.6 }] }, 8, 30), [[60, 1], [69, 0], [89, 0], [90, 1]]);
+  assert.deepEqual(musicEnvelope({ filters: [{ kind: "soft", from: 2, to: 6, open: 4, db: -12 }] }, 8, 30), [[59, 1], [60, 0.25], [180, 1]]);
+  assert.deepEqual(musicEnvelope({ end: { at: 6, stop: 1.5 } }, 8, 30), [[135, 1], [180, 0], [241, 0]]);
+  assert.deepEqual(musicEnvelope({ end: { at: 6, tail: 1 } }, 8, 30), [[180, 1], [195, 0], [241, 0]]);
+});
+
+test("a burst: one sound laid as a sequence denser than a frame, one cue, every hit on its own sample", async () => {
+  const { burstTimes, planCues, placeSounds, BURST_MAX } = await import("./sfx.ts");
+  const { soundChains } = await import("./mix.ts");
+  const { skillAudio } = await import("./skills.ts");
+  // « Pile de photos »'s clicking before 1,6 s: 40 a second slowing evenly to 16 over 1,5 s.
+  const times = burstTimes(40, 16, 1.5);
+  assert.equal(times[0], 0);
+  assert.equal(Math.round((times[1]! - times[0]!) * 1000), 25);
+  assert.ok(Math.abs(times.at(-1)! - times.at(-2)! - 1 / 16) < 0.004 && times.length >= 36 && times.length <= 40, `${times.length} hits`);
+  assert.deepEqual(burstTimes(10, 10, 1), [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1]);
+  assert.equal(burstTimes(60, 60, 10).length, BURST_MAX);
+  // On the plan: one cue, its hits in order within the Reel, their gains bounded; a burst of one hit is none.
+  const audio = skillAudio({
+    duration: 4,
+    sounds: [
+      { at: 0.1, sound: "light click", seconds: 0.5, gain: -8, burst: { times: [0.05, 0, 3.86, 0.025], gains: [-2, 0, -30, 9] } },
+      { at: 2, sound: "dry knock", burst: { times: [0] } },
+    ],
+  });
+  assert.deepEqual(audio.sounds, [
+    { at: 0.1, sound: "light click", seconds: 0.5, skill: true, gain: -8, burst: { times: [0, 0.025, 0.05], gains: [0, 6, -2] } },
+    { at: 2, sound: "dry knock", seconds: 1, skill: true },
+  ]);
+  const plan = { duration: 4, texts: [], segments: [{ clip_id: "a", in: 0, out: 4 }], sounds: audio.sounds } as never;
+  const cues = planCues(plan, [{ start: 0, length: 4 }]);
+  assert.deepEqual(cues[0]!.burst, audio.sounds![0]!.burst);
+  // Placed as the mix places it: its whole sound on each hit, each at its moment from the first and its own gain.
+  const library = { "light click@0.5": { lufs: -26, peak: -10, onset: 0.02, end: 0.09 }, "dry knock@1": { lufs: -20, peak: -6, onset: 0, end: 0.4 } };
+  const [click] = placeSounds(cues, { level: "light", mix: "music", duration: 4, speech: [], library });
+  assert.deepEqual(click!.burst, { times: [0, 0.025, 0.05], gains: [0, 6, -2] });
+  assert.deepEqual([click!.at, click!.onset, click!.end], [0.1, 0.02, 0.09]);
+  // In the mix: its file once, split, each copy delayed to its own sample and at its own gain, mixed back.
+  const chain = soundChains([{ at: 0.1, gain: -2, onset: 0.02, end: 0.09, burst: click!.burst }], 2);
+  assert.match(chain, /afade=t=out:st=0\.030:d=0\.04,asplit=3\[x0b0\]\[x0b1\]\[x0b2\];/);
+  assert.match(chain, /\[x0b0\]adelay=4410S:all=1\[x0d0\];\[x0b1\]adelay=5513S:all=1,volume=6dB\[x0d1\];\[x0b2\]adelay=6615S:all=1,volume=-2dB\[x0d2\]/);
+  assert.match(chain, /\[x0d0\]\[x0d1\]\[x0d2\]amix=inputs=3:duration=longest:normalize=0\[x0\]$/);
+  // A single sound's chain stays as it was.
+  assert.equal(
+    soundChains([{ at: 0.1, gain: -2, onset: 0.02, end: 0.09 }], 2),
+    "[2:a]atrim=start=0.020:end=0.090,asetpts=PTS-STARTPTS,aformat=sample_rates=44100:channel_layouts=stereo,volume=-2dB,afade=t=in:d=0.005,afade=t=out:st=0.030:d=0.04,adelay=100:all=1[x0]",
+  );
+});
+
+test("her video's own sound on a model's shot: kept by the render, heard on its shot, the music stepping back under it", async () => {
+  const { skillPlan } = await import("./skills.ts");
+  const { mixGains, mixFilter, SHOT_SOUND_LUFS, MIX_CASES } = await import("./mix.ts");
+  const { editorOutputSchemaLegacy } = await import("./editor.ts");
+  const skill = {
+    key: "test-sound",
+    version: 1,
+    bpm: 120,
+    shots: [3, 3] as [number, number],
+    files: [1, 3] as [number, number],
+    how: "",
+    texts: [],
+    end: false,
+    timeline: () => ({ duration: 6, shots: [{ start: 0, end: 2, want: "", sound: true }, { start: 2, end: 4, want: "" }, { start: 4, end: 6, want: "", sound: true }], texts: {}, marks: {} }),
+    code: "function Scene() { return null; }",
+  };
+  const files = [{ id: "v0", photo: false, seconds: 10 }, { id: "v1", photo: false, seconds: 10 }, { id: "p0", photo: true, seconds: 0 }];
+  const plan = skillPlan({ skill, name: "Test", files, fill: { shots: [{ file: "v0", at: 1 }, { file: "v1", at: 0 }, { file: "p0", at: 0 }], texts: {}, end: null } });
+  assert.ok(editPlanSchema.safeParse(plan).success);
+  // A video it hears keeps the flag; a photo has no sound to keep.
+  assert.deepEqual(plan.segments.map((s) => ("sound" in s ? s.sound : undefined)), [true, undefined, undefined]);
+  // The render plays that passage's sound (at its own pace, unless she wants none of her videos' sound).
+  const inputs = { template: "libre" as const, clipUrls: { v0: "https://x/v0.mp4", v1: "https://x/v1.mp4", p0: "https://x/p0.jpg" }, photoIds: ["p0"], brand: { name: "Studio" }, soundtrack: "https://x/m.mp3" };
+  const props = buildReelProps(plan, inputs);
+  assert.deepEqual(props.segments.map((s) => (s.type === "clip" ? Boolean(s.speech) : null)), [true, false, null]);
+  const none = buildReelProps({ ...plan, finish: { video_sound: "none" } }, inputs).segments[0]!;
+  assert.equal(none.type === "clip" && Boolean(none.speech), false);
+  // The live preview's music steps back under that shot as the mix does.
+  assert.deepEqual(props.soundtrack?.duck?.windows, [[0, 60]]);
+  // The mix: that sound a little under the music's level, the music ducking some 6 dB under it (not 17, as under speech).
+  const gains = mixGains({ speech: -30, music: -15 }, false, "shots");
+  assert.deepEqual([gains.kind, gains.speechGain, gains.musicGain], ["shot_sound", SHOT_SOUND_LUFS + 30, 0]);
+  assert.match(mixFilter(gains, 5.2), /sidechaincompress=threshold=0\.05:ratio=2:attack=15:release=400/);
+  assert.equal(MIX_CASES.shot_sound.under - MIX_CASES.shot_sound.music, -6);
+  // Never written by the editor (its grammar stays as it was).
+  const editorSegment = (editorOutputSchemaLegacy.shape.plan.shape.segments.element.options[0] as unknown as { shape: Record<string, unknown> }).shape;
+  assert.ok(!("sound" in editorSegment));
+});
+
+test("a sound on her gesture: when her hand does it in the shot, read on her hands, else on its beat", async () => {
+  const { handMoment } = await import("./tracking.ts");
+  const { planCues } = await import("./sfx.ts");
+  const { skillAudio } = await import("./skills.ts");
+  // Her hand (thousandths of the picture) rises from the bottom to the top of a jump at image 64, then comes down.
+  const hand = (y: number) => [1, ...Array.from({ length: 21 }, (_, k) => [500 + k, y - (k === 8 ? 40 : 0)]).flat()];
+  const heights = Array.from({ length: 120 }, (_, k) => 800 - 600 * Math.max(0, 1 - Math.abs(k - 64) / 40));
+  const file = { fps: 30, w: 1000, h: 1000, from: 0, n: 120, frames: heights.map((y) => ({ h: [hand(y)] })) };
+  assert.equal(handMoment(file, 0, 4, "highest"), 2.133);
+  assert.equal(handMoment(file, 0, 1.5, "highest"), 1.467);
+  assert.equal(handMoment(file, 0, 4, "lowest"), 0);
+  // A hand that goes up: once it has risen (handMoves).
+  const jump = { ...file, frames: Array.from({ length: 60 }, (_, k) => ({ h: [hand(k < 20 ? 800 : k < 30 ? 800 - 50 * (k - 20) : 300)] })) };
+  const raised = handMoment(jump, 0, 2, "raised");
+  assert.ok(raised !== null && raised > 0.6 && raised < 1.1, `${raised}`);
+  // No hand found: her body's wrists and fingers (visible), else nothing.
+  const body = (y: number) => [1, ...Array.from({ length: 33 }, (_, p) => [500, p >= 15 && p <= 22 ? y : 900, 90]).flat()];
+  assert.equal(handMoment({ ...file, frames: heights.map((y) => ({ b: [body(y)] })) }, 0, 4, "highest"), 2.133);
+  assert.equal(handMoment({ ...file, frames: heights.map(() => ({})) }, 0, 4, "highest"), null);
+  // On the plan: a skill's click on her hand at the switch, in its second shot (2 s to 6 s, her clip from 0,5 s), lands
+  // where her hand is highest; without her tracks (or another clip's), on its beat; a shot it does not have, none.
+  const audio = skillAudio({
+    duration: 8,
+    shots: [{ start: 0, end: 2, want: "" }, { start: 2, end: 6, want: "" }],
+    sounds: [
+      { at: 4, sound: "switch click", hand: { shot: 1, moment: "highest" } },
+      { at: 5, sound: "light click", hand: { shot: 7, moment: "highest" } },
+    ],
+  });
+  assert.deepEqual(audio.sounds!.map((s) => s.hand), [{ shot: 1, moment: "highest" }, undefined]);
+  const plan = { duration: 8, texts: [], segments: [{ clip_id: "a", in: 0, out: 2 }, { clip_id: "her", in: 0.5, out: 4.5 }], sounds: audio.sounds } as never;
+  const starts = [{ start: 0, length: 2 }, { start: 2, length: 4 }];
+  assert.equal(planCues(plan, starts, { her: file })[0]!.at, 3.633);
+  assert.equal(planCues(plan, starts)[0]!.at, 4);
+  assert.equal(planCues(plan, starts, { a: file })[0]!.at, 4);
+});
+
+test("the models switched to the new tools: its tail (décode v4), its downbeat (quatre coins v3), its burst (pile v3), its shots heard (coups de fouet v3)", async () => {
+  const { decode } = await import("./skills/decode.ts");
+  const { quatreCoins } = await import("./skills/quatre-coins.ts");
+  const { pile } = await import("./skills/pile.ts");
+  const { coupsDeFouet, fouetRoles } = await import("./skills/coups-de-fouet.ts");
+  const { skillPlan } = await import("./skills.ts");
+  const { musicDownbeat, musicShapeGraph } = await import("./music-shape.ts");
+  // « Titre qui se décode »: its last hit's tail dies away over the calm shot (60 dB down in 0,6 s, its breath almost
+  // silent), its music comes in on its downbeat with the band (its late start's end), its radio opens in the silence.
+  const line = decode.timeline(16, { end: false });
+  const [late, breath] = line.music!.pauses!;
+  assert.equal(breath!.tail, 0.6);
+  assert.ok(breath!.to - breath!.from > 1.3);
+  assert.equal(musicDownbeat(line.music, line.duration), late!.to);
+  const graph = musicShapeGraph(line.music!, "in", "out", line.duration, { beat: 60 / 122, downbeat: late!.to });
+  assert.match(graph, /afir=irnorm=2/);
+  // « Mots aux quatre coins »: its music's first strong beat half a beat in; its first cut (the reprise) on the first beat
+  // of its third bar, the next two on its beats, the fourth on an off-beat, as the original's after its reprise.
+  const coins = quatreCoins.timeline(12, { end: false });
+  const beat = 60 / 92;
+  const down = musicDownbeat(coins.music, coins.duration);
+  assert.ok(Math.abs(down - 0.5 * beat) < 1 / 30, `${down}`);
+  const onMusic = coins.shots.slice(1, 5).map((s) => Math.round(((s.start - down) / beat) * 100) / 100);
+  assert.ok(Math.abs(onMusic[0]! - 8) < 0.06 && Math.abs(onMusic[1]! - 9) < 0.06 && Math.abs(onMusic[2]! - 10) < 0.06 && Math.abs(onMusic[3]! - 11.5) < 0.06, JSON.stringify(onMusic));
+  // « Pile de photos »: its clicking before 1,6 s as one burst from its first photo, 46 a second slowing to 16,5, its last
+  // a click's gap before the first one laid alone; at a slower tempo, slower.
+  const stack = pile.timeline(37, { end: false });
+  const burst = stack.sounds!.find((s) => s.burst)!;
+  const alone = stack.sounds!.filter((s) => !s.burst);
+  assert.ok(burst.at >= stack.marks.first! / 30 && burst.at < 0.2, `${burst.at}`);
+  const hits = burst.burst!.times;
+  assert.ok(hits.length >= 38 && hits.length <= 44, `${hits.length} hits`);
+  assert.ok(Math.abs(hits[1]! - hits[0]! - 1 / 46) < 0.003 && Math.abs(hits.at(-1)! - hits.at(-2)! - 1 / 16.5) < 0.005);
+  assert.ok(burst.at + hits.at(-1)! < alone[0]!.at - 0.03, `${burst.at + hits.at(-1)!} → ${alone[0]!.at}`);
+  const slow = pile.timeline(37, { end: false, bpm: 100 }).sounds!.find((s) => s.burst)!;
+  assert.ok(Math.abs(slow.burst!.times.at(-1)! - hits.at(-1)! * 1.2) < 0.01);
+  const files = Array.from({ length: 37 }, (_, i) => ({ id: `p${i}`, photo: true, seconds: 0 }));
+  const pilePlan = skillPlan({ skill: pile, name: "Pile de photos", files, fill: { shots: files.map((f) => ({ file: f.id, at: 0 })), texts: { mots: "La Fripe Rétro" }, end: null } });
+  assert.equal(pilePlan.sounds![0]!.burst!.times.length, hits.length);
+  // « Ville en coups de fouet »: its opening shot and its tram keep their own sound, whatever its count of shots.
+  const city = coupsDeFouet.timeline(23, { end: false });
+  assert.deepEqual(city.shots.flatMap((s, i) => (s.sound ? [i] : [])), [0, 14]);
+  const fewer = fouetRoles(14);
+  assert.deepEqual(coupsDeFouet.timeline(14, { end: false }).shots.flatMap((s, i) => (s.sound ? [fewer[i]] : [])), [0, 14]);
+  const videos = Array.from({ length: 23 }, (_, i) => ({ id: `v${i}`, photo: false, seconds: 8 }));
+  const cityPlan = skillPlan({ skill: coupsDeFouet, name: "Ville en coups de fouet", files: videos, fill: { shots: videos.map((f) => ({ file: f.id, at: 0 })), texts: { titre: "Belleville" }, end: null } });
+  assert.deepEqual(cityPlan.segments.flatMap((s, i) => ("sound" in s && s.sound ? [i] : [])), [0, 14]);
 });

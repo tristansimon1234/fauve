@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { isClipSegment, isMotionSegment, type CameraMove, type ClipAnalysis, type EditPlan } from "./schemas.ts";
+import { isClipSegment, isMotionSegment, type CameraMove, type ClipAnalysis, type EditPlan, type HandMomentKind } from "./schemas.ts";
 import type { ReelSegment } from "./motion.ts";
 
 // What moves in her videos: hands (21 points each, fingertips included), faces and bodies,
@@ -381,6 +381,62 @@ export function handMoves(t: Pick<FootageTracks, "fps" | "from" | "frames" | "as
     .sort((a, b) => a.start - b.start || a.end - b.end)
     .filter((m, k, list) => !list.slice(0, k).some((o) => o.what === m.what && o.end >= m.start && Math.hypot(o.x - m.x, o.y - m.y) < 0.2));
   return told.slice(0, MAX_HAND_MOVES).map(({ start, end, what }) => ({ start, end: Math.max(end, Math.round((start + 0.1) * 10) / 10), what }));
+}
+
+/** What each moment of handMoves is, by the words it tells it in. */
+const MOVE_OF: Record<Exclude<HandMomentKind, "highest" | "lowest">, { what: (w: string) => boolean; edge: "start" | "end" }> = {
+  raised: { what: (w) => w === "la main monte", edge: "end" },
+  lowered: { what: (w) => w === "la main descend", edge: "end" },
+  toward: { what: (w) => w === "la main avance vers la caméra", edge: "end" },
+  away: { what: (w) => w === "la main recule", edge: "end" },
+  spread: { what: (w) => w.startsWith("le pouce et l'index s'écartent"), edge: "start" },
+  pinch: { what: (w) => w === "le pouce et l'index restent pincés", edge: "start" },
+};
+
+/** Her body's wrists and fingers (pose points 15 to 22): where her hand is when no hand was found. */
+const BODY_HANDS = [15, 16, 17, 18, 19, 20, 21, 22];
+
+/**
+ * When her hand does it in a passage of a clip (`from` to `to`, its seconds), read on its tracks: `highest`, the image
+ * where a hand is highest in the picture (any of its points; her body's wrists and fingers when no hand was found there):
+ * the top of a reach or of a jump, her hand on a switch drawn high on the wall; `lowest`, the opposite; the others, the
+ * first move of that kind handMoves tells (raised: once it has gone up; lowered: come down; toward the camera; away;
+ * spread: as thumb and index open; pinch: as a pinch starts being held). In seconds of the clip (to the image for highest
+ * and lowest, to a tenth for the others); null when nothing of the kind is read (three images seen at least).
+ */
+export function handMoment(file: TracksFile, from: number, to: number, moment: HandMomentKind): number | null {
+  const first = Math.max(file.from, Math.floor(from * file.fps));
+  const last = Math.min(file.from + file.frames.length, Math.ceil(to * file.fps));
+  if (last - first < 3) return null;
+  if (moment === "highest" || moment === "lowest") {
+    const sign = moment === "highest" ? 1 : -1;
+    // Per image, the highest (or lowest) point of a hand, in thousandths of the picture's height (0 at its top).
+    const seen: { frame: number; y: number }[] = [];
+    for (let n = first; n < last; n++) {
+      const row = file.frames[n - file.from];
+      const hands = (row?.h ?? []).flatMap((h) => h.slice(1).filter((_, k) => k % 2 === 1));
+      const body = (row?.b ?? []).flatMap((b) => BODY_HANDS.flatMap((p) => ((b[1 + 3 * p + 2] ?? 0) >= 50 ? [b[1 + 3 * p + 1]!] : [])));
+      const ys = (hands.length ? hands : body).filter((y) => Number.isFinite(y));
+      if (ys.length) seen.push({ frame: n, y: sign > 0 ? Math.min(...ys) : Math.max(...ys) });
+    }
+    if (seen.length < 3) return null;
+    // The median of each image and its neighbours: one point read wrong does not make the top; among the images it
+    // flattens the top over, the one read highest.
+    const smooth = seen.map((s, i) => {
+      const around = seen.slice(Math.max(0, i - 1), i + 2).map((x) => x.y).sort((a, b) => a - b);
+      return around[Math.floor(around.length / 2)]!;
+    });
+    let best = 0;
+    smooth.forEach((y, i) => {
+      if (sign * (smooth[best]! - y) > 0 || (y === smooth[best] && sign * (seen[best]!.y - seen[i]!.y) > 0)) best = i;
+    });
+    return Math.round((seen[best]!.frame / file.fps) * 1000) / 1000;
+  }
+  const passage = sliceTracks(file, first, last);
+  if (!passage) return null;
+  const kind = MOVE_OF[moment];
+  const move = handMoves(passage).find((m) => kind.what(m.what));
+  return move ? move[kind.edge] : null;
 }
 
 // ---------------------------------------------------------------------------

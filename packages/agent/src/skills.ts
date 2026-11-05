@@ -3,8 +3,8 @@ import { wordFont, wordFontsBrief } from "./font-pairs.ts";
 import { planLook, type ReelLook } from "./looks.ts";
 import { REEL_FPS } from "./motion.ts";
 import { readMusicShape, type MusicShape } from "./music-shape.ts";
-import type { ClipSegment, ClipSpeech, EditPlan, MotionDrawn, PlanSegment, SfxCue } from "./schemas.ts";
-import { soundSeconds } from "./sfx.ts";
+import type { ClipSegment, ClipSpeech, EditPlan, HandMomentKind, MotionDrawn, PlanSegment, SfxCue } from "./schemas.ts";
+import { BURST_MAX, soundSeconds } from "./sfx.ts";
 import { laterAudio } from "./sound-follow.ts";
 import { speechCuts } from "./speech.ts";
 import { followedFilter, followedLook, type FollowedStyle } from "./steal.ts";
@@ -57,11 +57,14 @@ export type SkillText = {
  * time counted once (the Reel lasts no longer for it); the filler casts it like any slot, told which slot it plays with
  * (`en_meme_temps_que`); its composition draws both (shots[i] keep the timeline's order: list it right after the shot it
  * plays beside; both have the same `from` when they start together). The plain montage, which plays when the
- * composition cannot, shows the main line alone. A skill timed on her voice may say which of her takes plays a shot
- * (`take`: 0 her main video, 1 her other angle synced on its sound, as SkillSaid.shots gives them by default) and
- * whether it is framed tighter (`punch`).
+ * composition cannot, shows the main line alone. `sound`: its passage keeps its own sound in the mix (the metro under
+ * its title, a tram rushing by, a door), the music stepping back under it while it plays (heard only while its shot
+ * plays at its own pace, a video of the main line: a shot beside another is seen, never heard; drawn once at a time by
+ * its code, else heard twice); her other shots stay silent under the music. A skill timed on her voice may say which
+ * of her takes plays a shot (`take`: 0 her main video, 1 her other angle synced on its sound, as SkillSaid.shots gives
+ * them by default) and whether it is framed tighter (`punch`).
  */
-export type SkillShot = { start: number; end: number; want: string; beside?: boolean; take?: number; punch?: boolean };
+export type SkillShot = { start: number; end: number; want: string; beside?: boolean; sound?: boolean; take?: number; punch?: boolean };
 
 /** One of her words on the Reel's clock (s), her hesitations out: what a skill timed on her voice reads of what she says. */
 export type SkillWord = { w: string; start: number; end: number };
@@ -147,8 +150,21 @@ export type SkillSaid = {
  * drop, a shutter on each flash): what it is (a short generic description in English, the sound library's key with its
  * length: « light click », « camera shutter »), when its loudest moment lands (s, on the Reel's clock: a whoosh that builds
  * starts before), its length (0,5 to 3 s), how loud (dB from the Reel's level of sound effects, −24 to +6; its peak capped).
+ * `burst`: the same sound laid again at each of `times` (s after `at`, the first 0; 120 at most; `burstTimes` makes them for
+ * a pace that changes evenly), each at its own `gains` (dB from `gain`): one cue for a clicking that slows down (« Pile de
+ * photos »: 40 a second, then 16), a roll, a ratchet, closer than a frame apart. `hand`: it lands on a gesture of hers in
+ * one of its shots (its index), read on her hands at the render (`moment`: « highest », her hand at the top of a reach or a
+ * jump, a click as it touches a switch; « lowest »; « raised », « lowered », « toward », « away », « spread », « pinch »;
+ * `within`, only between those seconds of the Reel); `at` stays its moment when nothing is read there (a beat).
  */
-export type SkillSound = { at: number; sound: string; seconds?: number; gain?: number };
+export type SkillSound = {
+  at: number;
+  sound: string;
+  seconds?: number;
+  gain?: number;
+  burst?: { times: number[]; gains?: number[] };
+  hand?: { shot: number; moment: HandMomentKind; within?: [number, number] };
+};
 
 export type SkillTimeline = {
   /** The Reel's length (s). */
@@ -160,13 +176,24 @@ export type SkillTimeline = {
   marks: Record<string, number>;
   /**
    * Its sounds, played on their own moments as the model plays them (plan.sounds, `skill`: never moved onto a cut, all
-   * kept one frame apart at least, unless her sound effects are off); made once by the sound library and mixed after the render.
+   * kept one frame apart at least, unless her sound effects are off; a burst one cue, a gesture's read at the render);
+   * made once by the sound library and mixed after the render.
    */
   sounds?: SkillSound[];
   /**
-   * How its music is shaped, on the Reel's clock from its beats (music-shape.ts): where it stops dead and comes back on a
-   * downbeat, where it plays muffled and when it opens, where it ends (cut dead, or faded), or no music at all (`none`).
-   * Applied by the mix to whatever music the Reel gets (plan.music_shape).
+   * How its music is shaped, on the Reel's clock from its beats (music-shape.ts), applied by the mix to whatever music
+   * the Reel gets (plan.music_shape):
+   * - `downbeat`: where the music's first strong beat lands (default: where a late start ends, else 0): the composed
+   *   piece is cut or held back so its beats fall on the model's (a model counted from a pickup gives it);
+   * - `pauses`: where it stops dead and comes back (on a beat: the music's nearest one is moved onto `to`); from 0, a late
+   *   start that comes in on its downbeat; `tail`, its sound ringing on and dying away instead (a break before the drop
+   *   whose last hit rings, the traîne over a calm shot): a wanted break is never taken for a broken piece (a gap the Reel
+   *   never lets be heard is not composed again);
+   * - `filters`: where it plays `muffled`, `radio`, `thin` (without its bass) or `soft` (`db` under its level) and when it
+   *   opens (`open` s: a build-up when `soft` rises over its whole passage);
+   * - `end`: cut dead, faded (`fade`), stopped on its last hit with its tail ringing (`tail`), or slowing down to a halt
+   *   like a tape (`stop`, its last seconds);
+   * - `none`: no music at all.
    */
   music?: MusicShape;
   /**
@@ -699,13 +726,15 @@ function castSegments(files: SkillFile[], fill: SkillFill, line: SkillTimeline):
     // A shot beside another plays from its own start on the Reel's clock, its time counted once.
     const beside = span.beside ? { beside: { at: round(span.start) } } : {};
     if (file.photo) return { clip_id: file.id, in: 0, out: length, zoom: "none", ...beside };
+    // Its own sound kept in the mix when its model hears this shot (a video of the main line only: one beside another is seen, never heard).
+    const heard = span.sound && !span.beside ? { sound: true } : {};
     // A video shorter than its shot: all of it, slowed down (never under half speed).
     if (file.seconds < length + 0.05) {
       const speed = Math.max(0.5, Math.min(1, file.seconds / length));
-      return { clip_id: file.id, in: 0, out: round(Math.min(file.seconds, length * speed)), zoom: "none", speed: round(speed), ...beside };
+      return { clip_id: file.id, in: 0, out: round(Math.min(file.seconds, length * speed)), zoom: "none", speed: round(speed), ...beside, ...heard };
     }
     const at = passage(file, length, pick.at, taken);
-    return { clip_id: file.id, in: at, out: round(at + length), zoom: "none", ...beside };
+    return { clip_id: file.id, in: at, out: round(at + length), zoom: "none", ...beside, ...heard };
   });
 }
 
@@ -775,16 +804,27 @@ const round3 = (n: number) => Math.round(n * 1000) / 1000;
 /**
  * What its timeline gives the Reel's sound, as the plan keeps it: its sounds on their own moments (`skill`), within the
  * Reel (none in its last 0,15 s), in order, 40 at most, each one's length as the library keeps it and its gain within
- * −24 to +6 dB; its music's shape read against its length (music-shape.ts).
+ * −24 to +6 dB; a burst's hits in order within the Reel (120 at most, their gains bounded), a gesture's shot among its
+ * shots; its music's shape read against its length (music-shape.ts).
  */
-export function skillAudio(line: Pick<SkillTimeline, "duration" | "sounds" | "music">): Pick<EditPlan, "sounds" | "music_shape"> {
+export function skillAudio(line: Pick<SkillTimeline, "duration" | "sounds" | "music"> & { shots?: SkillTimeline["shots"] }): Pick<EditPlan, "sounds" | "music_shape"> {
+  const bound = (n: number | undefined) => (Number.isFinite(n) ? Math.round(Math.min(6, Math.max(-24, n!)) * 10) / 10 : 0);
   const sounds = (line.sounds ?? [])
     .filter((s) => Number.isFinite(s.at) && s.at >= 0 && s.at < line.duration - 0.15 && s.sound.trim().length >= 2)
     .sort((a, b) => a.at - b.at)
     .slice(0, SKILL_SOUNDS)
     .map((s): SfxCue => {
-      const gain = Number.isFinite(s.gain) ? Math.round(Math.min(6, Math.max(-24, s.gain!)) * 10) / 10 : 0;
-      return { at: round3(s.at), sound: s.sound.trim().slice(0, 60), seconds: soundSeconds(s.seconds), skill: true, ...(gain ? { gain } : {}) };
+      const gain = bound(s.gain);
+      const hits = (s.burst?.times ?? [])
+        .map((t, k) => ({ t: round3(t), g: bound(s.burst!.gains?.[k]) }))
+        .filter((h) => Number.isFinite(h.t) && h.t >= 0 && h.t <= 12 && s.at + h.t < line.duration - 0.15)
+        .sort((a, b) => a.t - b.t)
+        .slice(0, BURST_MAX);
+      const burst = hits.length > 1 ? { burst: { times: hits.map((h) => h.t), ...(hits.some((h) => h.g) ? { gains: hits.map((h) => h.g) } : {}) } } : {};
+      const shot = s.hand && Number.isInteger(s.hand.shot) && s.hand.shot >= 0 && (!line.shots || s.hand.shot < line.shots.length) ? s.hand.shot : null;
+      const within = s.hand?.within && s.hand.within[1] > s.hand.within[0] ? { within: [round3(Math.max(0, s.hand.within[0])), round3(s.hand.within[1])] as [number, number] } : {};
+      const hand = s.hand && shot !== null ? { hand: { shot, moment: s.hand.moment, ...within } } : {};
+      return { at: round3(s.at), sound: s.sound.trim().slice(0, 60), seconds: soundSeconds(s.seconds), skill: true, ...(gain ? { gain } : {}), ...burst, ...hand };
     });
   const music = readMusicShape(line.music, line.duration);
   return { ...(sounds.length ? { sounds } : {}), ...(music ? { music_shape: music } : {}) };

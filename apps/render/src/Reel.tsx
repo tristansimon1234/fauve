@@ -365,12 +365,12 @@ export function Reel(props: ReelProps) {
       {props.overlays?.length ? <Overlays props={props} k={k} /> : null}
       {collage && !whole ? <Grain props={props} /> : null}
       {props.soundtrack?.src ? <Audio src={props.soundtrack.src} volume={(f) => musicVolume(props.soundtrack!, f)} /> : null}
-      {/* Its sound effects, as the mix sets them: from its attack, at its gain (the preview cannot go over the file's own level). */}
-      {(props.sfx ?? []).map((s, i) => (
-        <Sequence key={`sfx${i}`} from={s.from} durationInFrames={Math.max(2, Math.ceil((s.end - s.onset) * props.fps))} layout="none">
-          <Audio src={s.src} trimBefore={Math.round(s.onset * props.fps)} volume={Math.min(1, 10 ** (s.gain / 20))} />
+      {/* Its sound effects, as the mix sets them: from its attack, at its gain (the preview cannot go over the file's own level); a burst, each of its hits (one a frame). */}
+      {(props.sfx ?? []).flatMap((s, i) => sfxHits(s, props.fps).map((hit, k) => (
+        <Sequence key={`sfx${i}-${k}`} from={hit.from} durationInFrames={Math.max(2, Math.ceil((s.end - s.onset) * props.fps))} layout="none">
+          <Audio src={s.src} trimBefore={Math.round(s.onset * props.fps)} volume={Math.min(1, 10 ** (hit.gain / 20))} />
         </Sequence>
-      ))}
+      )))}
       {props.voice?.src ? (
         // A voice that starts before the Reel (negative from): its silence before the first word is cut.
         <Sequence from={Math.max(0, props.voice.from)} layout="none">
@@ -494,6 +494,16 @@ function underStickers(props: ReelProps, t: ReelProps["texts"][number]): boolean
     plainHook(t) &&
     props.segments.some((s, i) => hookBehind(props, i) && t.from < s.startAt + s.durationInFrames && t.from + t.durationInFrames > s.startAt)
   );
+}
+
+/** The hits of a sound effect in the live preview: itself, or each hit of its burst (one a frame, 48 at most), each at its gain. */
+function sfxHits(s: NonNullable<ReelProps["sfx"]>[number], fps: number): { from: number; gain: number }[] {
+  if (!s.burst?.times.length) return [{ from: s.from, gain: s.gain }];
+  const seen = new Set<number>();
+  return s.burst.times
+    .map((t, k) => ({ from: s.from + Math.round(t * fps), gain: s.gain + (s.burst!.gains[k] ?? 0) }))
+    .filter((hit) => !seen.has(hit.from) && Boolean(seen.add(hit.from)))
+    .slice(0, 48);
 }
 
 /**

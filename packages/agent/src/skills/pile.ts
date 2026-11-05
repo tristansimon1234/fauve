@@ -1,6 +1,7 @@
+import { burstTimes } from "../sfx.ts";
 import { beatSpans, toFrame, type MontageSkill, type SkillSound } from "../skills.ts";
 
-// « Pile de photos », version 2, written again on its original's fiche (docs/fiches/pile.md: measured image by image at
+// « Pile de photos », version 3, written again on its original's fiche (docs/fiches/pile.md: measured image by image at
 // 30 i/s, each photo's landing, box and leaving found on the differences of its images, its clicks on its sound; Tristan:
 // « c'est un effet que l'on veut pouvoir faire, pas exactement reproduire l'image »). The original has no cut and no
 // tempo: one white page where 37 photos land and leave, on a clicking that slows down like a wheel over a held chord.
@@ -22,7 +23,8 @@ import { beatSpans, toFrame, type MontageSkill, type SkillSound } from "../skill
 // original's own, never copied. Her photos stay still, her videos play while they lie on top of the pile (Tristan: « si
 // photos envoyées, figées ; si vidéos, ça joue »); its format setting crops them square as the original, or keeps their
 // own shape, or all in portrait, on her word; the Reel stays vertical, a white page. Its clicks as they slow down are
-// laid as its own sounds, on their measured moments, then a dry knock on the hit; no paper sound on each photo: its
+// laid as its own sounds, its densest first second as one burst, then on their measured moments, then a dry knock on
+// the hit; no paper sound on each photo: its
 // original has none. Its page is plain white, without grade: her photos keep their colours. Its ending card (an offer,
 // an announcement), in option.
 
@@ -46,8 +48,8 @@ const CARD_SECONDS = 1.6;
 /**
  * Its clicking as it slows down, measured on the original's sound (s on its clock, and how strong each attack is next to
  * its hit): 40 clicks a second at 0,3 s, 17 at 1,5, 10 at 2,3, 6 at 3,3, 4 at 4,3, 2 at 6,4, up to its dry hit at 7,962 s,
- * the loudest of its sound. Laid from 1,6 s, where they are two images apart or more and its photos land on them (one
- * frame apart, 40 sounds a Reel: denser, its first 1,6 s are not laid), each at its own strength, its hit 6 dB up.
+ * the loudest of its sound. Laid one by one from 1,6 s, where they are two images apart or more and its photos land on
+ * them, each at its own strength, its hit 6 dB up; before, too dense for one sound a frame, as one burst (BURST).
  */
 const CLICKS: [number, number][] = [
   [1.599, 0.19], [1.669, 0.31], [1.736, 0.47], [1.808, 0.4], [1.884, 0.22], [1.962, 0.45], [2.032, 0.21], [2.123, 0.27], [2.223, 0.24], [2.321, 0.27],
@@ -55,6 +57,12 @@ const CLICKS: [number, number][] = [
   [3.913, 0.23], [4.135, 0.18], [4.377, 0.06], [4.656, 0.25], [4.957, 0.29], [5.303, 0.27], [5.693, 0.18], [6.137, 0.74], [6.654, 0.17], [7.272, 0.44],
 ];
 const HIT_AT = 7.962;
+/**
+ * Its clicking before 1,6 s, too dense to lay a click a frame (its fiche measured its pace, not each click): one burst
+ * from its first photo (0,1 s) to 1,54 s, a click before the first one laid alone, its pace falling evenly from 46 to
+ * 16,5 a second (the line through its two measures, 40 at 0,3 s and 17 at 1,5), each as soft as its quietest measured ones.
+ */
+const BURST = { from: 0.1, to: 1.54, pace: [46.3, 16.5] as const, strength: 0.2 };
 const CLICK = { sound: "light click", seconds: 0.5 };
 const KNOCK = { sound: "dry knock", seconds: 0.5, gain: 6 };
 /** A click's gain (dB): its strength next to the hit's, from the hit's +6, never under -12. */
@@ -208,7 +216,8 @@ export const pile: MontageSkill = {
   // photo leaving 4 s after it landed (no full pile held), the pile empty on its dry hit; its 37 boxes, square but three;
   // its words as tall and as condensed as the original's, in her colour; her videos playing while they lie on top; its
   // clicks as they slow down and its hit, its music lighter after it; its page without grade.
-  version: 2,
+  // 3: its clicking before 1,6 s laid too, as one burst (SkillSound.burst), denser than a frame.
+  version: 3,
   bpm: BPM,
   shots: [8, 40],
   // Under 20 there is no burst left: Edith asks her first whether she has others (each video gives up to three photos).
@@ -265,9 +274,16 @@ export const pile: MontageSkill = {
             : "sa plus belle photo (ou vidéo), posée la dernière en bas de la pile : seule un instant quand les autres sont parties, juste avant que ses mots finissent seuls (une vidéo y joue tout du long)",
     );
     // Its clicks as they slow down, the original's, counted back from its hit (the photos of its burst land on them),
-    // from its first photo; then the dry knock on the hit, the loudest.
+    // from its first photo: the densest as one burst, then one by one; then the dry knock on the hit, the loudest.
+    const original = (t: number) => (hit - (HIT_AT - t) * 2) * beat;
+    const dense = burstTimes(BURST.pace[0], BURST.pace[1], BURST.to - BURST.from)
+      .map((t) => Math.round(original(BURST.from + t) * 1000) / 1000)
+      .filter((t) => t >= FIRST * beat);
     const sounds: SkillSound[] = [
-      ...CLICKS.map(([t, strength]) => ({ at: (hit - (HIT_AT - t) * 2) * beat, strength }))
+      ...(dense.length > 1
+        ? [{ at: dense[0]!, ...CLICK, gain: clickGain(BURST.strength), burst: { times: dense.map((t) => Math.round((t - dense[0]!) * 1000) / 1000) } }]
+        : []),
+      ...CLICKS.map(([t, strength]) => ({ at: original(t), strength }))
         .filter((c) => c.at >= FIRST * beat)
         .map((c) => ({ at: Math.round(c.at * 1000) / 1000, ...CLICK, gain: clickGain(c.strength) })),
       { at: Math.round(hit * beat * 1000) / 1000, ...KNOCK },

@@ -266,8 +266,11 @@ export type ReelProps = {
    * pauses, its end): points (frame, 0–1) to draw straight lines between.
    */
   soundtrack?: { src: string; volume?: number; duck?: { volume: number; windows: [number, number][] }; envelope?: [number, number][] } | null;
-  /** Its sound effects in the live preview (the render strips them and mixes them afterwards): from its frame, its gain in dB, the part of its file played (s). */
-  sfx?: { src: string; key: string; from: number; at: number; gain: number; onset: number; end: number }[];
+  /**
+   * Its sound effects in the live preview (the render strips them and mixes them afterwards): from its frame, its gain in
+   * dB, the part of its file played (s); a burst, laid again at each of its times (s after `at`), each at its own gain.
+   */
+  sfx?: { src: string; key: string; from: number; at: number; gain: number; onset: number; end: number; burst?: { times: number[]; gains: number[] } }[];
   /** Her videos kept whole and horizontal, on black above and below. */
   frame?: "letterbox";
   /** Her voice note over the Reel, from `from` (frames). */

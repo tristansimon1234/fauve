@@ -1,6 +1,6 @@
 import { beatSpans, toFrame, type MontageSkill, type SkillSound } from "../skills.ts";
 
-// « Titre qui se décode », version 3, written again on its original's fiche (docs/fiches/decode.md: measured image by
+// « Titre qui se décode », version 4, written again on its original's fiche (docs/fiches/decode.md: measured image by
 // image at 30 i/s, its music and its sounds measured, the video watched and heard by Gemini; Tristan: « c'est un effet
 // que l'on veut pouvoir faire, pas exactement reproduire l'image »). Its music is an electro-pop travel beat at 122 BPM
 // (Gemini heard 115), its first beat 0,36 s in, and every length below is in its beats from the Reel's start, so its
@@ -11,7 +11,7 @@ import { beatSpans, toFrame, type MontageSkill, type SkillSound } from "../skill
 //               ticks and lands on beat 10,7; no music yet;
 //   11,75 – 27  with the music (out of a small speaker), a band of video opens behind the title where the fold had left
 //               it and grows at a constant speed to the full frame; in it, a cut every 4 images, pieces of all her shots;
-//   27 – 30     the title goes at once, the music stops: a calm shot held almost in silence;
+//   27 – 30     the title goes at once, the music stops on a hit whose tail dies away: a calm shot held almost in silence;
 //   30 – 46     the music full on a shot that follows someone; the place changes behind its subject on the half beat
 //               (34,5), the subject stays on the next place, moving, then goes (36); the subject of the shot after lands
 //               early at its own place, two beats before the rest of its picture; then the person, cut out, stays while
@@ -59,8 +59,12 @@ const TICK = { sound: "digital glitch tick", seconds: 0.5, gain: -9 };
 /** In the follow, the place changes behind its subject (beats from its start); in the place, the next shot's subject lands early. */
 const SWAP = 4.5;
 const EARLY = 2;
-/** Its music stops on a last hit as the band is full: that hit heard this long (s), then nothing until the beat after the calm shot. */
+/**
+ * Its music stops on a last hit as the band is full: that hit heard this long (s), then its tail dies away over this long
+ * (s, 60 dB down) on the calm shot, silent long before the beat after it (the original's breath, almost silence: −41 dB).
+ */
 const LAST_HIT = 0.1;
+const LAST_TAIL = 0.6;
 const onFrame = (s: number) => Math.round(s * 30) / 30;
 const round = (n: number) => Math.round(n * 100) / 100;
 const round3 = (n: number) => Math.round(n * 1000) / 1000;
@@ -277,7 +281,8 @@ export const decode: MontageSkill = {
   // words in normal case on its edges, the band that opens with the music and grows for 15 beats with a cut every 4
   // images, the calm shot in silence, its ending by layers (a subject that stays while the place changes), its sounds
   // and its music's shape (late, out of a small speaker, stopped, full), a finish without grain nor dark corners.
-  version: 3,
+  // 4: its last hit's tail dies away over the calm shot (a pause's `tail`) instead of a dead cut 0,1 s after it.
+  version: 4,
   bpm: BPM,
   shots: [FEWEST, MOST],
   // Up to 23 for a length she asks for: about 30 s at its own tempo, more of her shots full frame after the calm one.
@@ -359,16 +364,17 @@ export const decode: MontageSkill = {
       "un plan fixe avec une personne ou une chose nette au premier plan (la coiffeuse, une chaise, la table dressée, un bouquet) : elle arrive détourée sur le plan d'avant, à sa place, avant le reste de l'image",
       "elle, quelqu'un de l'équipe ou une cliente filmée en entier, caméra posée, debout ou qui marche, sur un fond simple (sinon son produit) : détourée, elle reste pendant que ses lieux changent derrière elle",
     ];
-    // Its music: none under its opening (its sounds alone), coming in with the band out of a small speaker, stopped on
-    // a last hit as the band is full (its original's tail dies away almost in silence over the calm shot), full again on
-    // the beat after the calm shot (on the beat itself, so its attack stays whole), to the last image, as its original's.
+    // Its music: none under its opening (its sounds alone), coming in on its downbeat with the band out of a small speaker
+    // (the engine sets its first strong beat where this late start ends), stopped on a last hit as the band is full, its
+    // tail dying away almost in silence over the calm shot as the original's, full again on the beat after the calm shot
+    // (on the beat itself, so its attack stays whole; the music's nearest beat moved onto it), to the last image.
     const stop = round3((OPENING + MONTAGE) * beat + LAST_HIT);
     return {
       duration,
       music: {
         pauses: [
           { from: 0, to: round3(open) },
-          { from: stop, to: round3((OPENING + MONTAGE + BREATH) * beat) },
+          { from: stop, to: round3((OPENING + MONTAGE + BREATH) * beat), tail: LAST_TAIL },
         ],
         filters: [{ kind: "radio", from: round3(open), to: stop }],
         end: { at: duration, fade: 0.02 },

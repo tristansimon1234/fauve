@@ -1,6 +1,6 @@
 import { beatSpans, toFrame, type MontageSkill } from "../skills.ts";
 
-// « Ville en coups de fouet », version 2, written again on its original's fiche (docs/fiches/coups-de-fouet.md: measured
+// « Ville en coups de fouet », version 3, written again on its original's fiche (docs/fiches/coups-de-fouet.md: measured
 // image by image at 30 i/s, its music and its sounds measured, the video watched and heard by Gemini; Tristan: « c'est
 // un effet que l'on veut pouvoir faire, pas exactement reproduire l'image »). A city in 23 shots on a cinematic pad at
 // 84 BPM: every length below is in its beats from the Reel's start, so its cuts fall where the original's do (within two
@@ -38,6 +38,11 @@ const ON_BEAT = [9, 13, 18, 19];
 const PERCUSSION = 9;
 const CALM = 12;
 const RETURN = 14;
+/**
+ * The roles whose own sound is heard under its music (the original's city): the shot that opens, its metro cut dead on
+ * her name's shot, and the tram rushing past as the percussion comes back.
+ */
+const HEARD = [0, RETURN];
 /** Its name's shot, its first whip flash (two images, the second one on the cut). */
 const NAME = 1;
 const FIRST_WHIP = 2;
@@ -268,7 +273,7 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
 
 /** What each role wants of her files, for the filler (French). */
 const WANTS = [
-  "le plan qui ouvre, bref, qui défile déjà : un tram, un bus, une rue filmée en marchant vite, quelque chose qui passe tout près",
+  "le plan qui ouvre, bref, qui défile déjà : un tram, un bus, une rue filmée en marchant vite, quelque chose qui passe tout près (son bruit s'entend, coupé net sur le plan suivant)",
   "un plan large et calme de sa rue, de sa façade ou de son quartier, avec du ciel au-dessus des toits : son nom s'y pose, immobile, pendant que l'image avance doucement",
   "une contre-plongée : une façade, un immeuble, une tour ou un arbre vu d'en bas (en noir et blanc)",
   "quelqu'un qui marche, que la caméra suit : un passant, un client, quelqu'un de son équipe",
@@ -282,7 +287,7 @@ const WANTS = [
   "quelqu'un de dos dans la rue, qui marche ou attend, des passants, quelque chose qui passe derrière",
   "sa rue calme, sous les arbres ou au soleil : le plan le plus tranquille du Reel (la musique se tait presque)",
   "un plan fixe où quelque chose se détache devant un grand bâtiment : un feu, un lampadaire, une enseigne",
-  "un plan qui défile très vite : un tram, un métro, un bus ou une voiture qui passe tout près (la musique revient)",
+  "un plan qui défile très vite : un tram, un métro, un bus ou une voiture qui passe tout près (la musique revient, son bruit s'entend dessous)",
   "un plan en mouvement, penché ou de l'intérieur : dans le tram, dans sa boutique, dans sa salle",
   "un plan large et fixe : un pont, une place, la vue de sa rue (l'image recule doucement)",
   "un plan à contre-jour ou de près : un étal, un comptoir, une terrasse, ce qu'elle vend (l'image avance doucement)",
@@ -299,7 +304,8 @@ export const coupsDeFouet: MontageSkill = {
   // its flashes, its name still in her sky while the picture pushes in, its black and white, its ghost images, its rush
   // in and its sweep out, its jerky whip and its fades, its music muffled where its percussion is silent, its whoosh and
   // its thud, its sound dying away, its whites held low and no grain).
-  version: 2,
+  // 3: its opening shot and its tram keep their own sound under its music (SkillShot.sound), as the original's city.
+  version: 3,
   bpm: BPM,
   shots: [12, 23],
   files: [6, 16],
@@ -348,7 +354,8 @@ export const coupsDeFouet: MontageSkill = {
         ],
         end: { at: duration, fade: 1 },
       },
-      shots: spans.map((s, i) => ({ ...s, want: WANTS[roles[i]!]! })),
+      // Its opening shot and its tram keep their own sound (the metro, the tram), the music stepping back under them.
+      shots: spans.map((s, i) => ({ ...s, want: WANTS[roles[i]!]!, ...(HEARD.includes(roles[i]!) ? { sound: true } : {}) })),
       texts: { titre: named },
       marks: {
         // The image of her name's shot its whip flashes are made of, within it.

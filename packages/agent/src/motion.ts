@@ -757,12 +757,16 @@ export function buildReelProps(plan: EditPlan, inputs: ReelInputs): ReelProps {
     if (!src) throw new Error(`No URL for clip ${s.clip_id}`);
     const speed = s.speed && Math.abs(s.speed - 1) > 0.01 ? s.speed : undefined;
     // Someone speaks in this passage: its sound stays (unless her voice is over the Reel, or the shot plays at another speed);
-    // or she wants the sound of her videos all along (never slowed down), or none of it.
+    // or she wants the sound of her videos all along (never slowed down), or none of it; or its model hears this shot
+    // (a skill's `sound` shot: the metro under its title), at its own pace, unless she wants none of her videos' sound.
     const heard = plan.finish?.video_sound ?? "speech";
     // A shot laid beside another (the other half of a split screen) is seen, never heard: the main line's sound plays.
     const speech =
       !s.beside &&
-      (heard === "all" ? !speed : heard === "speech" && !plan.voice && !speed && (inputs.words?.[s.clip_id] ?? []).some((w) => w.start >= s.in && w.end <= s.out));
+      (heard === "all"
+        ? !speed
+        : (heard === "speech" && !plan.voice && !speed && (inputs.words?.[s.clip_id] ?? []).some((w) => w.start >= s.in && w.end <= s.out)) ||
+          (heard !== "none" && Boolean(s.sound) && !speed && !s.ramp));
     // Only a composition draws a shot laid beside the others: the plain montage skips it.
     const beside = s.beside ? { beside: true as const } : {};
     const zoom = s.zoom === "light" || plan.transitions === "light_zoom";
@@ -894,15 +898,21 @@ export function buildReelProps(plan: EditPlan, inputs: ReelInputs): ReelProps {
           .map((w) => ({ from: segment.startAt + toFrames(w.start - s.in), to: segment.startAt + toFrames(w.end - s.in) }));
       });
   const ambient = plan.finish?.video_sound === "all" && segments.some((s) => s.type === "clip" && s.speech);
-  const mix: MixCase = voice ? "voice_over" : spoken.length ? "speech_in_clips" : ambient ? "ambient" : "music";
+  // The shots its model hears (a skill's `sound` shots): the music steps back under them, as in the mix.
+  const heardShots: [number, number][] = segments.flatMap((seg, i) => {
+    const s = plan.segments[i];
+    return seg.type === "clip" && seg.speech && s && isClipSegment(s) && s.sound ? [[seg.startAt, seg.startAt + seg.durationInFrames] as [number, number]] : [];
+  });
+  const mix: MixCase = voice ? "voice_over" : spoken.length ? "speech_in_clips" : ambient ? "ambient" : heardShots.length ? "shot_sound" : "music";
   const speech = speechWindows(spoken.filter((w) => w.from < durationInFrames), toFrames(0.5));
   // Its model's shape on the music, as the mix sets it: silent in its pauses and after its end (its filters are the render's).
   const envelope = musicEnvelope(plan.music_shape, plan.duration, fps);
-  const music = { ...previewMusic(mix, speech), ...(envelope.length ? { envelope } : {}) };
-  // Its sound effects, placed once for the preview and the mix alike: at its level, never on top of what is said.
+  const music = { ...previewMusic(mix, mix === "shot_sound" ? heardShots : speech), ...(envelope.length ? { envelope } : {}) };
+  // Its sound effects, placed once for the preview and the mix alike: at its level, never on top of what is said; a
+  // skill's sound on her gesture where her hands do it.
   const sfx =
     inputs.sfx && inputs.sfx.level !== "off"
-      ? placeSounds(planCues(plan, planTimeline(plan).segments), {
+      ? placeSounds(planCues(plan, planTimeline(plan).segments, inputs.tracks), {
           level: inputs.sfx.level,
           mix,
           duration: durationInFrames / fps,
