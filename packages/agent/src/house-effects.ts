@@ -196,6 +196,10 @@ export const HOUSE_EFFECTS: Record<string, HouseEffect> = {
     effet: "son plat qui se finit en gros plans, puis elle qui le goûte face caméra ; ses mots au milieu, les forts en grand, sa formule de fin en très grand",
     il_faut: "des gros plans de son plat et une vidéo d'elle qui en parle à table",
   },
+  recette: {
+    effet: "chaque étape coupée geste par geste, ses mots au milieu de l'image comme les sous-titres d'une voix, un petit groupe par geste",
+    il_faut: "des gestes filmés téléphone posé, chaque étape d'un seul endroit en plusieurs gestes",
+  },
 };
 
 /** The most of Edith's models one Reel borrows from: one charter, one music, never a patchwork. */

@@ -1976,6 +1976,47 @@ export const HOUSE_MODELS: HouseModel[] = [
       why: "Le résultat d'abord donne faim avant de dire comment : on voit le plat se finir, puis quelqu'un le goûter et dire pourquoi c'est bon ; chaque étape tombe sur son mot, et la formule de fin fait sourire.",
     },
   }),
+  model({
+    key: "recette",
+    name: "Pas à pas raconté",
+    // Written on its original's fiche (v1 of its skill, docs/fiches/recette.md): a creator's recipe told by his voice,
+    // the result first, each step from one place cut gesture by gesture, his words subtitled in small groups in the
+    // middle of the picture in a bold serif, the end where he tastes at the lens. Played without a voice: its words are
+    // the subtitles of one, a group on each gesture.
+    pitch: "Ton savoir-faire pas à pas : ton résultat d'abord, puis chaque étape geste par geste, tes mots écrits au milieu comme des sous-titres, et à la fin quelqu'un qui goûte ou essaie.",
+    needs: "8 à 16 vidéos filmées téléphone posé : ton résultat fini de face, chaque étape d'un seul endroit (de dessus ou de face) en plusieurs gestes, et quelqu'un qui goûte, sent ou essaie face à l'objectif",
+    files: [4, 16],
+    pair: "sous-titres",
+    // Its skill's code is its reference.
+    example: null,
+    // Its original's music cannot be measured under its voice (its fiche): a lo-fi pace where a beat lasts about one of its gestures.
+    tempo: 85,
+    finish: { name: "Bois chaud", hint: "chaud et saturé, les hautes lumières retenues, sans grain ni coins sombres", warmth: 0.1, contrast: 0.06, saturation: 0.06 },
+    look: {
+      name: "pas à pas sous-titré",
+      format: "autre",
+      hook: { kind: "promesse", what: "son résultat fini posé devant l'objectif puis soulevé de tout près, et ses premiers mots écrits au milieu en sous-titres : ce que son savoir-faire promet" },
+      text: {
+        amount: "plusieurs",
+        composition: "ses mots écrits au milieu de l'image comme les sous-titres d'une voix, en petits groupes d'un à trois mots qui se remplacent d'un coup, un par geste, en serif grasse minuscule d'un blanc chaud, une ombre légère, sans boîte",
+        weight: "bold",
+        shadow: "soft",
+      },
+      layout: "plein cadre, téléphone posé, chaque étape coupée geste par geste dans le même plan, ses mots posés par-dessus au milieu de l'image ; en 16:9 sur du noir si ses vidéos sont en largeur",
+      moments: [
+        { at: 0, what: "son résultat fini posé sur son plan de travail devant l'objectif, de face, ses premiers mots au milieu dès la première image" },
+        { at: 1.03, what: "de tout près, ce qu'on en prend soulevé vers l'objectif, la promesse qui continue en sous-titres" },
+        { at: 3.67, what: "chaque étape d'un seul endroit, de dessus sur le plan de travail ou de face derrière lui, coupée geste par geste dans le même plan (ce qu'on ajoute, l'un après l'autre), un petit groupe de mots par geste" },
+        { at: 42.03, what: "à la fin, face à l'objectif, quelqu'un goûte ou essaie et sa réaction, le mot de la fin sous son visage" },
+      ],
+      camera: "fixe",
+      grade: "warm",
+      motion: "epure",
+      music: "warm lo-fi hip-hop, soft Rhodes chords, a mellow brushed beat, 85 BPM",
+      ending: "quelqu'un goûte ou essaie face à l'objectif, sa réaction tenue jusqu'au bout, le mot de la fin sous son visage",
+      why: "On voit le résultat d'abord, puis comment c'est fait, geste par geste, les mots qui racontent au rythme des mains ; la réaction à la fin donne envie d'y goûter.",
+    },
+  }),
 ];
 
 const BY_KEY = new Map(HOUSE_MODELS.map((m) => [m.key, m]));
@@ -2059,6 +2100,7 @@ export const HOUSE_WHEN: Record<string, { pour: string; pas_pour: string }> = {
   "vlog-ville": { pour: "raconter son quartier, sa ville ou son lieu comme un court-métrage, avec des phrases (ou une voix) qui racontent tout du long et beaucoup de beaux plans", pas_pour: "une offre à lire en détail, un produit seul, peu de vidéos, un Reel court" },
   assiettes: { pour: "montrer sa carte, ses plats du jour, des idées de recettes ou une sélection de produits, un par un, filmés d'en haut au même endroit (un restaurant, un traiteur, une cantine, une boulangerie, des box)", pas_pour: "un seul plat, les gestes d'une recette, quelqu'un qui parle, un lieu, moins de six plats" },
   "chef-face": { pour: "un plat, une recette ou une spécialité racontée face caméra et goûtée (un restaurant, un traiteur, une pâtisserie, un café) : le résultat d'abord, puis la dégustation", pas_pour: "sans vidéo où elle parle, des images sans parole, un lieu ou une ambiance sans rien à goûter" },
+  recette: { pour: "montrer un savoir-faire en étapes comme un tuto, pour tout métier qui a des gestes : une recette (cuisine, pâtisserie), un bouquet monté (fleuriste), une coupe (coiffeur, barbier), une pièce tournée (céramiste), un soin ; du résultat fini à la dégustation ou à l'essai", pas_pour: "un lieu ou une ambiance, une offre à lire, quelqu'un qui parle face caméra, des vidéos filmées à la main" },
 };
 
 /** The models for Edith: their key, name, what they do, what they want, and what only she can film for one. */
