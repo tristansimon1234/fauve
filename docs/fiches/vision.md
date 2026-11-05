@@ -74,13 +74,13 @@ Passe par passe (image de départ, puis nombre d'images ; les noms sont ceux des
 ### 8. L'image redessinée en caractères, clair sur noir
 - **Mesuré** : l'homme et son banc avec leurs dalles (68, 70 à 76, 146 à 150, 182, 186 à 195, 241 à 245) et une fois toute la place (201 à 205, de 6,70 à 6,87 s), redessinés en minuscules caractères façon ASCII, clairs sur noir : des cases d'environ 2,7 × 5,3 px sur 720 (4 × 8 px en 1080), trop petites pour se lire. La pierre, pleine de détails, devient un semis dense ; les manteaux sombres restent noirs ; le fond est noir et le bâtiment s'y dessine à 204–205. Ses dalles partent (70–76) ou reviennent (186–195) comme en 1 et 2 ; à 182, les cadres du sujet y sont aussi. La même trame, en points (≈ 3 × 7 px sur 720), remplit les cadres noirs de 3.
 - **Sur quoi** : n'importe quel plan ; ce qui a de la matière (un sol en pierre, un mur, un tissu, des étagères pleines) donne le plus.
-- **Outil** : manquant, **une passe en caractères** : l'image redessinée en petits caractères (ou en points) selon sa lumière, clair sur noir ou sombre sur blanc, sur un plan, un détourage ou une case. Le plus proche aujourd'hui : `Sketch invert={false}` (des traits clairs sur noir : les contours, pas la matière).
+- **Outil** : existant depuis le 5 novembre : `Ascii` (kit d'image, cases de 4 × 8 par défaut). Il manquait **une passe en caractères** : l'image redessinée en petits caractères (ou en points) selon sa lumière, clair sur noir ou sombre sur blanc, sur un plan, un détourage ou une case. Le plus proche aujourd'hui : `Sketch invert={false}` (des traits clairs sur noir : les contours, pas la matière).
 - **Si rien ne s'y prête** : `Sketch invert={false}`.
 
 ### 9. Les passants en points
 - **Mesuré** : à 1,57 s (47–48), 5,80 (174–175), 6,67 (200), de 6,87 à 6,97 (206 à 209) et de 7,13 à 7,20 s (214 à 216) : sur blanc, les gens seuls (l'homme du banc compris, sans son banc), en points gris foncé de 2 à 3 px (sur 720), serrés sur leurs contours et épars dedans : un nuage de points. Ni sol ni banc.
 - **Sur quoi** : les gens de son plan.
-- **Outil** : en partie existant : `Sketch` (traits sombres sur blanc) autour de `Subject shot={n} object="every person"` (tous les passants détourés ensemble) posé sur du blanc donne leurs contours en traits ; des points au lieu des traits : un masque de points (code du modèle). Ceux qui entrent pendant le plan : le même manque qu'en 3.
+- **Outil** : en partie existant : `Sketch` (traits sombres sur blanc) autour de `Subject shot={n} object="every person"` (tous les passants détourés ensemble) posé sur du blanc donne leurs contours en traits ; des points au lieu des traits : `Ascii kind="dots"` sombre sur blanc autour de ce `Subject` (kit d'image, depuis le 5 novembre). Ceux qui entrent pendant le plan : le même manque qu'en 3.
 - **Si rien ne s'y prête** : elle seule (`Subject shot={n}`), en points.
 
 ### 10. Le clignotement des passes, et les noirs

@@ -2,6 +2,7 @@ import React, { useId, useMemo, type CSSProperties, type ReactNode } from "react
 import { Easing, interpolate, interpolateColors, random } from "remotion";
 import type { Box, Draw, KitHooks, Size } from "./Kit";
 import type { TrackFn } from "./track";
+import { exposeAt } from "./picture-kit";
 
 // The interface, graphics and transitions kit of the animations (lot 3), measured on the reference Reels:
 // a cursor that moves and clicks, a switch, a button that changes when clicked, a profile card, a list of
@@ -453,14 +454,23 @@ function FanOf(hooks: KitHooks) {
   };
 }
 
-type TurnProps = { draw: Draw; angle?: 90 | -90; style?: CSSProperties };
+type TurnProps = { draw: Draw; angle?: 90 | -90 | 180; style?: CSSProperties };
 
-/** A shot in width turned a quarter, so it fills the vertical frame (it is drawn at the frame's height × width). */
+/**
+ * A shot in width turned a quarter, so it fills the vertical frame (it is drawn at the frame's height × width); 180: an
+ * upright shot turned upside down, drawn at the frame's size (a walker on a strap hanging under it, « Quart de tour »).
+ */
 function TurnOf(hooks: KitHooks) {
   return function Turn({ draw, angle = 90, style }: TurnProps) {
     const video = hooks.useVideoConfig();
     const W = video.width;
     const H = video.height;
+    if (angle === 180)
+      return (
+        <div style={{ position: "absolute", inset: 0, overflow: "hidden", ...style }}>
+          <div style={{ position: "absolute", left: 0, top: 0, width: W, height: H, transform: "rotate(180deg)" }}>{drawAt(draw, { width: W, height: H })}</div>
+        </div>
+      );
     return (
       <div style={{ position: "absolute", inset: 0, overflow: "hidden", ...style }}>
         <div style={{ position: "absolute", left: (W - H) / 2, top: (H - W) / 2, width: H, height: W, transform: `rotate(${angle}deg)` }}>{drawAt(draw, { width: H, height: W })}</div>
@@ -640,14 +650,38 @@ function ThroughOf(hooks: KitHooks) {
 
 // ——— Flash and Tint ——————————————————————————————————————————————————————————————————
 
-type FlashProps = { at: number | number[]; frames?: number; color?: string };
+type FlashProps = {
+  at: number | number[];
+  frames?: number;
+  color?: string;
+  /** A camera's flash instead of a card: the picture under it overexposed (true, or its strength), never replaced; brightest on `at`. */
+  expose?: boolean | number;
+  /** With expose: the images lit before `at` (1; 2 for a film's image doubled at 30 i/s). */
+  before?: number;
+};
 
-/** A frame (or two) of plain colour, on a cut: the white frame of the « Nike » edit. Only when it is asked for. */
+/**
+ * A frame (or two) of plain colour, on a cut: the white frame of the « Nike » edit. Only when it is asked for. With
+ * `expose`, a camera's flash (picture kit): what is under it multiplied and washed with white in screen, its whites
+ * burnt but still a picture (« Une journée chez toi », docs/fiches/journee.md, effect 4; exposeAt in picture.ts).
+ */
 function FlashOf(hooks: KitHooks) {
-  return function Flash({ at, frames = 2, color = "#ffffff" }: FlashProps) {
+  return function Flash({ at, frames, color = "#ffffff", expose, before = 1 }: FlashProps) {
     const frame = hooks.useCurrentFrame();
     const list = Array.isArray(at) ? at : [at];
-    return list.some((a) => frame >= a && frame < a + frames) ? <div style={{ position: "absolute", inset: 0, background: color }} /> : null;
+    if (expose !== undefined && expose !== false) {
+      const strength = typeof expose === "number" ? expose : 1;
+      const lit = list.map((a) => exposeAt(frame - a, before, frames ?? 2, strength)).find(Boolean);
+      if (!lit) return null;
+      return (
+        <>
+          <div style={{ position: "absolute", inset: 0, pointerEvents: "none", backdropFilter: `brightness(${lit[0]})`, WebkitBackdropFilter: `brightness(${lit[0]})` }} />
+          <div style={{ position: "absolute", inset: 0, pointerEvents: "none", background: color, mixBlendMode: "screen", opacity: lit[1] }} />
+        </>
+      );
+    }
+    const length = frames ?? 2;
+    return list.some((a) => frame >= a && frame < a + length) ? <div style={{ position: "absolute", inset: 0, background: color }} /> : null;
   };
 }
 

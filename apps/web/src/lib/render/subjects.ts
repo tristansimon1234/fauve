@@ -25,7 +25,7 @@ import {
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { costMeta } from "@/lib/cost-scope";
 import { timeLeft } from "@/lib/step-clock";
-import { depthVideosOnGpu, GPU_START_MS, gpuCostEur, gpuReady, objectsOnGpu, subjectsOnGpu } from "./gpu";
+import { depthVideosOnGpu, GPU_START_MS, gpuCostEur, gpuReady, objectsOnGpu, pieceOutlines, subjectsOnGpu, type PieceOutlines } from "./gpu";
 import { cutoutCostEur, subjectsInSandbox } from "./sandbox";
 
 // Her subject cut out at every image of the passages a composition draws it on (Subject), made in the cut-out
@@ -51,12 +51,15 @@ export const subjectPath = (studioId: string, mediaId: string, key: string, stil
 
 /**
  * Keeps a passage's outline at each image beside its cut-out ({path}.contour.json), for a line along its edge
- * (Outline); its path, or nothing when there is none or it could not be kept (the line is then simply not drawn).
+ * (Outline); its path, or nothing when there is none or it could not be kept (the line is then simply not drawn). An
+ * object read in pieces apart keeps their outlines in the same file ({ contours, pieces }: Subject part draws one
+ * alone), so the retention removes them with it.
  */
-async function keepContour(studioId: string, mediaId: string, key: string, contours: (number[] | null)[] | undefined): Promise<string | undefined> {
+async function keepContour(studioId: string, mediaId: string, key: string, contours: (number[] | null)[] | undefined, pieces?: PieceOutlines): Promise<string | undefined> {
   if (!contours?.some(Boolean)) return undefined;
   const path = `${subjectPath(studioId, mediaId, key, false).replace(/\.webm$/, "")}.contour.json`;
-  const saved = await supabaseAdmin().storage.from("media").upload(path, JSON.stringify(contours), { contentType: "application/json", upsert: true });
+  const body = pieces ? JSON.stringify({ contours, pieces }) : JSON.stringify(contours);
+  const saved = await supabaseAdmin().storage.from("media").upload(path, body, { contentType: "application/json", upsert: true });
   if (saved.error) {
     console.warn("subject outline not kept", key, saved.error.message);
     return undefined;
@@ -289,20 +292,27 @@ async function readClear(path: string): Promise<ClearMap | undefined> {
   }
 }
 
-/** A passage's outline at each image, read from its file (nothing when it is missing or unreadable). */
-async function readContour(path: string): Promise<(number[] | null)[] | undefined> {
+/**
+ * A passage's outline at each image, read from its file, and an object's pieces' outlines when it keeps them (nothing
+ * when it is missing or unreadable): the file holds the outlines alone, or { contours, pieces }.
+ */
+async function readContour(path: string): Promise<{ contours?: (number[] | null)[]; pieces?: PieceOutlines } | undefined> {
   const { data } = await supabaseAdmin().storage.from("media").download(path);
   if (!data) return undefined;
   try {
     const parsed: unknown = JSON.parse(await data.text());
-    return Array.isArray(parsed) ? (parsed.map((c) => (Array.isArray(c) && c.every((v) => typeof v === "number") ? (c as number[]) : null)) as (number[] | null)[]) : undefined;
+    const kept = Array.isArray(parsed) ? parsed : parsed && typeof parsed === "object" && Array.isArray((parsed as { contours?: unknown }).contours) ? (parsed as { contours: unknown[] }).contours : null;
+    if (!kept) return undefined;
+    const contours = kept.map((c) => (Array.isArray(c) && c.every((v) => typeof v === "number") ? (c as number[]) : null)) as (number[] | null)[];
+    const pieces = Array.isArray(parsed) ? undefined : pieceOutlines((parsed as { pieces?: unknown }).pieces);
+    return { contours, ...(pieces ? { pieces } : {}) };
   } catch {
     return undefined;
   }
 }
 
-/** What the render reads of a passage: its cut-out signed, its boxes, outline and pieces; or its clear areas (no file to draw). */
-type SubjectInput = { src: string; still?: boolean; top?: number; boxes?: (number[] | null)[]; contours?: (number[] | null)[]; parts?: number[]; clear?: ClearMap };
+/** What the render reads of a passage: its cut-out signed, its boxes, outline and pieces (their outlines apart); or its clear areas (no file to draw). */
+type SubjectInput = { src: string; still?: boolean; top?: number; boxes?: (number[] | null)[]; contours?: (number[] | null)[]; parts?: number[]; pieces?: PieceOutlines; clear?: ClearMap };
 
 /** The cut-outs this plan can draw, signed for the render and the live preview (by passage, subjectKey), with their outlines; and the clear areas its texts are set in (clearKey). */
 export async function subjectInputs(studioId: string, plan: Plan): Promise<Record<string, SubjectInput>> {
@@ -335,7 +345,8 @@ export async function subjectInputs(studioId: string, plan: Plan): Promise<Recor
             ...(f.top !== undefined ? { top: f.top } : {}),
             ...(f.boxes?.length ? { boxes: f.boxes } : {}),
             ...(f.parts?.length ? { parts: f.parts } : {}),
-            ...(contours[i]?.length ? { contours: contours[i] } : {}),
+            ...(contours[i]?.contours?.length ? { contours: contours[i]!.contours } : {}),
+            ...(contours[i]?.pieces ? { pieces: contours[i]!.pieces } : {}),
           },
         ],
       ];
@@ -477,7 +488,7 @@ async function followObjects(studioId: string, postId: string, missing: ObjectPa
       continue;
     }
     done++;
-    const contour = await keepContour(studioId, p.clip_id, p.key, result.contours);
+    const contour = await keepContour(studioId, p.clip_id, p.key, result.contours, result.pieces);
     record(p, {
       path: subjectPath(studioId, p.clip_id, p.key, result.still),
       still: result.still,
@@ -539,7 +550,7 @@ export async function photoObjectInputs(studioId: string, mediaIds: string[]): P
     const src = signed[i]?.signedUrl;
     if (!src) return;
     const [x, y, w, h] = f.box as [number, number, number, number];
-    const contour = contours[i]?.[0] ?? undefined;
+    const contour = contours[i]?.contours?.[0] ?? undefined;
     (out[f.media] ??= {})[f.name] = { cutout: src, box: { x, y, w, h }, ...(contour?.length ? { contour } : {}) };
   });
   return out;

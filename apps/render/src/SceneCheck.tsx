@@ -9,6 +9,7 @@ import { makeGraphic } from "./Graphic";
 import { makeEffects } from "./Effects";
 import { makeCaptions } from "./Captions";
 import { compileScene, SCOPE, type SceneComponent } from "./MotionScene";
+import { makePicture } from "./Picture";
 import { themeFor } from "./theme";
 import { inBox, inShape, onlyProbe, probeSpoken as probeWords, silhouette, type Box as PersonBox, type Shape } from "./silhouette";
 import { footageTrack, NOTHING_SEEN, type Seen, type TrackFn, type TrackPiece } from "./track";
@@ -137,6 +138,8 @@ function checkScope(width: number, height: number, durationInFrames: number): ty
     ...makeKit({ useCurrentFrame, useVideoConfig }),
     ...makeType({ useCurrentFrame, useVideoConfig }),
     ...makeGraphic({ useCurrentFrame, useVideoConfig }),
+    // The picture kit too (its burns, stars, fades and echoes move as they will in the render).
+    ...makePicture({ useCurrentFrame, useVideoConfig }),
     ...makeEffects({ useCurrentFrame, useVideoConfig }),
     // What is said, on this copy's clock too (its words are measured: does the scene write them?).
     Captions: makeCaptions({ useCurrentFrame, useVideoConfig }),

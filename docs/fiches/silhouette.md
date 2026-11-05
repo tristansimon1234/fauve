@@ -53,13 +53,13 @@ Aucun zoom ni poussée sur une vidéo. Les seuls changements de taille touchent 
 ### 4. La traîne pêche derrière ce qui bouge
 - **Mesuré** : ce qui bouge laisse derrière lui 3 à 5 copies pêche (#D79B6E), de plus en plus pâles, décalées vers là d'où il vient. Les lettres de « Hello » pendant qu'il grandit et se recentre vers la gauche (images 18 à 28 : copies à droite), le « a » qui grossit (81 à 83), l'iris qui file en bas à droite (136 à 140). Rien d'autre n'en a : la silhouette garde le simple flou de bougé de la caméra.
 - **Sur quoi** : ses mots et les formes qui bougent. Dans ses vidéos, sa silhouette quand elle baisse la tête (l'original ne le fait pas : à voir avec Tristan).
-- **Outil** : **manquant** : une traîne (`Echo` : les positions d'un élément quelques images plus tôt, teintées, de plus en plus transparentes). Sur un texte, le code du modèle peut la dessiner ; sur elle, des `Subject fill` posés avec `at` en retard (existants).
+- **Outil** : existant depuis le 5 novembre : `Echo` (kit d'image : les positions d'un élément quelques images plus tôt, teintées, de plus en plus transparentes). Sur un texte, le code du modèle peut la dessiner ; sur elle, des `Subject fill` posés avec `at` en retard (existants).
 - **Si rien ne s'y prête** : sans traîne.
 
 ### 5. La main en points qui salue
 - **Mesuré** : un pictogramme de main ouverte, fait d'une grille de petits carrés gris foncé, en haut à droite du mot (à la fin, x 65 – 74 % de la largeur, son haut à 22 % de la hauteur). Il se construit en 4 images, des points épars qui montent du bas (images 17 à 20), puis il salue en basculant d'un côté et de l'autre jusqu'à la coupe, et suit le mot quand il grandit.
 - **Sur quoi** : sa main à elle, filmée quand elle salue, ou son logo, rendus en points.
-- **Outil** : **manquant** : une trame de points (un détourage, un logo ou un pictogramme dessiné en grille de points, qui se construit point par point). Le moteur n'a ni pictogrammes ni émojis, et la consigne du motion designer trouve cheap les icônes qui flottent : à voir avec Tristan.
+- **Outil** : existant depuis le 5 novembre : `DotGrid` (kit d'image : un détourage, un logo, un mot ou un émoji dessiné en grille de points, qui se construit point par point ; la main qui salue : `text="👋"`). Le moteur n'a ni pictogrammes ni émojis, et la consigne du motion designer trouve cheap les icônes qui flottent : à voir avec Tristan.
 - **Si rien ne s'y prête** : le mot seul.
 
 ### 6. Sa silhouette d'un seul ton, de profil, qui fait un geste

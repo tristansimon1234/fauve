@@ -2121,7 +2121,7 @@ test("« Plans fixes de cinéma » (v3): horizontal 4:3 on black as its original
 function sceneAt(code: string, frame: number, props: Record<string, unknown>, parts: { x: number; y: number; w: number; h: number }[] = []): Drawn {
   const h = (type: unknown, p: Record<string, unknown> | null, ...children: unknown[]): Drawn => ({ type, props: p ?? {}, children: children.flat() });
   const interpolate = (x: number, [a, b]: number[], [c, d]: number[]) => c! + (d! - c!) * Math.min(1, Math.max(0, (x - a!) / (b! - a! || 1)));
-  const scope: Record<string, unknown> = { React: { createElement: h, Fragment: "Fragment" }, useCurrentFrame: () => frame, interpolate, AbsoluteFill: "AbsoluteFill", Footage: "Footage", FitText: "FitText", SubjectParts: () => parts };
+  const scope: Record<string, unknown> = { React: { createElement: h, Fragment: "Fragment" }, useCurrentFrame: () => frame, interpolate, AbsoluteFill: "AbsoluteFill", Footage: "Footage", FitText: "FitText", SubjectParts: () => parts, Flash: "Flash", Burn: "Burn", WindowStar: "WindowStar" };
   const Scene = new Function(...Object.keys(scope), `${code}\nreturn Scene;`)(...Object.values(scope)) as (p: unknown) => Drawn;
   return Scene({ width: 1080, height: 1920, durationInFrames: 451, brand: { displayFont: "Bodoni Moda", bodyFont: "Jost" }, reelTexts: [], end: null, ...props });
 }
@@ -2215,13 +2215,18 @@ test("« Une journée chez toi » (v2): horizontal 4:3 on black as its original 
   assert.equal(drawsSubject(journee.code), false);
   assert.deepEqual(objectsDrawn(journee.code), []);
   assert.deepEqual(objectsDrawn(skillCode(journee, { pareilles: "every jar" })), [{ shot: 1, name: "every jar" }]);
-  // A flash overexposes the cut (never a white card), a burn lays its light in screen; no zoom, no grain, no dark corners.
+  // A flash overexposes its cuts (the picture kit's Flash expose, never a white card: its film image doubled at 30 i/s
+  // lit before it), a burn lays its light in screen around its three cuts (Burn, its images as measured); her footage
+  // itself unfiltered; no zoom, no grain, no dark corners.
   const flash = drawnIn(frameBox(sceneAt(journee.code, 93, { shots: shots(16 / 9), texts: marks })));
-  assert.match(String(style(flash.find((d) => d.type === "Footage")!).filter), /brightness\(1\.35\)/);
-  assert.ok(flash.some((d) => style(d)?.mixBlendMode === "screen" && style(d)?.background === "#ffffff" && Number(style(d)?.opacity) < 0.3));
-  const burnt = drawnIn(frameBox(sceneAt(journee.code, 189, { shots: shots(16 / 9), texts: marks })));
-  assert.ok(burnt.some((d) => style(d)?.mixBlendMode === "screen" && /rgba\(255,96,64/.test(String(style(d)?.background))));
-  assert.ok(!/\b(Flash|Whip|ZoomThrough|Subject)\b|scale\(1\.0/.test(journee.code));
+  const lit = flash.find((d) => d.type === "Flash")!;
+  assert.deepEqual([lit.props.at, lit.props.expose, lit.props.before], [[93, 106, 263, 273, 283], true, 2]);
+  assert.equal(style(flash.find((d) => d.type === "Footage")!).filter, undefined);
+  const burns = flash.filter((d) => d.type === "Burn");
+  assert.deepEqual(burns.map((d) => d.props.at), [191, 213, 293]);
+  assert.match(JSON.stringify(burns[0]!.props.steps), /rgba\(255,96,64/);
+  assert.deepEqual((burns[0]!.props.steps as unknown[][]).map((s) => s[0]), [-3, -2, -1]);
+  assert.ok(!/\b(Whip|ZoomThrough|Subject)\b|scale\(1\.0/.test(journee.code));
   assert.deepEqual(journee.finish, { grain: 0, vignette: 0 });
 });
 
@@ -2608,10 +2613,19 @@ test("« Éventail de bandes » (v2): horizontal 16:9 on black when her videos a
   // The kit pieces its code lays besides the stand-in scope's, as named elements too; its shot's heart when one is found.
   const run = (frame: number, props: Record<string, unknown>, heart: unknown = null) =>
     sceneAt(`const Paper = "Paper"; const Split = "Split"; const SubjectBox = () => (${JSON.stringify(heart)});\n${eventail.code}`, frame, { durationInFrames: Math.round(line.duration * 30), ...props });
+  const { starPath, starRays } = await import("../../../apps/render/src/picture-kit.ts");
   const style = (d: Drawn) => (d.props.style ?? {}) as Record<string, number | string>;
   const frameBox = (tree: Drawn) => tree.children[0] as Drawn;
   const clipped = (tree: Drawn, kind: string) => drawnIn(tree).find((d) => String(style(d).clipPath ?? "").startsWith(kind));
-  const windows = (tree: Drawn) => String(style(clipped(tree, "path")!).clipPath).match(/M[^MZ]*Z/g)!;
+  // Its star is the picture kit's WindowStar: its windows at a frame as the kit draws them (its square, then the bands
+  // landed by then, a beat apart; the original's six by default, turned a quarter upright).
+  const star = (tree: Drawn) => drawnIn(tree).find((d) => d.type === "WindowStar");
+  const windows = (tree: Drawn, frame: number) => {
+    const p = star(tree)!.props as { box: { x: number; y: number; w: number; h: number }; center: { x: number; y: number }; upright: boolean; at: number; every: number };
+    const S = Math.min(p.box.w, p.box.h);
+    const landed = starRays(S, p.upright).filter((_, k) => frame >= Math.round(p.at + (k + 1) * p.every));
+    return starPath(p.center, 0.094 * S, landed, p.box.w + p.box.h).match(/M[^MZ]*Z/g)!;
+  };
   // Her videos in width: the original's 16:9 frame, 1080 × 608 in the middle of the vertical frame, on black.
   assert.deepEqual([style(frameBox(run(60, { shots: shots(16 / 9), texts: marks }))).top, style(frameBox(run(60, { shots: shots(16 / 9), texts: marks }))).height], [656, 608]);
   // Upright videos: the whole frame; her setting prevails both ways.
@@ -2624,14 +2638,15 @@ test("« Éventail de bandes » (v2): horizontal 16:9 on black when her videos a
   const wide = (frame: number) => run(frame, { shots: shots(16 / 9), texts: marks });
   assert.equal((frameBox(wide(0)).children[0] as Drawn).type, "Paper");
   assert.equal((frameBox(wide(0)).children[0] as Drawn).props.color, "#440a0b");
-  assert.deepEqual([0, 14, 15, 50, 89, 90, 104].map((f) => windows(wide(f)).length), [1, 1, 2, 4, 6, 7, 7]);
-  const starShot = drawnIn(clipped(wide(50), "path")!).find((d) => d.type === "Footage")!;
+  assert.deepEqual([0, 14, 15, 50, 89, 90, 104].map((f) => windows(wide(f), f).length), [1, 1, 2, 4, 6, 7, 7]);
+  assert.deepEqual(star(wide(50))!.props.box, { x: 0, y: 0, w: 1080, h: 608 });
+  const starShot = drawnIn(star(wide(50))!).find((d) => d.type === "Footage")!;
   assert.deepEqual([starShot.props.shot, style(starShot).width, style(starShot).height], [0, 1080, 608]);
   assert.match(String(style(starShot).filter), /^grayscale\(1\)/);
   // Its square at the middle, 9,4 % of the short side; its diagonals 36° from the horizontal, its last two upright; each
   // half cut short of the square (its first band from 13,5 % of the short side).
   const point = (w: string, k: number) => w.match(/-?[\d.]+/g)!.map(Number).slice(2 * k, 2 * k + 2) as [number, number];
-  const [square, first, , , , upright] = windows(wide(104)) as [string, string, string, string, string, string];
+  const [square, first, , , , upright] = windows(wide(104), 104) as [string, string, string, string, string, string];
   assert.deepEqual(point(square, 0).map(Math.round), [511, 275]);
   assert.ok(Math.abs(Number(square.match(/h([\d.]+)/)![1]) - 0.094 * 608) < 0.1);
   const slope = (w: string) => {
@@ -2641,19 +2656,19 @@ test("« Éventail de bandes » (v2): horizontal 16:9 on black when her videos a
   assert.ok(Math.abs(slope(first) - 36) < 0.1 && Math.abs(slope(upright) - 90) < 0.1, `${slope(first)}°, ${slope(upright)}°`);
   assert.ok(Math.hypot(point(first, 0)[0] - 540, point(first, 0)[1] - 304) > 0.135 * 608);
   // Turned a quarter upright: its straight bands to the sides, its diagonals to the corners at 54°.
-  const tall = windows(run(104, { shots: shots(9 / 16), texts: marks }));
+  const tall = windows(run(104, { shots: shots(9 / 16), texts: marks }), 104);
   assert.ok(Math.abs(slope(tall[1]!) - 54) < 0.1 && Math.abs(slope(tall[5]!)) < 0.1, `${slope(tall[1]!)}°, ${slope(tall[5]!)}°`);
   // On her shot's heart when the filler named it and it was found small: read once, the star pulled within an eighth of
   // the frame; a heart that fills much of it (a whole bandstand) leaves the star at the middle.
-  assert.deepEqual(point(windows(run(30, { shots: shots(16 / 9), texts: marks }, { x: 800, y: 40, w: 40, h: 40 }))[0]!, 0).map(Math.round), [646, 199]);
-  assert.deepEqual(point(windows(run(30, { shots: shots(16 / 9), texts: marks }, { x: 100, y: 0, w: 900, h: 400 }))[0]!, 0).map(Math.round), [511, 275]);
+  assert.deepEqual(point(windows(run(30, { shots: shots(16 / 9), texts: marks }, { x: 800, y: 40, w: 40, h: 40 }), 30)[0]!, 0).map(Math.round), [646, 199]);
+  assert.deepEqual(point(windows(run(30, { shots: shots(16 / 9), texts: marks }, { x: 100, y: 0, w: 900, h: 400 }), 30)[0]!, 0).map(Math.round), [511, 275]);
   assert.deepEqual(objectsDrawn(eventail.code), []);
   assert.deepEqual(objectsDrawn(skillCode(eventail, { coeur: "pendant lamp" })), [{ shot: 0, name: "pendant lamp" }]);
   assert.equal(drawsSubject(eventail.code), false);
   // The whole shot at once on the drop, at the same place and size, in a thin frame of the ground laid over it (the
   // original's 14 px a side, 12 above and below, of 720 × 406), its blacks lifted to the blue black, its whites held.
   const dropped = wide(Number(marks.whole));
-  assert.equal(clipped(dropped, "path"), undefined);
+  assert.equal(star(dropped), undefined);
   const film = clipped(dropped, "inset")!;
   assert.equal(style(film).clipPath, "inset(18px 21px)");
   const whole = drawnIn(film).find((d) => d.type === "Footage")!;
@@ -3752,7 +3767,7 @@ test("« Ville en coups de fouet » (v2): horizontal 4:3 on black as its origina
 
 // ——— « Quart de tour, deux tons » v2 (`tourne`), written again on its original's fiche (docs/fiches/tourne.md) ——————
 
-/** Its composition run at one frame with a stand-in scope (Turn, Flash, Footage and FitText as named elements), as sceneAt does. */
+/** Its composition run at one frame with a stand-in scope (Turn, Flash, Footage, FitText and the picture kit's pieces as named elements), as sceneAt does. */
 function turnedAt(code: string, frame: number, props: Record<string, unknown>): Drawn {
   const h = (type: unknown, p: Record<string, unknown> | null, ...children: unknown[]): Drawn => ({ type, props: p ?? {}, children: children.flat() });
   const interpolate = (x: number, [a, b]: number[], [c, d]: number[]) => c! + (d! - c!) * Math.min(1, Math.max(0, (x - a!) / (b! - a! || 1)));
@@ -3766,6 +3781,9 @@ function turnedAt(code: string, frame: number, props: Record<string, unknown>): 
     FitText: "FitText",
     Turn: "Turn",
     Flash: "Flash",
+    Punch: "Punch",
+    Smear: "Smear",
+    LensEdges: "LensEdges",
   };
   const Scene = new Function(...Object.keys(scope), `${code}\nreturn Scene;`)(...Object.values(scope)) as (p: unknown) => Drawn;
   return Scene({ width: 1080, height: 1920, durationInFrames: 384, brand: { displayFont: "Big Shoulders Display", bodyFont: "Inter" }, reelTexts: [], end: null, ...props });
@@ -3855,11 +3873,12 @@ test("« Quart de tour, deux tons » (v2): every shot in width turned a quarter 
   const drawnShot = (turn: Drawn) => (turn.props.draw as (size: { width: number; height: number }) => Drawn)({ width: 1920, height: 1080 });
   assert.deepEqual(styleOf(drawnShot(at(100).turn!)), { position: "absolute", left: 0, top: 0, width: 1920, height: 1080 });
   assert.deepEqual([60, 30].map((f) => at(f, { texts: { ...marks, sens: "alterne" } }).turn?.props.angle), [-90, 90]);
-  // An upright video plays upright; in its slot for one (a silhouette on the sky), a half turn, unless she wants them upright.
+  // An upright video plays upright; in its slot for one (a silhouette on the sky), a half turn (the picture kit's Turn
+  // 180, drawn at the frame's size), unless she wants them upright.
   const upright = shots((i) => (i === 6 || i === 7 ? 9 / 16 : 16 / 9));
-  const turnedBack = (frame: number, texts = marks) => drawnIn(turnedAt(tourne.code, frame, { shots: upright, texts })).find((d) => styleOf(d).transform === "rotate(180deg)");
-  assert.equal(drawnIn(turnedBack(80)!).find((d) => d.type === "Footage")?.props.shot, 6);
-  assert.equal(drawnIn(turnedAt(tourne.code, 80, { shots: upright, texts: marks })).find((d) => d.type === "Turn"), undefined);
+  const turnedBack = (frame: number, texts = marks) => drawnIn(turnedAt(tourne.code, frame, { shots: upright, texts })).find((d) => d.type === "Turn" && d.props.angle === 180);
+  assert.equal(drawnShot(turnedBack(80)!).props.shot, 6);
+  assert.deepEqual(drawnIn(turnedAt(tourne.code, 80, { shots: upright, texts: marks })).filter((d) => d.type === "Turn").map((d) => d.props.angle), [180]);
   assert.equal(turnedBack(80, { ...marks, format: "droit" }), undefined);
   assert.equal(turnedBack(110), undefined);
   // Two tones on all but its colour shots, the strobe's images overexposed; all in two tones on her word.
@@ -3868,9 +3887,10 @@ test("« Quart de tour, deux tons » (v2): every shot in width turned a quarter 
   assert.match(at(30).filter, /^url\(#tourne-colour\)$/);
   assert.match(at(250).filter, /^url\(#tourne-colour\)$/);
   assert.match(at(30, { texts: { ...marks, couleur: "aucune" } }).filter, /^url\(#tourne-duo\)$/);
-  // Its lens edges on the shots in two tones, at the top and the bottom of the frame, none on a colour shot.
-  const edges = (f: number) => at(f).nodes.filter((d) => /url\(#tourne-edge-(top|bottom)\)/.test(String(styleOf(d).filter ?? ""))).map((d) => [styleOf(d).top, styleOf(d).height]);
-  assert.deepEqual(edges(100), [[0, 480], [1440, 480]]);
+  // Its lens edges (the picture kit's LensEdges, at the top and the bottom of the frame by default, 6 px apart at the
+  // top and 5 at the bottom) over its shots in two tones, none on a colour shot.
+  const edges = (f: number) => at(f).nodes.filter((d) => d.type === "LensEdges").map((d) => [d.props.axis ?? "y", d.props.size ?? 0.25, d.props.split]);
+  assert.deepEqual(edges(100), [["y", 0.25, [6, 5]]]);
   assert.deepEqual(edges(30), []);
   // Its passage blur into the close detail (the walker's last images, the cactus's first), its white flashes over the
   // first images of the shots they open, the shot under them overexposed.
@@ -3883,16 +3903,20 @@ test("« Quart de tour, deux tons » (v2): every shot in width turned a quarter 
   assert.equal(flash(153), undefined);
   assert.equal(flash(Math.round(line.shots[13]!.start * 30))?.frames, 1);
   assert.equal(flash(320)?.color, "rgba(250,248,251,0.9)");
-  // Its punch zoom in one shot: its first image wide, then ×2,3 about the middle, held (no zoom blur once it has landed).
+  // Its punch zoom in one shot (the picture kit's Punch from its cut, ×2,3 in eight images): its first image wide, then
+  // ×2,3 about the middle, held (no zoom blur once it has landed; punchCopies, tested with the kit).
   const zoomFrom = Math.round(line.shots[12]!.start * 30);
-  const scales = (f: number) => at(f).nodes.map((d) => /^scale\(([\d.]+)\)$/.exec(String(styleOf(d).transform ?? ""))?.[1]).filter(Boolean).map(Number);
-  assert.deepEqual(scales(zoomFrom), []);
-  assert.ok(Math.abs(scales(zoomFrom + 2)[0]! - 1.2) < 0.01, JSON.stringify(scales(zoomFrom + 2)));
-  assert.ok(scales(zoomFrom + 4).length >= 4, "a zoom blur while it rushes");
-  assert.deepEqual(scales(zoomFrom + 10).filter((s) => s > 1.5), [2.3, 2.3, 2.3]);
-  // Its filés: the opening's over all its images, its burst's whip on its first image and its last four, then a hard cut.
-  const streaked = (f: number) => at(f).nodes.some((d) => styleOf(d).filter === "url(#tourne-streak)");
+  const punch = at(zoomFrom + 2).nodes.find((d) => d.type === "Punch")!;
+  assert.deepEqual([punch.props.at, punch.props.frames, punch.props.scale], [zoomFrom, 8, 2.3]);
+  assert.equal(drawnIn(punch).find((d) => d.type === "Turn")?.props.angle, 90);
+  assert.equal(at(zoomFrom - 1).nodes.find((d) => d.type === "Punch"), undefined);
+  // Its filés (the picture kit's Smear, sliding along the height): the opening's over all its images, its burst's whip on
+  // its first image and its last four, then a hard cut.
+  const streaked = (f: number) => at(f).nodes.some((d) => d.type === "Smear");
   assert.deepEqual([10, 11, 13, 15, 16].map(streaked), [false, true, true, true, false]);
+  const smear = at(13).nodes.find((d) => d.type === "Smear")!.props;
+  assert.deepEqual([smear.direction, smear.blur, smear.travel, smear.scale], ["up", 46, 0.12, 1.3]);
+  assert.ok(Math.abs(Number(smear.progress) - 2.5 / 5) < 1e-9, JSON.stringify(smear));
   const whipFrom = Math.round(line.shots[24]!.start * 30);
   const whipTo = Math.round(line.shots[25]!.start * 30);
   assert.deepEqual([whipFrom, whipFrom + 1, whipTo - 5, whipTo - 4, whipTo - 1, whipTo].map(streaked), [true, false, false, true, true, false]);
@@ -4092,4 +4116,190 @@ test("« Écran partagé titré » (v2): its layout as a setting her words ask, 
   assert.deepEqual(plan.skill, { key: "ecran-partage", version: 2, settings: { format: "empile" } });
   // Its music shaped on the plan: without its bass to the third bar, cut dead at the end.
   assert.deepEqual(plan.music_shape, { filters: [{ kind: "thin", from: 0, to: 4, open: 0.02 }], end: { at: plan.duration, fade: 0.012 } });
+});
+
+// ——— The picture kit (apps/render/src/Picture.tsx and picture-kit.ts): image effects the models' fiches found missing ———
+
+test("picture kit: a camera's flash overexposes the picture as measured on « a day in PARIS », a film burn lays its light in screen round a cut", async () => {
+  const { burnSteps, exposeAt, rgbOf } = await import("../../../apps/render/src/picture-kit.ts");
+  // « Une journée chez toi »'s flash, its film image doubled at 30 i/s (two images lit before the brightest): ×1,2 and
+  // +14 % of white, ×1,35 and +18 % on the cut, ×1,18 and +13 % after, then nothing (docs/fiches/journee.md, effect 4).
+  assert.deepEqual([-3, -2, -1, 0, 1, 2].map((t) => exposeAt(t, 2, 2)), [null, [1.2, 0.14], [1.2, 0.14], [1.35, 0.18], [1.18, 0.13], null]);
+  // By default a single image before; half as strong; longer, its last images fading out, never darker than the picture.
+  assert.deepEqual([-2, -1].map((t) => exposeAt(t)), [null, [1.2, 0.14]]);
+  assert.deepEqual(exposeAt(0, 1, 2, 0.5), [1.175, 0.09]);
+  const long = [1, 2, 3].map((t) => exposeAt(t, 1, 4)!);
+  assert.ok(long[0]![0] > long[1]![0] && long[1]![0] > long[2]![0] && long[2]![0] > 1, JSON.stringify(long));
+  // A burn from the left (its colour in screen): a glow growing from that edge, the whole picture washed just before the
+  // cut in a paler colour, still washed on the new shot's first image, a rest of it in the bottom right corner after.
+  const steps = burnSteps({ from: "left", color: "#ff6040" });
+  assert.deepEqual(steps.map((s) => s[0]), [-4, -3, -2, -1, 0, 1]);
+  assert.match(steps[0]![1], /^radial-gradient\(ellipse 45% 90% at 0% 55%, rgba\(255,96,64,0\.9\)/);
+  assert.match(steps[1]![1], /^radial-gradient\(ellipse 75% 110% at 0% 55%/);
+  assert.match(steps[2]![1], /^linear-gradient\(to right, rgba\(255,96,64,0\.95\)/);
+  assert.deepEqual(steps.slice(3).map((s) => [s[1].slice(0, 35), s[2]]), [["#ffb7a9", 0.86], ["#ffb7a9", 0.62], ["radial-gradient(circle at 100% 100%", 1]]);
+  // From a corner, in her own wash, weaker; nothing to filter under it (only steps given by hand do: Une journée's first burn).
+  const corner = burnSteps({ from: "top-right", color: "#f8ecaa", wash: "#efe9b4", strength: 0.5 });
+  assert.match(corner[0]![1], /at 100% 0%/);
+  assert.match(corner[2]![1], /^linear-gradient\(to bottom left/);
+  assert.deepEqual([corner[3]![1], corner[3]![2]], ["#efe9b4", 0.43]);
+  assert.ok(steps.every((s) => s[3] === undefined));
+  assert.deepEqual([rgbOf("#abc"), rgbOf("#FF6040"), rgbOf("rouge")], [[170, 187, 204], [255, 96, 64], null]);
+});
+
+test("picture kit: a punch zoom inside one shot as « Quart de tour »'s (×1,06, ×1,2, ×1,41… to ×2,3 in eight images), its lens edges' band", async () => {
+  const { edgeFade, punchAt, punchCopies } = await import("../../../apps/render/src/picture-kit.ts");
+  assert.deepEqual([0, 1, 2, 3, 8, 12].map((t) => Math.round(punchAt(t) * 100) / 100), [1, 1.06, 1.2, 1.41, 2.3, 2.3]);
+  // Its first image wide (and before it, the shot as it is); four copies while it rushes, the first the picture itself;
+  // held at ×2,3 without them once it has landed; no blur on demand.
+  assert.deepEqual([punchCopies(-5), punchCopies(0)], [[], []]);
+  const rushing = punchCopies(4);
+  assert.deepEqual(rushing.map((c) => c.opacity), [1, 0.3, 0.3, 0.3]);
+  assert.ok(rushing[0]!.scale === punchAt(4) && rushing[3]!.scale > rushing[1]!.scale, JSON.stringify(rushing));
+  assert.deepEqual(punchCopies(10), [{ scale: 2.3, opacity: 1 }]);
+  assert.deepEqual(punchCopies(4, 8, 2.3, false), [{ scale: punchAt(4), opacity: 1 }]);
+  // A lens edge's band: its outermost 8 px left to the picture, full to a third of the band, faded out at its end.
+  assert.equal(edgeFade("top"), "linear-gradient(to bottom, transparent 0px, #000 8px, #000 32%, transparent 100%)");
+  assert.equal(edgeFade("right", 4, 0.5), "linear-gradient(to left, transparent 0px, #000 4px, #000 50%, transparent 100%)");
+});
+
+test("picture kit: a star of windows onto one shot as « Éventail de bandes »'s, its square, its six bands cut square round it", async () => {
+  const { starPath, starRays } = await import("../../../apps/render/src/picture-kit.ts");
+  const S = 608;
+  const rays = starRays(S);
+  // « \ », « / », then « | », each in two halves; turned a quarter in a vertical frame.
+  assert.deepEqual(rays.map((r) => r.angle), [36, 216, 144, 324, 270, 90]);
+  assert.deepEqual(starRays(S, true).map((r) => r.angle), [126, 306, 234, 414, 360, 180]);
+  assert.ok(Math.abs(rays[0]!.width - 0.14 * S) < 1e-9 && Math.abs(rays[4]!.width - 0.155 * S) < 1e-9);
+  assert.ok(Math.abs(rays[0]!.from - 0.135 * S) < 1e-9 && Math.abs(rays[5]!.from - 0.115 * S) < 1e-9);
+  const c = { x: 540, y: 304 };
+  assert.equal(starPath(c, 0.094 * S, [], 1688), "M511.4 275.4 h57.2 v57.2 h-57.2 Z");
+  assert.equal(starPath(c, 0, [], 1688), "");
+  const all = starPath(c, 0.094 * S, rays, 1688).match(/M[^MZ]*Z/g)!;
+  assert.equal(all.length, 7);
+  // Each band starts square at its distance from the centre (the middle of its inner end), whatever its angle.
+  all.slice(1).forEach((w, k) => {
+    const v = w.match(/-?[\d.]+/g)!.map(Number);
+    const mid = { x: (v[0]! + v[6]!) / 2, y: (v[1]! + v[7]!) / 2 };
+    assert.ok(Math.abs(Math.hypot(mid.x - c.x, mid.y - c.y) - rays[k]!.from) < 0.15, `band ${k}: ${w}`);
+  });
+  // A band growing out from its inner end: half its way at 0.5, whole at 1.
+  const half = starPath(c, 0, [{ ...rays[0]!, grow: 0.5 }], 1688).match(/-?[\d.]+/g)!.map(Number);
+  assert.ok(Math.abs(Math.hypot(half[2]! - half[0]!, half[3]! - half[1]!) - (1688 - rays[0]!.from) / 2) < 0.2, JSON.stringify(half));
+  assert.equal(starPath(c, 0, [{ ...rays[0]!, grow: 1 }], 1688), starPath(c, 0, [rays[0]!], 1688));
+});
+
+test("picture kit: tiles land as « Mosaïque qui change »'s prints, askew one way then the other, a pixel or three off, then straight", async () => {
+  const { landPose } = await import("../../../apps/render/src/picture-kit.ts");
+  const poses = Array.from({ length: 12 }, (_, rank) => landPose(rank, 0, rank, 12, "tiles"));
+  poses.forEach((p, i) => {
+    assert.equal(Math.sign(p.angle), i % 2 ? 1 : -1, `tile ${i}: the first counterclockwise, then alternating`);
+    assert.ok(Math.abs(p.angle) >= 0.4 && Math.abs(p.angle) <= 1.6, JSON.stringify(p));
+    assert.ok(Math.abs(p.dx) <= 3 && Math.abs(p.dy) <= 3, JSON.stringify(p));
+  });
+  // The next picture goes on alternating across the grid (12 tiles: it starts as the first did; 11: the other way).
+  assert.equal(Math.sign(landPose(0, 1, 0, 12, "tiles").angle), -1);
+  assert.equal(Math.sign(landPose(0, 1, 0, 11, "tiles").angle), 1);
+  assert.deepEqual(landPose(5, 2, 7, 12, "x"), landPose(5, 2, 7, 12, "x"));
+});
+
+test("picture kit: a fade by light as the pile of « this is Joe Taylor » goes, the dark first, the white of a plate last", async () => {
+  const { lumaMatrix, lumaProgress } = await import("../../../apps/render/src/picture-kit.ts");
+  // The alpha its matrix gives a grey point of light L (its last row: three weights, then its offset).
+  const alpha = (m: string, L: number) => {
+    const v = m.trim().split(/\s+/).map(Number);
+    return Math.max(0, Math.min(1, (v[15]! + v[16]! + v[17]!) * L + v[19]!));
+  };
+  assert.deepEqual([3, 4, 5, 7, 8, 9].map((f) => lumaProgress(f, 4, 4)), [0, 0.2, 0.4, 0.8, 1, 1]);
+  assert.deepEqual([3, 4, 8].map((f) => lumaProgress(f, 4, 4, "in")), [1, 0.8, 0]);
+  // Before it, all there; on its first image its darkest points already half gone, the light ones whole; then only the
+  // brightest; at its end nothing, the white too. Its colours are kept.
+  assert.equal(alpha(lumaMatrix(0), 0), 1);
+  const first = lumaMatrix(0.2);
+  assert.ok(alpha(first, 0.05) > 0.2 && alpha(first, 0.05) < 0.6 && alpha(first, 0.8) === 1, first);
+  const third = lumaMatrix(0.6);
+  assert.ok(alpha(third, 0.3) === 0 && alpha(third, 0.95) === 1, third);
+  assert.ok(alpha(lumaMatrix(1), 1) < 1e-3);
+  assert.match(lumaMatrix(0.4), /^1 0 0 0 0 {2}0 1 0 0 0 {2}0 0 1 0 0 {2}/);
+  // Inverted: the light goes first.
+  const inverted = lumaMatrix(0.5, 0.35, true);
+  assert.ok(alpha(inverted, 0.95) < alpha(inverted, 0.1), inverted);
+});
+
+test("picture kit: an echo's copies, a cut-out's shadow from her feet, a dot grid's build, a pass in characters by light", async () => {
+  const { cellRamp, dotOrder, echoCopies, glyphTile, shadowPose, tileImage } = await import("../../../apps/render/src/picture-kit.ts");
+  // The echo of « Présente-toi »: its copies the oldest first, paler and paler, a gap of images apart.
+  assert.deepEqual(echoCopies(4, 1, 0.6), [
+    { back: 4, k: 4, opacity: 0.13 },
+    { back: 3, k: 3, opacity: 0.216 },
+    { back: 2, k: 2, opacity: 0.36 },
+    { back: 1, k: 1, opacity: 0.6 },
+  ]);
+  assert.deepEqual(echoCopies(3, 2).map((c) => c.back), [6, 4, 2]);
+  assert.deepEqual(echoCopies(0), []);
+  // Aplat's walker: his shadow from his feet (the bottom middle of his box), flattened and slanted (its v1's 0.26 and
+  // 38°), toward one side or the other; or dropped behind him.
+  const her = { x: 350, y: 560, w: 420, h: 1100 };
+  assert.deepEqual(shadowPose(her), { transformOrigin: "560px 1660px", transform: "skewX(38deg) scaleY(-0.26)" });
+  assert.deepEqual(shadowPose(her, "cast", 38, 0.3, "left"), { transformOrigin: "560px 1660px", transform: "skewX(-38deg) scaleY(-0.3)" });
+  assert.deepEqual(shadowPose(her, "drop", 0, 0, "right", 14, 18), { transformOrigin: "0 0", transform: "translate(14px, 18px)" });
+  // A dot grid builds from the bottom up (with some scatter), in reading order, or from the top down.
+  const cols = 8;
+  const rows = 10;
+  const mean = (build: "rise" | "fall", r: number) => Array.from({ length: cols }, (_, c) => dotOrder(build, c, r, cols, rows, "d")).reduce((a, b) => a + b) / cols;
+  assert.ok(mean("rise", rows - 1) < mean("rise", 0) && mean("fall", 0) < mean("fall", rows - 1));
+  assert.deepEqual([dotOrder("reading", 0, 0, cols, rows, "d"), dotOrder("reading", 7, 9, cols, rows, "d")], [0, 1]);
+  for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) assert.ok(dotOrder("random", c, r, cols, rows, "d") < 1);
+  // A pass in characters (« Vision »'s cells of 4 × 8 px): a cell inks more of itself as its light rises, a dot first,
+  // never its margin (letters do not touch); in dots, a disc from its middle.
+  const tile = glyphTile(4, 8);
+  assert.equal(tile.length, 32);
+  for (let y = 0; y < 8; y++) assert.equal(tile[y * 4 + 3], 1);
+  for (let x = 0; x < 4; x++) assert.equal(tile[7 * 4 + x], 1);
+  const inked = (L: number) => tile.filter((v) => v < L).length;
+  assert.deepEqual([inked(0.1), inked(0.5), inked(0.99)], [1, 9, 21]);
+  const dots = glyphTile(7, 7, "dots");
+  assert.ok(dots[3 * 7 + 3]! < dots[3 * 7 + 1]! && dots[3 * 7 + 1]! < dots[0]!);
+  const image = tileImage(tile, 4, 8);
+  assert.match(image, /^data:image\/svg\+xml;utf8,/);
+  assert.equal(decodeURIComponent(image).match(/<rect /g)!.length, 32);
+  // Its light read once per cell: a tiled displacement map sends every pixel of a cell to the cell's middle (red the
+  // x, green the y, over twice the cell's longer side), each shift within a tenth of a pixel once its colour is rounded.
+  const ramp = cellRamp(4, 8);
+  assert.equal(ramp.scale, 16);
+  assert.deepEqual([ramp.shifts[0], ramp.shifts[4 * 4 + 2], ramp.shifts[31]], [[2, 4], [0, 0], [-1, -3]]);
+  const colours = [...decodeURIComponent(ramp.href).matchAll(/rgb\((\d+),(\d+),0\)/g)].map((m) => [Number(m[1]), Number(m[2])]);
+  assert.equal(colours.length, 32);
+  colours.forEach(([r, g], i) => assert.ok(Math.abs((r! / 255 - 0.5) * 16 - ramp.shifts[i]![0]) < 0.1 && Math.abs((g! / 255 - 0.5) * 16 - ramp.shifts[i]![1]) < 0.1, `pixel ${i}`));
+});
+
+test("picture kit: one piece of an object alone (Subject part) is cut as « Titre derrière le décor » cut it by hand, unless read apart", async () => {
+  const { pieceInset } = await import("../../../apps/render/src/picture-kit.ts");
+  // Its box and a pad of 1,2 % of the box's height round it, as the model's own inset (p.y − pad, the right, the bottom, p.x − pad).
+  const laid = { left: 0, top: 0, width: 1080, height: 810 };
+  assert.equal(pieceInset({ x: 300, y: 200, w: 120, h: 340 }, laid, Math.max(2, Math.round(810 * 0.012))), "inset(190px 650px 260px 290px)");
+  assert.equal(pieceInset({ x: 300, y: 200, w: 120, h: 340 }, { left: 40, top: 100, width: 1000, height: 700 }, 0), "inset(100px 620px 260px 260px)");
+  assert.equal(pieceInset(undefined, laid), null);
+  assert.equal(pieceInset({ x: 1, y: 1, w: 0, h: 5 }, laid), null);
+});
+
+test("picture kit: its pieces are in the motion designer's scope and prompt, the renderer's and the scene check's", async () => {
+  const { readFileSync } = await import("node:fs");
+  const { MOTION_DESIGNER_PROMPT, MOTION_SCOPE } = await import("./motion-scene.ts");
+  const read = (path: string) => readFileSync(new URL(path, import.meta.url), "utf8");
+  const picture = read("../../../apps/render/src/Picture.tsx");
+  for (const name of ["Burn", "LensEdges", "Smear", "Punch", "WindowStar", "LumaFade", "Echo", "CastShadow", "DotGrid", "Ascii"]) {
+    assert.ok((MOTION_SCOPE as readonly string[]).includes(name), name);
+    assert.match(MOTION_DESIGNER_PROMPT, new RegExp(`<${name}\\b`), name);
+    assert.match(picture, new RegExp(`\\b${name}(: ${name}Of\\(hooks\\)|,)`), `${name} in makePicture`);
+  }
+  // Its additions to existing pieces: the flash that overexposes, the half turn, the reading wave and the landing tiles, one piece of an object.
+  assert.match(MOTION_DESIGNER_PROMPT, /<Flash at=\{\[frames\]\} expose/);
+  assert.match(MOTION_DESIGNER_PROMPT, /<Turn draw angle=\{180\} \/>/);
+  assert.match(MOTION_DESIGNER_PROMPT, /wave: "reading"[^\n]*reveal: "land"/);
+  assert.match(MOTION_DESIGNER_PROMPT, /object="every window" part=\{k\}/);
+  // The scene check draws them on its own clock, as the other kits.
+  assert.match(read("../../../apps/render/src/SceneCheck.tsx"), /\.\.\.makePicture\(\{ useCurrentFrame, useVideoConfig \}\)/);
+  assert.match(read("../../../apps/render/src/Graphic.tsx"), /angle\?: 90 \| -90 \| 180/);
+  assert.match(read("../../../apps/render/src/Kit.tsx"), /\| "reading";/);
 });

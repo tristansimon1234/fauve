@@ -108,17 +108,17 @@ const bpm = values.bpm ? Math.round(Math.min(140, Math.max(60, Number(values.bpm
 const plan = skillPlan({ skill, name: model?.name ?? skill.key, files, fill, ...(bpm ? { bpm } : {}) });
 const fonts = (values.fonts || "").split(",").map((f) => f.trim()).filter(Boolean);
 // The cut-outs of its objects, laid on their shots' passages as the render workshop gets them (by passage and name).
-const subjects: Record<string, { src: string; boxes?: (number[] | null)[]; contours?: (number[] | null)[]; parts?: number[]; clear?: ClearMap }> = {};
+const subjects: Record<string, { src: string; boxes?: (number[] | null)[]; contours?: (number[] | null)[]; parts?: number[]; pieces?: ((number[] | null)[] | null)[]; clear?: ClearMap }> = {};
 for (const [shot, o] of Object.entries(JSON.parse(values.objects ?? "{}") as Record<string, { src: string; result: string; id: string }>)) {
   const segment = plan.segments.filter(isClipSegment)[Number(shot)];
   // Named as the engine reads it: Subject or Outline given `object`, or SubjectBox, SubjectOutline, SubjectParts given a name.
   const name = objectsDrawn(plan.layers?.[0]?.motion.js).find((o) => o.shot === Number(shot))?.name;
   if (!segment || !name) throw new Error(`--objects: no named object on shot ${shot}`);
-  const reading = (JSON.parse(readFileSync(resolve(o.result), "utf8")) as Record<string, { boxes?: (number[] | null)[]; contours?: (number[] | null)[]; parts?: number[] }>)[o.id];
+  const reading = (JSON.parse(readFileSync(resolve(o.result), "utf8")) as Record<string, { boxes?: (number[] | null)[]; contours?: (number[] | null)[]; parts?: number[]; pieces?: ((number[] | null)[] | null)[] }>)[o.id];
   if (!reading) throw new Error(`--objects: no « ${o.id} » in ${o.result}`);
   const target = `${media}/object-${shot}-${createHash("sha1").update(resolve(o.src)).digest("hex").slice(0, 8)}.webm`;
   execFileSync("cp", [resolve(o.src), target]);
-  subjects[objectKey(segment.clip_id, segment.in, segment.out, name)] = { src: `/public/jobs/${job}/${basename(target)}`, ...(reading.boxes ? { boxes: reading.boxes } : {}), ...(reading.contours ? { contours: reading.contours } : {}), ...(reading.parts ? { parts: reading.parts } : {}) };
+  subjects[objectKey(segment.clip_id, segment.in, segment.out, name)] = { src: `/public/jobs/${job}/${basename(target)}`, ...(reading.boxes ? { boxes: reading.boxes } : {}), ...(reading.contours ? { contours: reading.contours } : {}), ...(reading.parts ? { parts: reading.parts } : {}), ...(reading.pieces ? { pieces: reading.pieces } : {}) };
   console.log(`object « ${name} » on shot ${shot}: ${reading.parts ? reading.parts.length / 4 : 0} pieces`);
 }
 // Where its texts are set in her shots (ClearBox): their clear areas read on her own files, as the engine reads them.

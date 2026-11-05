@@ -141,8 +141,21 @@ export const gpuReady = () => Boolean(env("MODAL_TOKEN_ID") && env("MODAL_TOKEN_
 /** A passage to cut out: its clip (signed), its seconds, and where its cut-out is sent (signed upload links). */
 export type GpuPassage = { key: string; url: string; from: number; to: number; upload: { webm: string; png: string } };
 /** A passage cut out on the card (its file already sent to its upload link). */
-/** `parts`: an object's pieces (the letters of a sign, each window of « every window ») as shares of its box where it was found (x, y, w, h, flat). */
-export type GpuCut = { still: boolean; frames: number; keys: number; people: boolean; top?: number; boxes?: (number[] | null)[]; contours?: (number[] | null)[]; parts?: number[] };
+/**
+ * `parts`: an object's pieces (the letters of a sign, each window of « every window ») as shares of its box where it was
+ * found (x, y, w, h, flat); `pieces`: in the same order, the outline of each one at every image when its box overlaps
+ * another's (null for one its box is enough for), so an animation draws one alone (Subject part).
+ */
+export type GpuCut = { still: boolean; frames: number; keys: number; people: boolean; top?: number; boxes?: (number[] | null)[]; contours?: (number[] | null)[]; parts?: number[]; pieces?: PieceOutlines };
+/** Each piece's outline at every image (flat x, y shares), or null for a piece its box is enough for. */
+export type PieceOutlines = ((number[] | null)[] | null)[];
+
+/** The pieces' outlines of a reading, kept only when they are what the card writes (anything else: none). */
+export function pieceOutlines(v: unknown): PieceOutlines | undefined {
+  if (!Array.isArray(v) || !v.some((p) => p !== null)) return undefined;
+  const outline = (c: unknown) => c === null || (Array.isArray(c) && c.every((x) => typeof x === "number" && Number.isFinite(x)));
+  return v.every((p) => p === null || (Array.isArray(p) && p.every(outline))) ? (v as PieceOutlines) : undefined;
+}
 /** A photo to cut out: its media id, the photo (signed), and where its cut-out is sent (signed upload links, WebP and PNG). */
 export type GpuPhoto = { key: string; url: string; upload: { webp: string; png: string } };
 /** A photo cut out on the card (its file already sent), with what it is like, as the cut-out sandbox reads it. */
@@ -438,6 +451,7 @@ export async function objectsOnGpu(
             ...(Array.isArray(r.boxes) ? { boxes: r.boxes as (number[] | null)[] } : {}),
             ...(Array.isArray(r.contours) ? { contours: r.contours as (number[] | null)[] } : {}),
             ...(Array.isArray(r.parts) && r.parts.length >= 8 && r.parts.every((v) => typeof v === "number") ? { parts: r.parts as number[] } : {}),
+            ...(pieceOutlines(r.pieces) ? { pieces: pieceOutlines(r.pieces) } : {}),
           };
   }
   return { results, clears: read, seconds, gpu };
