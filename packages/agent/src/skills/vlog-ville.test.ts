@@ -284,3 +284,31 @@ test("« Ta ville racontée » (v1): a voice laid over it is written in its subt
   assert.equal(sub(250), WORDS.l3);
   assert.notEqual(sub(30), "Chaque quartier a son rythme");
 });
+
+test("« Ta ville racontée » (v1): a voice note laid on its plan reaches its code as spoken, the engine's subtitles stepping aside under it", async () => {
+  const { buildReelProps } = await import("../motion.ts");
+  const files = Array.from({ length: 11 }, (_, i) => ({ id: `v${i}`, photo: false, seconds: 16, aspect: 16 / 9 }));
+  const fill = { shots: Array.from({ length: 31 }, (_, i) => ({ file: files[i % files.length]!.id, at: Math.floor(i / files.length) * 5 })), texts: WORDS, end: null };
+  const plan = skillPlan({ skill: vlogVille, name: "Ta ville racontée", files, fill });
+  // As a voice laid over a model would put it (chantier B): her voice note from the Reel's start, subtitled.
+  const voiced = { ...plan, subtitles: true, voice: { media_id: "voice", at: 0 } };
+  const words = [
+    { w: "Chaque", start: 0.6, end: 0.8 },
+    { w: "rue", start: 0.8, end: 1.0 },
+    { w: "a", start: 1.0, end: 1.1 },
+    { w: "son", start: 1.1, end: 1.3 },
+    { w: "pas.", start: 1.3, end: 1.7 },
+  ];
+  const props = buildReelProps(voiced, {
+    template: "libre",
+    clipUrls: Object.fromEntries(files.map((f) => [f.id, `/${f.id}.mp4`])),
+    photoIds: [],
+    aspects: Object.fromEntries(files.map((f) => [f.id, f.aspect])),
+    brand: { name: "Café des Arts" },
+    voice: { src: "/voice.mp3", words },
+  } as never);
+  const layer = props.layers!.find((l) => l.compose)!;
+  // Its code writes what is said (it reads spoken): the words, each at its frame; the engine's own subtitles step aside.
+  assert.deepEqual(layer.spoken?.map((w) => [w.w, w.from]), words.map((w) => [w.w, Math.round(w.start * 30)]));
+  assert.equal(layer.captionsStay, undefined);
+});
