@@ -3,7 +3,8 @@ import type { EffectPiece } from "../pieces.ts";
 // « Montage sport noir et blanc », the effect (its whole Reel is skills/nike.ts, written on its original: the sports
 // edit in the left part of a tutorial, looked at image by image; no fiche of its own). Over a run of her shots with
 // movement, the words' section of its Reel: each shot in a very contrasted black and white (its model's finish drawn
-// here too, on its own shots only: its contrast, its grain, its dark corners), a word per shot in red condensed
+// here too, on its own shots only: its contrast, its grain, its dark corners; a dark shot of hers lifted first, its
+// light read before the render, so a gym at night is contrasted rather than black), a word per shot in red condensed
 // capitals at the middle of the frame, landing on its cut with two images in negative where the word is black; its
 // first word lands through its opening strobe (two images red, three in negative, two red); one shot in four all red
 // (multiplied), its word white; its quick shots held image by image, the jerky slow motion of a sports ad (Footage
@@ -14,7 +15,7 @@ import type { EffectPiece } from "../pieces.ts";
 // colour takes the red's place on her word. It leaves the rest of its Reel: its burst of later shots flashed ahead,
 // its title on black, its black and its ending card. Nothing of the original's own: no swoosh, no slogan, her words.
 
-/** Its red (the original's), its condensed capitals, and a quick shot (frames: a beat and an image at most, held image by image). */
+/** Its code: a layer over the run of shots under it (the contract at the top of pieces.ts). */
 const CODE = String.raw`function Scene({ width, height, durationInFrames, brand, shots, texts, track }) {
   const h = React.createElement;
   const frame = useCurrentFrame();
