@@ -100,7 +100,7 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const CONDENSED = /condensed|narrow|compressed|bebas|anton|oswald|league gothic|big shoulders|fjalla|teko|six caps|antonio|pathway gothic|alumni sans|staatliches|smooch sans|bayon/i;
   const face = String(brand.displayFont || "");
   const display = CONDENSED.test(face) ? "'" + face + "', 'Big Shoulders Display', 'Arial Narrow', sans-serif" : "'Big Shoulders Display', '" + face + "', 'Arial Narrow', sans-serif";
-  const keep = (t) => String(t || "").replace(/(\d) (?=\d)/g, "$1 ");
+  const keep = (t) => String(t || "").replace(/(\d) (?=\d)/g, "$1\u00a0");
   const stacked = (text) => {
     const words = text.split(/[ \t\n]+/).filter(Boolean);
     if (text.length <= 11 || words.length < 2) return text;
