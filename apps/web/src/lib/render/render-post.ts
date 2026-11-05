@@ -58,7 +58,7 @@ import { ensureDepths, ensureObjects, ensureSubjects, subjectInputs } from "./su
 import { ensureReliefs, reliefInputs } from "./relief";
 import { smoothSlowMotion } from "./smooth";
 import { ensureCleanCopies } from "@/lib/video/speech";
-import { loadTracks } from "./tracks";
+import { ensureTracks, loadTracks } from "./tracks";
 import { postStyle } from "@/lib/steal";
 import { renderInSandbox, renderReelInSandbox, sandboxCostEur, smokeTestScenes, type SceneChecks } from "./sandbox";
 import { costMeta } from "@/lib/cost-scope";
@@ -368,14 +368,25 @@ export async function prepareRenderAssets(studioId: string, postId: string, plan
   if (subjectPhotoIds(plan).length) await ensureCutoutContours(studioId, subjectPhotoIds(plan));
   // A composition that draws her subject over her shots (Subject): its passages cut out at every image, as many as
   // the step has time for before its render.
+  // A model's sound on her gesture (a click as her hand touches the switch) lands where her hands do it: the shots it is
+  // read on followed first (once per clip, the cut-out sandbox; a clip with nobody in it is not).
+  const gestures = [
+    ...new Set(
+      (plan.sounds ?? []).flatMap((c) => {
+        const s = c.hand ? plan.segments[c.hand.shot] : undefined;
+        return s && isClipSegment(s) ? [s.clip_id] : [];
+      }),
+    ),
+  ];
   // The objects its compositions follow by name (a cup she lifts), on the rented card, at the same time (and in the same
-  // machine, the clear areas of the shots their texts are set in: ClearBox), the shots they show in depth (Depth), and
-  // its moving photos drawn in relief by their depth.
+  // machine, the clear areas of the shots their texts are set in: ClearBox), the shots they show in depth (Depth), its
+  // moving photos drawn in relief by their depth, and the hands its gestures' sounds are read on.
   await Promise.all([
     wantsSubjects(plan) ? ensureSubjects(studioId, postId, plan) : null,
     wantsObjects(plan) || wantsClear(plan) ? ensureObjects(studioId, postId, plan) : null,
     wantsDepth(plan) ? ensureDepths(studioId, postId, plan) : null,
     depthPhotoIds(plan).length ? ensureReliefs(studioId, postId, plan).catch((e: unknown) => console.warn("reliefs unavailable", e instanceof Error ? e.message : e)) : null,
+    gestures.length ? ensureTracks(studioId, gestures).catch((e: unknown) => console.warn("tracks for its gestures' sounds unavailable", e instanceof Error ? e.message : e)) : null,
   ]);
 }
 
@@ -441,7 +452,7 @@ export async function renderPost(studioId: string, postId: string, options: { ed
       durationMs = Math.round(plan.duration * 1000);
     } else if (motion.success) {
       const sfxLevel = post.kind === "reel" || post.kind === "story" ? await soundLevel(studioId, postId).catch(() => "off" as const) : "off";
-      const cues = sfxLevel === "off" ? [] : planCues(plan, planTimeline(plan).segments);
+      const cues = sfxLevel === "off" ? [] : planCues(plan, planTimeline(plan).segments, tracks);
       if (cues.length) {
         sounds.library = await ensureSounds({ studioId, postId, cues }).catch((error: unknown) => {
           console.warn("sound effects unavailable, none on this Reel", renderId, error);
@@ -546,11 +557,16 @@ export async function renderPost(studioId: string, postId: string, options: { ed
           sounds.library,
         ).catch(() => [])
       : [];
-    // The sound of her videos kept all along with nobody speaking (finish.video_sound « all ») stays under it as an ambience.
-    const ambient =
-      plan.finish?.video_sound === "all" &&
-      !plan.voice &&
-      !plan.segments.some((s) => isClipSegment(s) && (words[s.clip_id] ?? []).some((w) => w.start >= s.in && w.end <= s.out));
+    // The sound of her videos kept all along with nobody speaking (finish.video_sound « all ») stays under it as an ambience;
+    // a model's shots that keep their own sound (a skill's `sound` shots), nobody speaking in its Reel, are heard on their
+    // shot, the music stepping back under them.
+    const spoken = plan.segments.some((s) => isClipSegment(s) && (words[s.clip_id] ?? []).some((w) => w.start >= s.in && w.end <= s.out));
+    const ambient: boolean | "shots" =
+      plan.finish?.video_sound === "all"
+        ? !plan.voice && !spoken
+        : !plan.voice && !spoken && plan.finish?.video_sound !== "none" && plan.segments.some((s) => isClipSegment(s) && s.sound && !s.speed)
+          ? "shots"
+          : false;
     const voiced = await withMusic({ studioId, postId, kind: post.kind as PostKind, plan, mp4, renderId, fresh: options.freshMusic, sounds: effects, ambient }).catch((error: unknown) => {
       console.warn("music unavailable, silent Reel", renderId, error);
       return { mp4, music: "none" as const };

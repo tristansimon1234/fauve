@@ -218,11 +218,21 @@ export async function saveEditPlan(postId: string, input: unknown): Promise<Save
   if (plan.layers) plan.layers = plan.layers.map((l) => ({ ...l, motion: withKnownFonts(l.motion) }));
   // The editor's sounds and its music's shape stay those of the version she edits, never the browser's.
   const { data: current } = await db.from("posts").select("edit_plan_id").eq("id", postId).maybeSingle();
-  const edited = (versions ?? []).find((v) => v.id === current?.edit_plan_id)?.plan as { sounds?: SfxCue[]; music_shape?: MusicShape; skill?: EditPlan["skill"] } | undefined;
+  const edited = (versions ?? []).find((v) => v.id === current?.edit_plan_id)?.plan as
+    | { sounds?: SfxCue[]; music_shape?: MusicShape; skill?: EditPlan["skill"]; segments?: { clip_id?: string; in?: number; sound?: boolean }[] }
+    | undefined;
   delete plan.sounds;
   delete plan.music_shape;
   if (edited?.sounds?.length) plan.sounds = edited.sounds;
   if (edited?.music_shape) plan.music_shape = edited.music_shape;
+  // So does which of its shots keep their own sound (a skill's): on the same passage of the same clip, never the browser's.
+  const heard = (edited?.segments ?? []).filter((s) => s.sound && s.clip_id);
+  plan.segments = plan.segments.map((s) => {
+    if (!("clip_id" in s)) return s;
+    const kept = { ...s };
+    delete kept.sound;
+    return heard.some((h) => h.clip_id === s.clip_id && Math.abs((h.in ?? 0) - s.in) < 0.01) ? { ...kept, sound: true } : kept;
+  });
   // A montage skill's follow her words (a key click on each letter of her name as its code types it): computed again on
   // the words she wrote, for the skill of the version she edits, when its cut is the same.
   const skill = skillFor(edited?.skill?.key);

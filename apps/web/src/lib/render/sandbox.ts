@@ -9,6 +9,7 @@ import {
   MODEL_SHEETS,
   mixFilter,
   mixGains,
+  type MusicGrid,
   type MusicShape,
   soundLevelsFilter,
   soundLoudness,
@@ -858,14 +859,17 @@ export async function bassLevelsInSandbox(id: string, audio: Uint8Array, seconds
 }
 
 /**
- * A piece of music set on a Reel's beat grid (beatGrid): started on its first beat
- * (`offset` s cut off) and its tempo moved by `tempo` (its beat / the grid's, a few
- * percent at most, the pitch kept), so every cut falls on one of its beats.
+ * A piece of music set on a Reel's beat grid (beatGrid, musicStart): started on its first strong beat (`trim` s cut off,
+ * on its own clock) or held back to a late start (`delay` s of silence before it, on the Reel's clock), and its tempo
+ * moved by `tempo` (its beat / the grid's, a few percent at most, the pitch kept), so every cut falls on one of its beats.
  */
-export async function alignMusicInSandbox(id: string, audio: Uint8Array, offset: number, tempo: number): Promise<Uint8Array> {
+export async function alignMusicInSandbox(id: string, audio: Uint8Array, start: { trim: number; delay: number; tempo: number }): Promise<Uint8Array> {
+  const { trim, delay, tempo } = start;
   const filters = [
-    ...(offset >= 0.015 ? [`atrim=start=${offset.toFixed(3)}`, "asetpts=PTS-STARTPTS"] : []),
+    ...(trim >= 0.001 ? [`atrim=start=${trim.toFixed(3)}`, "asetpts=PTS-STARTPTS"] : []),
     ...(Math.abs(tempo - 1) >= 0.001 ? [`atempo=${tempo.toFixed(4)}`] : []),
+    // (In samples at 44.1 kHz: this ffmpeg reads « 0.25s » as milliseconds.)
+    ...(delay >= 0.001 ? ["aformat=sample_rates=44100", `adelay=${Math.round(delay * 44100)}S:all=1`] : []),
   ];
   if (!filters.length) return audio;
   const sandbox = await jobSandbox();
@@ -899,13 +903,21 @@ function printed(stdout: string, name: string): number | null {
  * limiter; without music (`audio` null) they go over the video's own sound as it is.
  * `shape`: how its model shapes its music (music-shape.ts: its pauses, its muffled passages,
  * its end), applied to the music alone, sample by sample, before anything joins it; `duration`,
- * the Reel's length when the video's cannot be read.
+ * the Reel's length when the video's cannot be read; `grid`, the music's beats once set on the cuts (its pauses come
+ * back on them). `ambient` « shots »: only a model's shots keep their own sound, the music stepping back under them.
  */
 export async function muxAudioInSandbox(
   id: string,
   mp4: Buffer,
   audio: Uint8Array | null,
-  options: { voiceOver?: boolean; ambient?: boolean; sounds?: (SoundInMix & { mp3: Uint8Array })[]; shape?: MusicShape | null; duration?: number } = {},
+  options: {
+    voiceOver?: boolean;
+    ambient?: boolean | "shots";
+    sounds?: (SoundInMix & { mp3: Uint8Array })[];
+    shape?: MusicShape | null;
+    duration?: number;
+    grid?: MusicGrid | null;
+  } = {},
 ): Promise<Buffer> {
   const sounds = options.sounds ?? [];
   if (!audio && !sounds.length) return mp4;
@@ -928,7 +940,7 @@ export async function muxAudioInSandbox(
     );
     const measured = await probe.stdout();
     const duration = printed(measured, "duration");
-    const placed: SoundInMix[] = sounds.map((s) => ({ at: s.at, gain: s.gain, onset: s.onset, end: s.end }));
+    const placed: SoundInMix[] = sounds.map((s) => ({ at: s.at, gain: s.gain, onset: s.onset, end: s.end, ...(s.burst ? { burst: s.burst } : {}) }));
     const inputs = files.flatMap((f) => ["-i", f]);
     if (!audio) {
       // No music of hers: the effects over the video's own sound (or silence), the picture copied.
@@ -940,10 +952,14 @@ export async function muxAudioInSandbox(
         [dir, filter, ...inputs],
       );
     } else {
-      const gains = mixGains({ speech: printed(measured, "speech"), music: printed(measured, "music") }, Boolean(options.voiceOver), Boolean(options.ambient));
-      // Its model's shape on the music, over the Reel's length (the video's, else the plan's).
+      const gains = mixGains(
+        { speech: printed(measured, "speech"), music: printed(measured, "music") },
+        Boolean(options.voiceOver),
+        options.ambient === "shots" ? "shots" : Boolean(options.ambient),
+      );
+      // Its model's shape on the music, over the Reel's length (the video's, else the plan's), its returns on its beats.
       const length = duration ?? options.duration;
-      const shaped = options.shape && length ? { shape: options.shape, duration: length } : undefined;
+      const shaped = options.shape && length ? { shape: options.shape, duration: length, grid: options.grid ?? null } : undefined;
       console.info("mix", id, measured.trim(), gains, { sounds: placed.length, ...(shaped ? { shape: options.shape } : {}) });
       await bash(
         sandbox,

@@ -1,4 +1,4 @@
-import { musicShapeGraph, readMusicShape, shapesMusic, type MusicShape } from "./music-shape.ts";
+import { musicShapeGraph, readMusicShape, shapesMusic, type MusicGrid, type MusicShape } from "./music-shape.ts";
 
 // How Edith's music sits under what is said in a Reel. Loudness in LUFS (EBU R128,
 // measured by ffmpeg on the rendered video and on the music), turned into fixed
@@ -15,10 +15,13 @@ export const SPEECH_LUFS = -14;
 /** A music track as ElevenLabs composes it (the live preview cannot measure it). */
 export const MUSIC_AS_COMPOSED_LUFS = -15;
 
-export type MixCase = "music" | "voice_over" | "speech_in_clips" | "ambient";
+export type MixCase = "music" | "voice_over" | "speech_in_clips" | "ambient" | "shot_sound";
 
 /** The sound of her videos kept all along (finish.video_sound « all ») with nobody speaking: an ambience, under a voice's level. */
 export const AMBIENT_LUFS = -21;
+
+/** The own sound of a model's shots that keep it (a skill's `sound` shot: the metro under the title), nobody speaking: heard, a little under the music's level. */
+export const SHOT_SOUND_LUFS = -18;
 
 export type Ducking = { threshold: number; ratio: number; attack: number; release: number };
 
@@ -31,6 +34,11 @@ export const MIX_CASES: Record<MixCase, { music: number; duck: Ducking | null; u
   speech_in_clips: { music: -15, duck: { threshold: 0.016, ratio: 8, attack: 20, release: 600 }, under: -33 },
   /** The sound of her videos kept all along, nobody speaking: the music over the ambience, both heard, nothing ducks. */
   ambient: { music: -16, duck: null, under: -16 },
+  /**
+   * A few of a model's shots keep their own sound, nobody speaking (the metro, a tram, a door): the music keeps its level
+   * and steps back under them (some 6 dB while they play, back over 400 ms), so that sound is heard on its shot.
+   */
+  shot_sound: { music: -15, duck: { threshold: 0.05, ratio: 2, attack: 15, release: 400 }, under: -21 },
 };
 
 /** Peaks of the mix held under -1 dBFS. */
@@ -51,18 +59,20 @@ export function speechGain(lufs: number | null): number | null {
 /**
  * The gains of a mix from the measured loudness of the video's own sound (null:
  * no sound track) and of the music: which case, how many dB each one moves,
- * and the ducking.
+ * and the ducking. `ambient`: her videos' sound kept all along with nobody speaking; « shots »: only a model's shots
+ * that keep their own sound, nobody speaking in them.
  */
-export function mixGains(loudness: { speech: number | null; music: number | null }, voiceOver: boolean, ambient = false): {
+export function mixGains(loudness: { speech: number | null; music: number | null }, voiceOver: boolean, ambient: boolean | "shots" = false): {
   kind: MixCase;
   speechGain: number;
   musicGain: number;
   duck: Ducking | null;
 } {
   const voiced = speechGain(loudness.speech);
-  const kind: MixCase = voiced === null ? "music" : voiceOver ? "voice_over" : ambient ? "ambient" : "speech_in_clips";
-  // An ambience sits under a voice's level, bounded like a voice.
-  const gain = kind === "ambient" && measured(loudness.speech) ? round1(clamp(AMBIENT_LUFS - loudness.speech, -12, 20)) : voiced;
+  const kind: MixCase = voiced === null ? "music" : voiceOver ? "voice_over" : ambient === "shots" ? "shot_sound" : ambient ? "ambient" : "speech_in_clips";
+  // An ambience sits under a voice's level, bounded like a voice; a shot's own sound a little higher, on its shot only.
+  const own = kind === "ambient" ? AMBIENT_LUFS : kind === "shot_sound" ? SHOT_SOUND_LUFS : null;
+  const gain = own !== null && measured(loudness.speech) ? round1(clamp(own - loudness.speech, -12, 20)) : voiced;
   const settings = MIX_CASES[kind];
   return {
     kind,
@@ -81,14 +91,15 @@ const MIX_EDGE = 0.02;
 /**
  * The ffmpeg filter graph of a mix: [0:a] the video's own sound, [1:a] the music,
  * out as [a], faded out over 0.8 s from `fadeAt` (s; null when the length is unknown: no fade).
- * `shaped`: the music's shape (music-shape.ts: its pauses, its filtered passages, its end) and the Reel's length: the
- * music is shaped before anything joins it; when it ends by its own shape, the mix only fades its last 20 ms.
+ * `shaped`: the music's shape (music-shape.ts: its pauses, its filtered passages, its end), the Reel's length and the
+ * music's beats once set on the cuts (its returns land on them): the music is shaped before anything joins it; when it
+ * ends by its own shape, the mix only fades its last 20 ms.
  */
 export function mixFilter(
   gains: ReturnType<typeof mixGains>,
   fadeAt: number | null,
   sounds: SoundInMix[] = [],
-  shaped?: { shape: MusicShape | null | undefined; duration: number },
+  shaped?: { shape: MusicShape | null | undefined; duration: number; grid?: MusicGrid | null },
 ): string {
   const read = shaped ? readMusicShape(shaped.shape, shaped.duration) : null;
   const shape = shapesMusic(read) ? read : null;
@@ -99,7 +110,7 @@ export function mixFilter(
         ? `,afade=t=out:st=${Math.max(0, fadeAt + MIX_FADE - MIX_EDGE).toFixed(3)}:d=${MIX_EDGE}`
         : `,afade=t=out:st=${Math.max(0, fadeAt).toFixed(2)}:d=${MIX_FADE}`;
   const limit = `alimiter=limit=${MIX_CEILING}:level=false`;
-  const music = `[1:a]${STEREO},volume=${gains.musicGain}dB${shape ? `[ms_in];${musicShapeGraph(shape, "ms_in", "ms_out", shaped!.duration)};[ms_out]anull` : ""}`;
+  const music = `[1:a]${STEREO},volume=${gains.musicGain}dB${shape ? `[ms_in];${musicShapeGraph(shape, "ms_in", "ms_out", shaped!.duration, shaped!.grid)};[ms_out]anull` : ""}`;
   // The sound effects (inputs 2…), added to the mix before its limiter and its fade.
   const end = sounds.length ? `[pre];${soundChains(sounds, 2)};[pre]${sounds.map((_, i) => `[x${i}]`).join("")}amix=inputs=${sounds.length + 1}:duration=first:normalize=0,` : ",";
   // The ambience of her videos under the music, both as they are.
@@ -115,12 +126,17 @@ export function mixFilter(
 
 const STEREO = "aformat=sample_rates=44100:channel_layouts=stereo";
 
-/** A sound effect as the mix takes it (sfx.ts placeSounds): its attack at `at` (s), its gain (dB), the part of its file played (s). */
-export type SoundInMix = { at: number; gain: number; onset: number; end: number };
+/**
+ * A sound effect as the mix takes it (sfx.ts placeSounds): its attack at `at` (s), its gain (dB), the part of its file
+ * played (s); `burst`: the same sound laid again at each of `times` (s after `at`, the first at 0), each at its own gain
+ * (dB, from `gain`): a clicking, a roll, denser than a frame.
+ */
+export type SoundInMix = { at: number; gain: number; onset: number; end: number; burst?: { times: number[]; gains: number[] } };
 
 /**
  * Each sound effect's chain, its file the input `first + i`, out as [x0], [x1]…: trimmed to its
  * attack and its fade, at its gain, faded in 5 ms and out 40 ms (no click), delayed to its moment.
+ * A burst is its one file split, each copy delayed to its own sample and at its own gain, mixed back into [xi].
  */
 export function soundChains(sounds: SoundInMix[], first: number): string {
   return sounds
@@ -128,10 +144,15 @@ export function soundChains(sounds: SoundInMix[], first: number): string {
       const length = Math.max(0.05, s.end - s.onset);
       const out = Math.max(0, length - 0.04);
       const delay = Math.max(0, Math.round(s.at * 1000));
-      return (
-        `[${first + i}:a]atrim=start=${s.onset.toFixed(3)}:end=${s.end.toFixed(3)},asetpts=PTS-STARTPTS,${STEREO},volume=${s.gain}dB,` +
-        `afade=t=in:d=0.005,afade=t=out:st=${out.toFixed(3)}:d=0.04,adelay=${delay}:all=1[x${i}]`
-      );
+      const head = `[${first + i}:a]atrim=start=${s.onset.toFixed(3)}:end=${s.end.toFixed(3)},asetpts=PTS-STARTPTS,${STEREO},volume=${s.gain}dB,afade=t=in:d=0.005,afade=t=out:st=${out.toFixed(3)}:d=0.04`;
+      const hits = s.burst?.times.length ?? 0;
+      if (hits < 2) return `${head},adelay=${delay}:all=1[x${i}]`;
+      const copies = s.burst!.times.map((t, k) => `[x${i}b${k}]adelay=${Math.max(0, Math.round((s.at + t) * 44100))}S:all=1${s.burst!.gains[k] ? `,volume=${s.burst!.gains[k]}dB` : ""}[x${i}d${k}]`);
+      return [
+        `${head},asplit=${hits}${s.burst!.times.map((_, k) => `[x${i}b${k}]`).join("")}`,
+        ...copies,
+        `${s.burst!.times.map((_, k) => `[x${i}d${k}]`).join("")}amix=inputs=${hits}:duration=longest:normalize=0[x${i}]`,
+      ].join(";");
     })
     .join(";");
 }
@@ -264,11 +285,7 @@ export function coarser(levels: number[], factor: number): number[] {
  */
 export function beatGrid(levels: number[], beat: number): { period: number; offset: number } | null {
   if (!levels.length) return null;
-  // Silence held 40 dB under the loud level, and a rise counted 12 dB at most: the first
-  // sound after a silent start is not worth ten kicks.
-  const loud = [...levels].sort((a, b) => a - b)[Math.floor(0.9 * (levels.length - 1))]!;
-  const db = levels.map((v) => Math.max(Number.isFinite(v) ? v : -120, loud - 40));
-  const onset = db.map((v, i) => (i ? Math.min(12, Math.max(0, v - db[i - 1]!)) : 0));
+  const onset = bassOnsets(levels);
   // A kick read within one step either side.
   const at = (t: number) => {
     const i = Math.round(t / BEAT_STEP);
@@ -324,6 +341,142 @@ export function beatGrid(levels: number[], beat: number): { period: number; offs
   // A first beat a hair before the start of the file is on it; further back, the next one is the first.
   if (offset < 0) offset = offset > -2 * BEAT_STEP ? 0 : offset + period;
   return { period: Math.round(period * 10000) / 10000, offset: Math.round(offset * 1000) / 1000 };
+}
+
+/** A rise of the bass under this (dB) is a held note's ripple across the 10 ms windows (a 55 Hz note beats with them), never an attack. */
+const RIPPLE_DB = 3;
+
+/**
+ * Where the bass rises, every BEAT_STEP (dB, 0 to 12): silence held 40 dB under the loud level, a rise counted 12 dB at
+ * most, so the first sound after a silent start is not worth ten kicks, and none under RIPPLE_DB (a bass held under the
+ * kicks made a rise every other window, and its grid stood out no more than twice from the others: never found).
+ */
+function bassOnsets(levels: number[]): number[] {
+  const loud = [...levels].sort((a, b) => a - b)[Math.floor(0.9 * (levels.length - 1))]!;
+  const db = levels.map((v) => Math.max(Number.isFinite(v) ? v : -120, loud - 40));
+  return db.map((v, i) => {
+    const rise = i ? Math.min(12, Math.max(0, v - db[i - 1]!)) : 0;
+    return rise < RIPPLE_DB ? 0 : rise;
+  });
+}
+
+/** The mean of the strongest rises of a piece, as many as it has beats: what a kick is. */
+function strongRise(onset: number[], beats: number): number {
+  const strongest = [...onset].sort((a, b) => b - a).slice(0, Math.max(1, Math.floor(beats)));
+  return strongest.reduce((sum, o) => sum + o, 0) / strongest.length;
+}
+
+/** A bar, in beats: a model counts its downbeats every four (its phrases of 8 and 16). */
+export const BAR_BEATS = 4;
+
+/** Its bars tell their first beat when that beat's kicks are this much stronger than any other beat's (a bass note that starts each bar, a kick on its 1 only). */
+const DOWNBEAT_LEAD = 1.25;
+
+/**
+ * The first strong beat of a piece on its grid (beatGrid), from its bass levels every BEAT_STEP (s on its own clock):
+ * the first beat whose kick is strong (an intro or a pickup before it is not its beat 0), moved on to the first beat of
+ * its bars when they tell it (four bars at least, the strongest kicks a quarter stronger on one beat of four than on any
+ * other: a bass note that starts each bar, a kick on its 1 only); a piece whose beats all hit alike (four on the floor)
+ * keeps its first strong one, the composer's start. Null when no beat of the grid has a kick.
+ */
+export function firstDownbeat(levels: number[], grid: { period: number; offset: number }): number | null {
+  if (!levels.length || !(grid.period > 0)) return null;
+  const onset = bassOnsets(levels);
+  const length = levels.length * BEAT_STEP;
+  // A beat's kick: the strongest rise within 30 ms of it (its attack starts in that step).
+  const kick = (t: number) => {
+    const c = Math.round(t / BEAT_STEP);
+    let top = 0;
+    for (let i = Math.max(1, c - 3); i <= Math.min(onset.length - 1, c + 3); i++) top = Math.max(top, onset[i]!);
+    return top;
+  };
+  const beats: number[] = [];
+  for (let t = grid.offset; t < length - BEAT_STEP; t += grid.period) beats.push(kick(t));
+  if (!beats.length) return null;
+  const strong = strongRise(onset, length / grid.period);
+  const first = beats.findIndex((k) => k >= 0.5 * strong);
+  if (first < 0) return null;
+  // Its bars: the mean kick on each of four beats from the first strong one.
+  const counted = beats.length - first;
+  let phase = 0;
+  if (counted >= 4 * BAR_BEATS) {
+    const means = Array.from({ length: BAR_BEATS }, (_, p) => {
+      const on = beats.slice(first).filter((_, n) => n % BAR_BEATS === p);
+      return on.reduce((sum, k) => sum + k, 0) / on.length;
+    });
+    const best = means.indexOf(Math.max(...means));
+    const others = Math.max(...means.filter((_, p) => p !== best));
+    if (means[best]! >= DOWNBEAT_LEAD * others) phase = best;
+  }
+  return Math.round((grid.offset + (first + phase) * grid.period) * 1000) / 1000;
+}
+
+/** A piece set on the cuts is cut this long (s) before its first attack: the attack stays whole and lands on the cut. */
+export const ATTACK_LEAD = 0.005;
+
+/** Under this (s), a cut or a silence before the music is not worth making. */
+const NOT_WORTH = 0.015;
+
+/**
+ * Where the composed piece starts so its first strong beat lands on the Reel's `mark` (s; its attack ATTACK_LEAD after
+ * it, as on every cut): `trim` s of the piece cut off (on its own clock, before its tempo is set to the grid's by `tempo`,
+ * its beat / the grid's), or `delay` s of silence before it (on the Reel's clock) when the music is not heard until then
+ * anyway (`heard`: where a late start ends). A mark in music already heard takes the piece from a later downbeat (a bar at
+ * a time, `bar` s on its clock), so a pickup plays before it rather than a silence.
+ */
+export function musicStart(input: { downbeat: number; tempo: number; bar: number; mark: number; heard: number }): { trim: number; delay: number } {
+  const tempo = input.tempo > 0 ? input.tempo : 1;
+  const trim = input.downbeat - (input.mark + ATTACK_LEAD) * tempo;
+  const round = (n: number) => Math.round(n * 1000) / 1000;
+  if (trim >= 0) return { trim: trim < NOT_WORTH ? 0 : round(trim), delay: 0 };
+  const silence = -trim / tempo;
+  if (silence < NOT_WORTH) return { trim: 0, delay: 0 };
+  // (Its attack ATTACK_LEAD after the late start ends, as the gate opens.)
+  if (silence <= input.heard + ATTACK_LEAD + 0.001) return { trim: 0, delay: round(silence) };
+  if (!(input.bar > 0)) return { trim: 0, delay: 0 };
+  return { trim: round(trim + Math.ceil(-trim / input.bar - 1e-9) * input.bar), delay: 0 };
+}
+
+/**
+ * How a composed piece is set on a Reel (its bass levels every BEAT_STEP over all of it): on its beat grid (beatGrid at
+ * the Reel's `beat`), its first strong beat (firstDownbeat) on `mark`, its tempo held to the grid's (`aligned`); without a
+ * steady beat, left as it is, but for a late start (`heard`) it is held back to (the piece then starts with the music).
+ */
+export function musicSetting(levels: number[], beat: number | null, mark: number, heard: number): { trim: number; delay: number; tempo: number; aligned: boolean } {
+  const grid = beat && levels.length ? beatGrid(levels, beat) : null;
+  if (!grid || !beat) return { ...musicStart({ downbeat: 0, tempo: 1, bar: 0, mark, heard }), tempo: 1, aligned: false };
+  const tempo = Math.round((grid.period / beat) * 10000) / 10000;
+  const downbeat = firstDownbeat(levels, grid) ?? grid.offset;
+  return { ...musicStart({ downbeat, tempo, bar: BAR_BEATS * grid.period, mark, heard }), tempo, aligned: true };
+}
+
+/**
+ * Where the beat falls away in what is heard of a Reel's music (s, the Reel's clock): its gaps (grooveGaps) read on the
+ * piece as the mix plays it (`start`: cut by `trim` s, held back `delay` s, its tempo moved by `tempo`), less where its
+ * model's shape silences it (a late start, a pause, after its end): a gap the music never plays there is not worth
+ * composing again. Those that keep a second heard.
+ */
+export function heardGaps(levels: number[], duration: number, start: { trim: number; delay: number; tempo: number }, shape?: MusicShape | null): { from: number; to: number }[] {
+  const tempo = start.tempo > 0 ? start.tempo : 1;
+  // The piece's steps on the Reel's clock: before it starts (its delay), silence.
+  const steps = Math.round(duration / BEAT_STEP);
+  const reel = Array.from({ length: steps }, (_, i) => {
+    const t = (i * BEAT_STEP - start.delay) * tempo + start.trim;
+    return t < 0 ? -120 : (levels[Math.round(t / BEAT_STEP)] ?? -120);
+  });
+  const gaps = grooveGaps(coarser(reel, Math.round(GROOVE_STEP / BEAT_STEP)), duration);
+  const read = readMusicShape(shape, duration);
+  const silent: { from: number; to: number }[] = [
+    ...(start.delay > 0 ? [{ from: 0, to: start.delay }] : []),
+    ...(read?.pauses ?? []),
+    ...(read?.end ? [{ from: read.end.at, to: duration }] : []),
+  ];
+  return gaps.flatMap((g) => {
+    // The gap less every silent span: what is left of it, heard.
+    let parts = [g];
+    for (const s of silent) parts = parts.flatMap((p) => (s.to <= p.from || s.from >= p.to ? [p] : [...(s.from > p.from ? [{ from: p.from, to: s.from }] : []), ...(s.to < p.to ? [{ from: s.to, to: p.to }] : [])]));
+    return parts.filter((p) => p.to - p.from >= 1 - 1e-6);
+  });
 }
 
 /**

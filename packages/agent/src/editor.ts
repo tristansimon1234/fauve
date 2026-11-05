@@ -142,7 +142,8 @@ export const editorOutputSchemaLegacy = z.object({
     // Retouch and blur are set by their own tools and carried over (carryRetouch), never written by the editor.
     // No signature transition field here: the structured-output grammar is at the API's
     // limit (400 « compiled grammar is too large »); the engine places it (signatureShot).
-    segments: z.array(z.union([editPlanSegmentSchema.omit({ adjust: true, blur: true, photo: true, accent: true, ramp: true, jump: true }), editPlanSceneSegmentSchema, editorMotionSegmentSchema])).min(1),
+    // Nor which shots keep their own sound (a montage skill's, set by the engine).
+    segments: z.array(z.union([editPlanSegmentSchema.omit({ adjust: true, blur: true, photo: true, accent: true, ramp: true, jump: true, sound: true }), editPlanSceneSegmentSchema, editorMotionSegmentSchema])).min(1),
   }),
   rationale: z.string(),
 });

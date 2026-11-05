@@ -1,13 +1,14 @@
 import "server-only";
 import {
+  BAR_BEATS,
   BEAT_STEP,
-  beatGrid,
-  coarser,
-  GROOVE_STEP,
-  grooveGaps,
+  heardGaps,
   isClipSegment,
   isMotionSegment,
   musicCostUsd,
+  musicDownbeat,
+  musicHeard,
+  musicSetting,
   musicTail,
   planBeat,
   planBpm,
@@ -15,6 +16,7 @@ import {
   sfxLevelSchema,
   usdToEur,
   type EditPlan,
+  type MusicGrid,
   type PostKind,
   type SfxLevel,
   type SoundInMix,
@@ -34,8 +36,9 @@ import { withSlot } from "@/lib/work-slots";
 // the cut. Composed watching the video, it stopped its beat before a cut to make it
 // hit, heard as the sound cutting out; that composer only steps in when the brief
 // alone fails. Its beats are then set on the cuts (beatGrid, alignMusicInSandbox),
-// and a piece whose beat still falls away inside the Reel is composed once more
-// (grooveGaps). The piece is
+// its first strong beat on the model's (firstDownbeat, musicStart: the Reel's start, a late
+// start's end, or its model's mark), and a piece whose beat still falls away where it is
+// heard is composed once more (heardGaps). The piece is
 // kept on the post and reused while the cut stays the same (a text changed, a
 // style…), so a small retouch does not pay for a new one; « Une autre » asks for
 // a new one. Without ELEVENLABS_API_KEY, or turned off, the Reel stays silent.
@@ -74,6 +77,8 @@ export const postMusicSchema = z.object({
       created_at: z.string(),
       /** The request it was composed for: another one composes again. */
       wish: z.string().max(300).optional(),
+      /** Where its first strong beat lands (s, the Reel's clock) once set on the cuts' grid: its pauses come back on its beats. Absent: its beats were not found. */
+      downbeat: z.number().min(0).max(120).optional(),
     })
     .nullable()
     .optional(),
@@ -110,15 +115,22 @@ export async function soundLevel(studioId: string, postId: string): Promise<SfxL
 }
 
 /** The cut of a montage: what the music follows (the clips, scenes and their lengths), not the texts. */
-export function cutSignature(plan: Pick<EditPlan, "segments" | "template" | "transitions"> & { voice?: EditPlan["voice"]; tempo?: number; baked?: EditPlan["baked"] }): string {
+export function cutSignature(
+  plan: Pick<EditPlan, "segments" | "template" | "transitions"> & { voice?: EditPlan["voice"]; tempo?: number; baked?: EditPlan["baked"]; music_shape?: EditPlan["music_shape"]; duration?: number },
+): string {
   // An effect's video is known by the session that drew it: drawn again with her words by its kit, it is a new
   // video with the same cut, and keeps its music (by its video's id, changing a word composed a new piece).
   const cut = plan.segments.map((s) =>
     isClipSegment(s) ? ["c", plan.baked?.session ?? s.clip_id, s.in, s.out] : isMotionSegment(s) ? ["m", s.duration] : ["s", s.duration],
   );
+  // Where its first strong beat lands (its model's mark, a late start's end): the piece is set on it. None at the start,
+  // as every Reel before it (their pieces still serve).
+  const downbeat = plan.duration ? musicDownbeat(plan.music_shape, plan.duration) : 0;
   // A Reel's own tempo counts (the music is composed at it); a plan without one keeps the signature it had.
   return createHash("sha1")
-    .update(JSON.stringify([plan.template, ...(plan.tempo ? [plan.tempo] : []), plan.transitions, cut, ...(plan.voice ? [plan.voice.media_id] : [])]))
+    .update(
+      JSON.stringify([plan.template, ...(plan.tempo ? [plan.tempo] : []), plan.transitions, cut, ...(plan.voice ? [plan.voice.media_id] : []), ...(downbeat > 0 ? [["d", downbeat]] : [])]),
+    )
     .digest("hex")
     .slice(0, 16);
 }
@@ -186,9 +198,6 @@ function brief(plan: EditPlan, business: string | null, adjustments: string[], s
 
 /** A piece whose beat still falls away inside the Reel is composed once more; the more continuous one is kept. */
 const MUSIC_TAKES = 2;
-
-/** A piece set on the cuts is cut this long (s) before its first attack: the attack stays whole and lands on the cut. */
-const ATTACK_LEAD = 0.005;
 
 type Composed = { mp3: Uint8Array; songId: string | null; ms: number; engine: "text" | "video" };
 
@@ -265,8 +274,11 @@ export async function withMusic(params: {
   fresh?: boolean;
   /** Its sound effects, placed and levelled (sfx.ts) with their files: mixed with the music, or alone over its own sound. */
   sounds?: (SoundInMix & { mp3: Uint8Array })[];
-  /** The sound of her videos kept all along, nobody speaking: mixed as an ambience under the music. */
-  ambient?: boolean;
+  /**
+   * The sound of her videos kept all along, nobody speaking: mixed as an ambience under the music; « shots »: only a
+   * model's shots that keep their own sound, nobody speaking in them: heard on their shot, the music stepping back.
+   */
+  ambient?: boolean | "shots";
 }): Promise<{ mp4: Buffer; music: "kept" | "new" | "none" }> {
   if (!env("ELEVENLABS_API_KEY") || (params.kind !== "reel" && params.kind !== "story")) return { mp4: params.mp4, music: "none" };
   const db = supabaseAdmin();
@@ -281,12 +293,17 @@ export async function withMusic(params: {
   }
 
   const signature = cutSignature(params.plan);
+  // The grid the cuts sit on (snapToTempo); none over a voice, whose phrases place the cuts.
+  const beat = params.plan.voice ? null : planBeat(params.plan);
   let mp3: Uint8Array | null = null;
   let made: "kept" | "new" = "kept";
+  // Its beats on the Reel's clock once set on the cuts: its model's pauses come back on them.
+  let grid: MusicGrid | null = null;
   // The same cut and the same request: the piece made for them serves again.
   if (!params.fresh && music.track?.signature === signature && (music.track.wish ?? "") === (music.wish ?? "")) {
     const { data } = await db.storage.from("media").download(music.track.path);
     if (data) mp3 = new Uint8Array(await data.arrayBuffer());
+    if (mp3 && beat && music.track.downbeat !== undefined) grid = { beat, downbeat: music.track.downbeat };
   }
   if (!mp3) {
     const [studio, profile] = await Promise.all([
@@ -300,12 +317,15 @@ export async function withMusic(params: {
     const sound = followed || (typeof stored?.signature?.music === "string" ? stored.signature.music.trim().slice(0, 80) : undefined);
     const ask = brief(params.plan, (studio.data?.business_type as string | null) ?? null, direction, sound || undefined, music.wish);
     const duration = params.plan.duration;
+    // Where its first strong beat lands (its model's mark, else where a late start ends, else the Reel's start), and
+    // from when it is heard: a mark in music already heard takes the piece from a later bar.
+    const mark = beat ? musicDownbeat(params.plan.music_shape, duration) : 0;
+    const heard = musicHeard(params.plan.music_shape, duration);
     // A piece is written with its ending (the beat stops over its last seconds): it is composed longer
-    // than the Reel, so that ending falls after it and the mix cuts it off.
-    const seconds = duration + musicTail(duration);
-    // The grid the cuts sit on (snapToTempo); none over a voice, whose phrases place the cuts.
-    const beat = params.plan.voice ? null : planBeat(params.plan);
-    let best: (Composed & { lost: number; grid: ReturnType<typeof beatGrid> }) | null = null;
+    // than the Reel, so that ending falls after it and the mix cuts it off; a bar and a beat more when it
+    // may start from a later bar.
+    const seconds = duration + musicTail(duration) + (beat && mark > heard + 0.001 ? Math.round((BAR_BEATS + 1) * beat * 100) / 100 : 0);
+    let best: (Composed & { lost: number; setting: ReturnType<typeof musicSetting> }) | null = null;
     for (let take = 1; take <= MUSIC_TAKES && (!best || best.lost > 0); take++) {
       const composed = await composeFromText(ask, seconds)
         .catch(async (error: unknown) => {
@@ -330,28 +350,35 @@ export async function withMusic(params: {
         cost_eur: usdToEur(usd, env("USD_TO_EUR")),
         meta: costMeta({ post_id: params.postId, render_id: params.renderId, song_id: composed.songId, model: env("ELEVENLABS_MUSIC_MODEL"), engine: composed.engine, signature, ms: composed.ms, seconds, take, cost_usd: usd }),
       });
-      // Its bass every 10 ms: where its beats land, and where its beat falls away inside the Reel
-      // (a break, a stop, an ending too early): heard as the sound cutting out.
+      // Its bass every 10 ms: where its beats land, where its first strong beat is, and where its beat falls away
+      // where the Reel lets it be heard (a break, a stop, an ending too early): heard as the sound cutting out.
       const levels = await bassLevelsInSandbox(params.renderId, composed.mp3, seconds, BEAT_STEP).catch((error: unknown) => {
         console.warn("music: beat not measured", params.renderId, error);
         return null;
       });
-      const reel = levels?.slice(0, Math.round(duration / BEAT_STEP));
-      const gaps = reel ? grooveGaps(coarser(reel, Math.round(GROOVE_STEP / BEAT_STEP)), duration) : [];
-      const grid = levels && beat ? beatGrid(levels, beat) : null;
+      const setting = levels ? musicSetting(levels, beat, mark, heard) : { trim: 0, delay: 0, tempo: 1, aligned: false };
+      const gaps = levels ? heardGaps(levels, duration, setting, params.plan.music_shape) : [];
       const lost = gaps.reduce((sum, g) => sum + g.to - g.from, 0);
-      console.info("music", params.renderId, { take, engine: composed.engine, seconds, gaps, grid });
-      if (!best || lost < best.lost) best = { ...composed, lost, grid };
+      console.info("music", params.renderId, { take, engine: composed.engine, seconds, gaps, setting, mark });
+      if (!best || lost < best.lost) best = { ...composed, lost, setting };
     }
     mp3 = best!.mp3;
-    // Its beats set on the cuts: the piece trimmed to its first beat and held to the grid's tempo (a hair).
-    if (best!.grid && beat) {
-      const { offset, period } = best!.grid;
-      mp3 = await alignMusicInSandbox(params.renderId, mp3, Math.max(0, offset - ATTACK_LEAD), period / beat).catch((error: unknown) => {
-        console.warn("music: not set on the beat", params.renderId, error);
-        return best!.mp3;
-      });
+    // Its beats set on the cuts: the piece cut to its first strong beat (or held back to a late start), held to the
+    // grid's tempo (a hair), its first strong beat on its mark.
+    const { trim, delay, tempo, aligned } = best!.setting;
+    let set = !trim && !delay && Math.abs(tempo - 1) < 0.001;
+    if (!set) {
+      mp3 = await alignMusicInSandbox(params.renderId, mp3, { trim, delay, tempo })
+        .then((out) => {
+          set = true;
+          return out;
+        })
+        .catch((error: unknown) => {
+          console.warn("music: not set on the beat", params.renderId, error);
+          return best!.mp3;
+        });
     }
+    if (aligned && set && beat) grid = { beat, downbeat: mark };
     made = "new";
     const path = `${params.studioId}/music/${params.postId}-${Date.now()}.mp3`;
     const { error } = await db.storage.from("media").upload(path, mp3, { contentType: "audio/mpeg", upsert: true });
@@ -361,7 +388,13 @@ export async function withMusic(params: {
       .from("posts")
       // Everything else she set on this Reel's sound stays (its sound effects, the sound she follows, her own publishing):
       // written without them, a new piece had put her sound effects back to her default.
-      .update({ music: { ...music, mode: "on", track: { path, signature, song_id: best!.songId, created_at: new Date().toISOString(), ...(music.wish ? { wish: music.wish } : {}) } } })
+      .update({
+        music: {
+          ...music,
+          mode: "on",
+          track: { path, signature, song_id: best!.songId, created_at: new Date().toISOString(), ...(music.wish ? { wish: music.wish } : {}), ...(grid ? { downbeat: grid.downbeat } : {}) },
+        },
+      })
       .eq("id", params.postId);
   }
   // Shaped as its model plays it (its pauses, its muffled passages, its end), whatever piece it got.
@@ -370,7 +403,7 @@ export async function withMusic(params: {
       voiceOver: Boolean(params.plan.voice),
       sounds,
       ambient: params.ambient,
-      ...(params.plan.music_shape ? { shape: params.plan.music_shape, duration: params.plan.duration } : {}),
+      ...(params.plan.music_shape ? { shape: params.plan.music_shape, duration: params.plan.duration, grid } : {}),
     }),
     music: made,
   };

@@ -119,6 +119,12 @@ export const editPlanSegmentSchema = z.object({
    * (`finish.cuts` off, and what a correction shows the editor).
    */
   jump: z.object({ in: z.number().min(0), out: z.number().positive(), move: cameraMoveSchema.optional() }).optional(),
+  /**
+   * Its own sound kept in the mix (a montage skill's shot whose passage is heard: the metro under its title, a tram going
+   * by), the music stepping back under it, at its own pace only. Set by the engine from a skill's timeline (SkillShot.sound),
+   * never by the editor nor the browser.
+   */
+  sound: z.boolean().optional(),
 });
 
 /**
@@ -174,6 +180,14 @@ export const editPlanSceneSegmentSchema = z.object({
 export const SLOT_NAME = /^[a-z][a-z0-9_]{0,23}$/;
 
 /**
+ * The moments of her hands a sound can land on (tracking.ts, handMoment): a hand at its highest in the picture (a reach,
+ * the top of a jump, her hand on the switch) or its lowest, a hand that has gone up, come down, come toward the camera or
+ * moved away, thumb and index that spread, a pinch held.
+ */
+export const HAND_MOMENTS = ["highest", "lowest", "raised", "lowered", "toward", "away", "spread", "pinch"] as const;
+export type HandMomentKind = (typeof HAND_MOMENTS)[number];
+
+/**
  * A light sound effect on something seen (sfx.ts): `at` seconds (from its animation's start on an animation, on the
  * Reel's clock on the plan), `sound` a short generic description in English (« soft pop », « paper whoosh »), the key
  * of the shared library with `seconds`, its length. Written by the motion designer and the editor, never the browser.
@@ -191,6 +205,21 @@ export const sfxCueSchema = z.object({
   skill: z.boolean().optional(),
   /** How loud, from the loudness of its level in the mix (dB): a soft tick under it, an impact over it (its peak still capped). */
   gain: z.number().min(-24).max(6).optional(),
+  /**
+   * A montage skill's burst: the same sound laid again at each of `times` (s after `at`, in order, the first at 0), each at
+   * its own gain (dB from the sound's): a clicking that slows down, a roll, denser than a frame (one cue for all of them).
+   */
+  burst: z
+    .object({ times: z.array(z.number().min(0).max(12)).min(1).max(120), gains: z.array(z.number().min(-24).max(6)).max(120).optional() })
+    .optional(),
+  /**
+   * A montage skill's sound on a gesture of hers: when her hand does it in that shot (its index in the plan's segments),
+   * read on her hands' tracks (tracking.ts, handMoment), its loudest moment there; else at `at` (its beat). `within`: only
+   * then (s, the Reel's clock).
+   */
+  hand: z
+    .object({ shot: z.number().int().min(0).max(80), moment: z.enum(HAND_MOMENTS), within: z.tuple([z.number().min(0), z.number().min(0)]).optional() })
+    .optional(),
 });
 export type SfxCue = z.infer<typeof sfxCueSchema>;
 
