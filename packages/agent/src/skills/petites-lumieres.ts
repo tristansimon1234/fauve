@@ -154,7 +154,7 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   if (n > 1 && cur === 1) {
     const s1 = shots[1];
     if (setting("soleil", "oui") !== "non") {
-      const COLS = 24;
+      const COLS = 64;
       const cw = bw / COLS;
       const read = Array.from({ length: COLS }, (_, k) => SkylineAt(shots[1], frame, laid, { from: k * cw, to: (k + 1) * cw }));
       const known = read.map((y, k) => (y !== null ? k : -1)).filter((k) => k >= 0);
@@ -178,10 +178,12 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
         const r = Math.round(R0 * fit * (1 - 0.215 * t));
         const cy = Math.round(Math.min(best.depth - 0.45 * r, bh * 0.5));
         const cx = Math.round(best.x);
-        let d = "M0 0H" + bw;
-        for (let k = COLS - 1; k >= 0; k--) d += "V" + Math.round(prof[k]) + "H" + Math.round(k * cw);
+        // Her sky: above a line through her skyline's points (a roof's slope stays a slope, never a staircase).
+        let d = "M0 0H" + bw + "V" + Math.round(prof[COLS - 1]);
+        for (let k = COLS - 1; k >= 0; k--) d += "L" + Math.round((k + 0.5) * cw) + " " + Math.round(prof[k]);
+        d += "L0 " + Math.round(prof[0]) + "Z";
         layers.push(
-          h("div", { key: "sky", style: { ...full, clipPath: "path('" + d + "Z')" } },
+          h("div", { key: "sky", style: { ...full, clipPath: "path('" + d + "')" } },
             h("div", { style: { position: "absolute", left: cx - r, top: cy - r, width: 2 * r, height: 2 * r, borderRadius: "50%", backgroundColor: SUN } })),
           h(Skyline, { key: "ground", shot: 1, style: full }));
       }

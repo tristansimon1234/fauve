@@ -98,6 +98,15 @@ Ses lieux (la cour d'immeubles vue d'en bas, ses tours) et la place exacte de so
 - **Le son** : sa musique composée à 83 BPM, son premier temps à 0,09 s, ses trois arrêts d'un temps, coupée au temps 12,37 ; le tic dans le dernier arrêt.
 - **Ce qui manque** : les ciels en aplat et la manière « en éclairs blancs » du second exemple (à proposer en réglages) ; ses lents mouvements, laissés exprès.
 
+## Banc local (5 novembre)
+Rendu en local (`scripts/skill-render.mts`, contrôle des scènes compris, aucun refus), sur des images fixes tirées de rushes Mixkit gratuits, leurs objets dessinés à la main à la place du suivi de la carte louée :
+- **Vertical** : l'enseigne au néon d'un théâtre (« neon sign » : assombrie, allumée et éteinte sur les images mêmes de l'original, de l'image 5 à l'image 123), une tour vue d'en bas sur un ciel bleu (ses six baies vitrées rouges du bas vers le haut sur les six vagues, le soleil rouge à droite, coupé par l'arête de la tour, qui rétrécit), des tours au couchant (la colonne de fenêtres en quatre pas, éteinte d'un coup à l'image 268 pour 267 ; « Café Lune » en néon dans son ciel avec le premier pas, resté allumé jusqu'à la fin).
+- **Horizontal** : une lanterne de rue la nuit, un immeuble sur un ciel de nuages, une façade ancienne la nuit, dans la bande 16:9 sur le noir, son nom au-dessus de la bande.
+- **L'effet de la banque**, posé de 1,2 à 6,6 s d'un montage de quatre plans : le néon sur ses temps, les fenêtres d'une ville la nuit en rouge par vagues, son nom en néon ; le montage reprend après lui.
+- **Ce que le banc a corrigé** : le soleil pouvait sortir du cadre (pris au plus profond de son ciel, au bord) et, sous un ciel bas, avoir le haut coupé par l'image : il reste entier, le plus près du milieu, plus petit sous un ciel bas ; son bord suivait sa ligne de ciel en escalier (des encoches dans le disque le long d'une arête en biais) : une ligne entre ses points ; une lampe éteinte devant un ciel blanc aurait brillé de ses propres pixels noirs : elle n'est dite déjà allumée que plus claire que ce qui l'entoure ; l'effet ne dessinait rien sur un plan sans objet lu (le contrôle refusait un calque vide) : son plan est toujours dessous.
+- **Pas vérifiable en local** : la musique composée (ses trois arrêts, le tic), son plan sans son ciel posé sur le soleil (`Skyline` ne dessine rien en local : le soleil n'y est coupé que par la ligne de ciel), le vrai suivi des objets (une enseigne, ses fenêtres une à une), la lecture d'un ciel de nuit (la lecture locale prend une tour sombre sur un ciel de nuit pour du ciel), Gemini.
+- **Aperçu de la galerie** : `public/modeles/petites-lumieres.mp4|jpg`, deux secondes du deuxième plan (la tour, ses baies qui rougissent, le soleil).
+
 ## Ce qu'il faut filmer
 Le soir, à la tombée de la nuit, téléphone posé (ou trois photos) :
 1. une de ses lumières de près, devant un ciel ou un mur calme : son lampadaire, sa lanterne, son applique, son enseigne lumineuse, un néon ;
