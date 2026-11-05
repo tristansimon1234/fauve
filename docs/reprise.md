@@ -55,6 +55,11 @@ Les retours de Tristan au banc et ce qu'ils ont changé sont dans chaque fiche (
 
 ## Passage de relais : un nouveau modèle de Tristan
 
+**Message de Tristan à la conversation suivante** (5 novembre au soir) : « je vais envoyer d'autres modèles, et il devra compléter la banque d'effets, la banque de modèles, la banque d'outils ». Chaque modèle qu'il envoie enrichit donc les trois banques, et jamais une seule :
+1. **La banque de modèles** : le modèle entier, joué tel quel (sa fiche `docs/fiches/<clé>.md`, son skill `packages/agent/src/skills/<clé>.ts` dans `skill-library.ts`, son entrée au catalogue `house-models.ts`), par la méthode ci-dessous.
+2. **La banque d'effets** : son effet signature, à poser dans n'importe quel Reel. Aujourd'hui, sa ligne dans `HOUSE_EFFECTS` (`packages/agent/src/house-effects.ts`, ce que fait l'effet et ce qu'il demande dans ses vidéos), que le monteur emprunte et que le motion designer réécrit depuis le code du skill ; dès que la banque d'effets prêts à jouer existe (chantier A plus bas : une pièce réglable, sur quel plan, à quel moment, quels mots, testée comme un modèle), son effet y entre aussi en pièce prête à jouer. Si la banque n'existe pas encore quand il arrive, la construire d'abord (en commençant par les 5 à 8 effets les plus utiles des 33), puis y ajouter le sien.
+3. **La banque d'outils** : tout ce que son effet demande et que le moteur ne sait pas encore faire (une lecture de ses vidéos, un dessin, un mouvement, un son) s'ajoute une fois au moteur, testé, documenté dans son `docs/<sujet>.md`, et sert ensuite à tous les modèles, à la recopie et au monteur (`docs/modeles.md`, « La chaîne des modèles », (2)).
+
 Tristan va envoyer de nouveaux modèles (des liens de Reels), sans doute dans une nouvelle conversation. À lire avant : CLAUDE.md, `docs/modeles.md` (« La chaîne des modèles », « Skills de montage », « Validation des modèles », « Décisions de Tristan sur les originaux »), une fiche comme exemple (`docs/fiches/interrupteur.md`), son skill (`packages/agent/src/skills/interrupteur.ts`) et ses tests (`features.test.ts`, chercher « Interrupteur »).
 
 Pour chacun (un agent par modèle en parallèle, chacun dans son arbre de travail, fusionnés un à un) :
