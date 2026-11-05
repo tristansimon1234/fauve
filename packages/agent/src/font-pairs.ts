@@ -181,6 +181,17 @@ export const FONT_PAIRS: FontPair[] = [
     how: "un titre de film en grandes capitales serif sur deux lignes serrées, un petit mot en capitales très espacées au-dessus, une signature en petit italique dessous, dans la même famille",
     fits: "un court métrage, une journée racontée comme un film, un générique d'ouverture",
   },
+  {
+    // « Pas à pas raconté » (docs/fiches/recette.md, effect 4): its words subtitled in small groups in the middle of the
+    // picture, a bold serif in lower case with old-style figures (Georgia Bold to the eye; Gelasio, its metric twin on
+    // Google Fonts, has the same figures, compared letter by letter), its ending card's line in the same family.
+    key: "sous-titres",
+    name: "Sous-titres serif",
+    display: { family: "Gelasio", weight: 700, case: "normal", tracking: "normal" },
+    body: { family: "Gelasio", weight: 500 },
+    how: "ses mots en petits groupes d'une serif grasse en minuscules, au milieu de l'image comme les sous-titres d'un créateur, aux chiffres elzéviriens, une ligne plus légère de la même famille",
+    fits: "un pas à pas raconté, une recette, un tuto, des mots qui suivent les gestes",
+  },
 ];
 
 const BY_KEY = new Map(FONT_PAIRS.map((p) => [p.key, p]));

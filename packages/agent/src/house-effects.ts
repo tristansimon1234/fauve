@@ -152,6 +152,10 @@ export const HOUSE_EFFECTS: Record<string, HouseEffect> = {
     effet: "ses plans projetés comme une vieille pellicule aux coins arrondis : l'image qui s'ouvre depuis une fente, son titre de film en jaune, une brûlure sur la coupe, la pellicule qui saute",
     il_faut: "des vidéos dans une belle lumière (le matin, l'heure dorée), à l'horizontale de préférence, la première calme",
   },
+  recette: {
+    effet: "chaque étape coupée geste par geste, ses mots au milieu de l'image comme les sous-titres d'une voix, un petit groupe par geste",
+    il_faut: "des gestes filmés téléphone posé, chaque étape d'un seul endroit en plusieurs gestes",
+  },
 };
 
 /** The most of Edith's models one Reel borrows from: one charter, one music, never a patchwork. */
