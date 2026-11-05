@@ -6,12 +6,13 @@ import type { EffectPiece, PieceTimeline } from "../pieces.ts";
 // with rounded corners (her small words on its two ends, falling into place on the opening whoosh), her shots playing in
 // the card, cut where the editor cut them, the name of each sound under the card as it is heard (« WHOOSH x2 »,
 // « CHARGEMENT », « DÉCLENCHEUR », « DÉCLICS », « CLIC SOURIS »: changed at once with it, a count when it comes again
-// within two thirds of a second, gone in a silence of more than a third of a second, the last one held), and the montage's timeline
-// under it, its red playhead crossing it at a constant speed, her shots on its first video track and each sound a green
-// clip where it is heard. On each cut under it, one of the original's moves on its sound (its timeline gives both, so
-// the label, the picture and the sound agree): a whoosh; the next shot loading tile by tile over the shot before, a beep
-// a jump (the card cut in 5 × 3 tiles, its second loading's pattern, or its first's over a long shot); a camera flash in
-// the card; the cut that stutters between the two shots on six clicks; a double mouse click. Its last cut is always a
+// within two thirds of a second, gone in a silence of more than a third of a second, the last one held), and the
+// montage's timeline under it, its red playhead crossing it at a constant speed, her shots on its first video track and
+// each sound a green clip where it is heard. On each cut under it, one of the original's moves on its sound (its
+// timeline gives both, so the label, the picture and the sound agree): a whoosh; the next shot loading tile by tile over
+// the shot before, a beep a jump (the card cut in 5 × 3 tiles, its second loading's pattern, or its first's over a long
+// shot); a camera flash in the card; the cut that stutters between the two shots on six clicks; a double mouse click
+// (a loading starts once the sound before it is over, so no label covers another's sound). Its last cut is always a
 // whoosh, and what her last shot shows (a dish, a product in her hand, named by the filler) arrives cut out on the shot
 // before, exactly in place, five images before it, as the original's pastries do. 16 sounds at most: a cut past them is
 // cut in silence, the label gone, as the original's three are. The card is 16:9 as the original's when her shots are

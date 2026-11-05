@@ -115,7 +115,8 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   // the middle of the lower one (44 %, clear of the apps' caption). A long title goes on two lines rather than
   // shrinking; a word is never cut at its hyphen.
   const display = "'" + brand.displayFont + "', 'EB Garamond', Georgia, serif";
-  const shade = "0 0 1px rgba(0,0,0,0.6), 0 1px 3px rgba(0,0,0,0.45), 0 2px 14px rgba(0,0,0,0.28)";
+  // (A dense edge of a pixel or two, dark on any picture: on white icing its letters still have a border; a big blur would look cheap.)
+  const shade = "0 0 1px rgba(0,0,0,0.85), 0 0 2px rgba(0,0,0,0.5), 0 1px 3px rgba(0,0,0,0.45), 0 2px 14px rgba(0,0,0,0.3)";
   const SIZE = 50;
   const LINE = 1.15;
   const BOX = Math.round(SIZE * LINE * 2 + 12);
