@@ -9768,7 +9768,7 @@ test("« Ton nom qui clignote » (v2): its rounded window on black when her vide
 
 // ——— « Présente-toi » v2 and « Vision machine » v1, written on their originals' fiches (docs/fiches/silhouette.md, vision.md) ———
 
-type KitRead = { boxes?: Record<string, TdBox>; outlines?: Record<string, string>; parts?: Record<string, TdBox[]>; heads?: { from: number; to: number; what: string }[] };
+type KitRead = { boxes?: Record<string, TdBox>; outlines?: Record<string, string>; parts?: Record<string, TdBox[]>; heads?: { from: number; to: number; what: string }[]; light?: { mean: number; high: number } };
 /**
  * What a skill's Scene draws at a frame with the whole kit in its scope, each piece a named node (as cutoutsDrawn lays
  * them), what the engine reads on her shots given by shot and object as drawCutOuts takes them (« 0 » her cut-out,
@@ -9795,6 +9795,7 @@ async function drawKit(code: string, frame: number, props: Record<string, unknow
     SubjectOutline: (shot: { segment?: number }, _f: number, _l: unknown, object?: string) => read.outlines?.[key(shot, object)] ?? null,
     SubjectParts: (shot: { segment?: number }, _f: number, _l: unknown, object?: string) => read.parts?.[key(shot, object)] ?? [],
     HeadMoves: () => read.heads ?? [],
+    LightUnder: () => read.light ?? null,
     ClearBox: fallback,
     VanishingPoint: fallback,
   });
@@ -9833,7 +9834,7 @@ const SIL_READ: KitRead = { boxes: { "0": { x: 300, y: 700, w: 560, h: 1220 } },
 test("« Présente-toi » (v2) changes where its original does, on its own music (84,5 BPM), with its clicks, its break and its last hit", async () => {
   const { silhouette, letterFrames } = await import("./skills/silhouette.ts");
   const { skillPlan } = await import("./skills.ts");
-  assert.equal(silhouette.version, 2);
+  assert.equal(silhouette.version, 3);
   assert.equal(silhouette.bpm, 84.5);
   assert.deepEqual([silhouette.shots, silhouette.files], [[2, 2], [1, 4]]);
   const line = silhouette.timeline(2, { end: false, words: { bonjour: "Hello" } });
@@ -9883,7 +9884,7 @@ test("« Présente-toi » (v2) changes where its original does, on its own music
     assert.ok(editPlanSchema.safeParse(plan).success);
     assert.equal(plan.texts.length, 6);
     assert.deepEqual(plan.layers![0]!.motion.drawn, { shots: 2, subjects: [0] });
-    assert.deepEqual(plan.skill, { key: "silhouette", version: 2 });
+    assert.deepEqual(plan.skill, { key: "silhouette", version: 3 });
     assert.equal(plan.sounds?.length, 7);
   }
 });
@@ -10155,4 +10156,40 @@ test("« Vision machine » (v1): vertical as its original, her shot in a 16:9 ba
     most = Math.max(most, n);
   }
   assert.ok(most <= 4, `${most} layers`);
+});
+
+test("« Présente-toi » (v3): nobody in profile, what the filler named there takes her place; the print's threshold from her shot's light", async () => {
+  const { silhouette } = await import("./skills/silhouette.ts");
+  const { skillCode, skillDrawn } = await import("./skills.ts");
+  // The filler names what stands in her place only when nobody is in profile there; the engine follows it on her first shot.
+  assert.deepEqual(silhouette.objects?.map((o) => [o.slot, o.shot]), [["forme", 0]]);
+  const line = silhouette.timeline(2, { end: false });
+  assert.deepEqual(skillDrawn(silhouette, line, { forme: "bouquet of roses" }), { shots: 2, subjects: [0], objects: [{ shot: 0, name: "bouquet of roses" }] });
+  assert.deepEqual(skillDrawn(silhouette, line, {}), { shots: 2, subjects: [0] });
+  const { props } = await silhouetteAt(40, {});
+  const code = skillCode(silhouette, { forme: "bouquet of roses" });
+  const bouquet: KitRead = {
+    boxes: { "0#bouquet of roses": { x: 280, y: 820, w: 520, h: 1100 } },
+    outlines: { "0#bouquet of roses": "M 540 820 C 700 830 800 1000 780 1200 L 760 1920 L 320 1920 L 300 1200 C 290 1000 380 830 540 820 Z" },
+  };
+  // Its shape cut out in her place, one midnight tone, « Je suis » kept inside it.
+  const named = await drawKit(code, 40, props, bouquet);
+  const cut = drawnNodes(named).find((n) => n.type === "Subject")!;
+  assert.deepEqual([cut.props.shot, cut.props.at, cut.props.fill, cut.props.object], [0, 32, "#0f0f1c", "bouquet of roses"]);
+  assert.match(String(styleOf(byKey(named, "im")!).clipPath), /^path\('M 540 820/);
+  // Under the lids too, on the drop.
+  assert.equal(drawnNodes(byKey(await drawKit(code, 117, props, bouquet), "eye")!).find((n) => n.type === "Subject")?.props.object, "bouquet of roses");
+  // Her own cut-out first when she is in it: the object is left.
+  const both = await drawKit(code, 40, props, { boxes: { ...SIL_READ.boxes, ...bouquet.boxes }, outlines: { ...SIL_READ.outlines, ...bouquet.outlines } });
+  assert.equal(drawnNodes(both).find((n) => n.type === "Subject")!.props.object, undefined);
+  // Nothing named (its code as written): no object, her print.
+  assert.equal(drawnNodes(await drawKit(silhouette.code, 40, props, bouquet)).find((n) => n.type === "Subject"), undefined);
+  // No cut-out at all: her shot as a print whose threshold is her shot's light (a bright window stays half dark), its
+  // darks midnight and its lights the pale; unmeasured, as before.
+  const print = async (light?: { mean: number; high: number }) => drawnNodes(await drawKit(silhouette.code, 40, props, light ? { light } : {})).find((n) => n.type === "Footage")!;
+  assert.match(String(styleOf(await print({ mean: 0.8, high: 0.95 })).filter), new RegExp("^grayscale\\(1\\) brightness\\(" + (0.5 / 0.8).toFixed(2) + "\\) contrast\\(3\\.2\\)$"));
+  assert.match(String(styleOf(await print({ mean: 0.1, high: 0.3 })).filter), /brightness\(2\.40\)/);
+  assert.match(String(styleOf(await print()).filter), /brightness\(1\.35\)/);
+  const blends = drawnNodes(await drawKit(silhouette.code, 40, props, {})).filter((n) => styleOf(n).mixBlendMode);
+  assert.deepEqual(blends.map((n) => [styleOf(n).background, styleOf(n).mixBlendMode]), [["#f3f4f9", "darken"], ["#0f0f1c", "lighten"]]);
 });

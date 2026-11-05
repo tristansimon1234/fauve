@@ -102,7 +102,7 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const NAVY = "#0d0d1b", SIL = "#0f0f1c", PALE = "#f3f4f9", PEACH = "#d99868", INK = "#0a0a10";
   const font = "'" + brand.displayFont + "', 'Inter', 'Helvetica Neue', sans-serif";
   const W = width;
-  // Vertical, or on her word the original's 16:9 frame on midnight bands.
+  // Vertical, or on her word its 16:9 frame on midnight bands.
   const wide = texts && texts.format === "horizontal";
   const S = wide ? { x: 0, y: Math.round((height - (W * 9) / 16) / 2), w: W, h: Math.round((W * 9) / 16) } : { x: 0, y: 0, w: W, h: height };
   const at = (fy, vy) => Math.round(wide ? S.y + fy * S.h : vy * height);
@@ -117,7 +117,7 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const letters = (s) => Array.from(String(s || "").normalize("NFC").trim());
   const ground = frame < NEG || (frame >= EYE && frame < OPEN) || frame >= LOGO ? NAVY : PALE;
 
-  // 1. Her first word typed, growing with its echo, white then ink; the box's dashed guides and px counts; a pixel hand.
+  // 1. Her first word typed, growing with its echo; guides, px counts, a hand of dots.
   const word = hello ? letters(keep(hello.text)) : [];
   const units = word.filter((c) => !/\s/.test(c));
   const H0 = M("h", 5), B0 = M("burst_from", 18), B1 = M("burst_to", 29), G0 = M("grow_from", 13), G1 = M("grow_to", 28);
@@ -157,14 +157,17 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   }).join(" L") + " Z").join(" ");
   const hand = opening && frame >= HAND ? h(DotGrid, { key: "hand", shape: handPath, box: { x: Math.round(hx - hs), y: Math.round(hy - hs * 0.2), w: Math.round(hs * 2), h: Math.round(hs * 1.4) }, step: 8, size: 6, color: "#3b3b45", at: HAND, frames: 4, build: "rise" }) : null;
 
-  // 2. Her profile cut out in one tone on the pale (else a black and white print), her picture laid whole (a cover would
-  // crop her off a horizontal video), scaled and moved onto the original's head.
+  // 2. Her profile in one tone on the pale (nobody: what the filler named, else a print), on the original's head.
   const sh = shots[0];
   const sil = sh && frame >= CUT && frame < EYE;
   const base ={ left: 0, top: 0, width: Math.round(S.h * (sh && sh.aspect > 0 ? sh.aspect : S.w / S.h)), height: S.h };
   const ref = Math.max(0, Math.min(sh ? sh.durationInFrames - 1 : 0, 6));
-  const box0 = sh ? SubjectBox(sh, ref, base) : null;
-  // Her head: the top of her outline, as wide as it is there.
+  const OBJ = "@forme";
+  const herBox = sh ? SubjectBox(sh, ref, base) : null;
+  const what = herBox || OBJ.charAt(0) === "@" ? undefined : OBJ;
+  const box0 = sh ? herBox || (what ? SubjectBox(sh, ref, base, what) : null) : null;
+  const cutHer = (style) => h(Subject, { shot: 0, at: CUT, fill: SIL, style, ...(what ? { object: what } : {}) });
+  // Her head: the top of her outline.
   const headOf = (path, b) => {
     const nums = path ? String(path).match(/-?\d+(?:\.\d+)?/g) : null;
     if (nums && nums.length >= 12) {
@@ -178,33 +181,37 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
     }
     return b ? { x: b.x + b.w / 2, y: b.y, w: b.w * 0.45 } : null;
   };
-  const head0 = sh ? headOf(SubjectOutline(sh, ref, base), box0) : null;
+  const head0 = sh ? headOf(SubjectOutline(sh, ref, base, what), box0) : null;
   const want = wide ? { w: S.w * 0.2, y: S.y + S.h * 0.22, x: S.x + S.w * 0.47 } : { w: W * 0.33, y: height * 0.42, x: W * 0.5 };
-  // As wide as the original's head, down to the frame's bottom when her picture cuts her there.
+  // As wide as the original's head (to the bottom when her picture cuts her).
   const low = box0 && box0.y + box0.h >= base.height * 0.97 ? (S.y + S.h - want.y) / Math.max(40, base.height - head0.y) : 0;
   const k = head0 ? Math.max(0.15, Math.min(3, Math.max(want.w / head0.w, low))) : 1;
   const laid = head0 ? { left: Math.round(want.x - head0.x * k), top: Math.round(want.y - head0.y * k), width: Math.round(base.width * k), height: Math.round(base.height * k) } : { ...full };
-  // A side where her picture cuts her goes past the frame's (no straight edge across the pale).
+  // A side her picture cuts goes past the frame's.
   if (head0 && box0.x + box0.w >= base.width * 0.97) laid.left = Math.max(laid.left, S.x + S.w - laid.width);
   if (head0 && box0.x <= base.width * 0.03) laid.left = Math.min(laid.left, S.x);
   const L = abs(laid);
   const local = (f) => Math.max(0, f - CUT);
   const cutOut = Boolean(box0);
-  const her = sil ? inFrame("her", cutOut ? h(Subject, { shot: 0, at: CUT, fill: SIL, style: L }) : h(Footage, { shot: 0, at: CUT, style: { ...L, filter: "grayscale(1) brightness(1.35) contrast(3.2)" } }), cutOut ? null : h("div", { style: { ...full, background: PALE, mixBlendMode: "darken" } })) : null;
-  // Her head going down: the first « down » measured on her tracks, else on the beat.
+  // The print's threshold from her shot's light, its darks midnight.
+  const lit = sh && !cutOut && typeof LightUnder === "function" ? LightUnder(shots[0], ref, base) : null;
+  const gain = lit && lit.mean > 0.04 ? Math.max(0.55, Math.min(2.4, 0.5 / lit.mean)) : 1.35;
+  const print = "grayscale(1) brightness(" + gain.toFixed(2) + ") contrast(3.2)";
+  const her = sil ? inFrame("her", cutOut ? cutHer(L) : h("div", { style: { ...full, isolation: "isolate" } }, h(Footage, { shot: 0, at: CUT, style: { ...L, filter: print } }),
+    h("div", { style: { ...full, background: PALE, mixBlendMode: "darken" } }), h("div", { style: { ...full, background: SIL, mixBlendMode: "lighten" } }))) : null;
+  // Her head going down: measured on her tracks, else on the beat.
   const down = (sh && typeof HeadMoves === "function" ? HeadMoves(sh) : []).map((m) => ({ from: m.from + CUT, to: m.to + CUT, what: m.what })).find((m) => m.what === "down" && m.from >= CUT + 4 && m.from < EYE - 40);
   const D0 = down ? down.from : M("head_down", 45), D1 = down ? Math.min(down.to, D0 + 20) : D0 + 8;
-  const headAt = (f) => (sh ? headOf(SubjectOutline(sh, local(f), laid), SubjectBox(sh, local(f), laid)) : null) || want;
+  const headAt = (f) => (sh ? headOf(SubjectOutline(sh, local(f), laid, what), SubjectBox(sh, local(f), laid, what)) : null) || want;
   const hd = headAt(CUT + 4);
   const face = track ? ((track(local(CUT + 4), { shot: 0, ...laid }) || {}).faces || [])[0] : null;
   const imAt = face ? { x: face.x, y: face.y } : { x: hd.x, y: hd.y + hd.w * 0.5 };
-  // « Je suis » white in her head, its first letter turning peach, the rest going as she lowers her head; kept inside
-  // her outline (its pieces joined).
+  // « Je suis » in her head; its first letter turns peach, the rest goes as her head lowers.
   const imChars = je ? letters(je.text) : [];
-  // Sized and kept in the part of her head inside the frame (left of Instagram's buttons under the middle).
+  // Kept in her head and in the frame (left of Instagram's buttons).
   const iL = Math.max(60, hd.x - hd.w / 2), iR = Math.min(imAt.y > 900 ? W - 160 : W - 60, hd.x + hd.w / 2);
   const imFs = Math.max(48, Math.min(wide ? 84 : 116, Math.round(((iR - iL) * 1.5) / Math.max(3, imChars.length))));
-  const outline = sil ? SubjectOutline(sh, local(frame), laid) : null;
+  const outline = sil ? SubjectOutline(sh, local(frame), laid, what) : null;
   const im = je && frame >= CUT && frame < D0 + 6
     ? h("div", { key: "im", style: abs({ left: 0, top: 0, width: W, height, ...(outline ? { clipPath: "path('" + outline.replace(/ M /g, " L ") + " Z')" } : {}) }) },
         row(Math.max(iL + imChars.length * imFs * 0.31, Math.min(iR - imChars.length * imFs * 0.31, imAt.x)) + lerp(frame, CUT, CUT + 8, 13, 0, EO), imAt.y - imFs * 0.6, imFs, 600, "#ffffff", imChars.map((c, i) => {
@@ -212,11 +219,10 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
           return h("span", { key: i, style: { opacity: i ? lerp(frame, g, g + 2, 1, 0) : 1, color: i || frame < D0 - 4 ? undefined : frame >= D0 ? PEACH : "#f0c6a6" } }, c);
         })))
     : null;
-  // Her name typed behind her head, its last name rising away; her first name's round letter becomes the o of « Votre »,
-  // whose letters pop round it; it fills with peach, a pupil grows, and the eye rises.
+  // Her name typed behind her head; its round letter becomes the o of « Votre », then an eye.
   const NT = down ? Math.min(EYE - 60, D0 + 5) : M("name_type", 50);
   const hdDown = headAt(Math.min(EYE - 1, Math.max(NT + 9, D1)));
-  // Over her head, a line of that width kept whole in the frame.
+  // Over her head, kept whole in the frame.
   const within = (w) => Math.max(60 + w / 2, Math.min(W - 60 - w / 2, hdDown.x));
   const nameWords = nom ? keep(nom.text).split(/\s+/).filter(Boolean) : [];
   const first = nameWords[0] || "", rest = nameWords.slice(1).join(" ");
@@ -241,14 +247,14 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const same = (c) => c.toLowerCase() === String(tonChars[ti] || "o").toLowerCase();
   const fi = Math.max(0, find(fl, same) >= 0 ? find(fl, same) : find(fl, (c) => ROUND.test(c)));
   const tFs = wide ? 72 : 84;
-  // Above the top of her head while it shows (ink on her silhouette would not read).
+  // Above her head (ink on her silhouette would not read).
   const ty = Math.round(Math.max(S.y + (wide ? 24 : 60), Math.min(hdDown.y, headAt(POP).y, headAt(FILL).y, headAt(EYE - 1).y) - tFs * 1.3));
   const cw = tFs * 0.56;
-  // Without a round letter in it (« Ta »), a peach dot at the end of the word becomes the eye.
+  // No round letter (« Ta »): a peach dot after it becomes the eye.
   const VX = within((tonChars.length + 1) * cw);
   const ox = VX + ((hasRound ? ti : tonChars.length + 0.2) - (tonChars.length - 1) / 2) * cw;
   const nx = within(nameLetters.length * nmFs * 0.6) - (nameLetters.length * nmFs * 0.54) / 2;
-  // The eye rises to where the iris will be, in the middle of the almond as it narrows (a match cut on the drop).
+  // The eye rises to where the iris will be (a match cut on the drop).
   const EH = wide ? S.h * 0.76 : W * 0.41;
   const T = wide ? S.y + EH * 0.36 : Math.max(at(0, 0.18), Math.min(at(0, 0.34), ty - tFs * 0.78 - EH * 0.36)) + EH * 0.36;
   const IX = Math.max(S.x + S.w * 0.35, Math.min(S.x + S.w * 0.65, ox)), eyeX = (f) => lerp(f, RISE, EYE, ox, IX, EI);
@@ -268,7 +274,7 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
         })),
         frame < BC + 3 && hasRound ? roundLetter(frame) : null)
     : null;
-  // The eye: a peach iris, fine rays, a brown rim, a highlight, a midnight pupil (round, then a slit).
+  // The eye: peach iris, rays, rim, highlight, pupil (round, then a slit).
   const irisAt = (cx, cy, r, slit, rays) => h("svg", { width: W, height, style: abs({ left: 0, top: 0, overflow: "visible" }) },
     h("circle", { cx, cy, r, fill: "#d69665", stroke: "#8a5a36", strokeWidth: Math.max(2, r * 0.05) }),
     rays ? Array.from({ length: 36 }, (_, i) => { const a = (i * Math.PI) / 18, c = Math.cos(a) * r, s = Math.sin(a) * r; return h("line", { key: i, x1: cx + c * 0.42, y1: cy + s * 0.42, x2: cx + c * 0.92, y2: cy + s * 0.92, stroke: "#a86f45", strokeWidth: 1.2, opacity: 0.5 }); }) : null,
@@ -280,7 +286,7 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
         h("circle", { cx: eyeX(frame), cy: eyeY(frame), r: tFs * 0.15 * lerp(frame, PU, PU + 4, 0, 1) * lerp(frame, RISE, EYE, 1, 2.4), fill: NAVY }))
     : null;
 
-  // 3. On the drop, lids close into an almond round the iris; her trade white in the iris, then ink on the pale.
+  // 3. On the drop, lids close into an almond; her trade white in the iris, then ink on the pale.
   const E = { x: S.x + S.w * 0.09, y: T - EH * 0.36, w: S.w * 0.82, h: EH };
   const box = (y0, y1, g) => ({ x: E.x - g * E.w, y: E.y + y0 * E.h, w: E.w * (1 + 2 * g), h: (y1 - y0) * E.h * (1 + g) });
   const SL = M("slit", 128), WI = M("wide", 132), SD = M("slide", 136), WO = M("word_in", 146), WN = M("widen", 156);
@@ -294,13 +300,13 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const eye = frame >= EYE && frame <= OPEN + 1 && frame < endAt
     ? h(Window, { key: "eye", box: box(0, 1, 0), at: EYE, open: 0, reveal: "eye", fit: "cut", moves: [{ at: EYE + 1, frames: 1, box: box(0.05, 0.67, 0) }, { at: WI, frames: 8, box: box(0.05, 1.16, 0) }, { at: WN, frames: 4, box: box(-0.2, 1.4, 0.12) }, { at: OPEN, frames: 1, box: { x: -W, y: -height, w: 3 * W, h: 3 * height } }] },
         h("div", { style: abs({ left: 0, top: 0, width: W, height, background: PALE }) },
-          frame < EYE + 2 && cutOut ? h(Subject, { shot: 0, at: CUT, fill: SIL, style: L }) : null,
+          frame < EYE + 2 && cutOut ? cutHer(L) : null,
           irisFade > 0 ? h("div", { style: { opacity: irisFade } }, frame >= SD && frame < SD + 8 ? h(Echo, { draw: (f) => irisAt(irisX(f), irisY(f), irisR, 1, false), count: 4, gap: 1, color: PEACH, self: false }) : null, irisAt(irisX(frame), irisY(frame), irisR, lerp(frame, SL, SL + 7, 0, 1), true)) : null,
           frame >= WO && trade ? h("div", { style: abs({ left: 0, top: 0, width: W, height, ...(inIris ? { clipPath: "circle(" + Math.round(irisR) + "px at " + Math.round(irisX(frame)) + "px " + Math.round(irisY(frame)) + "px)" } : {}) }) },
             row(W / 2, irisY(frame) - trFs * 0.55, trFs, 400, inIris ? "#ffffff" : INK, tradeText)) : null))
     : null;
 
-  // 4. Her trade held, what she does on the hits; a wavy line under it, a peach dot, then her trade's pictogram.
+  // 4. Her trade held, what she does on the hits, a wavy line, a peach dot, her pictogram.
   const items = list ? String(list.text).split(/\s*[,;·|\/\n]\s*/).map((s) => s.trim()).filter(Boolean).slice(0, 5) : [];
   const GAPS = [[0], [0, 6], [0, 4, 8], [0, 3, 6, 9], [0, 3, 6, 8, 10]][Math.max(0, items.length - 1)];
   const jobAt = GAPS.map((g) => Math.round(M("job", 165) + (g * mark("beat", 21.3)) / 4));
@@ -321,10 +327,10 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
           frame >= PI0 ? h("span", { style: abs({ right: -trFs * 0.62, top: -trFs * 0.42 }) }, h(Picto, { name: tradeText, size: trFs * 0.9, at: PI0, frames: 8 })) : null) : null,
       ], { transformOrigin: "0 50%", transform: "scale(" + lerp(frame, SH, SH + 9, 1, 0.75, EIO).toFixed(3) + ")", opacity: lerp(frame, NAME, NAME + 2, 1, 0), lineHeight: 1.2 }, true))
     : null;
-  // Her whole list in the page, for the scene check (one word shows at a time).
+  // Her whole list, for the scene check.
   const listCopy = jobsOn && list ? h("div", { key: "lc", "data-fauve-decor": "", style: abs({ left: JX, top: JY, opacity: 0, fontSize: 20 }) }, list.text) : null;
 
-  // 5. Her name alone, receding; her logo white on the blue (else her place's name); her ending card in option.
+  // 5. Her name receding; her logo white on the blue (else her place's name); her card in option.
   const MID = at(0.5, 0.45);
   const alone = nom && frame >= NAME && frame < LOGO
     ? h("div", { key: "alone" }, row(W / 2, MID - 40, Math.round(72 * lerp(frame, NAME, LOGO, 1, 0.68)), 400, INK, [first, rest ? h("span", { key: "r", style: { fontWeight: 700 } }, " " + rest) : null], { opacity: lerp(frame, NAME - 1, NAME + 1, 0, 1), lineHeight: 1.1 }))
@@ -350,8 +356,10 @@ export const silhouette: MontageSkill = {
   // 2: written again on its original's fiche: its opening as a layout program, its negative, her first word typed with
   // its clicks, her profile in one tone with « Je suis » in her head, her name typed behind it, the round letter that
   // becomes an eye, the almond on the drop, her trades on the hits, her name receding, her logo on the blue; its 84,5
-  // BPM, its break and its last hit with its tail.
-  version: 2,
+  // BPM, its break and its last hit with its tail. 3: nobody in profile in her shot (its first bench, a florist's window
+  // of roses, came out all pale: no silhouette at all): what the filler names there (her bouquet, her shop front) is
+  // cut out in its place, and the print without a cut-out takes its threshold from her shot's light, midnight on pale.
+  version: 3,
   bpm: BPM,
   // Her profile, then a shot never seen (the eye, her trades and her logo are drawn on its two flat colours).
   shots: [2, 2],
@@ -365,6 +373,13 @@ export const silhouette: MontageSkill = {
     { slot: "je", role: "caption", want: "les mots blancs dans sa tête, juste avant son nom : « Je suis » (« On est » pour une équipe, « Voici » quand elle présente quelqu'un)", max: 9, required: true },
     { slot: "ton", role: "caption", want: "le petit mot avant son métier, dont la lettre ronde devient un œil : « Votre » (ou « Ton », « Ta » selon son ton ; jamais un genre deviné)", max: 6, required: true },
     { slot: "metier", role: "caption", want: "son métier ou ce qu'elle est, en un mot (une forme comme « Fleuriste », « Coiffure », « Céramiste », « Barbier »)", max: 14, required: true },
+  ],
+  objects: [
+    {
+      slot: "forme",
+      shot: 0,
+      want: "seulement quand personne n'est de profil dans ce plan : la chose dont la forme fera sa silhouette, une seule, entière dans l'image et nette sur son fond (« bouquet of roses », « vase of flowers », « shop front », « coffee cup », « cake ») ; vide quand quelqu'un y est",
+    },
   ],
   settings: [
     {
@@ -406,7 +421,7 @@ export const silhouette: MontageSkill = {
         ...s,
         want:
           i === 0
-            ? "elle (ou quelqu'un de son équipe) de profil, tête et épaules, devant un fond clair, le téléphone posé, à vitesse réelle : une vidéo de 5 s où elle regarde droit devant puis baisse vite la tête (penchée sur son travail), la garde baissée et la relève ; son passage commence quand elle regarde encore droit devant, 0,5 s avant qu'elle baisse la tête ; sa silhouette devient d'un seul bleu nuit sur un fond pâle (une photo de profil va aussi, figée)"
+            ? "elle (ou quelqu'un de son équipe) de profil, tête et épaules, devant un fond clair, le téléphone posé, à vitesse réelle : une vidéo de 5 s où elle regarde droit devant puis baisse vite la tête (penchée sur son travail), la garde baissée et la relève ; son passage commence quand elle regarde encore droit devant, 0,5 s avant qu'elle baisse la tête ; sa silhouette devient d'un seul bleu nuit sur un fond pâle (une photo de profil va aussi, figée). Personne de profil dans ses fichiers : celui où une seule chose de son métier se détache entière sur un fond clair (un bouquet, un vase, sa devanture), sa forme devient la silhouette"
             : "jamais vue (l'œil, son métier, son nom et son logo sont dessinés sur deux aplats par-dessus) : une autre de ses vidéos ou photos, ou la même vidéo à un autre moment",
       })),
       // Her first word in the opening; « Je suis » in her head; her name from its typing to her logo; « Votre » as its
