@@ -10615,8 +10615,9 @@ function pieceRun(n: number, options: { lead?: number; photo?: boolean } = {}) {
 
 test("the bank of effects: each piece comes from a model, passes the code check, and holds over every count of shots and length it takes", async () => {
   const { EFFECT_PIECES } = await import("./piece-library.ts");
-  const { pieceTestPlan, layerShots } = await import("./pieces.ts");
+  const { pieceTestPlan, layerShots, pieceMusicShape } = await import("./pieces.ts");
   const { checkMotionCode } = await import("./motion-scene.ts");
+  const { subjectShots } = await import("./subject.ts");
   const { houseModel } = await import("./house-models.ts");
   const { HOUSE_EFFECTS } = await import("./house-effects.ts");
   const { SLOT_NAME } = await import("./schemas.ts");
@@ -10651,6 +10652,13 @@ test("the bank of effects: each piece comes from a model, passes the code check,
         assert.deepEqual(layerShots(plan, layer), Array.from({ length: n }, (_, i) => i + 1));
         assert.equal(Number(layer.motion.texts!.beat), 18, `${key}: a beat at 100 BPM is 18 frames`);
         for (const [slot, w] of Object.entries(words)) assert.equal(layer.motion.texts![slot], w);
+        // What it cuts out of her shots is what its timeline declares (motion.drawn), never read in its code: a cut-out
+        // drawn there and not declared would have every shot under it cut out (on a rented card), for nothing.
+        const cutOut = subjectShots(plan);
+        assert.deepEqual([...cutOut].sort((a, b) => a - b), [...new Set(layer.motion.drawn?.subjects ?? [])].sort((a, b) => a - b), `${key} n=${n}: its cut-outs declared`);
+        // Its music shaped within its span only, read as the mix reads it.
+        const shape = pieceMusicShape({ piece, fill: { texts: words, objects: {}, settings: {} }, plan, layer, bpm: 100 });
+        for (const x of [...(shape?.pauses ?? []), ...(shape?.filters ?? [])]) assert.ok(x.from >= span[0] - 1e-6 && x.to <= span[1] + 1e-6, `${key} n=${n}: its music shaped within its span`);
       }
     }
   }
