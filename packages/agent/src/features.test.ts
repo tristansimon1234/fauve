@@ -2157,6 +2157,8 @@ test("« Titre derrière le décor » (v2) cuts where its original does, on its 
   line.shots.forEach((s, i) => {
     const at = Math.round(s.start * 30);
     if (i) assert.ok(Math.abs(at - (TD_CUTS[i]! - TD_FIRST_BEAT)) <= 2, `shot ${i + 1}: image ${at}, the original's ${TD_CUTS[i]} (its beat at ${TD_FIRST_BEAT})`);
+    // On the original's own clock, those two images earlier: never more than four.
+    if (i) assert.ok(TD_CUTS[i]! - at >= -2 && TD_CUTS[i]! - at <= 4, `shot ${i + 1}: image ${at}, the original's ${TD_CUTS[i]}`);
   });
   assert.ok(Math.abs(line.duration - (12.03 - 0.07)) < 0.05, `${line.duration} s`);
   // Its burst: eleven shots of 3 or 4 images from beat 14 (the original: 4 3 4 3 4 4 3 4 3 4 4).

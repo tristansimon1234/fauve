@@ -194,7 +194,7 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
           h("filter", { id: BLUR, x: "-5%", y: "-60%", width: "110%", height: "220%" }, h("feGaussianBlur", { stdDeviation: "0 " + smear.toFixed(2) }))),
         h(FitText, { style: { position: "absolute", left: Math.round((bw - TW) / 2 + dx), top: Math.round(foot + dy - boxH), width: TW, height: boxH }, innerStyle: { justifyContent: "flex-end" } },
           h("div", { style: { display: "flex", flexDirection: "column", alignItems: "center" } },
-            small ? h("div", { "data-fauve-accent": "", style: smallStyle }, "++\u2009" + keep(small.text) + "\u2009++") : null,
+            small ? h("div", { "data-fauve-accent": "", style: smallStyle }, "++\u2003" + keep(small.text) + "\u2003++") : null,
             h("div", { style: titleStyle }, word))))
     : null;
   // What stands in front of it, cut out at every image and laid over it.
