@@ -1444,7 +1444,13 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
       });
     },
 
-    async find_sound({ mots }) {
+    async find_sound({ mots, ecouter }) {
+      // The one she picked: on WhatsApp, its Reel in Instagram behind a button (in the app, the page Sons plays it).
+      if (ecouter) {
+        if (!ctx.waId) return json({ note: "Elle est dans l'application : la page Sons fait écouter chaque son. Passe son son_lien à montage." });
+        ctx.extras.listen = { url: ecouter, label: "Écouter le son" };
+        return json({ bouton: "« Écouter le son » sous ton message", note: "N'écris aucun lien : le bouton ouvre ce Reel dans Instagram. Demande-lui ses vidéos si elle ne les a pas données, puis passe ce son_lien à montage." });
+      }
       // Her words among Instagram's music, else this week's list; each with a Reel that uses it (its son_lien).
       const list = mots ? await searchSounds(studioId, mots) : { ok: true as const, sounds: (await trendSounds()).sounds.slice(0, 8) };
       if (!list.ok) return json({ error: list.error });
@@ -1452,20 +1458,26 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
         list.sounds.slice(0, 5).map(async (sound) => {
           const example = await soundExample(sound.audioId, studioId).catch(() => null);
           if (!example) return null;
-          return {
-            titre: sound.title,
-            ...(sound.artist ? { artiste: sound.artist } : {}),
-            ...(sound.explicit ? { explicite: true } : {}),
-            ...(sound.chart ? { classement: `${sound.chart === "top" ? "Top 50" : "Viral 50"} n° ${sound.rank}` } : {}),
-            son_lien: example.link,
-          };
+          const chart = sound.chart ? `${sound.chart === "top" ? "Top 50" : "Viral 50"} n° ${sound.rank}` : null;
+          return { sound, example, chart };
         }),
       );
-      const sons = found.filter(Boolean);
+      // Each one's button (its title, 24 characters at most, once), and on WhatsApp its artist under it.
+      const seen = new Set<string>();
+      const sons = found.flatMap((f) => {
+        if (!f) return [];
+        let bouton = f.sound.title.slice(0, 24).trim();
+        if (seen.has(bouton)) bouton = `${f.sound.title.slice(0, 20).trim()} (${seen.size + 1})`;
+        seen.add(bouton);
+        return [{ bouton, titre: f.sound.title, ...(f.sound.artist ? { artiste: f.sound.artist } : {}), ...(f.sound.explicit ? { explicite: true } : {}), ...(f.chart ? { classement: f.chart } : {}), son_lien: f.example.link }];
+      });
       if (!sons.length) {
         return json({ sons: [], note: mots ? "Rien trouvé sur Instagram pour ces mots : propose-lui ta musique dans ce genre (set_music, des mots de genre, jamais le nom de l'artiste), ou un autre titre." : "La liste de la semaine n'est pas encore prête : demande-lui un titre ou un artiste." });
       }
-      return json({ sons, note: "Propose-lui-en un à trois (titre et artiste, jamais le lien), puis passe le son_lien choisi à montage. La page Tendances les fait écouter." });
+      if (ctx.waId) {
+        ctx.extras.option_notes = Object.fromEntries(sons.map((s) => [s.bouton, [s.artiste, s.classement].filter(Boolean).join(" · ").slice(0, 72)]).filter(([, note]) => note));
+      }
+      return json({ sons, note: "Propose-lui-en un à trois (reply_with options : leur bouton, jamais le lien), puis passe le son_lien choisi à montage ; une fois choisi, find_sound avec ecouter lui met un bouton pour l'écouter. La page Sons les fait écouter." });
     },
 
     async steal_style({ link, media_id, inspiration_id }) {

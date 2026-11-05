@@ -60,7 +60,7 @@ export default function PrivacyPage() {
         <li>Google (modèles Gemini) : lecture des vidéos et des photos, images par IA.</li>
         <li>ElevenLabs : voix off, clonage de ta voix si tu le demandes, lecture des messages vocaux, musique des Reels.</li>
         <li>TypeSafe : choix de la réaction d’Edith aux messages écrits dans l’application.</li>
-        <li>Treg : récupération de la vidéo d’un Reel Instagram que tu envoies en exemple, par son lien.</li>
+        <li>Treg : récupération de la vidéo d’un Reel Instagram que tu envoies en exemple, par son lien, et recherche des sons (un titre, un artiste que tu cherches) et des Reels qui les utilisent.</li>
         <li>Modal : détourage des personnes dans tes vidéos, sur une carte graphique louée le temps du travail ; rien n’y est gardé, la machine est supprimée juste après.</li>
         <li>
           OpenStreetMap (service Nominatim de la Fondation OpenStreetMap) : les coordonnées de l’adresse de ton commerce, quand un modèle les affiche ; seule cette adresse

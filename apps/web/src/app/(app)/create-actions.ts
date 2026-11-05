@@ -63,7 +63,7 @@ const launchSchema = z.object({
   copy: z.union([z.uuid(), z.boolean()]).default(true),
   /** A carousel or a post she likes, as captures or a screen recording of it (Instagram does not open a carousel's link to us): its form is followed, never its words. */
   refs: z.array(uploadSchema).max(4).default([]),
-  /** A Reel cut on a sound she picked on Tendances: the link of a Reel that uses it (she adds it from there in Instagram), its name. */
+  /** A Reel cut on a sound she picked on the page Sons: the link of a Reel that uses it (she adds it from there in Instagram), its name. */
   sound: z
     .object({
       link: z.string().url().max(600),

@@ -9,6 +9,10 @@ const nextConfig: NextConfig = {
   cacheComponents: true,
   partialPrefetching: true,
   transpilePackages: ["@fauve/agent"],
+  // The page Tendances became Sons (its trend videos removed): an old link or bookmark lands there.
+  async redirects() {
+    return [{ source: "/tendances", destination: "/sons", permanent: true }];
+  },
   turbopack: {
     rules: {
       "*.css": {

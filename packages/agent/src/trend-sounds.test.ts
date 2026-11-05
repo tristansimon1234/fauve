@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { chartSongs, instagramSounds, linkExpiry, sameSound, soundList, soundReels, soundWords, SOUND_LIST_SIZE } from "./trend-sounds.ts";
+import { chartSongs, instagramSounds, linkExpiry, sameSound, shortCount, soundList, soundReels, soundWords, SOUND_LIST_SIZE } from "./trend-sounds.ts";
 
 // The shapes Treg's providers answered at the first bench (5 November 2026), trimmed.
 const chart = {
@@ -70,4 +70,8 @@ test("trend sounds: 30 songs, the Top 50 first then the Viral 50, each once", ()
   assert.equal(list[20]?.title, "Viral 0");
   assert.equal(list[20]?.rank, 2);
   assert.equal(soundWords("SugarCrash! (Sped Up) feat. X"), "sugarcrash");
+  // Its TikTok videos, the way the apps write a count.
+  assert.equal(shortCount(1_240_000), "1,2\u00a0M");
+  assert.equal(shortCount(48_200), "48\u00a0k");
+  assert.equal(shortCount(950), "950");
 });

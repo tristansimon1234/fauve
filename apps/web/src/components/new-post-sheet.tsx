@@ -113,11 +113,11 @@ function defaultWhen(o: NewPostOptions | null, date?: string): When | null {
 
 const clock = (seconds: number) => `${Math.floor(seconds / 60)}:${String(Math.round(seconds % 60)).padStart(2, "0")}`;
 
-/** A sound she picked on the page Tendances: her Reel is cut on its beats, and she adds it in Instagram from this Reel (`link`). */
+/** A sound she picked on the page Sons: her Reel is cut on its beats, and she adds it in Instagram from this Reel (`link`). */
 export type PickedSound = { link: string; title: string; artist: string | null; audioId: string | null };
 
-/** `copyLink`: a Reel to make one like (from the page Tendances), read as the Reel she copies; `sound`: a sound to cut it on. */
-export function NewPostSheet({ date, copyLink, sound, onClose }: { date?: string; copyLink?: string; sound?: PickedSound; timezone: string; onClose: () => void }) {
+/** `sound`: a sound to cut the Reel on (from the page Sons). */
+export function NewPostSheet({ date, sound, onClose }: { date?: string; sound?: PickedSound; timezone: string; onClose: () => void }) {
   const titleId = useId();
   const [options, setOptions] = useState<NewPostOptions | null>(null);
   const [work, setWork] = useState<Work | null>(null);
@@ -151,7 +151,7 @@ export function NewPostSheet({ date, copyLink, sound, onClose }: { date?: string
         {work ? (
           <Working work={work} titleId={titleId} onClose={onClose} />
         ) : (
-          <Create date={date} copyLink={copyLink} sound={sound} options={options} titleId={titleId} onClose={onClose} onStarted={setWork} />
+          <Create date={date} sound={sound} options={options} titleId={titleId} onClose={onClose} onStarted={setWork} />
         )}
       </div>
     </div>
@@ -160,7 +160,6 @@ export function NewPostSheet({ date, copyLink, sound, onClose }: { date?: string
 
 function Create({
   date,
-  copyLink,
   sound,
   options,
   titleId,
@@ -168,7 +167,6 @@ function Create({
   onStarted,
 }: {
   date?: string;
-  copyLink?: string;
   sound?: PickedSound;
   options: NewPostOptions | null;
   titleId: string;
@@ -187,8 +185,8 @@ function Create({
   /** Picked, in order: « m:<media id> » from her library, « u:<draft id> » from her phone. */
   const [order, setOrder] = useState<string[]>([]);
   const [idea, setIdea] = useState("");
-  const [format, setFormat] = useState<PostKind | null>(copyLink || sound ? "reel" : null);
-  // The sound picked on Tendances: no voice over (a sound added in Instagram plays over it), and she can let it go.
+  const [format, setFormat] = useState<PostKind | null>(sound ? "reel" : null);
+  // The sound picked on Sons: no voice over (a sound added in Instagram plays over it), and she can let it go.
   const [soundOn, setSoundOn] = useState<PickedSound | null>(sound ?? null);
   const [when, setWhen] = useState<When | null>(null);
   const [other, setOther] = useState("");
@@ -310,7 +308,7 @@ function Create({
   const refShots = kind === "reel" ? [] : refs.files.filter((f) => f.status === "ready" && f.path);
   const refSending = kind !== "reel" && refs.files.some((f) => f.status === "uploading");
   // A Reel she likes, given on « Ton idée » (its link pasted in what she imagines, or the field below).
-  const [linkBusy, setLinkBusy] = useState(Boolean(copyLink));
+  const [linkBusy, setLinkBusy] = useState(false);
   const [linkError, setLinkError] = useState<string | null>(null);
   // What she asks for: her own words, and the plan Edith said back for them (« La proposition »).
   const finalIdea = idea.trim();
@@ -394,17 +392,6 @@ function Create({
       .catch(() => setLinkError("Ce Reel n’est pas passé. Réessaie dans un instant."))
       .finally(() => setLinkBusy(false));
   };
-
-  // A Reel from the page Tendances: a Reel, made like it, as soon as the sheet opens.
-  const askedCopy = useRef(false);
-  useEffect(() => {
-    if (!copyLink || askedCopy.current) return;
-    askedCopy.current = true;
-    copyReel({ link: copyLink })
-      .then((res) => (res.ok ? followGiven(res.id) : setLinkError(res.error)))
-      .catch(() => setLinkError("Ce Reel n’est pas passé. Réessaie dans un instant."))
-      .finally(() => setLinkBusy(false));
-  }, [copyLink]);
 
   const toggle = (key: string) => setOrder((o) => (o.includes(key) ? o.filter((k) => k !== key) : picked.length >= MAX_FILES ? o : [...o, key]));
   const add = (list: FileList | File[]) => {

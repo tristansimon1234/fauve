@@ -176,3 +176,11 @@ export function soundList(top: ChartSong[], viral: ChartSong[]): (ChartSong & { 
   add(top, "top", SOUND_LIST_SIZE);
   return kept;
 }
+
+/** « 1,2 M », « 48 k », « 950 »: a count the way the apps write it. */
+export function shortCount(n: number | null): string | null {
+  if (n === null || !Number.isFinite(n)) return null;
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(n >= 10_000_000 ? 0 : 1).replace(".", ",").replace(/,0$/, "")}\u00a0M`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(n >= 10_000 ? 0 : 1).replace(".", ",").replace(/,0$/, "")}\u00a0k`;
+  return String(Math.round(n));
+}
