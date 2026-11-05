@@ -1,9 +1,11 @@
 import type { EffectPiece } from "./pieces.ts";
 import { cadre } from "./pieces/cadre.ts";
+import { quatreCoins } from "./pieces/quatre-coins.ts";
 import { mosaique } from "./pieces/mosaique.ts";
 import { carteFeutre } from "./pieces/carte-feutre.ts";
 import { pile } from "./pieces/pile.ts";
 import { photoDump } from "./pieces/photo-dump.ts";
+import { facade } from "./pieces/facade.ts";
 import { frappe } from "./pieces/frappe.ts";
 import { titreDerriere } from "./pieces/titre-derriere.ts";
 import { journee } from "./pieces/journee.ts";
@@ -13,6 +15,7 @@ import { tourne } from "./pieces/tourne.ts";
 import { nike } from "./pieces/nike.ts";
 import { eventail } from "./pieces/eventail.ts";
 import { pixel } from "./pieces/pixel.ts";
+import { motsMeles } from "./pieces/mots-meles.ts";
 import { detourages } from "./pieces/detourages.ts";
 import { silhouette } from "./pieces/silhouette.ts";
 
@@ -22,7 +25,7 @@ import { silhouette } from "./pieces/silhouette.ts";
 // (scripts/skill-render.mts --piece); a new model of Edith's brings its own (docs/reprise.md, « Passage de relais »).
 
 /** The bank, in the catalogue's order (house-models.ts); the editor is offered them by what her files carry (pieces.ts, piecesOffered). */
-export const EFFECT_PIECES: Record<string, EffectPiece> = { cadre, mosaique, "carte-feutre": carteFeutre, pile, "photo-dump": photoDump, frappe, "titre-derriere": titreDerriere, journee, rallume, "coups-de-fouet": coupsDeFouet, tourne, nike, eventail, pixel, detourages, silhouette };
+export const EFFECT_PIECES: Record<string, EffectPiece> = { cadre, "quatre-coins": quatreCoins, mosaique, "carte-feutre": carteFeutre, pile, "photo-dump": photoDump, facade, frappe, "titre-derriere": titreDerriere, journee, rallume, "coups-de-fouet": coupsDeFouet, tourne, nike, eventail, pixel, "mots-meles": motsMeles, detourages, silhouette };
 
 /** The piece of the bank a model's key names, if it has one. */
 export const pieceFor = (key: string | null | undefined): EffectPiece | undefined => (key ? EFFECT_PIECES[key] : undefined);
