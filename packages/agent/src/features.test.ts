@@ -7417,7 +7417,7 @@ function gridLetters(tree: unknown) {
 test("« Mots mêlés » (v2): one calm shot of 25 beats at 80 BPM as its 18,67 s original, no cut, its sentence held, its card after the hold", async () => {
   const { motsMeles } = await import("./skills/mots-meles.ts");
   const { skillPlan } = await import("./skills.ts");
-  assert.equal(motsMeles.version, 3);
+  assert.equal(motsMeles.version, 4);
   assert.equal(motsMeles.bpm, 80);
   const line = motsMeles.timeline(1, { end: false });
   // One shot, no cut (the original has none, measured image by image): 25 of its beats, the original's 560 images and three.
@@ -7439,7 +7439,7 @@ test("« Mots mêlés » (v2): one calm shot of 25 beats at 80 BPM as its 18,67 
   assert.equal(plan.sounds, undefined);
   assert.equal(plan.music_shape, undefined);
   assert.deepEqual(motsMeles.settings?.map((s) => [s.name, s.choices.map((c) => c.value)]), [["format", ["auto", "horizontal", "vertical"]]]);
-  assert.deepEqual(plan.skill, { key: "mots-meles", version: 3 });
+  assert.deepEqual(plan.skill, { key: "mots-meles", version: 4 });
 });
 
 test("« Mots mêlés » (v2): its loops at the original's hand, chained 3 to 6 images apart, from just above each first letter, the letters never changing", async () => {
@@ -9175,4 +9175,25 @@ test("« Interrupteur » (v3): once she has left, her wall held on that image to
   const stays = (f: number) => ({ ...track(f), bodies: f >= 40 ? track(Math.min(f, 200)).bodies : [] });
   const { draw: there } = await kitScene(interrupteur.code, { track: stays });
   assert.equal(drawnNodes(there(250, props)).find((n) => n.props.key === "wall")!.props.at, undefined);
+});
+
+test("« Mots mêlés » (v4): each letter's halo stronger where the picture stays bright under it, the same as v3's on a dark one", async () => {
+  const { motsMeles } = await import("./skills/mots-meles.ts");
+  assert.equal(motsMeles.version, 4);
+  const line = motsMeles.timeline(1, { end: false });
+  const marks = Object.fromEntries(Object.entries(line.marks).map(([k, v]) => [k, String(v)]));
+  const props = { width: 1080, height: 1920, durationInFrames: 563, brand: { name: "Le Studio", displayFont: "Inter Tight", bodyFont: "Inter Tight" }, shots: rallumeShots(line), reelTexts: MM_WORDS, end: null, texts: marks };
+  const halo = async (light: { mean: number; high: number }) => {
+    const { draw } = await kitScene(motsMeles.code, { light });
+    const shadows = drawnNodes(draw(500, props)).map((n) => styleOf(n).textShadow).filter((t): t is string => typeof t === "string" && t.startsWith("0 0 "));
+    assert.ok(shadows.length > 100);
+    const alpha = Number(/rgba\(0,0,0,([\d.]+)\)/.exec(shadows[0]!)![1]);
+    const blur = Number(/^0 0 (\d+)px/.exec(shadows[0]!)![1]);
+    return { alpha, blur };
+  };
+  // Under a dark part (a fifth of white): v3's soft halo; under a glass roof that stays bright under the veil: darker and wider.
+  const dark = await halo({ mean: 0.2, high: 0.2 });
+  assert.deepEqual(dark, { alpha: 0.55, blur: 6 });
+  const bright = await halo({ mean: 0.85, high: 1 });
+  assert.ok(bright.alpha > 0.7 && bright.blur >= 10, JSON.stringify(bright));
 });

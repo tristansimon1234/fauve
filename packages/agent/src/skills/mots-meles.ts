@@ -241,7 +241,7 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
         shape = { kind: "capsule", box: { x: mx - length / 2, y: my - 0.45 * py, w: length, h: 0.9 * py }, angle: (Math.atan2(by2 - ay, bx - ax) * 180) / Math.PI };
       }
       const stroke = Scribble.frames({ ...shape, speed: 1, start: "top-left", direction: "ccw", wobble: 0.45, seed });
-      return { shape, seed, stroke, takes: Math.max(12, (shape.kind === "cells" ? 27.9 : 18.6) + (3.21 * stroke) / py) };
+      return { shape, seed, stroke, cells: w.cells, takes: Math.max(12, (shape.kind === "cells" ? 27.9 : 18.6) + (3.21 * stroke) / py) };
     });
     const kept = list.filter(Boolean);
     const total = kept.reduce((s, l, j) => s + l.takes + (j < kept.length - 1 ? LIFTS[j % LIFTS.length] : 0), 0);
@@ -265,9 +265,24 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
     film, veil > 0 ? h("div", { style: { position: "absolute", left: 0, top: 0, width: bw, height: bh, backgroundColor: "#000000", opacity: Number(veil.toFixed(3)) } }) : null);
 
   // The letters, each centred in its cell, the same white from the first image to the last (ringed or not), with a soft
-  // dark halo so they read on a bright part of her shot too (« parfois on voit pas » under a glass roof, its first bench).
-  const LETTER = { fontFamily: body, fontWeight: wide ? 500 : 400, fontSize: SIZE, lineHeight: 1, color: "#ffffff", textShadow: "0 0 6px rgba(0,0,0,0.55), 0 1px 2px rgba(0,0,0,0.45)" };
-  const cell = (key, c, r, ch) => h("div", { key, style: { position: "absolute", left: Math.round(cx(c) - px / 2), top: Math.round(cy(r) - py / 2), width: Math.ceil(px), height: Math.ceil(py), display: "flex", alignItems: "center", justifyContent: "center", ...LETTER } }, ch);
+  // dark halo so they read on a bright part of her shot too (« parfois on voit pas » under a glass roof, its first bench),
+  // stronger where the picture stays bright under its veil, by the light read under each letter (a glass roof, a window,
+  // a white wall: Tristan, « on voit pas bien les lettres sur certaines zones ») and nowhere else.
+  const LETTER = { fontFamily: body, fontWeight: wide ? 500 : 400, fontSize: SIZE, lineHeight: 1, color: "#ffffff" };
+  const lightAt = React.useMemo(() => {
+    const memo = new Map();
+    return (c, r) => {
+      const k = c + "," + r;
+      if (memo.has(k)) return memo.get(k);
+      const read = n ? LightUnder(shots[0], 0, laid, { x: cx(c) - px, y: cy(r) - py, w: 2 * px, h: 2 * py }) : null;
+      const v = read ? read.high * (1 - veil) : null;
+      memo.set(k, v);
+      return v;
+    };
+  }, [n, wide, veil]);
+  const brightAt = (c, r) => { const v = lightAt(c, r); return v === null ? 0 : Math.max(0, Math.min(1, (v - 0.3) / 0.35)); };
+  const haloOf = (k) => "0 0 " + Math.round(6 + 9 * k) + "px rgba(0,0,0," + (0.55 + 0.35 * k).toFixed(2) + "), 0 1px 2px rgba(0,0,0," + (0.45 + 0.4 * k).toFixed(2) + ")";
+  const cell = (key, c, r, ch) => h("div", { key, style: { position: "absolute", left: Math.round(cx(c) - px / 2), top: Math.round(cy(r) - py / 2), width: Math.ceil(px), height: Math.ceil(py), display: "flex", alignItems: "center", justifyContent: "center", ...LETTER, textShadow: haloOf(brightAt(c, r)) } }, ch);
   const unseen = (key, ch) => h("span", { key, style: { position: "absolute", left: 0, top: 0, opacity: 0, fontSize: 1 } }, ch);
   const spell = (word, key) => {
     let j = 0;
@@ -303,7 +318,9 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
     : null;
 
   // Under each loop, the same stroke darker and wider: a soft halo like its letters', without a filter (light to render).
-  const halos = loops.map((l, i) => (frame < l.at ? null : h(Scribble, { key: "halo" + i, ...l.shape, at: l.at, speed: l.speed, start: "top-left", direction: "ccw", color: "rgba(0,0,0,0.32)", width: Math.round(WIDTH * 3.2 * 10) / 10, wobble: 0.45, seed: l.seed })));
+  // Darker where the picture under the loop stays bright (its brightest letter's light).
+  const loopBright = (l) => (l.cells && l.cells.length ? Math.max.apply(null, l.cells.map((p) => brightAt(p[0], p[1]))) : 0);
+  const halos = loops.map((l, i) => (frame < l.at ? null : h(Scribble, { key: "halo" + i, ...l.shape, at: l.at, speed: l.speed, start: "top-left", direction: "ccw", color: "rgba(0,0,0," + (0.32 + 0.3 * loopBright(l)).toFixed(2) + ")", width: Math.round(WIDTH * 3.2 * 10) / 10, wobble: 0.45, seed: l.seed })));
   return h(AbsoluteFill, { style: { backgroundColor: "#000000" } }, frameBox, decor, words, halos, rings, extra, ending);
 }`;
 
@@ -311,8 +328,9 @@ export const motsMeles: MontageSkill = {
   key: "mots-meles",
   // 2: written again on its original's fiche (its grid, its hand's pace, its sentence held, its light, its format).
   // 3: its letters 1,4 times bigger on the 16:9 frame and a soft dark halo under its letters and loops, to read on a
-  // bright shot (Tristan, on its first bench: « un peu plus grosse et parfois on voit pas »).
-  version: 3,
+  // bright shot (Tristan, on its first bench: « un peu plus grosse et parfois on voit pas »). 4: that halo stronger where
+  // the picture stays bright under the letters, by the light read there (« il devrait appliquer un filtre »).
+  version: 4,
   bpm: BPM,
   // A calm music without marked drums: its length follows it (21,4 s at 70 BPM, 16,7 s at 90), its loops the hand.
   tempo: [70, 90],
