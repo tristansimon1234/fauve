@@ -6381,5 +6381,5 @@ test("« Voici mon travail » (v1): its clicks slowing down on their measured mo
   assert.match(input.cases[0]!.veut, /debout dans son lieu/);
   assert.match(input.cases[1]!.veut, /première photo de son travail/);
   assert.match(input.cases[33]!.veut, /devant ses jambes/);
-  assert.deepEqual(input.textes.map((t) => [t.slot, t.max_caracteres]), [["mots", 26]]);
+  assert.deepEqual(input.textes.map((t) => [t.slot, "max_caracteres" in t ? t.max_caracteres : null]), [["mots", 26]]);
 });
