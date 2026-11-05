@@ -124,8 +124,8 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
 
   // 3. Her words as a creator subtitles what he says: groups of one to three words, a group never ending on « de »,
   // « la », « tu »…, a number with its word, a verb with what it takes (« perdre du poids »), two short neighbours
-  // together (« bien chaude »); a comma, a full stop or a « / » always a change. No punctuation shown: each mark stays in
-  // the page, hidden, so the whole text is there for the check.
+  // together, from the end of the phrase (« des œufs » then « vraiment crémeux »); a comma, a full stop or a « / » always
+  // a change. No punctuation shown: each mark stays in the page, hidden, so the whole text is there for the check.
   const LIGHT = new Set("le la les l un une des du de d au aux à a en et ou ni mais donc car que qu qui dont ce c cet cette ces mon ma mes ton ta tes son sa ses notre nos votre vos leur leurs je j tu t te il ils elle elles on nous vous se s y ne n me m lui sur sous dans par pour avec sans chez vers entre est es sont ai as ont va vas vont si deux trois quatre cinq six sept huit neuf dix douze quinze vingt trente cent mille".split(" "));
   const LEADS = new Set("le la les l un une des du de d au aux à en ce cet cette ces mon ma mes ton ta tes son sa ses notre nos votre vos leur leurs deux trois quatre cinq six sept huit neuf dix douze quinze vingt trente cent mille".split(" "));
   const bare = (w) => w.toLowerCase().replace(/^.*['’]/, "").replace(/[^\p{L}\p{N}]/gu, "");
@@ -151,7 +151,7 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
     const joins = (g, b) => !g[g.length - 1].brk && g.length + b.length <= 3 && size(g) + 1 + size(b) <= 18;
     const groups = units.slice();
     for (let i = 0; i + 1 < groups.length; i++) if (leads(groups[i + 1][0].w) && joins(groups[i], groups[i + 1])) groups.splice(i, 2, groups[i].concat(groups[i + 1]));
-    for (let i = 0; i + 1 < groups.length; i++) if (joins(groups[i], groups[i + 1]) && full(groups[i].concat(groups[i + 1])) <= 2) groups.splice(i, 2, groups[i].concat(groups[i + 1]));
+    for (let i = groups.length - 2; i >= 0; i--) if (joins(groups[i], groups[i + 1]) && full(groups[i].concat(groups[i + 1])) <= 2) groups.splice(i, 2, groups[i].concat(groups[i + 1]));
     return { lead, items: groups.map((g) => ({ show: g.map((x) => x.w).join(" "), after: g[g.length - 1].after, tokens: g.length, chars: size(g) })) };
   };
 
@@ -229,12 +229,13 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   }), [shots, track, TASTE, MID, bh, durationInFrames]);
   const Y = n ? spot[cur] : MID;
 
-  // 6. Its subtitle: her display font (its pairing's Gelasio, a Georgia twin) in bold, a warm white, a faint shadow; one
-  // group seen at a time, cut in and out; the others in the page, hidden, so the whole text is there.
+  // 6. Its subtitle: her display font (its pairing's Gelasio, a Georgia twin) in bold, a warm white, a soft shadow (a
+  // little more than the original's faint one: her pale dough, her white flour, a yellow pan); one group seen at a time,
+  // cut in and out; the others in the page, hidden, so the whole text is there.
   const serif = "'" + brand.displayFont + "', 'Gelasio', Georgia, serif";
   const body = "'" + brand.bodyFont + "', 'Gelasio', Georgia, serif";
   const WHITE = "#fefaf6";
-  const shade = "0 2px 3px rgba(0,0,0,0.38), 0 0 12px rgba(0,0,0,0.24)";
+  const shade = "0 2px 4px rgba(0,0,0,0.45), 0 0 2px rgba(0,0,0,0.35), 0 0 16px rgba(0,0,0,0.3)";
   const hidden = { position: "absolute", left: 0, top: 0, opacity: 0, fontSize: 1, whiteSpace: "pre" };
   const lines = told.filter((x) => frame >= x.t.from && frame < Math.min(x.t.to, endAt)).map((x, ti) =>
     h("div", { key: "t" + ti },

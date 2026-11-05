@@ -203,6 +203,9 @@ test("« Pas à pas raconté »: its groups read like a creator's subtitles of t
   assert.deepEqual(groups("les courgettes en dernier c'est le plus rapide à cuire"), ["les courgettes", "en dernier", "c'est le plus", "rapide à cuire"]);
   assert.deepEqual(groups("il te faut deux trucs : du plaisir et du volume"), ["il te faut", "deux trucs", "du plaisir", "et du volume"]);
   assert.deepEqual(groups("dans une poêle bien chaude"), ["dans une poêle", "bien chaude"]);
+  // Two short neighbours from the end of the phrase: « vraiment crémeux », never « des œufs vraiment ».
+  assert.deepEqual(groups("si tu veux des œufs vraiment crémeux"), ["si tu veux", "des œufs", "vraiment crémeux"]);
+  assert.deepEqual(groups("à feu doux, sans arrêter"), ["à feu doux", "sans arrêter"]);
   // A number with its word, the marks never shown.
   assert.deepEqual(groups("12 raviolis, 100 calories !"), ["12 raviolis", "100 calories"]);
 });

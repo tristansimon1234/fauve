@@ -52,7 +52,7 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
     const joins = (g, b) => !g[g.length - 1].brk && g.length + b.length <= 3 && size(g) + 1 + size(b) <= 18;
     const groups = units.slice();
     for (let i = 0; i + 1 < groups.length; i++) if (leads(groups[i + 1][0].w) && joins(groups[i], groups[i + 1])) groups.splice(i, 2, groups[i].concat(groups[i + 1]));
-    for (let i = 0; i + 1 < groups.length; i++) if (joins(groups[i], groups[i + 1]) && full(groups[i].concat(groups[i + 1])) <= 2) groups.splice(i, 2, groups[i].concat(groups[i + 1]));
+    for (let i = groups.length - 2; i >= 0; i--) if (joins(groups[i], groups[i + 1]) && full(groups[i].concat(groups[i + 1])) <= 2) groups.splice(i, 2, groups[i].concat(groups[i + 1]));
     return { lead, items: groups.map((g) => ({ show: g.map((x) => x.w).join(" "), after: g[g.length - 1].after, tokens: g.length, chars: size(g) })) };
   };
 
@@ -121,7 +121,7 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
       const on = Boolean(span) && frame >= span.from && frame < span.to;
       return h(React.Fragment, { key: "g" + gi },
         on
-          ? h(FitText, { key: "w-" + gi + "-" + g.show, style: { position: "absolute", left: 140, top: Y - 52, width: 800, height: 104 }, innerStyle: { fontFamily: serif, fontWeight: 700, fontSize: 64, lineHeight: 1.15, color: "#fefaf6", textShadow: "0 2px 3px rgba(0,0,0,0.38), 0 0 12px rgba(0,0,0,0.24)", whiteSpace: "nowrap", textAlign: "center" } }, g.show)
+          ? h(FitText, { key: "w-" + gi + "-" + g.show, style: { position: "absolute", left: 140, top: Y - 52, width: 800, height: 104 }, innerStyle: { fontFamily: serif, fontWeight: 700, fontSize: 64, lineHeight: 1.15, color: "#fefaf6", textShadow: "0 2px 4px rgba(0,0,0,0.45), 0 0 2px rgba(0,0,0,0.35), 0 0 16px rgba(0,0,0,0.3)", whiteSpace: "nowrap", textAlign: "center" } }, g.show)
           : h("span", { style: hidden }, g.show),
         g.after ? h("span", { style: hidden }, g.after) : null);
     }));
