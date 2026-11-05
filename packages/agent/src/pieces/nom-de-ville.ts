@@ -81,8 +81,9 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const caps = Math.round(0.72 * F * scale);
 
   // 2. Its place: its foot a fifth of its capitals under her roofs (the median of what stands under her sky across its
-  // width, at the image it lands), behind them; a scenery that would hide most of its letters leaves it in front, at the
-  // bottom of her sky or calm area, else at the original's place. Its small words above it, under the top margin.
+  // width, at the image it lands), never deeper than half a capital under the second highest of them, behind them; a
+  // scenery too high for it (no room above for its small words) leaves it in front, at the bottom of her sky or calm
+  // area, else at the original's place; one lower than it may go has it as low in her sky as it may.
   const top0 = 100;
   const reach = small ? 2.15 : 1.1;
   const footMin = Math.round(top0 + reach * caps);
@@ -97,9 +98,8 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   }
   tops.sort((a, b) => a - b);
   const median = tops.length >= COLS / 2 ? tops[Math.floor((tops.length - 1) / 2)] : null;
-  const under = median === null ? null : Math.round(median + 0.2 * caps);
-  const tooHigh = under !== null && tops.filter((y) => y < under - 0.85 * caps).length >= 2;
-  const behind = under !== null && !tooHigh && under >= footMin && under <= footMax;
+  const under = median === null ? null : Math.round(Math.min(median + 0.2 * caps, tops[1] + 0.5 * caps));
+  const behind = under !== null && under >= footMin;
   const SKY = { prefer: "top", min: { w: Math.round(width * 0.5), h: Math.round(height * 0.06) }, within: { x: 0, y: 0, w: width, h: footMax }, pad: 4, fallback: null };
   const sky = behind ? null : ClearBox(list[g], LOOK, laid, SKY);
   const foot = Math.round(within(behind ? under : sky ? sky.y + sky.h : height * 0.42, footMin, footMax));

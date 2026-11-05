@@ -200,7 +200,15 @@ test("« Nom aux cinq polices »: behind her roofs when her sky is read, its foo
   assert.ok(Math.abs(box(bare).top + box(bare).height - (Math.round(608 * 0.475) + 0.07 * caps)) <= 2, JSON.stringify(box(bare)));
   const calm = drawAt(30, { reads: { clear: { x: 100, y: 40, w: 800, h: 200 } } });
   assert.ok(Math.abs(box(calm).top + box(calm).height - (240 + 0.07 * caps)) <= 2);
-  // A scenery that would hide most of its letters (towers over most of its width): in front.
+  // Never deeper than half a capital under the second highest top across it: mountains on its left (two of its eighths
+  // at 200 px) bite half its letters there, the rest of it free above her roofs.
+  const mountains = (_f: number, span: { from: number; to: number }) => (span.from < 300 ? 200 : 300);
+  const high = box(drawAt(30, { reads: { skyline: mountains } }));
+  assert.ok(Math.abs(high.top + high.height - (200 + 0.5 * caps + 0.07 * caps)) <= 2, JSON.stringify(high));
+  // Only a low horizon under it (a beach): behind it all the same, as low in her sky as it may go (two thirds of its box).
+  const beach = drawAt(30, { reads: { skyline: () => 560 } });
+  assert.ok(front(beach) && Math.abs(box(beach).top + box(beach).height - (Math.round(608 * 0.66) + 0.07 * caps)) <= 2, JSON.stringify(box(beach)));
+  // A scenery too high for it (towers over most of its width, no room above them for its small words): in front.
   const towers = (_f: number, span: { from: number; to: number }) => (span.from < 600 ? 120 : 300);
   assert.equal(front(drawAt(30, { reads: { skyline: towers } })), null);
 });

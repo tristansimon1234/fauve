@@ -116,9 +116,11 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const caps = Math.round(0.72 * F * scale);
 
   // 4. Its place: its foot (the letters' baseline) a fifth of its capitals under her roofs, the median of what stands
-  // under her sky across its width at the image it lands (eight columns), behind them; its small words above it under
-  // the top margin. A scenery that would hide most of its letters (two of its eighths rising over 85 % of them) leaves it
-  // in front: at the bottom of her sky or calm area (ClearBox), else at the original's place.
+  // under her sky across its width at the image it lands (eight columns), never deeper than half a capital under the
+  // second highest of them (a mountain, a tower or a tree bites half its letters at most), behind them; its small words
+  // above it under the top margin. A scenery too high for it (no room above it for its small words) leaves it in front:
+  // at the bottom of her sky or calm area (ClearBox), else at the original's place; one only lower than it may go (a
+  // beach, low hills) has it as low in her sky as it may.
   const top0 = band ? Math.round(bh * 0.05) : 100;
   // From its foot to the top of its small words (its capitals, the gap and their line), in its capitals.
   const reach = small ? 2.15 : 1.1;
@@ -133,9 +135,8 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   }
   tops.sort((a, b) => a - b);
   const median = tops.length >= COLS / 2 ? tops[Math.floor((tops.length - 1) / 2)] : null;
-  const under = median === null ? null : Math.round(median + 0.2 * caps);
-  const tooHigh = under !== null && tops.filter((y) => y < under - 0.85 * caps).length >= 2;
-  const behind = under !== null && !tooHigh && under >= footMin && under <= footMax;
+  const under = median === null ? null : Math.round(Math.min(median + 0.2 * caps, tops[1] + 0.5 * caps));
+  const behind = under !== null && under >= footMin;
   const SKY = { prefer: "top", min: { w: Math.round(bw * 0.5), h: Math.round(bh * 0.08) }, within: { x: 0, y: 0, w: bw, h: footMax }, origin: { x: 0, y: by }, pad: 4, fallback: null };
   const sky = !behind && shots[0] ? ClearBox(shots[0], LAND, laid, SKY) : null;
   const foot = Math.round(within(behind ? under : sky ? sky.y + sky.h : bh * (band ? 0.475 : 0.42), footMin, footMax));
