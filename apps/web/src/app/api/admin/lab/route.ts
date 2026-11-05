@@ -6,6 +6,7 @@ import {
   DEFAULT_EFFORT,
   directorOutputSchema,
   editPlanSchema,
+  effortSchema,
   GEMINI_MODEL_ID,
   isKimiModel,
   imaginedBrief,
@@ -15,6 +16,7 @@ import {
   motionTemplateSchema,
   reelLink,
   slidesPlanSchema,
+  type Effort,
   type MotionTemplate,
 } from "@fauve/agent";
 import { outputFormat } from "@fauve/agent/answer";
@@ -51,6 +53,8 @@ import { photoRegions } from "@/lib/video/regions";
 //                        clip without a new deploy;
 //                        route=agent|chain makes this Reel with the effects workshop or the chain,
 //                        to compare them on the same case (else decided as for her);
+//                        free=1 makes it in none of Edith's models (the creative test: the editor and the motion
+//                        designer free with every tool), effort=rapide|soigne|max at that care (else the default);
 //                        idea=<her words> is what she writes in « Ce que tu imagines » (else the
 //                        case's idea), sent as the Créer screen sends it: the post's title, and
 //                        « Ce que la gérante imagine : … » for the editor and the voice;
@@ -129,6 +133,10 @@ type LabCase = {
   photosOf?: { studio: string; max: number };
   /** Who makes the Reel for this run (route=agent|chain), to compare the effects workshop with the chain; else decided as for her. */
   route?: "agent" | "chain";
+  /** Made in none of Edith's models (free=1): the editor and the motion designer free with every tool (the creative test). */
+  free?: boolean;
+  /** Its level of care for this run (effort=rapide|soigne|max), else the default. */
+  effort?: Effort;
 };
 
 const CASES: Record<string, LabCase> = {
@@ -789,7 +797,7 @@ async function startSite(url: string, kindName: string, withClips: boolean, rese
   await montage(siteKey(url), studioId, { title: kind.title, idea: idea ?? kind.idea, template }, videos, photos, voice, copy);
 }
 
-async function montage(name: string, studioId: string, c: Pick<LabCase, "title" | "idea" | "template" | "route">, videos: string[], photos: string[], voice: LabVoice, copy: string | null = null) {
+async function montage(name: string, studioId: string, c: Pick<LabCase, "title" | "idea" | "template" | "route" | "free" | "effort">, videos: string[], photos: string[], voice: LabVoice, copy: string | null = null) {
   const db = supabaseAdmin();
   // Everything read first, as when she sends them: Gemini watches each video, each photo is framed.
   const [analyses] = await Promise.all([
@@ -828,7 +836,17 @@ async function montage(name: string, studioId: string, c: Pick<LabCase, "title" 
     console.log("lab: her voice note", name, note.seconds, note.text);
   }
   // The same chain as her first Reel at the default care, without a quote: two scenes of her own.
-  await queueJob("montage", { step: "design", studioId, postId: post.data.id, mediaIds, brief, maxNewScenes: 2, effort: DEFAULT_EFFORT, ...(c.route ? { route: c.route } : {}) });
+  await queueJob("montage", {
+    step: "design",
+    studioId,
+    postId: post.data.id,
+    mediaIds,
+    brief,
+    maxNewScenes: 2,
+    effort: c.effort ?? DEFAULT_EFFORT,
+    ...(c.route ? { route: c.route } : {}),
+    ...(c.free ? { free: true } : {}),
+  });
   console.log("lab: montage started", name, post.data.id);
 }
 
@@ -1174,8 +1192,16 @@ export async function POST(request: Request) {
   if (own && (own.length > MAX_MEDIA || !own.every((f) => LAB_FILE.test(f)))) return Response.json({ error: "own=<file>,…" }, { status: 400 });
   const route = params.get("route");
   if (route && route !== "agent" && route !== "chain") return Response.json({ error: "route=agent|chain" }, { status: 400 });
+  // The creative test (free=1): in none of Edith's models; its care (effort=rapide|soigne|max), else the default.
+  const effort = params.get("effort");
+  if (effort && !effortSchema.safeParse(effort).success) return Response.json({ error: "effort=rapide|soigne|max" }, { status: 400 });
   const media = own ? { ...c, clips: [], own } : stock ? { ...c, clips: stock.split(",").map(Number) } : c;
-  const run = route ? { ...media, route: route as "agent" | "chain" } : media;
+  const run = {
+    ...media,
+    ...(route ? { route: route as "agent" | "chain" } : {}),
+    ...(params.get("free") === "1" ? { free: true } : {}),
+    ...(effort ? { effort: effort as Effort } : {}),
+  };
   // « Steal »: a Reel's link, a video file's URL (https), or a video uploaded to the lab studio (lab:<file>).
   const steal = params.get("model") ? `house:${params.get("model")}` : params.get("steal");
   if (steal && !/^https:\/\/\S{8,500}$/.test(steal) && !(steal.startsWith("lab:") && LAB_FILE.test(steal.slice(4))) && !/^house:[a-z-]{2,40}$/.test(steal)) {

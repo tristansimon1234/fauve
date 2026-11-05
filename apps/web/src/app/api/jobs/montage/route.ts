@@ -140,6 +140,8 @@ const bodySchema = z.object({
   contract: reelContractSchema.optional(),
   /** Who makes this Reel, decided once at its design: the effects agent or the chain. */
   route: z.enum(["agent", "chain"]).optional(),
+  /** Made freely, in none of Edith's models (the lab's creative test, free=1): the editor and the motion designer choose everything. */
+  free: z.boolean().optional(),
   /** The editor's reasoning effort, set on a montage queued by hand to compare two levels; else its level of care's. */
   editorEffort: z.enum(["medium", "high"]).optional(),
   /**
@@ -388,7 +390,8 @@ function designInput(job: Job) {
  */
 async function edithModelFirst(job: Job): Promise<void> {
   if (job.correction) return;
-  await ensureEdithModel({ studioId: job.studioId, postId: job.postId, mediaIds: job.mediaIds, brief: job.brief }).catch((error: unknown) =>
+  if (!job.free)
+    await ensureEdithModel({ studioId: job.studioId, postId: job.postId, mediaIds: job.mediaIds, brief: job.brief }).catch((error: unknown) =>
     console.warn("house pick failed, the Reel is made freely", job.postId, error),
   );
   // A Reel she copies stays faithful to it unless she asked for her own look on it.
