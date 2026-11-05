@@ -1,4 +1,5 @@
 import type { EffectPiece, PieceTimeline } from "../pieces.ts";
+import { burstTimes } from "../sfx.ts";
 
 // « Pile de photos », the effect (docs/fiches/pile.md, effects 1 to 5; its whole Reel is skills/pile.ts): over a run of
 // her shots, a white page covers the frame and her photos land on it at once, in a burst, down the page in the
@@ -17,8 +18,10 @@ import type { EffectPiece, PieceTimeline } from "../pieces.ts";
 // its timeline sets every landing and leaving (its marks l0…, o0…) and lays the original's clicks on them, its dry knock
 // on the hit. Her photos stay still, her videos play while they lie on top of the pile, then hold. Kept from the skill:
 // its boxes, its shapes and its format setting, its words' type (Anton squeezed to two thirds, its bars thickened, her
-// own face as it is), its page without grade. Left out: its ending card, its whole Reel's length (37 photos over 9 s),
-// its music lighter after the hit, its burst of clicks denser than a frame (a piece lays 16 sounds at most).
+// own face as it is), its page without grade, its sound (v2): a click on each landing and, under its first photos, a
+// clicking too dense for a click a photo, slowing down like a wheel (its skill's burst, at the Reel's tempo), all one
+// burst of the same click; the dry knock on the hit; after it, her music without its bass to the cut (its skill's
+// `thin`), whole again with the montage. Left out: its ending card, its whole Reel's length (37 photos over 9 s).
 
 /** The original's landmarks, in beats: its first photo, its burst's pace a photo. */
 const FIRST = 0.2;
@@ -34,8 +37,15 @@ const CLICK = { sound: "light click", seconds: 0.5 };
 const KNOCK = { sound: "dry knock", seconds: 0.5, gain: 6 };
 const BURST_GAIN = -8;
 const SLOW_GAIN = -3;
-/** A piece lays 16 sounds at most (pieceMotion): the knock and the last landings' clicks. */
-const MOST_SOUNDS = 16;
+/**
+ * Its clicking under its first photos, too dense for a click a photo (its skill's burst: the original's 40 a second at
+ * 0,3 s, 17 at 1,5): its pace falling evenly from 46 to 16,5 a second at 120 BPM (the Reel's tempo scales it), over the
+ * first 57 % of its fast landings (the original's 1,44 s of its 2,53), as soft as its quietest clicks.
+ */
+const DENSE = { pace: [46.3, 16.5] as const, share: 0.57, gain: -8, bpm: 120 };
+/** Two hits of its burst closer than this are one (s). */
+const SAME_HIT = 0.012;
+const round3 = (n: number) => Math.round(n * 1000) / 1000;
 
 /** A value along a list, at t from 0 (its first) to 1 (its last), between two of them. */
 const along = (list: number[], t: number) => {
@@ -204,7 +214,7 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
 
 export const pile: EffectPiece = {
   key: "pile",
-  version: 1,
+  version: 2,
   name: "Pile de photos",
   how: "une page blanche couvre l'écran et ses photos s'y posent d'un coup, en rafale, du haut vers le bas en zigzag, chacune par-dessus la précédente dont elle couvre la moitié, recadrées au carré, sans bord ni ombre, de plus en plus lentement pour les dernières ; puis elles repartent d'un coup dans le même ordre, la pile se vidant par le haut au rythme où elle s'est faite, vide sur un coup sec ; 2 à 4 mots en très grandes capitales serrées de sa couleur, un par ligne, restent devant du début à la fin et finissent seuls sur le blanc ; puis le montage reprend, le plan suivant en plein écran.",
   needs: "beaucoup de photos de son travail en série (des gros plans qui se lisent petits : ses coupes, ses plats, ses pièces, ses produits), qui changent de couleur et de cadrage, et une phrase de 2 à 4 mots courts qui dit qui on est.",
@@ -237,11 +247,20 @@ export const pile: EffectPiece = {
     const marks: Record<string, number> = {};
     plan.lands.forEach((l, k) => (marks[`l${k}`] = l));
     plan.leaves.forEach((o, k) => (marks[`o${k}`] = o));
-    // A click on each landing (its slower ones a little louder), the knock on the hit: 16 at most, the last clicks kept.
+    // A click on each landing (its slower ones a little louder) and, under its first photos, its denser clicking that
+    // slows down: one burst of the same click from its first landing; the knock on the hit.
     const slowFrom = plan.lands.length - plan.slow;
-    const clicks = plan.lands.map((l, k) => ({ at: Math.round((l / 30) * 1000) / 1000, ...CLICK, gain: k >= slowFrom ? SLOW_GAIN : BURST_GAIN }));
-    const sounds = [...clicks.slice(Math.max(0, clicks.length - (MOST_SOUNDS - 1))), { at: Math.round((plan.hit / 30) * 1000) / 1000, ...KNOCK }];
-    return { marks, sounds };
+    const first = (plan.lands[0] ?? 0) / 30;
+    const landed = plan.lands.map((l, k) => ({ t: l / 30 - first, gain: k >= slowFrom ? SLOW_GAIN : BURST_GAIN }));
+    const fast = ((plan.lands[Math.max(0, slowFrom - 1)] ?? 0) / 30 - first) * DENSE.share;
+    const scale = bpm / DENSE.bpm;
+    const dense = fast > 0.2 ? burstTimes(DENSE.pace[0] * scale, DENSE.pace[1] * scale, fast).map((t) => ({ t, gain: DENSE.gain })) : [];
+    const hits: { t: number; gain: number }[] = [];
+    for (const h of [...landed, ...dense].sort((a, b) => a.t - b.t || b.gain - a.gain)) if (!hits.length || h.t - hits.at(-1)!.t >= SAME_HIT) hits.push(h);
+    const clicks = hits.length > 1 ? { at: round3(first), ...CLICK, burst: { times: hits.map((h) => round3(h.t)), gains: hits.map((h) => h.gain) } } : { at: round3(first), ...CLICK, gain: BURST_GAIN };
+    const sounds = [clicks, { at: round3(plan.hit / 30), ...KNOCK }];
+    // After the hit, her music goes on lighter, without its bass, to the cut (the original's 10 dB lower and clearer).
+    return { marks, sounds, music: { filters: [{ kind: "thin", from: round3(plan.hit / 30), to: round3(frames / 30) }] } };
   },
   code: CODE,
 };

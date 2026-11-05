@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { editPlanSchema } from "../schemas.ts";
-import { pieceTestPlan } from "../pieces.ts";
+import { pieceMusicShape, pieceTestPlan } from "../pieces.ts";
 import { pile, pileSchedule } from "./pile.ts";
 
 // « Pile de photos », the effect of the bank (pile.ts): its own checks, beside the bank's (features.test.ts).
@@ -34,7 +34,7 @@ const under = (n: number, beat = 18, video = (i: number) => i % 5 === 3) => [
 ];
 const brand = { displayFont: "Anton", bodyFont: "Inter Tight", accent: "#b4532a", palette: { light: "#f4ead8", dark: "#2b1d14" } };
 
-test("« Pile de photos » (effect v1): its schedule holds for every count and span it takes, the pile empty on a whole beat", () => {
+test("« Pile de photos » (effect v2): its schedule holds for every count and span it takes, the pile empty on a whole beat", () => {
   for (const bpm of [60, 85, 100, 120, 140]) {
     const beat = (60 / bpm) * 30;
     for (let n = pile.shots[0]; n <= pile.shots[1]; n++) {
@@ -68,7 +68,7 @@ test("« Pile de photos » (effect v1): its schedule holds for every count and s
   assert.ok(gaps.slice(-4).every((g) => g >= 8), JSON.stringify(gaps));
 });
 
-test("« Pile de photos » (effect v1): its layer gives every landing and leaving, a click on each landing and its knock on the hit", () => {
+test("« Pile de photos » (effect v2): its layer gives every landing and leaving, a click on each landing and its knock on the hit", () => {
   const shots = [{ file: "lead", at: 1, seconds: 1.2 }, ...Array.from({ length: 13 }, (_, i) => ({ file: `f${i}`, at: 0, seconds: 0.6, photo: true })), { file: "after", at: 2, seconds: 1.8 }];
   const plan = pieceTestPlan({ piece: pile, shots, span: [1.2, 9], fill: { texts: { mots: "fait main à Lyon" }, objects: {}, settings: {} }, bpm: 100 });
   assert.ok(editPlanSchema.safeParse(plan).success);
@@ -78,21 +78,35 @@ test("« Pile de photos » (effect v1): its layer gives every landing and leavin
   leaves.forEach((o, k) => assert.equal(motion.texts![`o${k}`], String(o)));
   assert.equal(motion.texts!.mots, "fait main à Lyon");
   assert.equal(motion.drawn, undefined);
-  // Its sounds within its span: a light click on each landing, then the dry knock on the hit, the loudest.
+  // Its sounds within its span: one burst of light clicks from its first landing (a click on each landing, its slower
+  // ones louder, and under its first ones a denser clicking that slows down), then the dry knock on the hit, the loudest.
   const sounds = motion.sounds!;
-  assert.equal(sounds.length, 14);
-  assert.deepEqual(sounds.slice(0, 13).map((s) => Math.round(s.at * 30)), lands);
-  assert.deepEqual([sounds.at(-1)!.sound, Math.round(sounds.at(-1)!.at * 30), sounds.at(-1)!.gain], ["dry knock", hit, 6]);
+  assert.equal(sounds.length, 2);
+  const [clicks, knock] = sounds as [NonNullable<typeof sounds>[number], NonNullable<typeof sounds>[number]];
+  assert.deepEqual([clicks.sound, Math.round(clicks.at * 30)], ["light click", lands[0]]);
+  const heard = clicks.burst!.times.map((t, k) => ({ f: (clicks.at + t) * 30, gain: clicks.burst!.gains![k]! }));
+  for (const l of lands) assert.ok(heard.some((h) => Math.abs(h.f - l) < 0.6), `a click on its landing at ${l}`);
+  assert.ok(heard.length >= lands.length + 15, `its denser clicking (${heard.length} hits)`);
+  const gaps = heard.slice(1).map((h, k) => h.f - heard[k]!.f);
+  assert.ok(gaps.slice(0, 5).every((g) => g < 1.2), "denser than a click a frame at first");
+  assert.ok(heard.at(-1)!.gain > heard[0]!.gain, "its slower ones louder");
+  assert.deepEqual([knock.sound, Math.round(knock.at * 30), knock.gain], ["dry knock", hit, 6]);
   assert.ok(sounds.every((s) => s.skill && s.at < 7.8));
-  // Sixteen at most: with more photos than that, the knock and the last clicks.
-  const many = [{ file: "lead", at: 1, seconds: 1.2 }, ...Array.from({ length: 20 }, (_, i) => ({ file: `f${i}`, at: 0, seconds: 0.4 })), { file: "after", at: 2, seconds: 1.8 }];
+  // Its music without its bass from the hit to its cut, whole again with the montage.
+  const shape = pieceMusicShape({ piece: pile, fill: { texts: { mots: "fait main à Lyon" }, objects: {}, settings: {} }, plan, layer: plan.layers![0]!, bpm: 100 });
+  assert.equal(shape?.filters?.length, 1);
+  assert.deepEqual([shape!.filters![0]!.kind, Math.round((shape!.filters![0]!.from - 1.2) * 30), shape!.filters![0]!.to], ["thin", hit, 9]);
+  // However many photos: every landing heard, in the one burst.
+  const many = [{ file: "lead", at: 1, seconds: 1.2 }, ...Array.from({ length: 16 }, (_, i) => ({ file: `f${i}`, at: 0, seconds: 0.5 })), { file: "after", at: 2, seconds: 1.8 }];
   const crowded = pieceTestPlan({ piece: pile, shots: many, span: [1.2, 9.2], fill: { texts: { mots: "voici notre travail" }, objects: {}, settings: {} }, bpm: 140 });
-  const heard = crowded.layers![0]!.motion.sounds!;
-  assert.equal(heard.length, 16);
-  assert.equal(heard.at(-1)!.sound, "dry knock");
+  const more = crowded.layers![0]!.motion.sounds!;
+  assert.equal(more.length, 2);
+  const full = pileSchedule(240, (60 / 140) * 30, 16);
+  for (const l of full.lands) assert.ok(more[0]!.burst!.times.some((t) => Math.abs((more[0]!.at + t) * 30 - l) < 0.6), `a click on its landing at ${l}`);
+  assert.equal(more.at(-1)!.sound, "dry knock");
 });
 
-test("« Pile de photos » (effect v1): what it draws: her photos landed and not gone, each over the one before, her words in front all along", () => {
+test("« Pile de photos » (effect v2): what it draws: her photos landed and not gone, each over the one before, her words in front all along", () => {
   const n = 13;
   const shots = under(n);
   const { lands, leaves } = pileSchedule(234, 18, n);
@@ -143,7 +157,7 @@ test("« Pile de photos » (effect v1): what it draws: her photos landed and not
   assert.match(colour("#b4532a").textShadow, /#fdfdfd/);
 });
 
-test("« Pile de photos » (effect v1): without its marks, a plain burst over its first half, the pile empty a beat before the end", () => {
+test("« Pile de photos » (effect v2): without its marks, a plain burst over its first half, the pile empty a beat before the end", () => {
   const props = { width: 1080, height: 1920, durationInFrames: 180, brand, shots: under(8), texts: { beat: "18", mots: "ça, c'est nous" } };
   const laid = (f: number) => footage(draw(f, props)).length;
   assert.equal(laid(0), 0);

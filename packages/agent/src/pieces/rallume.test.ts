@@ -59,7 +59,7 @@ const at96 = rallumeTimeline({ frames: 150, bpm: 96, shots: [{ from: 0, frames: 
 const marks = { beat: "18.75", ...Object.fromEntries(Object.entries(at96.marks!).map(([k, v]) => [k, String(v)])) };
 const props = (texts: Record<string, string> = {}) => ({ width: 1080, height: 1920, durationInFrames: 150, brand: { name: "Le Comptoir", displayFont: "Instrument Serif", bodyFont: "Inter Tight", accent: "#b5543a" }, shots, texts: { ...marks, nom: "Le Comptoir", ligne: "bar à vins", ...texts } });
 
-test("« La pièce qui se rallume » (effect v1): its lights on the beat faster and faster, its dark about half its shot, her name's time kept", () => {
+test("« La pièce qui se rallume » (effect v2): its lights on the beat faster and faster, its dark about half its shot, her name's time kept", () => {
   // At its skill's tempo over 5 s: its skill's own steps (beats 0, 1, 1,5, 2, 2,5, 2,75, 3, 3,25), the whole room on beat 4.
   assert.deepEqual([0, 1, 2, 3, 4, 5, 6, 7].map((k) => at96.marks![`step_${k}`]), [0, 19, 28, 38, 47, 52, 56, 61]);
   assert.equal(at96.marks!.all, 75);
@@ -67,6 +67,8 @@ test("« La pièce qui se rallume » (effect v1): its lights on the beat faster 
   assert.deepEqual(at96.sounds!.map((s) => [Math.round(s.at * 30), s.sound]), [...[0, 19, 28, 38, 47, 52, 56, 61].map((f) => [f, "light switch click"]), [75, "heavy light switch clunk"]]);
   assert.ok(at96.sounds![8]!.gain! > at96.sounds![0]!.gain! && at96.sounds![0]!.gain! > at96.sounds![1]!.gain!);
   assert.equal(at96.cutouts, undefined);
+  // Her music muffled as through a wall while the room is dark, open at once when it all comes on.
+  assert.deepEqual(at96.music, { filters: [{ kind: "muffled", from: 0, to: 2.5 }] });
   // On any tempo and length it takes: its dark in whole beats (a bar, two, half a bar, a beat), about half its shot, 4 s
   // at most, its steps faster and faster before it, her name then lit long enough to read; its sounds within its span.
   for (const bpm of [60, 72, 84, 96, 110, 120, 128, 140]) {
@@ -97,7 +99,7 @@ test("« La pièce qui se rallume » (effect v1): its lights on the beat faster 
   assert.equal(rallumeTimeline({ frames: 150, bpm: 96, shots: [{ from: -20, frames: 170 }], words: { nom: "Lino" }, settings: {} }).marks!.all, 75);
 });
 
-test("« La pièce qui se rallume » (effect v1): its layer over her room shot, its lamps named there, nothing of her cut out, her name required", () => {
+test("« La pièce qui se rallume » (effect v2): its layer over her room shot, its lamps named there, nothing of her cut out, her name required", () => {
   const run = [
     { file: "lead", at: 1, seconds: 1.2 },
     { file: "room", at: 5, seconds: 5 },
@@ -136,7 +138,7 @@ test("« La pièce qui se rallume » (effect v1): its layer over her room shot, 
   assert.deepEqual(readPieceFill(rallume, { ...answer, settings: [{ name: "couleur", value: "chaude" }] })!.settings, {});
 });
 
-test("« La pièce qui se rallume » (effect v1): dark, her lamps lit one by one at their own light, all at once on the beat, her name like a sign, to the cut", () => {
+test("« La pièce qui se rallume » (effect v2): dark, her lamps lit one by one at their own light, all at once on the beat, her name like a sign, to the cut", () => {
   const code = pieceCode(rallume, { lampes: "every pendant lamp", rangees: "every bottle" });
   // Ten lamps across the top of her room (and one off the frame, which never counts), three bottles under them.
   const lamps = [-120, ...Array.from({ length: 10 }, (_, i) => 60 + i * 96)].map((x) => ({ x, y: 300, w: 60, h: 90 }));
@@ -197,7 +199,7 @@ test("« La pièce qui se rallume » (effect v1): dark, her lamps lit one by one
   assert.equal(tone(at(75, {}, {}, rallume.code)), "brightness(1.3)");
 });
 
-test("« La pièce qui se rallume » (effect v1): its dark dosed on the room's light, and without her things, her lights read on it", () => {
+test("« La pièce qui se rallume » (effect v2): its dark dosed on the room's light, and without her things, her lights read on it", () => {
   // A bright room (a mean light of 0,6): darker than the skill's fifth; a dim bar (0,2): lighter, the same dark on screen
   // (her ten lamps found, no notch: its dose alone).
   const code = pieceCode(rallume, { lampes: "every pendant lamp" });

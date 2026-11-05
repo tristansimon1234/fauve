@@ -1,4 +1,5 @@
-import type { EffectPiece } from "../pieces.ts";
+import { REEL_FPS } from "../motion.ts";
+import type { EffectPiece, PieceTimeline, PieceTimelineInput } from "../pieces.ts";
 
 // « Carte au feutre », the effect (docs/fiches/carte-feutre.md, effects 1 to 5; its whole Reel is skills/carte-feutre.ts):
 // over a run of her shots, an open notebook, drawn as the skill draws it (two pages of warm light grey paper, its binding
@@ -16,9 +17,69 @@ import type { EffectPiece } from "../pieces.ts";
 // on a short one. Its ink the original's red, or her colour when it is dark enough to read on its paper (encre); its
 // pictures' place on her word (format). Kept from the skill: its notebook, its eight poses, its hand (Handwriting in
 // Covered By Your Grace stretched to the original's tall narrow capitals, two lines a page, each across the page's width,
-// the name in a slot a third taller), its pace of pictures. Left out: its ending card, its music's late start and its
-// one-beat blank under the name (a piece does not shape her music), its warm tone on her pictures (they keep the light
-// of the Reel around it); no sound (the original lays none when a word arrives).
+// the name in a slot a third taller), its pace of pictures, and (v2) its music's blank under the name: the music stops
+// dead up to a beat after the word before it and comes back on the Reel's beat just after the name lands (the
+// original's 5,57 – 5,93 s, its name 2 images before the return). Left out: its ending card, its music's late start, its
+// warm tone on her pictures (they keep the light of the Reel around it); no sound (the original lays none when a word
+// arrives).
+
+/** Its words' pace (images): a new picture every 3, each word landing on one. */
+const TICK = 3;
+/** Its music back this long after the name lands at least (images: the original's 2), on the Reel's next beat. */
+const RETURN_AFTER = 2;
+/** Its blank this long at least (s), else none: shorter, it would be heard as the sound cutting out. */
+const BLANK_LEAST = 0.2;
+const round3 = (n: number) => Math.round(n * 1000) / 1000;
+
+/**
+ * When each of its words lands (frames from its start), as its code spreads them: a word of one or two letters with the
+ * next one, the notebook empty a beat first, the name last, her whole sentence then held long enough to read; each on a
+ * change of picture. Its code's own reckoning, word for word (its words in capitals, one space between them).
+ */
+export function carteFeutreLands(frames: number, beat: number, texts: Record<string, string>): { lands: number[]; named: boolean } {
+  const up = (s: string | undefined) => String(s || "").trim().replace(/(\d) (?=\d)/g, "$1\u00a0").toLocaleUpperCase("fr").replace(/\s+/g, " ").trim();
+  const msg = up(texts.message);
+  const nm = up(texts.nom);
+  const words = msg ? msg.split(" ") : [];
+  const length = (w: string) => Array.from(w).length;
+  const short = (w: string) => length(w.replace(/[.,!?;:…'’"«»()]/g, "")) <= 2;
+  const ends: number[] = [];
+  words.forEach((w, i) => {
+    if (!short(w) || i === words.length - 1) ends.push(i + 1);
+  });
+  const steps = ends.length + (nm ? 1 : 0);
+  const said = words.length + (nm ? nm.split(" ").length : 0);
+  const BEAT = beat > 0 ? beat : 18;
+  const EMPTY = Math.max(TICK * 2, Math.min(BEAT, frames * 0.15));
+  const READ = Math.max(36, (0.8 + 0.3 * said) * 30);
+  const HOLD = Math.max(frames / 3, Math.min(READ, frames / 2));
+  const LAST = Math.max(EMPTY, frames - HOLD);
+  const snap = (f: number) => Math.max(TICK, Math.round(f / TICK) * TICK);
+  const lands: number[] = [];
+  for (let j = 0; j < steps; j++) {
+    const f = snap(steps > 1 ? EMPTY + (j * (LAST - EMPTY)) / (steps - 1) : EMPTY);
+    lands.push(j ? Math.max(f, lands[j - 1]! + TICK) : f);
+  }
+  return { lands, named: Boolean(nm) };
+}
+
+/**
+ * Its music's blank under the name (s from its start): back on the Reel's first beat at least two images after the name
+ * lands (its beats counted from its first shot's cut, which falls on one), stopped a beat before, never before the word
+ * before it has landed; none without a name, too short, or past its span.
+ */
+export function carteFeutreTimeline({ frames, bpm, shots, words }: PieceTimelineInput): PieceTimeline {
+  const beat = round3((60 / bpm) * REEL_FPS);
+  const { lands, named } = carteFeutreLands(frames, beat, words);
+  const name = named ? lands.at(-1) : undefined;
+  if (name === undefined) return {};
+  const grid = shots[0]?.from ?? 0;
+  const back = grid + Math.ceil((name + RETURN_AFTER - grid) / beat - 1e-6) * beat;
+  const before = lands.length > 1 ? lands[lands.length - 2]! + 1 : 0;
+  const stop = Math.min(name, Math.max(back - beat, before));
+  if (back > frames - 1 || (back - stop) / REEL_FPS < BLANK_LEAST) return {};
+  return { music: { pauses: [{ from: round3(stop / REEL_FPS), to: round3(back / REEL_FPS) }] } };
+}
 
 const CODE = String.raw`function Scene({ width, height, durationInFrames, brand, shots, texts }) {
   const h = React.createElement;
@@ -163,7 +224,7 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
 
 export const carteFeutre: EffectPiece = {
   key: "carte-feutre",
-  version: 1,
+  version: 2,
   name: "Carte au feutre",
   how: "un carnet ouvert gris clair est posé au milieu de l'écran par-dessus ses photos qui défilent en stop motion, une nouvelle toutes les 3 images (un dixième de seconde), dans son ordre, tour après tour (en deux bandes au-dessus et au-dessous du carnet quand la plupart sont horizontales) ; le carnet reste vide un temps, puis son message s'y écrit à la main au feutre (rouge, ou de sa couleur quand elle est foncée) en capitales, un mot à la fois, le carnet changeant de pose à chaque mot ; le nom de ce qu'elle annonce arrive en dernier, la plus grande ligne, le carnet droit, et la phrase entière reste le temps de la lire, les photos défilant toujours ; puis le montage reprend, le plan suivant en plein écran.",
   needs: "une dizaine de photos ou d'images de ses vidéos ou plus (ses plats ou ses produits vus de dessus, des gens à table, son équipe, ses imprimés), où ce qui compte est en haut ou en bas de l'image (le carnet cache le milieu), et un message de 6 à 9 mots qui finit sur le nom de ce qu'elle annonce.",
@@ -204,6 +265,7 @@ export const carteFeutre: EffectPiece = {
       ],
     },
   ],
+  timeline: carteFeutreTimeline,
   code: CODE,
   fonts: ["Covered By Your Grace"],
 };

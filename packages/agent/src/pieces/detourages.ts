@@ -1,5 +1,5 @@
 import { readingSeconds } from "../editor.ts";
-import type { EffectPiece, PieceTimelineInput } from "../pieces.ts";
+import type { EffectPiece, PieceTimeline, PieceTimelineInput } from "../pieces.ts";
 import { letterTimes } from "../skills/detourages.ts";
 
 // « L'œil qui s'ouvre », the effect of « Ton nom qui clignote » (docs/fiches/detourages.md, effects 1 to 3; its whole
@@ -21,9 +21,10 @@ import { letterTimes } from "../skills/detourages.ts";
 // type (a capital of 14,2 % of the width, the word on 87,6 % of it, within the apps' margins once its foot goes under
 // the middle), its placing behind the decor, its shade only on a bright sky (LightUnder), its tick. The slit becomes an
 // eye: what Edith calls this effect, from the kit (the original's slit is a format of its whole Reel, its rounded window
-// on black). Left to its Reel: that window, its burst on the dotted rhythm, its two sweeps, its last shot held, its
-// ending card, and its music shaped (an effect does not shape the Reel's music: the intro's muffled highs that open with
-// the slit are not there). Nothing of the original's own: « ICELAND » gives way to her name.
+// on black). Its music (v2), as its skill's intro: muffled at first, its highs opening with the eye until it is open,
+// then 5 dB softer to the cut, where the montage comes in as its drop. Left to its Reel: that window, its burst on the
+// dotted rhythm, its two sweeps, its last shot held, its ending card. Nothing of the original's own: « ICELAND » gives
+// way to her name.
 
 const CODE = String.raw`function Scene({ width, height, durationInFrames, brand, shots, texts }) {
   const h = React.createElement;
@@ -163,6 +164,8 @@ const READ_MARGIN = 6;
 const OPEN_IN_LETTERS = 0.46;
 /** A soft high tick on each letter's flash and when the whole name is lit, as its skill's (dB). */
 const TICK = { sound: "soft high glass tick", seconds: 0.5, gain: -4 };
+/** Its music after the eye has opened, to the cut: this much softer (dB), as its skill's intro before the drop. */
+const SOFT_DB = -5;
 const round3 = (n: number) => Math.round(n * 1000) / 1000;
 
 /**
@@ -170,7 +173,12 @@ const round3 = (n: number) => Math.round(n * 1000) / 1000;
  * window open, each letter's flash, dark and lit (by its place in her word: fl0, dk0, on0…), the whole name lit; a tick
  * on each flash and when all is lit; her cut-out on its shot (for her name behind what stands before her wall).
  */
-export function eyeTimeline({ frames, bpm, words }: Pick<PieceTimelineInput, "frames" | "bpm" | "words">) {
+export function eyeTimeline({ frames, bpm, words }: Pick<PieceTimelineInput, "frames" | "bpm" | "words">): {
+  marks: Record<string, number>;
+  sounds: NonNullable<PieceTimeline["sounds"]>;
+  cutouts: number[];
+  music: NonNullable<PieceTimeline["music"]>;
+} {
   const name = (words.nom ?? "").toUpperCase();
   const times = letterTimes(lettersOf(name).length || 7);
   const length = Math.max(1, ...times.map((t) => t.on));
@@ -195,12 +203,20 @@ export function eyeTimeline({ frames, bpm, words }: Pick<PieceTimelineInput, "fr
     flashes.add(fl);
   }
   const sounds = [...flashes, lit].sort((a, b) => a - b).map((f) => ({ at: round3(f / FPS), ...TICK }));
-  return { marks, sounds, cutouts: [0] };
+  // Her music muffled at first, its highs opening with the eye, then softer to the cut: the montage comes in as its drop.
+  const open = round3(eyeTo / FPS);
+  const music: NonNullable<PieceTimeline["music"]> = {
+    filters: [
+      { kind: "muffled", from: 0, to: open, open: Math.min(4, open) },
+      ...(frames - eyeTo >= 3 ? [{ kind: "soft" as const, from: open, to: round3(frames / FPS), db: SOFT_DB }] : []),
+    ],
+  };
+  return { marks, sounds, cutouts: [0], music };
 }
 
 export const detourages: EffectPiece = {
   key: "detourages",
-  version: 1,
+  version: 2,
   name: "L'œil qui s'ouvre",
   how: "l'image noire, puis un œil en amande qui s'ouvre au milieu et s'agrandit jusqu'à tout l'écran sur son plan large et fixe ; son nom s'y allume en très grandes capitales blanches, lettre par lettre dans le désordre (chacune clignote, s'éteint puis tient), derrière le décor (ses toits, ses collines, quelqu'un debout passent devant) ; il part avec la coupe.",
   needs: "un plan large et fixe de son lieu, de sa rue ou d'un paysage, le téléphone posé, avec du ciel ou un mur dégagé au-dessus de ce qui s'y détache (ses toits, sa devanture, quelqu'un debout).",

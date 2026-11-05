@@ -16,11 +16,11 @@ const run = (seconds: number) => [
 ];
 const marksOf = (texts: Record<string, string>) => Object.fromEntries(Object.entries(texts).map(([k, v]) => [k, Number(v)]));
 
-test("« L'œil qui s'ouvre » (effect v1): its layer over one wide shot, her cut-out declared on it only, her name lit letter by letter, a tick on each flash", () => {
+test("« L'œil qui s'ouvre » (effect v2): its layer over one wide shot, her cut-out declared on it only, her name lit letter by letter, a tick on each flash", () => {
   const plan = pieceTestPlan({ piece: detourages, shots: run(4), span: [1.2, 5.2], fill: { texts: { nom: "Brighton" }, objects: {}, settings: {} }, bpm: 100 });
   assert.ok(editPlanSchema.safeParse(plan).success);
   const motion = plan.layers![0]!.motion;
-  assert.deepEqual(motion.piece, { key: "detourages", version: 1 });
+  assert.deepEqual(motion.piece, { key: "detourages", version: 2 });
   // Her cut-out on its shot alone (the second of her shots), for her name behind what stands before her wall.
   assert.deepEqual(motion.drawn, { shots: 3, subjects: [1] });
   assert.deepEqual([...subjectShots(plan)], [1]);
@@ -51,7 +51,7 @@ test("« L'œil qui s'ouvre »: its moments hold over every length it takes, at 
     for (const bpm of [60, 90, 100, 120, 140]) {
       for (const nom of ["A", "Lune", "Le Marais", "Boulangeries"]) {
         const frames = Math.round(seconds * 30);
-        const { marks, sounds, cutouts } = eyeTimeline({ frames, bpm, words: { nom } });
+        const { marks, sounds, cutouts, music } = eyeTimeline({ frames, bpm, words: { nom } });
         const at = `${seconds} s, ${bpm} BPM, « ${nom} »: ${JSON.stringify(marks)}`;
         assert.ok(Object.values(marks).every((v) => Number.isInteger(v) && v >= 0 && v <= frames), at);
         assert.ok(marks.eye_from! < marks.name! && marks.name! < marks.lit! && marks.eye_to! <= marks.lit!, at);
@@ -64,6 +64,10 @@ test("« L'œil qui s'ouvre »: its moments hold over every length it takes, at 
         assert.equal(marks[`fl${count}`], undefined, at);
         assert.ok(sounds.length >= 2 && sounds.length <= 16 && sounds.every((s) => s.at * 30 < frames - 1.5), at);
         assert.deepEqual(cutouts, [0]);
+        // Her music muffled at first, opening with the eye until it is open, then softer to the cut.
+        const [muffled, soft] = music.filters!;
+        assert.deepEqual([muffled!.kind, muffled!.from, Math.round(muffled!.to * 30), muffled!.open], ["muffled", 0, marks.eye_to, Math.min(4, muffled!.to)], at);
+        assert.deepEqual([soft!.kind, soft!.from, Math.round(soft!.to * 30), soft!.db], ["soft", muffled!.to, frames, -5], at);
       }
     }
   }

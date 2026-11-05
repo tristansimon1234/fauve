@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { editPlanSchema } from "../schemas.ts";
-import { pieceTestPlan } from "../pieces.ts";
-import { carteFeutre } from "./carte-feutre.ts";
+import { pieceMusicShape, pieceTestPlan } from "../pieces.ts";
+import { carteFeutre, carteFeutreLands } from "./carte-feutre.ts";
 
 // « Carte au feutre », the effect of the bank (carte-feutre.ts): its own checks, beside the bank's (features.test.ts).
 
@@ -35,7 +35,7 @@ const under = (n: number, aspect: (i: number) => number, beat = 18) => [
 const brand = { displayFont: "DM Serif Display", bodyFont: "Inter Tight", accent: "#1d4d3a", palette: {} };
 const words = { message: "ce jeudi on vous attend pour la", nom: "soirée pizza" };
 
-test("« Carte au feutre » (effect v1): its layer, its hand's font, no reading of her shots, no sound", () => {
+test("« Carte au feutre » (effect v2): its layer, its hand's font, no reading of her shots, no sound", () => {
   const shots = [{ file: "lead", at: 1, seconds: 1.2 }, ...Array.from({ length: 10 }, (_, i) => ({ file: `f${i}`, at: 0, seconds: 0.6, photo: true })), { file: "after", at: 2, seconds: 1.8 }];
   const plan = pieceTestPlan({ piece: carteFeutre, shots, span: [1.2, 7.2], fill: { texts: words, objects: {}, settings: { format: "bandes" } }, bpm: 100 });
   assert.ok(editPlanSchema.safeParse(plan).success);
@@ -46,7 +46,7 @@ test("« Carte au feutre » (effect v1): its layer, its hand's font, no reading 
   assert.deepEqual([motion.texts!.message, motion.texts!.nom, motion.texts!.format], [words.message, words.nom, "bandes"]);
 });
 
-test("« Carte au feutre » (effect v1): her pictures in stop motion, a new one every 3 images in her order, round after round", () => {
+test("« Carte au feutre » (effect v2): her pictures in stop motion, a new one every 3 images in her order, round after round", () => {
   const props = { width: 1080, height: 1920, durationInFrames: 180, brand, shots: under(10, () => 0.5625), texts: { beat: "18", ...words } };
   // Upright pictures: full frame, one at a time, her shots under it in order (never her shot before it), round after round.
   for (let f = 0; f < 180; f += 3) {
@@ -71,7 +71,7 @@ test("« Carte au feutre » (effect v1): her pictures in stop motion, a new one 
   assert.equal(footage(draw(0, { ...wide, texts: { ...wide.texts, format: "vertical" } })).length, 1);
 });
 
-test("« Carte au feutre » (effect v1): the notebook empty a beat, her words one at a time on a change of picture, the name last, the whole sentence held", () => {
+test("« Carte au feutre » (effect v2): the notebook empty a beat, her words one at a time on a change of picture, the name last, the whole sentence held", () => {
   for (const frames of [90, 150, 180, 240]) {
     const props = { width: 1080, height: 1920, durationInFrames: frames, brand, shots: under(12, () => 0.5625), texts: { beat: "18", ...words } };
     const letters = Array.from({ length: frames }, (_, f) => written(draw(f, props)));
@@ -97,7 +97,7 @@ test("« Carte au feutre » (effect v1): the notebook empty a beat, her words on
   }
 });
 
-test("« Carte au feutre » (effect v1): its ink, hers when dark enough to read on its paper, else the original's red", () => {
+test("« Carte au feutre » (effect v2): its ink, hers when dark enough to read on its paper, else the original's red", () => {
   const ink = (accent: string, encre?: string) => {
     const props = { width: 1080, height: 1920, durationInFrames: 150, brand: { ...brand, accent }, shots: under(8, () => 0.5625), texts: { beat: "18", ...words, ...(encre ? { encre } : {}) } };
     return hands(draw(149, props))[0]!.props.color;
@@ -105,4 +105,32 @@ test("« Carte au feutre » (effect v1): its ink, hers when dark enough to read 
   assert.equal(ink("#1d4d3a"), "#1d4d3a");
   assert.equal(ink("#f2694e"), "#b20b21");
   assert.equal(ink("#1d4d3a", "rouge"), "#b20b21");
+});
+
+test("« Carte au feutre » (effect v2): its music stopped dead under the name, back on the Reel's beat just after it lands", () => {
+  // Its timeline reckons the landings as its code draws them, whatever the words and the span.
+  const sets = [words, { message: "viens fêter l'été avec nous à la", nom: "brunch" }, { message: "le 14 juin on ouvre", nom: "la terrasse du port" }];
+  for (const texts of sets)
+    for (const frames of [90, 150, 210]) {
+      const props = { width: 1080, height: 1920, durationInFrames: frames, brand, shots: under(12, () => 0.5625), texts: { beat: "18", ...texts } };
+      const letters = Array.from({ length: frames }, (_, f) => written(draw(f, props)));
+      const steps = letters.flatMap((l, f) => (f && l !== letters[f - 1] ? [f] : []));
+      assert.deepEqual(carteFeutreLands(frames, 18, texts).lands, steps, `${texts.nom} over ${frames}`);
+    }
+  // On the Reel: its blank ends on a beat (a cut of her shots, a beat each) two images after the name at least, a beat
+  // after it at most, and never starts before the word before it has landed.
+  const shots = [{ file: "lead", at: 1, seconds: 1.2 }, ...Array.from({ length: 10 }, (_, i) => ({ file: `f${i}`, at: 0, seconds: 0.6, photo: true })), { file: "after", at: 2, seconds: 1.8 }];
+  const fill = { texts: words, objects: {}, settings: {} };
+  const plan = pieceTestPlan({ piece: carteFeutre, shots, span: [1.2, 7.2], fill, bpm: 100 });
+  const shape = pieceMusicShape({ piece: carteFeutre, fill, plan, layer: plan.layers![0]!, bpm: 100 });
+  const { lands } = carteFeutreLands(180, 18, words);
+  const name = 1.2 + lands.at(-1)! / 30;
+  assert.equal(shape?.pauses?.length, 1);
+  const blank = shape!.pauses![0]!;
+  assert.ok(blank.to >= name + 2 / 30 - 1e-6 && blank.to <= name + 2 / 30 + 0.6 + 1e-6, `back at ${blank.to}, the name at ${name}`);
+  assert.ok(Math.abs(((blank.to - 1.2) / 0.6) - Math.round((blank.to - 1.2) / 0.6)) < 1e-3, `back on a beat: ${blank.to}`);
+  assert.ok(blank.from <= name && blank.from > 1.2 + lands.at(-2)! / 30, `stopped at ${blank.from}`);
+  assert.ok(blank.to - blank.from >= 0.2 && blank.to - blank.from <= 0.6 + 1e-6);
+  // Without the name, no blank.
+  assert.equal(pieceMusicShape({ piece: carteFeutre, fill: { ...fill, texts: { message: words.message } }, plan, layer: plan.layers![0]!, bpm: 100 }), undefined);
 });

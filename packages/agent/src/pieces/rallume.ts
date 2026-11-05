@@ -25,9 +25,9 @@ import type { EffectPiece, PieceTimeline, PieceTimelineInput } from "../pieces.t
 // as the camera moves (the calm area chosen once for her name, read where the camera has taken it); the light's grid is
 // coarse (64 cells along the video's long side), so a bright cloth may pass for a lamp there. Without a reading either,
 // the room comes back notch by notch, then all at once.
+// Its music (v2), as its skill's: muffled as through a wall while the room is dark, open at once when it all comes on.
 // Left out: its 16:9 frame on black (an effect plays in the Reel's own frame, full frame), the life of her place, its
-// lights going off at the end and its ending card, its music muffled while the room is dark (an effect's timeline has
-// no music shape), and its grain and corners left off (its Reel's finish).
+// lights going off at the end and its ending card, and its grain and corners left off (its Reel's finish).
 
 /** Its lights' steps, in beats of a four-beat dark (faster and faster), and the whole room on its fourth. */
 const STEPS = [0, 1, 1.5, 2, 2.5, 2.75, 3, 3.25];
@@ -76,6 +76,8 @@ export function rallumeTimeline({ frames, bpm, shots, words }: PieceTimelineInpu
   return {
     marks: { ...Object.fromEntries(steps.map((f, k) => [`step_${k}`, f])), all },
     sounds: [...steps.map((f, k) => ({ at: at(f), ...CLICK, gain: k ? -3 : -1 })), { at: at(all), ...CLUNK, gain: 3 }],
+    // Her music muffled as through a wall while the room is dark, open at once on the beat it all comes on.
+    music: { filters: [{ kind: "muffled", from: 0, to: at(all) }] },
   };
 }
 
@@ -286,7 +288,7 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
 
 export const rallume: EffectPiece = {
   key: "rallume",
-  version: 1,
+  version: 2,
   name: "La pièce qui se rallume",
   how: "son lieu plonge dans le noir ; ses lampes, ses bouteilles ou ses tasses se rallument une à une, de plus en plus vite, chacune à sa lumière avec un halo chaud et un petit clic ; puis toute la pièce d'un coup sur le temps, et son nom s'allume comme une enseigne dans la partie calme de la pièce, jusqu'à la coupe ; puis le montage reprend.",
   needs: "un plan large (ou moyen) de son lieu vu de l'intérieur, posé ou qui bouge lentement, le soir de préférence, avec dans l'image ses lumières (suspensions, lampes, bougies, guirlande) ou ce qu'il a plusieurs fois (bouteilles alignées, tasses, plantes).",
