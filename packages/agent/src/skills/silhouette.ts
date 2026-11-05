@@ -102,7 +102,7 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const NAVY = "#0d0d1b", SIL = "#0f0f1c", PALE = "#f3f4f9", PEACH = "#d99868", INK = "#0a0a10";
   const font = "'" + brand.displayFont + "', 'Inter', 'Helvetica Neue', sans-serif";
   const W = width;
-  // Its frame: the vertical one, or (on her word) the original's 16:9 frame in the middle on midnight bands.
+  // Vertical, or on her word the original's 16:9 frame on midnight bands.
   const wide = texts && texts.format === "horizontal";
   const S = wide ? { x: 0, y: Math.round((height - (W * 9) / 16) / 2), w: W, h: Math.round((W * 9) / 16) } : { x: 0, y: 0, w: W, h: height };
   const at = (fy, vy) => Math.round(wide ? S.y + fy * S.h : vy * height);
@@ -117,8 +117,7 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const letters = (s) => Array.from(String(s || "").normalize("NFC").trim());
   const ground = frame < NEG || (frame >= EYE && frame < OPEN) || frame >= LOGO ? NAVY : PALE;
 
-  // 1. Her first word typed (a letter, then a burst), growing by half on its baseline with a peach echo, white then ink
-  // once the picture turns negative; the box's dashed guides and px counts; a pixel hand waving.
+  // 1. Her first word typed, growing with its echo, white then ink; the box's dashed guides and px counts; a pixel hand.
   const word = hello ? letters(keep(hello.text)) : [];
   const units = word.filter((c) => !/\s/.test(c));
   const H0 = M("h", 5), B0 = M("burst_from", 18), B1 = M("burst_to", 29), G0 = M("grow_from", 13), G1 = M("grow_to", 28);
@@ -142,10 +141,8 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const tiny = (x, y, t) => h("div", { style: abs({ left: x, top: y, fontFamily: "monospace", fontSize: 16, color: gc }) }, t);
   const guides = opening
     ? inFrame("guides", h("div", { "data-fauve-decor": "", style: abs({ left: 0, top: 0, width: W, height }) },
-        h("div", { style: abs({ left: 0, top: gy0, width: W, height: 2, background: dash(90) }) }),
-        h("div", { style: abs({ left: 0, top: gy1, width: W, height: 2, background: dash(90) }) }),
-        h("div", { style: abs({ left: gx0, top: 0, width: 2, height, background: dash(180) }) }),
-        h("div", { style: abs({ left: gx1, top: 0, width: 2, height, background: dash(180) }) }),
+        [gy0, gy1].map((y) => h("div", { key: "y" + y, style: abs({ left: 0, top: y, width: W, height: 2, background: dash(90) }) })),
+        [gx0, gx1].map((x) => h("div", { key: "x" + x, style: abs({ left: x, top: 0, width: 2, height, background: dash(180) }) })),
         tiny(gx0 + 6, gy0 - 26, count(9)), tiny(gx0 - 70, gy0 + 8, count(43)),
         frame < H0 && Math.floor(frame / 2) % 2 === 0 ? h("div", { style: abs({ left: W / 2 - 2, top: BASE - FS * 0.62, width: 4, height: FS * 0.66, background: "#ffffff" }) }) : null))
     : null;
@@ -153,18 +150,18 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const HAND = M("hand", 17);
   const hx = W / 2 + tw / 2 + now.size * 0.08, hy = BASE - now.size * 1.55, hs = now.size * 0.8;
   const tilt = (Math.sin(((frame - HAND - 4) / 7) * Math.PI) * 14 * Math.PI) / 180;
-  const HANDPTS = [[[20, 55], [80, 55], [80, 96], [66, 116], [34, 116], [20, 96]], [[22, 18], [34, 18], [34, 55], [22, 55]], [[37, 6], [50, 6], [50, 55], [37, 55]], [[53, 12], [66, 12], [66, 55], [53, 55]], [[69, 26], [80, 26], [80, 55], [69, 55]], [[2, 58], [12, 52], [20, 64], [20, 84], [10, 78]]];
+  const HANDPTS = [[[20,55],[80,55],[80,96],[66,116],[34,116],[20,96]],[[22,18],[34,18],[34,55],[22,55]],[[37,6],[50,6],[50,55],[37,55]],[[53,12],[66,12],[66,55],[53,55]],[[69,26],[80,26],[80,55],[69,55]],[[2,58],[12,52],[20,64],[20,84],[10,78]]];
   const handPath = HANDPTS.map((poly) => "M" + poly.map(([x, y]) => {
     const dx = (x - 50) / 100, dy = (y - 116) / 100;
     return Math.round(hx + (dx * Math.cos(tilt) - dy * Math.sin(tilt)) * hs) + " " + Math.round(hy + hs + (dx * Math.sin(tilt) + dy * Math.cos(tilt)) * hs);
   }).join(" L") + " Z").join(" ");
   const hand = opening && frame >= HAND ? h(DotGrid, { key: "hand", shape: handPath, box: { x: Math.round(hx - hs), y: Math.round(hy - hs * 0.2), w: Math.round(hs * 2), h: Math.round(hs * 1.4) }, step: 8, size: 6, color: "#3b3b45", at: HAND, frames: 4, build: "rise" }) : null;
 
-  // 2. Her profile cut out and filled with one tone on the pale, her head where the original's is (cut by the frame's
-  // bottom), played from the cut; no cut-out: her shot as a hard black and white print on the pale.
+  // 2. Her profile cut out in one tone on the pale (else a black and white print), her picture laid whole (a cover would
+  // crop her off a horizontal video), scaled and moved onto the original's head.
   const sh = shots[0];
   const sil = sh && frame >= CUT && frame < EYE;
-  const base = { left: S.x, top: S.y, width: S.w, height: S.h };
+  const base ={ left: 0, top: 0, width: Math.round(S.h * (sh && sh.aspect > 0 ? sh.aspect : S.w / S.h)), height: S.h };
   const ref = Math.max(0, Math.min(sh ? sh.durationInFrames - 1 : 0, 6));
   const box0 = sh ? SubjectBox(sh, ref, base) : null;
   // Her head: the top of her outline, as wide as it is there.
@@ -182,9 +179,14 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
     return b ? { x: b.x + b.w / 2, y: b.y, w: b.w * 0.45 } : null;
   };
   const head0 = sh ? headOf(SubjectOutline(sh, ref, base), box0) : null;
-  const want = wide ? { w: S.w * 0.2, y: S.y + S.h * 0.16, x: S.x + S.w * 0.47 } : { w: W * 0.33, y: height * 0.42, x: W * 0.5 };
-  const k = head0 ? Math.max(0.6, Math.min(3, want.w / head0.w)) : 1;
-  const laid = head0 ? { left: Math.round(want.x - (head0.x - base.left) * k), top: Math.round(want.y - (head0.y - base.top) * k), width: Math.round(base.width * k), height: Math.round(base.height * k) } : base;
+  const want = wide ? { w: S.w * 0.2, y: S.y + S.h * 0.22, x: S.x + S.w * 0.47 } : { w: W * 0.33, y: height * 0.42, x: W * 0.5 };
+  // As wide as the original's head, down to the frame's bottom when her picture cuts her there.
+  const low = box0 && box0.y + box0.h >= base.height * 0.97 ? (S.y + S.h - want.y) / Math.max(40, base.height - head0.y) : 0;
+  const k = head0 ? Math.max(0.15, Math.min(3, Math.max(want.w / head0.w, low))) : 1;
+  const laid = head0 ? { left: Math.round(want.x - head0.x * k), top: Math.round(want.y - head0.y * k), width: Math.round(base.width * k), height: Math.round(base.height * k) } : { ...full };
+  // A side where her picture cuts her goes past the frame's (no straight edge across the pale).
+  if (head0 && box0.x + box0.w >= base.width * 0.97) laid.left = Math.max(laid.left, S.x + S.w - laid.width);
+  if (head0 && box0.x <= base.width * 0.03) laid.left = Math.min(laid.left, S.x);
   const L = abs(laid);
   const local = (f) => Math.max(0, f - CUT);
   const cutOut = Boolean(box0);
@@ -196,23 +198,26 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const hd = headAt(CUT + 4);
   const face = track ? ((track(local(CUT + 4), { shot: 0, ...laid }) || {}).faces || [])[0] : null;
   const imAt = face ? { x: face.x, y: face.y } : { x: hd.x, y: hd.y + hd.w * 0.5 };
-  // « Je suis » white in her head, gliding a little left; its first letter turns into a peach cursor, the rest goes from
-  // its end as she lowers her head; kept inside her silhouette.
+  // « Je suis » white in her head, its first letter turning peach, the rest going as she lowers her head; kept inside
+  // her outline (its pieces joined).
   const imChars = je ? letters(je.text) : [];
-  const imFs = Math.max(48, Math.min(wide ? 84 : 116, Math.round((hd.w * 1.64) / Math.max(3, imChars.length))));
+  // Sized and kept in the part of her head inside the frame (left of Instagram's buttons under the middle).
+  const iL = Math.max(60, hd.x - hd.w / 2), iR = Math.min(imAt.y > 900 ? W - 160 : W - 60, hd.x + hd.w / 2);
+  const imFs = Math.max(48, Math.min(wide ? 84 : 116, Math.round(((iR - iL) * 1.5) / Math.max(3, imChars.length))));
   const outline = sil ? SubjectOutline(sh, local(frame), laid) : null;
   const im = je && frame >= CUT && frame < D0 + 6
-    ? h("div", { key: "im", style: abs({ left: 0, top: 0, width: W, height, ...(outline ? { clipPath: "path('" + outline + "')" } : {}) }) },
-        row(imAt.x + lerp(frame, CUT, CUT + 8, 13, 0, EO), imAt.y - imFs * 0.6, imFs, 600, "#ffffff", imChars.map((c, i) => {
+    ? h("div", { key: "im", style: abs({ left: 0, top: 0, width: W, height, ...(outline ? { clipPath: "path('" + outline.replace(/ M /g, " L ") + " Z')" } : {}) }) },
+        row(Math.max(iL + imChars.length * imFs * 0.31, Math.min(iR - imChars.length * imFs * 0.31, imAt.x)) + lerp(frame, CUT, CUT + 8, 13, 0, EO), imAt.y - imFs * 0.6, imFs, 600, "#ffffff", imChars.map((c, i) => {
           const g = D0 + (imChars.length - 1 - i) * 0.7;
           return h("span", { key: i, style: { opacity: i ? lerp(frame, g, g + 2, 1, 0) : 1, color: i || frame < D0 - 4 ? undefined : frame >= D0 ? PEACH : "#f0c6a6" } }, c);
         })))
     : null;
-  // Her name typed behind her head on her hair (40 letters a second), first name roman, last name bold, a peach cursor;
-  // its last name rises away; her first name shrinks to its round letter, which grows with its echo into the round letter
-  // of « Votre »; its letters pop round it on a click; it fills with peach, a pupil grows, and the eye rises.
+  // Her name typed behind her head, its last name rising away; her first name's round letter becomes the o of « Votre »,
+  // whose letters pop round it; it fills with peach, a pupil grows, and the eye rises.
   const NT = down ? Math.min(EYE - 60, D0 + 5) : M("name_type", 50);
   const hdDown = headAt(Math.min(EYE - 1, Math.max(NT + 9, D1)));
+  // Over her head, a line of that width kept whole in the frame.
+  const within = (w) => Math.max(60 + w / 2, Math.min(W - 60 - w / 2, hdDown.x));
   const nameWords = nom ? keep(nom.text).split(/\s+/).filter(Boolean) : [];
   const first = nameWords[0] || "", rest = nameWords.slice(1).join(" ");
   const nmFs = 56;
@@ -222,7 +227,7 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const ny = Math.round(Math.max(S.y + 40, hdDown.y - nmFs * 1.1));
   const blink = frame < NT + nameLetters.length * 0.75 + 2 || Math.floor((frame - NT) / 6.5) % 2 === 0;
   const nameNode = nom && frame >= NT && frame < RD
-    ? h("div", { key: "name" }, row(hdDown.x, ny, nmFs, 400, INK, [
+    ? h("div", { key: "name" }, row(within(nameLetters.length * nmFs * 0.6), ny, nmFs, 400, INK, [
         h("span", { key: "f" }, nameLetters.slice(0, Math.min(typedN, first.length)).join("")),
         rest && typedN > first.length + 1 ? h("span", { key: "r", style: { fontWeight: 700, display: "inline-block", transform: "translateY(" + lerp(frame, LO, LO + 5, 0, -10) + "px)", opacity: lerp(frame, LO, LO + 5, 1, 0) } }, " " + nameLetters.slice(first.length + 1, typedN).join("")) : null,
         blink ? h("span", { key: "c", style: { display: "inline-block", width: 5, height: nmFs * 0.95, marginLeft: 3, background: PEACH } }) : null]))
@@ -236,12 +241,18 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const same = (c) => c.toLowerCase() === String(tonChars[ti] || "o").toLowerCase();
   const fi = Math.max(0, find(fl, same) >= 0 ? find(fl, same) : find(fl, (c) => ROUND.test(c)));
   const tFs = wide ? 72 : 84;
-  const ty = Math.round(Math.max(S.y + 60, hdDown.y - tFs * 1.25));
+  // Above the top of her head while it shows (ink on her silhouette would not read).
+  const ty = Math.round(Math.max(S.y + (wide ? 24 : 60), Math.min(hdDown.y, headAt(POP).y, headAt(FILL).y, headAt(EYE - 1).y) - tFs * 1.3));
   const cw = tFs * 0.56;
   // Without a round letter in it (« Ta »), a peach dot at the end of the word becomes the eye.
-  const ox = hdDown.x + ((hasRound ? ti : tonChars.length + 0.2) - (tonChars.length - 1) / 2) * cw;
-  const nx = hdDown.x - (nameLetters.length * nmFs * 0.54) / 2;
-  const eyeY = (f) => ty + tFs * 0.42 - lerp(f, RISE, EYE, 0, tFs * 1.2, EI);
+  const VX = within((tonChars.length + 1) * cw);
+  const ox = VX + ((hasRound ? ti : tonChars.length + 0.2) - (tonChars.length - 1) / 2) * cw;
+  const nx = within(nameLetters.length * nmFs * 0.6) - (nameLetters.length * nmFs * 0.54) / 2;
+  // The eye rises to where the iris will be, in the middle of the almond as it narrows (a match cut on the drop).
+  const EH = wide ? S.h * 0.76 : W * 0.41;
+  const T = wide ? S.y + EH * 0.36 : Math.max(at(0, 0.18), Math.min(at(0, 0.34), ty - tFs * 0.78 - EH * 0.36)) + EH * 0.36;
+  const IX = Math.max(S.x + S.w * 0.35, Math.min(S.x + S.w * 0.65, ox)), eyeX = (f) => lerp(f, RISE, EYE, ox, IX, EI);
+  const eyeY = (f) => lerp(f, RISE, EYE, ty + tFs * 0.42, T, EI);
   const roundLetter = (f) => {
     const sz = lerp(f, RD, BC, nmFs, tFs) * lerp(f, RD, BC, 1, 1.25, EO);
     return row(lerp(f, RD, BC, nx + (fi + 0.5) * nmFs * 0.54, ox, EIO), lerp(f, RD, BC, ny + nmFs * 0.55, ty + tFs * 0.42, EIO) - sz * 0.55, sz, 400, INK, f < BC ? fl[fi] || "o" : tonChars[ti] || "o");
@@ -250,14 +261,14 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const tonNode = ton && frame >= RD && frame < EYE
     ? h(React.Fragment, { key: "ton" },
         frame < BC + 3 ? h(Echo, { draw: (f) => (f >= RD ? roundLetter(f) : null), count: 3, gap: 1, color: PEACH }) : null,
-        row(hdDown.x, ty, tFs, 400, INK, tonChars.map((c, i) => {
+        row(VX, ty, tFs, 400, INK, tonChars.map((c, i) => {
           if (i === ti && hasRound) return h("span", { key: i, style: { opacity: frame >= BC + 3 && frame < FILL ? 1 : 0, display: "inline-block", transform: "translateY(" + (frame >= POP ? -Math.round(tFs * 0.12) : 0) + "px)" } }, c);
           const dy = bounce(i);
           return h("span", { key: i, style: { opacity: dy === null || (i === tonChars.length - 1 && frame >= LL) ? 0 : 1, display: "inline-block", transform: "translateY(" + (dy || 0) + "px)" } }, c);
         })),
         frame < BC + 3 && hasRound ? roundLetter(frame) : null)
     : null;
-  // The eye, a flat drawing: a peach iris with fine rays and a brown rim, a white highlight, a midnight pupil (round, then a cat's slit).
+  // The eye: a peach iris, fine rays, a brown rim, a highlight, a midnight pupil (round, then a slit).
   const irisAt = (cx, cy, r, slit, rays) => h("svg", { width: W, height, style: abs({ left: 0, top: 0, overflow: "visible" }) },
     h("circle", { cx, cy, r, fill: "#d69665", stroke: "#8a5a36", strokeWidth: Math.max(2, r * 0.05) }),
     rays ? Array.from({ length: 36 }, (_, i) => { const a = (i * Math.PI) / 18, c = Math.cos(a) * r, s = Math.sin(a) * r; return h("line", { key: i, x1: cx + c * 0.42, y1: cy + s * 0.42, x2: cx + c * 0.92, y2: cy + s * 0.92, stroke: "#a86f45", strokeWidth: 1.2, opacity: 0.5 }); }) : null,
@@ -265,17 +276,16 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
     h("circle", { cx: cx + r * 0.42, cy: cy - r * 0.48, r: r * 0.17, fill: "#ffffff" }));
   const smallEye = ton && frame >= FILL && frame < EYE
     ? h("svg", { key: "seye", width: W, height, style: abs({ left: 0, top: 0 }) },
-        h("circle", { cx: ox, cy: eyeY(frame), r: tFs * 0.34 * lerp(frame, RISE, EYE, 1, 1.9), fill: PEACH, stroke: frame < RISE && hasRound ? INK : "none", strokeWidth: tFs * 0.075 }),
-        h("circle", { cx: ox, cy: eyeY(frame), r: tFs * 0.19 * lerp(frame, PU, PU + 4, 0, 1) * lerp(frame, RISE, EYE, 1, 1.9), fill: NAVY }))
+        h("circle", { cx: eyeX(frame), cy: eyeY(frame), r: tFs * 0.27 * lerp(frame, RISE, EYE, 1, 2.4), fill: PEACH, stroke: frame < RISE && hasRound ? INK : "none", strokeWidth: tFs * 0.07 }),
+        h("circle", { cx: eyeX(frame), cy: eyeY(frame), r: tFs * 0.15 * lerp(frame, PU, PU + 4, 0, 1) * lerp(frame, RISE, EYE, 1, 2.4), fill: NAVY }))
     : null;
 
-  // 3. On the drop, midnight lids close into an almond, the iris where the eye was; it narrows, its pupil turns to a slit,
-  // it opens wide, its iris slides off with its echo, her trade white only in the iris, then ink as it opens onto the pale.
-  const E = { x: S.x + S.w * 0.09, y: wide ? S.y : at(0, 0.27), w: S.w * 0.82, h: wide ? S.h * 0.76 : W * 0.41 };
+  // 3. On the drop, lids close into an almond round the iris; her trade white in the iris, then ink on the pale.
+  const E = { x: S.x + S.w * 0.09, y: T - EH * 0.36, w: S.w * 0.82, h: EH };
   const box = (y0, y1, g) => ({ x: E.x - g * E.w, y: E.y + y0 * E.h, w: E.w * (1 + 2 * g), h: (y1 - y0) * E.h * (1 + g) });
   const SL = M("slit", 128), WI = M("wide", 132), SD = M("slide", 136), WO = M("word_in", 146), WN = M("widen", 156);
-  const irisX = (f) => lerp(f, SD, SD + 5, ox, ox + E.w * 0.08, EO);
-  const irisY = (f) => lerp(f, SD, SD + 5, Math.min(eyeY(EYE), E.y + E.h * 0.45), E.y + E.h * 0.62, EO);
+  const irisX = (f) => lerp(f, SD, SD + 5, IX, IX + E.w * 0.08, EO);
+  const irisY = (f) => lerp(f, SD, SD + 5, T, E.y + E.h * 0.62, EO);
   const irisR = E.h * 0.33;
   const tradeText = trade ? keep(trade.text) : "";
   const trFs = wide ? 60 : 66;
@@ -290,8 +300,7 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
             row(W / 2, irisY(frame) - trFs * 0.55, trFs, 400, inIris ? "#ffffff" : INK, tradeText)) : null))
     : null;
 
-  // 4. Her trade held, what she does changing beside it on the hits (faster, then settling); a wavy line drawn under it
-  // and taken back; a peach dot at the end of each word, then her trade's pictogram; the line shrinks into her name.
+  // 4. Her trade held, what she does on the hits; a wavy line under it, a peach dot, then her trade's pictogram.
   const items = list ? String(list.text).split(/\s*[,;·|\/\n]\s*/).map((s) => s.trim()).filter(Boolean).slice(0, 5) : [];
   const GAPS = [[0], [0, 6], [0, 4, 8], [0, 3, 6, 9], [0, 3, 6, 8, 10]][Math.max(0, items.length - 1)];
   const jobAt = GAPS.map((g) => Math.round(M("job", 165) + (g * mark("beat", 21.3)) / 4));
@@ -312,11 +321,10 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
           frame >= PI0 ? h("span", { style: abs({ right: -trFs * 0.62, top: -trFs * 0.42 }) }, h(Picto, { name: tradeText, size: trFs * 0.9, at: PI0, frames: 8 })) : null) : null,
       ], { transformOrigin: "0 50%", transform: "scale(" + lerp(frame, SH, SH + 9, 1, 0.75, EIO).toFixed(3) + ")", opacity: lerp(frame, NAME, NAME + 2, 1, 0), lineHeight: 1.2 }, true))
     : null;
-  // (Her whole list in the page while it plays, for the scene check: one word of it shows at a time.)
+  // Her whole list in the page, for the scene check (one word shows at a time).
   const listCopy = jobsOn && list ? h("div", { key: "lc", "data-fauve-decor": "", style: abs({ left: JX, top: JY, opacity: 0, fontSize: 20 }) }, list.text) : null;
 
-  // 5. Her name alone, small, receding; her logo in white on the midnight blue (else her place's name), then the blue
-  // alone; her ending card after it, in option.
+  // 5. Her name alone, receding; her logo white on the blue (else her place's name); her ending card in option.
   const MID = at(0.5, 0.45);
   const alone = nom && frame >= NAME && frame < LOGO
     ? h("div", { key: "alone" }, row(W / 2, MID - 40, Math.round(72 * lerp(frame, NAME, LOGO, 1, 0.68)), 400, INK, [first, rest ? h("span", { key: "r", style: { fontWeight: 700 } }, " " + rest) : null], { opacity: lerp(frame, NAME - 1, NAME + 1, 0, 1), lineHeight: 1.1 }))

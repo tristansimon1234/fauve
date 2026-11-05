@@ -7465,9 +7465,16 @@ test("« Présente-toi » (v2): its layout program, her silhouette with « Je su
   const her = drawnNodes(sil).find((n) => n.type === "Subject")!;
   assert.deepEqual([her.props.shot, her.props.at, her.props.fill], [0, 32, "#0f0f1c"]);
   assert.ok(!drawnNodes(sil).some((n) => n.type === "Footage"));
+  // Her picture laid whole, in its own shape (a horizontal video is not cropped round her head), down to the frame's bottom.
+  const laidHer = styleOf(her);
+  assert.ok(Math.abs(Number(laidHer.width) / Number(laidHer.height) - 16 / 9) < 0.01, `${laidHer.width} × ${laidHer.height}`);
+  assert.ok(Number(laidHer.top) + Number(laidHer.height) >= 1920);
   const im = byKey(sil, "im")!;
   assert.equal(textIn(im), "Je suis");
   assert.match(String(styleOf(im).clipPath), /^path\('M 470 700/);
+  // Her outline in pieces where her picture cuts her (the kit leaves it open there): joined into one shape for the clip.
+  const open = { ...SIL_READ, outlines: { "0": "M 300 1910 C 300 1500 330 1200 380 1000 C 400 900 410 760 470 700 C 560 690 640 720 660 800 M 700 820 C 760 900 860 1000 860 1910" } };
+  assert.match(String(styleOf(byKey(await at(40, open), "im")!).clipPath), /^path\('M 300 1910 C .* L 700 820 C [^M]* Z'\)$/);
   assert.ok(drawnNodes(im).some((n) => styleOf(n).color === "#ffffff"));
   const bare = await at(40, {});
   assert.match(String(styleOf(drawnNodes(bare).find((n) => n.type === "Footage")!).filter), /grayscale\(1\)/);
@@ -7650,8 +7657,12 @@ test("« Vision machine » (v1): its machine looks pass by pass, each at its own
   assert.equal(drawnNodes(graph).filter((n) => n.type === "circle").length, 5);
   assert.ok(/^[01]{16} [01]{8} [01]{8} [01]{8}$/.test(textIn(drawnNodes(graph).find((n) => n.type === "div" && /^[01]/.test(textIn(n)) && styleOf(n).fontSize === 14))));
   assert.ok(kinds(await at(117)).includes("Footage") && !kinds(graph).includes("Footage"));
-  // Everyone in dots on white; the whole place in characters; at the end, her still subject alone in characters, then black.
-  assert.ok(drawnNodes(drawnNodes(await at(174)).find((n) => n.type === "Ascii")!).some((n) => n.type === "Sketch"));
+  // Everyone in dots on white, tight on their edges (them in pale grey with a dark rim of two hard shadows, in halftone:
+  // no cut-out's rim, a dilation over her whole picture); the whole place in characters; at the end, her still subject
+  // alone in characters, then black.
+  const dots = drawnNodes(drawnNodes(await at(174)).find((n) => n.type === "Ascii")!).filter((n) => n.type === "Subject");
+  assert.deepEqual(dots.map((n) => [n.props.object, n.props.rim ?? 0]), [["every person", 0]]);
+  assert.match(String(styleOf(dots[0]!).filter), /^grayscale\(1\).*drop-shadow\(3px 2px 0 #1a1a1a\) drop-shadow\(-3px -2px 0 #1a1a1a\)$/);
   assert.ok(drawnNodes(drawnNodes(await at(201)).find((n) => n.type === "Ascii")!).some((n) => n.type === "Footage"));
   const end = drawnNodes(drawnNodes(await at(242)).find((n) => n.type === "Ascii")!);
   assert.ok(end.some((n) => n.type === "Subject") && !end.some((n) => n.type === "Footage"));

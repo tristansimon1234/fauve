@@ -88,7 +88,7 @@ const CODE =
   const AF = Math.min(frame, anchor ? anchor.durationInFrames - 1 : 0);
   const foot = (style) => h(Footage, { shot: 1, at: AT, hold, style: { ...L, ...style } });
   const still = (style) => h(React.Fragment, null, h(Subject, { shot: 0, object: "@support", style: { ...L, ...style } }), h(Subject, { shot: 0, object: "@sujet", style: { ...L, ...style } }));
-  const people = (style) => h(Subject, { shot: 1, object: "every person", at: AT, hold, style: { ...L, ...style } });
+  const people = (style, more) => h(Subject, { shot: 1, object: "every person", at: AT, hold, ...more, style: { ...L, ...style } });
   const fill = (c, kids) => h("div", { style: abs({ left: 0, top: 0, width: W, height: H, background: c }) }, kids);
   const inBand = (c, kids) => fill(wide ? "#000000" : c, h("div", { style: { ...abs(band), background: c, overflow: "hidden" } }, h("div", { style: abs({ left: -band.left, top: -band.top, width: W, height: H }) }, kids)));
   const clip = (bs) => (bs.length ? "path('" + bs.map((b) => "M" + Math.round(b.x) + " " + Math.round(b.y) + "h" + Math.round(b.w) + "v" + Math.round(b.h) + "h" + -Math.round(b.w) + "Z").join(" ") + "')" : "inset(100%)");
@@ -219,7 +219,10 @@ const CODE =
         h("div", { style: abs({ left: 0, top: 0, width: W, height: H, clipPath: clip(boxes) }) }, foot({})), stroke(boxes, "#000000", 3), tags("#000000"))));
       case "g": return inBand("#fbfdfa", graph(false));
       case "G": return inBand("#fbfdfa", graph(true));
-      case "o": return inBand("#fbfdfa", h(Ascii, { cell: [4, 8], kind: "dots", ink: "#26262a", paper: "#fbfdfa" }, h(Sketch, { invert: true, strength: 1.4 }, people({}))));
+      // Their dots tight on their edges, sparser inside: them in pale grey, two hard shadows for a dark rim (a cut-out's
+      // rim, a dilation over her whole picture, cost three times as much), in halftone.
+      case "o": return inBand("#fbfdfa", h(Ascii, { cell: [4, 8], kind: "dots", ink: "#26262a", paper: "#fbfdfa" },
+        people({ filter: "grayscale(1) contrast(0.5) brightness(1.9) drop-shadow(3px 2px 0 #1a1a1a) drop-shadow(-3px -2px 0 #1a1a1a)" })));
       case "a": case "A": case "B": case "X": {
         const share = kind === "A" ? 0.5 - 0.06 * t : kind === "B" ? 0.06 + 0.06 * t : kind === "X" ? 0 : 0.35;
         return fill("#000000", inBand("#000000", h(Ascii, { cell: [4, 8], ink: "#e6e6e6", paper: "#000000" }, share > 0 ? tiled(share) : still({}))));
