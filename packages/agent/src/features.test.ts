@@ -1233,13 +1233,19 @@ test("Edith's art direction by default: a model her files can make, never one of
 
 test("each of Edith's models shows its original's frames as a Reel she sends: sheets of ten frames over its passage", async () => {
   const { HOUSE_MODELS, houseModel, houseStyle, HOUSE_VERSION } = await import("./house-models.ts");
-  const { houseSheets, sheetSpan, houseOriginalPath, HOUSE_PASSAGES, MODEL_SHEETS } = await import("./house-sheets.ts");
+  const { houseSheets, sheetSpan, houseOriginalPath, HOUSE_PASSAGES, MODEL_SHEETS, HOUSE_DESIGNS } = await import("./house-sheets.ts");
   const { HOUSE_MEASURES } = await import("./house-measures.ts");
   const { stolenStyleSchema } = await import("./steal.ts");
   // A studio's row written before the sheets is rewritten (11: ten models written again on their originals' fiches).
   assert.equal(HOUSE_VERSION, 14);
   for (const m of HOUSE_MODELS) {
     const sheets = houseSheets(m.key);
+    // A model written as a design has no original, so no sheets (its row names none).
+    if (HOUSE_DESIGNS.has(m.key)) {
+      assert.deepEqual(sheets, [], m.key);
+      assert.equal(stolenStyleSchema.parse(houseStyle(m)).sheets, undefined, m.key);
+      continue;
+    }
     const duration = HOUSE_MEASURES[m.key]!.duration;
     // Every model has sheets over its whole passage, in order, a twelfth of it each (two seconds at least), twelve at most.
     assert.ok(sheets.length > 0 && sheets.length <= MODEL_SHEETS, m.key);
@@ -1258,7 +1264,7 @@ test("each of Edith's models shows its original's frames as a Reel she sends: sh
   assert.equal(houseOriginalPath("facade"), "house/originals/facade.mp4");
   // A 31 s original: twelve sheets of 2.583 s; a 9.4 s one: five of 2 s; as many as the workshop made for each model.
   assert.equal(sheetSpan(31), 2.583);
-  const made: Record<string, number> = { decode: 12, "quatre-coins": 11, mosaique: 3, "carte-feutre": 5, pile: 5, "photo-dump": 6, table: 5, "ecran-partage": 7, cadre: 4, fenetres: 7, facade: 5, gaufre: 7, "mot-cle": 12, frappe: 7, "titre-derriere": 6, journee: 8, "plans-fixes": 7, "coups-de-fouet": 12, tourne: 7, nike: 6, eventail: 10, coulisses: 6, interrupteur: 5, interface: 7, pixel: 8, "mots-meles": 10, aplat: 5, detourages: 9, createur: 12, silhouette: 6, vision: 5, "mon-travail": 5 };
+  const made: Record<string, number> = { decode: 12, "quatre-coins": 11, mosaique: 3, "carte-feutre": 5, pile: 5, "photo-dump": 6, table: 5, "ecran-partage": 7, cadre: 4, fenetres: 7, facade: 5, gaufre: 7, "mot-cle": 12, frappe: 7, "titre-derriere": 6, journee: 8, "plans-fixes": 7, "coups-de-fouet": 12, tourne: 7, nike: 6, eventail: 10, coulisses: 6, interrupteur: 5, interface: 7, pixel: 8, "mots-meles": 10, aplat: 5, detourages: 9, createur: 12, silhouette: 6, vision: 5, "mon-travail": 5, rallume: 0 };
   for (const m of HOUSE_MODELS) assert.equal(houseSheets(m.key).length, made[m.key], m.key);
   assert.deepEqual(houseSheets("facade").at(-1), { from: 8, to: 9.4, path: "house/sheets/facade/04.jpg" });
   assert.deepEqual(houseSheets("inconnu"), []);
@@ -6382,4 +6388,211 @@ test("« Voici mon travail » (v1): its clicks slowing down on their measured mo
   assert.match(input.cases[1]!.veut, /première photo de son travail/);
   assert.match(input.cases[33]!.veut, /devant ses jambes/);
   assert.deepEqual(input.textes.map((t) => [t.slot, "max_caracteres" in t ? t.max_caracteres : null]), [["mots", 26]]);
+});
+
+// ——— « La pièce qui se rallume » v1, Tristan's own idea written as a design (docs/fiches/rallume.md) ——————————————————
+
+/** Its shots as a composition gets them, on its timeline, all of one shape. */
+const rallumeShots = (line: { shots: { start: number; end: number }[] }, aspect = 16 / 9) =>
+  line.shots.map((s, i) => ({ src: `/v${i}.mp4`, aspect, from: Math.round(s.start * 30), durationInFrames: Math.round((s.end - s.start) * 30), kind: "video", segment: i }));
+/** What it lights at a frame: for each object drawn at its own light cut to its lit pieces, its name and the number of pieces lit. */
+const litPieces = (tree: Drawn) =>
+  drawnNodes(tree)
+    .filter((n) => n.type === "div" && /^brightness\(1\.18\)/.test(String(styleOf(n).filter ?? "")))
+    .map((n) => {
+      const cut = drawnNodes(n).find((m) => m.type === "div" && /^path\(/.test(String(styleOf(m).clipPath ?? "")))!;
+      return [String(drawnNodes(cut).find((m) => m.type === "Subject")?.props.object), (String(styleOf(cut).clipPath).match(/M/g) ?? []).length] as const;
+    });
+/** The filter its room shot is drawn with (empty: as filmed). */
+const filmTone = (tree: Drawn) => String(styleOf(drawnNodes(tree).find((n) => n.type === "Footage")!).filter ?? "");
+
+test("« La pièce qui se rallume » (v1): its lights on its beats faster and faster, the whole room on the downbeat, off at the end, at 96 BPM", async () => {
+  const { rallume } = await import("./skills/rallume.ts");
+  const { skillPlan } = await import("./skills.ts");
+  assert.equal(rallume.version, 1);
+  assert.equal(rallume.bpm, 96);
+  const beat = 60 / 96;
+  const line = rallume.timeline(10, { end: false });
+  // Its room shot two bars long, then the life of her place in shots of 1, 1 and 2 beats, then her room once more for
+  // three beats: every cut on a beat (on the image nearest to it).
+  const beats = [0, 8, 9, 10, 12, 13, 14, 16, 17, 18];
+  assert.equal(line.shots.length, beats.length);
+  line.shots.forEach((s, i) => assert.ok(Math.abs(s.start - beats[i]! * beat) <= 1 / 30 + 0.005, `shot ${i + 1}: ${s.start} s, beat ${beats[i]}`));
+  assert.ok(Math.abs(line.duration - 21 * beat) < 0.02, `${line.duration} s`);
+  // Its eight lights on beats 0, 1, 1,5, 2, 2,5, 2,75, 3 and 3,25 (faster and faster), the whole room on beat 4, off on beat 20.
+  assert.deepEqual([0, 1, 2, 3, 4, 5, 6, 7].map((k) => line.marks[`step_${k}`]), [0, 1, 1.5, 2, 2.5, 2.75, 3, 3.25].map((b) => Math.round(b * beat * 30)));
+  assert.equal(line.marks.all, 75);
+  assert.equal(line.marks.off, 375);
+  // Her name and its line from the moment the room lights up to the end (its code keeps them as its format does).
+  assert.deepEqual(line.texts, { nom: { from: 2.5, to: line.duration }, ligne: { from: 2.5, to: line.duration } });
+  // A soft click on each light, a heavier one when the room comes on and when it goes off, on their own images.
+  assert.deepEqual(line.sounds!.map((s) => [Math.round(s.at * 30), s.sound]), [
+    ...[0, 19, 28, 38, 47, 52, 56, 61].map((f) => [f, "light switch click"]),
+    [75, "heavy light switch clunk"],
+    [375, "heavy light switch clunk"],
+  ]);
+  assert.ok(line.sounds![8]!.gain! > line.sounds![1]!.gain!);
+  // Its music muffled while the room is dark, open at once on its light, muffled again when it goes off, cut with it.
+  assert.deepEqual(line.music, { filters: [{ kind: "muffled", from: 0, to: 2.5, open: 0.02 }, { kind: "muffled", from: 12.5, to: line.duration }], end: { at: line.duration } });
+  // Fewer files, a shorter life of her place; a length she asks for, more of it held two beats, up to about 30 s.
+  assert.ok(Math.abs(rallume.timeline(6, { end: false }).duration - 16 * beat) < 0.02);
+  assert.ok(Math.abs(rallume.timeline(14, { end: false }).duration - 27 * beat) < 0.02);
+  const longest = rallume.timeline(24, { end: false });
+  assert.ok(longest.duration <= 30 && longest.duration > 29, `${longest.duration} s`);
+  assert.equal(Math.round((longest.shots[20]!.end - longest.shots[20]!.start) / beat), 2);
+  // With an ending card, her room stays dark three beats (the card's 1,6 s), its cuts and its lights the same.
+  const ended = rallume.timeline(10, { end: true });
+  assert.deepEqual(ended.shots.slice(0, -1), line.shots.slice(0, -1));
+  assert.ok(Math.abs(ended.duration - line.duration - 2 * beat) < 0.02 && ended.duration - ended.marks.off! / 30 >= 1.6, `${ended.duration} s`);
+  assert.equal(ended.marks.off, line.marks.off);
+  // At another tempo, all of it follows its beats.
+  const slower = rallume.timeline(10, { end: false, bpm: 80 });
+  assert.ok(Math.abs(slower.marks.all! / line.marks.all! - 96 / 80) < 0.02 && Math.abs(slower.marks.off! / line.marks.off! - 96 / 80) < 0.01);
+  // On the plan, for every count it takes, with or without its card: valid, 45 s at most, its texts, sounds and music.
+  for (let n = rallume.shots[0]; n <= rallume.long!; n++) {
+    for (const end of [false, true]) {
+      const files = Array.from({ length: Math.max(4, Math.ceil(n / 3)) }, (_, i) => ({ id: `v${i}`, photo: false, seconds: 16 }));
+      const plan = skillPlan({ skill: rallume, name: "La pièce qui se rallume", files, fill: { shots: Array.from({ length: n }, (_, i) => ({ file: files[i % files.length]!.id, at: Math.floor(i / files.length) * 5 })), texts: { nom: "Le Comptoir", ligne: "bar à vins" }, end: end ? { title: "Ouvert dès 18 h" } : null } });
+      const parsed = editPlanSchema.safeParse(plan);
+      assert.ok(parsed.success, `n=${n} end=${end}: ${parsed.success ? "" : parsed.error.message.slice(0, 300)}`);
+      assert.ok(plan.duration <= 45 && plan.segments.length === n && plan.texts.length === 2);
+      assert.equal(plan.sounds?.length, 10);
+      assert.equal(plan.music_shape?.filters?.length, 2);
+    }
+  }
+});
+
+test("« La pièce qui se rallume » (v1): dark, then her things lit one by one at their own light, all at once, her name like a sign, off at the end", async () => {
+  const { rallume } = await import("./skills/rallume.ts");
+  const { skillCode } = await import("./skills.ts");
+  const line = rallume.timeline(10, { end: false });
+  const marks = Object.fromEntries(Object.entries(line.marks).map(([k, v]) => [k, String(v)]));
+  const reelTexts = [
+    { text: "Le Comptoir", role: "hook", from: 75, to: 394, emphasis: [] },
+    { text: "bar à vins", role: "caption", from: 75, to: 394, emphasis: [] },
+  ];
+  const props = (extra: Record<string, unknown> = {}) => ({ width: 1080, height: 1920, durationInFrames: 394, brand: { name: "Le Comptoir", displayFont: "Instrument Serif", bodyFont: "Inter Tight" }, shots: rallumeShots(line), reelTexts, end: null, texts: marks, ...extra });
+  // Ten lamps across its 16:9 picture (and two cut off by its edges, which never count), three bottles under them.
+  const lamps = [-80, ...Array.from({ length: 10 }, (_, i) => 60 + i * 100), 1100].map((x) => ({ x, y: 40, w: 60, h: 90 }));
+  const bottles = [300, 500, 700].map((x) => ({ x, y: 300, w: 30, h: 110 }));
+  const read = { parts: { "0#every pendant lamp": lamps, "0#every bottle": bottles } };
+  const code = skillCode(rallume, { lampes: "every pendant lamp", rangees: "every bottle" });
+  const draw = (f: number, r: Parameters<typeof drawCutOuts>[3] = read, extra: Record<string, unknown> = {}, c = code) => drawCutOuts(c, f, props(extra), r);
+  // The room dark from its first image (a fifth of its light, cooler); its first two lamps already on (13 pieces on 8 steps).
+  assert.equal(filmTone(draw(0)), "brightness(0.240) saturate(0.7)");
+  assert.ok(drawnNodes(draw(0)).some((n) => styleOf(n).mixBlendMode === "multiply"));
+  assert.deepEqual(litPieces(draw(0)), [["every pendant lamp", 2]]);
+  // Then more of them on each step, what is lit staying lit: the lamps first, then the bottles.
+  assert.deepEqual(litPieces(draw(30)), [["every pendant lamp", 5]]);
+  assert.deepEqual(litPieces(draw(55)), [["every pendant lamp", 10]]);
+  assert.deepEqual(litPieces(draw(58)), [["every pendant lamp", 10], ["every bottle", 2]]);
+  assert.deepEqual(litPieces(draw(74)), [["every pendant lamp", 10], ["every bottle", 3]]);
+  // Each piece at its own light, never pushed into white, and a bloom of its own highlights blurred in screen (no glow
+  // drawn round its shape: its brass cap lit like a sticker); a warm pool spilling from each, in screen.
+  const layers = drawnNodes(draw(30)).filter((n) => n.type === "div" && /^(brightness|contrast)\(/.test(String(styleOf(n).filter ?? "")));
+  assert.deepEqual(layers.map((n) => [styleOf(n).filter, styleOf(n).mixBlendMode ?? null]), [["brightness(1.18) saturate(1.1)", null], ["contrast(2.6) brightness(1.1) blur(12px)", "screen"]]);
+  assert.ok(layers.every((n) => drawnNodes(n).some((m) => m.type === "Subject" && m.props.object === "every pendant lamp")));
+  const pools = drawnNodes(draw(30)).find((n) => styleOf(n).mixBlendMode === "screen")!;
+  assert.equal((String(styleOf(pools).background).match(/radial-gradient/g) ?? []).length, 5);
+  // A lamp's pool flickers on as a bulb does: half, too bright, a little less, itself.
+  const alpha = (f: number) => Number(/rgba\(255,206,146,([\d.]+)\)/.exec(String(styleOf(drawnNodes(draw(f)).find((n) => styleOf(n).mixBlendMode === "screen")!).background))![1]);
+  assert.deepEqual([0, 1, 2, 3].map(alpha), [0.25, 0.675, 0.425, 0.5]);
+  // The whole room at once on the beat: two images brighter, a warm veil, then as filmed; nothing cut out any more (its
+  // own light takes over), the pools of all its pieces fading over ten images.
+  assert.equal(filmTone(draw(75)), "brightness(1.3)");
+  assert.equal(filmTone(draw(76)), "brightness(1.12)");
+  assert.equal(filmTone(draw(77)), "");
+  assert.ok(drawnNodes(draw(75)).some((n) => styleOf(n).mixBlendMode === "screen" && styleOf(n).background === "#fff1dc"));
+  const cutOuts = (f: number) => drawnNodes(draw(f)).filter((n) => n.type === "Subject").length;
+  assert.deepEqual([74, 75, 120].map(cutOuts), [4, 0, 0]);
+  assert.deepEqual([75, 80].map(alpha), [0.5, 0.25]);
+  assert.equal(drawnNodes(draw(85)).filter((n) => styleOf(n).mixBlendMode === "screen").length, 0);
+  // Her name catches like a neon with it (off, on, almost off, on, half, on), above its 16:9 picture on the black,
+  // its small line under it as a label; both lit to the end, the room off too.
+  const nameOf = (tree: Drawn) => drawnNodes(tree).find((n) => n.type === "FitText" && heldText(n).includes("Le Comptoir"));
+  const glowOf = (f: number) => { const n = nameOf(draw(f)); return n ? Number((n.props.innerStyle as Record<string, number>).opacity) : 0; };
+  assert.deepEqual([74, 75, 76, 77, 78, 79, 80].map(glowOf), [0, 0, 1, 0.3, 1, 0.55, 1]);
+  const box = nameOf(draw(120))!.props.style as { left: number; top: number; width: number; height: number };
+  assert.ok(box.top >= 80 && box.top + box.height <= 656 - 30 && box.left === 140 && box.width === 800, JSON.stringify(box));
+  assert.match(String((nameOf(draw(120))!.props.innerStyle as Record<string, string>).textShadow), /rgba\(255,176,92/);
+  const label = drawnNodes(draw(120)).find((n) => n.type === "FitText" && heldText(n).includes("bar à vins"))!;
+  assert.ok(drawnNodes(label).some((n) => "data-fauve-accent" in n.props));
+  assert.ok((label.props.style as { top: number }).top >= 656 + 608);
+  assert.ok(nameOf(draw(200)) && nameOf(draw(380)));
+  // Off at once on its beat, back to the dark of its opening (its end loops into its beginning).
+  assert.equal(filmTone(draw(374)), "");
+  assert.equal(filmTone(draw(375)), "brightness(0.240) saturate(0.7)");
+  // Few things (three lamps): one a step, then the room's own light back a notch on each step left, with a flicker.
+  const few = { parts: { "0#every pendant lamp": lamps.slice(1, 4) } };
+  assert.deepEqual(litPieces(draw(30, few)), [["every pendant lamp", 3]]);
+  assert.deepEqual([37, 38, 39, 40, 47].map((f) => filmTone(draw(f, few))), ["brightness(0.240) saturate(0.7)", "brightness(0.540) saturate(0.7)", "brightness(0.380) saturate(0.7)", "brightness(0.280) saturate(0.7)", "brightness(0.580) saturate(0.7)"]);
+  // Nothing named (nothing in her room shot to light): the room comes back notch by notch, then all at once.
+  assert.deepEqual([0, 1, 2].map((f) => filmTone(draw(f, {}, {}, rallume.code))), ["brightness(0.540) saturate(0.7)", "brightness(0.380) saturate(0.7)", "brightness(0.280) saturate(0.7)"]);
+  assert.deepEqual(litPieces(draw(30, {}, {}, rallume.code)), []);
+  assert.equal(filmTone(draw(75, {}, {}, rallume.code)), "brightness(1.3)");
+});
+
+test("« La pièce qui se rallume » (v1): horizontal 16:9 on black when her videos are, full frame otherwise or on her word; her colour; nothing cut out but her things", async () => {
+  const { rallume } = await import("./skills/rallume.ts");
+  const { skillCode, skillPlan, skillFillInput, skillSettings, readSkillFill } = await import("./skills.ts");
+  const { objectsDrawn, drawsSubject, clearsDrawn, objectPassages, OBJECT_MAX } = await import("./subject.ts");
+  const { checkMotionCode } = await import("./motion-scene.ts");
+  const line = rallume.timeline(10, { end: false });
+  const marks = Object.fromEntries(Object.entries(line.marks).map(([k, v]) => [k, String(v)]));
+  const reelTexts = [{ text: "Le Comptoir", role: "hook", from: 75, to: 394, emphasis: [] }];
+  const draw = (aspect: number, f: number, extra: Record<string, string> = {}, brand: Record<string, string> = {}) =>
+    drawCutOuts(rallume.code, f, { width: 1080, height: 1920, durationInFrames: 394, brand: { name: "Le Comptoir", displayFont: "Instrument Serif", bodyFont: "Inter Tight", ...brand }, shots: rallumeShots(line, aspect), reelTexts, end: null, texts: { ...marks, ...extra } });
+  const frameOf = (tree: Drawn) => {
+    const box = drawnNodes(tree).find((n) => n.type === "div" && styleOf(n).overflow === "hidden" && styleOf(n).backgroundColor === "#000000")!;
+    return { top: styleOf(box).top, height: styleOf(box).height };
+  };
+  const nameOf = (tree: Drawn) => drawnNodes(tree).find((n) => n.type === "FitText" && heldText(n).includes("Le Comptoir"));
+  // Her videos in width: its 16:9 frame in the middle; upright ones: the whole frame; her setting both ways.
+  assert.deepEqual(frameOf(draw(16 / 9, 120)), { top: 656, height: 608 });
+  assert.deepEqual(frameOf(draw(9 / 16, 120)), { top: 0, height: 1920 });
+  assert.equal(frameOf(draw(16 / 9, 120, { format: "vertical" })).height, 1920);
+  assert.equal(frameOf(draw(9 / 16, 120, { format: "horizontal" })).top, 656);
+  // Full frame: her name in the calm part of her room shot (here ClearBox's place for it, high in the frame), in the
+  // safe zone; gone with the cut, back in the dark at the end.
+  const tall = nameOf(draw(9 / 16, 120))!.props.style as { left: number; top: number; width: number; height: number };
+  assert.deepEqual(tall, { position: "absolute", left: 140, top: 288, width: 800, height: 195 });
+  assert.equal(nameOf(draw(9 / 16, 200)), undefined);
+  assert.ok(nameOf(draw(9 / 16, 376)));
+  // Her colour's light on her word, its tube a pale tint of it; a colour too pale to glow keeps the warm white.
+  const style = (tree: Drawn) => nameOf(tree)!.props.innerStyle as Record<string, string>;
+  const hers = style(draw(16 / 9, 120, { couleur: "sienne" }, { accent: "#7a2e8c" }));
+  assert.equal(hers.color, "rgb(218,196,223)");
+  assert.match(hers.textShadow!, /rgba\(122,46,140/);
+  assert.equal(style(draw(16 / 9, 120, { couleur: "sienne" }, { accent: "#f4efe6" })).color, "#fff3df");
+  assert.equal(style(draw(16 / 9, 120, {}, { accent: "#7a2e8c" })).color, "#fff3df");
+  assert.deepEqual(rallume.settings?.map((s) => [s.name, s.choices.map((c) => c.value)]), [["format", ["auto", "horizontal", "vertical"]], ["couleur", ["chaude", "sienne"]]]);
+  assert.deepEqual(skillSettings(rallume, [{ name: "format", value: "auto" }, { name: "couleur", value: "sienne" }]), { couleur: "sienne" });
+  // Its objects: up to four kinds of her things in her room shot, named by the filler; nothing named, nothing followed.
+  assert.deepEqual(checkMotionCode(rallume.code), []);
+  assert.deepEqual(objectsDrawn(rallume.code), []);
+  const named = skillCode(rallume, { lampes: "every pendant lamp", rangees: "every bottle", tables: "every cup", plantes: "every plant" });
+  assert.deepEqual(objectsDrawn(named).map((o) => [o.shot, o.name]), [[0, "every pendant lamp"], [0, "every bottle"], [0, "every cup"], [0, "every plant"]]);
+  assert.ok(objectsDrawn(named).length <= OBJECT_MAX);
+  // Nobody cut out (only her things), its name set in the clear part of its room shot, no zoom, no push.
+  assert.equal(drawsSubject(named), false);
+  assert.deepEqual(clearsDrawn(rallume.code), [0]);
+  assert.doesNotMatch(rallume.code, /transform|scale\(/);
+  assert.deepEqual(rallume.finish, { grain: 0, vignette: 0 });
+  // The filler sees its object slots on its first shot, and its answer is kept by slot; on the plan, its four objects
+  // are followed on her room shot's passage, within a Reel's 20 s of followed video at its own tempo.
+  const files = Array.from({ length: 10 }, (_, i) => ({ id: `v${i}`, photo: false, seconds: 16, shows: i ? "des gens au comptoir" : "la salle du bar le soir, ses suspensions allumées" }));
+  const input = skillFillInput({ skill: rallume, name: "La pièce qui se rallume", n: 10, files, business: {}, request: "" });
+  assert.deepEqual(input.objets?.map((o) => [o.slot, o.case]), [["lampes", 1], ["rangees", 1], ["tables", 1], ["plantes", 1]]);
+  assert.equal(input.textes.find((t) => t.slot === "ligne")?.obligatoire, false);
+  const fill = readSkillFill(rallume, files, 10, { fits: true, missing: "", shots: files.map((f) => ({ file: f.id, at: 0.5 })), texts: [{ slot: "nom", text: "Le Comptoir" }], end: null, objets: [{ slot: "lampes", name: "every pendant lamp" }, { slot: "rangees", name: "every bottle" }, { slot: "tables", name: "every cup" }, { slot: "plantes", name: "every plant" }], why: "" })!;
+  assert.deepEqual(fill.objects, { lampes: "every pendant lamp", rangees: "every bottle", tables: "every cup", plantes: "every plant" });
+  const plan = skillPlan({ skill: rallume, name: "La pièce qui se rallume", files, fill });
+  const passages = objectPassages(plan, () => true);
+  assert.equal(passages.length, 4);
+  assert.ok(passages.every((p) => p.clip_id === "v0" && p.from === 0.5 && p.to === 5.5), JSON.stringify(passages));
+  assert.deepEqual(plan.skill, { key: "rallume", version: 1 });
+  // Written as a design, without a reference Reel: no original kept, so no sheets of one, whatever its measures.
+  const { HOUSE_DESIGNS, houseSheets } = await import("./house-sheets.ts");
+  assert.ok(HOUSE_DESIGNS.has("rallume"));
+  assert.deepEqual(houseSheets("rallume"), []);
 });

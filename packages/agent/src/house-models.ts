@@ -721,6 +721,46 @@ export const HOUSE_MODELS: HouseModel[] = [
     },
   }),
   model({
+    key: "rallume",
+    name: "La pièce qui se rallume",
+    // Tristan's own idea, written as a design without an original (docs/fiches/rallume.md, v1 of its skill): her place
+    // in the dark, what it has several of lit again one by one at its own light, the whole room at once on the downbeat
+    // with her name like a sign, the life of her place, everything off at once so the Reel loops.
+    pitch: "Ton lieu dans le noir, puis tes lampes, tes bouteilles ou tes tasses qui se rallument une à une, chacune à sa lumière, toute la pièce d'un coup avec ton nom qui s'allume comme une enseigne, et la vie de ton lieu.",
+    needs: "6 à 12 vidéos de ton lieu le soir : un plan large de la salle avec ses lumières allumées (des suspensions, des lampes, des bougies) et ce qui s'y voit plusieurs fois, la caméra posée, puis des moments de la vie de ton lieu",
+    files: [4, 12],
+    pair: "editorial",
+    example: null,
+    // Its own design's tempo (no original to measure).
+    tempo: 96,
+    finish: { name: "Lumière du soir", hint: "chaud et doré, noirs profonds, un halo sur les lampes, sans grain ni coins sombres", contrast: 0.1, saturation: 0.06, warmth: 0.1, glow: 0.18, glow_color: "#FFB46A", shadows: "#0F0D14", highlights: "#F6DDB4", split: 0.15 },
+    look: {
+      name: "la pièce qui se rallume",
+      format: "pov",
+      hook: { kind: "mystère", what: "son lieu dans le noir, et ses lampes qui se rallument une à une, chacune avec un petit clic" },
+      text: {
+        amount: "une ligne",
+        composition: "le nom du lieu allumé comme une enseigne, blanc chaud avec un halo, au-dessus de l'image (en plein écran dans la partie calme de la salle) ; une petite ligne en capitales espacées dessous",
+        case: "normal",
+        weight: "regular",
+        tracking: "normal",
+      },
+      layout: "une image 16:9 sur du noir, son nom allumé au-dessus (plein écran si ses vidéos sont verticales) ; ses objets allumés un par un dans la salle assombrie, puis toute la salle",
+      moments: [
+        { at: 0, what: "la salle dans le noir, un cinquième de sa lumière ; ce qu'elle a plusieurs fois se rallume pièce par pièce, de plus en plus vite, chacune à sa lumière avec un halo chaud et un clic, la musique étouffée" },
+        { at: 2.5, what: "toute la salle d'un coup sur le temps, deux images plus vives ; la musique s'ouvre et le nom s'allume comme un néon qui prend" },
+        { at: 5, what: "la vie du lieu en plans courts coupés sur le temps, d'un, un puis deux temps" },
+        { at: 12.5, what: "un dernier plan large de la salle : tout s'éteint d'un coup avec un clic, le nom reste allumé dans le noir, la musique de nouveau étouffée" },
+      ],
+      camera: "mixte",
+      grade: "natural",
+      motion: "chaleureux",
+      music: "warm late-night soul groove, Rhodes chords, soft kick on every beat",
+      ending: "tout s'éteint d'un coup, son nom reste allumé dans le noir : la fin ressemble au début et le Reel reboucle",
+      why: "Le noir crée l'attente, chaque lumière qui revient est une petite récompense, et toute la salle qui s'allume avec son nom donne envie d'y entrer ; la boucle fait revoir le Reel.",
+    },
+  }),
+  model({
     key: "plans-fixes",
     name: "Plans fixes de cinéma",
     // 9: written again on its original's fiche (v3 of its skill): horizontal 4:3 on black when her videos are, its tempo, its
@@ -1287,6 +1327,7 @@ export const HOUSE_WHEN: Record<string, { pour: string; pas_pour: string }> = {
   frappe: { pour: "présenter un lieu au soleil, une terrasse, une saison", pas_pour: "un intérieur sombre, des produits seuls" },
   "titre-derriere": { pour: "un nom de lieu, de quartier ou de région en grand, une rue avec des toits, un paysage, un ciel", pas_pour: "sans plan large et fixe avec du ciel en haut" },
   journee: { pour: "raconter une journée du lieu, du matin au soir, son ambiance", pas_pour: "une offre, un produit seul" },
+  rallume: { pour: "un lieu le soir avec ses lumières (un bar, un restaurant, un café, une boutique éclairée), une soirée, l'hiver, une réouverture", pas_pour: "sans plan large de son lieu vu de l'intérieur, un lieu en plein jour sans lumières, des produits seuls en gros plan" },
   "plans-fixes": { pour: "un lieu calme et beau, une ambiance, l'heure dorée", pas_pour: "un Reel rythmé, une annonce" },
   "coups-de-fouet": { pour: "l'énergie d'une rue, d'un quartier, d'un lieu animé", pas_pour: "un lieu calme, un long message" },
   tourne: { pour: "un savoir-faire, des matières, un lieu, un look graphique de cinéma", pas_pour: "sans vidéos filmées en largeur" },

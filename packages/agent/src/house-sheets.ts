@@ -33,12 +33,20 @@ export const HOUSE_PASSAGES: Record<string, { to: number; crop?: { width: number
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
 /**
+ * The models written as a design, without a reference Reel (Tristan's own ideas, docs/fiches/rallume.md): no original
+ * is kept for them, so no sheets, whatever their measures (those of their own design); the agents that remake one read
+ * its skill's code and its catalogue reading, never frames of an original, and the director, who needs them, leaves it
+ * to the skill or to the editor.
+ */
+export const HOUSE_DESIGNS: ReadonlySet<string> = new Set(["rallume"]);
+
+/**
  * A model's sheets as named on its inspiration row: their span on its original and their path, the last one to its
- * end; none without its measures. A last stretch shorter than a frame's interval has no frame, so no sheet (the
- * mosaic's 6.04 s made three sheets, not four).
+ * end; none without its measures, nor for a model written as a design. A last stretch shorter than a frame's interval
+ * has no frame, so no sheet (the mosaic's 6.04 s made three sheets, not four).
  */
 export function houseSheets(key: string): { from: number; to: number; path: string }[] {
-  const duration = HOUSE_MEASURES[key]?.duration ?? 0;
+  const duration = HOUSE_DESIGNS.has(key) ? 0 : (HOUSE_MEASURES[key]?.duration ?? 0);
   if (!(duration > 0)) return [];
   const span = sheetSpan(duration);
   const sheets = Array.from({ length: MODEL_SHEETS }, (_, i) => ({ from: round2(i * span), to: round2(Math.min(duration, (i + 1) * span)), path: houseSheetPath(key, i) })).filter(
