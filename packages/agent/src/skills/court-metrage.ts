@@ -85,9 +85,11 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const credit = reelTexts.find((t) => t.role === "caption");
   const others = reelTexts.filter((t) => t !== band && t !== hook && t !== credit);
   const keep = (s) => String(s || "").replace(/(\d) (?=\d)/g, "$1 ");
+  // In capitals, an hour keeps its small h (« 7 h », never « 7 H »).
+  const caps = (s) => keep(s).toUpperCase().replace(/(\d)(\s?)H\b/g, "$1$2h");
   const words = (s) => String(s || "").split(/\s+/).filter((w) => /[\p{L}\p{N}]/u.test(w)).length;
   const lines = (s) => {
-    const w = keep(s).toUpperCase().split(/\s+/).filter(Boolean);
+    const w = caps(s).split(/\s+/).filter(Boolean);
     let best = [w.join(" ")];
     let worst = Infinity;
     for (let i = 1; i < w.length; i++) {
@@ -211,7 +213,7 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const cardIn = (a) => clamp01((frame - a) / 10);
   const ending = end && frame >= endAt
     ? h(React.Fragment, { key: "end" },
-        h(FitText, { key: "e-" + end.title, style: box(140, GH * 0.46 - TPX * 0.9, GW - 280, TPX * 1.8), innerStyle: { fontFamily: display, fontWeight: 600, fontSize: Math.round(TPX * 0.8), lineHeight: 0.95, textTransform: "uppercase", whiteSpace: "normal", textWrap: "balance", color: COLOR, opacity: cardIn(endAt), justifyContent: end.subtitle ? "flex-end" : "center" } }, keep(end.title)),
+        h(FitText, { key: "e-" + end.title, style: box(140, GH * 0.46 - TPX * 0.9, GW - 280, TPX * 1.8), innerStyle: { fontFamily: display, fontWeight: 600, fontSize: Math.round(TPX * 0.8), lineHeight: 0.95, whiteSpace: "normal", textWrap: "balance", color: COLOR, opacity: cardIn(endAt), justifyContent: end.subtitle ? "flex-end" : "center" } }, caps(end.title)),
         end.subtitle
           ? h(FitText, { key: "s-" + end.subtitle, style: box(140, GH * 0.46 + TPX * 0.95, GW - 280, Math.max(70, TPX)), innerStyle: { fontFamily: display, fontWeight: 500, fontStyle: "italic", fontSize: 48, lineHeight: 1.15, whiteSpace: "normal", textWrap: "balance", color: COLOR, opacity: cardIn(endAt + 5), justifyContent: "flex-start" } }, keep(end.subtitle))
           : null)

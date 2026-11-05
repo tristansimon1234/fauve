@@ -237,7 +237,8 @@ test("« Court métrage »: its ending card on the black after the fade, in its 
   const end = { title: "Ouvert dès 8 h", subtitle: "12 rue des Martyrs", from };
   assert.equal(keyed(drawAt(from - 1, { end, end_card: true }), "end"), null);
   const card = fits(drawAt(from + 12, { end, end_card: true }));
-  assert.deepEqual(card.map(textOf), ["Ouvert dès 8 h", "12 rue des Martyrs"]);
+  // Its title in capitals, an hour keeping its small h.
+  assert.deepEqual(card.map(textOf), ["OUVERT DÈS 8 h", "12 rue des Martyrs"]);
   assert.ok(card.every((t) => Number((t.props.innerStyle as { fontSize: number }).fontSize) >= 48));
   assert.equal(Number(styleOf(keyed(drawAt(from, { end, end_card: true }), "fade")!).opacity), 1);
 });

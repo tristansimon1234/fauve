@@ -81,9 +81,11 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   // 2. Her title card: one small word in spaced capitals near the top, her title in big serif capitals on two lines at
   // the middle, her credit in small italic near the bottom (upright: within the safe zone), all at once on its beat.
   const keep = (s) => String(s || "").replace(/(\d) (?=\d)/g, "$1 ");
+  // In capitals, an hour keeps its small h (« 7 h », never « 7 H »).
+  const caps = (s) => keep(s).toUpperCase().replace(/(\d)(\s?)H\b/g, "$1$2h");
   const count = (s) => String(s || "").split(/\s+/).filter((w) => /[\p{L}\p{N}]/u.test(w)).length;
   const lines = (s) => {
-    const w = keep(s).toUpperCase().split(/\s+/).filter(Boolean);
+    const w = caps(s).split(/\s+/).filter(Boolean);
     let best = [w.join(" ")];
     let worst = Infinity;
     for (let i = 1; i < w.length; i++) {
