@@ -42,10 +42,11 @@ export function usesFades(plan: Pick<EditPlan, "segments" | "transitions">): boo
   return plan.transitions === "fade" && plan.segments.length > 1 && plan.segments.every((s) => segmentLength(s) > FADE + 0.15);
 }
 
-/** Output timeline length: the kept segments, minus the overlaps of crossfades. */
+/** Output timeline length: the kept segments, minus the overlaps of crossfades (a shot laid beside the others adds nothing: its time is counted once). */
 export function renderDuration(plan: EditPlan): number {
-  const sum = plan.segments.reduce((total, s) => total + segmentLength(s), 0);
-  return round(usesFades(plan) ? sum - FADE * (plan.segments.length - 1) : sum);
+  const main = plan.segments.filter((s) => !(isClipSegment(s) && s.beside));
+  const sum = main.reduce((total, s) => total + segmentLength(s), 0);
+  return round(usesFades({ ...plan, segments: main }) ? sum - FADE * (main.length - 1) : sum);
 }
 
 /** "#5B3FD9" → ASS colour "&H00D93F5B" (alpha, blue, green, red). */
@@ -121,7 +122,7 @@ export function buildAss(plan: EditPlan, accent = DEFAULT_ACCENT): string {
  * with cuts or crossfades, burn the animated texts, add a silent track.
  */
 export function buildFfmpegArgs(plan: EditPlan, options: RenderOptions): string[] {
-  if (!plan.segments.every(isClipSegment)) throw new Error("The ffmpeg engine renders clips only: remove scenes first (withoutScenes)");
+  if (!plan.segments.every((s) => isClipSegment(s) && !s.beside)) throw new Error("The ffmpeg engine renders the main line of clips only: remove scenes and shots laid beside first (withoutScenes)");
   const clips = plan.segments as ClipSegment[];
   const { w, h } = SIZES[plan.format];
   const total = renderDuration(plan);
