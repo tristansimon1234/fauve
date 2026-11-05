@@ -456,7 +456,7 @@ test("motion scenes: the renderer, the smoke test and the prompt share one scope
 });
 
 test("pricing: Gemini, Kimi, the sandbox, the music and the transcriptions are priced", async () => {
-  const { geminiCostUsd, isKimiModel, kimiCostUsd, musicCostUsd, sandboxCostUsd, transcriptionCostUsd } = await import("./pricing.ts");
+  const { geminiCostUsd, isKimiModel, kimiCostUsd, musicCostUsd, sandboxCostUsd, sandboxMemoryCostUsd, transcriptionCostUsd } = await import("./pricing.ts");
   const tokens = { input: 1_000_000, output: 100_000 };
   // Introductory Flash price through 2026, doubled from January 1, 2027.
   assert.equal(geminiCostUsd("gemini-3.7-flash", tokens, new Date("2026-10-15T12:00:00Z")), 0.75 + 0.375);
@@ -474,6 +474,11 @@ test("pricing: Gemini, Kimi, the sandbox, the music and the transcriptions are p
   assert.ok(Math.abs(sandboxCostUsd(3600, 4, "cdg1") - 4 * (0.177 + 2 * 0.0292)) < 1e-9);
   assert.ok(sandboxCostUsd(60, 4, "iad1") < sandboxCostUsd(60, 4, "cdg1"));
   assert.equal(sandboxCostUsd(-5, 4), 0);
+  // A render sandbox kept up with nothing running: its 8 GB only, as the bill counts them (871.9 GB-hours, $24.95 in October).
+  assert.ok(Math.abs(sandboxMemoryCostUsd(3600, 8, "cdg1") - 8 * 0.0292) < 1e-9);
+  assert.ok(Math.abs(sandboxMemoryCostUsd(15 * 60, 16) - 4 * 0.0292) < 1e-9);
+  assert.ok(sandboxMemoryCostUsd(60, 8) < sandboxCostUsd(60, 4));
+  assert.equal(sandboxMemoryCostUsd(-1, 8), 0);
   assert.ok(Math.abs(musicCostUsd(20) - 0.05) < 1e-9);
   assert.ok(Math.abs(transcriptionCostUsd(3600) - 0.22) < 1e-9);
 });

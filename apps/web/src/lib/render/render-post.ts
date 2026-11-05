@@ -61,6 +61,7 @@ import { ensureCleanCopies } from "@/lib/video/speech";
 import { loadTracks } from "./tracks";
 import { postStyle } from "@/lib/steal";
 import { renderInSandbox, renderReelInSandbox, sandboxCostEur, smokeTestScenes, type SceneChecks } from "./sandbox";
+import { withoutCompositions } from "./render-tries";
 import { costMeta } from "@/lib/cost-scope";
 
 const extensionByMime: Record<string, string> = { "video/mp4": "mp4", "video/quicktime": "mov", "video/webm": "webm", "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp" };
@@ -510,31 +511,29 @@ export async function renderPost(studioId: string, postId: string, options: { ed
         console.warn("slow motion on the card unavailable", e instanceof Error ? e.message.slice(0, 300) : e);
         return {};
       });
+      // Remotion always gets a second, more patient try (a frame of her video waited on a busy workshop: the Reel fell
+      // back to ffmpeg, which draws neither her black bars nor the hook's animation), in the same place, on her files
+      // already copied, when its step has the time for it. A collage's composition that broke the render gives way to
+      // the printed collage, and the animation that draws the texts of a copied Reel goes with it (the engine draws them
+      // again). Photos, blurred zones or her voice: the ffmpeg engine cannot render them; anything else falls back to it
+      // only after that second try.
+      const composed = Boolean(props.layers?.some((l) => l.compose));
       try {
-        mp4 = await renderReelInSandbox({ id: renderId, props, slowmo });
+        mp4 = await renderReelInSandbox({
+          id: renderId,
+          props,
+          slowmo,
+          again: (local, error) => {
+            console.error("remotion render failed, trying again", renderId, composed ? "without its composition" : "", error);
+            return withoutCompositions(local);
+          },
+        });
         engine = "remotion";
         durationMs = Math.round((props.durationInFrames / props.fps) * 1000);
       } catch (error) {
-        // Remotion always gets a second, more patient try (a frame of her video waited on a busy workshop: the Reel
-        // fell back to ffmpeg, which draws neither her black bars nor the hook's animation). A collage's composition
-        // that broke the render gives way to the printed collage. Photos, blurred zones or her voice: the ffmpeg
-        // engine cannot render them; anything else falls back to it only after that second try.
-        const composed = Boolean(props.layers?.some((l) => l.compose));
-        console.error("remotion render failed, trying again", renderId, composed ? "without its composition" : "", error);
-        // The animation that draws the texts of a copied Reel goes with it: the engine draws them again.
-        const layers = props.layers?.filter((l) => !l.compose && !l.drawsTexts);
-        const again = await renderReelInSandbox({ id: `${renderId}-again`, props: { ...props, layers: layers?.length ? layers : undefined }, patient: true, slowmo }).catch(
-          (second: unknown) => {
-            if (composed || needsBlur || photoIds.length || plan.voice) throw second;
-            console.error("remotion failed twice, falling back to ffmpeg", renderId, second);
-            return null;
-          },
-        );
-        if (again) {
-          mp4 = again;
-          engine = "remotion";
-          durationMs = Math.round((props.durationInFrames / props.fps) * 1000);
-        } else mp4 = await ffmpegRender();
+        if (composed || needsBlur || photoIds.length || plan.voice) throw error;
+        console.error("remotion failed twice, falling back to ffmpeg", renderId, error);
+        mp4 = await ffmpegRender();
       }
     } else {
       mp4 = await ffmpegRender();
