@@ -1,5 +1,6 @@
 import type { MontageSkill } from "./skills.ts";
 import { cadre } from "./skills/cadre.ts";
+import { carteFeutre } from "./skills/carte-feutre.ts";
 import { coulisses } from "./skills/coulisses.ts";
 import { coupsDeFouet } from "./skills/coups-de-fouet.ts";
 import { createur } from "./skills/createur.ts";
@@ -24,6 +25,7 @@ import { pixel } from "./skills/pixel.ts";
 import { plansFixes } from "./skills/plans-fixes.ts";
 import { quatreCoins } from "./skills/quatre-coins.ts";
 import { rallume } from "./skills/rallume.ts";
+import { table } from "./skills/table.ts";
 import { titreDerriere } from "./skills/titre-derriere.ts";
 import { tourne } from "./skills/tourne.ts";
 
@@ -33,6 +35,7 @@ import { tourne } from "./skills/tourne.ts";
 
 export const MONTAGE_SKILLS: Record<string, MontageSkill> = {
   cadre,
+  "carte-feutre": carteFeutre,
   coulisses,
   "coups-de-fouet": coupsDeFouet,
   createur,
@@ -57,6 +60,7 @@ export const MONTAGE_SKILLS: Record<string, MontageSkill> = {
   "plans-fixes": plansFixes,
   "quatre-coins": quatreCoins,
   rallume,
+  table,
   "titre-derriere": titreDerriere,
   tourne,
 };

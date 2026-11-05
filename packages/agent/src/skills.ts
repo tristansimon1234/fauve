@@ -383,9 +383,10 @@ export type MontageSkill = {
    * What its code does itself, taken out of its model's finish (laid over the whole Reel, its composition too): « Montage
    * sport noir et blanc » draws its own black and white with its red over it, so its finish keeps only its contrast,
    * grain and vignette (saturation 0), else its red came out grey; « Quart de tour, deux tons » draws its two tones and
-   * its colour shots, so none of its model's exposure, saturation or split toning stays (split 0).
+   * its colour shots, so none of its model's exposure, saturation or split toning stays (split 0); « Carte au feutre »
+   * warms her pictures itself under a notebook that never takes their light, so its model's flash goes too (flash 0).
    */
-  finish?: Partial<Pick<ReelLook, "exposure" | "saturation" | "contrast" | "warmth" | "split" | "grain" | "vignette" | "fade">>;
+  finish?: Partial<Pick<ReelLook, "exposure" | "saturation" | "contrast" | "warmth" | "split" | "grain" | "vignette" | "fade" | "flash">>;
 };
 
 /** One of her files, as a skill uses it. */

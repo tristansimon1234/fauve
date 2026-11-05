@@ -1,223 +1,288 @@
 import { beatSpans, toFrame, type MontageSkill } from "../skills.ts";
 
-// « Carte au feutre », written on its original (house/originals/carte-feutre.mp4, 9 s, looked at image by image): a
-// folded card of grey-white paper (its fold across the middle, its lower half a little darker) held in front of the
-// pictures, some 70 % of the frame's width, at its middle; under it the pictures change every three images (an
-// eighth of a beat at 72 BPM: stop motion), some twenty of them coming back in a new order, and the card jumps a little
-// at each one (a few pixels, a degree or two, the angle of a hand that holds it). Blank for a beat, then the sentence is
-// written on it in red felt-tip capitals, tall and narrow, from its top left, a word more on each beat (a short word
-// with the next: « & COME »), the whole sentence by the eighth beat; held whole to the end, the pictures still flashing.
-// Here the card is drawn over her pictures (to_film_else), its words are hers; its ending card (an offer, an
-// announcement) is written on the same card at the end, its line under it smaller.
+// « Carte au feutre », version 2, written again on its original's fiche (docs/fiches/carte-feutre.md: measured image by
+// image at 30 i/s, the notebook of each step found on the pixels that do not change while the photos pass under it, its
+// music measured; Tristan: « c'est un effet que l'on veut pouvoir faire, pas exactement reproduire l'image »). An open
+// notebook, photographed, cut out and laid over her pictures, which pass under it in stop motion; her message written on
+// it by hand in red felt-tip capitals, a word at a time. Its music is a slow beat at 135 BPM played in half time, every
+// length below in its beats from the Reel's start, so its words land where the original's do (within two images):
+//   0 – 2       the notebook still empty, tilted left, her pictures passing under it (the hook: nothing written, all
+//               passing); the music comes in at 0,65 beat, its first bass hit on beat 1,5;
+//   2 – 11      her words, one at a time on the original's moments (a short word with the next one, « & COME »), each
+//               on a change of picture, the notebook taking a new pose with each (4 to 7°, left and right in turn);
+//   12,5 – 13,5 the music stops dead a beat; the name she announces lands in that blank, two images before its reprise,
+//               the biggest line, the notebook straight;
+//   to 20,25    her whole sentence held on the reprise, her pictures still passing; the sound fades over the last second;
+//               no ending card, no black (her ending card, an offer, only when she has one).
+// Under it, a new picture every 3 images (a tenth of a second, never on the music), her pictures always in her order,
+// round after round: a photo the same image each time, a video a little further on each time it comes back (stop
+// motion; Tristan: « si photos envoyées, figées ; si vidéos, ça joue »); full frame, or, when most of her pictures are in
+// width, two bands of them above and under the notebook, changing one after the other (its format setting). The notebook
+// is drawn: two pages of warm light grey paper, its binding across the middle with its stitches, the top page darker
+// just before it, corners hardly rounded, a notch at the fold, no shadow; it moves only with each word. Her words in the
+// original's red (#b20b21), or in her colour when it is dark enough to read on its paper; a hand that never repeats
+// (Handwriting: each letter a little different, each line across the notebook's width, a grease pencil's grain), in
+// Covered By Your Grace, the closest to the original's tall narrow capitals, stretched to their height. Nothing of the
+// original's own is copied: its words, its night's name, its menus' red writing are its brand; hers are written here.
 
-const BPM = 72;
-/** The first word on the card, and the beat by which her whole sentence is written (beats). */
-const WORDS_AT = 1;
-const FULL_BY = 7.5;
-/** Its length in beats: 10.5 with ten pictures, an eighth of a beat more for each one past ten (more to see). */
-const lengthBeats = (n: number) => 10.5 + 0.125 * (Math.max(10, n) - 10);
-/** The ending card's beats (at least the engine's 1,6 s). */
-const CARD = 2;
+const BPM = 135;
+/** Her pictures change every this many images (a tenth of a second at 30 i/s, never on the music). */
+const TICK = 3;
+/**
+ * Its words land on the original's images 27, 52, 72, 99, 123 and 147 (« PUT », « THAT », « PHONE », « DOWN »,
+ * « & COME », « TO »), the name on 177 (« BURGER NIGHT »), in beats from the Reel's start (13,33 images a beat).
+ */
+const ARRIVALS = [27, 52, 72, 99, 123, 147].map((f) => f / 13.3333);
+const NAME = 177 / 13.3333;
+/** Its music comes in at 0,29 s after nine silent images, its first bass hit on beat 1,5 (0,67 s). */
+const LATE = 0.65;
+const DOWNBEAT = 1.5;
+/** It stops dead one beat (5,57 – 5,93 s: the name lands in it) and comes back on the first beat of a bar (5,97 s). */
+const BLANK = [12.5, 13.5] as const;
+/** Its 9 s (270 images) in beats; its sound fades over the last second. */
+const LENGTH = 20.25;
+const FADE = 2.25;
+/** The engine's ending card: the Reel's last 1,6 s; whole beats more for it, only when she has one. */
 const CARD_SECONDS = 1.6;
 const round = (s: number) => Math.round(s * 100) / 100;
+const round3 = (s: number) => Math.round(s * 1000) / 1000;
 
 const CODE = String.raw`function Scene({ width, height, durationInFrames, brand, shots, reelTexts, end, texts }) {
   const h = React.createElement;
   const frame = useCurrentFrame();
   const mark = (k, d) => { const v = Number(texts && texts[k]); return Number.isFinite(v) ? v : d; };
-  const BEAT = mark("beat", 25);
-  const WORDS_AT = mark("words", Math.round(BEAT));
-  const FULL_BY = mark("full", Math.round(7.5 * BEAT));
+  const setting = (k, d) => { const v = texts && texts[k]; return typeof v === "string" && v ? v : d; };
   const n = shots.length;
   const endAt = end ? end.from : durationInFrames + 1;
-  // A new picture every eighth of a beat (stop motion): tick k starts at the frame nearest to k eighths.
-  const TICK = BEAT / 8;
-  const startOf = (k) => Math.round(k * TICK);
-  const tickAt = (f) => {
-    let k = Math.max(0, Math.floor(f / TICK));
-    while (startOf(k + 1) <= f) k++;
-    while (k > 0 && startOf(k) > f) k--;
-    return k;
+  const TICK = 3;
+  const t = Math.floor(frame / TICK);
+
+  // Its pictures full frame, as the original's; or, when most of hers are in width (or she asks), two bands of them
+  // above and under the notebook (a horizontal picture whole in each, almost 16:9), changing one after the other.
+  const format = setting("format", "auto");
+  const wideShots = shots.filter((s) => (Number(s.aspect) || 0.5625) > 1.15).length;
+  const bands = format === "bandes" || (format === "auto" && wideShots * 2 > n);
+
+  // 1. A new picture every 3 images, hers in her order, round after round: a photo the same image each time it comes
+  // back; a video 3 images further on its passage each time (stop motion: each of its images held while it shows).
+  // Warm and saturated, as the original's flash photos (the notebook never takes their light).
+  const tone = "sepia(0.1) saturate(1.12)";
+  const picture = (k, style) => {
+    const i = k % n;
+    const s = shots[i];
+    const m = s && s.kind === "video" ? Math.min(Math.max(0, s.durationInFrames - 1), Math.floor(k / n) * TICK) : 0;
+    return h(Footage, { key: "p" + k, shot: i, at: frame - m, style: { position: "absolute", ...style, filter: tone } });
   };
-  const t = tickAt(frame);
-  const ink = "#b3172b";
-  const hand = "'Just Another Hand', '" + brand.displayFont + "', cursive";
-  const body = "'" + brand.bodyFont + "', 'Inter Tight', sans-serif";
+  const BAND = Math.round(height / 3);
+  const pictures = !n
+    ? null
+    : bands
+      ? [picture(2 * Math.floor((t + 1) / 2), { left: 0, top: 0, width, height: BAND }), picture(2 * Math.floor(t / 2) + 1, { left: 0, top: height - BAND, width, height: BAND })]
+      : picture(t, { left: 0, top: 0, width, height });
 
-  // 1. Her pictures, full frame, one per tick: the first round in her order (her first picture opens the Reel), then
-  // each round in a new order, never the same picture twice in a row. A video shows the next slice of its passage each
-  // time it comes back, so it moves on in stop motion and its whole passage is seen once over the Reel.
-  const orderOf = (c) => {
-    const p = Array.from({ length: n }, (_, i) => i);
-    if (c === 0 || n < 3) return p;
-    for (let i = n - 1; i > 0; i--) { const j = Math.floor(random("card-order-" + c + "-" + i) * (i + 1)); const x = p[i]; p[i] = p[j]; p[j] = x; }
-    const before = orderOf(c - 1);
-    if (p[0] === before[n - 1]) { const x = p[0]; p[0] = p[1]; p[1] = x; }
-    return p;
-  };
-  const cycle = n ? Math.floor(t / n) : 0;
-  const shot = n ? orderOf(cycle)[t % n] : -1;
-  const picture = shot >= 0
-    ? h(Footage, { key: "s" + t, shot, at: startOf(t) - Math.round(cycle * TICK), style: { left: 0, top: 0, width, height } })
-    : null;
-
-  // 2. The card: grey-white paper folded across the middle, some 70 % of the frame's width, at its middle; at each
-  // tick it moves a little, as held in front of the camera (a few pixels, its tilt and its angle to the lens).
-  const CW = 760;
-  const CH = 830;
-  const CX = Math.round(width / 2);
-  const CY = 970;
-  const L = CX - CW / 2;
-  const T = CY - CH / 2;
-  const jit = (k, a) => (random("card-" + k + "-" + t) * 2 - 1) * a;
-  const move = { dx: jit("x", 11), dy: jit("y", 11), rz: -1 + jit("r", 1.4), ry: jit("ry", 6), rx: jit("rx", 4.5) };
-  const P = 1800;
-  const turn = (s) => "translate(" + (move.dx / s).toFixed(2) + "px, " + (move.dy / s).toFixed(2) + "px) perspective(" + (P / s).toFixed(1) + "px) rotateX(" + move.rx.toFixed(2) + "deg) rotateY(" + move.ry.toFixed(2) + "deg) rotate(" + move.rz.toFixed(2) + "deg)";
-  const FOLD = 0.48;
-  const paper = h("div", { style: { position: "absolute", left: L, top: T, width: CW, height: CH, transformOrigin: "50% 50%", transform: turn(1), borderRadius: 12, overflow: "hidden", boxShadow: "0 16px 36px rgba(0,0,0,0.26), 0 2px 6px rgba(0,0,0,0.18)" } },
-    h("div", { style: { position: "absolute", left: 0, top: 0, width: CW, height: Math.round(CH * FOLD), background: "linear-gradient(180deg, #d7d5ce 0%, #dcdad3 38%, #e3e0d9 74%, #d6d3cb 90%, #c4c1b9 100%)" } }),
-    h("div", { style: { position: "absolute", left: 0, top: Math.round(CH * FOLD), width: CW, height: CH - Math.round(CH * FOLD), background: "linear-gradient(180deg, #e0ded7 0%, #dad8d1 28%, #dfdcd5 70%, #d3d0c8 100%)" } }),
-    h("div", { style: { position: "absolute", left: 0, top: Math.round(CH * FOLD) - 1, width: CW, height: 2, background: "#aaa79f" } }),
-    h("div", { style: { position: "absolute", left: 0, top: Math.round(CH * FOLD) + 1, width: CW, height: 1, background: "rgba(255,255,255,0.55)" } }),
-    h("div", { style: { position: "absolute", inset: 0, borderRadius: 12, boxShadow: "inset 0 0 0 1px rgba(0,0,0,0.08)" } }));
-
-  // 3. Her sentence in red felt-tip capitals from the card's top left: its lines chosen for the largest letters (never
-  // a line that ends on a little word when another break is as good), every word laid from the start, unseen until its
-  // beat, so the card's letters keep one size; a word lands on each beat (a word of one or two letters with the next),
-  // faster when her sentence has more words than beats before the eighth.
-  const BX = L + 30;
-  const BY = T + 22;
-  const BW = CW - 30 - 22;
-  const BH = CH - 22 - 30;
-  const MAXF = 200;
-  const LINE = 0.86;
-  const keep = (s) => String(s || "").replace(/(\d) (?=\d)/g, "$1\u00a0");
-  // The felt-tip's capitals, their advance in hundredths of the size (measured on it), to choose the lines; a letter
-  // not listed counts as an average one (another font falling back only changes the guess: the box still fits it).
-  const ADV = { A: 36, B: 38, C: 40, D: 39, E: 36, F: 31, G: 42, H: 42, I: 32, J: 43, K: 36, L: 31, M: 47, N: 39, O: 39, P: 35, Q: 43, R: 38, S: 35, T: 33, U: 41, V: 35, W: 51, X: 32, Y: 29, Z: 31, "0": 33, "1": 19, "2": 29, "3": 33, "4": 28, "5": 32, "6": 30, "7": 24, "8": 33, "9": 30, "&": 29, "+": 26, "-": 21, "'": 9, "’": 9, ".": 11, ",": 11, "!": 17, "?": 31, ":": 15, ";": 15, "%": 47, "€": 32, " ": 15, "\u00a0": 15, "\u202f": 8, Œ: 61, Æ: 57 };
-  const emOf = (w) => Array.from(w).reduce((u, c) => u + (ADV[c] || ADV[c.normalize("NFD").charAt(0)] || 37) / 100, 0);
-  // A line never ends on an article or a little preposition when another break is as good.
-  const SHORT = /^(&|\+|À|A|AU|AUX|DE|DU|DES|D'|D’|L'|L’|LE|LA|LES|UN|UNE|EN|ET|OU|THE|TO|OF|AN)$/;
-  const layout = (words, box) => {
-    const ems = words.map(emOf);
+  // 2. Her words: her message, then the name she announces (its last line, the biggest), in capitals. Her message in at
+  // most three lines, the longest as short as can be: two lines on the top page, the rest and the name on the bottom one.
+  const keep = (s) => String(s || "").replace(/(\d) (?=\d)/g, "$1 ");
+  const up = (s) => keep(s).toLocaleUpperCase("fr").replace(/\s+/g, " ").trim();
+  const message = reelTexts.find((x) => x.role === "hook");
+  const named = reelTexts.find((x) => x.role === "caption");
+  const others = reelTexts.filter((x) => x !== message && x !== named);
+  const msg = up(message && message.text);
+  const nm = up(named && named.text);
+  const words = msg ? msg.split(" ") : [];
+  const length = (s) => Array.from(s).length;
+  const split = (list, k) => {
     let best = null;
-    const tryLines = (cuts) => {
-      const lines = [];
-      for (let i = 0; i < cuts.length - 1; i++) lines.push([cuts[i], cuts[i + 1]]);
-      const widths = lines.map(([a, b]) => ems.slice(a, b).reduce((x, y) => x + y, 0) + 0.15 * (b - a - 1));
-      // Its letters' boxes are a size high each, its lines LINE apart.
-      let f = Math.min(MAXF, box.w / Math.max.apply(null, widths), box.h / (LINE * (lines.length - 1) + 1));
-      lines.slice(0, -1).forEach(([a, b]) => { if (SHORT.test(words[b - 1])) f *= 0.95; });
-      if (!best || f > best.f + 0.01) best = { f, lines };
+    const go = (start, left, acc) => {
+      if (left === 1) {
+        const lines = acc.concat([list.slice(start).join(" ")]);
+        const most = Math.max.apply(null, lines.map(length));
+        if (!best || most < best.most) best = { most, lines };
+        return;
+      }
+      for (let stop = start + 1; stop <= list.length - left + 1; stop++) go(stop, left - 1, acc.concat([list.slice(start, stop).join(" ")]));
     };
-    const split = (start, left, cuts) => {
-      if (left === 1) return tryLines(cuts.concat([words.length]));
-      for (let stop = start + 1; stop <= words.length - left + 1; stop++) split(stop, left - 1, cuts.concat([stop]));
-    };
-    for (let k = 1; k <= Math.min(6, words.length); k++) split(0, k, [0]);
-    return best ? best.lines : [[0, words.length]];
+    if (list.length) go(0, Math.max(1, Math.min(k, list.length)), []);
+    return best ? best.lines : [];
   };
-  // When each word lands (frames): a word of one or two letters (or « & ») with the next one, a sign with the last.
-  const landings = (words, from, until) => {
-    const groups = [];
-    let pending = [];
-    words.forEach((w, i) => {
-      if (/^[%!?:;€$.,…)»]+$/.test(w) && groups.length && !pending.length) { groups[groups.length - 1].push(i); return; }
-      pending.push(i);
-      if (Array.from(w.replace(/[^A-Za-zÀ-ÿ0-9&+]/g, "")).length > 2 || i === words.length - 1) { groups.push(pending); pending = []; }
-    });
-    if (pending.length) groups.push(pending);
-    const t0 = tickAt(from);
-    const t1 = Math.max(t0, tickAt(until));
-    const G = groups.length;
-    const step = G <= 1 || 8 * (G - 1) <= t1 - t0 ? 8 : Math.max(2, Math.floor((t1 - t0) / (G - 1)));
-    const at = [];
-    groups.forEach((g, k) => g.forEach((i) => { at[i] = startOf(t0 + k * step); }));
-    return at;
-  };
-  const writing = (text, from, until, box, key, atOnce) => {
-    const words = keep(text).toUpperCase().split(/[ \t\n]+/).filter(Boolean);
-    if (!words.length) return null;
-    const lines = layout(words, box);
-    const at = atOnce ? words.map(() => startOf(tickAt(from))) : landings(words, from, until);
-    const style = { fontFamily: hand, fontWeight: 400, fontSize: MAXF, lineHeight: LINE, letterSpacing: "0.005em", color: ink, WebkitTextStroke: "2.6px " + ink, whiteSpace: "nowrap", textAlign: "left" };
-    // The lines move with the card: the card's own turn, about its centre, inside the box (so the box measures them
-    // still, at one size on every frame). The block is only as large as its lines: one as large as the box would be
-    // measured larger than it by the letters' boxes, taller than their lines, and the box would shrink to its least.
-    return h(FitText, { key, style: { position: "absolute", left: box.x, top: box.y, width: box.w, height: box.h } }, (s) =>
-      h("div", { style: { position: "absolute", left: 0, top: 0, display: "flex", flexDirection: "column", alignItems: "flex-start", justifyContent: "flex-start", transformOrigin: ((CX - box.x) / s).toFixed(2) + "px " + ((CY - box.y) / s).toFixed(2) + "px", transform: turn(s) } },
-        lines.map(([a, b], r) => h("div", { key: r, style }, words.slice(a, b).map((w, i) => h("span", { key: i, style: { opacity: frame >= at[a + i] ? 1 : 0 } }, (i ? " " : "") + w)))))
-    );
-  };
-  const hook = reelTexts.find((t) => t.role === "hook");
-  const others = reelTexts.filter((t) => t !== hook);
-  const box = { x: BX, y: BY, w: BW, h: BH };
-  const message = hook && frame < endAt ? writing(hook.text, WORDS_AT, FULL_BY, box, "message") : null;
+  const lines = split(words, Math.max(1, Math.min(3, Math.round(length(msg) / 11))));
+  const topLines = lines.slice(0, 2);
 
-  // Any other text of the Reel (none in its slots): a plain white line above the card, so nothing she wrote is lost.
-  const extra = others.filter((t) => frame >= t.from && frame < t.to && frame < endAt).map((t, i) =>
-    h(FitText, { key: "x" + i, style: { position: "absolute", left: 140, width: width - 280, top: 200 + i * 130, height: 120 }, innerStyle: { fontFamily: body, fontWeight: 600, fontSize: 56, lineHeight: 1.15, color: "#ffffff", textAlign: "center", textShadow: "0 1px 2px rgba(0,0,0,0.55), 0 2px 14px rgba(0,0,0,0.35)" } }, keep(t.text)));
+  // When each word lands: a word of one or two letters (or « & ») with the next one, the one before the name alone; on
+  // the original's moments, sampled along them for another count, each on a change of picture; the name in the music's
+  // blank, two images before its reprise.
+  const A = [0, 1, 2, 3, 4, 5].map((k) => mark("a" + k, NaN)).filter(Number.isFinite);
+  const along = (arr, x) => { const p = x * (arr.length - 1); const i = Math.max(0, Math.min(arr.length - 2, Math.floor(p))); return arr.length > 1 ? arr[i] + (arr[i + 1] - arr[i]) * (p - i) : arr[0] || 0; };
+  const snap = (f) => Math.max(TICK, Math.round(f / TICK) * TICK);
+  const short = (w) => length(w.replace(/[.,!?;:…'’"«»()]/g, "")) <= 2;
+  const ends = [];
+  words.forEach((w, i) => { if (!short(w) || i === words.length - 1) ends.push(i + 1); });
+  const lands = [];
+  ends.forEach((_, k) => { const f = snap(ends.length > 1 ? along(A, k / (ends.length - 1)) : A[0]); lands.push(Math.max(f, k ? lands[k - 1] + TICK : f)); });
+  const NAME_AT = snap(mark("name", 177));
+  const named_ = Boolean(nm) && frame >= NAME_AT;
+  const passed = lands.filter((f) => frame >= f).length;
+  let shown = passed ? length(words.slice(0, ends[passed - 1]).join(" ")) : 0;
+  if (named_) shown = length(words.concat([nm]).join(" "));
+  const topLength = length(topLines.join(" "));
 
-  // 4. Its ending card: the same card, written anew (its title at once, in the same felt-tip, its line under it smaller,
-  // a quarter of a beat later), the pictures still flashing under it.
-  let ending = null;
-  if (end && frame >= endAt) {
-    const title = String(end.title || "");
-    const sub = end.subtitle ? String(end.subtitle) : "";
-    const tBox = sub ? { x: BX, y: BY, w: BW, h: Math.round(BH * 0.6) } : box;
-    const later = startOf(tickAt(endAt) + 2);
-    ending = h(React.Fragment, null,
-      writing(title, endAt, endAt, tBox, "end-title", true),
-      sub
-        ? h(FitText, { key: "end-sub", style: { position: "absolute", left: BX, top: BY + Math.round(BH * 0.62), width: BW, height: Math.round(BH * 0.38) } }, (s) =>
-            h("div", { style: { position: "absolute", left: 0, top: 0, width: "100%", display: "flex", flexDirection: "column", alignItems: "flex-start", justifyContent: "flex-start", transformOrigin: ((CX - BX) / s).toFixed(2) + "px " + ((CY - BY - Math.round(BH * 0.62)) / s).toFixed(2) + "px", transform: turn(s) } },
-              h("div", { style: { fontFamily: hand, fontWeight: 400, fontSize: 112, lineHeight: 1, color: ink, WebkitTextStroke: "1.8px " + ink, textTransform: "uppercase", whiteSpace: "normal", textAlign: "left", width: "100%", opacity: frame >= later ? 1 : 0 } }, keep(sub))))
-        : null);
+  // 3. The notebook: one of its eight poses (the original's, measured: its centre as shares of the frame, its angle), a
+  // new one with each word, left and right in turn, the last one straight when the sentence is whole; a little
+  // perspective (its outline's bottom 1 to 2,5 % wider than its top: a flat outline, never a 3D transform, which the
+  // scene check's hundred copies could not lay in time) and a size a hair different each time. Still between two words.
+  const POSES = [[0.5, 0.53, -7.3], [0.498, 0.525, 4], [0.514, 0.5, -4.3], [0.499, 0.53, -0.3], [0.5, 0.527, 4.5], [0.497, 0.523, 4.3], [0.504, 0.511, -5.3], [0.527, 0.502, -0.4]];
+  const card = Boolean(end) && frame >= endAt;
+  const step = card ? 8 : named_ ? 7 : passed;
+  const pose = card ? [0.5, 0.515, 0] : step === 7 ? POSES[7] : step ? POSES[1 + ((step - 1) % 6)] : POSES[0];
+  const NW = Math.round(width * 0.665);
+  const NH = Math.round(height * 0.41);
+  const sc = (1 + (random("carnet-s-" + step) - 0.5) * 0.03).toFixed(4);
+  const FOLD = Math.round(NH * 0.495);
+  const R = Math.round(NW * 0.02);
+  const C = Math.round(NW * 0.009);
+  const T = Math.round(NW * (0.005 + 0.0075 * random("carnet-p-" + step)));
+  const inset = (y) => Math.round(T * (1 - y / NH));
+  const L = (x, y) => " L" + x + " " + y;
+  const arc = (x, y) => " A" + R + " " + R + " 0 0 1 " + x + " " + y;
+  const shape = "path('M" + (T + R) + " 0 H" + (NW - T - R) + arc(NW - T, R) + L(NW - inset(FOLD - C), FOLD - C) + L(NW - inset(FOLD) - C, FOLD) + L(NW - inset(FOLD + C), FOLD + C) + L(NW, NH - R) + arc(NW - R, NH) + " H" + R + arc(0, NH - R) + L(inset(FOLD + C), FOLD + C) + L(inset(FOLD) + C, FOLD) + L(inset(FOLD - C), FOLD - C) + L(T, R) + arc(T + R, 0) + " Z')";
+
+  // Its ink: the original's red; her colour when it is dark enough to read on its paper (on her word, the red always).
+  const rgb = (c) => { const x = /^#?([0-9a-f]{6})$/i.exec(String(c || "")); if (!x) return null; const v = parseInt(x[1], 16); return [(v >> 16) & 255, (v >> 8) & 255, v & 255]; };
+  const lin = (s) => { const v = s / 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); };
+  const own = rgb(brand.accent);
+  const dark = own && 0.2126 * lin(own[0]) + 0.7152 * lin(own[1]) + 0.0722 * lin(own[2]) <= 0.12;
+  const ink = setting("encre", "sienne") === "sienne" && dark ? String(brand.accent).toLowerCase() : "#b20b21";
+
+  // Its lines written by a hand that never repeats, at the left, each across the page's width, its capitals stretched to
+  // the original's height (tall and narrow): two lines on the top page; on the bottom one, the third and the name she
+  // announces, the biggest line (the original's 10,5 % of the image, the others 6,9 to 8,3 %): its slot a third taller
+  // and the page stretched as far as the name's width needs to fill it (the third line, held by its slot, keeps its
+  // height), its letters tighter. Two blocks at most: each one's grain is a filter pass a frame.
+  const hand = "'Covered By Your Grace', '" + brand.displayFont + "', cursive";
+  const STRETCH = 1.45;
+  const page = (rows, y, hh, upTo, seed, stretch, last) => rows.length && upTo > 0
+    ? h("div", { key: seed, style: { position: "absolute", left: 0, top: y, width: NW, height: hh, transformOrigin: "50% 0%", transform: "scaleY(" + stretch.toFixed(3) + ")" } },
+        h(Handwriting, { text: rows.join("\n"), box: { x: Math.round(NW * 0.018), y: 0, w: Math.round(NW * 0.964), h: Math.round(hh / stretch) }, upTo, color: ink, grain: 0.6, wobble: 1, last, align: "left", style: { fontFamily: hand, fontWeight: 400, ...(rows.length === 1 && rows[0] === nm ? { letterSpacing: "-0.02em" } : {}) }, seed }))
+    : null;
+  const topH = Math.round(NH * 0.4);
+  const bottomH = Math.round(NH * 0.42);
+  const third = lines[2] || null;
+  const bottom = (third ? [third] : []).concat(nm ? [nm] : []);
+  const last = third && nm ? 1.3 : 1;
+  const nameSlot = third && nm ? (bottomH / 2.3) * 1.3 : bottomH;
+  const stretched = nm ? Math.max(STRETCH, Math.min(2, (0.92 * nameSlot) / (0.72 * ((NW * 0.964) / (Math.max(4, length(nm)) * 0.38))))) : STRETCH;
+  let writing = [
+    page(topLines, Math.round(NH * 0.045), Math.round((topH * Math.max(1, topLines.length)) / 2), Math.min(shown, topLength), "carnet-haut", STRETCH, 1),
+    page(bottom, Math.round(NH * 0.535), bottomH, Math.max(0, shown - topLength - 1), "carnet-bas", stretched, last),
+  ];
+  // 4. Its ending card, when she has one (the original has none): the notebook straight, written anew at once, her title
+  // on the top page, its line on the bottom one.
+  if (card) {
+    const rows = (s) => { const t = up(s); return split(t.split(" ").filter(Boolean), Math.max(1, Math.min(2, Math.round(length(t) / 11)))); };
+    const title = rows(end.title);
+    const sub = end.subtitle ? rows(end.subtitle) : [];
+    writing = [page(title, Math.round(NH * 0.045), topH, 999, "carte-titre", STRETCH, 1), page(sub, Math.round(NH * 0.535), Math.round((bottomH * sub.length) / 2), 999, "carte-ligne", STRETCH, 1)];
   }
+  const notebook = h("div", { style: { position: "absolute", left: Math.round(width * pose[0] - NW / 2), top: Math.round(height * pose[1] - NH / 2), width: NW, height: NH, transformOrigin: "50% 50%", transform: "rotate(" + pose[2] + "deg) scale(" + sc + ")" } },
+    h("div", { style: { position: "absolute", left: 0, top: 0, width: NW, height: NH, clipPath: shape, background: "linear-gradient(180deg, #dcdad0 0%, #dad8cf 36%, #d6d4ca 41.5%, #c4c3b9 46.5%, #b7b6ad 49.3%, #a6a59d 49.5%, #c6c5bc 50%, #d9d8cf 52%, #dbdad1 70%, #d8d7ce 100%)" } },
+      h("div", { style: { position: "absolute", left: 0, top: FOLD - 2, width: NW, height: 4, background: "repeating-linear-gradient(90deg, rgba(88,87,80,0.55) 0px, rgba(88,87,80,0.55) 4px, rgba(0,0,0,0) 4px, rgba(0,0,0,0) 23px)" } })),
+    writing);
 
-  return h(AbsoluteFill, { style: { backgroundColor: "#000000" } }, picture, paper, message, extra, ending);
+  // Any other text of the Reel (none in its slots): a plain white line above the notebook, so nothing she wrote is lost.
+  const body = "'" + brand.bodyFont + "', 'Inter Tight', sans-serif";
+  const extra = others.filter((x) => frame >= x.from && frame < x.to && frame < endAt).map((x, i) =>
+    h(FitText, { key: "x" + i, style: { position: "absolute", left: 140, width: width - 280, top: 220 + i * 130, height: 120 }, innerStyle: { fontFamily: body, fontWeight: 600, fontSize: 56, lineHeight: 1.15, color: "#ffffff", textAlign: "center", textShadow: "0 1px 3px rgba(0,0,0,0.6), 0 2px 14px rgba(0,0,0,0.35)" } }, keep(x.text)));
+
+  return h(AbsoluteFill, { style: { backgroundColor: "#000000" } }, pictures, notebook, extra);
 }`;
 
 export const carteFeutre: MontageSkill = {
   key: "carte-feutre",
-  version: 1,
+  // 2: written again on its original's fiche: an open notebook laid over her pictures (no hand, no shadow), a new picture
+  // every 3 images in her order round after round, her words one at a time on the original's moments with a new pose of
+  // the notebook each (4 to 7°), the name she announces in the music's one-beat blank; 135 BPM in half time (v1 counted
+  // 72), its late start, its blank and its fading end; a hand that never repeats; two bands for her pictures in width.
+  version: 2,
   bpm: BPM,
-  shots: [10, 24],
-  files: [10, 20],
-  how: "Une carte de papier blanc pliée, tenue au milieu de l'écran devant ses photos et ses plans qui défilent en stop motion, un nouveau tous les huitièmes de temps (un dixième de seconde), et qui reviennent dans un autre ordre ; la carte bouge un peu à chaque image, comme tenue à la main. Blanche un temps, puis sa phrase s'y écrit au feutre rouge en grandes capitales, un mot de plus à chaque temps, et reste entière jusqu'à la fin, les images défilant toujours dessous.",
+  shots: [10, 25],
+  files: [10, 25],
+  how: "Un carnet ouvert, gris clair, posé au milieu de l'écran par-dessus ses photos qui défilent en stop motion, une nouvelle toutes les 3 images (un dixième de seconde), toujours dans son ordre, tour après tour (une vidéo y avance un peu à chaque tour) ; en deux bandes au-dessus et au-dessous du carnet quand la plupart de ses images sont horizontales. Le carnet reste vide une seconde, puis son message s'y écrit à la main au feutre rouge en capitales, un mot à la fois (un petit mot avec le suivant), le carnet changeant de pose à chaque mot ; le nom de ce qu'elle annonce arrive d'un coup, la plus grande ligne, dans le blanc de la musique ; la phrase entière reste jusqu'à la fin, les photos défilant toujours. Le milieu des images est caché par le carnet.",
   end: true,
   texts: [
     {
       slot: "message",
       role: "hook",
-      want: "la phrase écrite au feutre rouge sur la carte, un mot de plus à chaque temps : une invitation ou un message à ses clients, dit simplement comme on l'écrit à la main (une forme comme « pose ton téléphone et viens goûter la pizza du jeudi »), sans slogan ; elle s'écrit en capitales",
-      max: 48,
+      want: "le début de son message, écrit à la main sur le carnet un mot à la fois, qui amène le nom de ce qu'elle annonce : une invitation dite simplement comme on l'écrit sur un carnet (une forme comme « ce jeudi on vous attend pour la », « viens fêter l'été avec nous à la »), 4 à 7 mots, sans slogan",
+      max: 32,
+      required: true,
+    },
+    {
+      slot: "nom",
+      role: "caption",
+      want: "le nom de ce qu'elle annonce, qui finit la phrase en plus grand (« soirée jazz », « pizza du jeudi », « brunch »), 1 à 3 mots",
+      max: 16,
       required: true,
     },
   ],
-  timeline(n, { end, bpm: tempo }) {
-    // At another tempo (a longer Reel, or a music's own): every length in beats follows it.
-    const bpm = tempo ?? BPM;
+  settings: [
+    {
+      name: "format",
+      want: "la place de ses images sous le carnet : plein écran comme l'original, ou en deux bandes au-dessus et au-dessous du carnet (pour des images horizontales)",
+      choices: [
+        { value: "auto", says: "comme ses images : plein écran, ou deux bandes quand la plupart sont horizontales" },
+        { value: "vertical", says: "chaque image plein écran, comme l'original (une image horizontale y est recadrée)" },
+        { value: "bandes", says: "deux bandes d'images horizontales entières au-dessus et au-dessous du carnet, qui changent l'une après l'autre" },
+      ],
+    },
+    {
+      name: "encre",
+      want: "la couleur de l'encre",
+      choices: [
+        { value: "sienne", says: "sa couleur quand elle est assez foncée pour se lire sur le papier gris, sinon le rouge de l'original" },
+        { value: "rouge", says: "le rouge du feutre de l'original" },
+      ],
+    },
+  ],
+  // Its code warms her pictures itself and draws a notebook that never takes their light: none of its model's finish on
+  // the whole Reel (its contrast, its warmth and its flash would light the notebook, its grain would move on it).
+  finish: { exposure: 0, contrast: 0, saturation: 0, warmth: 0, split: 0, grain: 0, vignette: 0, fade: 0, flash: 0 },
+  timeline(n, options) {
+    // At another tempo (a longer Reel, a music's own): every length in beats follows it; her pictures keep their pace.
+    const bpm = options.bpm ?? BPM;
     const beat = 60 / bpm;
-    // Its code shows her pictures in turn, one per eighth of a beat, each coming back several times: the slots only say
-    // how much of each passage is seen over the Reel, the same for all (and an even montage if the code cannot run).
-    // Its ending card lasts the engine's 1,6 s at least, whatever the tempo.
-    const beats = lengthBeats(n) + (end ? Math.max(CARD, CARD_SECONDS / beat) : 0);
-    const spans = beatSpans(bpm, Array.from({ length: n }, () => beats / Math.max(1, n)));
+    const card = options.end ? Math.ceil(CARD_SECONDS / beat - 1e-6) : 0;
+    // Its code shows her pictures in turn, one every 3 images, each coming back round after round: its slots say which
+    // picture is which (and the even montage played if the composition cannot), each as long as the others.
+    const count = Math.max(1, n);
+    const spans = beatSpans(bpm, Array.from({ length: count }, () => (LENGTH + card) / count));
     const duration = spans.at(-1)!.end;
     const wants = spans.map((_, i) =>
       i === 0
-        ? "l'image qui ouvre le Reel sous la carte encore blanche : la plus forte et la plus colorée de son lieu ou de ses produits (le centre est caché par la carte, ce qui compte se voit autour)"
-        : "une photo ou un passage de son lieu, de ses produits, de son équipe ou de ses clients, vu par éclairs d'un dixième de seconde sous la carte : le centre est caché, ce qui compte se voit en haut, en bas ou sur les côtés ; chacun différent du précédent",
+        ? "l'image qui ouvre le Reel sous le carnet encore vide : la plus forte et la plus colorée, ce qui compte en haut ou en bas de l'image (le milieu est caché par le carnet)"
+        : "une photo de son lieu en action (ou un instant d'une vidéo, qui avance un peu à chaque tour), vue un dixième de seconde sous le carnet à chaque tour : ses plats ou ses produits vus de dessus, des gens à table, son équipe, ses imprimés, un détail ; ce qui compte en haut ou en bas de l'image (le milieu est caché), d'une autre lumière que la précédente",
     );
+    // The name on its tick, as its code lands it.
+    const nameAt = Math.round(toFrame(NAME * beat) / 3) * 3;
+    const to = options.end ? round(duration - CARD_SECONDS) : duration;
     return {
       duration,
       shots: spans.map((s, i) => ({ ...s, want: wants[i]! })),
-      // Her sentence is on the card from the first image (written a word a beat from the first beat) to the end, or the card.
-      texts: { message: { from: 0, to: end ? round(duration - CARD_SECONDS) : duration } },
-      marks: { beat: beat * 30, words: toFrame(WORDS_AT * beat), full: toFrame(FULL_BY * beat) },
+      // Her message from the first image (written a word at a time on its moments), the name from its landing, both to
+      // the end (or her ending card).
+      texts: { message: { from: 0, to }, nom: { from: round(nameAt / 30), to } },
+      marks: { beat: round3(beat * 30), ...Object.fromEntries(ARRIVALS.map((b, k) => [`a${k}`, toFrame(b * beat)])), name: toFrame(NAME * beat) },
+      // Its music: in after nine silent images, its first bass hit on beat 1,5; stopped dead a beat for the name, back on
+      // the first beat of a bar; its sound fading over the last second, to the end (or her ending card's).
+      music: {
+        downbeat: round3(DOWNBEAT * beat),
+        pauses: [
+          { from: 0, to: round3(LATE * beat) },
+          { from: round3(BLANK[0] * beat), to: round3(BLANK[1] * beat) },
+        ],
+        end: { at: duration, fade: round(FADE * beat) },
+      },
     };
   },
   code: CODE,
-  fonts: ["Just Another Hand"],
+  fonts: ["Covered By Your Grace"],
 };

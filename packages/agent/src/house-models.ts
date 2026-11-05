@@ -17,8 +17,8 @@ import type { z } from "zod";
 
 /** The source of the inspiration row a house model is kept on, per studio (one per model, made when first used). */
 export const HOUSE_SOURCE = "house";
-/** The catalogue's version: a studio's row written by an older one is rewritten when the model is used again (3: its original's sheets; 4: no brand in a model's name; 5: Mots aux quatre coins as its original; 6: Plans fixes at 65 BPM; 7: four renamed; 8: Lieu tapé without its original's orange; 9: Plans fixes on its fiche; 10: Une journée chez toi on its fiche; 11: ten models on their fiches; 12: Façade qui se construit and Coulisses façon fiche on their fiches; 13: Recette cosy on its fiche; 14: Titre gaufré on its fiche; 15: Mots mêlés and Interrupteur on their fiches; 16: Interface minimaliste and Fenêtres et étiquettes on theirs; 17: Mot clé en grand and Face caméra et références on theirs). */
-export const HOUSE_VERSION = 17;
+/** The catalogue's version: a studio's row written by an older one is rewritten when the model is used again (3: its original's sheets; 4: no brand in a model's name; 5: Mots aux quatre coins as its original; 6: Plans fixes at 65 BPM; 7: four renamed; 8: Lieu tapé without its original's orange; 9: Plans fixes on its fiche; 10: Une journée chez toi on its fiche; 11: ten models on their fiches; 12: Façade qui se construit and Coulisses façon fiche on their fiches; 13: Recette cosy on its fiche; 14: Titre gaufré on its fiche; 15: Mots mêlés and Interrupteur on their fiches; 16: Interface minimaliste and Fenêtres et étiquettes on theirs; 17: Mot clé en grand and Face caméra et références on theirs; 18: Photos posées sur la table and Carte au feutre on theirs). */
+export const HOUSE_VERSION = 18;
 
 export type HouseModel = {
   key: string;
@@ -207,40 +207,45 @@ export const HOUSE_MODELS: HouseModel[] = [
   model({
     key: "carte-feutre",
     name: "Carte au feutre",
-    pitch: "Une carte tenue devant tes plans, où ton message s'écrit au feutre rouge un mot de plus toutes les deux coupes.",
-    needs: "15 à 20 photos ou petits passages de vidéo de ton lieu et de tes produits",
-    files: [10, 20],
+    // 15: written again on its original's fiche (v2 of its skill): an open notebook cut out and laid over her pictures
+    // (no hand holding a card, no shadow), a new picture every 3 images in her order, her words one at a time with a new
+    // pose of the notebook each, the name she announces in the music's one-beat blank; 135 BPM in half time (its measure
+    // said 92, v1 72), a slow 808 beat with its late start and its blank, fading at the end; its red, no grain nor flash
+    // over the notebook; nothing to film by hand (the notebook is drawn).
+    pitch: "Un carnet ouvert posé sur tes photos qui défilent en stop motion, où ton message s'écrit au feutre rouge, un mot après l'autre.",
+    needs: "15 à 25 photos (ou petits passages de vidéo) de ton lieu en action, ce qui compte en haut ou en bas de l'image, et un message de 6 à 9 mots qui finit sur ce que tu annonces",
+    files: [10, 25],
     pair: "feutre",
     example: "C-carte",
-    finish: { name: "Flash chaud", hint: "couleurs franches, un peu de flash, grain", contrast: 0.12, saturation: 0.12, warmth: 0.12, flash: 0.25, grain: 0.3, grain_size: "medium" },
+    // Measured on its original (docs/fiches/carte-feutre.md): its eleven bass hits on a grid of 135, played in half time.
+    tempo: 135,
+    finish: { name: "Flash chaud", hint: "couleurs franches et chaudes au flash sur ses photos, noirs profonds, sans grain", contrast: 0.12, saturation: 0.12, warmth: 0.12 },
     look: {
-      name: "carte écrite au feutre",
+      name: "carnet écrit au feutre",
       format: "message",
-      hook: { kind: "mystère", what: "une carte blanche pliée tenue devant le premier plan, le premier mot qui s'y écrit au feutre" },
+      hook: { kind: "mystère", what: "un carnet ouvert encore vide posé au milieu de ses photos qui défilent dix fois par seconde : on attend ce qui va s'y écrire" },
       text: {
         amount: "un message tenu",
-        composition: "une seule phrase écrite au feutre rouge en capitales, sur une carte de papier blanc au centre, un mot de plus toutes les deux coupes",
+        composition: "une phrase écrite à la main au feutre rouge en capitales hautes et étroites sur un carnet ouvert au milieu de l'image, deux lignes par page, chaque ligne sur toute la largeur, la dernière (ce qu'elle annonce) la plus grande",
         case: "upper",
         weight: "bold",
         stroke: "thick",
-        tilt: -3,
+        tilt: 0,
       },
-      colors: ["#d2122e"],
-      layout: "plein cadre, avec une carte de papier blanc posée au centre par-dessus chaque plan, qui bouge un peu à chaque coupe comme tenue à la main",
+      colors: ["#b20b21"],
+      layout: "plein cadre, ses photos en stop motion une toutes les 3 images, et par-dessus un carnet ouvert gris clair, sans ombre, qui change de pose à chaque mot ; en deux bandes pour des images horizontales",
       moments: [
-        { at: 0, what: "une coupe toutes les 0,25 s environ, en stop motion : un plan différent à chaque fois sous la même carte" },
-        { at: 0.5, what: "un mot de plus au feutre rouge toutes les deux coupes, jusqu'à la phrase entière ; la carte se décale de quelques pixels et tourne d'un degré à chaque coupe" },
-        { at: 6, what: "la phrase entière reste sur la carte pendant les dernières coupes" },
+        { at: 0, what: "le carnet ouvert vide, penché à gauche, au milieu de l'image ; dessous, une nouvelle photo toutes les 3 images, toujours dans le même ordre" },
+        { at: 0.9, what: "un mot de plus au feutre rouge toutes les 0,8 s environ, chacun sur un changement de photo (un petit mot avec le suivant), le carnet changeant de pose à chaque mot, 4 à 7° à gauche puis à droite" },
+        { at: 5.9, what: "le nom de ce qu'elle annonce arrive d'un coup, la plus grande ligne, dans le blanc d'un temps de la musique ; le carnet droit, la phrase entière tenue 3 s, les photos défilent toujours" },
       ],
       camera: "à la main",
       grade: "flash",
       motion: "fait_main",
-      music: "upbeat funk soul, punchy drums and slap bass",
-      ending: "la carte avec la phrase entière sur un dernier plan, tenue une seconde",
-      why: "Le rythme en stop motion accroche et la phrase se lit en se construisant : on attend le mot suivant, et l'invitation finit écrite à la main.",
-      // In the model the card is real, held by a hand in front of each shot.
-      to_film: "ta main qui tient une carte blanche devant tes plans, comme dans le modèle",
-      to_film_else: "je dessine la carte par-dessus tes images",
+      music: "slow trap soul beat in half time, long 808 bass, looped guitar, one-beat break",
+      ending: "la phrase entière tenue sur la reprise de la musique, les photos défilant toujours, le son qui baisse : ni carte, ni logo, ni noir",
+      why: "Le stop motion accroche et la phrase se lit en s'écrivant : on attend le mot suivant, et le nom de ce qu'elle annonce tombe en grand dans le silence de la musique.",
+      // Its notebook is drawn by the model (to_film and to_film_else go: there is no hand holding a card in the original).
     },
   }),
   model({
@@ -351,33 +356,44 @@ export const HOUSE_MODELS: HouseModel[] = [
   model({
     key: "table",
     name: "Photos posées sur la table",
+    // 15: written again on its original's fiche (v2 of its skill): horizontal 4:3 on black when her table's video is in
+    // width, ten prints at once at the centre without border nor shadow, eleven a second (not dropping every 0,3 s with a
+    // shadow), gone by their light; two jerky quick shots, a burned flash; its split screen side by side, each half at
+    // its own speed, the gesture's half cutting alone, its last shot taking the frame from it; 8 to 20 files; its tempo
+    // (110, measured), its finish without vignette nor grain (the original has neither).
     pitch: "Tes photos tirées sont posées une à une sur ta table, avec deux mots manuscrits, puis on passe en plans partagés.",
-    needs: "une vidéo de ta table ou de ton comptoir, et 4 à 8 photos de tes plats ou produits",
-    files: [5, 10],
+    needs: "une vidéo de ta table ou de ton comptoir filmée posée, 8 à 10 photos de ce que tu fais (une même série), et des vidéos de ton lieu et de tes gestes, chacun de près puis de plus près",
+    files: [8, 20],
     pair: "editorial",
     example: "W-table",
-    finish: { name: "Restaurant du soir", hint: "lumière chaude et sombre, rouges profonds, grain", exposure: -0.03, contrast: 0.14, saturation: 0.04, warmth: 0.22, vignette: 0.45, grain: 0.3, grain_size: "fine" },
+    // Measured on its original (docs/fiches/table.md): its hi-hat on every eighth note, its cuts on its beats and half beats.
+    tempo: 110,
+    finish: { name: "Restaurant du soir", hint: "lumière chaude et sombre, rouges profonds, noirs bouchés, sans grain ni coins sombres", exposure: -0.03, contrast: 0.14, saturation: 0.04, warmth: 0.22 },
     look: {
       name: "photos posées sur la table",
       format: "collage",
-      hook: { kind: "geste", what: "une photo tirée posée sur la nappe, puis une autre par-dessus" },
+      hook: { kind: "geste", what: "sa table filmée posée, deux petits mots écrits à la main de part et d'autre de son milieu, puis ses photos tirées qui s'y posent d'un coup en rafale" },
       text: {
         amount: "une ligne",
-        composition: "deux petits mots manuscrits blancs de part et d'autre de la pile, à mi-hauteur",
+        composition: "deux petits mots manuscrits crème au feutre fin, en minuscules aux lettres espacées, de part et d'autre de la pile juste au-dessus du milieu : à gauche ce qui amène son nom, à droite son nom",
         weight: "regular",
         stroke: "thin",
       },
-      layout: "un plan de table en plein cadre, avec des photos tirées posées une à une en pile au centre par-dessus, puis un écran partagé en deux",
+      layout: "sa table en plein cadre, ses photos tirées posées en pile au centre, puis un écran partagé en deux moitiés côte à côte ; en 4:3 sur du noir quand sa table est filmée en largeur",
       moments: [
-        { at: 0, what: "des photos tirées tombent une à une sur la nappe au centre, toutes les 0,3 s, un peu tournées, avec une ombre douce" },
-        { at: 0.4, what: "deux petits mots manuscrits blancs à gauche et à droite de la pile" },
-        { at: 2.6, what: "écran partagé en deux, deux plans côte à côte qui changent sur les coupes" },
+        { at: 0.3, what: "deux petits mots manuscrits crème apparaissent en fondu de part et d'autre du milieu de sa table" },
+        { at: 0.43, what: "dix photos tirées se posent d'un coup au centre, l'une sur l'autre, onze par seconde, sans bord ni ombre, chacune un peu tournée, sur un cliquetis sec" },
+        { at: 1.8, what: "la pile tenue un temps s'efface par la lumière en quatre images, le sombre d'abord, le blanc d'une assiette en dernier" },
+        { at: 2.03, what: "deux plans éclair de son lieu, saccadés, le second brûlé au blanc sauf son rouge, puis noir à gauche : les mots partent avec la coupe" },
+        { at: 2.53, what: "écran partagé : son lieu à gauche, un geste sur ce qu'elle fait à droite, chacun à sa vitesse, qui coupent ensemble cinq fois ; puis la droite coupe seule, de plus près" },
+        { at: 6.67, what: "sa plus belle pièce vue du dessus prend la moitié droite, puis tout le cadre une image après : une main en prend un morceau et sort du cadre" },
       ],
+      camera: "mixte",
       grade: "moody",
       motion: "fait_main",
-      music: "smooth jazz-hop, warm Rhodes and soft drums",
-      ending: "un gros plan d'un plat tenu deux secondes",
-      why: "Le geste de poser des photos sur la table raconte l'endroit avant de le montrer : intime, chic, sans un mot de trop.",
+      music: "jazzy lo-fi beat, brushed drums, warm bass line, mellow keys",
+      ending: "sa plus belle pièce vue du dessus, un geste qui en prend un morceau et sort du cadre, puis elle seule ; la musique coupée net, ni carte ni texte",
+      why: "Le geste de poser ses photos sur la table raconte l'endroit avant de le montrer, puis le lieu et le geste côte à côte disent le savoir-faire sans un mot de trop.",
     },
   }),
   model({
@@ -1368,11 +1384,11 @@ export const HOUSE_WHEN: Record<string, { pour: string; pas_pour: string }> = {
   decode: { pour: "présenter un lieu, un quartier ou un nom, une ouverture, une rentrée", pas_pour: "une offre à lire en détail, un produit en gros plan, quelqu'un qui parle" },
   "quatre-coins": { pour: "présenter le lieu et son équipe, son adresse, ce qu'on y vit", pas_pour: "des produits seuls, quelqu'un face caméra" },
   mosaique: { pour: "des plats, des produits ou des créations en série, une carte, une collection", pas_pour: "un message à lire, quelqu'un qui parle, un lieu en plan large" },
-  "carte-feutre": { pour: "un message de quelques mots qui s'écrit sur ses images (une offre, une nouveauté, un horaire)", pas_pour: "un Reel sans message" },
+  "carte-feutre": { pour: "un message de quelques mots qui s'écrit sur ses images et finit sur ce qu'elle annonce (une soirée, une invitation, une offre, un horaire)", pas_pour: "un Reel sans message, un sujet au milieu de l'image (le carnet le cache), un geste qu'il faut voir bouger (tout y devient image fixe)" },
   pile: { pour: "montrer son travail en série (réalisations, coupes, pièces) avec une phrase courte qui dit qui on est", pas_pour: "des vidéos qui racontent une histoire, une voix" },
   "mon-travail": { pour: "se présenter avec son travail en série (bouquets, coupes, plats, pièces, céramiques), soi au milieu", pas_pour: "sans photo ou vidéo de soi debout, des vidéos qui racontent une histoire, une voix" },
   "photo-dump": { pour: "une semaine, un événement, l'envers du décor en vrac, beaucoup de photos", pas_pour: "un message précis, une offre" },
-  table: { pour: "des plats ou des produits présentés comme des tirages posés sur sa table, un moment chaleureux", pas_pour: "un lieu, une rue" },
+  table: { pour: "ses photos de ce qu'elle fait posées comme des tirages sur sa table, puis son lieu et ses gestes côte à côte : un moment chaleureux, un savoir-faire", pas_pour: "sans photos de son travail, une rue, un message à lire" },
   "ecran-partage": { pour: "le geste et le résultat côte à côte (l'artisan et sa pièce, la coiffeuse et la coupe, le chef et l'assiette)", pas_pour: "un seul sujet, un lieu" },
   cadre: { pour: "faire entrer dans un lieu (un couloir, une salle), une ouverture, des travaux", pas_pour: "sans plan large de son lieu, des produits seuls en gros plan" },
   fenetres: { pour: "une sortie, un quartier, un voyage, des lieux qui défilent, son lieu de jour et de nuit", pas_pour: "des produits seuls, une offre à lire, quelqu'un qui parle" },
