@@ -79,7 +79,7 @@ type Drawn = { type: unknown; props: Record<string, unknown>; children: unknown[
 type Box = { x: number; y: number; w: number; h: number };
 
 /** What its Scene draws at a frame (its marks as its layer gets them), run with a plain tree for React. */
-function drawAt(frame: number, props: { box?: Box | null; parts?: Box[]; light?: number; texts?: Record<string, string>; brand?: Record<string, unknown> }): Drawn {
+function drawAt(frame: number, props: { box?: Box | null; parts?: Box[]; light?: number; around?: number; texts?: Record<string, string>; brand?: Record<string, unknown> }): Drawn {
   const React = { createElement: (type: unknown, p: Record<string, unknown> | null, ...children: unknown[]): Drawn => ({ type, props: p ?? {}, children }) };
   const scope: Record<string, unknown> = {
     AbsoluteFill: "AbsoluteFill",
@@ -89,7 +89,12 @@ function drawAt(frame: number, props: { box?: Box | null; parts?: Box[]; light?:
     useCurrentFrame: () => frame,
     SubjectBox: () => props.box ?? null,
     SubjectParts: () => props.parts ?? [],
-    LightUnder: () => (props.light === undefined ? null : { mean: props.light, high: props.light }),
+    // Its light under her lamp's box; round it, what is around (a dark street by default).
+    LightUnder: (_s: unknown, _f: number, _l: unknown, b: Box) => {
+      if (props.light === undefined) return null;
+      const v = b && props.box && b.w === props.box.w && b.h === props.box.h ? props.light : (props.around ?? 0.3);
+      return { mean: v, high: v };
+    },
     ClearBox: (_s: unknown, _f: number, _l: unknown, o: { fallback: Box }) => o.fallback,
   };
   const make = new Function("React", ...Object.keys(scope), `"use strict";\n${petitesLumieres.code}\nreturn Scene;`) as (...args: unknown[]) => (p: Record<string, unknown>) => Drawn;
@@ -122,6 +127,8 @@ test("« Petites lumières » draws her light dimmed off and lit on its spans, t
   // A lamp off in her picture: a lamp's warm light and a halo; already shining: a glow of its highlights.
   assert.ok(keyed(drawAt(60, { box: LAMP, light: 0.3 }), "fill") && keyed(drawAt(60, { box: LAMP, light: 0.3 }), "halo"));
   assert.ok(keyed(drawAt(60, { box: LAMP, light: 0.9 }), "shine") && !keyed(drawAt(60, { box: LAMP, light: 0.9 }), "fill"));
+  // As bright as what is round it (a lamp off against a white sky): off in her picture.
+  assert.ok(keyed(drawAt(60, { box: LAMP, light: 0.9, around: 0.85 }), "fill") && !keyed(drawAt(60, { box: LAMP, light: 0.9, around: 0.85 }), "shine"));
   // Nothing named: her highlights bloom on the same spans.
   assert.ok(keyed(drawAt(60, {}), "bloom") && !keyed(drawAt(20, {}), "bloom"));
   // Her shot always under its lights, as the montage plays it: never an empty layer (the scene check refused one at its

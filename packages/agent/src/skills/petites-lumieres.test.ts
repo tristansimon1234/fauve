@@ -104,7 +104,7 @@ test("« Petites lumières »: on the plan, its objects named for her shots, fol
 
 type Drawn = { type: unknown; props: Record<string, unknown>; children: unknown[] };
 type Box = { x: number; y: number; w: number; h: number };
-type Reads = { box?: (name: string) => Box | null; parts?: (name: string) => Box[]; skyline?: (from: number, to: number) => number | null; light?: number; clear?: Box | null };
+type Reads = { box?: (name: string) => Box | null; parts?: (name: string) => Box[]; skyline?: (from: number, to: number) => number | null; light?: number; around?: number; clear?: Box | null };
 
 /** What its Scene draws at a frame, run with a plain tree for React: the kit's pieces as named nodes, its readings as given. */
 function drawAt(frame: number, props: { shots?: number; aspect?: number; reads?: Reads; texts?: Record<string, string>; hook?: string; end?: { title: string; subtitle?: string; from: number } | null; brand?: Record<string, unknown>; code?: string }): Drawn {
@@ -122,7 +122,12 @@ function drawAt(frame: number, props: { shots?: number; aspect?: number; reads?:
     SubjectBox: (_s: unknown, _f: number, _l: unknown, name: string) => (r.box ? r.box(name) : null),
     SubjectParts: (_s: unknown, _f: number, _l: unknown, name: string) => (r.parts ? r.parts(name) : []),
     SkylineAt: (_s: unknown, _f: number, _l: unknown, span: { from: number; to: number }) => (r.skyline ? r.skyline(span.from, span.to) : null),
-    LightUnder: () => (r.light === undefined ? null : { mean: r.light, high: r.light }),
+    // Its light under her lamp's box; round it, what is around (a dark street by default).
+    LightUnder: (_s: unknown, _f: number, _l: unknown, b: Box) => {
+      if (r.light === undefined) return null;
+      const v = b && b.w === LAMP_BOX.w && b.h === LAMP_BOX.h ? r.light : (r.around ?? 0.3);
+      return { mean: v, high: v };
+    },
     ClearBox: (_s: unknown, _f: number, _l: unknown, o: { fallback: Box }) => (r.clear === undefined ? o.fallback : r.clear),
   };
   const code = props.code ?? skillCode(petitesLumieres, { lumiere: "street lamp head", fenetres: "every window", suite: "every window", colonne: "every window" });
@@ -169,6 +174,9 @@ test("« Petites lumières » draws her light dimmed off, lit on its beats (the 
   assert.equal(flatten(keyed(off, "fill")).find((d) => d.type === "Subject")!.props.fill, "#ffe2a2");
   const lit = drawAt(60, { reads: reads({ light: 0.95 }) });
   assert.ok(keyed(lit, "shine") && !keyed(lit, "fill"));
+  // As bright as what is round it (a lamp off against a white sky): off in her picture, lit by the model.
+  const white = drawAt(60, { reads: reads({ light: 0.95, around: 0.9 }) });
+  assert.ok(keyed(white, "fill") && keyed(white, "halo") && !keyed(white, "shine"));
   // Nothing named in her shot: her own highlights bloom on the same beats, nothing when off.
   const none = { box: () => null };
   assert.ok(keyed(drawAt(60, { reads: none }), "bloom") && !keyed(drawAt(20, { reads: none }), "bloom"));
@@ -208,6 +216,14 @@ test("« Petites lumières »: her windows filled with her colour in six waves f
   assert.match(start.clip, /^path\('M0 0H1080V700/);
   const late = sun(198);
   assert.ok(Number(late.disc.width) < 432 && Number(late.disc.width) >= Math.round(432 * 0.785) - 2, JSON.stringify(late.disc));
+  // Her sky deepest only at the frame's edge: the sun stays whole inside the frame, the nearest the middle.
+  const edge = keyed(drawAt(124, { reads: reads({ skyline: (from: number, to: number) => ((from + to) / 2 > 880 ? 1300 : 900) }) }), "sky")!;
+  const disc = styleOf(edge.children[0] as Drawn);
+  assert.ok(Number(disc.left) >= 0 && Number(disc.left) + Number(disc.width) <= 1080, JSON.stringify(disc));
+  assert.ok(Math.abs(Number(disc.left) + Number(disc.width) / 2 - 540) <= 46, JSON.stringify(disc));
+  // A low sky (her roofline at y 300): a smaller sun, its top still inside the frame.
+  const low = styleOf(keyed(drawAt(124, { reads: reads({ skyline: () => 300 }) }), "sky")!.children[0] as Drawn);
+  assert.ok(Number(low.width) < 432 && Number(low.width) >= 216 && Number(low.top) >= 76, JSON.stringify(low));
   const order = flatten(at(150)).map((d) => (d.props.key === "sky" ? "sun" : d.type === "Skyline" ? "ground" : d.props.key === "windows" ? "windows" : "")).filter(Boolean);
   assert.deepEqual(order, ["sun", "ground", "windows"]);
   // No sky read, too little of it, or her words: no sun.

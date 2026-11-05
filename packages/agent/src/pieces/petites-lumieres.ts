@@ -115,13 +115,18 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
     const light = () => h(Subject, { shot: k0, object: "@lumiere", style: full });
     if (b && lampOn) {
       const seen = LightUnder(list[k0], frame, BOX, b);
+      const x0 = Math.max(0, b.x - b.w);
+      const y0 = Math.max(0, b.y - b.h);
+      const around = LightUnder(list[k0], frame, BOX, { x: x0, y: y0, w: Math.min(W, b.x + 2 * b.w) - x0, h: Math.min(H, b.y + 2 * b.h) - y0 });
+      // Already shining in her picture: bright, and brighter than what is round it (a lamp off against a white sky is not).
+      const shines = seen && seen.high > 0.6 && (!around || seen.high > around.mean + 0.2);
       const blur = Math.max(6, Math.round(Math.max(b.w, b.h) * 0.16));
       const core = "radial-gradient(ellipse " + Math.round(b.w * 0.75 + 8) + "px " + Math.round(b.h * 0.75 + 8) + "px at " + Math.round(b.x + b.w / 2) + "px " + Math.round(b.y + b.h / 2) + "px, #000 0%, #000 40%, rgba(0,0,0,0.3) 100%)";
       layers.push(h("div", { key: "own", style: { ...full, filter: "brightness(1.35) saturate(1.15)" } }, light()));
-      if (seen && seen.high > 0.72) layers.push(h("div", { key: "shine", style: { ...full, mixBlendMode: "screen", opacity: 0.9, filter: "contrast(2.2) brightness(1.25) blur(" + blur + "px)" } }, light()));
+      if (shines) layers.push(h("div", { key: "shine", style: { ...full, mixBlendMode: "screen", opacity: 0.9, filter: "contrast(2.2) brightness(1.25) blur(" + blur + "px)" } }, light()));
       else layers.push(
         h("div", { key: "fill", style: { ...full, mixBlendMode: "screen", opacity: 0.92, maskImage: core, WebkitMaskImage: core } }, h(Subject, { shot: k0, object: "@lumiere", style: full, fill: "#ffe2a2" })),
-        h("div", { key: "halo", style: { ...full, mixBlendMode: "screen", opacity: 0.8, filter: "blur(" + blur + "px)" } }, h(Subject, { shot: k0, object: "@lumiere", style: full, fill: "#ffbf5c" })));
+        h("div", { key: "halo", style: { ...full, mixBlendMode: "screen", opacity: 0.55, filter: "blur(" + blur + "px)" } }, h(Subject, { shot: k0, object: "@lumiere", style: full, fill: "#ffbf5c" })));
     } else if (b) layers.push(h("div", { key: "dim", style: { ...full, filter: "brightness(0.42) saturate(0.7)" } }, light()));
     else if (lampOn) layers.push(bloom(k0, 0.85));
   }

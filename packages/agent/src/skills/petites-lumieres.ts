@@ -130,20 +130,26 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
     const light = () => h(Subject, { shot: 0, object: "@lumiere", style: full });
     if (b && lampOn) {
       const seen = LightUnder(shots[0], frame, laid, b);
+      const x0 = Math.max(0, b.x - b.w);
+      const y0 = Math.max(0, b.y - b.h);
+      const around = LightUnder(shots[0], frame, laid, { x: x0, y: y0, w: Math.min(bw, b.x + 2 * b.w) - x0, h: Math.min(bh, b.y + 2 * b.h) - y0 });
+      // Already shining in her picture: bright, and brighter than what is round it (a lamp off against a white sky is not).
+      const shines = seen && seen.high > 0.6 && (!around || seen.high > around.mean + 0.2);
       const blur = Math.max(6, Math.round(Math.max(b.w, b.h) * 0.16));
       const core = "radial-gradient(ellipse " + Math.round(b.w * 0.75 + 8) + "px " + Math.round(b.h * 0.75 + 8) + "px at " + Math.round(b.x + b.w / 2) + "px " + Math.round(b.y + b.h / 2) + "px, #000 0%, #000 40%, rgba(0,0,0,0.3) 100%)";
       layers.push(h("div", { key: "own", style: { ...full, filter: "brightness(1.35) saturate(1.15)" } }, light()));
-      if (seen && seen.high > 0.72) layers.push(h("div", { key: "shine", style: { ...full, mixBlendMode: "screen", opacity: 0.9, filter: "contrast(2.2) brightness(1.25) blur(" + blur + "px)" } }, light()));
+      if (shines) layers.push(h("div", { key: "shine", style: { ...full, mixBlendMode: "screen", opacity: 0.9, filter: "contrast(2.2) brightness(1.25) blur(" + blur + "px)" } }, light()));
       else layers.push(
         h("div", { key: "fill", style: { ...full, mixBlendMode: "screen", opacity: 0.92, maskImage: core, WebkitMaskImage: core } }, h(Subject, { shot: 0, object: "@lumiere", style: full, fill: "#ffe2a2" })),
-        h("div", { key: "halo", style: { ...full, mixBlendMode: "screen", opacity: 0.8, filter: "blur(" + blur + "px)" } }, h(Subject, { shot: 0, object: "@lumiere", style: full, fill: "#ffbf5c" })));
+        h("div", { key: "halo", style: { ...full, mixBlendMode: "screen", opacity: 0.55, filter: "blur(" + blur + "px)" } }, h(Subject, { shot: 0, object: "@lumiere", style: full, fill: "#ffbf5c" })));
     } else if (b) layers.push(h("div", { key: "dim", style: { ...full, filter: "brightness(0.42) saturate(0.7)" } }, light()));
     else if (lampOn) layers.push(bloom(0, 0.85));
   }
 
   // 5. Its second shot: a sun in her sky behind her roofs, shrinking slowly (its radius from 20 to 15,7 % of the width), cut
   // to the sky above her skyline as read on her shot, her shot without its sky laid over it; set where her sky goes
-  // deepest across a sun's width (the middle on a tie, as the original's), its centre a little above her roofline there;
+  // deepest across a sun's width (the nearest the middle when two places are as good, as the original's), its centre a
+  // little above her roofline there, the whole disc inside the frame (smaller under a low sky, none under too little);
   // her windows filled with her colour in six waves from the bottom, lit to the cut. No sky read (an interior): no sun.
   if (n > 1 && cur === 1) {
     const s1 = shots[1];
@@ -155,17 +161,23 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
       const prof = known.length ? read.map((y, k) => (y !== null ? y : read[known.reduce((a, j) => (Math.abs(j - k) < Math.abs(a - k) ? j : a), known[0])])) : [];
       const t = Math.max(0, Math.min(1, rel / Math.max(1, s1.durationInFrames)));
       const R0 = Math.round(Math.min(bw * 0.2, bh * 0.24));
-      const r = Math.round(R0 * (1 - 0.215 * t));
       const span = Math.max(1, Math.round(R0 / cw));
-      let best = null;
+      // Its whole disc inside the frame: only the columns a sun's width from both edges.
+      const cols = [];
       for (let c = 0; c < prof.length; c++) {
-        const depth = Math.min(...prof.slice(Math.max(0, c - Math.floor(span / 2)), Math.min(COLS, c + Math.ceil(span / 2))));
         const x = (c + 0.5) * cw;
-        if (!best || depth > best.depth + 4 || (Math.abs(depth - best.depth) <= 4 && Math.abs(x - bw / 2) < Math.abs(best.x - bw / 2))) best = { depth, x };
+        if (x < R0 + bw * 0.06 || x > bw - R0 - bw * 0.06) continue;
+        cols.push({ depth: Math.min(...prof.slice(Math.max(0, c - Math.floor(span / 2)), Math.min(COLS, c + Math.ceil(span / 2)))), x });
       }
-      const cy = best ? Math.round(Math.min(best.depth - 0.45 * r, bh * 0.5)) : -1;
-      if (best && best.depth > 1.1 * R0 && cy > r * 0.5) {
-        const cx = Math.round(Math.max(R0 * 0.8, Math.min(bw - R0 * 0.8, best.x)));
+      const deepest = Math.max(-1, ...cols.map((q) => q.depth));
+      const best = cols.filter((q) => q.depth >= deepest - 0.25 * R0).sort((a, b) => Math.abs(a.x - bw / 2) - Math.abs(b.x - bw / 2))[0];
+      // Its top a little below the frame's: the disc made smaller to fit (half its size at least).
+      const m = bh * 0.04;
+      const fit = best ? Math.min(1, (best.depth - m) / (1.45 * R0), (bh * 0.5 - m) / R0) : 0;
+      if (best && fit >= 0.5) {
+        const r = Math.round(R0 * fit * (1 - 0.215 * t));
+        const cy = Math.round(Math.min(best.depth - 0.45 * r, bh * 0.5));
+        const cx = Math.round(best.x);
         let d = "M0 0H" + bw;
         for (let k = COLS - 1; k >= 0; k--) d += "V" + Math.round(prof[k]) + "H" + Math.round(k * cw);
         layers.push(
