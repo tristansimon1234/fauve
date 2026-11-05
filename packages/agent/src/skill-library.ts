@@ -16,6 +16,7 @@ import { pile } from "./skills/pile.ts";
 import { pixel } from "./skills/pixel.ts";
 import { plansFixes } from "./skills/plans-fixes.ts";
 import { quatreCoins } from "./skills/quatre-coins.ts";
+import { rallume } from "./skills/rallume.ts";
 import { titreDerriere } from "./skills/titre-derriere.ts";
 import { tourne } from "./skills/tourne.ts";
 
@@ -41,6 +42,7 @@ export const MONTAGE_SKILLS: Record<string, MontageSkill> = {
   pixel,
   "plans-fixes": plansFixes,
   "quatre-coins": quatreCoins,
+  rallume,
   "titre-derriere": titreDerriere,
   tourne,
 };
