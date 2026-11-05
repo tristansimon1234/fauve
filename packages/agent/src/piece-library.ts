@@ -5,6 +5,7 @@ import { carteFeutre } from "./pieces/carte-feutre.ts";
 import { pile } from "./pieces/pile.ts";
 import { photoDump } from "./pieces/photo-dump.ts";
 import { frappe } from "./pieces/frappe.ts";
+import { rallume } from "./pieces/rallume.ts";
 import { detourages } from "./pieces/detourages.ts";
 import { silhouette } from "./pieces/silhouette.ts";
 
@@ -14,7 +15,7 @@ import { silhouette } from "./pieces/silhouette.ts";
 // (scripts/skill-render.mts --piece); a new model of Edith's brings its own (docs/reprise.md, « Passage de relais »).
 
 /** The bank, in the catalogue's order (house-models.ts); the editor is offered them by what her files carry (pieces.ts, piecesOffered). */
-export const EFFECT_PIECES: Record<string, EffectPiece> = { cadre, mosaique, "carte-feutre": carteFeutre, pile, "photo-dump": photoDump, frappe, detourages, silhouette };
+export const EFFECT_PIECES: Record<string, EffectPiece> = { cadre, mosaique, "carte-feutre": carteFeutre, pile, "photo-dump": photoDump, frappe, rallume, detourages, silhouette };
 
 /** The piece of the bank a model's key names, if it has one. */
 export const pieceFor = (key: string | null | undefined): EffectPiece | undefined => (key ? EFFECT_PIECES[key] : undefined);
