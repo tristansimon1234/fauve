@@ -51,7 +51,10 @@ import {
   memoryLines,
   resolveReelBrand,
   type EditPlan,
+  type PlanLayer,
   openingCandidates,
+  layerPiece,
+  MAX_PIECES,
   pieceLayers,
   pieceShots,
   planHook,
@@ -773,7 +776,11 @@ export async function designEdit(params: {
     const allowed = Math.min(MAX_FREE_SCENES, (params.maxNewScenes ?? MAX_FREE_SCENES) + replacedAnimations(drafted, params.fresh ? null : base));
     // A clip whose passages look alike shows twice at most, whatever its passages.
     const capped = spreadRepeats(drafted, alike, files, still);
-    return carryRetouch(carryTextStyle(normalizeEditPlan(capped, durations, allowed, speech), params.fresh ? null : base), base);
+    // The effect of the bank it lays is played by the engine (next to nothing): not one of its animations.
+    const offeredPieces = lending?.pieces ? [...lending.pieces.keys()] : [];
+    let piecesLeft = MAX_PIECES;
+    const uncounted = (l: PlanLayer) => Boolean(offeredPieces.length && piecesLeft > 0 && layerPiece(l, offeredPieces) && piecesLeft--);
+    return carryRetouch(carryTextStyle(normalizeEditPlan(capped, durations, allowed, speech, uncounted), params.fresh ? null : base), base);
   };
   let plan = toPlan(output);
   // Her videos whole and horizontal on black (her contract): the engine draws it on every version.

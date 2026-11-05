@@ -10737,6 +10737,35 @@ test("an effect of the bank is offered only when her files can carry it, the bes
   assert.deepEqual(photos.map((s) => s.wide), [true, false]);
 });
 
+test("an effect of the bank is not one of the editor's animations: laid beside its own, never instead of them", async () => {
+  const { normalizeEditPlan } = await import("./editor.ts");
+  const { BORROW_PIECES, layerPiece } = await import("./pieces.ts");
+  const plan: EditPlan = editPlanSchema.parse({
+    format: "9:16",
+    duration: 6,
+    template: "libre",
+    segments: [{ clip_id: "a", in: 0, out: 3, zoom: "none" }, { clip_id: "b", in: 0, out: 3, zoom: "none" }],
+    texts: [],
+    images: [],
+    transitions: "cut",
+    subtitles: false,
+    music: null,
+    layers: [
+      { from: 0, to: 2.5, motion: { brief: "[borrow: cadre] Her room opening frame after frame" } },
+      { from: 3, to: 5, motion: { brief: "The number moment: « 1909 » very large" } },
+    ],
+  });
+  // One animation allowed: without the exemption the second is dropped; the bank's effect does not count.
+  assert.equal(normalizeEditPlan(plan, { a: 3, b: 3 }, 1).layers?.length, 1);
+  const kept = normalizeEditPlan(plan, { a: 3, b: 3 }, 1, undefined, (l) => layerPiece(l, ["cadre"]) !== undefined);
+  assert.deepEqual(kept.layers?.map((l) => l.motion.brief.slice(0, 16)), ["[borrow: cadre] ", "The number momen"]);
+  // None allowed: the effect alone.
+  assert.equal(normalizeEditPlan(plan, { a: 3, b: 3 }, 0, undefined, (l) => layerPiece(l, ["cadre"]) !== undefined).layers?.length, 1);
+  // Its rule says so, and lays one whenever her videos carry one.
+  assert.match(BORROW_PIECES, /not one of your animations/);
+  assert.match(BORROW_PIECES, /never instead of it/);
+});
+
 test("an effect of the bank: the editor names it in its layer's brief, one per Reel, and the engine builds its layer from it", async () => {
   const { cadre } = await import("./pieces/cadre.ts");
   const { pieceLayers, pieceMotion, pieceLine, piecesForEditor, pieceWordsOf, unplayedPiece, MAX_PIECES } = await import("./pieces.ts");
@@ -10777,7 +10806,7 @@ test("an effect of the bank: the editor names it in its layer's brief, one per R
   // The editor's line and rule: one at most, laid in « layers », named in its brief.
   assert.match(pieceLine(cadre), /^cadre — Cadre dans le cadre : .* Il faut : .* Se pose : .*\(2 à 8 s\)\. Ses mots : .*16 signes au plus, facultatif/);
   const offered = piecesForEditor([cadre])!;
-  assert.match(offered.rule, /lay ONE, never more/);
+  assert.match(offered.rule, /lay ONE of them, never more/);
   assert.match(offered.rule, /\[borrow: <key>\]/);
   assert.equal(piecesForEditor([]), undefined);
 });
