@@ -126,6 +126,15 @@ export type SkillVoice = {
   row?: number;
   /** False: one frame all along, never another take nor a tighter frame between two ideas. */
   angles?: boolean;
+  /**
+   * An idea's own images one after the other (« Le plat, puis la dégustation »: her dish being finished, shot after shot,
+   * before she shows; her videos tasting it, quickly, before her face): from where the idea begins, each its equal share
+   * of the idea's span (to its first name that has an image, or its end), this many seconds at most, at its own pace from
+   * its best moment; what is left of the idea is her talk. More images than fit at TURN_LEAST each: the first ones. None:
+   * each of them over the whole span (its code lays them: a wall behind her, two or three in turn), a short video slowed
+   * down to fill it.
+   */
+  turns?: number;
 };
 
 /**
@@ -1121,6 +1130,8 @@ const ATTACK_LEAD = 0;
 const SNAP = 0.2;
 /** The most images of her own an idea takes (four or more make a wall behind her: « Face caméra et références »). */
 const REFS_PER_IDEA = 8;
+/** The shortest an image of hers plays in turn (SkillVoice.turns, s): fewer of them when more would flash by. */
+export const TURN_LEAST = 0.4;
 
 /**
  * Her talking video cut as a creator cuts it, for a skill timed on her voice: from just before her first word to just
@@ -1265,7 +1276,7 @@ export function readSaid(voice: SkillVoice, talk: Pick<SkillTalk, "words">, answ
  * unless the skill keeps one frame, every other idea framed tighter), its texts' default moments, her images' spans
  * (SkillVoice.refs) and her business's name said.
  */
-export function skillSaid(talk: SkillTalk, picks: SkillPicks, voice: Pick<SkillVoice, "angles" | "cut">): SkillSaid {
+export function skillSaid(talk: SkillTalk, picks: SkillPicks, voice: Pick<SkillVoice, "angles" | "cut" | "turns">): SkillSaid {
   const words = talk.words;
   const ideas = picks.ideas.map((idea) => ({
     text: idea.text,
@@ -1326,11 +1337,20 @@ export function skillSaid(talk: SkillTalk, picks: SkillPicks, voice: Pick<SkillV
     idea.items.forEach((item, j) => (texts[`idee${k + 1}_${j + 1}`] = { from: round(item.at), to: until }));
   });
   // Her images on what she says: an idea's own from where it begins to its first name that has one (or where the next
-  // idea begins), each name's from the instant she says it to the next name that has one (or its idea's end).
+  // idea begins), each name's from the instant she says it to the next name that has one (or its idea's end). In turn
+  // (SkillVoice.turns): an idea's own one after the other from where it begins, each its share, `turns` s at most.
   const ends = ideas.map((_, k) => (k + 1 < ideas.length ? starts[k + 1]! : talk.duration));
   const refs = ideas.flatMap((idea, k) => {
     const named = idea.items.flatMap((item, j) => (item.file ? [{ file: item.file, at: item.at, item: j + 1 }] : []));
-    const own = (idea.files ?? []).map((file) => ({ file, from: starts[k]!, to: named[0]?.at ?? ends[k]!, idea: k, item: 0 }));
+    const until = named[0]?.at ?? ends[k]!;
+    const files = idea.files ?? [];
+    const fit = voice.turns ? Math.max(0, Math.min(files.length, Math.floor((until - starts[k]!) / TURN_LEAST + 1e-6))) : files.length;
+    // Never a sliver of her between the last one and the next idea: a rest shorter than an image goes to the images.
+    const even = fit > 0 ? (until - starts[k]!) / fit : 0;
+    const share = voice.turns && fit > 0 ? (until - starts[k]! - fit * Math.min(voice.turns, even) < TURN_LEAST ? even : Math.min(voice.turns, even)) : 0;
+    const own = files
+      .slice(0, fit)
+      .map((file, j) => ({ file, from: share ? starts[k]! + j * share : starts[k]!, to: share ? starts[k]! + (j + 1) * share : until, idea: k, item: 0 }));
     const names = named.map((x, i) => ({ file: x.file, from: x.at, to: named[i + 1]?.at ?? ends[k]!, idea: k, item: x.item }));
     return [...own, ...names].filter((r) => r.to - r.from >= REF_MIN).map((r) => ({ ...r, from: round(r.from), to: round(r.to) }));
   });
