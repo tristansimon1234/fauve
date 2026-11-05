@@ -130,6 +130,7 @@ Le skill (`skills/mots-meles.ts`, version 1, un brouillon hors de la bibliothèq
 - **Ses autres mots** (`autres`) cachés sans boucle, en rangée, en colonne ou en diagonale qui monte, et son mot le plus court une fois de plus, comme le second « FOR » de l'original.
 - **Sa vidéo** telle que filmée (sa photo fixe), assombrie juste ce qu'il faut pour que son dixième le plus clair reste sous 60 % de blanc (`LightUnder` : un voile noir de 1 − 0,6 / sa clarté, 25 % quand elle n'est pas lue, 55 % au plus) ; ni grain, ni coins sombres, ni zoom, ni poussée.
 - **Format** : réglage `format` (`auto` comme sa vidéo, `horizontal`, `vertical`). Carte de fin en option, après la tenue.
+- **Rendu** : mesuré en local sur le café (un onglet, la machine chargée) : 0,61 s par image pendant les boucles, 0,54 pendant la tenue, autant que « Plans fixes de cinéma » sur le même plan (0,61 et 0,57) : rien de détouré ni de suivi, sa clarté lue une fois.
 - **Au catalogue** (`models-v2/mots-meles/catalogue-change.ts`) : sa lumière `natural` (au lieu de `moody`, qui contraste), sa finition sans grain, couleurs passées et noirs à peine levés, une musique calme sans batterie marquée, ses moments et sa fin.
 
 ## Ce qu'il faut filmer
