@@ -11,6 +11,7 @@ import {
   pieceFillInput,
   pieceFillSchemaFor,
   pieceMotion,
+  pieceMusicShape,
   pieceSettingsOf,
   saidUnder,
   pieceWordsOf,
@@ -154,11 +155,13 @@ export async function playPieces(input: {
       }
     };
     // Its layer from an answer, then its check (its words and marks as they will play): its js, or what the check refused.
+    let filledWith: Parameters<typeof pieceMotion>[0]["fill"] | null = null;
     const tried = async (answer: PieceFillAnswer): Promise<{ js: string; fonts: string[] } | { error: string } | null> => {
       const filled = readPieceFill(piece, answer, { photos: (input.photos ?? []).map((p) => p.id), ...(facts ? { facts } : {}) });
       if (!filled) return null;
       // A correction keeps the settings it had (« papier noir » once asked) but what her request changes now.
       const read = earlier ? { ...filled, settings: mergeSkillSettings(piece, pieceSettingsOf(piece, earlier.motion), answer.settings) } : filled;
+      filledWith = read;
       layers[index] = { ...laid, motion: pieceMotion({ piece, fill: read, plan: input.plan, layer: laid, bpm: input.plan.tempo ?? 100 }) };
       const motion = layers[index]!.motion;
       // Her photos it lays, as its code gets them (links, cut-outs) in the check too.
@@ -204,6 +207,11 @@ export async function playPieces(input: {
     }
     const motion = layers[index]!.motion;
     layers[index] = { ...layers[index]!, motion: { ...motion, js: outcome.js, ...(outcome.fonts.length ? { fonts: outcome.fonts } : {}) } };
+    // How it shapes the Reel's music during it (muffled while the room is dark, a name written in silence), when the Reel has no shape of its own.
+    if (filledWith) {
+      const shape = pieceMusicShape({ piece, fill: filledWith, plan: input.plan, layer: layers[index]!, bpm: input.plan.tempo ?? 100 });
+      if (shape) input.plan.music_shape = shape;
+    }
     console.log("piece: played", input.postId, key, JSON.stringify(motion.texts));
     result.played.push({ index, key });
   }

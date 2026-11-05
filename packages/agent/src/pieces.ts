@@ -3,6 +3,8 @@ import type { PhotoFacts } from "./finish.ts";
 import { houseModel } from "./house-models.ts";
 import { REEL_FPS } from "./motion.ts";
 import { isClipSegment, screenTime, segmentSpans, SLOT_NAME, type ClipAnalysis, type EditPlan, type HandMomentKind, type MotionDrawn, type PlanLayer, type SfxCue } from "./schemas.ts";
+import { readMusicShape, type MusicShape } from "./music-shape.ts";
+import { BURST_MAX } from "./sfx.ts";
 import { fitWords, skillObjectName, skillSettings, type SkillSetting } from "./skills.ts";
 
 // The bank of ready-to-play effects (chantier A of docs/reprise.md; docs/modeles.md, « Banque d'effets prêts à jouer »).
@@ -20,7 +22,8 @@ import { fitWords, skillObjectName, skillSettings, type SkillSetting } from "./s
 // texts, cuts }) (h = React.createElement, the kit's scope of motion-scene.ts), playing from the first frame of its span
 // to its last, over her shots playing full frame under it (it may cover them). It finds its own shots in `shots` (the
 // Reel's shots up to its end, `from` in frames from its start, so negative for one that started before it): those that
-// play during it, `const mine = shots.map((s, i) => i).filter((i) => shots[i].from < durationInFrames && shots[i].from +
+// play during it, as the engine counts them in `texts.mine` (their indices in `shots`, comma separated), else
+// `const mine = shots.map((s, i) => i).filter((i) => shots[i].from < durationInFrames && shots[i].from +
 // shots[i].durationInFrames > 0)`. It reads its words by their slot (texts[slot], already cut to their place), its
 // settings by their name, and its marks (frames from its start, numbers as strings): `beat`, the frames of one beat of
 // the Reel's tempo, and those its timeline gives. It holds for any length within its `seconds` and any number of shots
@@ -69,8 +72,22 @@ export type PieceNeeds = {
  */
 export type PieceTimeline = {
   marks?: Record<string, number>;
-  sounds?: { at: number; sound: string; seconds?: number; gain?: number; hand?: { shot: number; moment: HandMomentKind; within?: [number, number] } }[];
+  /** `burst`: the same sound laid again at each of `times` (s after `at`), each at its own `gains` (dB), as a skill's (a clicking that slows down). */
+  sounds?: {
+    at: number;
+    sound: string;
+    seconds?: number;
+    gain?: number;
+    hand?: { shot: number; moment: HandMomentKind; within?: [number, number] };
+    burst?: { times: number[]; gains?: number[] };
+  }[];
   cutouts?: number[];
+  /**
+   * How it shapes the Reel's music during it (music-shape.ts, seconds from its start): where it stops dead and comes back
+   * (`pauses`: a name written in silence), where it plays filtered (`filters`: muffled while the room is dark, opened when
+   * it lights up). Laid on the Reel's music when the Reel has no shape of its own (a model's).
+   */
+  music?: Pick<MusicShape, "pauses" | "filters">;
 };
 
 /** Its span as its timeline gets it: its frames, the Reel's tempo, its shots (each one's start, frames from its start, and length), her words and its settings. */
@@ -462,6 +479,8 @@ export function pieceMotion(input: {
   const marks: Record<string, number> = { beat: (60 / bpm) * REEL_FPS, ...line.marks };
   const texts: Record<string, string> = {
     ...Object.fromEntries(Object.entries(marks).flatMap(([k, v]) => (SLOT_NAME.test(k) && Number.isFinite(v) ? [[k, String(round3(v))] as const] : []))),
+    // The shots under it as the engine counts them (their indices in its code's `shots`), the same in its code as here.
+    mine: under.join(","),
     ...fill.settings,
     ...fill.texts,
   };
@@ -485,6 +504,13 @@ export function pieceMotion(input: {
       const clip = s.hand ? at(s.hand.shot) : undefined;
       const shot = clip === undefined ? undefined : segmentOf(clip);
       const within = s.hand?.within && s.hand.within[1] > s.hand.within[0] ? { within: [round3(layer.from + Math.max(0, s.hand.within[0])), round3(layer.from + s.hand.within[1])] as [number, number] } : {};
+      // A burst: its hits in order within its span (120 at most), their gains bounded.
+      const bound = (n: number | undefined) => (Number.isFinite(n) ? Math.round(Math.min(6, Math.max(-24, n!)) * 10) / 10 : 0);
+      const hits = (s.burst?.times ?? [])
+        .map((t, k) => ({ t: round3(t), g: bound(s.burst!.gains?.[k]) }))
+        .filter((h) => Number.isFinite(h.t) && h.t >= 0 && h.t <= 12 && s.at + h.t < seconds - 0.05)
+        .sort((a, b) => a.t - b.t)
+        .slice(0, BURST_MAX);
       return {
         at: round3(s.at),
         sound: s.sound.trim().slice(0, 60),
@@ -492,6 +518,7 @@ export function pieceMotion(input: {
         ...(s.gain ? { gain: Math.round(Math.min(6, Math.max(-24, s.gain)) * 10) / 10 } : {}),
         skill: true,
         ...(s.hand && shot !== undefined ? { hand: { shot, moment: s.hand.moment, ...within } } : {}),
+        ...(hits.length > 1 ? { burst: { times: hits.map((h) => h.t), ...(hits.some((h) => h.g) ? { gains: hits.map((h) => h.g) } : {}) } } : {}),
       };
     });
   // Only the objects on a shot under it are named in its code: one named for a shot it does not have (its sign before its
@@ -514,6 +541,35 @@ export function pieceMotion(input: {
     ...(piece.photos && fill.photos?.length ? { photos: fill.photos.slice(0, 4) } : {}),
     piece: { key: piece.key, version: piece.version },
   };
+}
+
+/**
+ * How a piece shapes the Reel's music, on the Reel's clock (its timeline's `music`, shifted by its start, within its
+ * span), laid over the shape the Reel has (`current`, kept as it is: a model's shape wins); undefined when it shapes
+ * nothing.
+ */
+export function pieceMusicShape(input: {
+  piece: EffectPiece;
+  fill: PieceFill;
+  plan: Pick<EditPlan, "segments" | "duration" | "music_shape">;
+  layer: Pick<PlanLayer, "from" | "to">;
+  bpm: number;
+}): MusicShape | undefined {
+  const { piece, fill, plan, layer } = input;
+  if (plan.music_shape) return plan.music_shape;
+  const frames = Math.max(1, Math.round((layer.to - layer.from) * REEL_FPS));
+  const under = layerShots(plan, layer);
+  const { spans } = segmentSpans(plan.segments);
+  const clipSpans = plan.segments.flatMap((s, i) => (isClipSegment(s) ? [spans[i]!] : []));
+  const shots = under.map((k) => ({ from: Math.round((clipSpans[k]!.start - layer.from) * REEL_FPS), frames: Math.round(clipSpans[k]!.length * REEL_FPS) }));
+  const line = piece.timeline?.({ frames, bpm: Math.min(140, Math.max(60, input.bpm)), shots, words: fill.texts, settings: fill.settings });
+  const span = layer.to - layer.from;
+  const inside = <T extends { from: number; to: number }>(xs: T[] | undefined) =>
+    (xs ?? []).filter((x) => x.to > x.from && x.from >= 0 && x.from < span).map((x) => ({ ...x, from: round3(layer.from + x.from), to: round3(layer.from + Math.min(span, x.to)) }));
+  const pauses = inside(line?.music?.pauses);
+  const filters = inside(line?.music?.filters);
+  if (!pauses.length && !filters.length) return undefined;
+  return readMusicShape({ ...(pauses.length ? { pauses } : {}), ...(filters.length ? { filters } : {}) }, plan.duration) ?? undefined;
 }
 
 /** What she says under a layer, as its filler reads it: the words of her shots under it, as Gemini (or Scribe) timed them, in order. */

@@ -10871,3 +10871,37 @@ test("an effect's settings: named in the editor's line, kept by a correction but
   assert.deepEqual(mergeSkillSettings(mosaique, pieceSettingsOf(mosaique, earlier), []), { papier: noir });
   assert.deepEqual(mergeSkillSettings(mosaique, pieceSettingsOf(mosaique, earlier), [{ name: "papier", value: papier.choices[0]!.value }]), {});
 });
+
+test("an effect of the bank: its shots counted by the engine, a burst of sounds, the music shaped during it", async () => {
+  const { cadre } = await import("./pieces/cadre.ts");
+  const { pieceMotion, pieceMusicShape } = await import("./pieces.ts");
+  const piece = {
+    ...cadre,
+    timeline: () => ({
+      sounds: [{ at: 0.2, sound: "light click", burst: { times: [0, 0.05, 0.1, 9], gains: [0, -3, -6, 0] } }],
+      music: { filters: [{ kind: "muffled" as const, from: 0, to: 1.5, open: 0.2 }], pauses: [{ from: 2.5, to: 3.5 }, { from: 9, to: 10 }] },
+    }),
+  };
+  const plan: Pick<EditPlan, "segments" | "tempo" | "duration"> = {
+    tempo: 100,
+    duration: 8,
+    segments: [
+      { clip_id: "lead", in: 0, out: 2, zoom: "none" },
+      { clip_id: "a", in: 0, out: 2, zoom: "none" },
+      { clip_id: "b", in: 0, out: 2, zoom: "none" },
+      { clip_id: "after", in: 0, out: 2, zoom: "none" },
+    ],
+  };
+  const layer = { from: 2, to: 6, motion: { brief: "" } };
+  const fill = { texts: {}, objects: {}, settings: {} };
+  const motion = pieceMotion({ piece, fill, plan, layer, bpm: 100 });
+  // Its shots as the engine counts them, the same indices its code finds in `shots`.
+  assert.equal(motion.texts!.mine, "1,2");
+  // Its burst within its span.
+  assert.deepEqual(motion.sounds?.[0]?.burst, { times: [0, 0.05, 0.1], gains: [0, -3, -6] });
+  // Its music shaped on the Reel's clock, within its span; a model's own shape wins.
+  assert.deepEqual(pieceMusicShape({ piece, fill, plan, layer, bpm: 100 }), { filters: [{ kind: "muffled", from: 2, to: 3.5, open: 0.2 }], pauses: [{ from: 4.5, to: 5.5 }] });
+  const shaped = { ...plan, music_shape: { end: { at: 7 } } };
+  assert.deepEqual(pieceMusicShape({ piece, fill, plan: shaped, layer, bpm: 100 }), { end: { at: 7 } });
+  assert.equal(pieceMusicShape({ piece: cadre, fill, plan, layer, bpm: 100 }), undefined);
+});
