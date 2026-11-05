@@ -176,6 +176,10 @@ export const HOUSE_EFFECTS: Record<string, HouseEffect> = {
     effet: "son nom géant dans le ciel de son plan large, derrière ses toits, dont la police change d'un coup à chaque temps (ronde, carrée, étroite, puis la sienne), à la même place et dans la même couleur",
     il_faut: "un plan large et fixe de sa rue, de ses toits ou d'un paysage, avec un ciel calme dans le haut de l'image",
   },
+  carnet: {
+    effet: "son visage dans un hublot, un rond de lumière sur du noir, pendant qu'elle dit ce qu'elle aime, qui se rapproche d'un coup sur sa dernière phrase",
+    il_faut: "une vidéo d'elle qui parle face caméra, le visage bien éclairé",
+  },
 };
 
 /** The most of Edith's models one Reel borrows from: one charter, one music, never a patchwork. */

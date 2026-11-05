@@ -1737,6 +1737,57 @@ export const HOUSE_MODELS: HouseModel[] = [
       why: "Le nom dans le ciel qui change de police à chaque temps accroche dès la première seconde et donne le tempo ; les coupes le reprennent, la ruelle fait respirer la musique, et la vie du lieu donne envie d'y aller.",
     },
   }),
+  model({
+    key: "carnet",
+    name: "Ton produit raconté",
+    // Written on its original's fiche (v1 of its skill, timed on her voice, docs/fiches/carnet.md): her voice over her
+    // pictures of what she presents, cut on her words; her first words small one by one, then its name very big; a number
+    // typed digit by digit; her face once in a lit round on black, 1,61 times closer on her last phrase; her question laid
+    // around her object; small subtitles; black after her last word. Its music: a soft bed, its weak pulse at 89,8 BPM.
+    pitch: "Tu présentes en parlant ce que tu fais ou ce que tu vends : ta voix sur tes images, son nom en très grand quand tu le dis, un chiffre qui se tape, ton visage dans un hublot rond sur du noir, ta question posée autour de lui.",
+    needs: "une vidéo de toi qui parles face caméra (20 à 40 s) de la chose que tu présentes, et 6 à 11 photos ou vidéos d'elle : levée dans ta main, seule sur un fond uni vue de dessus, ses détails de près, tes mains au travail, ton lieu",
+    files: [2, 12],
+    // Its words in a very bold grotesque in lowercase (the original's SF Pro Heavy: Inter Tight, its skill sets it at 800).
+    pair: "grotesque",
+    example: null,
+    // Its music's weak pulse (89,8 BPM: house-measures.ts has no bpm for it, no beat leads its cuts).
+    tempo: 90,
+    finish: { name: "Noirs profonds", hint: "ses images telles quelles, des noirs purs, sans grain ni coins sombres", contrast: 0.04 },
+    look: {
+      name: "produit raconté, hublot",
+      format: "raconte",
+      voice: "quelqu'un parle",
+      hook: { kind: "promesse", what: "sa main lève la chose dans le cadre ; ses premiers mots s'écrivent un à un en petit, puis son nom en très grand dessous au moment où elle le dit" },
+      text: {
+        amount: "plusieurs",
+        composition: "quelques mots en très grand, minuscules très grasses, chacun sur son mot : le nom de la chose sous ses premiers mots en petit, un chiffre tapé chiffre à chiffre, une question autour de l'objet ; de petits sous-titres gras sinon",
+        case: "normal",
+        weight: "black",
+        tracking: "tight",
+        subtitles: true,
+      },
+      layout: "ses images de la chose en plein écran coupées sur ses mots, sa voix dessous ; une fois, son visage dans un rond de lumière sur du noir ; les grands mots au milieu",
+      moments: [
+        { at: 0, what: "sa main lève la chose dans le cadre ; ses premiers mots s'écrivent un à un en petit au milieu, un toutes les 5 images, chacun d'un coup à sa place sur une ligne posée d'avance" },
+        { at: 0.67, what: "le nom de la chose en très grand juste dessous, sur son mot, 81 % de la largeur, posé sur la chose ; parti 0,6 s plus tard" },
+        { at: 1.37, what: "la chose sous un projecteur sur du noir, puis ses détails de tout près et ses mains, des plans de 0,2 à 0,8 s coupés sur ses mots" },
+        { at: 7.03, what: "un chiffre tapé chiffre à chiffre en très grand au milieu, un toutes les 4 à 5 images à sa place finale, son unité en petit dessous sur son mot ; puis la suite de sa phrase un mot à la fois, une image par mot" },
+        { at: 10.33, what: "10 images de noir, puis d'un coup son visage dans un rond de lumière sur du noir (la moitié de la largeur, 1,36 fois plus haut), ses sous-titres dessous" },
+        { at: 14.1, what: "sur le premier mot de sa dernière phrase, la même image 1,6 fois plus près, en une image" },
+        { at: 15.5, what: "sa question en très grand autour de la chose posée au milieu, un mot à la fois : en haut à gauche, dessous à droite, petit en bas à gauche, en travers dessous ; une chose de plus posée sur chaque mot ; puis « ? » seul au milieu" },
+        { at: 23.13, what: "il lève une pièce devant l'objectif sur chaque chose qu'il cite" },
+        { at: 36.67, what: "noir pur jusqu'à la fin, la musique coupée avec" },
+      ],
+      sounds: [{ at: 15.88, what: "soft thud, on each thing laid on the stack during the question" }],
+      camera: "mixte",
+      transitions: "coupes nettes",
+      grade: "natural",
+      motion: "energique",
+      music: "soft lofi chill beat, felt piano, vinyl crackle, about 90 BPM, under a voice",
+      ending: "l'ancien posé, le nouveau montré face à l'objectif, puis 0,7 s de noir",
+      why: "On regarde la chose pendant qu'elle en parle : chaque mot important tombe en très grand à l'instant où il est dit, et son visage, une seule fois dans le hublot, rend le moment personnel.",
+    },
+  }),
 ];
 
 const BY_KEY = new Map(HOUSE_MODELS.map((m) => [m.key, m]));
@@ -1815,6 +1866,7 @@ export const HOUSE_WHEN: Record<string, { pour: string; pas_pour: string }> = {
   nuit: { pour: "un lieu le soir ou la nuit (un bar, un restaurant, une boutique ouverte tard), son enseigne ou son néon, sa rue la nuit, une soirée", pas_pour: "sans plusieurs angles de son enseigne ou d'un objet qui la représente, un lieu calme de jour, un long message à lire" },
   bientot: { pour: "annoncer ce qui arrive (une ouverture, une nouvelle collection, une nouvelle carte, un événement) avec ses gestes de métier, un teaser élégant", pas_pour: "un message à lire en détail, quelqu'un qui parle, un lieu calme montré lentement, trop peu de vidéos" },
   "nom-de-ville": { pour: "présenter son quartier, sa rue, sa ville ou son lieu avec du rythme, une sortie, un voyage, l'été, la lumière du soir", pas_pour: "sans plan large avec du ciel, un intérieur seul, des produits seuls, un message à lire" },
+  carnet: { pour: "présenter en parlant un produit, une pièce ou un outil phare (ce qu'il a de spécial, un chiffre, pourquoi elle l'aime), avec des images de lui", pas_pour: "des images sans parole, quelqu'un qui parle sans images de ce dont il parle, un lieu sans chose à montrer" },
 };
 
 /** The models for Edith: their key, name, what they do, what they want, and what only she can film for one. */
