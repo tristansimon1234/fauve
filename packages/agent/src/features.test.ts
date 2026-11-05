@@ -6432,13 +6432,13 @@ test("« Voici mon travail » (v1): its clicks slowing down on their measured mo
 /** Its shots as a composition gets them, on its timeline, all of one shape. */
 const rallumeShots = (line: { shots: { start: number; end: number }[] }, aspect = 16 / 9) =>
   line.shots.map((s, i) => ({ src: `/v${i}.mp4`, aspect, from: Math.round(s.start * 30), durationInFrames: Math.round((s.end - s.start) * 30), kind: "video", segment: i }));
-/** What it lights at a frame: for each object drawn at its own light cut to its lit pieces, its name and the number of pieces lit. */
+/** What it lights at a frame: for each object drawn at its own light seen through its lit pieces' soft ovals (v2), its name and the number of pieces lit. */
 const litPieces = (tree: Drawn) =>
   drawnNodes(tree)
     .filter((n) => n.type === "div" && /^brightness\(1\.18\)/.test(String(styleOf(n).filter ?? "")))
     .map((n) => {
-      const cut = drawnNodes(n).find((m) => m.type === "div" && /^path\(/.test(String(styleOf(m).clipPath ?? "")))!;
-      return [String(drawnNodes(cut).find((m) => m.type === "Subject")?.props.object), (String(styleOf(cut).clipPath).match(/M/g) ?? []).length] as const;
+      const cut = drawnNodes(n).find((m) => m.type === "div" && /radial-gradient\(ellipse/.test(String(styleOf(m).maskImage ?? "")))!;
+      return [String(drawnNodes(cut).find((m) => m.type === "Subject")?.props.object), (String(styleOf(cut).maskImage).match(/radial-gradient\(/g) ?? []).length] as const;
     });
 /** The filter its room shot is drawn with (empty: as filmed). */
 const filmTone = (tree: Drawn) => String(styleOf(drawnNodes(tree).find((n) => n.type === "Footage")!).filter ?? "");
@@ -6446,7 +6446,7 @@ const filmTone = (tree: Drawn) => String(styleOf(drawnNodes(tree).find((n) => n.
 test("« La pièce qui se rallume » (v1): its lights on its beats faster and faster, the whole room on the downbeat, off at the end, at 96 BPM", async () => {
   const { rallume } = await import("./skills/rallume.ts");
   const { skillPlan } = await import("./skills.ts");
-  assert.equal(rallume.version, 1);
+  assert.equal(rallume.version, 2);
   assert.equal(rallume.bpm, 96);
   const beat = 60 / 96;
   const line = rallume.timeline(10, { end: false });
@@ -6627,7 +6627,7 @@ test("« La pièce qui se rallume » (v1): horizontal 16:9 on black when her vid
   const passages = objectPassages(plan, () => true);
   assert.equal(passages.length, 4);
   assert.ok(passages.every((p) => p.clip_id === "v0" && p.from === 0.5 && p.to === 5.5), JSON.stringify(passages));
-  assert.deepEqual(plan.skill, { key: "rallume", version: 1 });
+  assert.deepEqual(plan.skill, { key: "rallume", version: 2 });
   // Written as a design, without a reference Reel: no original kept, so no sheets of one, whatever its measures.
   const { HOUSE_DESIGNS, houseSheets } = await import("./house-sheets.ts");
   assert.ok(HOUSE_DESIGNS.has("rallume"));

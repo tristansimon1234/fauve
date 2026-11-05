@@ -84,11 +84,21 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   ] : [];
   const inside = (p) => p && p.w > 2 && p.h > 2 && p.x + p.w / 2 > 0 && p.x + p.w / 2 < bw && p.y + p.h / 2 > 0 && p.y + p.h / 2 < bh;
   const pieces = [];
-  KINDS.forEach((k, kind) => k[0].forEach((p, i) => { if (inside(p) && pieces.length < 48) pieces.push({ kind, box: k[1][i] || p, warm: k[3] }); }));
-  // Many: one or two on each step; few: one a step from the first, the room's own light coming back a notch on each step left.
-  const m = pieces.length;
+  KINDS.forEach((k, kind) => k[0].forEach((p, i) => { if (inside(p) && pieces.length < 48) pieces.push({ kind, ref: p, box: k[1][i] || p, warm: k[3] }); }));
+  // Pieces that touch (one lamp read as two halves, a bottle and its shine) light together: a group each, in reading
+  // order. Many groups: one or two on each step; few: one a step from the first, the room's own light coming back a
+  // notch on each step left.
+  const near = (a, b) => {
+    const gx = Math.max(a.w, b.w) * 0.12, gy = Math.max(a.h, b.h) * 0.12;
+    return a.x - gx < b.x + b.w && b.x - gx < a.x + a.w && a.y - gy < b.y + b.h && b.y - gy < a.y + a.h;
+  };
+  const groupOf = pieces.map((_, j) => j);
+  const root = (j) => (groupOf[j] === j ? j : (groupOf[j] = root(groupOf[j])));
+  pieces.forEach((a, i) => pieces.forEach((b, j) => { if (j > i && a.kind === b.kind && near(a.ref, b.ref)) groupOf[root(j)] = root(i); }));
+  const groups = [...new Set(pieces.map((_, j) => root(j)))];
+  const m = groups.length;
   const S = STEPS.length;
-  pieces.forEach((p, j) => { p.at = STEPS[m >= S ? Math.floor((j * S) / m) : j]; });
+  pieces.forEach((p, j) => { const g = groups.indexOf(root(j)); p.at = STEPS[m >= S ? Math.floor((g * S) / m) : g]; });
   const lit = cur === 0 && frame < ALL ? pieces.filter((p) => frame >= p.at) : [];
   const notches = cur === 0 && frame < ALL && m < S ? STEPS.slice(m).filter((s) => frame >= s) : [];
   const lastNotch = notches.length ? notches[notches.length - 1] : -100;
@@ -103,7 +113,7 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const night = dark ? h("div", { style: { ...full, background: "#a9b5d4", mixBlendMode: "multiply" } }) : null;
   const bloom = cur === 0 && since >= 0 && since < 2 ? h("div", { style: { ...full, background: "#fff1dc", mixBlendMode: "screen", opacity: [0.2, 0.08][since] } }) : null;
 
-  // 3. Each piece lit at its own light (a little brighter and warmer), cut to its own box, with a bloom made of its own
+  // 3. Each piece lit at its own light (a little brighter and warmer), seen through its own soft oval, with a bloom made of its own
   // picture, its highlights only (a strong contrast first), blurred and laid in screen: what shines in it (a bulb, its
   // glass) glows, what does not (a lamp's brass cap, a bottle's label) stays as it is (a glow drawn round its shape lit
   // the caps like stickers on the bench). A warm pool
@@ -112,15 +122,19 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const ownLight = "brightness(1.18) saturate(1.1)";
   const bloomLight = "contrast(2.6) brightness(1.1) blur(" + Math.max(6, Math.round(bh * 0.02)) + "px)";
   const pad = Math.max(4, Math.round(bh * 0.012));
-  const rect = (b) => {
-    const x0 = Math.max(0, Math.round(b.x - pad)), y0 = Math.max(0, Math.round(b.y - pad));
-    const x1 = Math.min(bw, Math.round(b.x + b.w + pad)), y1 = Math.min(bh, Math.round(b.y + b.h + pad));
-    return "M" + x0 + " " + y0 + "H" + x1 + "V" + y1 + "H" + x0 + "Z";
+  // Each lit piece seen through a soft oval a little larger than its box: what its cut-out holds shows whole even when its
+  // box from the card cuts it (half a lamp lit at the bench), and a box-shaped cut-out comes as a glow, never a sharp
+  // rectangle (the bench's small lamps); only its cut-out's own pixels light, so a wider oval does not light the room.
+  const oval = (b) => {
+    const cx = Math.round(b.x + b.w / 2), cy = Math.round(b.y + b.h / 2);
+    const rx = Math.round(b.w * 0.72 + pad), ry = Math.round(b.h * 0.66 + pad);
+    return "radial-gradient(ellipse " + rx + "px " + ry + "px at " + cx + "px " + cy + "px, #000 0%, #000 74%, rgba(0,0,0,0) 100%)";
   };
   const litKinds = KINDS.map((k, kind) => {
     const mine = lit.filter((p) => p.kind === kind);
     if (!mine.length) return null;
-    const cut = () => h("div", { style: { ...full, clipPath: "path('" + mine.map((p) => rect(p.box)).join(" ") + "')" } }, k[2]());
+    const mask = mine.map((p) => oval(p.box)).join(", ");
+    const cut = () => h("div", { style: { ...full, maskImage: mask, WebkitMaskImage: mask, maskRepeat: "no-repeat", WebkitMaskRepeat: "no-repeat" } }, k[2]());
     return h(React.Fragment, { key: "l" + kind },
       h("div", { style: { ...full, filter: ownLight } }, cut()),
       h("div", { style: { ...full, filter: bloomLight, mixBlendMode: "screen", opacity: 0.85 } }, cut()));
@@ -205,7 +219,9 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
 
 export const rallume: MontageSkill = {
   key: "rallume",
-  version: 1,
+  // 2: its first bench (a hotel bar's pendant lamps read on the card) lit small lamps as sharp rectangles and a big one
+  // by halves: each piece now shows through a soft oval a little larger than its box, and pieces that touch light together.
+  version: 2,
   bpm: BPM,
   shots: [6, 14],
   // Up to 24 for a length she asks for: about 30 s at its own tempo (the life of her place goes on, two beats a shot).
