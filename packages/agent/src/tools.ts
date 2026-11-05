@@ -112,8 +112,11 @@ export const toolSpecs = {
   },
   find_sound: {
     description:
-      "Trouve un son sur lequel caler son Reel (« sur la musique de Bad Bunny », « un son tendance ») : sans mots, les sons du moment (Top 50 et Viral 50 de TikTok aux États-Unis, retrouvés sur Instagram) ; avec ses mots (un titre, un artiste), ceux d'Instagram. Chacun avec son_lien, un Reel qui l'utilise : propose-lui-en un à trois (titre, artiste, reply_with options), puis passe le son_lien choisi à montage. Le son n'entre jamais dans la vidéo : elle sort sans musique, coupée sur ses temps, et elle l'ajoute dans Instagram en la publiant.",
-    input: z.object({ mots: z.string().min(2).max(80).optional().describe("Un titre ou un artiste ; vide : les sons du moment") }),
+      "Trouve un son sur lequel caler son Reel (« sur la musique de Bad Bunny », « un son tendance ») : sans mots, les sons du moment (Top 50 et Viral 50 de TikTok aux États-Unis, retrouvés sur Instagram) ; avec ses mots (un titre, un artiste), ceux d'Instagram. Chacun avec son_lien, un Reel qui l'utilise : propose-lui-en un à trois (reply_with options : leur bouton ; sur WhatsApp, l'artiste s'affiche dessous), puis passe le son_lien choisi à montage ; une fois choisi, ecouter avec son son_lien met sous ton message un bouton « Écouter le son » qui ouvre ce Reel dans Instagram. Le son n'entre jamais dans la vidéo : elle sort sans musique, coupée sur ses temps, et elle l'ajoute dans Instagram en la publiant.",
+    input: z.object({
+      mots: z.string().min(2).max(80).optional().describe("Un titre ou un artiste ; vide : les sons du moment"),
+      ecouter: z.string().url().startsWith("https://www.instagram.com/").max(300).optional().describe("Le son_lien du son qu'elle a choisi : un bouton « Écouter le son » sous ton message (WhatsApp)"),
+    }),
   },
   steal_style: {
     description:
@@ -544,7 +547,7 @@ export const toolSpecs = {
   reply_with: {
     description:
       "Ajoute à ta réponse des boutons et des cartes, affichés sous ton message (dans l'app ; sur WhatsApp, les boutons deviennent des boutons WhatsApp). options : les réponses possibles quand tu poses une question fermée (« Oui, lance » / « Non », un choix d'horaire, de format…), 2 à 6, courtes. posts : les publications dont tu parles, montrées en carte avec leur aperçu (vidéo, photo), format, date et statut. grid : true pour montrer la grille Instagram avec les publications à venir. upload : une zone de dépôt (video, photo ou any) quand tu lui demandes des fichiers ; sur WhatsApp, elle devient son lien de dépôt en pleine qualité, ajouté sous ton message. pick_media (video, photo ou any) : sa médiathèque en vignettes à cocher, avec aussi l'ajout de nouveaux fichiers ; sa réponse revient avec les media_id choisis. step_card (onboarding, dans l'app) : la carte de l'étape en cours (website : champ pour son site ; style : sa charte trouvée et son moodboard ; rhythm : son rythme ; connect : le bouton Instagram ; first_post : créer sa première publication). Ni pick_media ni step_card n'apparaissent sur WhatsApp. plan : ton plan avant de produire (« Avant de produire ») : title, points (4 à 6, dans l'ordre, chacun « Rubrique : ce qu'on fait »), why (pourquoi ça marche, une phrase) ; il est écrit sous ta phrase tel quel, avec les boutons « C'est parti » et « Changer le plan » : ne l'écris jamais dans ton texte, une courte phrase avant suffit. Appelle-le au plus une fois par réponse, avec ton message.",
-    input: replyExtrasSchema.omit({ quote: true, link: true, kind: true }).extend({ plan: proposalSchema.optional() }),
+    input: replyExtrasSchema.omit({ quote: true, link: true, kind: true, option_notes: true, listen: true }).extend({ plan: proposalSchema.optional() }),
   },
   log_feedback: {
     description:

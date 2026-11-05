@@ -87,7 +87,6 @@ export * from "./copy.ts";
 export * from "./toolkit.ts";
 export * from "./tracking.ts";
 export * from "./rework.ts";
-export * from "./trends.ts";
 export * from "./trend-sounds.ts";
 export * from "./feedback.ts";
 export * from "./video-quality.ts";

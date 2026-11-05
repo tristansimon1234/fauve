@@ -58,7 +58,7 @@ const INTERACTIVE_BODY = 1024;
  * plan in points) sends its first paragraphs as text and keeps the buttons under
  * the last ones. The manager's tap comes back as a message whose text is the option.
  */
-export async function sendReply(toWaId: string, body: string, options?: string[], links: string[] = []): Promise<string | undefined> {
+export async function sendReply(toWaId: string, body: string, options?: string[], links: string[] = [], notes: Record<string, string> = {}): Promise<string | undefined> {
   const text = [body, ...links].join("\n\n");
   if (!options?.length) return sendText(toWaId, text);
   if (text.length > INTERACTIVE_BODY) {
@@ -67,10 +67,12 @@ export async function sendReply(toWaId: string, body: string, options?: string[]
     while (paragraphs.length && tail.length + 2 + paragraphs.at(-1)!.length <= INTERACTIVE_BODY) tail = `${paragraphs.pop()!}\n\n${tail}`;
     if (!paragraphs.length || tail.length > INTERACTIVE_BODY) return sendText(toWaId, `${text}\n\n${options.join(" · ")}`);
     await sendText(toWaId, paragraphs.join("\n\n"));
-    return sendReply(toWaId, tail, options);
+    return sendReply(toWaId, tail, options, [], notes);
   }
+  // A line under an answer (a sound's artist) only shows in a list.
+  const noted = options.some((o) => notes[o]);
   const interactive =
-    options.length <= 3 && options.every((o) => o.length <= 20)
+    options.length <= 3 && options.every((o) => o.length <= 20) && !noted
       ? {
           type: "button",
           body: { text },
@@ -81,7 +83,7 @@ export async function sendReply(toWaId: string, body: string, options?: string[]
           body: { text },
           action: {
             button: "Choisir",
-            sections: [{ title: "Réponses", rows: options.slice(0, 10).map((title, i) => ({ id: `opt_${i}`, title: title.slice(0, 24) })) }],
+            sections: [{ title: "Réponses", rows: options.slice(0, 10).map((title, i) => ({ id: `opt_${i}`, title: title.slice(0, 24), ...(notes[title] ? { description: notes[title]!.slice(0, 72) } : {}) })) }],
           },
         };
   try {

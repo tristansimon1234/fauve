@@ -61,6 +61,10 @@ export const replyExtrasSchema = z.object({
   link: z
     .object({ path: z.string().startsWith("/").max(200), label: z.string().min(1).max(20), purpose: z.enum(["open_post", "connect_social", "upload", "voice", "billing"]) })
     .optional(),
+  /** WhatsApp: a line under each answer of its list (« Harry Styles · Top 50 n° 1 »), by the answer's text; set by find_sound, not by the model. */
+  option_notes: z.record(z.string().max(24), z.string().max(72)).optional(),
+  /** WhatsApp: a Reel in Instagram behind a button under the message (« Écouter le son »); set by find_sound, not by the model. */
+  listen: z.object({ url: z.string().url().startsWith("https://www.instagram.com/").max(300), label: z.string().min(1).max(20) }).optional(),
   /** What kind of message it is, kept in its payload (« daily_cap », « nudge »…), set by the code, not by the model. */
   kind: z.string().max(40).optional(),
 });

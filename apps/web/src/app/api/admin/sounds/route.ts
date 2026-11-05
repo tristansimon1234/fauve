@@ -64,6 +64,8 @@ export async function POST(request: Request) {
   const action = new URL(request.url).searchParams.get("action");
   // This week's list made now (lib/trend-sounds.ts), as the Monday cron does: about $0.06 when its 30 sounds are new.
   if (action === "refresh") return Response.json(await refreshTrendSounds({ force: true }));
+  // The covers the removed trend videos kept (media/trends/{list}/{video}.webp), deleted once.
+  if (action === "drop_trend_covers") return Response.json(await dropTrendCovers());
   if (action !== "bench") return Response.json({ error: "action=bench|refresh" }, { status: 400 });
   let costUsd = 0;
   let calls = 0;
@@ -143,4 +145,19 @@ export async function POST(request: Request) {
     searched,
     used,
   });
+}
+
+/** Every file under media/trends/ (one folder per list), removed. */
+async function dropTrendCovers(): Promise<{ removed: number }> {
+  const bucket = supabaseAdmin().storage.from("media");
+  const { data: folders } = await bucket.list("trends", { limit: 1000 });
+  let removed = 0;
+  for (const folder of folders ?? []) {
+    const { data: files } = await bucket.list(`trends/${folder.name}`, { limit: 1000 });
+    const paths = (files ?? []).map((f) => `trends/${folder.name}/${f.name}`);
+    if (!paths.length) continue;
+    const { data } = await bucket.remove(paths);
+    removed += data?.length ?? 0;
+  }
+  return { removed };
 }

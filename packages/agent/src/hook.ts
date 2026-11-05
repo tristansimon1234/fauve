@@ -136,7 +136,6 @@ A very strong hook:
 - is true: only the facts given and what the image shows, no invented price, number or promise;
 - sounds like a creator talking to their followers, never like an ad nor a clickbait: no hollow formula, no « vous ne devinerez jamais », no shouted capitals, no emojis, no em dash;
 - has neither the form nor the words of the business's recent hooks (« recentes »);
-- knows what hooks people in this trade right now (« du_moment »: the form and an example from another account): use them to sense which forms land this week and to write better ones, never to copy; a hook that takes, or barely changes, the words of one of them scores 3 at most.
 
 Mood lines are not hooks: a line that only sets a mood or names the moment (« samedi matin, tout ralentit », « de la cape au miroir ») opens no question and scores 4 at most.
 
@@ -164,8 +163,6 @@ export type HookJudgeInput = {
   /** The written hook: the voice's first sentence, when a voice speaks. */
   voix_premiere_phrase?: string;
   recentes?: string[];
-  /** The hooks that work right now in its trade, read on the covers of other accounts' videos: forms to beat, never words to take. */
-  du_moment?: { forme: string; exemple: string }[];
   accroches: string[];
 };
 

@@ -12,7 +12,7 @@ export const PROVIDERS: { key: ProviderKey; label: string; role: string; topUp: 
   { key: "google", label: "Google (Gemini)", role: "La lecture des vidéos et des photos", topUp: "https://aistudio.google.com/usage" },
   { key: "elevenlabs", label: "ElevenLabs", role: "La musique, les voix off, la lecture des vocaux", topUp: "https://elevenlabs.io/app/subscription" },
   { key: "vercel_sandbox", label: "Vercel (rendus)", role: "Les ateliers qui fabriquent les vidéos", topUp: "https://vercel.com/dashboard/usage" },
-  { key: "treg", label: "Treg", role: "Les Reels Instagram à recopier, les tendances", topUp: "https://treg.to" },
+  { key: "treg", label: "Treg", role: "Les Reels Instagram à recopier, les sons tendance", topUp: "https://treg.to" },
 ];
 
 /** Days of spending left below which the team is told, by default. */

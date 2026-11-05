@@ -471,16 +471,26 @@ async function answerOnWhatsApp({ studioId, memberId, waId, phone, replyTo, note
       ...(posts && posts.length > 1 ? posts.map((id) => `${env("APP_URL")}/v/${id}`) : []),
       ...(!url && button ? [`${env("APP_URL")}${button.path}`] : []),
     ];
-    const send = () =>
+    const notes = result.extras.option_notes ?? {};
+    // A Reel in Instagram to listen to a sound (find_sound): on her message when it carries no other button, else after it.
+    const listen = result.extras.listen;
+    const main = () =>
       url
         ? options?.length
           ? // WhatsApp puts one kind of button on a message: the answers on hers, then the page.
-            sendReply(waId, result.reply!, options, links).then(async (id) => {
+            sendReply(waId, result.reply!, options, links, notes).then(async (id) => {
               await sendLinkButton(waId, button!.purpose === "upload" ? "En pleine qualité, depuis ta galerie :" : "C’est ici :", { url, label: button!.label });
               return id;
             })
           : sendLinkButton(waId, [result.reply, ...links].join("\n\n"), { url, label: button!.label })
-        : sendReply(waId, result.reply!, options, links);
+        : listen && !options?.length
+          ? sendLinkButton(waId, [result.reply, ...links].join("\n\n"), listen)
+          : sendReply(waId, result.reply!, options, links, notes);
+    const send = () =>
+      main().then(async (id) => {
+        if (listen && (url || options?.length)) await sendLinkButton(waId, "Écoute-le ici :", listen).catch((e: unknown) => console.warn("listen button failed", e));
+        return id;
+      });
     // A reply WhatsApp refuses (its number's display name awaiting Meta's approval, error 131037) is still kept,
     // marked: it shows in the app, the next turn knows she never read it, and what it started still runs below.
     // Lost, each of her « Alors ? » ran the whole turn again (her site read four times) and her site's look,

@@ -30,7 +30,7 @@ export async function followSound(
   if (post.voice_media_id) return { ok: false, why: "voice" };
   const music = readPostMusic(post.music);
   const kept = music.sound?.link === found.url ? music.sound : { link: found.url };
-  // A Reel of a trending sound (find_sound, Tendances): its name and its page, for the Reel's page.
+  // A Reel of a trending sound (find_sound, page Sons): its name and its page, for the Reel's page.
   let name = named;
   if (!name.title) {
     const { data: known } = await db.from("trend_sounds").select("audio_id, title, artist").contains("reels", [{ link: found.url }]).limit(1).maybeSingle();
