@@ -69,10 +69,14 @@ const scope = {
   Edges: ({ items = [] }) => React.createElement("div", null, ...items.map((item, i) => React.createElement("div", { key: i }, String(item?.text ?? "")))),
   Paper: ({ style, children }) => React.createElement("div", { style }, children),
   Card: ({ text, steps }) => React.createElement("div", null, String(steps?.at?.(-1)?.text ?? text ?? "")),
-  Scribble: () => React.createElement("svg", null),
+  // How long a stroke takes (Scribble.frames): a number here, its real pace in the layout check.
+  Scribble: Object.assign(() => React.createElement("svg", null), { frames: (p) => Math.max(1, Number(p?.frames) || 14) }),
   WordSearch: ({ words = [] }) => React.createElement("div", null, ...words.map((w, i) => React.createElement("div", { key: i }, String(w)))),
   Kinetic: ({ text }) => React.createElement("div", null, Array.isArray(text) ? text.join(" ") : String(text ?? "")),
   Burst: ({ children }) => React.createElement("div", null, children),
+  // The hand-made pieces (Type.tsx): a hand's words written whole, a pictogram a mark.
+  Handwriting: ({ text, style }) => React.createElement("div", { style }, String(text ?? "")),
+  Picto: () => React.createElement("svg", null),
   // The interface, graphics and transitions kit (Graphic.tsx): its words are written, what it shows is drawn.
   Cursor: () => React.createElement("div", null),
   Toggle: () => React.createElement("div", null),

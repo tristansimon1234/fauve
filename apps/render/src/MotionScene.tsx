@@ -252,7 +252,8 @@ function Subject({
 // Tiles, Window, Stack, Split: the layout kit (Kit.tsx), tested once, so an animation lays its pictures in tiles,
 // windows, stacks and split screens without coding their geometry.
 // Decode, TypeOn, Reveal, Count, Edges, Paper, Emboss, Card, Scribble, WordSearch, Kinetic, WordArt, Burst: the text and
-// materials kit (Type.tsx), with the timings of the reference Reels.
+// materials kit (Type.tsx), with the timings of the reference Reels; Handwriting (a hand that never repeats) and Picto
+// (line pictograms of her trade, drawing themselves), its hand-made pieces.
 const kit = makeKit({ useCurrentFrame, useVideoConfig });
 const type = makeType({ useCurrentFrame, useVideoConfig });
 // Cursor, Toggle, Button, ProfileCard, WordList, Timeline, Grid, Fan, Turn, Whip, ZoomThrough, Through, Flash, Tint: the
@@ -294,6 +295,8 @@ export const SCOPE = {
   Kinetic: type.Kinetic,
   WordArt: type.WordArt,
   Burst: type.Burst,
+  Handwriting: type.Handwriting,
+  Picto: type.Picto,
   Cursor: graphic.Cursor,
   Toggle: graphic.Toggle,
   Button: graphic.Button,

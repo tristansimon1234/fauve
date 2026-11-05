@@ -4093,3 +4093,247 @@ test("« Écran partagé titré » (v2): its layout as a setting her words ask, 
   // Its music shaped on the plan: without its bass to the third bar, cut dead at the end.
   assert.deepEqual(plan.music_shape, { filters: [{ kind: "thin", from: 0, to: 4, open: 0.02 }], end: { at: plan.duration, fade: 0.012 } });
 });
+
+// ——— The hand-made pieces of the kit (apps/render/src/handmade.ts, pictos.ts, captions.ts), asked by the models' fiches ———
+
+/** A chance by key, the same for the same key (Remotion's random in the render). */
+const chance = (key: string) => {
+  let h = 2166136261;
+  for (const ch of key) h = Math.imul(h ^ ch.charCodeAt(0), 16777619) >>> 0;
+  h = Math.imul(h ^ (h >>> 15), 0x2c1b3c6d) >>> 0;
+  return ((h ^ (h >>> 13)) >>> 0) / 4294967296;
+};
+/** Whether a point is inside a closed polyline (even-odd). */
+const insideRing = (pts: { x: number; y: number }[], x: number, y: number) => {
+  let inside = false;
+  for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+    const a = pts[i]!;
+    const b = pts[j]!;
+    if (a.y > y !== b.y > y && x < ((b.x - a.x) * (y - a.y)) / (b.y - a.y) + a.x) inside = !inside;
+  }
+  return inside;
+};
+
+test("kit: a hand's pace round a word, as « Mots mêlés » measured it (no easing, slower in the turns, back faster)", async () => {
+  const { capsuleRing, handPace, loopRing } = await import("../../../apps/render/src/handmade.ts");
+  // SATURDAY on a grid of 120 px: the loop 0,9 of a pitch tall, its ends 0,4 of a pitch past its first and last letters.
+  const p = 120;
+  const word = (n: number) => ({ x: 140 - 0.4 * p, y: 300 - 0.45 * p, w: (n - 1) * p + 0.8 * p, h: 0.9 * p });
+  const box = word(8);
+  const ring = capsuleRing(box, "top-left", "ccw");
+  // It starts just above its first letter, turns counterclockwise (down round the first letter first), and closes on its start.
+  assert.ok(Math.abs(ring[0]!.x - (box.x + box.h / 2)) < 0.5 && Math.abs(ring[0]!.y - box.y) < 0.5, JSON.stringify(ring[0]));
+  assert.ok(ring[1]!.x < ring[0]!.x && ring[6]!.y > ring[0]!.y);
+  assert.ok(Math.hypot(ring.at(-1)!.x - ring[0]!.x, ring.at(-1)!.y - ring[0]!.y) < 0.06 * box.w);
+  // Clockwise from the bottom right, the other way.
+  const cw = capsuleRing(box, "bottom-right", "cw");
+  assert.ok(Math.abs(cw[0]!.y - (box.y + box.h)) < 0.5 && cw[1]!.x < cw[0]!.x);
+  const loop = loopRing(box, "top", "ccw");
+  assert.ok(Math.abs(loop[0]!.x - (box.x + box.w / 2)) < 0.5 && loop[0]!.y < box.y && loop[1]!.x < loop[0]!.x);
+  // A letter every 4,5 images: its quarters drawn as the original's (21, 47, 70 %), where an ease-out draws 58, 88, 98.
+  const pace = handPace([ring], p / 4.5, { closed: true, radius: box.h / 2 });
+  const length = ring.slice(1).reduce((s, q, i) => s + Math.hypot(q.x - ring[i]!.x, q.y - ring[i]!.y), 0);
+  assert.ok(Math.abs(pace.frames - length / (p / 4.5)) < 0.5, `${pace.frames}`);
+  const quarters = [0.25, 0.5, 0.75].map((f) => pace.drawn(pace.frames * f));
+  [0.21, 0.47, 0.7].forEach((want, i) => assert.ok(Math.abs(quarters[i]! - want) < 0.04, `${quarters}`));
+  assert.equal(pace.drawn(0), 0);
+  assert.equal(pace.drawn(pace.frames), 1);
+  for (let t = 1; t < pace.frames; t++) assert.ok(pace.drawn(t) >= pace.drawn(t - 1));
+  // Faster on the way back than in the ends.
+  const speedAt = (f: number) => pace.drawn(pace.frames * (f + 0.02)) - pace.drawn(pace.frames * (f - 0.02));
+  assert.ok(speedAt(0.85) > speedAt(0.05) * 1.3, `${speedAt(0.85)} ${speedAt(0.05)}`);
+  // Its length follows the word's: FOR takes less than SATURDAY at the same pace; two strokes leave the pen lifted between.
+  assert.ok(handPace([capsuleRing(word(3))], p / 4.5, { closed: true }).frames < pace.frames * 0.5);
+  const cross = handPace([ring.slice(0, 20), ring.slice(30, 50)], 20, { lift: 5 });
+  assert.ok(cross.drawn(cross.frames / 2) > 0.3 && cross.drawn(cross.frames / 2) < 0.7);
+  const none = handPace([], 20);
+  assert.ok(none.frames === 0 && none.drawn(5) === 1);
+});
+
+test("kit: one stroke round a word over two rows (« AFTER » over « NOON »), in steps, from above its first letter", async () => {
+  const { cellsRing } = await import("../../../apps/render/src/handmade.ts");
+  const p = 120;
+  const row = (r: number, c0: number, c1: number) => ({ x: 140 + c0 * p - 0.42 * p, y: 600 + r * p - 0.45 * p, w: (c1 - c0) * p + 0.84 * p, h: 0.9 * p });
+  const centre = (r: number, c: number) => ({ x: 140 + c * p, y: 600 + r * p });
+  const ring = cellsRing([row(0, 0, 4), row(1, 0, 3)], "top-left", "ccw");
+  // Every letter of both rows inside it; the cell under the R of « AFTER », outside: it steps.
+  for (let c = 0; c <= 4; c++) assert.ok(insideRing(ring, centre(0, c).x, centre(0, c).y), `AFTER ${c}`);
+  for (let c = 0; c <= 3; c++) assert.ok(insideRing(ring, centre(1, c).x, centre(1, c).y), `NOON ${c}`);
+  assert.ok(!insideRing(ring, centre(1, 4).x, centre(1, 4).y));
+  // Above its A, going left then down (counterclockwise), back on its start.
+  assert.ok(Math.abs(ring[0]!.y - row(0, 0, 4).y) < 1 && ring[0]!.x < centre(0, 0).x + 0.1 * p, JSON.stringify(ring[0]));
+  assert.ok(ring[1]!.x < ring[0]!.x && ring[8]!.y > ring[0]!.y);
+  assert.ok(ring.slice(-4).some((q) => Math.hypot(q.x - ring[0]!.x, q.y - ring[0]!.y) < 1) && Math.hypot(ring.at(-1)!.x - ring[0]!.x, ring.at(-1)!.y - ring[0]!.y) < 0.4 * p);
+  // Its points evenly apart, its corners rounded (no point at a corner of the cells' union).
+  const steps = ring.slice(1).map((q, i) => Math.hypot(q.x - ring[i]!.x, q.y - ring[i]!.y));
+  assert.ok(Math.max(...steps) < 0.2 * p);
+  assert.ok(!ring.some((q) => Math.hypot(q.x - row(0, 0, 4).x, q.y - row(0, 0, 4).y) < 0.1 * p));
+  // Rows offset on both sides step on both sides; rows that do not touch are stretched until one outline goes round them.
+  const offset = cellsRing([row(0, 1, 5), row(1, 0, 3), row(2, 2, 6)], "top-left", "cw");
+  for (const [r, c] of [[0, 5], [1, 0], [2, 6], [1, 2]] as const) assert.ok(insideRing(offset, centre(r, c).x, centre(r, c).y), `${r},${c}`);
+  const apart = cellsRing([row(0, 0, 1), row(1, 4, 6)], "top-left", "ccw");
+  for (const [r, c] of [[0, 0], [1, 6]] as const) assert.ok(insideRing(apart, centre(r, c).x, centre(r, c).y), `${r},${c}`);
+  // One row is a capsule round it.
+  const one = cellsRing([row(0, 0, 4)]);
+  for (let c = 0; c <= 4; c++) assert.ok(insideRing(one, centre(0, c).x, centre(0, c).y));
+  assert.deepEqual(cellsRing([]), []);
+});
+
+test("kit: a word search hides her words and the words of her world it never circles, the accents dropped", async () => {
+  const { placeWords, plainLetters } = await import("../../../apps/render/src/handmade.ts");
+  assert.equal(plainLetters("Crème brûlée"), "CREMEBRULEE");
+  assert.equal(plainLetters("l'Été !"), "LETE");
+  const [cols, rows] = [9, 16];
+  const allowed = (c: number, r: number) => c >= 1 && c <= 7 && r >= 1 && r <= 11;
+  const grid = new Map<string, string>();
+  const found = placeWords(["SAMEDI", "Café", "crème"], cols, rows, allowed, "plage", chance, grid);
+  const hidden = placeWords(["brioche", "mer", "thé", "tartine"], cols, rows, () => true, "plage-decoy", chance, grid);
+  assert.deepEqual(found.map((p) => p.word), ["SAMEDI", "CAFE", "CREME"]);
+  assert.deepEqual(hidden.map((p) => p.word), ["BRIOCHE", "MER", "THE", "TARTINE"]);
+  assert.ok(found.every((p) => p.cells.every(([c, r]) => allowed(c, r))));
+  // Each in a line, read forwards (along a row, down a column or a diagonal), every letter where the grid says.
+  for (const p of [...found, ...hidden]) {
+    const [dx, dy] = [p.cells[1]![0] - p.cells[0]![0], p.cells[1]![1] - p.cells[0]![1]];
+    assert.ok(["h", "v", "d", "u"].includes(p.dir) && dx === 1 - Number(p.dir === "v") && dy === { h: 0, v: 1, d: 1, u: -1 }[p.dir]);
+    p.cells.forEach(([c, r], k) => assert.equal(grid.get(`${c},${r}`), p.word[k]));
+  }
+  // The same seed, the same grid: the words placed before its decoys never move for them.
+  assert.deepEqual(placeWords(["SAMEDI", "Café", "crème"], cols, rows, allowed, "plage", chance).map((p) => p.cells), found.map((p) => p.cells));
+});
+
+test("kit: TypeOn's cursor goes back and eats the text, down to what it keeps", async () => {
+  const { typedState } = await import("../../../apps/render/src/handmade.ts");
+  // « Héloïse Marchand » typed a letter every 2 frames; from frame 40 the cursor eats one every 2 frames (15 a second).
+  const times = Array.from({ length: 16 }, (_, i) => i * 2);
+  assert.deepEqual(typedState(times, 5), { shown: 3, busy: true, since: 5 });
+  assert.deepEqual(typedState(times, 35), { shown: 16, busy: false, since: 30 });
+  const erase = { at: 40, perSecond: 15, keep: 7 };
+  assert.equal(typedState(times, 39, erase).shown, 16);
+  assert.equal(typedState(times, 40, erase).shown, 15);
+  assert.equal(typedState(times, 44, erase).shown, 13);
+  // Down to « Héloïse », then it rests: the caret blinks from the frame the last letter went.
+  assert.deepEqual(typedState(times, 80, erase), { shown: 7, busy: false, since: 40 + 8 * 2 });
+  // Erasing before the end of its typing: what was typed then, nothing more.
+  assert.equal(typedState(times, 13, { at: 12, perSecond: 30, keep: 0 }).shown, 5);
+  assert.equal(typedState(times, 60, { at: 12, perSecond: 30, keep: 0 }).shown, 0);
+});
+
+test("kit: a hand that never repeats (« Carte au feutre »): each letter different, its lines, its textures", async () => {
+  const { handBreak, handLine, handSlots, handStrays, strokeTexture } = await import("../../../apps/render/src/handmade.ts");
+  // The two T of « THAT », the two M of « MAMAN »: never the same letter twice, never larger than the font by 3 %.
+  const strays = handStrays(5, "maman", chance);
+  for (const [a, b] of [[0, 2], [1, 3], [2, 4]] as const) {
+    const [s, t] = [strays[a]!, strays[b]!];
+    assert.ok(Math.abs(s.rotate - t.rotate) + Math.abs(s.sx - t.sx) + Math.abs(s.sy - t.sy) + Math.abs(s.dy - t.dy) > 0.01, `${a} ${b}`);
+  }
+  for (const s of handStrays(200, "long", chance)) {
+    assert.ok(s.sx <= 1.03 && s.sy <= 1.03 && s.sx >= 0.89 && s.sy >= 0.9 && Math.abs(s.rotate) <= 4 && Math.abs(s.dy) <= 0.051, JSON.stringify(s));
+  }
+  assert.deepEqual(handStrays(3, "maman", chance), handStrays(3, "maman", chance));
+  assert.ok(handStrays(2, "x", chance, 0).every((s) => Math.abs(s.dx) + Math.abs(s.dy) + Math.abs(s.rotate) < 1e-12 && s.sx === 1 && s.sy === 1));
+  assert.ok(Math.abs(handLine("carte", 0, chance).tilt) <= 1.4);
+  // Its own lines; else even lines between its words, about ten letters each, never a word cut.
+  assert.deepEqual(handBreak("PUT THAT\nPHONE DOWN\n\n& COME TO\n BURGER  NIGHT "), ["PUT THAT", "PHONE DOWN", "& COME TO", "BURGER NIGHT"]);
+  const cut = handBreak("UN BOUQUET POUR MAMAN CE DIMANCHE");
+  assert.equal(cut.join(" "), "UN BOUQUET POUR MAMAN CE DIMANCHE");
+  assert.ok(cut.length === 3 && Math.max(...cut.map((l) => l.length)) <= 12, JSON.stringify(cut));
+  assert.deepEqual(handBreak("Bonjour"), ["Bonjour"]);
+  assert.deepEqual(handBreak("UN DEUX TROIS", 2), ["UN DEUX", "TROIS"]);
+  // The last line 1,3 times as tall, the slots filling the box.
+  const slots = handSlots(4, 660, 1.3);
+  assert.ok(Math.abs(slots[3]!.h / slots[0]!.h - 1.3) < 1e-9 && Math.abs(slots[3]!.top + slots[3]!.h - 660) < 1e-9);
+  assert.deepEqual(handSlots(1, 300), [{ top: 0, h: 300 }]);
+  // Its textures, made once: the same for a seed, a slow noise (neighbours close, opaque), a grain (its alpha spread out).
+  const slow = strokeTexture("slow", 48, "carte", 10);
+  assert.equal(slow.length, 48 * 48 * 4);
+  assert.deepEqual(strokeTexture("slow", 48, "carte", 10), slow);
+  const jumps: number[] = [];
+  for (let i = 4; i < slow.length; i += 4) if ((i / 4) % 48) jumps.push(Math.abs(slow[i]! - slow[i - 4]!));
+  const mean = jumps.reduce((a, b) => a + b, 0) / jumps.length;
+  assert.ok(Math.max(...jumps) < 100 && mean < 20 && slow[3] === 255, `${Math.max(...jumps)} ${mean}`);
+  const fine = strokeTexture("fine", 64, "carte");
+  const alphas = Array.from({ length: 64 * 64 }, (_, i) => fine[i * 4 + 3]!);
+  assert.ok(Math.min(...alphas) < 20 && Math.max(...alphas) > 235 && new Set(alphas).size > 200);
+});
+
+test("kit: an eye's almond for a window (« Silhouette et mot »)", async () => {
+  const { almondPath } = await import("../../../apps/render/src/handmade.ts");
+  const numbers = (d: string) => (d.match(/-?\d+(\.\d+)?/g) ?? []).map(Number);
+  // Shut: its lids on the middle line; open: its corners at the box's left and right middle, its lids touching top and bottom.
+  assert.ok(numbers(almondPath(800, 220, 0)).every((v, i) => i % 2 === 0 || v === 110));
+  const open = numbers(almondPath(800, 220, 1));
+  assert.deepEqual([open[0], open[1], open[6], open[7]], [0, 110, 800, 110]);
+  // A cubic peaks at three quarters of its handles' height: the upper lid's handles at −36,7 reach the top, the lower's 256,7 the bottom.
+  assert.ok(Math.abs(110 - 0.75 * (110 - open[3]!) - 0) < 0.2 && Math.abs(110 + 0.75 * (open[9]! - 110) - 220) < 0.2, JSON.stringify(open));
+  // Narrowed from below: the lower lid opens a fifth as far as the upper.
+  const narrowed = numbers(almondPath(800, 220, 1, [1, 0.2]));
+  assert.ok(Math.abs((narrowed[9]! - 110) / (110 - narrowed[3]!) - 0.2) < 0.01);
+  assert.ok(!/NaN/.test(almondPath(0, 0, 2, [3, -1])));
+});
+
+test("kit: a creator's hook on bands (« Face caméra et références »): phrases of nine words, lines as even as they go", async () => {
+  const { BAND_LIMITS, bandLines, captionCards } = await import("../../../apps/render/src/captions.ts");
+  const said = "Avoir une très bonne culture visuelle, je pense que c'est un des points les plus importants en réalisation.".split(" ");
+  const words = said.map((w, i) => ({ w, from: i * 8, to: i * 8 + 7 }));
+  const bands = captionCards(words, 30, 400, BAND_LIMITS);
+  assert.deepEqual(bands[0]!.words.map((w) => w.w).join(" "), "Avoir une très bonne culture visuelle,");
+  assert.ok(bands.every((c) => c.words.length <= 9) && bands.map((c) => c.words.map((w) => w.w).join(" ")).join(" ") === said.join(" "));
+  // The engine's own phrases keep six words at most.
+  assert.ok(captionCards(words, 30, 400).every((c) => c.words.length <= 6));
+  // As few lines as hold the words, then even: never a line past the width unless a word alone is wider.
+  assert.deepEqual(bandLines([150, 100, 110, 170, 200, 230], 600, 20), [[0, 1, 2, 3], [4, 5]]);
+  assert.deepEqual(bandLines([200, 200, 200, 200], 1000, 20), [[0, 1, 2, 3]]);
+  assert.deepEqual(bandLines([200, 200, 200, 200], 500, 20), [[0, 1], [2, 3]]);
+  assert.deepEqual(bandLines([900, 100], 600, 20), [[0], [1]]);
+  assert.deepEqual(bandLines([100], 600, 20), [[0]]);
+  assert.deepEqual(bandLines([], 600, 20), []);
+});
+
+test("kit: line pictograms by trade, drawn as strokes on their grid, found by her trade's words", async () => {
+  const { PICTOS, PICTO_NAMES, pathLength, pathStrokes, pictoFor } = await import("../../../apps/render/src/pictos.ts");
+  assert.ok(PICTO_NAMES.length >= 20);
+  for (const [name, picto] of Object.entries(PICTOS)) {
+    assert.ok(picto.paths.length >= 1 && picto.paths.length <= 8, name);
+    for (const d of picto.paths) {
+      // Only the commands the pictograms are written in; every stroke on the grid, with room for the line's width.
+      assert.match(d, /^[MLHVCQZ0-9.\s-]+$/, name);
+      const strokes = pathStrokes(d);
+      assert.ok(strokes.length >= 1 && pathLength(d) > 3, `${name}: ${d}`);
+      for (const p of strokes.flat()) assert.ok(p.x >= 3 && p.x <= 97 && p.y >= 3 && p.y <= 97, `${name} ${p.x},${p.y}`);
+    }
+    for (const w of picto.words) assert.equal(w, w.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase(), `${name}: ${w}`);
+  }
+  // Her trade in her own words, French or English, a key as it is; « salon de thé » before « salon ».
+  const asked: [string, string | null][] = [
+    ["Salon de coiffure", "ciseaux"],
+    ["Café des Arts", "cafe"],
+    ["Boulangerie Dupont", "croissant"],
+    ["Fleuriste du marché", "tulipe"],
+    ["La Friperie", "cintre"],
+    ["Atelier Pilates", "lotus"],
+    ["Bar à vin", "vin"],
+    ["Salon de thé", "the"],
+    ["Le Barbier", "moustache"],
+    ["The Barber", "moustache"],
+    ["Studio photo", "appareil"],
+    ["Pizzeria Mamma", "pizza"],
+    ["scissors", "ciseaux"],
+    ["lotus", "lotus"],
+    ["Notaire", null],
+    ["", null],
+  ];
+  for (const [name, want] of asked) assert.equal(pictoFor(name), want, name);
+  // A square drawn clockwise is 4 sides; a curve is cut in pieces.
+  assert.equal(pathLength("M 10 10 H 20 V 20 H 10 Z"), 40);
+  assert.ok(Math.abs(pathLength("M 0 0 C 0 0 10 0 10 0") - 10) < 1e-9);
+});
+
+test("kit: the hand-made pieces are in the scope and told to the motion designer", async () => {
+  const { MOTION_SCOPE, MOTION_DESIGNER_PROMPT } = await import("./motion-scene.ts");
+  assert.ok(MOTION_SCOPE.includes("Handwriting") && MOTION_SCOPE.includes("Picto"));
+  for (const told of [/erase=\{\{ at, speed: 14, keep \}\}/, /kind="loop" \| "capsule" \| "cells"/, /Scribble\.frames\(props\)/, /decoys=\{\[…\]\}/, /pace=\{4\.5\}/, /<Handwriting text=/, /<Picto name=/, /reveal="grow" \| "iris" \| "eye"/, /style="kinetic" \| "stickers" \| "bands"/]) {
+    assert.match(MOTION_DESIGNER_PROMPT, told);
+  }
+  // A pictogram goes with its word, never an icon floating on its own (what looks cheap).
+  assert.match(MOTION_DESIGNER_PROMPT, /never an icon floating on its own/);
+});

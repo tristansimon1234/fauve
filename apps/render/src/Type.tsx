@@ -1,7 +1,24 @@
-import React, { useId, type CSSProperties, type ReactNode } from "react";
-import { Easing, interpolate, interpolateColors, random } from "remotion";
+import React, { useEffect, useId, useState, type CSSProperties, type ReactNode } from "react";
+import { continueRender, delayRender, Easing, interpolate, interpolateColors, random } from "remotion";
 import { Fit } from "./Fit";
+import {
+  capsuleRing,
+  cellsRing,
+  handBreak,
+  handLine,
+  handPace,
+  handSlots,
+  handStrays,
+  loopRing,
+  placeWords,
+  plainLetters,
+  strokeTexture,
+  typedState,
+  type Spot as StrokeStart,
+  type Turn,
+} from "./handmade";
 import type { Box, KitHooks } from "./Kit";
+import { PICTOS, pathLength, pictoFor } from "./pictos";
 
 // The text and materials kit of the animations (lot 2, after the layout kit): texts that decode, type
 // themselves, rise word by word or count, words spread on the edges of the frame, letters pressed into
@@ -133,6 +150,12 @@ type TypeOnProps = {
   jitter?: number;
   caret?: "none" | "bar" | "block" | "underscore";
   caretColor?: string;
+  /**
+   * From this frame the cursor goes back and eats the text from its end, `speed` letters a second (14: a key held
+   * down), down to `keep` letters, or to the start of the text it keeps (her first name kept, her last name eaten);
+   * what is eaten leaves the page. Typing stops when it starts.
+   */
+  erase?: { at: number; speed?: number; keep?: number | string };
   style?: CSSProperties;
   seed?: string;
 };
@@ -150,16 +173,21 @@ export function typingTimes(units: string[], perSecond: number, jitter: number, 
 }
 
 function TypeOnOf(hooks: KitHooks) {
-  return function TypeOn({ text, at = 0, speed = 4.5, by = "letter", jitter = 0.6, caret = "none", caretColor, style, seed = "type" }: TypeOnProps) {
+  return function TypeOn({ text, at = 0, speed = 4.5, by = "letter", jitter = 0.6, caret = "none", caretColor, erase, style, seed = "type" }: TypeOnProps) {
     const frame = hooks.useCurrentFrame();
     if (frame < at) return null;
-    const units = by === "word" ? text.split(/(\s+)/).filter(Boolean) : letters(text);
+    const split = (s: string) => (by === "word" ? s.split(/(\s+)/).filter(Boolean) : letters(s));
+    const units = split(text);
     const times = typingTimes(units, speed, jitter, seed);
     const t = frame - at;
-    let shown = 0;
-    while (shown < units.length && times[shown]! <= t) shown++;
-    const done = shown >= units.length;
-    const blinkOn = !done || Math.floor((t - (times.at(-1) ?? 0)) / 15) % 2 === 0;
+    // What it keeps once erased: a number of units, or the start of its text.
+    const keep = !erase ? 0 : typeof erase.keep === "string" ? (text.startsWith(erase.keep) ? split(erase.keep).length : 0) : num(erase.keep, 0);
+    const state = typedState(times, t, erase && Number.isFinite(erase.at) ? { at: erase.at - at, perSecond: num(erase.speed, 14), keep } : undefined);
+    const shown = state.shown;
+    // Erasing, nothing more is typed: the rest of the text leaves the page with what is eaten.
+    const done = shown >= units.length || Boolean(erase && t >= erase.at - at);
+    // The caret holds still while the hand types or erases, and blinks once it rests.
+    const blinkOn = state.busy || Math.floor((t - state.since) / 15) % 2 === 0;
     const mark =
       caret !== "none" && blinkOn ? (
         <span style={{ display: "inline-block", width: 0, position: "relative" }}>
@@ -535,12 +563,17 @@ type CardProps = {
   jitter?: number;
   paper?: string;
   ink?: string;
+  /**
+   * Written by a hand that never repeats (Handwriting): each line filling the card's width (its own \n, else cut
+   * evenly, `lines` of them), the last one taller, each letter a little different, a marker's grain on the stroke.
+   */
+  hand?: boolean | { grain?: number; wobble?: number; bend?: number; last?: number; lines?: number };
   style?: CSSProperties;
   seed?: string;
 };
 
-function CardOf(hooks: KitHooks) {
-  return function Card({ text, at = 0, every = 10, cuts, wordsPerCut = 1, steps, box, tilt = -2, jitter = 1.2, paper = "#f6f3ec", ink = "#c8102e", style, seed = "card" }: CardProps) {
+function CardOf(hooks: KitHooks, Handwriting: ReturnType<typeof HandwritingOf>) {
+  return function Card({ text, at = 0, every = 10, cuts, wordsPerCut = 1, steps, box, tilt = -2, jitter = 1.2, paper = "#f6f3ec", ink = "#c8102e", hand, style, seed = "card" }: CardProps) {
     const frame = hooks.useCurrentFrame();
     const video = hooks.useVideoConfig();
     if (frame < at) return null;
@@ -579,15 +612,265 @@ function CardOf(hooks: KitHooks) {
           borderRadius: 4,
         }}
       >
-        <Fit
-          style={{ position: "absolute", left: b.w * 0.07, top: b.h * 0.08, width: b.w * 0.86, height: b.h * 0.84 }}
-          innerStyle={{ textAlign: "left", color: ink, fontSize: 92, lineHeight: 0.98, textTransform: "uppercase", ...style }}
-        >
-          <span>
-            {written}
-            {rest ? <span style={{ opacity: 0 }}>{rest}</span> : null}
-          </span>
-        </Fit>
+        {hand ? (
+          // Its lines written by hand, as many letters shown as the words written so far.
+          <Handwriting
+            // Its own line breaks when its steps write the same words.
+            text={handBreak(full.replace(/\s+/g, " ").trim() === text.replace(/\s+/g, " ").trim() ? text : full, typeof hand === "object" ? hand.lines : undefined).join("\n")}
+            box={{ x: b.w * 0.06, y: b.h * 0.07, w: b.w * 0.88, h: b.h * 0.86 }}
+            upTo={letters(written.replace(/\s+/g, " ").trim()).length}
+            color={ink}
+            {...(typeof hand === "object" ? { grain: hand.grain, wobble: hand.wobble, bend: hand.bend, last: hand.last } : {})}
+            style={{ textTransform: "uppercase", ...style }}
+            seed={seed}
+          />
+        ) : (
+          <Fit
+            style={{ position: "absolute", left: b.w * 0.07, top: b.h * 0.08, width: b.w * 0.86, height: b.h * 0.84 }}
+            innerStyle={{ textAlign: "left", color: ink, fontSize: 92, lineHeight: 0.98, textTransform: "uppercase", ...style }}
+          >
+            <span>
+              {written}
+              {rest ? <span style={{ opacity: 0 }}>{rest}</span> : null}
+            </span>
+          </Fit>
+        )}
+      </div>
+    );
+  };
+}
+
+// ——— Handwriting —————————————————————————————————————————————————————————————————————
+
+type HandwritingProps = {
+  /** What is written: its lines at its own \n (each one filling the width), else cut evenly between its words. */
+  text: string;
+  /** Where (px of the frame, or of the element it is laid in), its lines from top to bottom. */
+  box?: Box;
+  at?: number;
+  /** Its first n letters show (spaces counted, lines joined by one), the rest kept unseen in place… */
+  upTo?: number;
+  /** …or one more word every n frames from `at`; else the whole text. */
+  every?: number;
+  color?: string;
+  /** A dry marker's or a grease pencil's grain on the stroke, its rim darker (0: a clean line; 0.6). */
+  grain?: number;
+  /** How far each letter strays from the font: its size, its angle, its place (1; 0: the font as it is). */
+  wobble?: number;
+  /** How much its strokes themselves bend, each letter its own way (0 to 1; 0 by default: it costs a filter pass a frame). */
+  bend?: number;
+  /** The last line this many times as tall as the others (1.3: the name it ends on). */
+  last?: number;
+  /** Lines to cut a text without \n into (by default about ten letters a line). */
+  lines?: number;
+  align?: "left" | "center" | "right";
+  style?: CSSProperties;
+  seed?: string;
+};
+
+/** The textures of a hand's stroke as PNG data URLs, made once each (in a browser; elsewhere, none). */
+const strokeTextures = new Map<string, string | null>();
+function strokeTextureUrl(kind: "slow" | "fine", size: number, seed: string, cells?: number): string | null {
+  if (typeof document === "undefined") return null;
+  const key = `${kind}|${size}|${seed}|${cells ?? ""}`;
+  if (strokeTextures.has(key)) return strokeTextures.get(key)!;
+  let url: string | null = null;
+  try {
+    const canvas = document.createElement("canvas");
+    canvas.width = canvas.height = size;
+    const ctx = canvas.getContext("2d");
+    if (ctx) {
+      const image = ctx.createImageData(size, size);
+      image.data.set(strokeTexture(kind, size, seed, cells));
+      ctx.putImageData(image, 0, 0);
+      url = canvas.toDataURL("image/png");
+    }
+  } catch {
+    url = null;
+  }
+  strokeTextures.set(key, url);
+  return url;
+}
+/** Each texture decoded once: an feImage not decoded yet draws nothing, so the first image waits for it. */
+const decodedTextures = new Map<string, Promise<void>>();
+const decodeTexture = (url: string) => {
+  const known = decodedTextures.get(url);
+  if (known) return known;
+  const image = new Image();
+  image.src = url;
+  const done = image.decode().catch(() => undefined);
+  decodedTextures.set(url, done);
+  return done;
+};
+
+/**
+ * A text written by hand that never repeats (« Carte au feutre »: « PUT THAT / PHONE DOWN / & COME TO / BURGER NIGHT »
+ * in red grease pencil): each line fits the width of its box, the last one taller; each letter a little different from
+ * the last time it was written (its height, width, angle and place), each line a little crooked; one SVG filter over
+ * the whole gives the stroke a dry grain, its rim darker, and with `bend` bends each letter its own way (a slow noise:
+ * no letter sits on the same part of it). Its noises are small textures made once, never recomputed at every image.
+ * In the font it is given (a handwritten one: Covered By Your Grace, Caveat Brush, Permanent Marker…).
+ */
+function HandwritingOf(hooks: KitHooks) {
+  return function Handwriting({ text, box, at = 0, upTo, every, color = "#b20b21", grain = 0.6, wobble = 1, bend = 0, last = 1.3, lines, align = "left", style, seed = "hand" }: HandwritingProps) {
+    const frame = hooks.useCurrentFrame();
+    const video = hooks.useVideoConfig();
+    const id = useId().replace(/[^a-zA-Z0-9_-]/g, "");
+    // Its stroke's textures, made once for its seed (a slow noise that bends its letters, a fine grain), decoded before an image is taken.
+    const slowUrl = num(bend, 0) > 0 ? strokeTextureUrl("slow", 48, seed, 10) : null;
+    const fineUrl = num(grain, 0.6) > 0 ? strokeTextureUrl("fine", 128, seed) : null;
+    const [handle] = useState(() => (slowUrl || fineUrl ? delayRender("handwriting textures", { timeoutInMilliseconds: 20000 }) : null));
+    useEffect(() => {
+      if (handle === null) return;
+      let released = false;
+      const release = () => {
+        if (released) return;
+        released = true;
+        continueRender(handle);
+      };
+      Promise.all([slowUrl, fineUrl].filter((u): u is string => Boolean(u)).map(decodeTexture)).then(release);
+      return release;
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+    if (frame < at) return null;
+    const b = box ?? { x: video.width * 0.12, y: video.height * 0.3, w: video.width * 0.76, h: video.height * 0.3 };
+    const rows = handBreak(text, lines);
+    const slots = handSlots(rows.length, b.h, num(last, 1.3));
+    const w = Math.max(0, num(wobble, 1));
+    const g = Math.max(0, Math.min(1, num(grain, 0.6)));
+    // How many letters show: spaces counted, its lines joined by one space (the words written so far).
+    const total = letters(rows.join(" ")).length;
+    const words = rows.join(" ").split(" ");
+    const shown =
+      upTo !== undefined && Number.isFinite(upTo)
+        ? upTo
+        : every && every > 0
+          ? letters(words.slice(0, Math.floor((frame - at) / every) + 1).join(" ")).length
+          : total;
+    // The textures at the scale of its letters (a line's height): the slow noise over the whole box, the grain tiled.
+    const unit = slots[0]?.h ?? b.h;
+    const tile = Math.round(128 * Math.max(1, Math.min(4, unit / 56)));
+    const dark = interpolateColors(0.38, [0, 1], [color, "#000000"]);
+    const bent = Math.max(0, Math.min(1, num(bend, 0)));
+    const bends = bent > 0 && slowUrl;
+    const dry = g > 0 && fineUrl;
+    let index = 0;
+    return (
+      <div
+        style={{
+          position: "absolute",
+          left: b.x,
+          top: b.y,
+          width: b.w,
+          height: b.h,
+          filter: bends || dry ? `url(#h${id})` : undefined,
+        }}
+      >
+        {bends || dry ? (
+          <svg width={0} height={0} style={{ position: "absolute" }} aria-hidden="true">
+            {/* Each result is used once (the filter's steps are not shared: a result used twice is computed twice, and
+                bending the letters first then graining them cost three times their sum): the grain and the rim on
+                the letters as they are, then one bend of the whole at the end. */}
+            <filter id={`h${id}`} x="-6%" y="-10%" width="112%" height="120%" colorInterpolationFilters="sRGB">
+              {dry ? (
+                <>
+                  <feGaussianBlur in="SourceGraphic" stdDeviation={Math.max(0.6, unit * 0.012).toFixed(2)} result="soft" />
+                  <feImage href={fineUrl} x={0} y={0} width={tile} height={tile} preserveAspectRatio="none" result="grain" />
+                  <feTile in="grain" result="fine" />
+                  {/* A dry stroke: the grain eats its edges (where its blurred self thins) far more than its middle. */}
+                  <feComposite in="soft" in2="fine" operator="arithmetic" k1={0} k2={2.6} k3={-1.2 * g} k4={-(0.9 + 0.2 * g)} result="mask" />
+                  {/* Its rim darker where the ink dries: its colour, and a darker one where the stroke thins. */}
+                  <feComposite in="soft" in2="soft" operator="arithmetic" k1={0} k2={-1} k3={0} k4={1} result="thin" />
+                  <feFlood floodColor={color} result="ink" />
+                  <feFlood floodColor={dark} floodOpacity={0.55 + 0.4 * g} result="dark" />
+                  <feComposite in="dark" in2="thin" operator="in" result="rim" />
+                  <feMerge result="tinted">
+                    <feMergeNode in="ink" />
+                    <feMergeNode in="rim" />
+                  </feMerge>
+                  <feComposite in="tinted" in2="mask" operator="in" result="inked" />
+                </>
+              ) : null}
+              {bends ? (
+                <>
+                  <feImage href={slowUrl} x={-b.w * 0.06} y={-b.h * 0.1} width={b.w * 1.12} height={b.h * 1.2} preserveAspectRatio="none" result="slow" />
+                  <feDisplacementMap in={dry ? "inked" : "SourceGraphic"} in2="slow" scale={(unit * 0.05 * bent).toFixed(2)} xChannelSelector="R" yChannelSelector="G" />
+                </>
+              ) : null}
+            </filter>
+          </svg>
+        ) : null}
+        {rows.map((row, li) => {
+          const slot = slots[li]!;
+          const chars = letters(row);
+          const strays = handStrays(chars.length, `${seed}-${li}`, random, w);
+          const crooked = handLine(seed, li, random, w);
+          const start = index;
+          index += chars.length + 1;
+          // The last line (the name it ends on) in tighter letters, so it comes out bigger even when it is long.
+          const tight = li === rows.length - 1 && rows.length > 1 && num(last, 1.3) > 1 ? "-0.04em" : undefined;
+          // Each line fills the width: its box tall enough that only the width limits it (a handwritten font's line is
+          // much taller than its capitals), its size at most the one whose capitals fill the slot (about 0.72 em), and
+          // from a size its letters about fill (FitText shrinks to 0.3 at most: a wide marker would stay too big).
+          return (
+            <Fit
+              key={li}
+              style={{ position: "absolute", left: 0, top: slot.top - slot.h, width: b.w, height: slot.h * 3 }}
+              innerStyle={{
+                fontSize: Math.min((slot.h / 0.72) * 0.92, b.w / (Math.max(1, chars.length) * 0.38)),
+                lineHeight: 1,
+                whiteSpace: "nowrap",
+                color,
+                alignItems: align === "left" ? "flex-start" : align === "right" ? "flex-end" : "center",
+                textAlign: align,
+                ...style,
+              }}
+            >
+              <span style={{ position: "relative", display: "inline-block", whiteSpace: "nowrap", transform: `translateY(${crooked.shift}em) rotate(${crooked.tilt.toFixed(2)}deg)` }}>
+                {/* Its letters, each its own drawing (a letter alone is a mark to the scene check)… */}
+                <span data-fauve-decor="" style={{ display: "inline-block", whiteSpace: "nowrap" }}>
+                  {chars.map((c, ci) => {
+                    const s = strays[ci]!;
+                    return (
+                      <span
+                        key={ci}
+                        style={{
+                          display: "inline-block",
+                          whiteSpace: "pre",
+                          marginRight: tight,
+                          transformOrigin: "50% 75%",
+                          transform: `translate(${s.dx.toFixed(3)}em, ${s.dy.toFixed(3)}em) rotate(${s.rotate.toFixed(2)}deg) scale(${s.sx.toFixed(3)}, ${s.sy.toFixed(3)})`,
+                          opacity: start + ci < shown ? 1 : 0,
+                        }}
+                      >
+                        {c}
+                      </span>
+                    );
+                  })}
+                </span>
+                {/* …and the words written so far, unseen over them, which the scene check reads as a text (its place, its size). */}
+                {shown > start ? (
+                  <span
+                    style={{
+                      position: "absolute",
+                      left: 0,
+                      top: 0,
+                      whiteSpace: "pre",
+                      letterSpacing: tight,
+                      color: "transparent",
+                      WebkitTextFillColor: "transparent",
+                      WebkitTextStroke: "0",
+                      textShadow: "none",
+                      pointerEvents: "none",
+                    }}
+                  >
+                    {chars.slice(0, Math.max(0, shown - start)).join("")}
+                  </span>
+                ) : null}
+              </span>
+            </Fit>
+          );
+        })}
       </div>
     );
   };
@@ -596,19 +879,30 @@ function CardOf(hooks: KitHooks) {
 // ——— Scribble ————————————————————————————————————————————————————————————————————————
 
 type Point = { x: number; y: number };
-type ScribbleKind = "loop" | "capsule" | "underline" | "strike" | "zigzag" | "arrow" | "cross" | "tick" | "star" | "scribble";
+type ScribbleKind = "loop" | "capsule" | "cells" | "underline" | "strike" | "zigzag" | "arrow" | "cross" | "tick" | "star" | "scribble";
 type ScribbleProps = {
   kind?: ScribbleKind;
   /** What it is drawn around, under or through (px of the frame). */
   box?: Box;
+  /** For cells: the boxes of the rows it goes round in one stroke, one under the other (px: a word over two rows of a grid). */
+  rows?: Box[];
   /** For an arrow. */
   from?: Point;
   to?: Point;
   /** A capsule (or a loop) along this angle, degrees: a word written on a diagonal. */
   angle?: number;
   at?: number;
-  /** Frames to draw it (14: a hand draws a loop in about half a second). */
+  /** Frames to draw it (14: a hand draws a loop in about half a second)… */
   frames?: number;
+  /**
+   * …or a hand's pace, px an image on average (the frame's px: about a letter every 5 images round a word, 20 to 25 px
+   * round letters of 110): no easing, slower in the turns, a little faster on the way back; Scribble.frames(props)
+   * says how long it takes, to start the next one as it closes.
+   */
+  speed?: number;
+  /** Where a loop, a capsule or cells start (top-left: just above the first letter) and which way they turn (ccw, like the hand of « Mots mêlés »). */
+  start?: StrokeStart;
+  direction?: Turn;
   color?: string;
   width?: number;
   /** How shaky the hand is (1). */
@@ -636,8 +930,19 @@ function smooth(points: Point[]): string {
   return d;
 }
 
+type ScribbleShape = { from?: Point; to?: Point; angle?: number; wobble?: number; seed: string; start?: StrokeStart; direction?: Turn; rows?: Box[] };
+
 /** The hand-drawn path of a scribble, in px of the frame. */
-export function scribblePath(kind: ScribbleKind, box: Box, opts: { from?: Point; to?: Point; angle?: number; wobble?: number; seed: string }): string {
+export function scribblePath(kind: ScribbleKind, box: Box, opts: ScribbleShape): string {
+  return scribbleStroke(kind, box, opts).d;
+}
+
+/**
+ * A scribble's path and the points it goes through, stroke by stroke (a cross has two), for a hand's pace along them;
+ * `closed` when it goes round (a hand comes back faster). With `start` or `direction`, a loop or a capsule starts
+ * there and turns that way, closing on its start (« Mots mêlés »); without, the shapes are drawn as they always were.
+ */
+export function scribbleStroke(kind: ScribbleKind, box: Box, opts: ScribbleShape): { d: string; strokes: Point[][]; closed: boolean } {
   const { x, y, w, h } = box;
   const cx = x + w / 2;
   const cy = y + h / 2;
@@ -653,9 +958,20 @@ export function scribblePath(kind: ScribbleKind, box: Box, opts: { from?: Point;
   const rot = ((opts.angle ?? 0) * Math.PI) / 180;
   const turn = (p: Point): Point => ({ x: cx + (p.x - cx) * Math.cos(rot) - (p.y - cy) * Math.sin(rot), y: cy + (p.x - cx) * Math.sin(rot) + (p.y - cy) * Math.cos(rot) });
   const shake = (ps: Point[]) => ps.map((p, i) => ({ x: p.x + jit(i, "x"), y: p.y + jit(i, "y") }));
+  const one = (pts: Point[], closed: boolean) => ({ d: smooth(pts), strokes: [pts], closed });
+  // A hand that starts where it is told and goes the way it is told (the loops of « Mots mêlés »).
+  const handed = opts.start !== undefined || opts.direction !== undefined;
+  const start = opts.start ?? "top-left";
+  const direction = opts.direction ?? "ccw";
   switch (kind) {
+    case "cells": {
+      // One stroke round several rows of a grid: the rounded outline of their cells, in steps (never turned).
+      const rows = opts.rows?.length ? opts.rows : [box];
+      return one(shake(cellsRing(rows, start, direction)), true);
+    }
     case "loop":
     case "scribble": {
+      if (kind === "loop" && handed) return one(shake(loopRing(box, start, direction).map(turn)), true);
       const turns = kind === "scribble" ? 2.4 : 1.12;
       const n = Math.round(44 * turns);
       const pts: Point[] = [];
@@ -664,9 +980,10 @@ export function scribblePath(kind: ScribbleKind, box: Box, opts: { from?: Point;
         const grow = 1 + (kind === "scribble" ? 0.08 * Math.sin(i * 0.7) : 0.05 * (i / n));
         pts.push(turn({ x: cx + Math.cos(a) * (w / 2) * 1.14 * grow, y: cy + Math.sin(a) * (h / 2) * 1.3 * grow }));
       }
-      return smooth(shake(pts));
+      return one(shake(pts), true);
     }
     case "capsule": {
+      if (handed) return one(shake(capsuleRing(box, start, direction).map(turn)), true);
       // A stadium around a word: two half circles joined by two straight sides, ending a little past its start.
       const r = h / 2;
       const half = Math.max(0, w / 2 - r);
@@ -688,20 +1005,23 @@ export function scribblePath(kind: ScribbleKind, box: Box, opts: { from?: Point;
         }
         pts.push(turn(p));
       }
-      return smooth(shake(pts));
+      return one(shake(pts), true);
     }
     case "underline":
-      return smooth(shake([0, 0.25, 0.5, 0.75, 1].map((t) => turn({ x: x - w * 0.03 + t * w * 1.06, y: y + h * 1.04 + Math.sin(t * Math.PI) * h * 0.05 - t * h * 0.03 }))));
+      return one(shake([0, 0.25, 0.5, 0.75, 1].map((t) => turn({ x: x - w * 0.03 + t * w * 1.06, y: y + h * 1.04 + Math.sin(t * Math.PI) * h * 0.05 - t * h * 0.03 }))), false);
     case "strike":
-      return smooth(shake([0, 0.33, 0.66, 1].map((t) => turn({ x: x - w * 0.03 + t * w * 1.06, y: cy + h * 0.06 - t * h * 0.12 }))));
+      return one(shake([0, 0.33, 0.66, 1].map((t) => turn({ x: x - w * 0.03 + t * w * 1.06, y: cy + h * 0.06 - t * h * 0.12 }))), false);
     case "zigzag": {
       const teeth = Math.max(3, Math.round(w / Math.max(20, h * 0.6)));
-      return smooth(shake(Array.from({ length: teeth * 2 + 1 }, (_, i) => turn({ x: x + (i / (teeth * 2)) * w, y: i % 2 ? y + h * 0.15 : y + h * 0.85 }))));
+      return one(shake(Array.from({ length: teeth * 2 + 1 }, (_, i) => turn({ x: x + (i / (teeth * 2)) * w, y: i % 2 ? y + h * 0.15 : y + h * 0.85 }))), false);
     }
-    case "cross":
-      return `${smooth(shake([turn({ x, y }), turn({ x: cx, y: cy }), turn({ x: x + w, y: y + h })]))} ${smooth(shake([turn({ x: x + w, y }), turn({ x: cx, y: cy }), turn({ x, y: y + h })]))}`;
+    case "cross": {
+      const first = shake([turn({ x, y }), turn({ x: cx, y: cy }), turn({ x: x + w, y: y + h })]);
+      const second = shake([turn({ x: x + w, y }), turn({ x: cx, y: cy }), turn({ x, y: y + h })]);
+      return { d: `${smooth(first)} ${smooth(second)}`, strokes: [first, second], closed: false };
+    }
     case "tick":
-      return smooth(shake([turn({ x, y: y + h * 0.55 }), turn({ x: x + w * 0.38, y: y + h }), turn({ x: x + w, y })]));
+      return one(shake([turn({ x, y: y + h * 0.55 }), turn({ x: x + w * 0.38, y: y + h }), turn({ x: x + w, y })]), false);
     case "star": {
       const pts: Point[] = [];
       for (let i = 0; i <= 8; i++) {
@@ -709,7 +1029,7 @@ export function scribblePath(kind: ScribbleKind, box: Box, opts: { from?: Point;
         const r = i % 2 ? 0.18 : 0.5;
         pts.push({ x: cx + Math.cos(a) * w * r, y: cy + Math.sin(a) * h * r });
       }
-      return pts.map((p, i) => `${i ? "L" : "M"} ${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(" ");
+      return { d: pts.map((p, i) => `${i ? "L" : "M"} ${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(" "), strokes: [pts], closed: true };
     }
     case "arrow":
     default: {
@@ -720,34 +1040,87 @@ export function scribblePath(kind: ScribbleKind, box: Box, opts: { from?: Point;
       const ny = (b.x - a.x) / len;
       const bend = len * 0.12;
       const mid = { x: (a.x + b.x) / 2 + nx * bend, y: (a.y + b.y) / 2 + ny * bend };
-      const shaft = smooth(shake([a, { x: (a.x + mid.x) / 2 + nx * bend * 0.4, y: (a.y + mid.y) / 2 + ny * bend * 0.4 }, mid, b]));
+      const shaftPts = shake([a, { x: (a.x + mid.x) / 2 + nx * bend * 0.4, y: (a.y + mid.y) / 2 + ny * bend * 0.4 }, mid, b]);
+      const shaft = smooth(shaftPts);
       const dir = Math.atan2(b.y - mid.y, b.x - mid.x);
       const head = Math.min(60, len * 0.18);
       const wing = (s: number) => ({ x: b.x - Math.cos(dir + s * 0.5) * head, y: b.y - Math.sin(dir + s * 0.5) * head });
       const w1 = wing(1);
       const w2 = wing(-1);
-      return `${shaft} M ${w1.x.toFixed(1)} ${w1.y.toFixed(1)} L ${b.x.toFixed(1)} ${b.y.toFixed(1)} L ${w2.x.toFixed(1)} ${w2.y.toFixed(1)}`;
+      return {
+        d: `${shaft} M ${w1.x.toFixed(1)} ${w1.y.toFixed(1)} L ${b.x.toFixed(1)} ${b.y.toFixed(1)} L ${w2.x.toFixed(1)} ${w2.y.toFixed(1)}`,
+        strokes: [shaftPts, [w1, b, w2]],
+        closed: false,
+      };
     }
   }
 }
 
+/** The box a scribble is drawn in: its own, its rows' bounds for cells, or a default one in the frame. */
+function scribbleBox(kind: ScribbleKind, box: Box | undefined, rows: Box[] | undefined, video: { width: number; height: number }): Box {
+  if (box) return box;
+  if (kind === "cells" && rows?.length) {
+    const x0 = Math.min(...rows.map((r) => r.x));
+    const y0 = Math.min(...rows.map((r) => r.y));
+    return { x: x0, y: y0, w: Math.max(...rows.map((r) => r.x + r.w)) - x0, h: Math.max(...rows.map((r) => r.y + r.h)) - y0 };
+  }
+  return { x: video.width * 0.3, y: video.height * 0.4, w: video.width * 0.4, h: video.height * 0.08 };
+}
+
+/** A hand's pace along a scribble: a turn is measured against its rows' height for cells, its own half height otherwise. */
+const scribblePace = (kind: ScribbleKind, stroke: ReturnType<typeof scribbleStroke>, b: Box, rows: Box[] | undefined, speed: number) =>
+  handPace(stroke.strokes, speed, { closed: stroke.closed, radius: kind === "cells" && rows?.length ? Math.min(...rows.map((r) => r.h)) / 2 : Math.max(1, Math.min(b.w, b.h) / 2) });
+
 function ScribbleOf(hooks: KitHooks) {
-  return function Scribble({ kind = "loop", box, from, to, angle, at = 0, frames = 14, color = "#ffffff", width = 6, wobble = 1, boil = 0, out, seed = "scribble" }: ScribbleProps) {
+  const Scribble = function Scribble({
+    kind = "loop",
+    box,
+    rows,
+    from,
+    to,
+    angle,
+    at = 0,
+    frames = 14,
+    speed,
+    start,
+    direction,
+    color = "#ffffff",
+    width = 6,
+    wobble = 1,
+    boil = 0,
+    out,
+    seed = "scribble",
+  }: ScribbleProps) {
     const frame = hooks.useCurrentFrame();
     const video = hooks.useVideoConfig();
     if (frame < at) return null;
-    const b = box ?? { x: video.width * 0.3, y: video.height * 0.4, w: video.width * 0.4, h: video.height * 0.08 };
+    const b = scribbleBox(kind, box, rows, video);
     const tick = boil > 0 ? Math.floor((frame - at) / boil) : 0;
-    const d = scribblePath(kind, b, { from, to, angle, wobble, seed: `${seed}-${tick}` });
-    const drawn = interpolate(frame, [at, at + Math.max(1, frames)], [0, 1], { ...clamp, easing: Easing.out(Easing.cubic) });
+    const stroke = scribbleStroke(kind, b, { from, to, angle, wobble, seed: `${seed}-${tick}`, start, direction, rows });
+    // At a hand's pace (no easing, slower in the turns), or in its frames with an ease-out as it always was.
+    const drawn =
+      speed !== undefined && speed > 0
+        ? scribblePace(kind, stroke, b, rows, speed).drawn(frame - at)
+        : interpolate(frame, [at, at + Math.max(1, frames)], [0, 1], { ...clamp, easing: Easing.out(Easing.cubic) });
     const fade = out === undefined ? 1 : interpolate(frame, [out, out + 8], [1, 0], clamp);
     if (fade <= 0) return null;
     return (
       <svg width={video.width} height={video.height} viewBox={`0 0 ${video.width} ${video.height}`} style={{ position: "absolute", left: 0, top: 0, overflow: "visible", opacity: fade }} aria-hidden="true">
-        <path d={d} pathLength={1} fill="none" stroke={color} strokeWidth={width} strokeLinecap="round" strokeLinejoin="round" strokeDasharray="1 1" strokeDashoffset={1 - drawn} />
+        <path d={stroke.d} pathLength={1} fill="none" stroke={color} strokeWidth={width} strokeLinecap="round" strokeLinejoin="round" strokeDasharray="1 1" strokeDashoffset={1 - drawn} />
       </svg>
     );
   };
+  /** How many frames a scribble takes at a hand's pace (its `speed`), or its `frames`: to start the next one as it closes. */
+  const frames = (p: ScribbleProps) => {
+    // Its default box is the one of a 1080 × 1920 frame (a composition's size).
+    const video = { width: 1080, height: 1920 };
+    const kind = p.kind ?? "loop";
+    if (!(p.speed !== undefined && p.speed > 0)) return Math.max(1, num(p.frames, 14));
+    const b = scribbleBox(kind, p.box, p.rows, video);
+    const stroke = scribbleStroke(kind, b, { from: p.from, to: p.to, angle: p.angle, wobble: p.wobble ?? 1, seed: `${p.seed ?? "scribble"}-0`, start: p.start, direction: p.direction, rows: p.rows });
+    return Math.ceil(scribblePace(kind, stroke, b, p.rows, p.speed).frames);
+  };
+  return Object.assign(Scribble, { frames });
 }
 
 // ——— WordSearch ——————————————————————————————————————————————————————————————————————
@@ -755,13 +1128,21 @@ function ScribbleOf(hooks: KitHooks) {
 type WordSearchProps = {
   /** The words hidden in the grid, found one after the other. */
   words: string[];
+  /** Words of her world hidden in the grid too, never circled (along a row, down a column or a diagonal): « brioche », « cannelle ». */
+  decoys?: string[];
   cols?: number;
   rows?: number;
   at?: number;
-  /** Frames between two words found (60). */
+  /** Frames between two words found (60)… */
   every?: number;
-  /** Frames to draw the loop around a word (15). */
+  /** …and to draw the loop around a word (15); */
   loop?: number;
+  /**
+   * or a hand's pace: images a letter (5, « Mots mêlés »), each loop from just above its first letter, counterclockwise,
+   * at the speed of a hand, and the next one `lift` frames after it closes (4: the pen lifted).
+   */
+  pace?: number;
+  lift?: number;
   /** The grid's letters; the found words' letters; the loops. */
   color?: string;
   found?: string;
@@ -773,40 +1154,25 @@ type WordSearchProps = {
   seed?: string;
 };
 
-const plainLetters = (w: string) =>
-  w
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
-    .toUpperCase()
-    .replace(/[^A-Z0-9]/g, "");
-const DIRS = { h: [1, 0], v: [0, 1], d: [1, 1], u: [1, -1] } as const;
-type Placed = { word: string; cells: [number, number][]; dir: keyof typeof DIRS };
-
-/** Where each word goes in the grid (cells inside the allowed part only, crossings only on the same letter). */
-export function placeWords(words: string[], cols: number, rows: number, allowed: (c: number, r: number) => boolean, seed: string): Placed[] {
-  const grid = new Map<string, string>();
-  const placed: Placed[] = [];
-  words.forEach((raw, wi) => {
-    const word = plainLetters(raw);
-    if (!word) return;
-    for (let attempt = 0; attempt < 400; attempt++) {
-      const dir = (["h", "v", "d", "u"] as const)[Math.floor(random(`${seed}-d-${wi}-${attempt}`) * (attempt < 200 ? 4 : 1))]!;
-      const [dx, dy] = DIRS[dir];
-      const c0 = Math.floor(random(`${seed}-c-${wi}-${attempt}`) * cols);
-      const r0 = Math.floor(random(`${seed}-r-${wi}-${attempt}`) * rows);
-      const cells = letters(word).map((_, i) => [c0 + dx * i, r0 + dy * i] as [number, number]);
-      const fits = cells.every(([c, r], i) => c >= 0 && c < cols && r >= 0 && r < rows && allowed(c, r) && (grid.get(`${c},${r}`) ?? word[i]) === word[i]);
-      if (!fits) continue;
-      cells.forEach(([c, r], i) => grid.set(`${c},${r}`, word[i]!));
-      placed.push({ word, cells, dir });
-      return;
-    }
-  });
-  return placed;
-}
-
 function WordSearchOf(hooks: KitHooks, Scribble: ReturnType<typeof ScribbleOf>) {
-  return function WordSearch({ words, cols, rows, at = 0, every = 60, loop = 15, color = "rgba(255,255,255,0.62)", found = "#ffffff", stroke = "#ffffff", strokeWidth = 4, box, style, seed = "words" }: WordSearchProps) {
+  return function WordSearch({
+    words,
+    decoys = [],
+    cols,
+    rows,
+    at = 0,
+    every = 60,
+    loop = 15,
+    pace,
+    lift = 4,
+    color = "rgba(255,255,255,0.62)",
+    found = "#ffffff",
+    stroke = "#ffffff",
+    strokeWidth = 4,
+    box,
+    style,
+    seed = "words",
+  }: WordSearchProps) {
     const frame = hooks.useCurrentFrame();
     const video = hooks.useVideoConfig();
     if (frame < at) return null;
@@ -822,8 +1188,12 @@ function WordSearchOf(hooks: KitHooks, Scribble: ReturnType<typeof ScribbleOf>) 
       const p = center(c, r);
       return p.x - cw * 0.4 >= safe.x && p.x + cw * 0.4 <= safe.x + safe.w && p.y - ch * 0.4 >= safe.y && p.y + ch * 0.4 <= safe.y + safe.h;
     };
-    const placed = placeWords(words, nc, nr, allowed, seed);
+    const grid = new Map<string, string>();
+    const placed = placeWords(words, nc, nr, allowed, seed, random, grid);
     const taken = new Set(placed.flatMap((p) => p.cells.map(([c, r]) => `${c},${r}`)));
+    // Her other words, hidden among the letters and never circled: anywhere in the grid, crossing hers on a shared letter.
+    const hidden = decoys.length ? placeWords(decoys, nc, nr, () => true, `${seed}-decoy`, random, grid) : [];
+    const decoyAt = new Map(hidden.flatMap((p) => p.cells.map(([c, r], k) => [`${c},${r}`, p.word[k]!] as const)));
     const size = Math.min(cw, ch) * 0.46;
     const cell = (c: number, r: number, ch2: string, extra?: CSSProperties) => {
       const p = center(c, r);
@@ -837,37 +1207,100 @@ function WordSearchOf(hooks: KitHooks, Scribble: ReturnType<typeof ScribbleOf>) 
     for (let r = 0; r < nr; r++)
       for (let c = 0; c < nc; c++) {
         if (taken.has(`${c},${r}`)) continue;
-        filler.push(cell(c, r, "ABCDEFGHIJKLMNOPQRSTUVWXYZ"[Math.floor(random(`${seed}-l-${c}-${r}`) * 26)]!));
+        filler.push(cell(c, r, decoyAt.get(`${c},${r}`) ?? "ABCDEFGHIJKLMNOPQRSTUVWXYZ"[Math.floor(random(`${seed}-l-${c}-${r}`) * 26)]!));
       }
+    // At a hand's pace, each loop starts as the one before closes, the pen lifted a moment.
+    const handed = pace !== undefined && pace > 0;
+    const speed = handed ? Math.min(cw, ch) / pace : undefined;
+    let next = at;
     return (
       <div style={{ position: "absolute", inset: 0 }}>
         <div data-fauve-decor="" style={{ position: "absolute", inset: 0 }}>
           {filler}
         </div>
         {placed.map((p, i) => {
-          const when = at + i * every;
-          const isFound = frame >= when + loop * 0.6;
           const [a, b] = [center(...p.cells[0]!), center(...p.cells.at(-1)!)];
           const length = Math.hypot(b.x - a.x, b.y - a.y) + Math.min(cw, ch) * 0.95;
           const thick = Math.min(cw, ch) * 0.78;
+          const ring = { x: (a.x + b.x) / 2 - length / 2, y: (a.y + b.y) / 2 - thick / 2, w: length, h: thick };
+          const angle = (Math.atan2(b.y - a.y, b.x - a.x) * 180) / Math.PI;
+          const hand = handed ? ({ speed, start: "top-left", direction: "ccw" } as const) : {};
+          const takes = handed ? Scribble.frames({ kind: "capsule", box: ring, angle, wobble: 0.5, seed: `${seed}-loop-${i}`, ...hand }) : loop;
+          const when = handed ? next : at + i * every;
+          next = when + takes + Math.max(0, lift);
+          const isFound = frame >= when + takes * 0.6;
           return (
             <React.Fragment key={p.word + i}>
               <div style={{ position: "absolute", inset: 0 }}>{p.cells.map(([c, r], k) => cell(c, r, p.word[k]!, isFound ? { color: found } : undefined))}</div>
-              <Scribble
-                kind="capsule"
-                box={{ x: (a.x + b.x) / 2 - length / 2, y: (a.y + b.y) / 2 - thick / 2, w: length, h: thick }}
-                angle={(Math.atan2(b.y - a.y, b.x - a.x) * 180) / Math.PI}
-                at={when}
-                frames={loop}
-                color={stroke}
-                width={strokeWidth}
-                wobble={0.5}
-                seed={`${seed}-loop-${i}`}
-              />
+              <Scribble kind="capsule" box={ring} angle={angle} at={when} frames={loop} color={stroke} width={strokeWidth} wobble={0.5} seed={`${seed}-loop-${i}`} {...hand} />
             </React.Fragment>
           );
         })}
       </div>
+    );
+  };
+}
+
+// ——— Picto ———————————————————————————————————————————————————————————————————————————
+
+type PictoProps = {
+  /** Its trade or what it shows, in French or English (« café », « fleuriste », « coiffure », « scissors »), or its name (pictos.ts). */
+  name: string;
+  /** Where (px), drawn square in the middle of it; without a box, inline in the text it sits in, `size` high (1em). */
+  box?: Box;
+  size?: number | string;
+  at?: number;
+  /** Frames it takes to draw itself, stroke after stroke (20; 0: whole at once)… */
+  frames?: number;
+  /** …or a hand's pace, px an image. */
+  speed?: number;
+  /** Its stroke: the text's colour by default (currentColor), its width in px with a box (5.5 % of its size; inline, 8.5 %). */
+  color?: string;
+  width?: number;
+  /** Fades out from this frame. */
+  out?: number;
+};
+
+/** Each pictogram's strokes' lengths, measured once. */
+const pictoLengths = new Map<string, number[]>();
+
+/**
+ * A line pictogram of her trade (a café's cup, a florist's tulip, a hairdresser's scissors, a studio's lotus, a bar's
+ * cocktail…: pictos.ts), drawn stroke after stroke like a line by hand, in the colour of the text it goes with. Nothing
+ * when no pictogram stands for that name.
+ */
+function PictoOf(hooks: KitHooks) {
+  return function Picto({ name, box, size = "1em", at = 0, frames = 20, speed, color = "currentColor", width, out }: PictoProps) {
+    const frame = hooks.useCurrentFrame();
+    if (frame < at) return null;
+    const key = pictoFor(String(name ?? ""));
+    const picto = key ? PICTOS[key] : undefined;
+    if (!key || !picto) return null;
+    const lengths = pictoLengths.get(key) ?? pictoLengths.set(key, picto.paths.map((d) => pathLength(d))).get(key)!;
+    const total = lengths.reduce((a, b) => a + b, 0);
+    const side = box ? Math.min(box.w, box.h) : null;
+    // Its stroke in the drawing's own units (100 a side): px given for a box; inline, close to the stem of its text.
+    const stroke = side ? (width !== undefined ? (width * 100) / side : 5.5) : 8.5;
+    const time = speed !== undefined && speed > 0 && side ? (total * side) / 100 / speed : Math.max(0, num(frames, 20));
+    const drawn = time > 0 ? Math.max(0, Math.min(1, (frame - at) / time)) : 1;
+    const fade = out === undefined ? 1 : interpolate(frame, [out, out + 8], [1, 0], clamp);
+    if (fade <= 0) return null;
+    let before = 0;
+    const place: CSSProperties =
+      box && side
+        ? { position: "absolute", left: box.x + (box.w - side) / 2, top: box.y + (box.h - side) / 2, width: side, height: side }
+        : { display: "inline-block", width: size, height: size, verticalAlign: "-0.12em" };
+    return (
+      <svg viewBox="0 0 100 100" style={{ overflow: "visible", opacity: fade, ...place }} aria-hidden="true">
+        <g fill="none" stroke={color} strokeWidth={stroke} strokeLinecap="round" strokeLinejoin="round">
+          {picto.paths.map((d, i) => {
+            const own = Math.max(0, Math.min(1, (drawn * total - before) / Math.max(1e-6, lengths[i]!)));
+            before += lengths[i]!;
+            // A stroke not started yet is not drawn at all (a round cap would leave a dot).
+            return own > 0 ? <path key={i} d={d} pathLength={1} strokeDasharray="1 1" strokeDashoffset={1 - own} /> : null;
+          })}
+        </g>
+      </svg>
     );
   };
 }
@@ -1060,6 +1493,7 @@ export function makeType(hooks: KitHooks) {
   const TypeOn = TypeOnOf(hooks);
   const Reveal = RevealOf(hooks);
   const Scribble = ScribbleOf(hooks);
+  const Handwriting = HandwritingOf(hooks);
   return {
     Decode,
     TypeOn,
@@ -1068,11 +1502,14 @@ export function makeType(hooks: KitHooks) {
     Edges: EdgesOf(hooks, Reveal, TypeOn, Decode),
     Paper,
     Emboss: EmbossOf(hooks),
-    Card: CardOf(hooks),
+    Card: CardOf(hooks, Handwriting),
     Scribble,
     WordSearch: WordSearchOf(hooks, Scribble),
     Kinetic: KineticOf(hooks),
     WordArt: WordArtOf(hooks),
     Burst: BurstOf(hooks),
+    // The hand-made pieces the models' fiches asked for (« Carte au feutre », « Silhouette et mot »).
+    Handwriting,
+    Picto: PictoOf(hooks),
   };
 }

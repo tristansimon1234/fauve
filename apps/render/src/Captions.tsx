@@ -1,6 +1,6 @@
-import { createContext, useContext, useMemo, type CSSProperties, type ReactNode } from "react";
+import { createContext, Fragment, useContext, useMemo, type CSSProperties, type ReactNode } from "react";
 import { AbsoluteFill, interpolate, useCurrentFrame, useVideoConfig } from "remotion";
-import { captionCards, cardAt, cardTop, labelSpot, strongSize, type CaptionCard, type CaptionStyle, type SpokenWord } from "./captions";
+import { BAND_LIMITS, bandLines, captionCards, cardAt, cardTop, labelSpot, strongSize, type CaptionCard, type CaptionStyle, type SpokenWord } from "./captions";
 
 // What is said, written like a creator does (plan.captions, lot 7): « kinetic », each phrase around the person, its
 // words arriving on the frame they are said, its strong word big in the brand's titles or a serif italic, the faces
@@ -117,10 +117,12 @@ function CaptionsAt(p: CaptionsProps & { frame: number; video: { width: number; 
     onFootage: p.look?.onFootage ?? inherited?.onFootage ?? p.look?.accent ?? inherited?.accent ?? "#ffffff",
     row: p.look?.row ?? inherited?.row ?? 0.64,
   };
-  const cards = useMemo(() => captionCards(p.words, fps, durationInFrames), [p.words, fps, durationInFrames]);
+  const bands = p.style === "bands";
+  const cards = useMemo(() => captionCards(p.words, fps, durationInFrames, bands ? BAND_LIMITS : undefined), [p.words, fps, durationInFrames, bands]);
   const card = cardAt(cards, frame);
   if (!card) return null;
   const k = width / 1080;
+  if (bands) return <Bands card={card} frame={frame} look={look} k={k} width={width} height={height} />;
   return (p.style ?? "kinetic") === "stickers" ? (
     <Labels card={card} frame={frame} look={look} k={k} width={width} height={height} />
   ) : (
@@ -279,5 +281,86 @@ function Labels({ card, frame, look, k, width, height }: { card: CaptionCard; fr
         })}
       </div>
     </AbsoluteFill>
+  );
+}
+
+/** The bands of a hook, as measured on « Face caméra et références »: black bands, the words to come grey, white once said. */
+const BAND = { size: 74, band: "#010101", pending: "#505050", said: "#ffffff", height: 1.24, pad: 0.16, width: 0.78 };
+
+/**
+ * A creator's hook on bands (« Face caméra et références », its first sentence): the whole phrase is there from its
+ * first word, in bold on black bands, one band a line, touching, centred on the row; the words still to come in grey,
+ * each turning white on the frame it is said. The first phrase comes in growing out of a blur (from 0.9 to 1.08 and
+ * back in 6 frames), the next ones replace it at once. Its lines are one sentence in the page (inline blocks): the
+ * scene check reads the phrase whole.
+ */
+function Bands({ card, frame, look, k, width, height }: { card: CaptionCard; frame: number; look: CaptionLook; k: number; width: number; height: number }) {
+  const size = BAND.size * k;
+  const line = Math.round(size * BAND.height);
+  const pad = size * BAND.pad;
+  const font = `700 {px} "${look.fonts.display}"`;
+  const measure = (s: string) => ((widthAt100(s, font) ?? [...s].length * 52) * size) / 100;
+  const lines = bandLines(
+    card.words.map((w) => measure(w.w)),
+    width * BAND.width - 2 * pad,
+    measure(" ") || size * 0.25,
+  );
+  const block = lines.length * line;
+  // Centred on its row, whole between the top margin and the apps' caption (74 % of the height).
+  const top = Math.max(0.08 * height, Math.min(0.74 * height - block, look.row * height - block / 2));
+  const local = frame - card.from;
+  const first = card.index === 0;
+  const grow = first ? interpolate(local, [0, 3, 6], [0.9, 1.08, 1], clamp) : 1;
+  const blur = first ? interpolate(local, [0, 3], [6 * k, 0], clamp) : 0;
+  return (
+    <div
+      style={{
+        position: "absolute",
+        left: 0,
+        right: 0,
+        top,
+        textAlign: "center",
+        fontSize: 0,
+        lineHeight: 0,
+        transform: grow !== 1 ? `scale(${grow.toFixed(3)})` : undefined,
+        filter: blur > 0.05 ? `blur(${blur.toFixed(2)}px)` : undefined,
+      }}
+    >
+      {lines.map((ids, li) => (
+        <Fragment key={li}>
+          {li ? (
+            <>
+              {" "}
+              <br />
+            </>
+          ) : null}
+          <span
+            style={{
+              display: "inline-block",
+              verticalAlign: "top",
+              background: BAND.band,
+              height: line,
+              lineHeight: `${line}px`,
+              padding: `0 ${pad.toFixed(1)}px`,
+              fontFamily: `"${look.fonts.display}", sans-serif`,
+              fontWeight: 700,
+              fontSize: size,
+              letterSpacing: "-0.01em",
+              whiteSpace: "pre",
+            }}
+          >
+            {ids.map((i, j) => {
+              const w = card.words[i]!;
+              return (
+                <Fragment key={i}>
+                  {j ? " " : ""}
+                  <span style={{ color: frame >= w.from ? BAND.said : BAND.pending }}>{w.w}</span>
+                </Fragment>
+              );
+            })}
+          </span>
+        </Fragment>
+      ))}
+    </div>
   );
 }

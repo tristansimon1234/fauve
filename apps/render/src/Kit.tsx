@@ -1,5 +1,6 @@
 import React, { type CSSProperties, type ReactNode } from "react";
 import { Easing, interpolate, random } from "remotion";
+import { almondPath } from "./handmade";
 
 // The layout kit of the animations (Tristan: « crée les outils toi-même, laisse pas faire l'API »):
 // tiles and strips, windows, stacks of photos and split screens, written once and tested, so that an
@@ -178,7 +179,7 @@ function TilesOf(hooks: KitHooks) {
 
 // ——— Window ——————————————————————————————————————————————————————————————————————————
 
-export type WindowReveal = "grow" | "iris" | "wipe-up" | "wipe-down" | "wipe-left" | "wipe-right" | "fade" | "cut";
+export type WindowReveal = "grow" | "iris" | "eye" | "wipe-up" | "wipe-down" | "wipe-left" | "wipe-right" | "fade" | "cut";
 
 type WindowProps = {
   /** Where it opens (px of the frame). */
@@ -186,7 +187,13 @@ type WindowProps = {
   /** The frame it starts opening at, and how long it takes (frames). */
   at?: number;
   open?: number;
+  /**
+   * How it opens: grows, an iris (a circle), an eye (an almond whose two lids part from the middle line: open, it is the
+   * almond inscribed in its box; moves to a box larger than the frame open it onto the whole picture), wipes, fades, cuts.
+   */
   reveal?: WindowReveal;
+  /** For an eye: how far each lid opens, upper and lower ([1, 0.2]: an eye narrowed from below). */
+  lids?: [number, number];
   /** Where it goes next: each move starts at its frame and eases to its box. */
   moves?: { at: number; frames?: number; box: Box }[];
   /** When it closes (the opening played backwards, or its own reveal). */
@@ -204,7 +211,7 @@ const lerpBox = (a: Box, b: Box, t: number): Box => ({ x: a.x + (b.x - a.x) * t,
 
 /** A window in the frame that opens, moves, grows or shrinks (into a card), and closes, showing another picture. */
 function WindowOf(hooks: KitHooks) {
-  return function Window({ box, at = 0, open = 12, reveal = "grow", moves = [], close, radius = 0, shadow = false, border, fit = "cover", children }: WindowProps) {
+  return function Window({ box, at = 0, open = 12, reveal = "grow", lids, moves = [], close, radius = 0, shadow = false, border, fit = "cover", children }: WindowProps) {
   const frame = hooks.useCurrentFrame();
   const video = hooks.useVideoConfig();
   let current = box;
@@ -219,13 +226,17 @@ function WindowOf(hooks: KitHooks) {
   if (shown <= 0) return null;
   const how = closing > 0 && close?.reveal ? close.reveal : reveal;
   const { x, y, w, h } = current;
+  // An eye: the almond its lids leave open (both ways when it closes with its own reveal).
+  const almond = how === "eye" ? almondPath(w, h, shown, lids && lids.length === 2 ? [num(lids[0], 1), num(lids[1], 1)] : [1, 1]) : null;
   // The part of the window that shows, as an inset of its box.
   const inset =
     how === "grow"
       ? `inset(${((1 - shown) * h) / 2}px ${((1 - shown) * w) / 2}px round ${radius}px)`
       : how === "iris"
         ? `circle(${shown * Math.hypot(w, h) * 0.5}px at 50% 50%)`
-        : how === "wipe-up"
+        : almond
+          ? `path('${almond}')`
+          : how === "wipe-up"
           ? `inset(${(1 - shown) * h}px 0 0 0 round ${radius}px)`
           : how === "wipe-down"
             ? `inset(0 0 ${(1 - shown) * h}px 0 round ${radius}px)`
@@ -245,7 +256,14 @@ function WindowOf(hooks: KitHooks) {
     <div style={{ position: "absolute", left: x, top: y, width: w, height: h, opacity: how === "fade" ? shown : 1, filter: shade ? `drop-shadow(${shade})` : undefined }}>
       <div style={{ position: "absolute", inset: 0, overflow: "hidden", borderRadius: radius, clipPath: inset }}>
         {content}
-        {border ? <div style={{ position: "absolute", inset: 0, borderRadius: radius, boxShadow: `inset 0 0 0 ${border.width}px ${border.color}` }} /> : null}
+        {border && almond ? (
+          // An eye's rim follows its lids: the inner half of a stroke along the almond (its outer half clipped away).
+          <svg width={w} height={h} style={{ position: "absolute", left: 0, top: 0, overflow: "visible" }} aria-hidden="true">
+            <path d={almond} fill="none" stroke={border.color} strokeWidth={border.width * 2} strokeLinejoin="round" />
+          </svg>
+        ) : border ? (
+          <div style={{ position: "absolute", inset: 0, borderRadius: radius, boxShadow: `inset 0 0 0 ${border.width}px ${border.color}` }} />
+        ) : null}
       </div>
     </div>
   );

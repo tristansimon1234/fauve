@@ -5,7 +5,8 @@
 // check (no JSX: the tests read it).
 
 export type SpokenWord = { w: string; from: number; to: number };
-export type CaptionStyle = "kinetic" | "stickers";
+/** bands: a creator's hook (« Face caméra et références »), the whole phrase on black bands, each word white when said. */
+export type CaptionStyle = "kinetic" | "stickers" | "bands";
 export type CaptionWord = SpokenWord & { strong: boolean };
 /** A phrase: its words, the frames it holds, how it is set (its strong word's face and colour, its side). */
 export type CaptionCard = {
@@ -62,11 +63,19 @@ function splitAt(words: SpokenWord[]): number {
   return best;
 }
 
+/** How much a phrase holds: its words and its seconds at most. */
+export type CardLimits = { words: number; seconds: number };
+/**
+ * A phrase on bands holds more (« Face caméra et références »: « je pense que c'est un des points les plus », nine
+ * words on two bands): nine words, 3.6 s.
+ */
+export const BAND_LIMITS: CardLimits = { words: 9, seconds: 3.6 };
+
 /** A clause cut until each piece holds on screen: six words, 2.6 s at most. */
-function pieces(words: SpokenWord[], fps: number): SpokenWord[][] {
-  if (words.length < 2 || (words.length <= CARD_WORDS && words.at(-1)!.to - words[0]!.from <= CARD_SECONDS * fps)) return [words];
+function pieces(words: SpokenWord[], fps: number, limits: CardLimits = { words: CARD_WORDS, seconds: CARD_SECONDS }): SpokenWord[][] {
+  if (words.length < 2 || (words.length <= limits.words && words.at(-1)!.to - words[0]!.from <= limits.seconds * fps)) return [words];
   const at = splitAt(words);
-  return [...pieces(words.slice(0, at), fps), ...pieces(words.slice(at), fps)];
+  return [...pieces(words.slice(0, at), fps, limits), ...pieces(words.slice(at), fps, limits)];
 }
 
 /**
@@ -93,8 +102,8 @@ export function strongIndex(words: { w: string }[]): number {
 
 const ALIGNS: CaptionCard["align"][] = ["center", "left", "right", "center", "right", "left"];
 
-/** The phrases of what is said, in order, each with its strong word and how it is set. */
-export function captionCards(words: SpokenWord[], fps: number, total: number): CaptionCard[] {
+/** The phrases of what is said, in order, each with its strong word and how it is set; `limits`: how much a phrase holds. */
+export function captionCards(words: SpokenWord[], fps: number, total: number, limits: CardLimits = { words: CARD_WORDS, seconds: CARD_SECONDS }): CaptionCard[] {
   // Clauses first (its punctuation, a pause of the voice), then each one cut until it holds.
   const clauses: SpokenWord[][] = [];
   for (const word of words) {
@@ -103,12 +112,12 @@ export function captionCards(words: SpokenWord[], fps: number, total: number): C
     if (current && last && word.from - last.to < PAUSE_SECONDS * fps && !ENDS.test(last.w)) current.push(word);
     else clauses.push([word]);
   }
-  const groups = clauses.flatMap((c) => pieces(c, fps));
+  const groups = clauses.flatMap((c) => pieces(c, fps, limits));
   // A phrase of one small word joins the next one (« et » alone never holds the screen).
   for (let i = groups.length - 2; i >= 0; i--) {
     const g = groups[i]!;
     const next = groups[i + 1]!;
-    if (g.length === 1 && isStop(g[0]!.w) && next.length < CARD_WORDS && next[0]!.from - g[0]!.to < PAUSE_SECONDS * fps) {
+    if (g.length === 1 && isStop(g[0]!.w) && next.length < limits.words && next[0]!.from - g[0]!.to < PAUSE_SECONDS * fps) {
       groups.splice(i, 2, [...g, ...next]);
     }
   }
@@ -127,6 +136,46 @@ export function captionCards(words: SpokenWord[], fps: number, total: number): C
       tone: index % 3 === 2 ? "accent" : "white",
     };
   });
+}
+
+/**
+ * A phrase's words on bands, one band a line (« Avoir une très bonne / culture visuelle »): as few lines as hold them
+ * within `max` px, then as even as they can be (the longest the shortest), never cutting a word; a word wider than
+ * `max` alone on its line. `widths`: each word's width, `space`: a space's (px). The words' indexes, line by line.
+ */
+export function bandLines(widths: number[], max: number, space: number): number[][] {
+  const n = widths.length;
+  if (!n) return [];
+  const span = (a: number, b: number) => widths.slice(a, b).reduce((s, w) => s + w, 0) + space * (b - a - 1);
+  // The fewest lines, filled greedily.
+  let lines = 1;
+  for (let i = 1, width = widths[0]!; i < n; i++) {
+    if (width + space + widths[i]! > max) {
+      lines++;
+      width = widths[i]!;
+    } else width += space + widths[i]!;
+  }
+  // As many lines, the longest as short as can be.
+  const cost = Array.from({ length: lines + 1 }, () => Array<number>(n + 1).fill(Infinity));
+  const from = Array.from({ length: lines + 1 }, () => Array<number>(n + 1).fill(0));
+  cost[0]![0] = 0;
+  for (let k = 1; k <= lines; k++)
+    for (let i = k; i <= n; i++)
+      for (let j = k - 1; j < i; j++) {
+        const c = Math.max(cost[k - 1]![j]!, span(j, i));
+        if (c < cost[k]![i]!) {
+          cost[k]![i] = c;
+          from[k]![i] = j;
+        }
+      }
+  const out: number[][] = [];
+  let i = n;
+  for (let k = lines; k >= 1; k--) {
+    const j = from[k]![i]!;
+    out.unshift(Array.from({ length: i - j }, (_, m) => j + m));
+    i = j;
+  }
+  return out;
 }
 
 /** The phrase on screen at a frame. */
