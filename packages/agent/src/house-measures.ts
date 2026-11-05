@@ -45,4 +45,7 @@ export const HOUSE_MEASURES: Record<string, ReelMeasures> = {
   // Its fiche's cuts (the first image of each new picture: its title card's black, then under its burn and its roll),
   // on its cuts' grid; its loudness by ffmpeg's ebur128.
   "court-metrage": { duration: 24.4, cuts: [0.13, 4, 6.83, 9.6, 12.4, 15.2, 18.03, 20.87], bpm: 85.5, lufs: -10.3 },
+  // Its fiche's 30 cuts, read image by image (measure.py found them all), on its drop's grid (its intro's vocal has its
+  // own pace); its loudness by ffmpeg's ebur128.
+  "assiettes": { duration: 16.9, cuts: [0.47, 1.03, 1.53, 2.13, 2.47, 2.83, 3.23, 3.6, 4.3, 4.67, 5.13, 5.63, 6.27, 6.37, 9.23, 9.7, 10.43, 10.97, 11.6, 11.93, 12.27, 12.77, 13.07, 13.93, 14.2, 14.57, 14.87, 15.43, 15.73, 16.33], bpm: 91.6, lufs: -20.1 },
 };
