@@ -541,7 +541,7 @@ async function siteFacts(studioId: string, site: Awaited<ReturnType<typeof readW
 async function siteStudio(url: string, kind: { business: string }): Promise<string> {
   const db = supabaseAdmin();
   const key = siteKey(url);
-  const found = await db.from("studios").select("id").eq("website_url", key).maybeSingle();
+  const found = await db.from("studios").select("id").eq("website_url", key).order("created_at").limit(1).maybeSingle();
   if (found.data) return found.data.id as string;
   const site = await readWebsite(url);
   const host = new URL(site.url).hostname.replace(/^www\./, "");
@@ -584,7 +584,9 @@ async function siteStudio(url: string, kind: { business: string }): Promise<stri
 
 async function labStudio(name: string, c: LabCase): Promise<string> {
   const db = supabaseAdmin();
-  const found = await db.from("studios").select("id").eq("website_url", labUrl(name)).maybeSingle();
+  // The oldest one: uploads sent together for a new case each created its studio (28 for one case, 5 November);
+  // with maybeSingle() a second row made every later call create one more.
+  const found = await db.from("studios").select("id").eq("website_url", labUrl(name)).order("created_at").limit(1).maybeSingle();
   if (found.data) return found.data.id as string;
   const at = new Date().toISOString();
   const studio = await db
@@ -887,7 +889,7 @@ async function keepBench(skill: { key: string; version: number }, from: string, 
 
 async function result(key: string) {
   const db = supabaseAdmin();
-  const studio = await db.from("studios").select("id, name, business_type, memory, motion_model").eq("website_url", key).maybeSingle();
+  const studio = await db.from("studios").select("id, name, business_type, memory, motion_model").eq("website_url", key).order("created_at").limit(1).maybeSingle();
   if (!studio.data) return { error: "case not set up" };
   const studioId = studio.data.id as string;
   const post = await db
@@ -1003,7 +1005,7 @@ async function result(key: string) {
 
 /** The lab studio of a case or a site, once set up. */
 async function labStudioId(key: string): Promise<string | null> {
-  const { data } = await supabaseAdmin().from("studios").select("id").eq("website_url", key).maybeSingle();
+  const { data } = await supabaseAdmin().from("studios").select("id").eq("website_url", key).order("created_at").limit(1).maybeSingle();
   return (data?.id as string | undefined) ?? null;
 }
 
@@ -1064,7 +1066,7 @@ async function labWords(key: string, params: URLSearchParams) {
 
 async function newMusic(key: string) {
   const db = supabaseAdmin();
-  const studio = await db.from("studios").select("id").eq("website_url", key).maybeSingle();
+  const studio = await db.from("studios").select("id").eq("website_url", key).order("created_at").limit(1).maybeSingle();
   if (!studio.data) throw new Error("case not set up");
   const post = await db.from("posts").select("id").eq("studio_id", studio.data.id).order("created_at", { ascending: false }).limit(1).maybeSingle();
   if (!post.data) throw new Error("no post");
