@@ -207,8 +207,8 @@ export const quatreCoins: EffectPiece = {
   texts: [
     { slot: "debut", want: "1 à 3 petits mots qui ouvrent la phrase, posés en haut à gauche, au tiers et à droite (une forme comme « un matin chez », « un samedi au », « une journée chez ») ; chacun court", max: 24, required: true },
     { slot: "nom", want: "son nom (le mot qui la distingue s'il est long : « Farine » pour « Maison Farine »), posé au milieu à gauche ; il s'écrit en minuscules", max: 14, required: true },
-    { slot: "lieu", want: "facultatif : son quartier ou sa ville quand on les sait, sinon ce qu'elle est en un mot (« fleuriste », « atelier ») ; posé au milieu à droite, en minuscules", max: 12, required: false },
-    { slot: "adresse", want: "facultatif : une ligne posée en bas, sur une seule ligne : son adresse quand on la sait, sinon un repère vrai qu'on sait (« ouvert dès 8 h »), sinon ce qu'elle fait en quelques mots (« fleurs de saison ») ; rien d'inventé", max: 28, required: false },
+    { slot: "lieu", want: "son quartier ou sa ville quand on les sait, sinon ce qu'elle est en un mot (« fleuriste », « atelier ») ; posé au milieu à droite, en minuscules", max: 12, required: false },
+    { slot: "adresse", want: "une ligne posée en bas, sur une seule ligne : son adresse quand on la sait, sinon un repère vrai qu'on sait (« ouvert dès 8 h »), sinon ce qu'elle fait en quelques mots (« fleurs de saison ») ; rien d'inventé", max: 28, required: false },
   ],
   settings: [
     {
