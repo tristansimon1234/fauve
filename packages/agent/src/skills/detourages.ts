@@ -1,247 +1,420 @@
-import { beatSpans, toFrame, type MontageSkill } from "../skills.ts";
+import { beatSpans, toFrame, type MontageSkill, type SkillSound } from "../skills.ts";
 
-// « Détourages qui surgissent », written on its model (its reading and its reference, a cut-out with a white scissor
-// edge over a street shot, a word written with a marker) and on what its original shares with it (house/originals/
-// detourages.mp4, 16,5 s at 94 BPM, a travel edit looked at image by image: shots cut fast on the beat and the half
-// beat, a warm filmic grade, a last wide shot held; its own opening, a window widening on black and a title landing
-// letter by letter behind a house, is another model's). Here her street or her place, full frame, cut on the beat and
-// the half beat; every third beat, one of her photos (an object, a product, someone) surges big over the shot, cut
-// out with a thick white scissor edge and a soft shadow, a little tilted, each time at another place, a small word
-// written with a white marker against it; it stays the next shot and goes on the cut; the last one is laid on the last
-// shot, held to the end. The shot under a cut-out as it surges holds its last image (the half beat of a pop); a video
-// given a cut-out's place is cut out the same way (her subject from its whole picture, its last image held), and a file
-// whose cut-out is missing pops as a print with a white border instead. Its ending card (an offer, an announcement) is
-// written with the same marker over the last shot, softly darkened, the last cut-out above it.
+// « Ton nom qui clignote » (`detourages`), version 2, written again on its original's fiche (docs/fiches/detourages.md:
+// a travel edit of 16,5 s measured image by image at 30 i/s, its sound by bands; Tristan: « c'est un effet que l'on
+// veut pouvoir faire, pas exactement reproduire l'image »). No cut-out surges in it (its v1 described another Reel): a
+// window opens on a still wide shot, a name lights up letter by letter behind the scenery, then a burst of shots on the
+// song's dotted rhythm. Its music is an indie-electro song at 140 BPM (Gemini heard 120, the workshop 94: its cuts'
+// dotted rhythm), its intro without drums; every length below is in its beats, so its cuts fall where the original's do:
+//   0 – 14,5    her still wide shot, her place or her landscape: black for an image, then a slit at its middle, the
+//               frame's whole height, widening at a constant speed to its whole width (its ends round while it is
+//               narrow), the music's highs opening with it; then her name, in very bold wide capitals across the frame,
+//               each letter flashing, going dark, then lit for good, out of order and faster and faster (the original's
+//               D, C, L, E, I, N, A of ICELAND, a soft high tick on each), behind her scenery: in her sky, everything
+//               else in front of it (her roofs, her hills, someone standing), its foot just under their top; without a
+//               sky, behind what stands in front of her wall (her cut-out); it goes with the cut;
+//   14,5 – 34,6 the drop: a burst of shots cut on the song's dotted rhythm (three sixteenths: ¾ of a beat most often, a
+//               beat, a beat and a half), each cut on the original's own (just after its hit), people, matters and
+//               details, wide or from above; its tenth and eighteenth shots streaked as fast sweeps (her real whip when
+//               she has one, else her shot swept);
+//   34,6 – 38,4 a last shot held, someone from behind before her place, arms raised; the bass falls away under it and
+//               comes back, and the Reel ends dead on the next bar, looping onto its black slit.
+// Played as the original, a window a little wider than high (1,18:1) with rounded corners on black, when her videos are
+// mostly horizontal or square (or she asks), else full frame, its corners rounded and its slit kept. Fewer of her files:
+// fewer shots in its burst (whole bars of it left out, from its middle), longer, still on the original's cuts. Her photos
+// stay still, her videos play; its grade is its finish (a soft film). Nothing of the original's own is copied: its name
+// is hers, its places hers.
 
-const BPM = 94;
-/** The first two shots (beats), then each round: a cut-out's half beat, the shot it stays on, a shot without. */
-const INTRO = [1.5, 1.5];
-const POP = 0.5;
-const WITH = 1.5;
-const PLAIN = 1;
-/** The last shot, the last cut-out laid on it (beats). */
-const FINAL = 4;
-/** The engine's ending card: the Reel's last 1,6 s, over the last shot. */
-const CARD_SECONDS = 1.6;
-const round = (s: number) => Math.round(s * 100) / 100;
+const BPM = 140;
+/** Its intro to the drop (beats: 6,22 s): the slit opens to its whole width by SLIT, her name lights up from NAME. */
+const INTRO = 14.5;
+const SLIT = 9.72;
+const NAME = 8.4;
+/**
+ * Its burst, bar by bar, in beats from the drop: where each shot starts (the original's cuts, measured, just after the
+ * song's hits) and how long the bar is; `file`: its first shot is a fast sweep (10 images). Its first and last bars
+ * always; its middle ones (1, 2, 3) as her files allow, each in whole or in part (its shots then longer).
+ */
+const BARS: { cuts: number[]; length: number; file?: boolean }[] = [
+  { cuts: [0, 0.9, 1.45, 2.3, 3.05], length: 4.1 },
+  { cuts: [0, 0.7, 1.45, 2.25], length: 3.95 },
+  { cuts: [0, 0.8, 1.4, 2.95], length: 3.95, file: true },
+  { cuts: [0, 0.85, 1.9, 3.05], length: 4.15 },
+  { cuts: [0, 0.75, 1.45, 2.95], length: 3.95, file: true },
+];
+/** A middle bar kept in part: which of its cuts, for 1, 2 or 3 shots (its shots as even as its cuts let them). */
+const PARTS: number[][][] = [[], [[0], [0, 3], [0, 2, 3]], [[0], [0, 1], [0, 1, 3]], [[0], [0, 2], [0, 2, 3]], []];
+/** Past its 23 shots (a length she asks for): more bars of four shots before its last, each four beats. */
+const MORE = { cuts: [0, 0.7, 1.45, 2.25], length: 4 };
+const LONG = 31;
+/** Its last shot, held; with her ending card, two beats longer (its last 1,6 s over it). */
+const LAST = 3.8;
+const CARD = 2;
+/** The bass falls away this far into its last shot and comes back here (beats: the original's 15,0 and 16,1 s). */
+const THIN = [0.4, 2.9];
+/** The intro: its highs open over its first 3 s (seven beats), then it plays softer to the drop. */
+const OPEN = 7;
+const SOFT_DB = -5;
+/**
+ * Her name's letters, as the original's seven (images at 30 i/s from its first flash): when each one flashes, how long
+ * it flashes (about 60 %), how long it goes dark (a ghost of 8 % at most), then lit for good; and which letter of the
+ * word goes first, second… (its D, C, L, E, I, N and A: the last, the second, the fourth, the third, the first, the
+ * sixth, the fifth).
+ */
+const FLASH_AT = [0, 8, 16, 20, 25, 29, 32];
+const FLASH_FOR = [4, 4, 2, 4, 3, 2, 3];
+const DARK_FOR = [4, 4, 4, 2, 3, 3, 2];
+const ORDER = [6, 1, 3, 2, 0, 5, 4];
+/** A soft high tick on each letter's flash and when the whole name is lit, as its music's (dB). */
+const TICK = { sound: "soft high glass tick", seconds: 0.5, gain: -4 };
+const round = (n: number) => Math.round(n * 100) / 100;
+const round3 = (n: number) => Math.round(n * 1000) / 1000;
 
-/** Each shot's part for n shots: the two first, then rounds of a cut-out, the shot it stays on and one without, then the last cut-out and the last shot. */
-function detourageRoles(n: number): ("street" | "pop" | "with" | "final")[] {
-  const count = Math.max(5, n);
-  const middle = count - 4;
-  const roles: ("street" | "pop" | "with" | "final")[] = ["street", "street"];
-  for (let i = 0; i < middle; i++) roles.push(i % 3 === 0 && i < middle - 1 ? "pop" : roles.at(-1) === "pop" ? "with" : "street");
-  roles.push("pop", "final");
-  return roles;
+/** Her name's letters (graphemes but spaces), as its code lights them. */
+const lettersOf = (text: string) =>
+  (typeof Intl !== "undefined" && Intl.Segmenter ? Array.from(new Intl.Segmenter("fr", { granularity: "grapheme" }).segment(text), (x) => x.segment) : Array.from(text)).filter((c) => /\S/.test(c));
+
+/**
+ * When each of n letters flashes, goes dark and lights for good (images from the first flash, at 140 BPM), by its place
+ * in the word: the original's seven, sampled along it for another count, in the same order of places, faster and
+ * faster.
+ */
+export function letterTimes(n: number): { place: number; flash: number; dark: number; on: number }[] {
+  const count = Math.max(1, Math.min(24, n));
+  const used = new Set<number>();
+  return Array.from({ length: count }, (_, k) => {
+    const u = count > 1 ? (k * 6) / (count - 1) : 0;
+    const i = Math.min(5, Math.floor(u));
+    const at = FLASH_AT[i]! + (FLASH_AT[i + 1]! - FLASH_AT[i]!) * (u - i);
+    const j = Math.round(u);
+    // Its place: the original's for that step, the nearest one not lit yet.
+    const want = (ORDER[j]! / 6) * (count - 1);
+    let place = -1;
+    for (let p = 0; p < count; p++) if (!used.has(p) && (place < 0 || Math.abs(p - want) < Math.abs(place - want))) place = p;
+    used.add(place);
+    const flash = Math.round(at);
+    const dark = flash + FLASH_FOR[j]!;
+    return { place, flash, dark, on: dark + DARK_FOR[j]! };
+  });
+}
+
+/**
+ * Where each shot of its burst starts (beats from the drop), whether it is a fast sweep, which of the original's 21 it
+ * stands for (`of`, −1 for a bar added past them), and where its last shot starts, for m shots of its burst.
+ */
+export function burstCuts(m: number): { cuts: { at: number; file: boolean; of: number }[]; last: number } {
+  const total = Math.max(9, m);
+  // Its first and last bars always (nine shots); then its middle bars, each in whole before the next; then more bars.
+  let left = total - 9;
+  const middle = [1, 2, 3].map((b) => {
+    const k = Math.min(BARS[b]!.cuts.length, left);
+    left -= k;
+    return k;
+  });
+  const more = Math.ceil(left / 4);
+  const cuts: { at: number; file: boolean; of: number }[] = [];
+  // Where each bar's first shot is among the original's 21.
+  const first = BARS.map((_, b) => BARS.slice(0, b).reduce((a, x) => a + x.cuts.length, 0));
+  let at = 0;
+  const lay = (bar: { cuts: number[]; length: number; file?: boolean }, keep: number[], b: number) => {
+    keep.forEach((c, i) => cuts.push({ at: round3(at + bar.cuts[c]!), file: Boolean(bar.file && c === 0 && keep[i + 1] === 1), of: b < 0 ? -1 : first[b]! + c }));
+    at += bar.length;
+  };
+  const all = (bar: { cuts: number[] }) => bar.cuts.map((_, i) => i);
+  lay(BARS[0]!, all(BARS[0]!), 0);
+  [1, 2, 3].forEach((b, j) => {
+    const k = middle[j]!;
+    if (k) lay(BARS[b]!, k === BARS[b]!.cuts.length ? all(BARS[b]!) : PARTS[b]![k - 1]!, b);
+  });
+  for (let i = 0; i < more; i++) lay(MORE, all(MORE).slice(0, Math.min(4, left - 4 * i)), -1);
+  lay(BARS[4]!, all(BARS[4]!), 4);
+  return { cuts, last: round3(at) };
 }
 
 const CODE = String.raw`function Scene({ width, height, durationInFrames, brand, shots, reelTexts, end, texts }) {
   const h = React.createElement;
   const frame = useCurrentFrame();
   const mark = (k, d) => { const v = Number(texts && texts[k]); return Number.isFinite(v) ? v : d; };
-  const BEAT = Math.max(4, mark("beat", 19.15));
+  const setting = (k, d) => { const v = texts && texts[k]; return typeof v === "string" && v ? v : d; };
   const n = shots.length;
-  const cur = Math.min(Math.max(0, n - 1), shots.reduce((k, s, i) => (s.from <= frame ? i : k), 0));
+  const cur = shots.reduce((k, s, i) => (s.from <= frame ? i : k), 0);
   const endAt = end ? end.from : durationInFrames + 1;
   const clamp = { extrapolateLeft: "clamp", extrapolateRight: "clamp" };
-  const pop = Easing.bezier(0.34, 1.56, 0.64, 1);
-  const hand = "'Permanent Marker', '" + brand.displayFont + "', cursive";
-  const body = "'" + brand.bodyFont + "', 'Inter Tight', 'Inter', sans-serif";
-  const PAPER = "#fbfaf7";
-  const full = { position: "absolute", left: 0, top: 0, width, height };
-  // The marker's white, with a fine dark edge all round (and a soft drop) so it reads on a bright street too.
-  const edge = "0 0 1px rgba(0,0,0,0.9), 1px 1px 0 rgba(0,0,0,0.55), -1px 1px 0 rgba(0,0,0,0.55), 1px -1px 0 rgba(0,0,0,0.55), -1px -1px 0 rgba(0,0,0,0.55), 0 3px 6px rgba(0,0,0,0.45)";
-  const hook = reelTexts.find((t) => t.role === "hook");
-  const list = reelTexts.find((t) => t.role === "band");
-  const others = reelTexts.filter((t) => t !== hook && t !== list);
-  // A phone number or a date never breaks between its digits.
-  const keep = (s) => String(s || "").replace(/(\d) (?=\d)/g, "$1\u00a0");
+  const SLIT_FROM = mark("slit_from", 1);
+  const SLIT_TO = Math.max(SLIT_FROM + 1, mark("slit_to", 125));
+  const NAME_AT = mark("name", 108);
+  const FILES = [mark("file_a", -1), mark("file_b", -1)];
+  // Its own filters, one id each (two copies of the scene in one page never share one).
+  const ID = "dt" + String(React.useId ? React.useId() : "0").replace(/[^a-zA-Z0-9_-]/g, "");
 
-  // Its shots' parts: a cut-out's shot is the short one (half a beat), the shot after it is the one it stays on; the
-  // last shot keeps the last one.
-  const isPop = (i) => i > 0 && i < n && shots[i].durationInFrames <= Math.round(0.75 * BEAT);
-  const pops = [];
-  for (let i = 0; i < n; i++) if (isPop(i)) pops.push(i);
-  const popNow = isPop(cur) ? cur : isPop(cur - 1) ? cur - 1 : -1;
-  // Each cut-out lands at another place, a little tilted: big in the middle first, then around; the last one big in
-  // the middle, or above the ending card.
-  const SPOTS = [
-    { cx: 540, cy: 850, w: 780, h: 860, tilt: -5 },
-    { cx: 690, cy: 600, w: 640, h: 700, tilt: 6 },
-    { cx: 380, cy: 1110, w: 600, h: 640, tilt: -7 },
-    { cx: 390, cy: 600, w: 640, h: 700, tilt: -4 },
-    { cx: 640, cy: 1090, w: 560, h: 600, tilt: 7 },
-  ];
-  const FINAL_SPOT = end ? { cx: 540, cy: 560, w: 720, h: 680, tilt: -4 } : { cx: 540, cy: 870, w: 820, h: 860, tilt: -4 };
-  const spotOf = (k, last) => (last ? FINAL_SPOT : k === 0 ? SPOTS[0] : SPOTS[1 + ((k - 1) % 4)]);
-  // Its word's box against the piece: under it, or over it when it has no room under it; always inside the safe zone
-  // (below the middle, clear of the apps' buttons).
-  const WORD_W = 620;
-  const WORD_H = 104;
-  const wordBox = (px, py, pw, ph) => {
-    let y = py + ph + 12;
-    if (y + WORD_H > 1436) y = py - WORD_H - 12;
-    y = Math.max(92, Math.min(1436 - WORD_H, y));
-    const right = y + WORD_H > 948 ? 940 : 1040;
-    const x = Math.max(40, Math.min(right - WORD_W, Math.round(px + pw / 2 - WORD_W / 2)));
-    return { left: x, top: Math.round(y), width: WORD_W, height: WORD_H };
-  };
+  // Its frame: the original's window, a little wider than high (1,18:1), when most of her videos are horizontal or
+  // square (or she asks), else the whole vertical frame; its corners rounded on black either way (a radius of 3 % of the
+  // width), a fine black line on the window's sides. Every place below is a share of it.
+  const format = setting("format", "auto");
+  const upright = shots.filter((s) => (Number(s.aspect) || 0.5625) < 0.87).length;
+  const windowed = format === "fenetre" || (format === "auto" && upright * 2 <= n);
+  const bw = width;
+  const bh = windowed ? Math.round(width / 1.18) : height;
+  const by = windowed ? Math.round((height - bh) / 2) : 0;
+  const laid = { left: 0, top: 0, width: bw, height: bh };
+  const box = { position: "absolute", left: 0, top: 0, width: bw, height: bh };
+  const R = Math.round(bw * 0.03);
+  const EDGE = windowed ? Math.max(2, Math.round(bw * 0.003)) : 0;
 
-  // 1. Her shots full frame, cut on the beat; under a cut-out as it surges, the shot before it holds its last image,
-  // pushed in a little.
-  const bg = isPop(cur) ? cur - 1 : cur;
-  const held = isPop(cur) ? interpolate(frame, [shots[cur].from, shots[cur].from + shots[cur].durationInFrames], [0, 1], clamp) : 0;
-  const film = n ? h(Footage, { key: "film", shot: Math.max(0, bg), style: { ...full, ...(held > 0 ? { transform: "scale(" + (1 + 0.035 * held).toFixed(4) + ")" } : {}) } }) : null;
+  // 1. The window: black on its first image, then a slit at its middle, the whole height, widening at a constant speed
+  // from 1 % of the width to all of it (round ends while it is narrow), then the picture in its rounded rectangle.
+  const share = interpolate(frame, [SLIT_FROM, SLIT_TO], [0.01, 1], clamp);
+  const open = Math.max(2, Math.round(bw * share));
+  const side = frame < SLIT_TO ? Math.max(EDGE, Math.round((bw - open) / 2)) : EDGE;
+  const radius = Math.min(R, Math.max(1, Math.round(open / 2)));
+  const clip = "inset(0 " + side + "px round " + radius + "px)";
 
-  // 2. The cut-out of the moment: her photo's subject cut out with its white scissor edge and its shadow; a video's
-  // subject cut out (from its whole picture, at its own shape); without a cut-out, the picture itself as a print with a
-  // white border. It surges from small with a bounce, turning to its tilt, then breathes a little.
-  let piece = null;
-  let label = null;
-  if (popNow >= 0) {
-    const k = pops.indexOf(popNow);
-    const last = popNow === pops[pops.length - 1] && popNow === n - 2;
-    const spot = spotOf(k, last);
-    const s = shots[popNow];
-    const t = frame - s.from;
-    const grow = interpolate(t, [0, 7], [0.3, 1], { ...clamp, easing: pop });
-    const breath = 1 + 0.015 * Math.sin(t / 17);
-    // Its box is the spot's (not the frame's: a layer of the whole frame moved at every image is heavy), what it holds
-    // placed from the spot's corner. It turns to its tilt about its middle; one standing on the frame's bottom edge
-    // grows from its foot, upright, so its cut edge stays on the frame's.
-    const X0 = Math.round(spot.cx - spot.w / 2);
-    const Y0 = Math.round(spot.cy - spot.h / 2);
-    let at = null;
-    let standing = false;
-    const wrap = (child) => {
-      const turn = standing ? 0 : spot.tilt * interpolate(t, [0, 7], [2.2, 1], clamp) + Math.sin(t / 13) * 0.8;
-      const origin = standing ? Math.round(at.x + at.w / 2 - X0) + "px " + Math.round(height - Y0) + "px" : "50% 50%";
-      return h("div", { style: { position: "absolute", left: X0, top: Y0, width: spot.w, height: spot.h, opacity: t < 0 ? 0 : interpolate(t, [0, 2], [0, 1], clamp), transformOrigin: origin, transform: "rotate(" + turn.toFixed(2) + "deg) scale(" + (grow * breath).toFixed(4) + ")" } }, child);
-    };
-    const sub = s.subject;
-    const a = Math.max(0.3, Math.min(3.5, s.aspect || 0.8));
-    if (s.kind === "photo" && s.cutout && sub && sub.w > 0 && sub.h > 0) {
-      // Its subject's own shape, fitted to the spot; a subject cut by its photo's bottom edge stands on the frame's.
-      const ratio = (sub.w * a) / sub.h;
-      const hh = Math.min(spot.h, spot.w / Math.max(0.05, ratio));
-      const ww = hh * ratio;
-      standing = (s.cutEdges || []).indexOf("bottom") >= 0;
-      at = { x: spot.cx - ww / 2, y: standing ? height - hh : spot.cy - hh / 2, w: ww, h: hh };
-      piece = wrap(h(Cutout, { photo: s, x: Math.round(at.x) - X0, y: Math.round(at.y) - Y0, height: Math.round(hh), rim: 13, shadow: true }));
-    } else if (s.subjectBoxes && s.subjectBoxes.some(Boolean)) {
-      // Her video's subject read in its whole picture (a box of its own shape), then fitted to the spot; one cut by the
-      // picture's bottom edge (a bust, a counter) stands on the frame's.
-      const whole = { left: 0, top: 0, width: Math.round(1000 * a), height: 1000 };
-      const b = SubjectBox(s, s.from, whole);
-      if (b && b.w > 0 && b.h > 0) {
-        const k2 = Math.min(spot.w / b.w, spot.h / b.h);
-        standing = b.y + b.h >= whole.height - 8;
-        at = { x: spot.cx - (k2 * b.w) / 2, y: standing ? height - k2 * b.h : spot.cy - (k2 * b.h) / 2, w: k2 * b.w, h: k2 * b.h };
-        const laid = { left: Math.round(at.x - k2 * b.x) - X0, top: Math.round(at.y - k2 * b.y) - Y0, width: Math.round(whole.width * k2), height: Math.round(whole.height * k2) };
-        piece = wrap(h(Subject, { shot: popNow, rim: 12, rimColor: PAPER, shadow: true, style: { position: "absolute", ...laid } }));
-      }
-    }
-    if (!piece) {
-      // The print: the picture at its own shape, fitted to the spot, a white border and a soft shadow.
-      standing = false;
-      const pw = Math.min(spot.w, spot.h * a) * 0.92;
-      const ph = pw / a;
-      at = { x: spot.cx - pw / 2, y: spot.cy - ph / 2, w: pw, h: ph };
-      piece = wrap(h("div", { style: { position: "absolute", left: Math.round((spot.w - pw) / 2), top: Math.round((spot.h - ph) / 2), width: Math.round(pw), height: Math.round(ph), backgroundColor: PAPER, boxShadow: "0 18px 36px rgba(20,12,4,0.38)" } },
-        h(Footage, { shot: popNow, style: { position: "absolute", left: 14, top: 14, width: Math.round(pw) - 28, height: Math.round(ph) - 28 } })));
-    }
-    // Its small word, written with the marker against it, in at its third image (straight: text turned at an angle in
-    // every image of the scene check is more than its browser holds); every word in the page all along (her separators
-    // too), only this cut-out's seen.
-    if (list && frame >= list.from && frame < Math.min(list.to, endAt)) {
-      const parts = String(list.text).split(/[,;·|\/\n]/.test(list.text) ? /(\s*[,;·|\/\n]\s*)/ : /( +)/);
-      const box = wordBox(at.x, at.y, at.w, at.h);
-      const land = interpolate(t, [3, 8], [1.18, 1], { ...clamp, easing: pop });
-      let index = -1;
-      label = h("div", { key: "words", style: full },
-        parts.map((p, i) => {
-          if (i % 2 === 1 || !p.trim()) return h("span", { key: "s" + i, style: { position: "absolute", left: 0, top: 0, opacity: 0, fontSize: 1 } }, p);
-          index += 1;
-          const on = index === k && t >= 3;
-          return h(FitText, { key: "w" + i, style: { position: "absolute", ...box, opacity: on ? 1 : 0 }, innerStyle: { fontFamily: hand, fontWeight: 400, fontSize: 84, lineHeight: 1.05, color: "#ffffff", whiteSpace: "nowrap", textShadow: edge } },
-            h("span", { style: { display: "inline-block", transform: "scale(" + (on ? land : 1).toFixed(3) + ")" } }, keep(p.trim())));
-        }));
-    }
+  // 2. Her shots, cut on its hits, as filmed (a photo still, a video playing). Its two fast sweeps streaked along their
+  // way and sliding (her own whip, or her shot swept): a vertical sweep, then a sideways one.
+  const sweep = FILES.indexOf(cur);
+  let film = frame >= SLIT_FROM ? h(Footage, { key: "film", shot: cur, style: box }) : null;
+  if (sweep >= 0 && film) {
+    const s = shots[cur];
+    const p = interpolate(frame, [s.from, s.from + s.durationInFrames], [0, 1], clamp);
+    const up = sweep === 0;
+    const shift = Math.round((up ? -1 : 1) * p * (up ? bh : bw) * 0.14);
+    film = h("div", { key: "film", style: { ...box, overflow: "hidden" } },
+      h("svg", { width: 0, height: 0, style: { position: "absolute" }, "aria-hidden": "true" },
+        h("filter", { id: ID + "s", x: up ? "0" : "-0.2", y: up ? "-0.2" : "0", width: up ? "1" : "1.4", height: up ? "1.4" : "1", colorInterpolationFilters: "sRGB" }, h("feGaussianBlur", { stdDeviation: up ? "0 42" : "42 0" }))),
+      h("div", { style: { ...box, transform: (up ? "translateY(" : "translateX(") + shift + "px) scale(1.3)", filter: "url(#" + ID + "s)" } }, h(Footage, { shot: cur, style: box })));
   }
 
-  // 3. Its title (when she gave one), written big with the marker over the first shots, landing on the first image.
-  const title = hook && frame >= hook.from && frame < Math.min(hook.to, endAt)
-    ? h(FitText, { key: "title", style: { position: "absolute", left: 90, top: 300, width: 900, height: 420 }, innerStyle: { fontFamily: hand, fontWeight: 400, fontSize: 150, lineHeight: 1.02, color: "#ffffff", textAlign: "center", textWrap: "balance", textShadow: edge } },
-        h("span", { style: { display: "inline-block", transform: "scale(" + interpolate(frame - hook.from, [0, 6], [1.25, 1], { ...clamp, easing: pop }).toFixed(3) + ")" } }, keep(hook.text)))
-    : null;
+  // 3. Her name, in very bold wide capitals across the frame (87,6 % of its width; within the apps' margins once its foot
+  // goes under the middle), as tall as the original's (16,8 % of its window), white, no outline: each letter flashes
+  // (60 %), goes dark (a ghost), then lights for good, on its own images (its timeline's, the original's order and
+  // pace), every letter in the page from the start. Behind her scenery: in her sky (Skyline: everything else in front
+  // of it), its foot set so that about an eighth of the word is hidden, in its middle (the top of what stands there
+  // read across it); without a sky, behind what stands in front of her wall (her cut-out), its foot under its top; else
+  // in front, at the original's place. A soft shade under it only on a bright sky (else it would not read).
+  const hook = reelTexts.find((t) => t.role === "hook");
+  const others = reelTexts.filter((t) => t !== hook);
+  const display = "'" + brand.displayFont + "', 'Montserrat', 'Archivo Black', sans-serif";
+  const body = "'" + brand.bodyFont + "', 'Montserrat', 'Inter', sans-serif";
+  const keep = (s) => String(s || "").replace(/(\d) (?=\d)/g, "$1 ");
+  const graphemes = (s) => (typeof Intl !== "undefined" && Intl.Segmenter ? Array.from(new Intl.Segmenter("fr", { granularity: "grapheme" }).segment(s), (x) => x.segment) : Array.from(s));
+  const nameOn = hook && cur === 0 && frame >= hook.from && frame < Math.min(hook.to, endAt);
+  let title = null;
+  let front = null;
+  if (nameOn) {
+    const chars = graphemes(keep(hook.text).toUpperCase());
+    const CAP = Math.round(windowed ? bh * 0.168 : bw * 0.142);
+    const F = Math.round(CAP / 0.7);
+    const FULL = Math.round(bw * 0.876);
+    // The top of what stands in its width (eight columns of her skyline), read once on its first lit image.
+    const REF = NAME_AT;
+    const cols = 8;
+    const x0 = Math.round((bw - FULL) / 2);
+    const tops = [];
+    for (let k = 0; k < cols; k++) {
+      const y = SkylineAt(shots[0], REF, laid, { from: x0 + (k * FULL) / cols, to: x0 + ((k + 1) * FULL) / cols });
+      if (typeof y === "number" && Number.isFinite(y)) tops.push(y);
+    }
+    const hidden = (foot) => tops.reduce((a, y) => a + Math.max(0, Math.min(CAP, foot - y)), 0) / (cols * CAP);
+    // How many of its columns are hidden past 60 % (a tree or a front up to the top of the frame hides a whole letter).
+    const deep = (foot) => tops.filter((y) => foot - y > 0.6 * CAP).length;
+    // Its foot within the frame's safe zone: its capitals under the top margin, its foot above the lowest quarter.
+    const footMin = Math.max(80 - by, Math.round(bh * 0.06)) + CAP;
+    const footMax = Math.min(Math.round(bh * 0.62), Math.round(1440 - by - 0.25 * CAP));
+    let foot = Math.round(bh * 0.594);
+    let behind = null;
+    if (tops.length >= cols / 2) {
+      // The foot that hides an eighth of the word (bisection: more is hidden as it goes down); a sky too narrow or too
+      // high for it (her trees or her front up to the top of the frame, a whole letter hidden) is none.
+      let lo = footMin;
+      let hi = footMax;
+      for (let i = 0; i < 18; i++) { const mid = (lo + hi) / 2; if (hidden(mid) < 0.125) lo = mid; else hi = mid; }
+      const f = Math.round(Math.max(footMin, Math.min(footMax, (lo + hi) / 2)));
+      if (hidden(f) <= 0.2 && deep(f) <= 2) { foot = f; behind = "sky"; }
+    }
+    if (!behind) {
+      const her = SubjectBox(shots[0], REF, laid);
+      if (her && her.h > bh * 0.08) {
+        const f = Math.round(her.y + 0.3 * CAP);
+        if (f >= footMin && f <= footMax) { foot = f; behind = "her"; }
+      }
+    }
+    foot = Math.max(footMin, Math.min(footMax, foot));
+    // Its glyphs within the apps' margins on both sides once they reach under the middle of the Reel.
+    const low = by + foot > 960;
+    const TW = low ? bw - 280 : FULL;
+    const light = LightUnder(shots[0], REF, laid, { x: (bw - TW) / 2, y: foot - CAP, w: TW, h: CAP });
+    const shade = light && light.mean > 0.68 ? "0 2px 22px rgba(0,0,0,0.32), 0 0 2px rgba(0,0,0,0.25)" : "none";
+    // Each letter's state at this frame: the k-th letter of the word (its spaces left as they are).
+    let k = -1;
+    const spans = chars.map((c, i) => {
+      if (!/\S/.test(c)) return h("span", { key: i }, c);
+      k += 1;
+      const fl = mark("fl" + k, NAME_AT);
+      const dk = mark("dk" + k, fl + 3);
+      const on = mark("on" + k, dk + 3);
+      const o = frame < fl ? 0 : frame < dk ? 0.6 : frame < on ? 0.06 : 1;
+      return h("span", { key: i, style: { opacity: o } }, c);
+    });
+    // One box, its bottom just under its foot (its line's descent): a long name is smaller, its foot where it was.
+    const boxH = Math.round(CAP * 1.6);
+    title = h(FitText, { key: "name", style: { position: "absolute", left: Math.round((bw - TW) / 2), top: Math.round(foot + 0.2 * CAP - boxH), width: TW, height: boxH }, innerStyle: { fontFamily: display, fontWeight: 800, fontSynthesis: "none", fontSize: F, lineHeight: 1, letterSpacing: "0.005em", color: "#ffffff", whiteSpace: "nowrap", textAlign: "center", justifyContent: "flex-end", textShadow: shade } },
+      h("span", { style: { display: "inline-block" } }, ...spans));
+    front = behind === "sky" ? h(Skyline, { key: "front", shot: 0, style: box }) : behind === "her" ? h(Subject, { key: "front", shot: 0, style: box }) : null;
+  }
 
-  // Any other text of the Reel (none in its slots): a plain line in the marker's white, so nothing she wrote is lost.
-  const extra = others.filter((t) => frame >= t.from && frame < Math.min(t.to, endAt)).map((t, i) =>
-    h(FitText, { key: "x" + i, style: { position: "absolute", left: 140, top: 150 + i * 120, width: 800, height: 110 }, innerStyle: { fontFamily: body, fontWeight: 600, fontSize: 52, color: "#ffffff", textAlign: "center", textWrap: "balance", textShadow: edge } }, t.text));
-
-  // 4. Its ending card: the last shot softly darkened, its title written with the marker under the last cut-out, its line under it.
-  const veil = end && frame >= endAt ? interpolate(frame, [endAt, endAt + 8], [0, 1], clamp) : 0;
+  // 4. Its ending card, when she has one, over the last shot softly darkened: its title in the name's capitals, its line under it.
+  const e = end ? frame - endAt : -1;
   const ending = end && frame >= endAt
     ? h(React.Fragment, { key: "end" },
-        h(FitText, { style: { position: "absolute", left: 120, top: 1010, width: 840, height: 250 }, innerStyle: { fontFamily: hand, fontWeight: 400, fontSize: 110, lineHeight: 1.04, color: "#ffffff", textAlign: "center", textWrap: "balance", textShadow: edge } },
-          h("span", { style: { display: "inline-block", opacity: interpolate(frame, [endAt + 2, endAt + 6], [0, 1], clamp) } }, keep(end.title))),
+        h("div", { style: { ...box, backgroundColor: "rgba(0,0,0," + (0.42 * Math.min(1, (e + 1) / 6)).toFixed(3) + ")" } }),
+        h(FitText, { style: { position: "absolute", left: 140, top: Math.round(bh / 2) - (end.subtitle ? Math.round(bh * 0.2) : Math.round(bh * 0.12)), width: bw - 280, height: Math.round(bh * 0.22) }, innerStyle: { fontFamily: display, fontWeight: 800, fontSynthesis: "none", fontSize: 96, lineHeight: 1, color: "#ffffff", textAlign: "center", textWrap: "balance", whiteSpace: "normal", textTransform: "uppercase", justifyContent: end.subtitle ? "flex-end" : "center" } },
+          h("span", { style: { opacity: interpolate(frame, [endAt + 1, endAt + 5], [0, 1], clamp) } }, keep(end.title))),
         end.subtitle
-          ? h(FitText, { style: { position: "absolute", left: 140, top: 1272, width: 800, height: 150 }, innerStyle: { fontFamily: body, fontWeight: 600, fontSize: 50, lineHeight: 1.18, color: "#ffffff", textAlign: "center", textWrap: "balance", textShadow: edge } },
-              h("span", { style: { display: "inline-block", opacity: interpolate(frame, [endAt + 7, endAt + 11], [0, 1], clamp) } }, keep(end.subtitle)))
+          ? h(FitText, { style: { position: "absolute", left: 140, top: Math.round(bh / 2) + Math.round(bh * 0.04), width: bw - 280, height: Math.round(bh * 0.16) }, innerStyle: { fontFamily: body, fontWeight: 500, fontSize: 48, lineHeight: 1.2, color: "#ffffff", textAlign: "center", textWrap: "balance", justifyContent: "flex-start" } },
+              h("span", { style: { opacity: interpolate(frame, [endAt + 6, endAt + 10], [0, 1], clamp) } }, keep(end.subtitle)))
           : null)
     : null;
-  const shade = veil > 0 ? h("div", { key: "veil", style: { ...full, background: "linear-gradient(180deg, rgba(14,9,4," + (0.12 * veil).toFixed(3) + ") 0%, rgba(14,9,4," + (0.5 * veil).toFixed(3) + ") 62%, rgba(14,9,4," + (0.62 * veil).toFixed(3) + ") 100%)" } }) : null;
 
-  return h(AbsoluteFill, { style: { backgroundColor: "#141009" } }, film, shade, piece, label, title, extra, ending);
+  const frameBox = h("div", { style: { position: "absolute", left: 0, top: by, width: bw, height: bh, overflow: "hidden", backgroundColor: "#000000", clipPath: clip } }, film, title, front, ending);
+
+  // Any other text of the Reel (none in its slots): a plain white line off its picture, so nothing she wrote is lost.
+  const extra = others.filter((t) => frame >= t.from && frame < Math.min(t.to, endAt)).map((t, i) =>
+    h(FitText, { key: "x" + i, style: { position: "absolute", left: 140, width: width - 280, top: windowed ? Math.max(100, by - 130 - i * 120) : 1250 - i * 130, height: 110 }, innerStyle: { fontFamily: body, fontWeight: 600, fontSize: 50, lineHeight: 1.15, color: "#ffffff", textAlign: "center", textShadow: "0 1px 3px rgba(0,0,0,0.55)" } }, keep(t.text)));
+
+  return h(AbsoluteFill, { style: { backgroundColor: "#000000" } }, frameBox, extra);
 }`;
+
+/** What each shot of the original's burst shows, as hers would (its 21, in order: people, matters and details, wide or from above, its two sweeps). */
+const BURST_WANTS = [
+  "quelqu'un qui fait un grand geste (danse, lève les bras, rit), en mouvement",
+  "sa rue, son lieu ou son paysage, en large",
+  "des mains dans une matière, de près (farine, café, tissu, terre)",
+  "une matière ou un produit de près",
+  "quelqu'un qui sourit, de près",
+  "un objet de son lieu en entier, un peu de loin",
+  "son nom écrit quelque part (vitrine, tablier, enseigne, ardoise)",
+  "une matière de près (des grains, une texture, ce qu'elle vend en vrac)",
+  "quelqu'un qui lève les bras ou fait un geste large",
+  "un balayage très rapide du téléphone sur son sol ou son comptoir (sinon un plan qui bouge, il sera filé)",
+  "un détail qui bouge, de près (la vapeur, l'eau, un geste)",
+  "quelqu'un qui prend une photo ou qui filme",
+  "un plan qui avance vite au ras du sol ou d'une table",
+  "sa rue ou son lieu vu d'en haut",
+  "quelque chose qui coule ou qui tombe (de l'eau, un café versé, de la farine)",
+  "quelqu'un qui danse ou qui bouge, à contre-jour",
+  "quelqu'un qui regarde ou qui filme, de près",
+  "un balayage très rapide de côté (sinon un plan qui bouge, il sera filé)",
+  "vu d'en haut : une table, un comptoir, une rue",
+  "vu d'en haut, un autre endroit",
+  "une matière vue d'en haut, de près",
+];
+/** Its two sweeps among the original's 21. */
+const SWEEPS = [9, 17];
 
 export const detourages: MontageSkill = {
   key: "detourages",
-  version: 1,
+  // 2: written again on its original's fiche (its 140 BPM and its cuts, its window opening as a slit, her name flashing
+  // letter by letter behind her scenery, its burst on the dotted rhythm with its two sweeps, its rounded window on black,
+  // its last shot held while the bass falls away, its soft film grade); no cut-out surges any more.
+  version: 2,
   bpm: BPM,
-  shots: [10, 19],
-  // Up to 31 for a length she asks for: more rounds of her street and her cut-outs.
-  long: 31,
+  // Its opening, its burst (whole bars of it left out when her files are fewer), its last shot.
+  shots: [11, 23],
+  // Up to 31 for a length she asks for: more bars of its burst before its last shot.
+  long: LONG,
   files: [6, 16],
-  fonts: ["Permanent Marker"],
-  how: "Ses plans de rue ou de son lieu en plein cadre, coupés sur le temps ; toutes les deux secondes environ, sur le temps, une de ses photos (un objet, un produit, quelqu'un) surgit en grand par-dessus, détourée avec un épais bord blanc de ciseau et une ombre, un peu penchée, chaque fois à une autre place, un petit mot écrit au feutre blanc à côté ; elle reste le plan suivant et part à la coupe ; la dernière se pose sur le dernier plan, tenu jusqu'à la fin.",
+  fonts: ["Montserrat"],
+  // Its sweeps: her real whips, when she filmed some.
+  reads: ["moves"],
+  how: "Un plan large et fixe de son lieu ou de son paysage qui s'ouvre comme une fenêtre : une fente noire au milieu qui s'élargit lentement jusqu'à toute la largeur ; son nom s'y allume en très grandes capitales blanches, lettre par lettre dans le désordre (chacune clignote, s'éteint puis tient), derrière le décor (ses toits, ses collines, quelqu'un debout passent devant) ; puis, sur le drop, une rafale de plans courts coupés sur le rythme pointé de la chanson (des gens qui font un geste, des mains et des matières de près, son nom écrit, son lieu vu d'en haut, deux balayages très rapides), et un dernier plan tenu de quelqu'un de dos, les bras levés. Dans une fenêtre aux coins arrondis sur du noir, un peu plus large que haute, quand ses vidéos sont horizontales.",
   end: true,
   texts: [
-    { slot: "mots", role: "band", want: "un petit mot écrit au feutre à côté de chaque détourage, dans l'ordre des détourages (autant que de cases « détourage »), séparés par des virgules, 1 ou 2 mots chacun : ce qu'il est ou qui (une forme comme « la baguette, Léa, le four, à emporter ») ; une virgule de plus sans mot laisse un détourage sans mot", max: 96, required: true },
-    { slot: "titre", role: "hook", want: "facultatif : 1 à 3 mots écrits en grand au feutre sur les deux premiers plans : sa rue, son quartier ou son lieu (une forme comme « rue des Martyrs », « le marché »)", max: 22, required: false },
+    {
+      slot: "titre",
+      role: "hook",
+      want: "son nom, sa rue, son quartier ou un mot de sa demande, 4 à 10 lettres, qui s'allume lettre par lettre en très grandes capitales dans le ciel de son premier plan : un seul mot de préférence (le mot de son nom qui la distingue : « Farine » pour « Maison Farine »), plus il est court plus il est grand",
+      max: 12,
+      required: true,
+    },
   ],
-  timeline(n, { end, bpm: tempo }) {
-    // At another tempo (a longer Reel, or a music's own): every length in beats follows it.
-    const bpm = tempo ?? BPM;
+  settings: [
+    {
+      name: "format",
+      want: "le format : la fenêtre aux coins arrondis de l'original, ou vertical plein écran",
+      choices: [
+        { value: "auto", says: "comme ses vidéos (la fenêtre si la plupart sont horizontales ou carrées)" },
+        { value: "fenetre", says: "une fenêtre un peu plus large que haute (1,18:1) aux coins arrondis sur du noir, comme l'original" },
+        { value: "vertical", says: "vertical plein écran, ses coins arrondis et sa fente gardés" },
+      ],
+    },
+  ],
+  // Its grade is its finish (a soft film, docs/fiches/detourages.md, effect 8), without what would grey its black: no
+  // fade, no grain, no dark corners on the black around its window.
+  finish: { fade: 0, grain: 0, vignette: 0 },
+  timeline(n, options) {
+    const { end } = options;
+    // At another tempo (a longer Reel, a music's own): every length in beats follows it.
+    const bpm = options.bpm ?? BPM;
     const beat = 60 / bpm;
-    const roles = detourageRoles(n);
-    const card = end ? Math.max(0, CARD_SECONDS / beat - (FINAL - 2)) : 0;
-    let intro = 0;
-    const beats = roles.map((r) => (r === "street" && intro < 2 ? INTRO[intro++]! : r === "pop" ? POP : r === "with" ? WITH : r === "final" ? FINAL + card : PLAIN));
-    const spans = beatSpans(bpm, beats);
+    const count = Math.max(11, Math.min(LONG, n));
+    const { cuts, last } = burstCuts(count - 2);
+    const hold = LAST + (end ? CARD : 0);
+    // Its opening, then each shot of its burst to the next cut, then its last shot.
+    const edges = [0, ...cuts.map((c) => INTRO + c.at), INTRO + last, INTRO + last + hold];
+    const spans = beatSpans(bpm, edges.slice(1).map((b, i) => round3(b - edges[i]!)));
     const duration = spans.at(-1)!.end;
-    let cutouts = 0;
-    const wants = roles.map((r, i) =>
-      i === 0
-        ? "le plan qui ouvre le Reel : sa rue, sa devanture ou son lieu, vivant, en mouvement"
-        : r === "pop"
-          ? `détourage ${++cutouts} : une photo d'un objet, d'un produit ou de quelqu'un, sur un fond simple et net${i === roles.length - 2 ? " (le plus beau : il se pose sur le dernier plan)" : ""} ; il surgit détouré en grand par-dessus le plan suivant, avec un petit mot à côté`
-          : r === "with"
-            ? "un plan de sa rue ou de son lieu en plein cadre, assez calme : le détourage reste posé dessus"
-            : r === "final"
-              ? "le dernier plan, large et calme, tenu jusqu'à la fin : le dernier détourage s'y pose"
-              : "un plan vivant de sa rue ou de son lieu, en plein cadre, différent du précédent : des gens qui passent, un geste, un détail",
-    );
-    const firstPop = spans[roles.indexOf("pop")]!.start;
+    const drop = spans[1]!.start;
+    // What each burst shot wants: the original's at its place; a sweep only where its sweep is kept as one.
+    const files = cuts.flatMap((c, i) => (c.file ? [i + 1] : []));
+    const wants = [
+      "le plan large et fixe qui ouvre, le téléphone posé, au moins 6 s : son lieu, sa rue ou un paysage, avec du ciel (ou un mur dégagé) au-dessus de ce qui passera devant son nom (son toit, sa devanture, ses collines, quelqu'un debout), quelqu'un qui y entre et s'arrête : son nom s'y allume derrière le décor",
+      ...cuts.map((c) => (c.of < 0 ? "un moment de plus, court : quelqu'un, un geste, une matière de près, son lieu vu d'en haut" : c.file || !SWEEPS.includes(c.of) ? BURST_WANTS[c.of]! : "un plan qui bouge, court : un geste, une matière, sa rue")),
+      "le dernier plan, tenu : quelqu'un de dos devant son lieu, un geste large (les bras levés, un salut), le téléphone posé",
+    ];
+    // Her name's letters, on their images from its first flash (the original's images at 140 BPM, following its tempo),
+    // and a tick on each flash and when it is all lit.
+    const name = lettersOf(options.words?.titre ?? "ICELAND");
+    const scale = 140 / bpm;
+    const nameAt = toFrame(NAME * beat);
+    const times = letterTimes(name.length || 7);
+    const at = (f: number) => Math.round(nameAt + f * scale);
+    const letters: Record<string, number> = {};
+    for (const t of times) {
+      letters[`fl${t.place}`] = at(t.flash);
+      letters[`dk${t.place}`] = at(t.dark);
+      letters[`on${t.place}`] = at(t.on);
+    }
+    const lit = Math.max(...times.map((t) => at(t.on)));
+    const flashes = [...new Set([...times.map((t) => at(t.flash)), lit])].sort((a, b) => a - b);
+    const sounds: SkillSound[] = [{ at: round3(flashes[0]! / 30), ...TICK, burst: { times: flashes.map((f) => round3((f - flashes[0]!) / 30)) } }];
+    const lastAt = spans.at(-1)!.start;
     return {
       duration,
       shots: spans.map((s, i) => ({ ...s, want: wants[i]! })),
-      // The title on the first two shots; the words with the cut-outs, from the first to the end (or its card).
-      texts: {
-        mots: { from: firstPop, to: round(end ? duration - CARD_SECONDS : duration) },
-        titre: { from: 0, to: firstPop },
+      // Her name from its first flash to the drop.
+      texts: { titre: { from: round(nameAt / 30), to: drop } },
+      marks: {
+        slit_from: 1,
+        slit_to: toFrame(SLIT * beat),
+        name: nameAt,
+        ...letters,
+        file_a: files[0] ?? -1,
+        file_b: files[1] ?? -1,
       },
-      marks: { beat: beat * 30, first: toFrame(firstPop) },
+      sounds,
+      // Its intro without drums: its highs opening over its first seven beats, then softer to the drop, where its first
+      // strong beat lands; the bass falling away under its last shot and back; cut dead at the end (the loop).
+      music: {
+        downbeat: round3(drop),
+        filters: [
+          { kind: "muffled", from: 0, to: round3(OPEN * beat), open: round3(OPEN * beat) },
+          { kind: "soft", from: round3(OPEN * beat), to: round3(drop), db: SOFT_DB, open: 0.02 },
+          { kind: "thin", from: round3(lastAt + THIN[0]! * beat), to: round3(lastAt + THIN[1]! * beat), open: 0.02 },
+        ],
+        end: { at: duration },
+      },
+      // Her opening shot cut out, only for her name behind what stands before her wall (no sky there).
+      cutouts: [0],
     };
   },
   code: CODE,

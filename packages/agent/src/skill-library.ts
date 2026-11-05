@@ -3,6 +3,7 @@ import { cadre } from "./skills/cadre.ts";
 import { coulisses } from "./skills/coulisses.ts";
 import { coupsDeFouet } from "./skills/coups-de-fouet.ts";
 import { decode } from "./skills/decode.ts";
+import { detourages } from "./skills/detourages.ts";
 import { ecranPartage } from "./skills/ecran-partage.ts";
 import { eventail } from "./skills/eventail.ts";
 import { facade } from "./skills/facade.ts";
@@ -30,6 +31,7 @@ export const MONTAGE_SKILLS: Record<string, MontageSkill> = {
   coulisses,
   "coups-de-fouet": coupsDeFouet,
   decode,
+  detourages,
   "ecran-partage": ecranPartage,
   eventail,
   facade,
