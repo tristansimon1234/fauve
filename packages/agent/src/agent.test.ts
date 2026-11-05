@@ -455,6 +455,35 @@ test("motion scenes: the renderer, the smoke test and the prompt share one scope
   }
 });
 
+test("her videos are prepared the same way in the render workshop and the local skill render, a key image every second", async () => {
+  const { readFileSync } = await import("node:fs");
+  const { HDR_MARKS, keyInterval, PREPARED_CODEC, preparedFilter } = await import("./prepare.ts");
+  // A key image every second at any frame rate: an image dropped from OffthreadVideo's cache is decoded again from at most
+  // 29 images before it (x264's own default, one every 250 images, made the six bands of « Titre qui se décode » decode
+  // every image of every band again from its key image).
+  const g = PREPARED_CODEC.indexOf("-g");
+  assert.ok(g >= 0 && Number(PREPARED_CODEC[g + 1]) === 30, PREPARED_CODEC.join(" "));
+  assert.deepEqual([keyInterval(30), keyInterval(60), keyInterval(24)], [30, 60, 24]);
+  assert.match(preparedFilter(), /^scale=.*min\(iw,2560\).*:flags=lanczos,fps=30,tpad=stop_mode=clone:stop_duration=2,format=yuv420p$/);
+  assert.match("Color primaries: arib-std-b67", new RegExp(HDR_MARKS));
+  // Both prepare her videos with these settings, never their own (the local render used to skip the sound, the lanczos
+  // scaler, the quality and the key images the workshop uses, and could not catch what stalled it).
+  const read = (path: string) => readFileSync(new URL(path, import.meta.url), "utf8");
+  const workshop = read("../../../apps/web/src/lib/render/sandbox.ts");
+  const local = read("../../../scripts/skill-render.mts");
+  for (const source of [workshop, local]) {
+    assert.match(source, /preparedFilter\(\)/);
+    assert.match(source, /PREPARED_CODEC/);
+    assert.match(source, /HDR_TO_SDR/);
+    assert.doesNotMatch(source, /min\(iw,2560\)/);
+  }
+  // A slow motion's own file (60 images a second) has its key image every second too.
+  assert.match(workshop, /-g \$\{keyInterval\(SLOW_FPS\)\}/);
+  // Its colour tags are a list: written into a shell command, always joined by spaces (never by commas).
+  assert.doesNotMatch(workshop, /\$\{HDR_TAGS\}/);
+  assert.doesNotMatch(workshop, /"arib-std-b67\|smpte2084"/);
+});
+
 test("pricing: Gemini, Kimi, the sandbox, the music and the transcriptions are priced", async () => {
   const { geminiCostUsd, isKimiModel, kimiCostUsd, musicCostUsd, sandboxCostUsd, sandboxMemoryCostUsd, transcriptionCostUsd } = await import("./pricing.ts");
   const tokens = { input: 1_000_000, output: 100_000 };

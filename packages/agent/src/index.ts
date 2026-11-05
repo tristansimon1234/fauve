@@ -8,6 +8,7 @@ export * from "./phone.ts";
 export * from "./website.ts";
 export * from "./history.ts";
 export * from "./render.ts";
+export * from "./prepare.ts";
 export * from "./motion.ts";
 export * from "./editor.ts";
 export * from "./motion-scene.ts";

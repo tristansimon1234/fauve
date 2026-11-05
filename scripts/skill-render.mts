@@ -29,10 +29,13 @@
 // image (media_assets.subjects); made locally by track_objects.py on her (« woman », with `photo` for a photo).
 // The shots its code sets a text in the clear area of (ClearBox) are read here as the engine reads them
 // (apps/render/clear_area.py, by PYTHON: a Python with OpenCV and numpy, `python3` by default); without it, the fallback.
-// Clips are local files (videos or photos); they are normalized at 30 images a second into the bundle's public folder,
-// once per file (named after its path, size and date: another file at the same place in the list is normalized anew),
-// as the render workshop does. The browser is Playwright's Chromium (CHROME, default /opt/pw-browsers/…), whose fonts
-// load through the machine's own certificates.
+// Clips are local files (videos or photos); her videos are prepared exactly as the render workshop prepares them
+// (packages/agent/src/prepare.ts: 2560 px at most, 30 images a second, a key image every second, her sound kept, an HDR
+// video tone-mapped, the file as it came when ffmpeg cannot read it), each one once per file and recipe (named after its
+// path, size, date and the recipe: another file at the same place, or a new recipe, is prepared anew) into the bundle's
+// public folder, in jobs/prepared, shared by every skill. A Reel slow or stalled in the workshop is slow or stalled here
+// too. The browser is Playwright's Chromium (CHROME, default /opt/pw-browsers/…), whose fonts load through the machine's
+// own certificates.
 //
 // A skill timed on her voice (its `voice`): her talking video is the first clip, its words given as Scribe times them
 // (--talk: a JSON file or text, { "words": [{ "w", "start", "end" }], "pauses": [{ "start", "end" }], "fillers": [...] },
@@ -42,13 +45,14 @@
 // --takes sync measures them on their sound as the sandbox does (ffmpeg decodes them, takeOffset correlates them). Her
 // sound is kept in the render, and the engine's subtitles of what she says are drawn.
 
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, readFileSync, renameSync, statSync, writeFileSync } from "node:fs";
 import { basename, extname, resolve } from "node:path";
 import { parseArgs } from "node:util";
 import { buildReelProps, readsSpoken } from "../packages/agent/src/motion.ts";
 import { HOUSE_MODELS, houseStyle } from "../packages/agent/src/house-models.ts";
+import { HDR_MARKS, HDR_TAGS, HDR_TO_SDR, PREPARED_CODEC, preparedFilter } from "../packages/agent/src/prepare.ts";
 import { MONTAGE_SKILLS } from "../packages/agent/src/skill-library.ts";
 import { isClipSegment } from "../packages/agent/src/schemas.ts";
 import { followedFrom, signatureOf } from "../packages/agent/src/steal.ts";
@@ -109,7 +113,8 @@ const job = `skill-${skill.key}`;
 const media = `${RENDER}/build/public/jobs/${job}`;
 mkdirSync(media, { recursive: true });
 
-// Her files: each normalized once (30 i/s, its last image held 2 s, like NORMALIZE), measured with ffprobe.
+// Her files: each video prepared once as the workshop prepares it (NORMALIZE in apps/web/src/lib/render/sandbox.ts), a
+// photo copied as it is, measured with ffprobe.
 const PHOTO = /\.(jpe?g|png|webp)$/i;
 const probe = (path: string) => {
   const [w, h, d] = execFileSync("ffprobe", ["-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height:format=duration", "-of", "csv=p=0:s=,", path], { encoding: "utf8" })
@@ -118,27 +123,39 @@ const probe = (path: string) => {
     .filter((x) => Number.isFinite(x));
   return { width: w ?? 1080, height: h ?? 1920, seconds: d ?? 0 };
 };
+const prepared = `${RENDER}/build/public/jobs/prepared`;
+mkdirSync(prepared, { recursive: true });
+const RECIPE = JSON.stringify([preparedFilter(), PREPARED_CODEC, HDR_TO_SDR, HDR_TAGS]);
+/** As NORMALIZE: an HDR video tone-mapped (else as it is, if that fails), the file as it came when ffmpeg cannot read it. */
+function prepare(source: string, target: string) {
+  const info = spawnSync("ffmpeg", ["-hide_banner", "-i", source], { encoding: "utf8" }).stderr ?? "";
+  const encode = (hdr: boolean) =>
+    spawnSync(
+      "ffmpeg",
+      ["-v", "error", "-y", "-i", source, "-map", "0:v:0", "-map", "0:a:0?", "-vf", `${hdr ? `${HDR_TO_SDR},` : ""}${preparedFilter()}`, ...PREPARED_CODEC, ...(hdr ? HDR_TAGS : []), target],
+      { stdio: ["ignore", "inherit", "inherit"] },
+    ).status === 0;
+  if ((new RegExp(HDR_MARKS).test(info) && encode(true)) || encode(false)) return;
+  copyFileSync(source, target);
+}
 const files: (SkillFile & { src: string; aspect: number; path: string })[] = (values.clips ?? "").split(",").filter(Boolean).map((path, i) => {
   const source = resolve(path);
   const photo = PHOTO.test(source);
   const id = `f${i}`;
   const { size, mtimeMs } = statSync(source);
-  const stamp = createHash("sha1").update(`${source}:${size}:${mtimeMs}`).digest("hex").slice(0, 10);
-  // On her voice, her sound is kept (the Reel is what she says).
-  const sound = Boolean(skill.voice) && !photo;
-  const target = `${media}/${id}-${stamp}${sound ? "-a" : ""}${photo ? extname(source) : ".mp4"}`;
+  // Her sound always kept, as the workshop keeps it (a skill on her voice plays it: the Reel is what she says).
+  const stamp = createHash("sha1").update(`${source}:${size}:${mtimeMs}${photo ? "" : `:${RECIPE}`}`).digest("hex").slice(0, 16);
+  const name = `${stamp}${photo ? extname(source) : ".mp4"}`;
+  const target = `${prepared}/${name}`;
   if (!existsSync(target)) {
-    if (photo) execFileSync("cp", [source, target]);
-    else
-      execFileSync("ffmpeg", [
-        "-v", "error", "-y", "-i", source,
-        ...(sound ? ["-map", "0:v:0", "-map", "0:a:0?", "-c:a", "aac", "-b:a", "160k"] : ["-an"]),
-        "-vf", "scale='if(gt(iw,ih),min(iw,2560),-2)':'if(gt(iw,ih),-2,min(ih,2560))',fps=30,tpad=stop_mode=clone:stop_duration=2,format=yuv420p",
-        "-c:v", "libx264", "-preset", "veryfast", "-crf", "18", "-movflags", "+faststart", target,
-      ]);
+    // Written aside, then moved in place: another run preparing the same file never reads half of it.
+    const aside = `${prepared}/${stamp}.${process.pid}.part${photo ? extname(source) : ".mp4"}`;
+    if (photo) copyFileSync(source, aside);
+    else prepare(source, aside);
+    renameSync(aside, target);
   }
   const p = probe(source);
-  return { id, photo, seconds: photo ? 0 : Math.max(0, p.seconds), shows: basename(source), src: `/public/jobs/${job}/${basename(target)}`, aspect: p.width / Math.max(1, p.height), path: source };
+  return { id, photo, seconds: photo ? 0 : Math.max(0, p.seconds), shows: basename(source), src: `/public/jobs/prepared/${name}`, aspect: p.width / Math.max(1, p.height), path: source };
 });
 if (!files.length) throw new Error("--clips: at least one file");
 

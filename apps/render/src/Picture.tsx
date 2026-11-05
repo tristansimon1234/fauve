@@ -76,7 +76,7 @@ function BurnOf(hooks: KitHooks) {
 // ——— LensEdges ————————————————————————————————————————————————————————————————————————————
 
 type LensEdgesProps = {
-  /** What it shows (her shot, a whole composition), drawn at the frame's size; drawn once more in each edge. */
+  /** What it shows (her shot, a whole composition), drawn once at the frame's size; its edges filter it where it is. */
   children: Draw;
   /** y: the top and the bottom of the frame (a shot in width turned a quarter, as « Quart de tour »); x: its sides. */
   axis?: "y" | "x";
@@ -92,7 +92,9 @@ type LensEdgesProps = {
 /**
  * The edges of an anamorphic lens: near two edges of the frame the picture streaks along them and splits green and
  * magenta, the magenta outward; the middle stays sharp (« Quart de tour, deux tons », docs/fiches/tourne.md, effect 7).
- * Laid over a picture in two tones too: its split adds the colour.
+ * Laid over a picture in two tones too: its split adds the colour. Each band filters what is under it (a backdrop
+ * filter), never a copy of it: drawn once more in each band, her shot (its video, its tones) took half the render of
+ * « Quart de tour » (docs/rendu.md, « Une image clé par seconde »).
  */
 function LensEdgesOf(hooks: KitHooks) {
   return function LensEdges({ children, axis = "y", size = 0.25, split = 6, streak = 2, hold = 8 }: LensEdgesProps) {
@@ -119,13 +121,8 @@ function LensEdgesOf(hooks: KitHooks) {
       const box: CSSProperties = vertical
         ? { position: "absolute", left: 0, top: start ? 0 : H - band, width: W, height: band }
         : { position: "absolute", top: 0, left: start ? 0 : W - band, height: H, width: band };
-      const inner: CSSProperties = vertical ? { position: "absolute", left: 0, top: start ? 0 : band - H, width: W, height: H } : { position: "absolute", top: 0, left: start ? 0 : band - W, width: W, height: H };
       const mask = edgeFade(side, hold);
-      return (
-        <div key={side} data-fauve-decor="" aria-hidden="true" style={{ ...box, overflow: "hidden", filter: `url(#${id}-${side})`, WebkitMaskImage: mask, maskImage: mask }}>
-          <div style={inner}>{drawAt(children, full)}</div>
-        </div>
-      );
+      return <div key={side} data-fauve-decor="" aria-hidden="true" style={{ ...box, backdropFilter: `url(#${id}-${side})`, WebkitMaskImage: mask, maskImage: mask }} />;
     };
     return (
       <>

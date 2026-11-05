@@ -1,10 +1,10 @@
 import "server-only";
 import { randomUUID } from "node:crypto";
-import { clearMapSchema, modalCostUsd, usdToEur, type ClearMap } from "@fauve/agent";
+import { clearMapSchema, HDR_TO_SDR, modalCostUsd, usdToEur, type ClearMap } from "@fauve/agent";
 import { ModalClient, type Sandbox } from "modal";
 import { env } from "@/lib/env";
 import { REMOTION_SOURCE_FILES } from "./remotion-source.generated";
-import { HDR_TO_SDR, type CutoutReading } from "./sandbox";
+import type { CutoutReading } from "./sandbox";
 
 // Her video cut out at every image on a graphics card rented by the second (Modal, Tristan: « rétro-engineer ça pour
 // avoir un truc bien », on poof.bg): a Modal sandbox with an A10G is created for the job and ended after it, its image

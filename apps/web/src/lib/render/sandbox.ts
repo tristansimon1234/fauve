@@ -4,6 +4,10 @@ import {
   bassLevelsFilter,
   BEAT_STEP,
   GROOVE_STEP,
+  HDR_MARKS,
+  HDR_TAGS,
+  HDR_TO_SDR,
+  keyInterval,
   MIX_CEILING,
   MIX_FADE,
   MODEL_SHEETS,
@@ -21,6 +25,8 @@ import {
   parseSilences,
   shotMiddles,
   pauseFilter,
+  PREPARED_CODEC,
+  preparedFilter,
   quietPauses,
   REEL_FPS,
   RENDER_FONTS,
@@ -109,28 +115,20 @@ const EMOJI_FONTS = [
 const FETCH = 'curl -fsSL --http1.1 --retry 4 --retry-all-errors --retry-delay 1 --connect-timeout 15 -o "$1" "$2"';
 
 /**
- * Downloads the video $2 and writes it to $1 at the Reel's frame rate, its last image held
- * two more seconds. A phone video (variable frame rate, odd timestamps, a picture a little
- * shorter than its sound) could stop Remotion on « No frame found at position »; this one
- * always has a frame where the plan asks. An iPhone's HDR video (HLG or PQ, 10 bits) is
- * tone-mapped to the SDR of a Reel on the way, else its colours come out washed out. If
- * ffmpeg cannot read it, the file as it came.
+ * Downloads the video $2 and writes it to $1 prepared for the render (packages/agent/src/prepare.ts, which the local
+ * skill render follows too): its long side 2560 px at most, at the Reel's frame rate, its last image held two more
+ * seconds, a key image every second, an iPhone's HDR video tone-mapped to the SDR of a Reel on the way. If ffmpeg cannot
+ * read it, the file as it came.
  */
-/** An iPhone's HDR (HLG or PQ, 10 bits) tone-mapped to the SDR of a Reel, else its colours come out washed out. */
-export const HDR_TO_SDR = "zscale=t=linear:npl=100,format=gbrpf32le,zscale=p=bt709,tonemap=tonemap=hable:desat=0,zscale=t=bt709:m=bt709:r=tv";
-const HDR_TAGS = "-color_primaries bt709 -color_trc bt709 -colorspace bt709";
-
 const NORMALIZE = [
   "set -euo pipefail",
   `${FETCH.replace('"$1"', '"$1.src"')}`,
-  // Its long side 2560 px at most: enough to frame a 1080 x 1920 Reel, and Remotion's frame extractor no longer runs
-  // out of memory on ten phone videos at full size (killed by the system, the Paris Reel came out broken at 11 s).
-  `tail="scale='if(gt(iw,ih),min(iw,2560),-2)':'if(gt(iw,ih),-2,min(ih,2560))':flags=lanczos,fps=${REEL_FPS},tpad=stop_mode=clone:stop_duration=2,format=yuv420p"`,
-  'enc="-c:v libx264 -preset veryfast -crf 16 -c:a aac -b:a 192k -movflags +faststart"',
+  `tail="${preparedFilter()}"`,
+  `enc="${PREPARED_CODEC.join(" ")}"`,
   `plain() { ${ROOT}/ffmpeg -v error -y -i "$1.src" -map 0:v:0 -map "0:a:0?" -vf "$tail" $enc "$1"; }`,
-  `hdr() { ${ROOT}/ffmpeg -v error -y -i "$1.src" -map 0:v:0 -map "0:a:0?" -vf "${HDR_TO_SDR},$tail" $enc ${HDR_TAGS} "$1"; }`,
+  `hdr() { ${ROOT}/ffmpeg -v error -y -i "$1.src" -map 0:v:0 -map "0:a:0?" -vf "${HDR_TO_SDR},$tail" $enc ${HDR_TAGS.join(" ")} "$1"; }`,
   `info=$(${ROOT}/ffmpeg -hide_banner -i "$1.src" 2>&1 || true)`,
-  'if grep -qE "arib-std-b67|smpte2084" <<<"$info"; then hdr "$1" || plain "$1" || cp "$1.src" "$1"; else plain "$1" || cp "$1.src" "$1"; fi',
+  `if grep -qE "${HDR_MARKS}" <<<"$info"; then hdr "$1" || plain "$1" || cp "$1.src" "$1"; else plain "$1" || cp "$1.src" "$1"; fi`,
   'rm -f "$1.src"',
 ].join("\n");
 
@@ -150,18 +148,18 @@ const SMOOTH_BUDGET_SECONDS = 3;
  * The passage of the video $2 from $3 seconds, $4 seconds long, at 60 frames a second, written to $1
  * for a shot in slow motion (CapCut's smooth slow motion): a video filmed at 50 fps or more keeps its
  * own frames; a 30 fps one gets the frames in between made by motion interpolation ($5 = 1), else
- * repeated. Its last image held a second; an iPhone's HDR tone-mapped like NORMALIZE.
+ * repeated. Its last image held a second, a key image every second; an iPhone's HDR tone-mapped like NORMALIZE.
  */
 const SLOW_NORMALIZE = [
   "set -euo pipefail",
   `${FETCH.replace('"$1"', '"$1.src"')}`,
   `info=$(${ROOT}/ffmpeg -hide_banner -i "$1.src" 2>&1 || true)`,
   'fps=$(grep -m1 -oE "[0-9.]+ fps" <<<"$info" | cut -d" " -f1 || true)',
-  `hdr=""; tags=""; if grep -qE "arib-std-b67|smpte2084" <<<"$info"; then hdr="${HDR_TO_SDR},"; tags="${HDR_TAGS}"; fi`,
+  `hdr=""; tags=""; if grep -qE "${HDR_MARKS}" <<<"$info"; then hdr="${HDR_TO_SDR},"; tags="${HDR_TAGS.join(" ")}"; fi`,
   `motion="fps=${SLOW_FPS}"`,
   `if [ "$5" = "1" ] && ! awk -v f="\${fps:-30}" 'BEGIN{exit !(f >= 48)}'; then motion="minterpolate=fps=${SLOW_FPS}:mi_mode=mci:mc_mode=aobmc:me_mode=bidir:vsbmc=1"; fi`,
   'tail="tpad=stop_mode=clone:stop_duration=1,format=yuv420p"',
-  'enc="-an -c:v libx264 -preset veryfast -crf 16 -movflags +faststart"',
+  `enc="-an -c:v libx264 -preset veryfast -crf 16 -g ${keyInterval(SLOW_FPS)} -movflags +faststart"`,
   `cut() { timeout "$1" ${ROOT}/ffmpeg -v error -y -ss "$SS" -t "$T" -i "$SRC.src" -map 0:v:0 -vf "$2" $enc $tags "$SRC"; }`,
   'SRC="$1"; SS="$3"; T="$4"',
   `cut 240 "\${hdr}$motion,$tail" || cut 90 "\${hdr}fps=${SLOW_FPS},$tail"`,
@@ -1713,7 +1711,7 @@ const STABILIZE = [
   `ff="timeout 150 ${CUTOUT_ROOT}/ffmpeg"`,
   '$ff -v error -y -i in.src -vf "vidstabdetect=shakiness=6:accuracy=12:result=t.trf" -f null -',
   'info=$($ff -hide_banner -i in.src 2>&1 || true)',
-  `hdr=""; tags=""; if grep -qE "arib-std-b67|smpte2084" <<<"$info"; then hdr="${HDR_TO_SDR},"; tags="${HDR_TAGS}"; fi`,
+  `hdr=""; tags=""; if grep -qE "${HDR_MARKS}" <<<"$info"; then hdr="${HDR_TO_SDR},"; tags="${HDR_TAGS.join(" ")}"; fi`,
   '$ff -v error -y -i in.src -map 0:v:0 -map "0:a:0?" -vf "${hdr}vidstabtransform=input=t.trf:smoothing=15:optzoom=1:zoomspeed=0.2:interpol=bicubic,unsharp=5:5:0.5,format=yuv420p" -c:v libx264 -preset veryfast -crf 15 $tags -c:a aac -b:a 192k -movflags +faststart out.mp4',
 ].join("\n");
 

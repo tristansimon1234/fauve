@@ -7077,6 +7077,12 @@ test("picture kit: its pieces are in the motion designer's scope and prompt, the
   assert.match(MOTION_DESIGNER_PROMPT, /<Turn draw angle=\{180\} \/>/);
   assert.match(MOTION_DESIGNER_PROMPT, /wave: "reading"[^\n]*reveal: "land"/);
   assert.match(MOTION_DESIGNER_PROMPT, /object="every window" part=\{k\}/);
+  // LensEdges draws what it shows once, each band filtering what is under it: drawn once more in each band, her shot
+  // (its video, its tones) took half the render of « Quart de tour ».
+  const lens = /function LensEdgesOf[\s\S]*?\n}\n/.exec(picture)![0];
+  assert.equal(lens.match(/drawAt\(children/g)?.length, 1);
+  assert.match(lens, /backdropFilter: `url\(#\$\{id\}-\$\{side\}\)`/);
+  assert.doesNotMatch(lens, /[^p]filter: `url\(#/);
   // The scene check draws them on its own clock, as the other kits.
   assert.match(read("../../../apps/render/src/SceneCheck.tsx"), /\.\.\.makePicture\(\{ useCurrentFrame, useVideoConfig \}\)/);
   assert.match(read("../../../apps/render/src/Graphic.tsx"), /angle\?: 90 \| -90 \| 180/);
