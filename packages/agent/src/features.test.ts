@@ -7602,7 +7602,7 @@ test("« Mots mêlés » (v2): its picture darkened to its own light, as filmed,
 test("« Interrupteur » (v2): one shot of 9,1 s on its original's grid (143,7 BPM, one beat in two), its music stopped dead and back as she lands, its beep", async () => {
   const { interrupteur } = await import("./skills/interrupteur.ts");
   const { skillPlan } = await import("./skills.ts");
-  assert.equal(interrupteur.version, 7);
+  assert.equal(interrupteur.version, 8);
   assert.equal(interrupteur.bpm, 71.85);
   const line = interrupteur.timeline(1, { end: false });
   // One fixed shot, no cut (the original has none): its 275 images less its last two, a rest of its edit.
@@ -9175,7 +9175,7 @@ test("« Photos posées sur la table » (v2): horizontal 4:3 on black when her t
 
 test("« Interrupteur » (v4): once she has left, her wall held on that image to the end, nothing of hers coming back; never frozen when nothing says she was there", async () => {
   const { interrupteur } = await import("./skills/interrupteur.ts");
-  assert.equal(interrupteur.version, 7);
+  assert.equal(interrupteur.version, 8);
   const line = interrupteur.timeline(1, { end: false });
   const marks = Object.fromEntries(Object.entries(line.marks).map(([k, v]) => [k, String(v)]));
   const brand = { name: "Atelier Rose", displayFont: "Inter Tight", bodyFont: "Inter Tight", accent: "#7a2e3b", palette: { secondary: "#2c4a3e", light: "#f4efe9", dark: "#1d1d1b" } };
@@ -10211,6 +10211,9 @@ test("« Interrupteur » (v6): held only once nothing of her is left in her cut-
   const edge = (f: number) => (f <= 200 ? body : hands);
   assert.equal(await wallAt(edge, 230), undefined);
   assert.equal(await wallAt(edge, 272), undefined);
+  // v8: her hand leaving at the edge, a hundredth of her, is still her: never frozen on it (v7 froze it there).
+  const finger = { x: 1040, y: 1500, w: 40, h: 210 };
+  assert.equal(await wallAt((f: number) => (f <= 200 ? body : finger), 260), undefined);
   // Nothing of her from 201, her hand back on 240: held from her leaving, her hand never seen.
   const back = (f: number) => (f <= 200 ? body : f >= 240 ? hands : null);
   const held = await Promise.all([215, 240, 272].map(async (f) => f - ((await wallAt(back, f)) ?? f)));
@@ -10271,5 +10274,26 @@ test("the answers' schemas stay within the API's optional parameters: the editor
   assert.equal(fonts.safeParse({ display: "Anton" }).success, false);
   assert.equal(fonts.safeParse({ display: "Anton", body: "Inter" }).success, true);
   assert.equal(fonts.safeParse(undefined).success, true);
+});
+
+test("« Interrupteur » (v8): its poster's texts keyed by their words, so its ending card's long line is measured again", async () => {
+  const { interrupteur } = await import("./skills/interrupteur.ts");
+  const line = interrupteur.timeline(1, { end: true });
+  const marks = Object.fromEntries(Object.entries(line.marks).map(([k, v]) => [k, String(v)]));
+  const brand = { name: "La Fripe Rétro", displayFont: "Inter Tight", bodyFont: "Inter Tight", accent: "#c4471c", palette: { secondary: "#2c4a3e", light: "#f4efe9", dark: "#1d1d1b" } };
+  const durationInFrames = Math.round(line.duration * 30);
+  const reelTexts = [
+    { text: "La Fripe Rétro", role: "hook", from: 123, to: durationInFrames, emphasis: [] },
+    { text: "Nouvelle saison", role: "caption", from: 123, to: durationInFrames, emphasis: [] },
+  ];
+  const end = { title: "La nouvelle saison est ouverte", subtitle: "Deux salles, de nouvelles pièces chaque semaine", from: durationInFrames - 48 };
+  const props = { width: 1080, height: 1920, durationInFrames, brand, shots: rallumeShots(line, 9 / 16), reelTexts, end, texts: marks };
+  const { draw } = await kitScene(interrupteur.code);
+  const fits = (f: number) => drawnNodes(draw(f, props)).filter((n) => n.type === "FitText").map((n) => String(n.props.key));
+  const before = fits(end.from - 5), after = fits(end.from + 5);
+  // A new box for each text (a FitText measures once): the card's title and line are never the poster's boxes.
+  assert.ok(before.includes("s-Nouvelle saison") && before.includes("title-La Fripe Rétro"), before.join(" "));
+  assert.ok(after.includes("s-Deux salles, de nouvelles pièces chaque semaine") && after.includes("title-La nouvelle saison est ouverte"), after.join(" "));
+  assert.equal(after.some((k) => before.includes(k)), false);
 });
 

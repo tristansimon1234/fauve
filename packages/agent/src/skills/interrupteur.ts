@@ -206,9 +206,11 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
     return { position: "absolute", left: Math.round(CX - half), top: y, width: Math.round(2 * half), height: tallPx };
   };
   const rule = (k) => h("span", { key: k, style: { display: "inline-block", width: "1.6em", height: "0.12em", backgroundColor: INK, verticalAlign: "middle", margin: "0 0.6em" } });
+  // Keyed by its text: a FitText measures once, so a longer text in the same box (her ending card's line after « Nouvelle
+  // saison ») would keep the short one's size and run off the frame.
   const small = (t, top, tall, size, spaced) => {
     const fit = words(t.text) > 4 ? Math.max(size, 48) : size;
-    return h(FitText, { style: at(top, Math.max(tall, (fit * 1.25) / PH)), innerStyle: { fontFamily: body, fontWeight: 700, fontSize: fit, lineHeight: 1.1, letterSpacing: spaced ? "0.18em" : "0.08em", textTransform: "uppercase", color: INK, whiteSpace: "nowrap", textAlign: "center" } },
+    return h(FitText, { key: "s-" + keep(t.text), style: at(top, Math.max(tall, (fit * 1.25) / PH)), innerStyle: { fontFamily: body, fontWeight: 700, fontSize: fit, lineHeight: 1.1, letterSpacing: spaced ? "0.18em" : "0.08em", textTransform: "uppercase", color: INK, whiteSpace: "nowrap", textAlign: "center" } },
       h("span", { "data-fauve-accent": "" }, spaced ? rule("a") : null, keep(t.text), spaced ? rule("b") : null));
   };
   const sparkle = (cx0, cy0, r) => h("svg", { key: "spark", width: 2 * r, height: 2 * r, viewBox: "-1 -1 2 2", style: { position: "absolute", left: Math.round(cx0 - r), top: Math.round(cy0 - r) } },
@@ -223,7 +225,7 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
     ? h("div", { key: "poster" },
         logo ? h("div", { style: { ...at(0, title ? 0.5 : 0.78), left: Math.round(PX + PW * 0.2), width: Math.round(PW * 0.6) } },
           h(Img, { src: brand.logoUrl, maxRetries: 1, onError: () => null, style: { width: "100%", height: "100%", objectFit: "contain" } })) : null,
-        title ? h(FitText, { key: "title", style: nameBox, innerStyle: { fontFamily: display, fontWeight: 700, fontSize: Math.round(PH * nameTall * 0.62), lineHeight: 1, letterSpacing: "-0.02em", color: NAME, textAlign: "center", textWrap: "balance" } }, keep(title.text)) : null,
+        title ? h(FitText, { key: "title-" + keep(title.text), style: nameBox, innerStyle: { fontFamily: display, fontWeight: 700, fontSize: Math.round(PH * nameTall * 0.62), lineHeight: 1, letterSpacing: "-0.02em", color: NAME, textAlign: "center", textWrap: "balance" } }, keep(title.text)) : null,
         title ? h(Scribble, { key: "under", kind: "underline", box: { x: nameBox.left + nameBox.width * 0.02, y: nameBox.top, w: nameBox.width * 0.96, h: nameBox.height * 0.9 }, at: ON - 1, frames: 1, color: NAME, width: Math.max(3, Math.round(PH * 0.011)), wobble: 0.5, seed: "switch-under" }) : null,
         card ? (end.subtitle ? small({ text: end.subtitle }, 0.8, 0.07, LINE, true) : null) : line ? small(line, 0.8, 0.07, LINE, true) : null,
         !card && detail ? small(detail, 0.875, 0.045, DETAIL, false) : null,
@@ -248,13 +250,13 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
     const atFlip = cut(ON);
     const byCut = Boolean(atFlip && atFlip.w * atFlip.h > 0);
     if (!byCut && tracked(ON) !== true) return null;
-    // Gone when nothing of her is left in her cut-out (under a fiftieth of what it held at the flip): her hands still at
-    // the picture's edge are her (v5 froze them there, on its second bench); a hand coming back once she has gone is not.
+    // Gone when nothing of her is left in her cut-out (under a five-hundredth of what it held at the flip): her hands
+    // still at the picture's edge are her (v5 and v7 froze one there); a hand coming back once she has gone is not.
     const her = byCut ? atFlip.w * atFlip.h : 0;
     const seenAt = (f) => {
       if (!byCut) return tracked(f) !== false;
       const b = cut(f);
-      return Boolean(b && b.w * b.h > her * 0.02);
+      return Boolean(b && b.w * b.h > her * 0.002);
     };
     let run = 0;
     for (let f = ON + 6; f < until; f++) {
@@ -284,7 +286,9 @@ export const interrupteur: MontageSkill = {
   // hands at the edge of its friperie's wall, where she never quite left; there her shot now plays to the end. 7: her
   // passage ends on her wall alone, a second at least after she has left (Tristan on v6: « bizarre que la main reste »:
   // its filler had set her highest reach on the flip, and her video's 3 s of empty wall came after the Reel's end).
-  version: 7,
+  // 8: gone under a five-hundredth (v7 froze her hand leaving at the edge, a hundredth of her); her title and lines keyed
+  // by their text (its ending card's long line kept the size of « Nouvelle saison » and ran off both sides).
+  version: 8,
   bpm: BPM,
   shots: [1, 1],
   files: [1, 2],

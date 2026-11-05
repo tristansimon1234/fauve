@@ -30,7 +30,7 @@ Version du skill, et son dernier banc (cas du banc, durée, coût ; tous faits p
 | Lieu tapé lettre à lettre | `frappe` | v4 | v4, brighton, 13,9 s, 0,31 € | v1 |
 | Titre gaufré | `gaufre` | v2 | v2, librairie, 12,7 s, 0,14 € | v1 |
 | Interface minimaliste | `interface` | v3 | v3, ceramiste, 16,2 s, 0,10 € | — |
-| Interrupteur | `interrupteur` | v7 | v6, friperie, 9,1 s, 0,10 € (v7 en cours) | — |
+| Interrupteur | `interrupteur` | v8 | v7, friperie, 10,8 s, 0,17 € (v8 pas encore au banc) | — |
 | Une journée chez toi | `journee` | v2 | v2, budapest, 15,0 s, 0,17 € | v1 |
 | Voici mon travail | `mon-travail` | v1 | v1, ceramiste, 8,3 s, 0,18 € | — |
 | Mosaïque qui change | `mosaique` | v3 | v3, friperie, 12,0 s, 0,16 € | v1 |
@@ -84,6 +84,7 @@ Pour chacun (un agent par modèle en parallèle, chacun dans son arbre de travai
 - **Un Reel calé sur un son donné par lien** (« sur la musique de Bad Bunny », `docs/son.md`) : fait, jamais passé au banc (il faut un lien de Reel Instagram avec une chanson).
 - **Horizontal** : rien ne change (elle publie elle-même, sans l'API) ; piste notée dans `docs/monteur.md` : lui donner la version horizontale à publier en « Publication », sans bandes dans le fil.
 - **Le schéma « legacy » du monteur**, son repli quand l'API refuse le schéma courant, a 37 paramètres facultatifs et ne peut plus passer : à alléger ou à retirer.
+- **Une boîte `FitText` ne se mesure qu'une fois** (`apps/render/src/Fit.tsx`) : un texte plus long posé ensuite dans la même boîte garde la taille du premier et peut sortir du cadre (la carte de fin d'Interrupteur v7). Interrupteur v8 donne une boîte par texte (une clé faite de ses mots) ; à faire dans le kit pour tous (`FitText` remonté quand son texte change, dans `MotionScene.tsx`), puis `npm run render:pack`.
 - **Le réalisateur unique** (`lib/agent/director.ts`) : au banc du 3 novembre, pas meilleur que la chaîne ; il ne tourne que pour l'équipe et le banc (`directorTrial`). Pistes : effort high, ou deux agents (le monteur avec les planches, le regard du motion designer avec l'original au même instant).
 - **Plus tard** : des skills qui se combinent (l'ouverture d'un modèle, la fin d'un autre), pas encore fait. Déjà en place (vérifié dans le code le 5 novembre) : la librairie dans « Créer » (« Ou un modèle d'Edith », la galerie de leurs aperçus, `houseCards`, `docs/modeles.md`) ; jamais le même modèle deux fois de suite pour un commerce (`recentHouseKeys` dans `lib/agent/house-pick.ts`) ; un modèle choisi d'après ce qu'elle a filmé ; chacun habillé de sa charte, de ses images et de ses mots ; un juge avant livraison en effort « Soigné » et « Max » (`critic.ts`), pas en « Rapide », le réglage par défaut.
 
