@@ -2541,3 +2541,162 @@ test("« Mots aux quatre coins » (v2): horizontal 16:9 on black as its original
   assert.deepEqual(plan.music_shape, readMusicShape(line.music, line.duration));
   assert.equal(plan.sounds, undefined);
 });
+
+// ——— « Éventail de bandes » v2, written again on its original's fiche (docs/fiches/eventail.md) ——————————————————————
+
+test("« Éventail de bandes » (v2) cuts where its original does, on its own music (119,8 BPM): its star, its drop, its intro of hits alone", async () => {
+  const { eventail } = await import("./skills/eventail.ts");
+  const { readMusicShape } = await import("./music-shape.ts");
+  assert.equal(eventail.version, 2);
+  assert.equal(eventail.bpm, 119.8);
+  const line = eventail.timeline(13, { end: false });
+  // The original's thirteen shots and its black (images at 30 i/s, docs/fiches/eventail.md), counted from its first
+  // beat (its square, image 4: its picture runs five images ahead of its own music, ours lands on our music's beats from
+  // the first image): within two images each, on its beats.
+  const original = [4, 139, 169, 199, 230, 261, 291, 320, 350, 379, 410, 440, 469].map((f) => f - 4);
+  assert.equal(line.shots.length, original.length);
+  line.shots.forEach((s, i) => assert.ok(Math.abs(Math.round(s.start * 30) - original[i]!) <= 2, `shot ${i + 1}: image ${Math.round(s.start * 30)}, the original's ${original[i]}`));
+  assert.ok(Math.abs(line.duration * 30 - (597 - 4)) <= 2, `${line.duration} s`);
+  // A band on each beat after its square (the original's images 19, 33, 49, 64, 79, 94), the whole shot on the drop (109).
+  const beat = line.marks.beat!;
+  [19, 33, 49, 64, 79, 94].forEach((f, k) => assert.ok(Math.abs(Math.round((k + 1) * beat) - (f - 4)) <= 1, `band ${k + 1}: image ${Math.round((k + 1) * beat)}`));
+  assert.ok(Math.abs(line.marks.whole! - (109 - 4)) <= 1);
+  assert.equal(line.marks.whole, Math.round(line.shots[0]!.start * 30 + 7 * beat));
+  // Its split screen on its fifth two-beat shot (the original's images 261 to 291), its right half the black's file.
+  assert.deepEqual([line.marks.split, line.marks.split_to], [Math.round(line.shots[5]!.start * 30), Math.round(line.shots[5]!.end * 30)]);
+  assert.match(line.shots.at(-1)!.want, /6e.*écran partagé/);
+  assert.match(line.shots[9]!.want, /centre et des lignes/);
+  // Its words on the black only: her name from its first image (the original's 469), its red line two beats later (498).
+  assert.equal(Math.round(line.texts.signature!.from * 30), line.marks.black);
+  assert.ok(Math.abs(Math.round(line.texts.ligne!.from * 30) - (498 - 4)) <= 2, `${line.texts.ligne!.from} s`);
+  assert.deepEqual([line.texts.signature!.to, line.texts.ligne!.to], [line.duration, line.duration]);
+  // Its music shaped as the original's: a hit of it on each of the seven beats before the drop (0,28 s), through a small
+  // speaker (its intro's sound is all between 400 and 1 800 Hz), silent between; all of it, open, on the drop; going on
+  // under the black and cut with a short fade at the very end. No sound effect: its original has none.
+  const shape = readMusicShape(line.music, line.duration)!;
+  assert.equal(shape.pauses!.length, 7);
+  shape.pauses!.forEach((p, k) => assert.ok(Math.abs(p.from - (k * beat) / 30 - 0.28) < 0.01 && Math.abs(p.to - ((k + 1) * beat) / 30) < 0.002, JSON.stringify(p)));
+  assert.deepEqual(shape.filters, [{ kind: "radio", from: 0, to: Math.round((7 * beat * 1000) / 30) / 1000, open: 0.02 }]);
+  assert.deepEqual(shape.end, { at: line.duration, fade: 0.25 });
+  assert.equal(line.sounds, undefined);
+  // With an ending card (an option): her name six beats on the black, then the card's 1,6 s from a beat; cuts the same.
+  const ended = eventail.timeline(13, { end: true });
+  assert.deepEqual(ended.shots.slice(0, -1), line.shots.slice(0, -1));
+  assert.ok(Math.abs(((ended.duration - 1.6) * 30) / beat - 37) < 0.05, `${ended.duration} s`);
+  assert.equal(ended.texts.signature!.to, Math.round((ended.duration - 1.6) * 100) / 100);
+  // Fewer of her files: down to six shots, its split screen and its echo kept; more for a length she asks for, about 30 s.
+  const fewest = eventail.timeline(6, { end: false });
+  assert.equal(fewest.shots.length, 6);
+  assert.match(fewest.shots[3]!.want, /écran partagé/);
+  assert.match(fewest.shots[4]!.want, /centre et des lignes/);
+  assert.match(fewest.shots[5]!.want, /4e.*écran partagé/);
+  assert.equal(fewest.marks.split, Math.round(fewest.shots[3]!.start * 30));
+  assert.ok(Math.abs(eventail.timeline(23, { end: false }).duration - 29.8) < 0.1);
+  // At another tempo, all of it follows its beats.
+  const slower = eventail.timeline(13, { end: false, bpm: 100 });
+  assert.ok(Math.abs(slower.marks.whole! / line.marks.whole! - 119.8 / 100) < 0.01);
+  assert.ok(Math.abs(readMusicShape(slower.music, slower.duration)!.filters![0]!.to - 7 * 0.6) < 0.002);
+});
+
+test("« Éventail de bandes » (v2): horizontal 16:9 on black when her videos are, its star of windows on one shot, its frame, its split, its end", async () => {
+  const { eventail } = await import("./skills/eventail.ts");
+  const { skillCode, skillPlan, skillFillInput, skillSettings } = await import("./skills.ts");
+  const { drawsSubject, objectsDrawn } = await import("./subject.ts");
+  const line = eventail.timeline(13, { end: false });
+  const marks = Object.fromEntries(Object.entries(line.marks).map(([k, v]) => [k, String(v)]));
+  const shots = (aspect: number) => line.shots.map((s) => ({ from: Math.round(s.start * 30), durationInFrames: Math.round((s.end - s.start) * 30), kind: "video", aspect }));
+  // The kit pieces its code lays besides the stand-in scope's, as named elements too; its shot's heart when one is found.
+  const run = (frame: number, props: Record<string, unknown>, heart: unknown = null) =>
+    sceneAt(`const Paper = "Paper"; const Split = "Split"; const SubjectBox = () => (${JSON.stringify(heart)});\n${eventail.code}`, frame, { durationInFrames: Math.round(line.duration * 30), ...props });
+  const style = (d: Drawn) => (d.props.style ?? {}) as Record<string, number | string>;
+  const frameBox = (tree: Drawn) => tree.children[0] as Drawn;
+  const clipped = (tree: Drawn, kind: string) => drawnIn(tree).find((d) => String(style(d).clipPath ?? "").startsWith(kind));
+  const windows = (tree: Drawn) => String(style(clipped(tree, "path")!).clipPath).match(/M[^MZ]*Z/g)!;
+  // Her videos in width: the original's 16:9 frame, 1080 × 608 in the middle of the vertical frame, on black.
+  assert.deepEqual([style(frameBox(run(60, { shots: shots(16 / 9), texts: marks }))).top, style(frameBox(run(60, { shots: shots(16 / 9), texts: marks }))).height], [656, 608]);
+  // Upright videos: the whole frame; her setting prevails both ways.
+  assert.deepEqual([style(frameBox(run(60, { shots: shots(9 / 16), texts: marks }))).top, style(frameBox(run(60, { shots: shots(9 / 16), texts: marks }))).height], [0, 1920]);
+  assert.equal(style(frameBox(run(60, { shots: shots(9 / 16), texts: { ...marks, format: "horizontal" } }))).height, 608);
+  assert.equal(style(frameBox(run(60, { shots: shots(16 / 9), texts: { ...marks, format: "vertical" } }))).height, 1920);
+  assert.deepEqual(eventail.settings?.map((s) => [s.name, s.choices.map((c) => c.value)]), [["format", ["auto", "horizontal", "vertical"]], ["fond", ["bordeaux", "sienne"]]]);
+  // The star: on its bordeaux ground, the square alone on its first image, a band more on each beat, all windows onto her
+  // opening shot laid whole at its place, in black and white; no frame around it.
+  const wide = (frame: number) => run(frame, { shots: shots(16 / 9), texts: marks });
+  assert.equal((frameBox(wide(0)).children[0] as Drawn).type, "Paper");
+  assert.equal((frameBox(wide(0)).children[0] as Drawn).props.color, "#440a0b");
+  assert.deepEqual([0, 14, 15, 50, 89, 90, 104].map((f) => windows(wide(f)).length), [1, 1, 2, 4, 6, 7, 7]);
+  const starShot = drawnIn(clipped(wide(50), "path")!).find((d) => d.type === "Footage")!;
+  assert.deepEqual([starShot.props.shot, style(starShot).width, style(starShot).height], [0, 1080, 608]);
+  assert.match(String(style(starShot).filter), /^grayscale\(1\)/);
+  // Its square at the middle, 9,4 % of the short side; its diagonals 36° from the horizontal, its last two upright; each
+  // half cut short of the square (its first band from 13,5 % of the short side).
+  const point = (w: string, k: number) => w.match(/-?[\d.]+/g)!.map(Number).slice(2 * k, 2 * k + 2) as [number, number];
+  const [square, first, , , , upright] = windows(wide(104)) as [string, string, string, string, string, string];
+  assert.deepEqual(point(square, 0).map(Math.round), [511, 275]);
+  assert.ok(Math.abs(Number(square.match(/h([\d.]+)/)![1]) - 0.094 * 608) < 0.1);
+  const slope = (w: string) => {
+    const [a, b] = [point(w, 0), point(w, 1)];
+    return (Math.atan2(Math.abs(b[1] - a[1]), Math.abs(b[0] - a[0])) * 180) / Math.PI;
+  };
+  assert.ok(Math.abs(slope(first) - 36) < 0.1 && Math.abs(slope(upright) - 90) < 0.1, `${slope(first)}°, ${slope(upright)}°`);
+  assert.ok(Math.hypot(point(first, 0)[0] - 540, point(first, 0)[1] - 304) > 0.135 * 608);
+  // Turned a quarter upright: its straight bands to the sides, its diagonals to the corners at 54°.
+  const tall = windows(run(104, { shots: shots(9 / 16), texts: marks }));
+  assert.ok(Math.abs(slope(tall[1]!) - 54) < 0.1 && Math.abs(slope(tall[5]!)) < 0.1, `${slope(tall[1]!)}°, ${slope(tall[5]!)}°`);
+  // On her shot's heart when the filler named it and it was found small: read once, the star pulled within an eighth of
+  // the frame; a heart that fills much of it (a whole bandstand) leaves the star at the middle.
+  assert.deepEqual(point(windows(run(30, { shots: shots(16 / 9), texts: marks }, { x: 800, y: 40, w: 40, h: 40 }))[0]!, 0).map(Math.round), [646, 199]);
+  assert.deepEqual(point(windows(run(30, { shots: shots(16 / 9), texts: marks }, { x: 100, y: 0, w: 900, h: 400 }))[0]!, 0).map(Math.round), [511, 275]);
+  assert.deepEqual(objectsDrawn(eventail.code), []);
+  assert.deepEqual(objectsDrawn(skillCode(eventail, { coeur: "pendant lamp" })), [{ shot: 0, name: "pendant lamp" }]);
+  assert.equal(drawsSubject(eventail.code), false);
+  // The whole shot at once on the drop, at the same place and size, in a thin frame of the ground laid over it (the
+  // original's 14 px a side, 12 above and below, of 720 × 406), its blacks lifted to the blue black, its whites held.
+  const dropped = wide(Number(marks.whole));
+  assert.equal(clipped(dropped, "path"), undefined);
+  const film = clipped(dropped, "inset")!;
+  assert.equal(style(film).clipPath, "inset(18px 21px)");
+  const whole = drawnIn(film).find((d) => d.type === "Footage")!;
+  assert.deepEqual([whole.props.shot, style(whole).width, style(whole).height], [0, 1080, 608]);
+  assert.deepEqual(drawnIn(film).filter((d) => style(d).mixBlendMode).map((d) => [style(d).backgroundColor, style(d).mixBlendMode]), [["#03090d", "lighten"], ["#e8e9ea", "darken"]]);
+  assert.equal(style(clipped(run(Number(marks.whole), { shots: shots(9 / 16), texts: marks }), "inset")!).clipPath, "inset(37px 32px)");
+  // Its split screen: her shot and the one that answers it (her last, from the split's first image), side by side, each
+  // an exact half, nothing between; one above the other upright.
+  const split = drawnIn(wide(Number(marks.split) + 3)).find((d) => d.type === "Split")!;
+  assert.deepEqual([split.props.direction, split.props.gap, split.props.enter, split.props.box], ["row", 0, "cut", { x: 0, y: 0, w: 1080, h: 608 }]);
+  const halves = (split.props.parts as ((size: { width: number; height: number }) => Drawn)[]).map((p) => p({ width: 540, height: 608 }));
+  assert.deepEqual(halves.map((d) => [d.props.shot, d.props.at]), [[5, undefined], [12, Number(marks.split)]]);
+  assert.equal(drawnIn(run(Number(marks.split) + 3, { shots: shots(9 / 16), texts: marks })).find((d) => d.type === "Split")!.props.direction, "column");
+  assert.equal(drawnIn(wide(Number(marks.split_to))).find((d) => d.type === "Split"), undefined);
+  // Its end: the blue black in the frame, her name white at the middle in its serif, its red line two beats later under
+  // it, a short one an accent beside her name; nothing of the original's own words.
+  const reelTexts = [
+    { text: "Brighton Pier", role: "hook", from: Number(marks.black), to: 593 },
+    { text: "@brighton.pier", role: "caption", from: Number(marks.black) + 30, to: 593 },
+  ];
+  const black = run(Number(marks.black) + 31, { shots: shots(16 / 9), texts: marks, reelTexts });
+  assert.ok(drawnIn(frameBox(black)).some((d) => style(d).backgroundColor === "#03090d" && style(d).clipPath === "inset(18px 21px)"));
+  assert.equal(drawnIn(frameBox(black)).filter((d) => d.type === "Footage").length, 0);
+  const [name, handle] = drawnIn(black).filter((d) => d.type === "FitText");
+  assert.deepEqual([(name!.props.innerStyle as Record<string, unknown>).color, (handle!.props.innerStyle as Record<string, unknown>).color], ["#ffffff", "#972f34"]);
+  assert.match(String((name!.props.innerStyle as Record<string, unknown>).fontFamily), /^'Bodoni Moda', 'Instrument Serif'/);
+  assert.ok(Math.abs(Number(style(name!).top) + Number(style(name!).height) / 2 - 953) <= 1 && Number(style(handle!).top) > Number(style(name!).top));
+  assert.ok(drawnIn(handle!).some((d) => "data-fauve-accent" in d.props));
+  assert.equal(drawnIn(run(Number(marks.black) + 29, { shots: shots(16 / 9), texts: marks, reelTexts })).filter((d) => d.type === "FitText").length, 1);
+  assert.doesNotMatch(eventail.code, /Preet|blaster|\bscale\(|\b(Flash|Whip|ZoomThrough|Fan)\b/);
+  // On her word, her own dark colour for its ground and its frame (the bordeaux when she has none).
+  const hers = run(0, { shots: shots(16 / 9), texts: { ...marks, fond: "sienne" }, brand: { displayFont: "Lora", bodyFont: "Jost", palette: { dark: "#1d3b2a" } } });
+  assert.equal((frameBox(hers).children[0] as Drawn).props.color, "#1d3b2a");
+  assert.equal((frameBox(run(0, { shots: shots(16 / 9), texts: { ...marks, fond: "sienne" } })).children[0] as Drawn).props.color, "#440a0b");
+  // Its own grade: nothing of its model's finish laid over everything (no grey bordeaux, no grain, no crushed blacks).
+  assert.deepEqual(eventail.finish, { saturation: 0, contrast: 0, grain: 0, vignette: 0 });
+  // The filler sees its object and its settings; the plan keeps a choice her words asked for.
+  const files = Array.from({ length: 12 }, (_, i) => ({ id: `v${i}`, photo: false, seconds: 12 }));
+  const input = skillFillInput({ skill: eventail, name: "Éventail de bandes", n: 13, files, business: {}, request: "avec ma couleur" });
+  assert.deepEqual([input.objets?.[0]?.slot, input.objets?.[0]?.case], ["coeur", 1]);
+  assert.deepEqual(skillSettings(eventail, [{ name: "fond", value: "bordeaux" }]), {});
+  const plan = skillPlan({ skill: eventail, name: "Éventail de bandes", files, fill: { shots: Array.from({ length: 13 }, (_, i) => ({ file: files[i % 12]!.id, at: 1 })), texts: { signature: "Brighton Pier" }, end: null, settings: { fond: "sienne" } } });
+  assert.equal(plan.layers![0]!.motion.texts!.fond, "sienne");
+  assert.deepEqual(plan.skill, { key: "eventail", version: 2, settings: { fond: "sienne" } });
+  assert.equal(plan.music_shape?.pauses?.length, 7);
+});
