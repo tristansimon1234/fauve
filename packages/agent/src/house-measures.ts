@@ -42,4 +42,6 @@ export const HOUSE_MEASURES: Record<string, ReelMeasures> = {
   "silhouette": { duration: 11.15, cuts: [0.47, 1.07, 3.9, 5.37, 9.57], bpm: null, lufs: -14.1 },
   "vision": { duration: 8.55, cuts: [0.2, 0.7, 1.2, 1.5, 1.77, 2.1, 2.63, 3, 3.27, 3.63, 4.67, 5.13, 5.37, 5.67, 5.93, 6.53, 6.87, 7.13, 8.03], bpm: null, lufs: -14.1 },
   "detourages": { duration: 16.47, cuts: [6.23, 6.6, 6.83, 7.2, 7.53, 7.97, 8.27, 8.6, 8.93, 9.67, 10, 10.27, 10.93, 11.37, 11.73, 12.17, 12.67, 13.13, 13.47, 13.77, 14.4, 14.83], bpm: 140, lufs: -14.2 },
+  // Its fiche's 14 cuts, read image by image; its first piece's tempo counted one beat in two (142,4 BPM; its second, 150,5, after its break).
+  "nom-de-ville": { duration: 14.73, cuts: [2.27, 2.73, 3.13, 3.53, 3.97, 6.33, 7.27, 8.33, 9.13, 9.8, 10.73, 11.47, 12.83, 13.8], bpm: 71.2, lufs: -19.9 },
 };
