@@ -81,8 +81,8 @@ function inZone(box: Box, label: string) {
   else assert.ok(box.left >= 40 && box.left + box.width <= 1040, `${label}: ${JSON.stringify(box)}`);
 }
 
-test("« Celui-là » (v1): its original's grid (96,5 BPM), its products one a beat, its cuts within two images of the original's", () => {
-  assert.equal(celuiLa.version, 1);
+test("« Celui-là » (v2): its original's grid (96,5 BPM), its products one a beat, its cuts within two images of the original's", () => {
+  assert.equal(celuiLa.version, 2);
   assert.equal(celuiLa.bpm, 96.5);
   assert.deepEqual(celuiLa.shots, [5, 16]);
   const line = celuiLa.timeline(9, { end: false });
@@ -119,7 +119,7 @@ test("« Celui-là » (v1): its original's grid (96,5 BPM), its products one a b
   assert.ok(Math.abs(slower.marks.last! / line.marks.last! - 96.5 / 80) < 0.01);
 });
 
-test("« Celui-là » (v1): its music shaped as its original's voice: thin through her hail, its bass on the first product, stopped on her series, back on her last word", () => {
+test("« Celui-là » (v2): its music shaped as its original's voice: thin through her hail, its bass on the first product, stopped on her series, back on her last word", () => {
   const line = celuiLa.timeline(9, { end: false });
   const music = line.music!;
   // Its first strong beat on the grid's beat 1 (0,51 s).
@@ -143,10 +143,10 @@ test("« Celui-là » (v1): its music shaped as its original's voice: thin throu
   assert.ok(plan.music_shape?.pauses?.length === 1 && plan.music_shape.filters?.length === 1);
   assert.equal(plan.sounds, undefined);
   assert.equal(plan.layers![0]!.motion.drawn, undefined);
-  assert.deepEqual(plan.skill, { key: "celui-la", version: 1 });
+  assert.deepEqual(plan.skill, { key: "celui-la", version: 2 });
 });
 
-test("« Celui-là » (v1): her hail typed letter by letter then faded, her stop word on three places, « Regarde » in the middle", () => {
+test("« Celui-là » (v2): her hail typed letter by letter then faded, her stop word on three places, « Regarde » in the middle", () => {
   const { props } = propsFor(9);
   const draw = scene();
   // Its hail typed from its left edge (25,6 % of the width): its letters to come in place but unseen, then faded out.
@@ -179,7 +179,7 @@ test("« Celui-là » (v1): her hail typed letter by letter then faded, her stop
   for (const f of [6, 22, 28, 36, 60]) for (const w of wordsAt(draw(f, props))) inZone(w.box, `${w.text} at ${f}`);
 });
 
-test("« Celui-là » (v1): her pointing word on each product at once, each time elsewhere, then her hesitation typed and her last word", () => {
+test("« Celui-là » (v2): her pointing word on each product at once, each time elsewhere, then her hesitation typed and her last word", () => {
   const { line, props } = propsFor(16);
   const draw = scene();
   // On each of her fourteen products from its cut to the next, never twice in a row in the same place, all in the zone:
@@ -213,7 +213,7 @@ test("« Celui-là » (v1): her pointing word on each product at once, each time
   assert.equal(wordsAt(draw(270, bare))[0]!.text, "Celle-là !");
 });
 
-test("« Celui-là » (v1): its ink, the original's cream where it reads on her picture, a deep ink where it is too bright; her colours as asked", () => {
+test("« Celui-là » (v2): its ink, the original's cream where it reads on her picture, a deep ink where it is too bright; her colours as asked", () => {
   const { props } = propsFor(9);
   const ink = (light: number | null, settings: Record<string, string> = {}, f = 80) => {
     const draw = scene(() => (light === null ? null : { mean: light, high: light }));
@@ -240,7 +240,7 @@ test("« Celui-là » (v1): its ink, the original's cream where it reads on her 
   assert.deepEqual(celuiLa.settings?.map((s) => [s.name, s.choices.map((c) => c.value)]), [["format", ["auto", "vertical", "horizontal"]], ["couleur", ["creme", "blanc", "sa-couleur"]]]);
 });
 
-test("« Celui-là » (v1): upright as her files, in a 16:9 band on black when most are horizontal or she asks; its ending card", () => {
+test("« Celui-là » (v2): upright as her files, in a 16:9 band on black when most are horizontal or she asks; its ending card", () => {
   const draw = scene();
   const footage = (tree: Drawn) => flatten(tree).find((n) => n.type === "Footage")!.props.style as Box;
   assert.deepEqual(footage(draw(80, propsFor(9).props)), { left: 0, top: 0, width: 1080, height: 1920 });
@@ -258,7 +258,7 @@ test("« Celui-là » (v1): upright as her files, in a 16:9 band on black when m
   assert.equal(wordsAt(draw(props.durationInFrames - 60, props))[0]!.text, "Tout ça !");
 });
 
-test("« Celui-là » (v1): its filler's words, its code light to render: her light read on her shots, nothing cut out", () => {
+test("« Celui-là » (v2): its filler's words, its code light to render: her light read on her shots, nothing cut out", () => {
   // Its words: all but its last one required, each cut to its place.
   const files = [{ id: "a", photo: true, seconds: 0 }, { id: "b", photo: false, seconds: 6 }];
   const answer = (texts: { slot: string; text: string }[]) => ({ fits: true, missing: "", shots: [], texts, end: null, why: "" });
@@ -282,4 +282,66 @@ test("« Celui-là » (v1): its filler's words, its code light to render: her li
   assert.doesNotMatch(celuiLa.code, /transform|scale\(/);
   // Its words are the original's never: French, hers.
   for (const t of celuiLa.texts) assert.doesNotMatch(t.want, /« (Stop|This|Look at|Hey)/i);
+});
+
+test("« Celui-là » (v2): its voice says each of its words exactly when it lands on screen, on the beats; its filler told how long each one has", () => {
+  // Its words are what its voice says, by default (Tristan: « par défaut voix off et le user peut changer de voix »).
+  assert.deepEqual(celuiLa.saysWords, { slots: ["appel", "arret", "regarde", "celui", "et", "fin"], default: true });
+  const { line, props } = propsFor(9);
+  const m = line.marks;
+  // Each moment on the frame its code shows its word (the original's to an image): her hail on 1, her stop word on its
+  // three pops (21, 26, 33), « Regarde » on 52, her pointing word on each of her seven products' cuts, her hesitation on
+  // 204, her last word on 248.
+  const cuts = line.shots.slice(1, -1).map((s) => Math.round(s.start * 30));
+  assert.equal(cuts.length, 7);
+  assert.deepEqual(
+    line.says!.map((s) => [s.slot, Math.round(s.at * 30)]),
+    [["appel", m.hail_from], ["arret", m.stop1], ["arret", m.stop2], ["arret", m.stop3], ["regarde", m.look], ...cuts.map((f) => ["celui", f]), ["et", m.and_from], ["fin", m.last]],
+  );
+  for (const s of line.says!) assert.ok(Math.abs(s.at * 30 - Math.round(s.at * 30)) < 0.05, `${s.slot} on a frame: ${s.at}`);
+  // Exactly when it lands: drawn on that frame, not the frame before (or another pop of it, elsewhere).
+  const draw = scene();
+  const words: Record<string, string> = { appel: "Hééééé", arret: "Attends !", regarde: "Regarde", celui: "Celle-là", et: "Eeeeet…", fin: "Tout ça !" };
+  const keyAt = (f: number, text: string, p = props) => wordsAt(draw(f, p)).find((w) => w.text === text)?.key;
+  for (const s of line.says!) {
+    const f = Math.round(s.at * 30);
+    assert.ok(keyAt(f, words[s.slot]!), `« ${words[s.slot]} » drawn on ${f}`);
+    assert.notEqual(keyAt(f - 1, words[s.slot]!), keyAt(f, words[s.slot]!), `« ${words[s.slot]} » lands on ${f}`);
+  }
+  // Without a last word of hers: the voice says her pointing word with « ! », as its code writes it.
+  const bare = celuiLa.timeline(9, { end: false, words: { ...words, fin: "" } });
+  assert.deepEqual(bare.says!.at(-1), { slot: "celui", text: "Celle-là !", at: line.says!.at(-1)!.at });
+  assert.equal(keyAt(Math.round(bare.says!.at(-1)!.at * 30), "Celle-là !", propsFor(9, { words: { fin: "" } }).props) !== undefined, true);
+  assert.deepEqual(celuiLa.timeline(9, { end: false, words }).says!.at(-1), { slot: "fin", at: line.says!.at(-1)!.at });
+  // More products, another tempo: one more pointing word a product, every moment on its beats.
+  assert.equal(celuiLa.timeline(16, { end: false }).says!.filter((s) => s.slot === "celui").length, 14);
+  const slower = celuiLa.timeline(9, { end: false, bpm: 80 });
+  slower.says!.forEach((s, i) => assert.ok(Math.abs(s.at - line.says![i]!.at * (96.5 / 80)) < 0.07, `${s.slot}: ${s.at} for ${line.says![i]!.at}`));
+  assert.ok(Math.abs(slower.says!.at(-1)!.at - (slower.marks.last! / 30)) < 0.02);
+
+  // Its filler, when the voice says them: told so, and how many times and in how long each one is said, to be said in time.
+  const files = Array.from({ length: 9 }, (_, i) => ({ id: `f${i}`, photo: true, seconds: 0 }));
+  type Input = { mots_dits?: string; textes: { slot: string; dit_par_la_voix?: string }[] };
+  const base = { skill: celuiLa, name: "Celui-là, celui-là…", n: 9, files, business: { name: "Atelier Terre" }, request: "" };
+  const told = skillFillInput({ ...base, says: true }) as Input;
+  assert.match(told.mots_dits ?? "", /Une voix dit les mots de ce modèle/);
+  // (Its filler reads the model with its ending card in option: her last word has until the Reel's end.)
+  assert.deepEqual(Object.fromEntries(told.textes.map((t) => [t.slot, t.dit_par_la_voix])), {
+    appel: "1 fois en 0,67 s",
+    arret: "3 fois en 1,03 s",
+    regarde: "1 fois en 0,63 s",
+    celui: "7 fois en 4,43 s",
+    et: "1 fois en 1,47 s",
+    fin: "1 fois en 2,8 s",
+  });
+  // Without its voice (she took it away, her business never wants one), or under a voice of hers laid over it: none of it.
+  const quiet = skillFillInput(base) as Input;
+  assert.equal(quiet.mots_dits, undefined);
+  assert.ok(quiet.textes.every((t) => t.dit_par_la_voix === undefined));
+  const laid = skillFillInput({ ...base, says: true, voiceOver: { text: "Mes tasses.", phrases: [{ start: 0.2, end: 1, text: "Mes tasses." }] } }) as Input;
+  assert.equal(laid.mots_dits, undefined);
+  // Its plan carries no voice by itself: the engine lays it once her words are written (model-voice.ts).
+  const plan = skillPlan({ skill: celuiLa, name: "Celui-là, celui-là…", files, fill: { shots: files.map((f) => ({ file: f.id, at: 0 })), texts: words, end: null } });
+  assert.equal(plan.voice, undefined);
+  assert.equal(plan.subtitles, false);
 });

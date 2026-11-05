@@ -558,6 +558,14 @@ export const editPlanObjectSchema = z.object({
   // `at`: where the recording starts on the Reel's clock; negative, the silence before its first word is cut.
   voice: z.object({ media_id: z.string().min(1), at: z.number().min(-30).max(10) }).optional(),
   /**
+   * A model whose words are what its voice says (MontageSkill.saysWords, « Celui-là, celui-là… »; model-voice.ts): the
+   * voice that says them (one of Edith's voices or her own clone, read again by voiceIn) and what its track says (`key`:
+   * its words, their moments and that voice). Its track is `voice` (from 0, subtitles off: its words are on screen); a
+   * key that no longer matches (her words changed by hand), or no track yet (another voice asked), is made again at the
+   * render. Set by the engine, never the browser.
+   */
+  says_words: z.object({ voice_id: z.string().regex(/^[A-Za-z0-9]{10,40}$/), key: z.string().max(40).optional() }).optional(),
+  /**
    * A look over the whole video, under the texts (looks.ts: its grade and its texture, as settings written from her
    * words, the Reel she copies, or a preset), on her request, the Reel she copies, or her default for all her Reels.
    */

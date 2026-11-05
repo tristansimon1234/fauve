@@ -50,6 +50,7 @@ import {
 import { z } from "zod";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { meterWaits } from "@/lib/work-slots";
+import { refreshModelWords } from "@/lib/model-voice";
 import { logoTone } from "./logo-tone";
 import { soundLevel, withMusic } from "./music";
 import { ensureSounds, soundFiles, type LibrarySound } from "./sfx";
@@ -423,6 +424,18 @@ export async function renderPost(studioId: string, postId: string, options: { ed
       .single(),
   ).data!;
   const plan = editPlanSchema.parse(planRow.plan);
+  // A model whose voice says its words: its track made again when it no longer says what the plan shows (her words
+  // changed by hand) or has none yet (another voice asked), kept on the plan; a failure renders the Reel as it is.
+  const resaid = await refreshModelWords(studioId, postId, plan).catch((error: unknown) => {
+    console.warn("said words: not made again, the Reel renders as it is", postId, error instanceof Error ? error.message.slice(0, 300) : error);
+    return null;
+  });
+  if (resaid) {
+    Object.assign(plan, resaid);
+    Object.assign(planRow.plan as Record<string, unknown>, resaid);
+    const kept = await db.from("edit_plans").update({ plan: planRow.plan }).eq("id", planRow.id);
+    if (kept.error) console.warn("said words: not kept on the plan", planRow.id, kept.error.message);
+  }
   await prepareRenderAssets(studioId, postId, plan);
   // She wants the sound cleaned, even where it was not noisy: the cleaned copies are made first.
   if (plan.finish?.sound === "clean" || plan.finish?.sound === "voice")

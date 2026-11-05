@@ -1197,6 +1197,38 @@ export async function levelSpeechInSandbox(
   }
 }
 
+/**
+ * The words a model's voice says, laid on one track of the Reel's length (model-voice.ts): its reading measured first (its
+ * loudness, EBU R128, and its level every 10 ms), then `lay` turns what was measured into the filter that cuts each word
+ * out of it and lays it at its moments (levelled like a voice), and the track is made, as MP3. Also how long it took (s).
+ */
+export async function sayWordsInSandbox<T>(
+  id: string,
+  reading: Buffer,
+  lay: (measured: { lufs: number | null; levels: number[] }) => { filter: string; laid: T },
+): Promise<{ mp3: Buffer; lufs: number | null; laid: T; seconds: number }> {
+  const started = Date.now();
+  const sandbox = await jobSandbox();
+  const dir = `${ROOT}/jobs/${id}-said`;
+  try {
+    await bash(sandbox, 'rm -rf "$1" && mkdir -p "$1"', [dir]);
+    await sandbox.writeFiles([{ path: `${dir}/in.mp3`, content: reading }]);
+    const lufs = printed(await (await bash(sandbox, `cd "$1" && ${LOUD} && echo "speech=$(loud in.mp3)"`, [dir])).stdout(), "speech");
+    const run = await bash(sandbox, `cd "$1" && ${ROOT}/ffmpeg -hide_banner -nostats -i in.mp3 -vn -af "$2" -f null - 2>&1 | grep -o 'RMS_level=[^ ]*' | cut -d= -f2`, [dir, speechLevelsFilter(BEAT_STEP)]);
+    const levels = (await run.stdout())
+      .split(/\s+/)
+      .filter(Boolean)
+      .map((v) => (Number.isFinite(Number(v)) ? Number(v) : -120));
+    const { filter, laid } = lay({ lufs, levels });
+    await bash(sandbox, `cd "$1" && ${ROOT}/ffmpeg -loglevel error -y -i in.mp3 -filter_complex "$2" -map "[out]" -ac 1 -ar 44100 -c:a libmp3lame -b:a 160k out.mp3`, [dir, filter]);
+    const out = await sandbox.readFileToBuffer({ path: `${dir}/out.mp3` });
+    if (!out?.length) throw new Error("the said words produced no file");
+    return { mp3: out, lufs, laid, seconds: Math.round((Date.now() - started) / 100) / 10 };
+  } finally {
+    await bash(sandbox, 'rm -rf "$1"', [dir]).catch(() => {});
+  }
+}
+
 /** RNNoise's model in the render sandbox, fetched once and checked by its checksum (speech.ts). */
 const SPEECH_DIR = `${ROOT}/speech`;
 const SPEECH_SETUP = [

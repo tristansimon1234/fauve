@@ -161,7 +161,7 @@ export async function loadReview(db: Db, studioId: string, post: ReviewPost, tim
     locked || !isBaked(plan.data) ? Promise.resolve([]) : runningJobs(studioId, { postId: post.id, kind: "effect_words" }),
     instagramAccount(studioId),
     locked ? Promise.resolve([]) : reviewSlots(studioId, timezone),
-    loadVoice(studioId, post.voice_media_id, ownVoice?.id ?? null),
+    loadVoice(studioId, post.voice_media_id, ownVoice?.id ?? null, plan.data.says_words),
     tiktokPanel(studioId, { kind: "reel", platforms: post.platforms, caption: post.caption, hashtags: post.hashtags, tiktok: post.tiktok, external_ids: post.external_ids }, !locked),
     shown?.storage_path ? admin.storage.from("media").createSignedUrl(shown.storage_path as string, 3600, { download: fileName }) : Promise.resolve(null),
     modelState(studioId, post.id).catch(() => null),
@@ -249,8 +249,12 @@ export async function instagramHandle(studioId: string): Promise<string | null> 
   return (account?.data?.handle as string | null) ?? (studio.data?.instagram_handle as string | null) ?? null;
 }
 
-/** The voice over the Reel: Edith's (her name) or the manager's own voice note; null: none. */
-async function loadVoice(studioId: string, mediaId: string | null, ownId: string | null): Promise<ReviewData["voice"]> {
+/**
+ * The voice over the Reel: Edith's (her name) or the manager's own voice note; on a model whose voice says its words, the
+ * voice that says them (its plan's `says_words`, its track made or to be made); null: none.
+ */
+async function loadVoice(studioId: string, mediaId: string | null, ownId: string | null, says?: EditPlan["says_words"]): Promise<ReviewData["voice"]> {
+  if (!mediaId && says) return { who: "simone", name: says.voice_id === ownId ? "Ta voix" : (findVoice(says.voice_id)?.name ?? null), id: says.voice_id };
   if (!mediaId) return null;
   const { data } = await supabaseAdmin().from("media_assets").select("source, ai").eq("id", mediaId).eq("studio_id", studioId).maybeSingle();
   if (!data) return null;

@@ -68,6 +68,7 @@ import {
 import { outputFormat, readAnswer } from "@fauve/agent/answer";
 import { MONTAGE_SKILLS, skillFor } from "@fauve/agent/skills";
 import { insertPlanVersion } from "@/lib/edit-plans";
+import { modelVoiceFor, sayModelWords } from "@/lib/model-voice";
 import { usableFonts } from "@/lib/fonts";
 import { ensureFileReadings } from "@/lib/render/readings";
 import { ensureTracks, loadTracks } from "@/lib/render/tracks";
@@ -102,8 +103,12 @@ export function skillCandidate(followed: FollowedStyle | undefined, contract: Re
   return skill;
 }
 
-/** The model a voice is written for, before it is recorded: its name, how it goes and its length (s, without its ending card). */
-export type VoiceSkill = { key: string; name: string; how: string; seconds: number };
+/**
+ * The model a voice is written for, before it is recorded: its name, how it goes and its length (s, without its ending
+ * card); `says`, a model whose words are what its voice says (MontageSkill.saysWords): no voice is written for it, its
+ * voice says its words (model-voice.ts).
+ */
+export type VoiceSkill = { key: string; name: string; how: string; seconds: number; says: boolean };
 
 /**
  * Before Edith's voice is written (the model is picked before it, ensureEdithModel): the model this Reel will be played
@@ -119,7 +124,7 @@ export async function voiceSkill(input: { studioId: string; postId: string; file
   if (!skill) return null;
   const fit = input.contract?.duration ? skillFit(skill, input.contract.duration) : { n: skillShotCount(skill, input.files), bpm: skill.bpm };
   const seconds = skill.timeline(fit.n, { end: false, ...(fit.bpm !== skill.bpm ? { bpm: fit.bpm } : {}) }).duration;
-  return { key: skill.key, name: houseModel(skill.key)?.name ?? skill.key, how: skill.how, seconds: Math.round(seconds * 100) / 100 };
+  return { key: skill.key, name: houseModel(skill.key)?.name ?? skill.key, how: skill.how, seconds: Math.round(seconds * 100) / 100, says: Boolean(skill.saysWords) };
 }
 
 /**
@@ -288,6 +293,14 @@ export async function designSkill(params: {
     }
     fit = reach;
   }
+  // A model whose words are what its voice says (« Celui-là, celui-là… »): the voice chosen for this Reel (none under a
+  // voice of hers laid over it), known before its filler writes them, so that each one can be said in its time.
+  const saying = skill.saysWords && !laid
+    ? await modelVoiceFor({ studioId: params.studioId, postId: params.postId, skill, contract: params.contract, ...(params.copied ? { copied: params.followed.look.voice } : {}) }).catch((error: unknown) => {
+        console.warn("said words: no voice chosen, the Reel goes without it", params.postId, error);
+        return null;
+      })
+    : null;
   // Its first beat: the Reel's first image held that long, then every cut on the sound's beats.
   const lead = params.sound && soundBpm ? soundLead(params.sound.offset, soundBpm) : 0;
   const n = fit.n;
@@ -319,6 +332,8 @@ export async function designSkill(params: {
     ...(params.copied ? { copied: true } : {}),
     // The voice laid over it, written before it: its words on screen go with what it says, when it says it.
     ...(laid ? { voiceOver: { text: laid.transcript.text, phrases: voicePhrases(laid.transcript, laid.at) } } : {}),
+    // Its own words said by a voice: each one told how many times and in how long, to be said in time.
+    ...(saying ? { says: true } : {}),
   });
   // One small call fills it; `again`: its answer and what the check said of it, for a second try.
   const fillIt = async (again?: { answer: SkillFillAnswer; note: string }): Promise<SkillFillAnswer | null> => {
@@ -399,6 +414,15 @@ export async function designSkill(params: {
     return null;
   }
   const plan = result.plan;
+  // Its words said by the voice chosen, each at its moments, on one track (subtitles off: they are on screen); the track
+  // of the version it corrects kept when it says the same. A failure leaves the Reel without its voice, never without it.
+  if (saying) {
+    const said = await sayModelWords({ studioId: params.studioId, postId: params.postId, skill, plan, voiceId: saying, previous: params.previous }).catch((error: unknown) => {
+      console.warn("said words: the Reel goes without its voice", params.postId, skill.key, error instanceof Error ? error.message.slice(0, 300) : error);
+      return null;
+    });
+    if (said) Object.assign(plan, said, { subtitles: false });
+  }
 
   const row = await insertPlanVersion(params.studioId, params.postId, plan);
   await supabaseAdmin().from("posts").update({ edit_plan_id: row.id }).eq("id", params.postId);

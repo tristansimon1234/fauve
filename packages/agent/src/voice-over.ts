@@ -121,6 +121,23 @@ export function voiceIn(idOrName: string | null | undefined, own: OwnVoice | nul
   return gallery ? { id: gallery.id, name: gallery.name, gender: gallery.gender, asmr: gallery.asmr, own: false } : undefined;
 }
 
+/**
+ * The voice a Reel is read with: the one picked (this Reel's, else her business's), her own clone kept as it is when no
+ * gender is asked; else a voice of the gallery (the default when none, or one unknown), one of the gender she asked for
+ * when it is not (« une voix d'homme »: the first of the gallery, never a whispered one). Another business's clone or a
+ * voice deleted since is never read for her (voiceIn).
+ */
+export function readingVoice(picked: string | null | undefined, own: OwnVoice | null, gender?: "femme" | "homme" | "libre" | null): string {
+  const voice = voiceIn(picked, own);
+  const free = !gender || gender === "libre";
+  if (voice?.own && free) return voice.id;
+  const id = voice?.id ?? DEFAULT_VOICE_ID;
+  if (free) return id;
+  const want = gender === "homme" ? "m" : "f";
+  if (findVoice(id)?.gender === want) return id;
+  return SIMONE_VOICES.find((v) => v.gender === want && !v.asmr)?.id ?? id;
+}
+
 /** The studio's voice over its Reels (Style): when, and which voice. */
 export const voiceSettingSchema = z.object({
   /** auto: when it helps the Reel (see wantsVoiceOver); always; never. */

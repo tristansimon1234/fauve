@@ -100,6 +100,7 @@ export * from "./copy-model.ts";
 export * from "./house-measures.ts";
 export * from "./house-sheets.ts";
 export * from "./skills.ts";
+export * from "./model-voice.ts";
 export * from "./pieces.ts";
 export * from "./director.ts";
 export * from "./takes.ts";
