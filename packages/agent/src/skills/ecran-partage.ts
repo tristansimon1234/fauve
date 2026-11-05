@@ -1,6 +1,6 @@
 import { beatSpans, type MontageSkill } from "../skills.ts";
 
-// « Écran partagé titré », version 2, written again on its original's fiche (docs/fiches/ecran-partage.md: measured image
+// « Écran partagé titré », version 3, written again on its original's fiche (docs/fiches/ecran-partage.md: measured image
 // by image at 30 i/s, each half measured on its own, its music measured, the video watched and heard by Gemini; Tristan:
 // « c'est un effet que l'on veut pouvoir faire, pas exactement reproduire l'image »). On black, a card with rounded
 // corners cut in two halves that touch, still from the first image to the last: her or her team at work in one, what
@@ -10,11 +10,11 @@ import { beatSpans, type MontageSkill } from "../skills.ts";
 //   five pairs of 4,5 · 7 · 4 · 5,85 · 4,2 beats, both halves cutting on the same image, never one alone, never a shot
 //   full frame; two small titles in a classic book serif, white, one on each half, just under the middle of the card,
 //   that answer each other (« The Artists », « The Art »), still the whole Reel; a clean end on the last pair.
-// Each half plays its own passage over its whole pair at half its speed (the original's play at their own: a Reel's
-// shots follow one another, so each half has half its pair to play; the engine cannot lay two passages on one moment
-// yet). An odd number of shots takes a second passage of one of her videos: a short pair more in the middle plays the
-// start of a video in one half and the rest of it in the other, never a shot alone full frame. Her photos stay still,
-// her videos play. Its layout follows her files (Tristan: « format par défaut [comme ses vidéos], et changement à la
+// Since version 3, each half plays its own passage at its own speed, as the original's do: the two shots of a pair are
+// laid on the same moment (SkillShot.beside, the engine's simultaneous shots: the second half's time counted once),
+// where version 2 had each half play its passage at half its speed over the pair, the images between two blended. An
+// odd number of shots takes a short pair more in the middle, one video alone: its gesture plays in one half while the
+// other holds its last image, what it gives; never a shot alone full frame. Her photos stay still, her videos play. Its layout follows her files (Tristan: « format par défaut [comme ses vidéos], et changement à la
 // demande du user »): the original's 4:3 card at the middle of the screen, its halves 2:3, when they are mostly
 // vertical; full screen, one half above the other, when they are horizontal (a 16:9 video keeps 38 % of its width in a
 // 2:3 half, 63 % in a 9:8 one); or as she asks. Its ending card, which the original has not, only when she wants one
@@ -42,9 +42,7 @@ const round = (n: number) => Math.round(n * 100) / 100;
 const CODE = String.raw`function Scene({ width, height, durationInFrames, brand, shots, reelTexts, end, texts }) {
   const h = React.createElement;
   const frame = useCurrentFrame();
-  const mark = (k, d) => { const v = Number(texts && texts[k]); return Number.isFinite(v) ? v : d; };
   const setting = (k, d) => { const v = texts && texts[k]; return typeof v === "string" && v ? v : d; };
-  const SOLO = mark("solo", -1);
   const n = shots.length;
 
   // Its layout, as her files are: the original's 4:3 card at the middle of the screen, its halves side by side (2:3), when
@@ -68,52 +66,50 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const first = stacked ? { x: 0, y: 0, w: cw, h: Math.round(ch / 2) } : { x: 0, y: 0, w: Math.round(cw / 2), h: ch };
   const second = stacked ? { x: 0, y: first.h, w: cw, h: ch - first.h } : { x: first.w, y: 0, w: cw - first.w, h: ch };
 
-  // Its pairs, in order: two shots (the person at work, what it gives), or one shot alone (an odd count) whose start plays
-  // in one half and the rest in the other; the two halves always cut together.
+  // Its pairs, in order: two shots that start on the same image, laid side by side on that moment (the person at work,
+  // what it gives: the second half is a shot beside the first), or one shot alone (an odd count); the two halves always
+  // cut together. Shots that all follow one another (a plan of the editor's, which lays none beside another) are paired
+  // two by two instead, each half played over its pair at half its speed, as version 2 did.
+  const together = shots.some((s, i) => i > 0 && Math.abs(s.from - shots[i - 1].from) <= 1);
   const pairs = [];
   for (let i = 0; i < n; ) {
-    const solo = i === SOLO || i + 1 >= n;
-    const last = shots[solo ? i : i + 1];
-    pairs.push({ a: i, b: solo ? i : i + 1, solo, from: shots[i].from, to: last.from + last.durationInFrames });
-    i += solo ? 1 : 2;
+    const b = i + 1 < n && (!together || Math.abs(shots[i + 1].from - shots[i].from) <= 1) ? i + 1 : -1;
+    const ends = (k) => shots[k].from + shots[k].durationInFrames;
+    pairs.push({ a: i, b, from: shots[i].from, to: b >= 0 ? Math.max(ends(i), ends(b)) : ends(i) });
+    i += b >= 0 ? 2 : 1;
   }
   const now = pairs.find((p) => frame >= p.from && frame < p.to) || pairs[pairs.length - 1];
 
-  // Both halves play from their pair's first image, each its whole passage over the pair, at half its speed (a Reel's
-  // shots follow one another, so each half has half the pair); an image between two of hers is the two blended, the next
-  // one always laid (unseen on the others) so the live preview does not open and close a video at every image. A photo
-  // stays still; nothing moves, zooms nor slides in (cuts only).
+  // Each half plays its own passage at its own speed from their pair's first image, as the original's: a video plays,
+  // a photo stays still; nothing moves, zooms nor slides in (cuts only). « held »: its last image held, what it gives.
+  // Two shots one after the other (the editor's plan): each over the whole pair, an image between two blended.
   const P = now ? Math.max(1, now.to - now.from) : 1;
-  const rel = now ? Math.max(0, Math.min(P - 1, frame - now.from)) : 0;
-  const pane = (key, k, part, box) => {
+  const pane = (key, k, box, held) => {
     const s = shots[k];
     const style = { position: "absolute", left: 0, top: 0, width: box.w, height: box.h };
-    let inside = h(Footage, { shot: k, style });
-    if (s && s.kind === "video") {
-      const length = Math.max(1, s.durationInFrames);
-      const cut = Math.floor(length / 2);
-      const start = part === 2 ? cut : 0;
-      const span = part === 0 ? length : part === 1 ? cut : length - cut;
-      const t = start + (rel * span) / P;
+    let inside = held && s && s.kind === "video" ? h(Footage, { shot: k, at: frame - s.durationInFrames, style }) : h(Footage, { shot: k, style });
+    if (!together && s && s.kind === "video" && now && now.b >= 0) {
+      const t = (Math.max(0, Math.min(P - 1, frame - now.from)) * Math.max(1, s.durationInFrames)) / P;
       const at = Math.floor(t);
-      const blend = t - at;
+      const mix = Math.round((t - at) * 100) / 100;
       inside = [
         h(Footage, { key: "a", shot: k, at: frame - at, style }),
-        h(Footage, { key: "b", shot: k, at: frame - at - 1, style: { ...style, opacity: blend > 0.01 ? Math.round(blend * 100) / 100 : 0 } }),
+        h(Footage, { key: "b", shot: k, at: frame - at - 1, style: { ...style, opacity: mix > 0.01 ? mix : 0 } }),
       ];
     }
     return h("div", { key, style: { position: "absolute", left: box.x, top: box.y, width: box.w, height: box.h, overflow: "hidden" } }, inside);
   };
-  // A shot alone in its pair (an odd count): a video's start in one half, the rest of it in the other; a photo, still,
-  // has no rest: it is laid across the card, the line between its halves on it, rather than twice.
-  const alone = now && now.solo && !(shots[now.a] && shots[now.a].kind === "video");
+  // A shot alone in its pair (an odd count): a video's gesture plays in one half while the other holds its last image,
+  // what it gives; a photo, still, is laid across the card rather than twice.
+  const alone = Boolean(now) && now.b < 0;
+  const still = alone && !(shots[now.a] && shots[now.a].kind === "video");
   const panes = !now
     ? null
-    : alone
-      ? pane("p0", now.a, 0, { x: 0, y: 0, w: cw, h: ch })
-      : now.solo
-        ? [pane("p0", now.a, 1, first), pane("p1", now.a, 2, second)]
-        : [pane("p0", now.a, 0, first), pane("p1", now.b, 0, second)];
+    : still
+      ? pane("p0", now.a, { x: 0, y: 0, w: cw, h: ch }, false)
+      : alone
+        ? [pane("p0", now.a, first, false), pane("p1", now.a, second, true)]
+        : [pane("p0", now.a, first, false), pane("p1", now.b, second, false)];
   // Its ending card, only when she has one: the last pair darkened under its words.
   const endAt = end ? end.from : durationInFrames + 1;
   const veil = end && frame >= endAt ? h("div", { style: { position: "absolute", left: 0, top: 0, width: cw, height: ch, background: "#000000", opacity: Math.round(55 * Math.min(1, (frame - endAt + 1) / 6)) / 100 } }) : null;
@@ -180,9 +176,9 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
 type Slot = { side: "left" | "right" | "solo"; beats: number; first: boolean; last: boolean };
 
 /**
- * Its shots in time order for n: pairs of two shots (the person at work, then what it gives), each half of its pair,
- * the opening, the middle ones in turn, the last one; with an odd count, a short pair more in the middle, one shot alone
- * (its start in one half, the rest in the other).
+ * Its shots in time order for n: pairs of two shots laid on the same moment (the person at work, then what it gives
+ * beside it), the opening, the middle ones in turn, the last one; with an odd count, a short pair more in the middle,
+ * one shot alone. `beats`: the pair's (its second half laid beside its first, the same beats).
  */
 function slots(n: number, endBeats: number): Slot[] {
   const full = Math.floor(n / 2);
@@ -193,7 +189,7 @@ function slots(n: number, endBeats: number): Slot[] {
     if (odd && k === Math.floor(full / 2)) out.push({ side: "solo", beats: SOLO_BEATS, first: false, last: false });
     const last = k === full - 1;
     const beats = (k === 0 ? OPENING : last ? LAST : MIDDLE[(k - 1) % MIDDLE.length]!) + (last ? endBeats : 0);
-    out.push({ side: "left", beats: beats / 2, first: k === 0, last }, { side: "right", beats: beats / 2, first: k === 0, last });
+    out.push({ side: "left", beats, first: k === 0, last }, { side: "right", beats, first: k === 0, last });
   }
   return out;
 }
@@ -211,13 +207,16 @@ export const ecranPartage: MontageSkill = {
   // when her files are horizontal (its format setting); its cuts within an image of the original's (120 BPM), both halves
   // always together, never a shot alone full frame; its titles in a book serif just under the middle of the card; its
   // music without its bass to the third bar, cut dead at the end; no ending card unless she asks, no vignette nor grain.
-  version: 2,
+  // 3: its two halves laid on the same moment (the engine's simultaneous shots), each at its own speed, as the
+  // original's, where they played at half speed, their images blended; a video alone in its pair plays its gesture
+  // beside its last image.
+  version: 3,
   bpm: BPM,
   shots: [6, 10],
   // Up to 22 for a length she asks for: eleven pairs, about 30 s at its own tempo.
   long: 22,
   files: [4, 10],
-  how: "Une carte aux coins arrondis sur du noir, coupée en deux moitiés qui se touchent : côte à côte, hautes et étroites (la carte 4:3 de l'original au milieu de l'écran), quand la plupart de ses fichiers sont verticaux ; l'une sur l'autre, larges, sur tout l'écran, quand ils sont horizontaux (un fichier de l'autre format n'y garde que son milieu : son sujet doit être au centre de l'image). Dans l'une, elle ou son équipe au travail ; dans l'autre, au même moment, ce que ce geste donne : le plat qu'on pose devant la caméra, la dernière touche. Les deux moitiés coupent toujours ensemble, une paire toutes les deux à trois secondes et demie, chacune jouée au ralenti sur toute sa paire ; la dernière sur le résultat fini. Deux petits titres en serif blanc, un sur chaque moitié, qui se répondent (« Les artistes » / « L'art »), tenus tout le Reel. Il finit net sur la dernière paire, sans carte de fin, sauf si elle en demande une (une offre, une annonce).",
+  how: "Une carte aux coins arrondis sur du noir, coupée en deux moitiés qui se touchent : côte à côte, hautes et étroites (la carte 4:3 de l'original au milieu de l'écran), quand la plupart de ses fichiers sont verticaux ; l'une sur l'autre, larges, sur tout l'écran, quand ils sont horizontaux (un fichier de l'autre format n'y garde que son milieu : son sujet doit être au centre de l'image). Dans l'une, elle ou son équipe au travail ; dans l'autre, au même moment, ce que ce geste donne : le plat qu'on pose devant la caméra, la dernière touche. Les deux moitiés jouent en même temps, chacune à sa vitesse, et coupent toujours ensemble, une paire toutes les deux à trois secondes et demie ; la dernière sur le résultat fini. Deux petits titres en serif blanc, un sur chaque moitié, qui se répondent (« Les artistes » / « L'art »), tenus tout le Reel. Il finit net sur la dernière paire, sans carte de fin, sauf si elle en demande une (une offre, une annonce).",
   end: true,
   texts: [
     {
@@ -257,17 +256,21 @@ export const ecranPartage: MontageSkill = {
     const beat = 60 / bpm;
     // With an ending card, its last pair held whole beats longer, so her words have the card's time.
     const list = slots(n, end ? Math.ceil(END_CARD / beat - 1e-6) : 0);
-    const spans = beatSpans(bpm, list.map((s) => s.beats));
-    const duration = spans.at(-1)!.end;
+    // Its main line: each pair's first half (or a shot alone), one after the other on its beats; each pair's second half
+    // laid beside its first, on the same span, its time counted once.
+    const main = list.flatMap((s, i) => (s.side === "right" ? [] : [i]));
+    const mainSpans = beatSpans(bpm, main.map((i) => list[i]!.beats));
+    const spans = list.map((s, i) => mainSpans[main.indexOf(s.side === "right" ? i - 1 : i)]!);
+    const duration = mainSpans.at(-1)!.end;
     const [a, b] = halves(options.settings?.format);
     const want = (s: Slot) => {
       if (s.side === "solo")
-        return "les deux moitiés à la fois : une vidéo où le geste et ce qu'il donne se suivent (ses mains qui dressent puis l'assiette finie, la coupe puis la coiffure) ; son début joue dans une moitié, sa suite dans l'autre, en même temps, au ralenti";
+        return "les deux moitiés à la fois : une vidéo où le geste mène à ce qu'il donne (ses mains qui dressent puis l'assiette finie, la coupe puis la coiffure) ; le geste joue dans une moitié pendant que l'autre garde sa dernière image, ce qu'il donne";
       if (s.side === "left")
-        return `${s.first ? "le plan qui ouvre, " : ""}la moitié ${a} : elle ou son équipe au travail, la caméra posée (de dos à son poste, les mains qui font, un visage concentré pris d'en bas, l'atelier en plan large avec quelqu'un derrière) ; joué au ralenti sur toute la paire, en même temps que ce que ce geste donne dans l'autre moitié`;
+        return `${s.first ? "le plan qui ouvre, " : ""}la moitié ${a} : elle ou son équipe au travail, la caméra posée (de dos à son poste, les mains qui font, un visage concentré pris d'en bas, l'atelier en plan large avec quelqu'un derrière) ; joué à sa vitesse sur toute la paire, en même temps que ce que ce geste donne dans l'autre moitié`;
       return s.last
-        ? `la moitié ${b} : le résultat fini, le plus beau, posé devant la caméra ou qui reçoit sa dernière touche, la caméra fixe ; joué au ralenti jusqu'à la fin${end ? ", sous la carte de fin" : ""}`
-        : `la moitié ${b} : ce que ce geste donne (le même plat, la même coupe, la même pièce), la caméra fixe, filmé du dessus de préférence : quelqu'un le pose devant la caméra (le passage commence juste avant qu'il entre dans l'image) ou la dernière touche tombe dessus ; joué au ralenti sur toute la paire, en même temps que le geste`;
+        ? `la moitié ${b} : le résultat fini, le plus beau, posé devant la caméra ou qui reçoit sa dernière touche, la caméra fixe ; joué à sa vitesse jusqu'à la fin${end ? ", sous la carte de fin" : ""}, en même temps que le geste`
+        : `la moitié ${b} : ce que ce geste donne (le même plat, la même coupe, la même pièce), la caméra fixe, filmé du dessus de préférence : quelqu'un le pose devant la caméra (le passage commence juste avant qu'il entre dans l'image) ou la dernière touche tombe dessus ; joué à sa vitesse sur toute la paire, en même temps que le geste`;
     };
     // Both titles the whole Reel (up to its ending card).
     const to = end ? round(duration - END_CARD) : duration;
@@ -276,7 +279,8 @@ export const ecranPartage: MontageSkill = {
       // Its music: without its bass to the third bar (the original's held bass comes in at 4,55 s), cut dead with the
       // last image, as the original's; no sound effect (its original has none).
       music: { filters: [{ kind: "thin", from: 0, to: round(BASS * beat) }], end: { at: duration } },
-      shots: spans.map((s, i) => ({ ...s, want: want(list[i]!) })),
+      // Each pair's second half laid beside its first: the same moment, each at its own speed.
+      shots: spans.map((s, i) => ({ ...s, want: want(list[i]!), ...(list[i]!.side === "right" ? { beside: true } : {}) })),
       texts: { personne: { from: 0, to }, resultat: { from: 0, to } },
       marks: { solo: list.findIndex((s) => s.side === "solo") },
     };
