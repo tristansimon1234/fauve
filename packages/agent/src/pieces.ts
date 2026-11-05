@@ -2,7 +2,7 @@ import { z } from "zod";
 import type { PhotoFacts } from "./finish.ts";
 import { houseModel } from "./house-models.ts";
 import { REEL_FPS } from "./motion.ts";
-import { isClipSegment, segmentSpans, SLOT_NAME, type ClipAnalysis, type EditPlan, type MotionDrawn, type PlanLayer, type SfxCue } from "./schemas.ts";
+import { isClipSegment, screenTime, segmentSpans, SLOT_NAME, type ClipAnalysis, type EditPlan, type HandMomentKind, type MotionDrawn, type PlanLayer, type SfxCue } from "./schemas.ts";
 import { fitWords, skillObjectName, skillSettings, type SkillSetting } from "./skills.ts";
 
 // The bank of ready-to-play effects (chantier A of docs/reprise.md; docs/modeles.md, « Banque d'effets prêts à jouer »).
@@ -26,9 +26,21 @@ import { fitWords, skillObjectName, skillSettings, type SkillSetting } from "./s
 // the Reel's tempo, and those its timeline gives. It holds for any length within its `seconds` and any number of shots
 // within its `shots`, with or without its optional words; where it writes « @slot » it names an object of one of its
 // shots, replaced by what its filler saw there (left as is when nothing fits: its code does without).
+//
+// Three more things an effect can ask for. `spoken`: it is timed on what she says under it (her keyword written big
+// above her head as she says it): its code gets the words said under it, each at its frame (`spoken`, the engine's
+// subtitles staying under it), and its filler reads them to choose its words among hers. `photos`: up to four of her
+// photos (her work, what she names) laid in it, chosen by its filler from what each one shows, given to its code as
+// `photos` (each { src, aspect, cutout, subject }). A text of it may be written by the engine from what it knows
+// (`fact`: her place's coordinates, as a skill's), and a sound of its timeline may land on a gesture of hers in one of
+// its shots (`hand`: a click as her hand touches the switch).
 
-/** One of its words: what its filler writes there (in French, for the filler and Tristan) and the most characters it holds. */
-export type PieceText = { slot: string; want: string; max: number; required: boolean };
+/**
+ * One of its words: what its filler writes there (in French, for the filler and Tristan) and the most characters it
+ * holds. `fact`: written by the engine from what it knows, never by its filler (« coordinates », her place's, skills.ts):
+ * when it is not known, its filler writes the slot as its `want` says (its fallback: her neighbourhood).
+ */
+export type PieceText = { slot: string; want: string; max: number; required: boolean; fact?: "coordinates" };
 
 /**
  * Something in one of its shots its code lights up, cuts out or follows (her door, her sign, her windows): written
@@ -50,10 +62,14 @@ export type PieceNeeds = {
   shot?: { framing?: PieceFraming[]; still?: boolean; outdoors?: boolean; indoors?: boolean; person?: boolean; video?: boolean };
 };
 
-/** What its timeline gives for a span: its marks (frames from its start), its sounds (s from its start), the shots it cuts her out on (by their rank among its shots). */
+/**
+ * What its timeline gives for a span: its marks (frames from its start), its sounds (s from its start; `hand`: on a
+ * gesture of hers in one of its shots, by its rank among them, negative from its last, `within` seconds from its start,
+ * `at` its moment when nothing is read there), the shots it cuts her out on (by their rank among its shots).
+ */
 export type PieceTimeline = {
   marks?: Record<string, number>;
-  sounds?: { at: number; sound: string; seconds?: number; gain?: number }[];
+  sounds?: { at: number; sound: string; seconds?: number; gain?: number; hand?: { shot: number; moment: HandMomentKind; within?: [number, number] } }[];
   cutouts?: number[];
 };
 
@@ -87,6 +103,10 @@ export type EffectPiece = {
   code: string;
   /** Google Fonts families its code brings besides the Reel's two. */
   fonts?: string[];
+  /** Timed on what she says under it: its code gets `spoken` (her words, each at its frame), its filler what she says. */
+  spoken?: boolean;
+  /** Her photos it lays (her work, what she names): what they are, in French for its filler, and how many (four at most). */
+  photos?: { want: string; most: number };
 };
 
 /** The most effects of the bank one Reel plays: one charter, one music, never a patchwork. */
@@ -148,12 +168,22 @@ export function pieceShots(clips: { media_id: string; analysis: ClipAnalysis }[]
 /** How well one of her shots carries a piece: null when it cannot, else a score (its beauty, its framing exactly the one wanted). */
 function carries(need: NonNullable<PieceNeeds["shot"]>, shot: PieceShot): number | null {
   if (need.video && shot.photo) return null;
-  if (need.framing && (!shot.framing || !need.framing.includes(shot.framing))) return shot.photo && !need.video && need.framing.includes("wide") ? 1 : null;
+  let score = shot.beauty;
+  if (need.framing) {
+    if (shot.framing) {
+      if (!need.framing.includes(shot.framing)) return null;
+      if (shot.framing === need.framing[0]) score += 1;
+    } else if (shot.photo) {
+      // A photo's size is not read (only what it shows): it may carry any framing asked for, weighed low (her plates for
+      // the mosaic, her wide picture of the room for the frame in the frame).
+      score = 1;
+    } else return null;
+  }
   if (need.still && !shot.still) return null;
   if (need.outdoors && !shot.outdoors) return null;
   if (need.indoors && !shot.indoors) return null;
   if (need.person && !shot.person) return null;
-  return shot.beauty + (need.framing && shot.framing === need.framing[0] ? 1 : 0);
+  return score;
 }
 
 /**
@@ -208,7 +238,10 @@ export const PIECE_FILL_PROMPT = `You fill one of Edith's ready-made effects (Ed
 - a required slot (« obligatoire » true) always written, an optional one only when the brief or her request wants those words, else an empty text;
 - « mots_actuels » (a correction): keep them, but what her request changes.
 "objects": one per slot of « effet.ses_objets »: what in the shot it names (« plan », among « plans_dessous ») carries it, named in plain English as the eye sees it, two to four words (« back door », « shop window », « shop sign », « every window », « string lights »), « every » first for several to take one after the other; « none » when nothing in that shot fits (the code does without).
-"settings": only a setting of « effet.reglages » her request or the brief asks for, with the value that does it; otherwise none.`;
+"settings": only a setting of « effet.reglages » her request or the brief asks for, with the value that does it; otherwise none.
+With « ce_qu_elle_dit » (an effect timed on her voice): its words are hers, written exactly as she says them (a word the transcript misheard set right), in the order she says them, each one a word or a name she really says under it.
+With « ses_photos » (an effect that lays her photos): "photos", the ids of those of her photos it lays, in its order, as many as it takes at most (« effet.photos »), each one what its « veut » asks, from what each shows; none when none fits.
+A slot « ecrit_par_le_moteur » (her place's coordinates) is never yours: leave its text empty.`;
 
 export const pieceFillSchema = z.object({
   fits: z.boolean().describe("true when the shots under it carry the effect and her request is served by it"),
@@ -217,7 +250,12 @@ export const pieceFillSchema = z.object({
   objects: z.array(z.object({ slot: z.string().describe("A slot of « effet.ses_objets »"), name: z.string().describe("What carries it in that shot, in plain English; « none » when nothing fits") })),
   settings: z.array(z.object({ name: z.string(), value: z.string() })),
 });
-export type PieceFillAnswer = z.infer<typeof pieceFillSchema>;
+export type PieceFillAnswer = z.infer<typeof pieceFillSchema> & { photos?: string[] };
+
+/** Its filler's answer schema: the photos it lays only for an effect that lays some (no optional parameter for the API either way). */
+export function pieceFillSchemaFor(piece: Pick<EffectPiece, "photos">) {
+  return piece.photos ? pieceFillSchema.extend({ photos: z.array(z.string()).describe("The ids of her photos it lays, in its order; empty when none fits") }) : pieceFillSchema;
+}
 
 /** One of the shots under it, as its filler reads it. */
 export type PieceUnder = { id: string; photo: boolean; shows: string; framing?: string; camera?: string };
@@ -231,6 +269,12 @@ export function pieceFillInput(input: {
   business: { name?: string | null; activity?: string | null; facts?: string[] };
   contract?: string[];
   current?: Record<string, string>;
+  /** What she says under it (an effect timed on her voice). */
+  said?: string;
+  /** Her photos it may lay (an effect that lays some): each one's id and what it shows. */
+  photos?: { id: string; shows: string }[];
+  /** What the engine writes itself (her coordinates): its slots are left to it. */
+  facts?: PieceFacts;
 }) {
   const { piece, under } = input;
   const n = under.length;
@@ -240,7 +284,8 @@ export function pieceFillInput(input: {
       nom: piece.name,
       ce_qu_il_fait: piece.how,
       il_faut: piece.needs,
-      ses_mots: piece.texts.map((t) => ({ slot: t.slot, veut: t.want, max: t.max, obligatoire: t.required })),
+      ses_mots: piece.texts.map((t) => ({ slot: t.slot, veut: t.want, max: t.max, obligatoire: t.required, ...(pieceFact(t, input.facts) ? { ecrit_par_le_moteur: true } : {}) })),
+      ...(piece.photos ? { photos: { veut: piece.photos.want, au_plus: Math.min(4, piece.photos.most) } } : {}),
       ...(piece.objects?.length
         ? {
             ses_objets: piece.objects.flatMap((o) => {
@@ -257,26 +302,44 @@ export function pieceFillInput(input: {
     commerce: { nom: input.business.name ?? undefined, activite: input.business.activity ?? undefined, ...(input.business.facts?.length ? { ce_qu_on_sait: input.business.facts } : {}) },
     ...(input.contract?.length ? { contrat: input.contract } : {}),
     ...(input.current && Object.keys(input.current).length ? { mots_actuels: input.current } : {}),
+    ...(piece.spoken && input.said?.trim() ? { ce_qu_elle_dit: input.said.trim().slice(0, 1500) } : {}),
+    ...(piece.photos && input.photos?.length ? { ses_photos: input.photos.slice(0, 20).map((p) => ({ id: p.id, montre: p.shows.slice(0, 160) })) } : {}),
   };
 }
 
-/** Its filler's answer read: its words cut to their place, its objects named, its settings; null when it does not fit or a required word is missing. */
-export type PieceFill = { texts: Record<string, string>; objects: Record<string, string>; settings: Record<string, string> };
+/** What the engine knows of her business that an effect's text can show as it is (PieceText.fact): her place's coordinates. */
+export type PieceFacts = { coordinates?: string };
 
-export function readPieceFill(piece: Pick<EffectPiece, "texts" | "objects" | "settings">, answer: PieceFillAnswer): PieceFill | null {
+/** The words the engine writes in a slot from what it knows (her coordinates), when they fit; none when unknown. */
+export const pieceFact = (t: Pick<PieceText, "fact" | "max">, facts: PieceFacts | undefined): string | undefined =>
+  t.fact === "coordinates" && facts?.coordinates && facts.coordinates.length <= t.max ? facts.coordinates : undefined;
+
+/**
+ * Its filler's answer read: its words cut to their place (the engine's own where it knows them), its objects named, its
+ * settings, the photos it lays (among those offered, four at most); null when it does not fit or a required word is missing.
+ */
+export type PieceFill = { texts: Record<string, string>; objects: Record<string, string>; settings: Record<string, string>; photos?: string[] };
+
+export function readPieceFill(
+  piece: Pick<EffectPiece, "texts" | "objects" | "settings" | "photos">,
+  answer: PieceFillAnswer,
+  options: { photos?: string[]; facts?: PieceFacts } = {},
+): PieceFill | null {
   if (!answer.fits) return null;
   const texts: Record<string, string> = {};
   for (const t of piece.texts) {
-    const words = fitWords(answer.texts.find((w) => w.slot === t.slot)?.text ?? "", t.max);
+    const words = pieceFact(t, options.facts) ?? fitWords(answer.texts.find((w) => w.slot === t.slot)?.text ?? "", t.max);
     if (words) texts[t.slot] = words;
     else if (t.required) return null;
   }
+  const offered = new Set(options.photos ?? []);
+  const photos = piece.photos ? [...new Set(answer.photos ?? [])].filter((id) => offered.has(id)).slice(0, Math.min(4, piece.photos.most)) : [];
   const objects: Record<string, string> = {};
   for (const o of piece.objects ?? []) {
     const name = skillObjectName(answer.objects.find((x) => x.slot === o.slot)?.name);
     if (name) objects[o.slot] = name;
   }
-  return { texts, objects, settings: skillSettings(piece, answer.settings) };
+  return { texts, objects, settings: skillSettings(piece, answer.settings), ...(photos.length ? { photos } : {}) };
 }
 
 // ——— Its plan ——————————————————————————————————————————————————————————————————————————————————————————————————————
@@ -366,20 +429,28 @@ export function pieceMotion(input: {
   const count = plan.segments.filter(isClipSegment).length;
   const drawn: MotionDrawn | undefined = subjects.length || objects.length ? { shots: count, ...(subjects.length ? { subjects } : {}), ...(objects.length ? { objects } : {}) } : undefined;
   const seconds = frames / REEL_FPS;
+  // A sound on her gesture: its shot by its index among the plan's segments (sfx.ts reads it there), its window on the Reel's clock.
+  const segmentOf = (clip: number) => plan.segments.map((s, i) => (isClipSegment(s) ? i : -1)).filter((i) => i >= 0)[clip];
   const sounds: SfxCue[] = (line.sounds ?? [])
     .filter((s) => Number.isFinite(s.at) && s.at >= 0 && s.at < seconds - 0.05 && s.sound.trim().length >= 2)
     .sort((a, b) => a.at - b.at)
     .slice(0, 16)
-    .map((s) => ({
-      at: round3(s.at),
-      sound: s.sound.trim().slice(0, 60),
-      ...(s.seconds !== undefined ? { seconds: Math.min(3, Math.max(0.5, s.seconds)) } : {}),
-      ...(s.gain ? { gain: Math.round(Math.min(6, Math.max(-24, s.gain)) * 10) / 10 } : {}),
-      skill: true,
-    }));
+    .map((s) => {
+      const clip = s.hand ? at(s.hand.shot) : undefined;
+      const shot = clip === undefined ? undefined : segmentOf(clip);
+      const within = s.hand?.within && s.hand.within[1] > s.hand.within[0] ? { within: [round3(layer.from + Math.max(0, s.hand.within[0])), round3(layer.from + s.hand.within[1])] as [number, number] } : {};
+      return {
+        at: round3(s.at),
+        sound: s.sound.trim().slice(0, 60),
+        ...(s.seconds !== undefined ? { seconds: Math.min(3, Math.max(0.5, s.seconds)) } : {}),
+        ...(s.gain ? { gain: Math.round(Math.min(6, Math.max(-24, s.gain)) * 10) / 10 } : {}),
+        skill: true,
+        ...(s.hand && shot !== undefined ? { hand: { shot, moment: s.hand.moment, ...within } } : {}),
+      };
+    });
   const code = pieceCode(piece, fill.objects);
   // What a fallback, a correction or an animation over it reads: its brief as the editor wrote it, nothing of its earlier code.
-  const { code: _code, js: _js, texts: _texts, drawn: _drawn, sounds: _sounds, fonts: _fonts, piece: _piece, ...rest } = layer.motion;
+  const { code: _code, js: _js, texts: _texts, drawn: _drawn, sounds: _sounds, fonts: _fonts, piece: _piece, photos: _photos, times_spoken: _spoken, ...rest } = layer.motion;
   return {
     ...rest,
     code,
@@ -388,8 +459,31 @@ export function pieceMotion(input: {
     ...(drawn ? { drawn } : {}),
     ...(sounds.length ? { sounds } : {}),
     ...(piece.fonts?.length ? { fonts: piece.fonts.slice(0, 3) } : {}),
+    // Timed on what she says under it: its code gets her words said, each at its frame; the engine's subtitles stay under it.
+    ...(piece.spoken ? { times_spoken: true } : {}),
+    // Her photos it lays, in its order (its code reads them as `photos`).
+    ...(piece.photos && fill.photos?.length ? { photos: fill.photos.slice(0, 4) } : {}),
     piece: { key: piece.key, version: piece.version },
   };
+}
+
+/** What she says under a layer, as its filler reads it: the words of her shots under it, as Gemini (or Scribe) timed them, in order. */
+export function saidUnder(plan: Pick<EditPlan, "segments">, clips: Record<string, ClipAnalysis>, layer: Pick<PlanLayer, "from" | "to">): string {
+  const { spans } = segmentSpans(plan.segments);
+  const words: { w: string; at: number }[] = [];
+  plan.segments.forEach((s, i) => {
+    if (!isClipSegment(s) || s.beside) return;
+    const span = spans[i]!;
+    for (const w of clips[s.clip_id]?.words ?? []) {
+      if (w.start < s.in || w.end > s.out) continue;
+      const at = span.start + screenTime(s, w.start);
+      if (at >= layer.from - 0.05 && at < layer.to) words.push({ w: w.w, at });
+    }
+  });
+  return words
+    .sort((a, b) => a.at - b.at)
+    .map((w) => w.w)
+    .join(" ");
 }
 
 /**
@@ -407,6 +501,6 @@ export function pieceTestPlan(input: { piece: EffectPiece; shots: { file: string
 
 /** A layer's motion as the editor left it, for the motion designer to write when the piece could not play (its brief alone). */
 export function unplayedPiece(motion: PlanLayer["motion"]): PlanLayer["motion"] {
-  const { code: _code, js: _js, texts: _texts, drawn: _drawn, sounds: _sounds, fonts: _fonts, piece: _piece, ...rest } = motion;
+  const { code: _code, js: _js, texts: _texts, drawn: _drawn, sounds: _sounds, fonts: _fonts, piece: _piece, photos: _photos, times_spoken: _spoken, ...rest } = motion;
   return rest;
 }

@@ -10764,3 +10764,66 @@ test("an effect of the bank: the editor names it in its layer's brief, one per R
   assert.match(offered.rule, /\[borrow: <key>\]/);
   assert.equal(piecesForEditor([]), undefined);
 });
+
+test("an effect of the bank may be timed on what she says, lay her photos, write her coordinates and click on her gesture", async () => {
+  const { cadre } = await import("./pieces/cadre.ts");
+  const { pieceMotion, pieceFillInput, pieceFillSchemaFor, pieceFillSchema, readPieceFill, saidUnder } = await import("./pieces.ts");
+  const { outputFormat } = await import("./answer.ts");
+  const piece = {
+    ...cadre,
+    key: "test",
+    spoken: true,
+    photos: { want: "ce qu'elle nomme", most: 2 },
+    texts: [
+      { slot: "mot", want: "un mot qu'elle dit", max: 20, required: true },
+      { slot: "lieu", want: "ses coordonnées, sinon son quartier", max: 30, required: false, fact: "coordinates" as const },
+    ],
+    timeline: () => ({ sounds: [{ at: 1, sound: "light switch click", hand: { shot: 0, moment: "highest" as const, within: [0.5, 2] as [number, number] } }] }),
+  };
+  const plan: Pick<EditPlan, "segments" | "tempo"> = {
+    tempo: 100,
+    segments: [
+      { clip_id: "intro", in: 0, out: 1, zoom: "none" },
+      { motion: { brief: "an animation" }, duration: 1 },
+      { clip_id: "talk", in: 2, out: 6, zoom: "none" },
+    ],
+  };
+  const layer = { from: 2, to: 5, motion: { brief: "[borrow: test]" } };
+  // What she says under it, on the Reel's clock: her words of the passage under the span, in order.
+  const clips = { talk: { words: [{ w: "avant", start: 1, end: 1.5 }, { w: "Ici", start: 2.1, end: 2.3 }, { w: "brioches", start: 3, end: 3.5 }, { w: "après", start: 5.5, end: 5.8 }] } } as never;
+  assert.equal(saidUnder(plan, clips, layer), "Ici brioches");
+  // Its coordinates are the engine's; her photos are chosen among those offered, as many as it takes.
+  const schema = pieceFillSchemaFor(piece);
+  assert.notEqual(schema, pieceFillSchema);
+  assert.equal(pieceFillSchemaFor(cadre), pieceFillSchema);
+  const json = (outputFormat(schema as never) as unknown as { schema: { required?: string[] } }).schema;
+  assert.ok(json.required?.includes("photos"), "its photos are required: no optional parameter for the API");
+  const answer = { fits: true, missing: "", texts: [{ slot: "mot", text: "brioches" }, { slot: "lieu", text: "48.8° N" }], objects: [], settings: [], photos: ["p2", "x", "p1", "p3"] };
+  const read = readPieceFill(piece, answer, { photos: ["p1", "p2", "p3"], facts: { coordinates: "48.8772° N, 2.3394° E" } })!;
+  assert.deepEqual(read.photos, ["p2", "p1"]);
+  assert.equal(read.texts.lieu, "48.8772° N, 2.3394° E");
+  // Without coordinates known, its filler's fallback words stand.
+  assert.equal(readPieceFill(piece, answer, { photos: [] })!.texts.lieu, "48.8° N");
+  const input = pieceFillInput({ piece, under: [{ id: "talk", photo: false, shows: "elle parle face caméra" }], brief: "", request: "", business: {}, said: "Ici brioches", photos: [{ id: "p1", shows: "une brioche" }], facts: { coordinates: "48.8772° N, 2.3394° E" } });
+  assert.equal(input.ce_qu_elle_dit, "Ici brioches");
+  assert.deepEqual(input.ses_photos, [{ id: "p1", montre: "une brioche" }]);
+  assert.equal(input.effet.ses_mots[1]!.ecrit_par_le_moteur, true);
+  // Its layer: timed on what she says (its code gets her words), her photos, its click on her gesture in its shot (the
+  // plan's third segment, its window on the Reel's clock).
+  const motion = pieceMotion({ piece, fill: read, plan, layer, bpm: 100 });
+  assert.equal(motion.times_spoken, true);
+  assert.deepEqual(motion.photos, ["p2", "p1"]);
+  assert.deepEqual(motion.sounds?.[0]?.hand, { shot: 2, moment: "highest", within: [2.5, 4] });
+});
+
+test("a sound of an effect laid over the montage lands on her gesture, read on her hands, else on its own moment", async () => {
+  const { planCues } = await import("./sfx.ts");
+  const plan = {
+    duration: 6,
+    texts: [],
+    segments: [{ clip_id: "v", in: 0, out: 6, zoom: "none" as const }],
+    layers: [{ from: 1, to: 5, motion: { brief: "[borrow: interrupteur]", sounds: [{ at: 1, sound: "light switch click", skill: true, hand: { shot: 0, moment: "highest" as const } }] } }],
+  };
+  // No tracks: its own moment, from the layer's start.
+  assert.deepEqual(planCues(plan, [{ start: 0, length: 6 }]).map((c) => c.at), [2]);
+});

@@ -8,20 +8,23 @@ import {
   memoryLines,
   PIECE_FILL_PROMPT,
   pieceFillInput,
-  pieceFillSchema,
+  pieceFillSchemaFor,
   pieceMotion,
+  saidUnder,
   pieceWordsOf,
   readPieceFill,
   unplayedPiece,
   type EditPlan,
   type EffectPiece,
   type MediaFacts,
+  type PieceFacts,
   type PieceFillAnswer,
   type PieceUnder,
   type ReelContract,
 } from "@fauve/agent";
+import { studioPlace } from "@/lib/geo";
 import { outputFormat, readAnswer } from "@fauve/agent/answer";
-import { designMotionScenes, type SceneBrand, type SceneContext, type SceneRequest } from "./motion-designer";
+import { designMotionScenes, type OfferedPhoto, type SceneBrand, type SceneContext, type SceneRequest } from "./motion-designer";
 import { anthropic, logClaudeCost } from "./run";
 
 // An effect of the bank played on her Reel (packages/agent/src/pieces.ts): the editor laid it over some of her shots
@@ -75,9 +78,23 @@ export async function playPieces(input: {
   requestFor: (index: number) => SceneRequest;
   brand: SceneBrand;
   context: SceneContext;
+  /** Her photos in this Reel (an effect that lays some chooses among them): each one's id and what it shows. */
+  photos?: { id: string; shows: string }[];
+  /** Her photos as an animation gets them (links, cut-outs), for the check of an effect that lays some. */
+  photoOffers?: (ids: string[]) => Promise<OfferedPhoto[]>;
 }): Promise<PiecesPlayed> {
   const result: PiecesPlayed = { played: [], unplayed: [] };
   const layers = input.plan.layers ?? [];
+  // What the engine writes itself in an effect's slots: her place's coordinates (her address geocoded once, kept on the studio).
+  const wantsPlace = input.layers.some(({ key }) => input.pieces.get(key)?.texts.some((t) => t.fact === "coordinates"));
+  const facts: PieceFacts | undefined = wantsPlace
+    ? await studioPlace(input.studioId)
+        .then((place) => (place ? { coordinates: place.label } : undefined))
+        .catch((error: unknown) => {
+          console.warn("geo: no coordinates for this effect", input.studioId, error instanceof Error ? error.message : error);
+          return undefined;
+        })
+    : undefined;
   for (const { index, key } of input.layers) {
     const piece = input.pieces.get(key);
     const layer = layers[index];
@@ -108,13 +125,18 @@ export async function playPieces(input: {
       business: { name: input.studio.name, activity: input.studio.business, facts: memoryLines(input.studio.memory) },
       contract: contractLines(input.contract),
       ...(earlier ? { current: pieceWordsOf(piece, earlier.motion) } : {}),
+      // Timed on her voice: what she says under it; laying her photos: those of this Reel; what the engine writes itself.
+      ...(piece.spoken ? { said: saidUnder(input.plan, input.facts.clips, laid) } : {}),
+      ...(piece.photos && input.photos?.length ? { photos: input.photos } : {}),
+      ...(facts ? { facts } : {}),
     });
+    const schema = pieceFillSchemaFor(piece);
     const fill = async (again?: { answer: PieceFillAnswer; note: string }): Promise<PieceFillAnswer | null> => {
       try {
         const response = await anthropic().beta.messages.parse({
           model: CHAT_MODEL,
           max_tokens: 3000,
-          output_config: { effort: "low", format: outputFormat(pieceFillSchema) },
+          output_config: { effort: "low", format: outputFormat(schema) },
           system: PIECE_FILL_PROMPT,
           messages: [
             { role: "user", content: JSON.stringify(fillInput) },
@@ -122,7 +144,7 @@ export async function playPieces(input: {
           ],
         });
         await logClaudeCost(input.studioId, response.usage, "piece_fill", CHAT_MODEL);
-        return response.parsed_output ? readAnswer(pieceFillSchema, response.parsed_output) : null;
+        return response.parsed_output ? (readAnswer(schema, response.parsed_output) as PieceFillAnswer) : null;
       } catch (error) {
         console.warn("piece: its filling failed", input.postId, key, error);
         return null;
@@ -130,15 +152,19 @@ export async function playPieces(input: {
     };
     // Its layer from an answer, then its check (its words and marks as they will play): its js, or what the check refused.
     const tried = async (answer: PieceFillAnswer): Promise<{ js: string; fonts: string[] } | { error: string } | null> => {
-      const read = readPieceFill(piece, answer);
+      const read = readPieceFill(piece, answer, { photos: (input.photos ?? []).map((p) => p.id), ...(facts ? { facts } : {}) });
       if (!read) return null;
       layers[index] = { ...laid, motion: pieceMotion({ piece, fill: read, plan: input.plan, layer: laid, bpm: input.plan.tempo ?? 100 }) };
       const motion = layers[index]!.motion;
+      // Her photos it lays, as its code gets them (links, cut-outs) in the check too.
+      const offered = motion.photos?.length && input.photoOffers ? await input.photoOffers(motion.photos).catch(() => []) : [];
+      const asked = input.requestFor(index);
       const request: SceneRequest = {
-        ...input.requestFor(index),
-        draft: { code: motion.code!, name: piece.name, ...(motion.fonts?.length ? { fonts: motion.fonts } : {}) },
+        ...asked,
+        draft: { code: motion.code!, name: piece.name, ...(motion.fonts?.length ? { fonts: motion.fonts } : {}), ...(motion.photos?.length ? { photos: motion.photos } : {}) },
         keep: true,
         texts: motion.texts ?? {},
+        ...(offered.length ? { photos: [...(asked.photos ?? []).filter((p) => !offered.some((o) => o.id === p.id)), ...offered] } : {}),
       };
       const [checked] = await designMotionScenes(input.studioId, [request], undefined, input.brand, [], input.context).catch((error: unknown) => [
         { id: request.id, code: null, js: null, error: `le contrôle n'a pas pu tourner : ${error instanceof Error ? error.message : String(error)}` },

@@ -56,6 +56,9 @@
 // --span 0,4.2 (seconds of the Reel) [--cast '[[0,1.5,2.4],[1,0,0.6]]' (each shot: its file's place in --clips, where it
 // starts, how long it lasts; else each clip a shot of --each seconds, 1.2 by default)] [--bpm 100] --words '{…}' (its
 // slots) --named '{…}' (its objects) [--settings '{…}']; its check is the layer's, as the engine runs it on an animation.
+// An effect that lays her photos takes them by --photos f2,f3 (their ids, in --clips' order, f0 the first file); one timed
+// on what she says takes her words in its first clip by --talk (as Scribe times them, seconds of that clip): its code gets
+// them as `spoken`, and the engine's subtitles show under it.
 
 import { execFileSync, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -115,6 +118,7 @@ const { values } = parseArgs({
     piece: { type: "string" },
     span: { type: "string" },
     each: { type: "string" },
+    photos: { type: "string" },
   },
 });
 /** A JSON option given as text or as the path of a file. */
@@ -250,14 +254,23 @@ const laidShots = piece
     : files.map((f) => ({ file: f.id, at: f.photo ? 0 : Math.max(0, Math.min(f.seconds - Number(values.each ?? 1.2), f.seconds / 3)), seconds: Number(values.each ?? 1.2), photo: f.photo }))
   : [];
 const span = (values.span ?? "").split(",").map(Number);
-const plan = piece
+// An effect timed on what she says: her words in its first clip (--talk), heard and subtitled as the engine does.
+if (piece?.spoken) {
+  const given = json<{ words: Timed[] }>(values.talk);
+  if (!given?.words?.length) throw new Error("--talk: her words in her first clip, as Scribe times them (an effect timed on her voice)");
+  spoken[files[0]!.id] = given.words;
+}
+const piecePlan = piece
   ? pieceTestPlan({
       piece,
       shots: laidShots,
       span: [Number.isFinite(span[0]) ? span[0]! : 0, Number.isFinite(span[1]) ? span[1]! : laidShots.reduce((t, s) => t + s.seconds, 0)],
-      fill: { texts: fill.texts, objects: fill.objects ?? {}, settings: fill.settings ?? {} },
+      fill: { texts: fill.texts, objects: fill.objects ?? {}, settings: fill.settings ?? {}, ...(values.photos ? { photos: values.photos.split(",").map((x) => x.trim()).filter(Boolean) } : {}) },
       bpm: bpm ?? 100,
     })
+  : null;
+const plan = piecePlan
+  ? { ...piecePlan, ...(piece?.spoken ? { subtitles: true } : {}) }
   : dressSkillPlan(skillPlan({ skill, name: model?.name ?? skill.key, files, fill, ...(bpm ? { bpm } : {}), ...(talk ? { talk } : {}) }), skill, followed);
 const fonts = (values.fonts || "").split(",").map((f) => f.trim()).filter(Boolean);
 console.log(

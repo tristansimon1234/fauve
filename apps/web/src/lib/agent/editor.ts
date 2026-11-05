@@ -1208,6 +1208,12 @@ export async function designEdit(params: {
       requestFor: (index) => requestFor({ id: `l${index}`, brief: layers[index]!.motion.brief }),
       brand: sceneBrand,
       context: sceneContext,
+      // Her photos in this Reel, for an effect that lays some (her work, what she names), cut out first for its check.
+      photos: photoIds.map((id, i) => ({ id, shows: photoReads[i]?.detection.notes ?? "" })),
+      photoOffers: async (ids) => {
+        await ensureCutouts(params.studioId, ids).catch((e: unknown) => console.warn("cut-outs: not ready", e));
+        return photoOffers(params.studioId, ids);
+      },
     });
     const left = outcome.unplayed.map((u) => requestFor({ id: `l${u.index}`, brief: layers[u.index]!.motion.brief }));
     if (left.length) {

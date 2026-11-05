@@ -324,7 +324,8 @@ export function Reel(props: ReelProps) {
                 ? {
                     footage: {
                       shots: layer.shots.map((shot) => placedShot(shot, props.segments[shot.segment], theme, true)),
-                      draw: (shot: ComposeShot, size: { width: number; height: number }) => drawShot(props.segments[shot.segment], theme, size, shot.face, undefined, shot.segment),
+                      // Muted: the montage under it already plays this shot's sound once (an effect that draws it in twelve tiles never plays it twelve times).
+                      draw: (shot: ComposeShot, size: { width: number; height: number }) => drawShot(silent(props.segments[shot.segment]), theme, size, shot.face, undefined, shot.segment),
                       subject: (shot: ComposeShot, size: { width: number; height: number }) => drawShot(props.segments[shot.segment], theme, size, shot.face, "subject", shot.segment),
                       object: (shot: ComposeShot, name: string, size: { width: number; height: number }) =>
                         drawShot(props.segments[shot.segment], theme, size, shot.face, { object: name }, shot.segment),
@@ -396,6 +397,11 @@ type Layer = "subject" | "depth" | "ground" | "near" | { object: string };
  * animation laid over the montage (full frame): a photo with the montage's own slow zoom, a shot with its punch, so the
  * cut-out stays on the picture the montage plays under it.
  */
+/** A shot drawn without its sound: what an animation over the montage draws of it (the montage under it plays it, heard once). */
+function silent(segment: ReelProps["segments"][number] | undefined): ReelProps["segments"][number] | undefined {
+  return segment?.type === "clip" && segment.speech ? { ...segment, speech: false } : segment;
+}
+
 function drawShot(
   segment: ReelProps["segments"][number] | undefined,
   theme: Theme,
