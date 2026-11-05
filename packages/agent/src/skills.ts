@@ -148,7 +148,17 @@ export type SkillFile = {
   shows?: string;
   /** A video's passages worth showing, best first. */
   moments?: { start: number; end: number; what?: string }[];
+  /**
+   * Its shape (width / height), when known: the filler sees whether it is vertical, horizontal or square, so a slot laid
+   * in a box of another shape (a tall half of a split screen) gets a file of its shape, or a passage with its subject in
+   * the middle (« Écran partagé titré »: a 16:9 video keeps 38 % of its width in a 2:3 half).
+   */
+  aspect?: number;
 };
+
+/** A file's shape in the filler's words. */
+export const fileFormat = (aspect: number | undefined): "verticale" | "horizontale" | "carrée" | undefined =>
+  !aspect || !Number.isFinite(aspect) || aspect <= 0 ? undefined : aspect > 1.15 ? "horizontale" : aspect < 0.87 ? "verticale" : "carrée";
 
 /** The filler's answer, read: a file and its start for each shot, her words by slot, the ending's words. */
 export type SkillFill = {
@@ -522,6 +532,7 @@ Then cast her files on its slots (« cases », in order: each with its length an
 - each slot gets the file and the passage that suits what it wants; the first slot opens the Reel: the strongest, most beautiful image;
 - a video's passage starts at "at" (seconds) and lasts the slot's length: choose it inside one of its good moments (« moments »), never a blurry or dark one when another exists;
 - never the same passage twice; a video may fill several slots only with moments that look different; her files all used before one comes back, never the same file on two slots in a row when another fits;
+- a file's format (« format »: verticale, horizontale, carrée) matters where the model lays a slot in a box of another shape (its « veut » or « deroule » says: a tall half, a wide band): there a file of that shape when one fits, else a passage whose subject is in the middle of its picture (only its middle shows);
 - a photo plays still (at 0).
 
 Then write its texts, in French (what her customers read), each in its slot (« textes »: what it says and its most characters):
@@ -584,10 +595,18 @@ export function skillFillInput(input: {
     ...(input.skill.objects?.length ? { objets: input.skill.objects.map((o) => ({ slot: o.slot, case: o.shot + 1, cherche: o.want })) } : {}),
     ...(input.current ? { textes_actuels: input.current } : {}),
     ...(input.currentSettings && Object.keys(input.currentSettings).length ? { reglages_actuels: input.currentSettings } : {}),
-    fichiers: input.files.map((f) =>
-      f.photo
-        ? { id: f.id, type: "photo", montre: f.shows }
-        : { id: f.id, type: "vidéo", duree: `${round(f.seconds)} s`, montre: f.shows, moments: f.moments?.slice(0, 6).map((m) => ({ de: round(m.start), a: round(m.end), ...(m.what ? { quoi: m.what } : {}) })) },
-    ),
+    fichiers: input.files.map((f) => {
+      const format = fileFormat(f.aspect);
+      return f.photo
+        ? { id: f.id, type: "photo", ...(format ? { format } : {}), montre: f.shows }
+        : {
+            id: f.id,
+            type: "vidéo",
+            ...(format ? { format } : {}),
+            duree: `${round(f.seconds)} s`,
+            montre: f.shows,
+            moments: f.moments?.slice(0, 6).map((m) => ({ de: round(m.start), a: round(m.end), ...(m.what ? { quoi: m.what } : {}) })),
+          };
+    }),
   };
 }
