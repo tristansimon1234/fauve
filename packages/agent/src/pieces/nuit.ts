@@ -25,8 +25,7 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, shots,
   const mine = counted.length ? counted : list.map((s, i) => i).filter((i) => list[i].from < DUR && list[i].from + list[i].durationInFrames > 0);
   const N = Math.max(1, Math.min(6, mine.length));
   const box = { position: "absolute", left: 0, top: 0, width: W, height: H };
-  const laid = { left: 0, top: 0, width: W, height: H };
-  const fill = (bg, key, extra) => h("div", { key, style: { ...box, background: bg, ...extra } });
+  const fill =(bg, key, extra) => h("div", { key, style: { ...box, background: bg, ...extra } });
   const len = (i) => Math.max(1, list[i] ? list[i].durationInFrames : 1);
   // One image of one of her shots at this frame (k: its image in her passage), held: a photo stays still.
   const pic = (i, k, style, key) => (list[i] ? h(Footage, { key: key || "p" + i, shot: i, style: { ...box, ...style }, at: frame - Math.max(0, Math.min(len(i) - 1, Math.round(k))) }) : null);
@@ -37,27 +36,34 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, shots,
   const FLASH = Math.max(1, BLACK - 2);
 
   // 1. Her object at one place and one size in every shot: its box read once in each, where the engine found it by its
-  // name; each shot enlarged a little (1,15 times, room to move it) and more until her object is as big as where it is
-  // biggest (1,9 times at most), then moved onto the point the most can reach, nearest the middle, never uncovering an
-  // edge (one that cannot reach it comes as near as it can). Not found: as the montage frames it.
+  // name, on her whole picture laid to cover the frame (a horizontal one keeps its sides: room to move it on); each shot
+  // enlarged a little (1,15 times, room to move it) and more until her object is as big as where it is biggest (1,9 times
+  // at most), then moved onto the point the most can reach, nearest the middle, never uncovering an edge (one that cannot
+  // reach it comes as near as it can). Not found: as the montage frames it.
   const near = (k) => (mine[k] !== undefined && list[mine[k]] ? Math.max(0, list[mine[k]].from) + 1 : 0);
+  const whole = (k) => {
+    const a = Number(list[mine[k]] && list[mine[k]].aspect) || W / H;
+    return a >= W / H ? { left: 0, top: 0, width: H * a, height: H } : { left: 0, top: 0, width: W, height: W / a };
+  };
   const fit = React.useMemo(() => {
     const seen = [
-      N > 0 ? SubjectBox(shots[mine[0]], near(0), laid, "@objet1") : null,
-      N > 1 ? SubjectBox(shots[mine[1]], near(1), laid, "@objet2") : null,
-      N > 2 ? SubjectBox(shots[mine[2]], near(2), laid, "@objet3") : null,
-      N > 3 ? SubjectBox(shots[mine[3]], near(3), laid, "@objet4") : null,
-      N > 4 ? SubjectBox(shots[mine[4]], near(4), laid, "@objet5") : null,
-      N > 5 ? SubjectBox(shots[mine[5]], near(5), laid, "@objet6") : null,
-    ].map((b) => (b && b.w > 8 && b.h > 8 && b.w < W * 0.9 && b.h < H * 0.9 ? b : null));
+      N > 0 ? SubjectBox(shots[mine[0]], near(0), whole(0), "@objet1") : null,
+      N > 1 ? SubjectBox(shots[mine[1]], near(1), whole(1), "@objet2") : null,
+      N > 2 ? SubjectBox(shots[mine[2]], near(2), whole(2), "@objet3") : null,
+      N > 3 ? SubjectBox(shots[mine[3]], near(3), whole(3), "@objet4") : null,
+      N > 4 ? SubjectBox(shots[mine[4]], near(4), whole(4), "@objet5") : null,
+      N > 5 ? SubjectBox(shots[mine[5]], near(5), whole(5), "@objet6") : null,
+    ].map((b, k) => (b && b.w > 8 && b.h > 8 && b.w < whole(k).width * 0.9 && b.h < whole(k).height * 0.9 ? b : null));
     const tall = 1.15 * Math.max(0, ...seen.map((b) => (b ? b.h : 0)));
     if (!(tall > 0)) return [];
-    const place = seen.map((b) => {
+    const place = seen.map((b, k) => {
       if (!b) return null;
       const s = Math.min(1.9, Math.max(1.15, tall / b.h));
+      const w = whole(k).width * s;
+      const ht = whole(k).height * s;
       const cx = (b.x + b.w / 2) * s;
       const cy = (b.y + b.h / 2) * s;
-      return { s, cx, cy, rx: [cx - (s - 1) * W, cx], ry: [cy - (s - 1) * H, cy] };
+      return { w, ht, cx, cy, rx: [cx - (w - W), cx], ry: [cy - (ht - H), cy] };
     });
     const within = (v, r) => Math.max(r[0], Math.min(r[1], v));
     const most = (ranges, centre) => {
@@ -72,12 +78,10 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, shots,
     const kept = place.filter(Boolean);
     const tx = most(kept.map((p) => p.rx), W * 0.5);
     const ty = most(kept.map((p) => p.ry), H * 0.42);
-    return place.map((p) => (p ? { s: p.s, x: Math.round(within(tx, p.rx) - p.cx), y: Math.round(within(ty, p.ry) - p.cy) } : null));
+    return place.map((p) => (p ? { left: Math.floor(within(tx, p.rx) - p.cx), top: Math.floor(within(ty, p.ry) - p.cy), width: Math.ceil(p.w) + 1, height: Math.ceil(p.ht) + 1 } : null));
   }, [N, W, H, DUR]);
-  const aligned = (a, node) => {
-    const f = fit[a];
-    return f ? h("div", { key: "al" + a, style: { ...box, transform: "translate(" + f.x + "px, " + f.y + "px) scale(" + f.s.toFixed(4) + ")", transformOrigin: "0 0" } }, node) : node;
-  };
+  // An image of one of her shots, her picture laid where her object comes to its place (else as the montage frames it).
+  const angle = (a, k, style, key) => pic(mine[a], k, fit[a] ? { ...style, ...fit[a] } : style, key);
   // A motion blur along a slant: an SVG blur in a turned box, its id this image's.
   const DIAG = Math.ceil(Math.hypot(W, H));
   const streak = (node, sigma, angle, key) => {
@@ -95,7 +99,8 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, shots,
   const angleAt = (f) => {
     let p = 0;
     while (p < 14 && f >= ST[p + 1]) p++;
-    const a = p % N;
+    // In turn, its last cut on her last shot as the original's (A B C D E F A B C D E F A B F).
+    const a = p === 14 && N > 2 ? N - 1 : p % N;
     let k = f - ST[p];
     for (let q = a; q < p; q += N) k += ST[q + 1] - ST[q];
     return { p, a, k };
@@ -110,12 +115,12 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, shots,
   let node = null;
   if (frame < FLASH) {
     const { p, a, k } = angleAt(frame);
-    const shot = aligned(a, pic(mine[a], k, {}, "an" + a));
+    const shot = angle(a, k, {}, "an" + a);
     node = p >= 9 && p <= 13 ? streak(shot, 9 + (p - 9) * 7, p % 2 ? 8 : -8, "st" + p) : shot;
   } else if (frame < BLACK) {
-    // Its last image burnt white, then the whole picture in negative.
+    // Its last image burnt white (its blacks lifted: a night burns through), then the whole picture in negative.
     const { a, k } = angleAt(FLASH - 1);
-    node = aligned(a, pic(mine[a], k + 1, { filter: frame === FLASH ? "brightness(10) saturate(0.5)" : "invert(1) contrast(1.15)" }, "flash"));
+    node = angle(a, k + 1, { filter: frame === FLASH ? "contrast(0.86) brightness(10) saturate(0.5)" : "invert(1) contrast(1.15)" }, "flash");
   } else if (frame < BURN) node = fill("#000000", "black");
   else node = fill(MOTTLE + BURNS[Math.min(2, frame - BURN)], "burn", { backgroundColor: "#000000" });
   return h(AbsoluteFill, { style: { backgroundColor: "#000000" } }, node);

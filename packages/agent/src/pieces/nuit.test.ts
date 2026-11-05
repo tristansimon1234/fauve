@@ -59,24 +59,32 @@ test("« Sous tous les angles »: no words of its own, its objects named by its 
 // ——— What its code draws, frame by frame ————————————————————————————————————————————————————————————————————————————
 
 type Drawn = { type: unknown; props: Record<string, unknown>; children: unknown[] };
-type Box = { x: number; y: number; w: number; h: number } | null;
+type Laid = { left: number; top: number; width: number; height: number };
+type Box = { x: number; y: number; w: number; h: number };
 
-/** What its Scene draws at a frame (a plain tree for React): her four angles from image 0 of the effect, 18 images each. */
-function drawAt(frame: number, options: { box?: (shot: { segment: number }) => Box; durationInFrames?: number; black?: number; burn?: number } = {}): Drawn {
+/**
+ * What its Scene draws at a frame (a plain tree for React): her four angles from image 0 of the effect, 18 images each,
+ * standing up (or of the shape `aspect` gives); `boxes`: where the engine found her object on each, in shares of her picture.
+ */
+function drawAt(frame: number, options: { boxes?: Record<number, Box>; aspect?: number; durationInFrames?: number; black?: number; burn?: number } = {}): Drawn {
   const React = { createElement: (type: unknown, p: Record<string, unknown> | null, ...children: unknown[]): Drawn => ({ type, props: p ?? {}, children }), useMemo: (f: () => unknown) => f() };
   const scope: Record<string, unknown> = {
     AbsoluteFill: "AbsoluteFill",
     Footage: "Footage",
     useCurrentFrame: () => frame,
-    SubjectBox: (shot: { segment: number } | undefined) => (shot && options.box ? options.box(shot) : null),
+    SubjectBox: (shot: { segment: number } | undefined, _f: number, laid: Laid) => {
+      const b = shot && options.boxes?.[shot.segment];
+      return b ? { x: laid.left + b.x * laid.width, y: laid.top + b.y * laid.height, w: b.w * laid.width, h: b.h * laid.height } : null;
+    },
   };
   const make = new Function("React", ...Object.keys(scope), `"use strict";\n${nuit.code}\nreturn Scene;`) as (...args: unknown[]) => (p: Record<string, unknown>) => Drawn;
   const durationInFrames = options.durationInFrames ?? 72;
+  const aspect = options.aspect ?? 0.5625;
   return make(React, ...Object.values(scope))({
     width: 1080,
     height: 1920,
     durationInFrames,
-    shots: [{ from: -36, durationInFrames: 36, kind: "video", aspect: 0.5625, segment: 0 }, ...Array.from({ length: 4 }, (_, i) => ({ from: i * 18, durationInFrames: 18, kind: "video", aspect: 0.5625, segment: i + 1 }))],
+    shots: [{ from: -36, durationInFrames: 36, kind: "video", aspect: 0.5625, segment: 0 }, ...Array.from({ length: 4 }, (_, i) => ({ from: i * 18, durationInFrames: 18, kind: "video", aspect, segment: i + 1 }))],
     texts: { beat: "18", black: String(options.black ?? 60), burn: String(options.burn ?? 68), mine: "1,2,3,4" },
   });
 }
@@ -99,10 +107,13 @@ test("« Sous tous les angles » draws her angles in turn on its cuts, its last 
   };
   assert.deepEqual([0, 5, 11, 16, 19, 24, 29].map((f) => shown(f)[0]), [1, 2, 3, 4, 1, 2, 3]);
   assert.deepEqual([shown(0), shown(4), shown(19), shown(23)], [[1, 0], [1, 4], [1, 5], [1, 9]]);
+  // Its last cut on her last angle, as the original's (… A B F): 50 A, 54 B, 57 D.
+  assert.deepEqual([50, 54, 57].map((f) => shown(f)[0]), [1, 2, 4]);
   const blur = (f: number) => flatten(drawAt(f)).find((n) => n.type === "feGaussianBlur")?.props.stdDeviation;
   assert.deepEqual([blur(41), blur(42), blur(57)], [undefined, "9.0 0", undefined]);
-  // Its last image burnt white (58), the picture in negative (59), black (60 – 67), its burn on its last four images.
-  assert.equal(styleOf(footage(drawAt(58))[0]!).filter, "brightness(10) saturate(0.5)");
+  // Its last image burnt white (58, its blacks lifted: a night burns through), the picture in negative (59), black
+  // (60 – 67), its burn on its last four images.
+  assert.equal(styleOf(footage(drawAt(58))[0]!).filter, "contrast(0.86) brightness(10) saturate(0.5)");
   assert.equal(styleOf(footage(drawAt(59))[0]!).filter, "invert(1) contrast(1.15)");
   assert.ok([60, 63, 67].every((f) => keyed(drawAt(f), "black")) && footage(drawAt(62)).length === 0);
   const burn = (f: number) => String(styleOf(keyed(drawAt(f), "burn")!).background);
@@ -110,22 +121,27 @@ test("« Sous tous les angles » draws her angles in turn on its cuts, its last 
   assert.match(burn(69), /#2d2523 0%/);
   assert.match(burn(71), /#000000 19%/);
   // Her object found in each angle: one place and one size (1,15 to 1,9 times, never an edge uncovered).
-  const boxes: Record<number, { x: number; y: number; w: number; h: number }> = { 1: { x: 380, y: 520, w: 300, h: 260 }, 2: { x: 300, y: 640, w: 330, h: 280 }, 3: { x: 450, y: 560, w: 240, h: 200 }, 4: { x: 330, y: 700, w: 280, h: 240 } };
-  const placed = (f: number) => {
-    const tree = drawAt(f, { box: (shot) => boxes[shot.segment] ?? null });
-    const k = Number(footage(tree)[0]!.props.shot);
-    const m = /translate\((-?\d+)px, (-?\d+)px\) scale\(([\d.]+)\)/.exec(String(styleOf(keyed(tree, `al${k - 1}`)!).transform))!;
-    const [x, y, s] = [Number(m[1]), Number(m[2]), Number(m[3])];
-    const b = boxes[k]!;
-    return { s, x, y, cx: x + s * (b.x + b.w / 2), cy: y + s * (b.y + b.h / 2), h: s * b.h };
+  const px = (x: number, y: number, w: number, h: number) => ({ x: x / 1080, y: y / 1920, w: w / 1080, h: h / 1920 });
+  const boxes: Record<number, Box> = { 1: px(380, 520, 300, 260), 2: px(300, 640, 330, 280), 3: px(450, 560, 240, 200), 4: px(330, 700, 280, 240) };
+  const placedOn = (list: Record<number, Box>, aspect?: number) => (f: number) => {
+    const node = footage(drawAt(f, { boxes: list, aspect }))[0]!;
+    const st = styleOf(node) as Laid;
+    const b = list[Number(node.props.shot)]!;
+    return { ...st, cx: st.left + st.width * (b.x + b.w / 2), cy: st.top + st.height * (b.y + b.h / 2), h: st.height * b.h };
   };
-  const all = [0, 5, 11, 16].map(placed);
-  assert.ok(all.every((p) => Math.abs(p.cx - all[0]!.cx) <= 1 && Math.abs(p.cy - all[0]!.cy) <= 1 && Math.abs(p.h - 322) <= 1), JSON.stringify(all));
-  assert.ok(all.every((p) => p.s >= 1.15 && p.s <= 1.9 && p.x <= 0 && p.x >= 1080 - 1080 * p.s && p.y <= 0 && p.y >= 1920 - 1920 * p.s), JSON.stringify(all));
+  const all = [0, 5, 11, 16].map(placedOn(boxes));
+  assert.ok(all.every((p) => Math.abs(p.cx - all[0]!.cx) <= 2 && Math.abs(p.cy - all[0]!.cy) <= 2 && Math.abs(p.h - 322) <= 2), JSON.stringify(all));
+  const covers = (p: Laid) => p.left <= 0 && p.left + p.width >= 1080 && p.top <= 0 && p.top + p.height >= 1920;
+  assert.ok(all.every((p) => p.width >= 1080 * 1.15 && p.width <= 1080 * 1.9 + 2 && covers(p)), JSON.stringify(all));
+  // Horizontal angles: each one's whole picture at the frame's height (3413 px wide), so an object at its side comes to
+  // the middle too, where the frame alone shows only the middle third of her picture.
+  const sides: Record<number, Box> = { 1: { x: 0.12, y: 0.3, w: 0.1, h: 0.2 }, 2: { x: 0.7, y: 0.32, w: 0.1, h: 0.2 }, 3: { x: 0.45, y: 0.28, w: 0.1, h: 0.2 }, 4: { x: 0.25, y: 0.33, w: 0.1, h: 0.2 } };
+  const wide = [0, 5, 11, 16].map(placedOn(sides, 16 / 9));
+  assert.ok(wide.every((p) => Math.abs(p.cx - 540) <= 2 && Math.abs(p.cy - wide[0]!.cy) <= 2 && covers(p)), JSON.stringify(wide));
   // Nothing found: as the montage frames her shots.
-  assert.equal(keyed(drawAt(4), "al1"), null);
+  assert.deepEqual([styleOf(footage(drawAt(4))[0]!).left, styleOf(footage(drawAt(4))[0]!).width], [0, 1080]);
   // A shorter one (1 s): the same end on its own last images, its stutter quicker.
   const short = (f: number) => drawAt(f, { durationInFrames: 30, black: 18, burn: 26 });
-  assert.equal(styleOf(footage(short(16))[0]!).filter, "brightness(10) saturate(0.5)");
+  assert.equal(styleOf(footage(short(16))[0]!).filter, "contrast(0.86) brightness(10) saturate(0.5)");
   assert.ok(keyed(short(20), "black") && keyed(short(27), "burn"));
 });

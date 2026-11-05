@@ -11,10 +11,11 @@ import { beatSpans, type MontageSkill, type SkillShot } from "../skills.ts";
 //               light) one or two images each at the same place, and the lens again, held: its glass flashes white, the
 //               picture turns negative;
 //   66 – 78     black, the music cut dead (2,235 s), the drop (2,425 s) on a film burn that slides off to the right;
-//   78 – 328    the night in 16 shots of 3 to 40 images: a white flash that burns the next shot through, a warm panel of
-//               light, a cut hidden by a passer-by right before the lens, an orange leak then white, a shot that comes in
-//               overexposed, a taxi crossing, a train streaking past, someone taking a photo: their camera turns white, the
-//               picture under a grey veil, their silhouette white;
+//   78 – 328    the night in 16 shots of 3 to 40 images: the shot before burnt white and held before the next, a warm
+//               panel of light, a cut hidden by a passer-by right before the lens, an orange leak, a shot's first image in
+//               negative (a night in negative is white, its lights dark) then white, a shot that comes in in negative, a
+//               taxi crossing, a train streaking past, someone taking a photo: their camera turns white, the picture under
+//               a white veil, their silhouette white;
 //   328 – 360   black, the same burn, the last wide shot of the night cut by the burn again, and the first angle's first
 //               image to end: the Reel loops.
 // Here her object (her sign, her neon, her door, her tap) is located in each of her angles by its name (the filler names
@@ -42,8 +43,9 @@ const MAIN = [22, 30, 13, 16, 9, 40, 10, 26, 10, 9, 9, 7, 3, 24, 26, 32];
 const LEFT_OUT = [12, 3, 10, 6, 9, 2, 11, 4];
 /**
  * How each role comes in: 0 a hard cut, 1 a warm panel of light over the end of the shot before (123 – 124), 2 its first
- * two images overexposed in colour (250), 3 a white flash, its first three images burnt (96 – 98), 4 an orange leak on the
- * last image of the shot before, its first image burnt white and two white images (239 – 242).
+ * two images in negative (250, 251), 3 a white flash: the last image of the shot before burnt and held three images
+ * (96 – 98), 4 an orange leak on the last image of the shot before, its first image in a negative burnt white and two
+ * white images (239 – 242).
  */
 const ENTRY = [0, 3, 1, 0, 0, 0, 0, 0, 4, 2, 0, 0, 0, 0, 0, 0];
 /** The photographer (its camera, then its silhouette white) and the last shot. */
@@ -90,8 +92,10 @@ export function nuitRoles(main: number, extras = 0): { roles: number[]; entries:
   return { roles, entries };
 }
 
+/** The angle (of n) the stutter's cut p shows: in turn, its last cut on the last angle as the original's (… A B F); its code deals them so. */
+const turnOf = (p: number, n: number) => (p === STUTTER.length - 2 && n > 2 ? n - 1 : p % n);
 /** Each angle's time on screen (frames of the original): the stutter's cuts dealt to n angles in turn. */
-export const angleFrames = (n: number) => Array.from({ length: n }, (_, a) => STUTTER.slice(0, -1).reduce((sum, f, p) => (p % n === a ? sum + STUTTER[p + 1]! - f : sum), 0));
+export const angleFrames = (n: number) => Array.from({ length: n }, (_, a) => STUTTER.slice(0, -1).reduce((sum, f, p) => (turnOf(p, n) === a ? sum + STUTTER[p + 1]! - f : sum), 0));
 
 const CODE = String.raw`function Scene({ width, height, durationInFrames, brand, shots, reelTexts, end, texts }) {
   const h = React.createElement;
@@ -119,35 +123,41 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const bw = width;
   const bh = wide ? Math.round((width * 9) / 16) : height;
   const by = wide ? Math.round((height - bh) / 2) : 0;
-  const laid = { left: 0, top: 0, width: bw, height: bh };
-  const box = { position: "absolute", left: 0, top: 0, width: bw, height: bh };
+  const box ={ position: "absolute", left: 0, top: 0, width: bw, height: bh };
   const fill = (bg, key, extra) => h("div", { key, style: { ...box, background: bg, ...extra } });
   // One image of one of her shots at this frame (k: its image in her passage), held: a photo stays still.
   const pic = (i, k, style, key) => (shots[i] ? h(Footage, { key: key || "p" + i, shot: i, style: { ...box, ...style }, at: frame - Math.max(0, Math.min(len(i) - 1, Math.round(k))) }) : null);
 
   // 1. Her object at the same place and the same size in every angle (the original's walk signal stays within a
   // hundredth of the frame from one angle to the next): its box read once in each angle, where the engine found it by its
-  // name; each angle enlarged a little (1,15 times, room to move it) and more until her object is as big as where it is
+  // name, on her whole picture laid to cover the frame (a horizontal one in a vertical frame keeps its sides: room to move
+  // it on); each angle enlarged a little (1,15 times, room to move it) and more until her object is as big as where it is
   // biggest (1,9 times at most), then moved onto the point the most angles can reach, the nearest to the middle, never so
   // far that the picture uncovers an edge (one that cannot reach it comes as near as it can). Not found: as filmed.
   const near = (i) => (shots[i] ? shots[i].from + Math.min(2, len(i) - 1) : 0);
+  const whole = (i) => {
+    const a = Number(shots[i] && shots[i].aspect) || bw / bh;
+    return a >= bw / bh ? { left: 0, top: 0, width: bh * a, height: bh } : { left: 0, top: 0, width: bw, height: bw / a };
+  };
   const fit = React.useMemo(() => {
     const seen = [
-      NA > 0 ? SubjectBox(shots[0], near(0), laid, "@angle1") : null,
-      NA > 1 ? SubjectBox(shots[1], near(1), laid, "@angle2") : null,
-      NA > 2 ? SubjectBox(shots[2], near(2), laid, "@angle3") : null,
-      NA > 3 ? SubjectBox(shots[3], near(3), laid, "@angle4") : null,
-      NA > 4 ? SubjectBox(shots[4], near(4), laid, "@angle5") : null,
-      NA > 5 ? SubjectBox(shots[5], near(5), laid, "@angle6") : null,
-    ].map((b) => (b && b.w > 8 && b.h > 8 && b.w < bw * 0.9 && b.h < bh * 0.9 ? b : null));
+      NA > 0 ? SubjectBox(shots[0], near(0), whole(0), "@angle1") : null,
+      NA > 1 ? SubjectBox(shots[1], near(1), whole(1), "@angle2") : null,
+      NA > 2 ? SubjectBox(shots[2], near(2), whole(2), "@angle3") : null,
+      NA > 3 ? SubjectBox(shots[3], near(3), whole(3), "@angle4") : null,
+      NA > 4 ? SubjectBox(shots[4], near(4), whole(4), "@angle5") : null,
+      NA > 5 ? SubjectBox(shots[5], near(5), whole(5), "@angle6") : null,
+    ].map((b, i) => (b && b.w > 8 && b.h > 8 && b.w < whole(i).width * 0.9 && b.h < whole(i).height * 0.9 ? b : null));
     const tall = 1.15 * Math.max(0, ...seen.map((b) => (b ? b.h : 0)));
     if (!(tall > 0)) return [];
-    const place = seen.map((b) => {
+    const place = seen.map((b, i) => {
       if (!b) return null;
       const s = Math.min(1.9, Math.max(1.15, tall / b.h));
+      const w = whole(i).width * s;
+      const ht = whole(i).height * s;
       const cx = (b.x + b.w / 2) * s;
       const cy = (b.y + b.h / 2) * s;
-      return { s, cx, cy, rx: [cx - (s - 1) * bw, cx], ry: [cy - (s - 1) * bh, cy] };
+      return { w, ht, cx, cy, rx: [cx - (w - bw), cx], ry: [cy - (ht - bh), cy] };
     });
     const within = (v, r) => Math.max(r[0], Math.min(r[1], v));
     // The point the most of these ranges reach, the nearest to the middle among them.
@@ -163,12 +173,10 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
     const kept = place.filter(Boolean);
     const tx = most(kept.map((p) => p.rx), bw * 0.5);
     const ty = most(kept.map((p) => p.ry), bh * 0.47);
-    return place.map((p) => (p ? { s: p.s, x: Math.round(within(tx, p.rx) - p.cx), y: Math.round(within(ty, p.ry) - p.cy) } : null));
+    return place.map((p) => (p ? { left: Math.floor(within(tx, p.rx) - p.cx), top: Math.floor(within(ty, p.ry) - p.cy), width: Math.ceil(p.w) + 1, height: Math.ceil(p.ht) + 1 } : null));
   }, [n, bw, bh, NA]);
-  const aligned = (a, node) => {
-    const f = fit[a];
-    return f ? h("div", { key: "al" + a, style: { ...box, transform: "translate(" + f.x + "px, " + f.y + "px) scale(" + f.s.toFixed(4) + ")", transformOrigin: "0 0" } }, node) : node;
-  };
+  // An image of one of her angles, her picture laid where her object comes to its place (else as the montage frames it).
+  const angle = (a, k, style, key) => pic(a, k, fit[a] ? { ...style, ...fit[a] } : style, key);
   // A motion blur along a slant (CSS degrees from the horizontal): an SVG blur in a turned box, its id this image's.
   const D = Math.ceil(Math.hypot(bw, bh));
   const streak = (node, sigma, angle, key) => {
@@ -201,10 +209,11 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
     if (frame < ST[15]) {
       let p = 0;
       while (p < 14 && frame >= ST[p + 1]) p++;
-      const a = p % NA;
+      // In turn, the last cut on her last angle as the original's (A B C D E F A B C D E F A B F).
+      const a = p === 14 && NA > 2 ? NA - 1 : p % NA;
       let k = frame - ST[p];
       for (let q = a; q < p; q += NA) k += ST[q + 1] - ST[q];
-      const node = aligned(a, pic(a, k, {}, "an" + a));
+      const node = angle(a, k, {}, "an" + a);
       // Its last turn streaks along faster and faster as the roll speeds up, its last angle sharp again.
       return p >= 9 && p <= 13 ? streak(node, 9 + (p - 9) * 7, p % 2 ? 8 : -8, "st" + p) : node;
     }
@@ -228,8 +237,8 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
     return pic(FL, k, {}, "fl");
   };
 
-  // 4. Its night: her shot as it plays, each coming in as the original's (the white flash, the panel, the leak and white,
-  // the overexposed start), the photographer's flash, the black and the burn, the last shot cut by the burn, the loop.
+  // 4. Its night: her shot as it plays, each coming in as the original's (the white flash, the panel, the leak and the
+  // negatives), the photographer's flash, the black and the burn, the last shot cut by the burn, the loop.
   const cur = shots.reduce((k, s, i) => (s.from <= frame ? i : k), 0);
   let base = null;
   const over = [];
@@ -241,11 +250,12 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
     const e = entry(cur);
     const next = entry(cur + 1);
     base = pic(cur, t);
-    // Burnt as the original's (its darkest parts still seen, the rest white): ten times its light burns a night shot through.
+    // Its flashes as the original's: the shot before burnt white and held (its darkest parts still seen, lifted so that a
+    // night burns through too), or hers in negative, which turns a night white and its lights dark (burnt, then white).
     if (cur === M0 && t < Math.max(4, P(4))) { base = null; over.push(burn(Math.floor(t / S), "drop")); }
-    else if (e === 3 && t < 3) { base = null; over.push(pic(cur, t, { filter: "brightness(10) saturate(0.5)" }, "burnt")); }
-    else if (e === 4 && t < 3) { base = null; over.push(t === 0 ? pic(cur, 0, { filter: "brightness(14) saturate(0.35)" }, "burnt") : fill("#fcfcfc", "white")); }
-    else if (e === 2 && t < 2) { base = null; over.push(pic(cur, t, { filter: "brightness(5) saturate(1.5)" }, "burnt")); }
+    else if (e === 3 && t < 3 && cur > M0) { base = null; over.push(pic(cur - 1, len(cur - 1) - 1, { filter: "contrast(0.86) brightness(10) saturate(0.5)" }, "burnt")); }
+    else if (e === 4 && t < 3) { base = null; over.push(t === 0 ? pic(cur, 0, { filter: "url(#nt-glare)" }, "burnt") : fill("#fcfcfc", "white")); }
+    else if (e === 2 && t < 2) { base = null; over.push(pic(cur, t, { filter: "url(#nt-neg)" }, "burnt")); }
     if (next === 4 && left === 1) over.push(fill(LEAK, "leak"));
     if (next === 1 && (left === 3 || left === 2))
       over.push(fill(left === 3
@@ -254,7 +264,7 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
     if (r === ${PHOTO} && left <= 4) {
       // Its camera or phone turns white, the picture goes under a grey veil, then its silhouette is white.
       if (left === 4) over.push(h(Subject, { key: "camera", shot: cur, object: "@appareil", fill: "#ffffff", style: box }));
-      else if (left > 1) over.push(fill("#c3c3c5", "veil", { opacity: 0.86 }));
+      else if (left > 1) over.push(fill("#ffffff", "veil", { opacity: 0.71 }));
       else over.push(h(Subject, { key: "silhouette", shot: cur, fill: "#d2d4d8", style: box }));
     }
     if (r === ${LAST}) {
@@ -263,14 +273,18 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
       else if (t < 6) { base = null; over.push(burn(t - 2, "again")); }
       else if (len(cur) >= cutAt + 12 && t >= cutAt && t < cutAt + 4) { base = null; over.push(burn([0, 1, 1, 2][t - cutAt], "mid")); }
       // Without an ending card, its last two images are her first angle's first one: the Reel loops.
-      if (!end && frame >= durationInFrames - 2) base = aligned(0, pic(0, 0, {}, "loop"));
+      if (!end && frame >= durationInFrames - 2) base = angle(0, 0, {}, "loop");
     }
   }
   // Its film grade on her pictures, held as the original's (its blacks lifted to 9 of 255, its whites at 210 or under:
   // only its flashes and its burns are white); the Reel's finish lays its colours and its grain over all of it.
+  const table = (id, values) => h("filter", { id, x: "0", y: "0", width: "100%", height: "100%", colorInterpolationFilters: "sRGB" },
+    h("feComponentTransfer", null, ["feFuncR", "feFuncG", "feFuncB"].map((f) => h(f, { key: f, type: "table", tableValues: values }))));
   const grade = h("svg", { width: 0, height: 0, style: { position: "absolute" } },
-    h("filter", { id: "nt-film", x: "0", y: "0", width: "100%", height: "100%", colorInterpolationFilters: "sRGB" },
-      h("feComponentTransfer", null, ["feFuncR", "feFuncG", "feFuncB"].map((f) => h(f, { key: f, type: "table", tableValues: "0.035 0.27 0.5 0.7 0.82" })))));
+    table("nt-film", "0.035 0.27 0.5 0.7 0.82"),
+    // Its negatives, measured on the original: its cart's (its middle tones dark), its Radio City's (burnt white, its lights grey).
+    table("nt-neg", "1 0.76 0.56 0.395 0.265 0.165 0.092 0.044 0.015 0.003 0"),
+    table("nt-glare", "1 1 1 0.96 0.88 0.8 0.72 0.64 0.56 0.48 0.4"));
 
   // 5. Her name when the Reel has one (the original writes none): fine white capitals, widely spaced, in the middle of the
   // first shot of her night as the burn leaves it, gone with the panel of light; her ending card over the last shot.
@@ -309,15 +323,15 @@ const LENS =
   "le dernier rond, celui qui flashe : une lampe, une ampoule, un spot, l'objectif d'un appareil photo ou d'un téléphone, de face et au milieu (il passe une image au début des ronds, puis tenu à la fin : il s'éclaire en blanc, en négatif, puis le noir)";
 const WANTS = [
   "le premier plan de sa nuit, large et calme : sa rue, sa devanture ou son quartier la nuit, de préférence à travers quelque chose (une vitre, un grillage, des feuilles) ; il arrive après le noir, sur une brûlure de pellicule",
-  "une rue ou une façade en contre-plongée, entre deux immeubles ou sous un pont (il arrive dans un flash blanc)",
+  "une rue ou une façade en contre-plongée, entre deux immeubles ou sous un pont (il arrive après un flash blanc)",
   "des néons, des écrans, des vitrines allumées la nuit, du monde",
   "un plan sombre et calme : des lampadaires, de l'eau ou une rue mouillée, quelqu'un qui s'éloigne",
   "un plan qui commence caché par quelqu'un ou quelque chose qui passe tout près de l'objectif, puis découvre sa rue ou son lieu (la coupe s'y cache)",
   "quelque chose qui passe vite devant l'objectif : un métro, un tram, un bus, des voitures",
   "un plan symétrique : un plafond, une verrière, un couloir, sa salle vue du milieu",
   "une contre-plongée vers le haut : une façade, une enseigne, un immeuble, un arbre, un lustre (il finit sur une lumière orange)",
-  "son enseigne allumée la nuit, de près ou en contre-plongée (elle arrive dans un flash blanc)",
-  "son comptoir, son bar ou son étal allumé la nuit, avec du monde (il arrive surexposé)",
+  "son enseigne allumée la nuit, de près ou en contre-plongée (elle arrive en négatif, dans un flash blanc)",
+  "son comptoir, son bar ou son étal allumé la nuit, avec du monde (il arrive en négatif)",
   "une rue la nuit à contre-jour : des silhouettes, des phares, de la brume ou de la vapeur",
   "quelqu'un de dos qui regarde la nuit, et quelque chose qui passe devant (une voiture, un vélo)",
   "un détail de couleur qui passe vite : un taxi, un vélo, un bus, un néon",
@@ -337,7 +351,7 @@ export const nuit: MontageSkill = {
   long: LONGEST,
   // The moments something passes right before her lens, measured on her videos: its hidden cut gets a real one.
   reads: ["covered"],
-  how: "Sa nuit sous tous les angles, en horizontal 16:9 comme l'original quand ses vidéos le sont : son enseigne (ou l'objet qui la représente) vue sous quatre à six angles, toujours au même endroit et à la même taille, coupée de plus en plus vite sur un roulement qui accélère, le dernier tour filé ; puis ses choses rondes qui se remplacent au même endroit, une ou deux images chacune, jusqu'à la dernière qui s'éclaire en blanc et passe en négatif ; le noir et un silence, et la musique tombe sur une brûlure de pellicule : sa nuit en plans d'une demi-seconde à une seconde, enchaînés en flashs blancs, en brûlures, en coupes cachées par quelqu'un qui passe, une lumière orange, quelqu'un qui prend une photo au flash (son appareil puis sa silhouette deviennent blancs) ; un dernier plan large de sa nuit coupé d'une brûlure, qui revient sur la première image de son enseigne pour boucler.",
+  how: "Sa nuit sous tous les angles, en horizontal 16:9 comme l'original quand ses vidéos le sont : son enseigne (ou l'objet qui la représente) vue sous quatre à six angles, toujours au même endroit et à la même taille, coupée de plus en plus vite sur un roulement qui accélère, le dernier tour filé ; puis ses choses rondes qui se remplacent au même endroit, une ou deux images chacune, jusqu'à la dernière qui s'éclaire en blanc et passe en négatif ; le noir et un silence, et la musique tombe sur une brûlure de pellicule : sa nuit en plans d'une demi-seconde à une seconde, enchaînés en flashs blancs, en négatifs (sa nuit devient blanche, ses lumières sombres), en brûlures, en coupes cachées par quelqu'un qui passe, une lumière orange, quelqu'un qui prend une photo au flash (son appareil puis sa silhouette deviennent blancs) ; un dernier plan large de sa nuit coupé d'une brûlure, qui revient sur la première image de son enseigne pour boucler.",
   end: true,
   texts: [
     {

@@ -18,8 +18,10 @@ const shotsOf = (line: Pick<SkillTimeline, "shots">, aspect = 16 / 9) =>
 /** Its marks as the plan passes them (strings). */
 const marksOf = (line: Pick<SkillTimeline, "marks">) => Object.fromEntries(Object.entries(line.marks).map(([k, v]) => [k, String(v)]));
 
-/** Its Scene at a frame, run with a plain tree for React (no renderer): the kit's pieces as named nodes; `box` stands for what the engine found of an object, by its name and shot. */
-function drawAt(code: string, frame: number, props: Record<string, unknown>, box?: (shot: { segment: number }, f: number, name: string) => Box): Drawn {
+type Laid = { left: number; top: number; width: number; height: number };
+
+/** Its Scene at a frame, run with a plain tree for React (no renderer): the kit's pieces as named nodes; `box` stands for what the engine found of an object, by its name and shot, in the box her picture is laid in. */
+function drawAt(code: string, frame: number, props: Record<string, unknown>, box?: (shot: { segment: number }, f: number, name: string, laid: Laid) => Box): Drawn {
   const React = { createElement: (type: unknown, p: Record<string, unknown> | null, ...children: unknown[]): Drawn => ({ type, props: p ?? {}, children }), Fragment: "Fragment", useMemo: (f: () => unknown) => f() };
   const scope: Record<string, unknown> = {
     AbsoluteFill: "AbsoluteFill",
@@ -27,7 +29,7 @@ function drawAt(code: string, frame: number, props: Record<string, unknown>, box
     Footage: "Footage",
     Subject: "Subject",
     useCurrentFrame: () => frame,
-    SubjectBox: (shot: { segment: number } | undefined, f: number, _laid: unknown, name: string) => (shot && box ? box(shot, f, name) : null),
+    SubjectBox: (shot: { segment: number } | undefined, f: number, laid: Laid, name: string) => (shot && box ? box(shot, f, name, laid) : null),
   };
   const make = new Function("React", ...Object.keys(scope), `"use strict";\n${code}\nreturn Scene;`) as (...args: unknown[]) => (p: Record<string, unknown>) => Drawn;
   return make(React, ...Object.values(scope))(props);
@@ -67,9 +69,9 @@ test("« La nuit sous tous les angles » (v1): its 29 shots at 136,8 BPM, its ni
   assert.equal(Math.round(LINE.duration * 30), 360);
   // Its six angles share the stutter's 46 images by turns (four images for the first, five for the second…), its six round
   // things the 13 images to the lens, held 15 (its flash, then black).
-  assert.deepEqual(angleFrames(6), [12, 9, 8, 4, 7, 6]);
-  assert.deepEqual(angleFrames(4), [14, 13, 13, 6]);
-  assert.deepEqual(LINE.shots.slice(0, 13).map((s) => Math.round(s.start * 30)), [0, 12, 21, 29, 33, 40, 46, 48, 50, 52, 54, 56, 59]);
+  assert.deepEqual(angleFrames(6), [12, 9, 7, 4, 7, 7]);
+  assert.deepEqual(angleFrames(4), [14, 13, 12, 7]);
+  assert.deepEqual(LINE.shots.slice(0, 13).map((s) => Math.round(s.start * 30)), [0, 12, 21, 28, 32, 39, 46, 48, 50, 52, 54, 56, 59]);
   // From the fewest (four angles, two round things, the lens, eight of the night) to the most, then a longer night.
   assert.deepEqual(nuitCounts(15), { angles: 4, rounds: 2, main: 8, extras: 0 });
   assert.deepEqual(nuitCounts(29), { angles: 6, rounds: 6, main: 16, extras: 0 });
@@ -141,57 +143,69 @@ test("« La nuit sous tous les angles » (v1): its plan names her object in each
 });
 
 test("« La nuit sous tous les angles » (v1): one object in every angle, in turn on the roll, its last turn streaked, at one place and size", () => {
-  // Six angles: the original's 15 cuts dealt by turns (A B C D E F A B C D E F A B C), each angle's images going on.
+  // Six angles: the original's 15 cuts dealt by turns, the last on the last angle (A B C D E F A B C D E F A B F), each
+  // angle's images going on.
   const shown = (f: number) => {
     const node = footage(drawAt(nuit.code, f, props()))[0]!;
     return [Number(node.props.shot), imageOf(node, f)];
   };
   const starts = [0, 4, 9, 13, 15, 19, 23, 28, 30, 33, 35, 38, 40, 43, 45];
-  assert.deepEqual(starts.map((f) => shown(f)[0]), [0, 1, 2, 3, 4, 5, 0, 1, 2, 3, 4, 5, 0, 1, 2]);
+  assert.deepEqual(starts.map((f) => shown(f)[0]), [0, 1, 2, 3, 4, 5, 0, 1, 2, 3, 4, 5, 0, 1, 5]);
+  // That last F goes on from its two turns (four images, then two): its seventh image.
+  assert.deepEqual(shown(45), [5, 6]);
   // The first angle's images 0 – 3, then 4 – 8 on its second turn, then 9 – 11.
   assert.deepEqual([shown(0), shown(3), shown(23), shown(27), shown(40), shown(42)], [[0, 0], [0, 3], [0, 4], [0, 8], [0, 9], [0, 11]]);
   // Its last turn (images 33 to 44) streaked by a blur, more and more; its last angle sharp again.
   const blur = (f: number) => flatten(drawAt(nuit.code, f, props())).find((n) => n.type === "feGaussianBlur")?.props.stdDeviation;
   assert.deepEqual([blur(32), blur(33), blur(43), blur(45)], [undefined, "9.0 0", "37.0 0", undefined]);
-  // Her object found in each angle (in the 16:9 frame, 1080 × 608): each one enlarged a little and more (1,15 to 1,9
-  // times) and moved so the six land on one place and one size, near the middle.
+  // Her object found in each angle (shares of her picture, as the engine keeps it), read on her whole picture laid to
+  // cover the 16:9 frame (1080 × 608): each one enlarged a little and more (1,15 to 1,9 times) and moved so the six land
+  // on one place and one size, near the middle.
+  const share = (x: number, y: number, w: number, h: number, W = 1080, H = 608) => ({ x: x / W, y: y / H, w: w / W, h: h / H });
   const boxes: Record<number, { x: number; y: number; w: number; h: number }> = {
-    0: { x: 600, y: 150, w: 200, h: 160 },
-    1: { x: 420, y: 120, w: 230, h: 180 },
-    2: { x: 300, y: 230, w: 136, h: 110 },
-    3: { x: 480, y: 260, w: 150, h: 120 },
-    4: { x: 380, y: 200, w: 180, h: 140 },
-    5: { x: 520, y: 180, w: 210, h: 165 },
+    0: share(600, 150, 200, 160),
+    1: share(420, 120, 230, 180),
+    2: share(300, 230, 136, 110),
+    3: share(480, 260, 150, 120),
+    4: share(380, 200, 180, 140),
+    5: share(520, 180, 210, 165),
   };
-  const placedWith = (list: typeof boxes) => (f: number) => {
-    const tree = drawAt(nuit.code, f, props(), (shot) => list[shot.segment] ?? null);
-    const node = footage(tree)[0]!;
+  const onPicture = (list: typeof boxes) => (shot: { segment: number }, _f: number, _name: string, laid: Laid) => {
+    const b = list[shot.segment];
+    return b ? { x: laid.left + b.x * laid.width, y: laid.top + b.y * laid.height, w: b.w * laid.width, h: b.h * laid.height } : null;
+  };
+  const placedWith = (list: typeof boxes, extra: Record<string, unknown> = {}) => (f: number) => {
+    const node = footage(drawAt(nuit.code, f, props(extra), onPicture(list)))[0]!;
     const k = Number(node.props.shot);
-    const wrap = flatten(tree).find((n) => n.props.key === `al${k}`)!;
-    const m = /translate\((-?\d+)px, (-?\d+)px\) scale\(([\d.]+)\)/.exec(String(styleOf(wrap).transform))!;
-    const [x, y, s] = [Number(m[1]), Number(m[2]), Number(m[3])];
+    const st = styleOf(node) as Laid;
     const b = list[k]!;
-    return { k, s, cx: x + s * (b.x + b.w / 2), cy: y + s * (b.y + b.h / 2), h: s * b.h, x, y };
+    return { k, ...st, cx: st.left + st.width * (b.x + b.w / 2), cy: st.top + st.height * (b.y + b.h / 2), h: st.height * b.h };
   };
   const all = starts.slice(0, 6).map(placedWith(boxes));
   for (const p of all) {
-    assert.ok(p.s >= 1.15 && p.s <= 1.9, JSON.stringify(p));
+    assert.ok(p.width >= 1080 * 1.15 && p.width <= 1080 * 1.9 + 2, JSON.stringify(p));
     // Never so far that her picture uncovers an edge of the frame.
-    assert.ok(p.x <= 0 && p.x >= 1080 - 1080 * p.s && p.y <= 0 && p.y >= 608 - 608 * p.s, JSON.stringify(p));
+    assert.ok(p.left <= 0 && p.left + p.width >= 1080 && p.top <= 0 && p.top + p.height >= 608, JSON.stringify(p));
   }
-  assert.ok(all.every((p) => Math.abs(p.cx - all[0]!.cx) <= 1 && Math.abs(p.cy - all[0]!.cy) <= 1), JSON.stringify(all));
+  assert.ok(all.every((p) => Math.abs(p.cx - all[0]!.cx) <= 2 && Math.abs(p.cy - all[0]!.cy) <= 2), JSON.stringify(all));
   assert.ok(Math.abs(all[0]!.cx - 540) <= 80 && Math.abs(all[0]!.cy - 304) <= 80, JSON.stringify(all[0]));
   // One size: 1,15 times as big as where it is biggest (180 px), unless that would take it past 1,9 times.
-  assert.ok(all.every((p) => Math.abs(p.h - 207) <= 1), JSON.stringify(all));
+  assert.ok(all.every((p) => Math.abs(p.h - 207) <= 2), JSON.stringify(all));
   // An angle whose object is small and at the edge cannot reach them: as near as it can, at 1,9 times; the others still one place.
-  const outlier = placedWith({ ...boxes, 2: { x: 30, y: 250, w: 60, h: 50 } });
+  const outlier = placedWith({ ...boxes, 2: share(30, 250, 60, 50) });
   const others = [0, 4, 13, 15, 19].map(outlier);
-  assert.ok(others.every((p) => Math.abs(p.cx - others[0]!.cx) <= 1 && Math.abs(p.cy - others[0]!.cy) <= 1), JSON.stringify(others));
+  assert.ok(others.every((p) => Math.abs(p.cx - others[0]!.cx) <= 2 && Math.abs(p.cy - others[0]!.cy) <= 2), JSON.stringify(others));
   const far = outlier(9);
-  assert.equal(far.s, 1.9);
-  assert.equal(far.x, 0);
+  assert.ok(Math.abs(far.height / 608 - 1.9) < 0.01 && far.left === 0, JSON.stringify(far));
+  // Horizontal angles in the vertical frame: each one's whole picture (3413 px wide at the frame's height), so an object
+  // at its side comes to the middle too (the frame alone shows only its middle third).
+  const upright = { texts: { ...marksOf(LINE), format: "vertical" } };
+  const sides = { 0: share(0.44, 0.32, 0.12, 0.2, 1, 1), 1: share(0.14, 0.35, 0.12, 0.2, 1, 1), 2: share(0.72, 0.3, 0.12, 0.2, 1, 1), 3: share(0.3, 0.37, 0.12, 0.2, 1, 1), 4: share(0.55, 0.33, 0.12, 0.2, 1, 1), 5: share(0.2, 0.31, 0.12, 0.2, 1, 1) };
+  const turned = starts.slice(0, 6).map(placedWith(sides, upright));
+  assert.ok(turned.every((p) => Math.abs(p.cx - 540) <= 2 && Math.abs(p.cy - turned[0]!.cy) <= 2 && p.height >= 1920 * 1.15 - 1), JSON.stringify(turned));
+  assert.ok(turned.every((p) => p.left <= 0 && p.left + p.width >= 1080 && p.top <= 0 && p.top + p.height >= 1920), JSON.stringify(turned));
   // Nothing found: as filmed.
-  assert.equal(flatten(drawAt(nuit.code, 4, props())).find((n) => n.props.key === "al1"), undefined);
+  assert.deepEqual([styleOf(footage(drawAt(nuit.code, 4, props()))[0]!).left, styleOf(footage(drawAt(nuit.code, 4, props()))[0]!).width], [0, 1080]);
 });
 
 test("« La nuit sous tous les angles » (v1): its round things, the lens that flashes and turns negative, the black and the burn", () => {
@@ -217,23 +231,29 @@ test("« La nuit sous tous les angles » (v1): its round things, the lens that f
   assert.equal(keyed(at(75), "base"), null);
 });
 
-test("« La nuit sous tous les angles » (v1): its night comes in as the original's: white flash, panel, leak and white, overexposed, the photographer, the loop", () => {
+test("« La nuit sous tous les angles » (v1): its night comes in as the original's: white flash, panel, leak, negatives and white, the photographer, the loop", () => {
   const at = (f: number, extra = {}) => drawAt(nuit.code, f, props(extra));
-  // The white flash into the second shot of the night: its first three images burnt (96 – 98), then as filmed.
-  assert.deepEqual([96, 97, 98].map((f) => styleOf(keyed(at(f), "burnt")!).filter), ["brightness(10) saturate(0.5)", "brightness(10) saturate(0.5)", "brightness(10) saturate(0.5)"]);
+  // The white flash before the second shot of the night: the first one's last image burnt white (its blacks lifted: a
+  // night burns through) and held on 96 – 98, then the second shot as filmed.
+  const burnt = (f: number) => footage(at(f)).find((n) => n.props.key === "burnt")!;
+  assert.deepEqual([96, 97, 98].map((f) => [Number(burnt(f).props.shot), imageOf(burnt(f), f), styleOf(burnt(f)).filter]), [96, 97, 98].map(() => [13, Math.round((LINE.shots[13]!.end - LINE.shots[13]!.start) * 30) - 1, "contrast(0.86) brightness(10) saturate(0.5)"]));
   assert.equal(keyed(at(99), "burnt"), null);
+  assert.equal(Number(footage(at(99))[0]!.props.shot), 14);
   // The warm panel of light on the right of its last images (123, 124), none on 125.
   assert.ok(keyed(at(123), "panel") && keyed(at(124), "panel") && !keyed(at(125), "panel"));
-  // The orange leak on the last image before the neon (239), its first image burnt white, then two white images.
+  // The orange leak on the last image before the neon (239), its first image in a negative burnt white, then two white images.
   assert.match(String(styleOf(keyed(at(239), "leak")!).background), /#893d23/);
-  assert.match(String(styleOf(keyed(at(240), "burnt")!).filter), /brightness\(14\)/);
+  assert.equal(styleOf(keyed(at(240), "burnt")!).filter, "url(#nt-glare)");
   assert.deepEqual([241, 242].map((f) => styleOf(keyed(at(f), "white")!).background), ["#fcfcfc", "#fcfcfc"]);
-  // Its counter coming in overexposed in colour (250, 251).
-  assert.deepEqual([250, 251].map((f) => String(styleOf(keyed(at(f), "burnt")!).filter)), ["brightness(5) saturate(1.5)", "brightness(5) saturate(1.5)"]);
-  // The one who takes a photo: their camera white (324), a grey veil (325, 326), their silhouette white (327).
+  // Its counter coming in in negative (250, 251): a night in negative is white, its lights dark.
+  assert.deepEqual([250, 251].map((f) => String(styleOf(keyed(at(f), "burnt")!).filter)), ["url(#nt-neg)", "url(#nt-neg)"]);
+  const filters = flatten(at(250)).filter((n) => n.type === "filter").map((n) => n.props.id);
+  assert.deepEqual(filters, ["nt-film", "nt-neg", "nt-glare"]);
+  // The one who takes a photo: their camera white (324), a white veil (325, 326), their silhouette white (327).
   const camera = keyed(at(324), "camera")!;
   assert.deepEqual([camera.type, camera.props.object, camera.props.fill, camera.props.shot], ["Subject", "@appareil", "#ffffff", 27]);
   assert.ok(keyed(at(325), "veil") && keyed(at(326), "veil"));
+  assert.deepEqual([styleOf(keyed(at(325), "veil")!).background, styleOf(keyed(at(325), "veil")!).opacity], ["#ffffff", 0.71]);
   assert.deepEqual([keyed(at(327), "silhouette")!.props.fill, keyed(at(327), "silhouette")!.props.object], ["#d2d4d8", undefined]);
   // Then black (328, 329), the burn again (330 – 333), the last shot, cut by the burn (344 – 347), and the loop: her first
   // angle's first image on the last two.
