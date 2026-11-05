@@ -15,7 +15,7 @@
 // it starts, s), for a skill whose shots want the same video in a row (« Recette cosy »: a step's next gesture); it
 // sets the number of shots.
 // --named names its objects as the filler would (its « @slot » in its code); --objects lays the cut-outs the card made of
-// them (apps/render/track_objects.py, run with OBJECTS_CPU=1), by shot: its file (webm, left out when its code only
+// them (apps/render/track_objects.py, run with OBJECTS_CPU=1), by shot: its file (webm, or png for one read on a still, left out when its code only
 // reads where it is) and its reading in that run's printed result (its boxes, outline and pieces), on that shot's
 // passage of the plan; a list for several objects on one shot, each with its `name` (else the shot's objects in order).
 // The shots its code sets a text in the clear area of (ClearBox) are read here as the engine reads them
@@ -130,7 +130,7 @@ for (const [shot, given] of Object.entries(JSON.parse(values.objects ?? "{}") as
     // Its cut-out, when its code draws it (Subject object): a reading alone serves SubjectBox, SubjectOutline and SubjectParts.
     let src = "";
     if (o.src) {
-      const target = `${media}/object-${shot}-${createHash("sha1").update(resolve(o.src)).digest("hex").slice(0, 8)}.webm`;
+      const target = `${media}/object-${shot}-${createHash("sha1").update(`${resolve(o.src)}#${name}`).digest("hex").slice(0, 8)}${extname(o.src) || ".webm"}`;
       execFileSync("cp", [resolve(o.src), target]);
       src = `/public/jobs/${job}/${basename(target)}`;
     }
