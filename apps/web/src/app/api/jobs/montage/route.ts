@@ -41,6 +41,7 @@ import {
   type EffectsState,
 } from "@/lib/agent/effects-agent";
 import { voiceOverIfWanted } from "@/lib/voice-over";
+import { saidVoiceOf } from "@/lib/model-voice";
 import { chargeQuote, montageCost, quoteSuperseded, restoreChainQuote, setQuoteStage, switchQuoteToEffect } from "@/lib/credits";
 import { insertPlanVersion } from "@/lib/edit-plans";
 import { keepKit } from "@/lib/effect-words";
@@ -898,6 +899,8 @@ async function deliver(job: Job, best: Version, outcome: Care | null): Promise<b
   // A Reel from « Créer » has no caption yet: written before she opens its page (never blocks the delivery).
   await ensureCaption(job.studioId, job.postId, best.planId, job.brief).catch((error) => console.error("caption failed", job.postId, error));
   const care = careLine(Boolean(job.compared), outcome);
+  // A model whose voice says its words (« Celui-là, celui-là… »): its voice named as Edith's voice-overs are.
+  const voice = job.voice ?? (await saidVoiceOf(job.studioId, best.planId).catch(() => null))?.name ?? undefined;
   // The review priced is not charged when the critic could not watch the video, nor a second take never compared.
   // An effect is charged on what its session really cost (effectCredits).
   const skipped = outcome?.effect
@@ -918,7 +921,7 @@ async function deliver(job: Job, best: Version, outcome: Care | null): Promise<b
         note: [best.rationale, care].filter(Boolean).join(" ") || undefined,
         // Two versions were already compared: no variant offered on top; an effect has no hook of the engine's to change.
         offerVariant: !job.compared && !outcome?.effect,
-        voice: job.voice,
+        voice,
         spokenKept: job.spokenKept,
         cost,
       },

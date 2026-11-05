@@ -994,6 +994,8 @@ async function result(key: string) {
         ["motion_designer", "motion_look"].includes((c.meta as { purpose?: string } | null)?.purpose ?? ""),
     )
     .reduce((sum, c) => sum + Number(c.cost_eur), 0);
+  // A model whose voice says its words (« Celui-là, celui-là… »): the voice saying them and each word at its moment on its track.
+  const saidTrack = plan.success && plan.data.says_words && plan.data.voice ? (await db.from("media_assets").select("transcript, ai").eq("id", plan.data.voice.media_id).maybeSingle()).data : null;
   return {
     studioId,
     studio: { name: studio.data.name, business: studio.data.business_type, facts: studio.data.memory },
@@ -1017,6 +1019,9 @@ async function result(key: string) {
     renders: renders.map((r) => ({ plan: r.edit_plan_id, status: r.status, seconds: r.duration_ms ? Math.round((r.duration_ms as number) / 100) / 10 : null, error: r.error, url: r.storage_path ? url.get(r.storage_path as string) : null })),
     message: message.data?.body ?? null,
     voice: (voice.data?.transcript as { text?: string; duration?: number } | null) ?? null,
+    ...(plan.success && plan.data.says_words
+      ? { said_words: { voice_id: plan.data.says_words.voice_id, track: plan.data.voice?.media_id ?? null, words: (saidTrack?.transcript as { words?: unknown } | null)?.words ?? null, ai: saidTrack?.ai ?? null } }
+      : {}),
     costs: byKind(post.data.created_at as string),
     studio_costs: byKind(),
     steal: await stolenStyles(studioId),

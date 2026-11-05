@@ -26,6 +26,10 @@ import { beatSpans, toFrame, type MontageSkill } from "../skills.ts";
 // hit a beat later. Her photos stay still, her videos play. Vertical full frame as the original when her files are
 // upright; each shot whole in a 16:9 band on black when most are horizontal (Tristan: « format par défaut [comme ses
 // vidéos], et changement à la demande du user »).
+// Version 2: its words are what its voice says, as its original's (Tristan: « par défaut voix off et le user peut changer
+// de voix »): by default a voice (Edith's default for her, or the one she chose) says each of its words exactly when it
+// lands on screen, on the beats: her hail, her stop word on each of its pops, « Regarde », her pointing word on each
+// product, her hesitation, her last word (saysWords, its timeline's `says`; model-voice.ts); no subtitles, her music under it.
 
 const BPM = 96.5;
 /** Where the Reel starts on its original's grid (beats): its beat 0 is 0,11 s before the Reel's first image. */
@@ -47,6 +51,8 @@ const END_CARD = 1.6;
 const round = (n: number) => Math.round(n * 100) / 100;
 const round3 = (n: number) => Math.round(n * 1000) / 1000;
 const comma = (n: number) => String(round(n)).replace(".", ",");
+/** A moment (s) on the frame its code shows it on, as its voice says it there. */
+const onFrame = (s: number) => round3(toFrame(s) / 30);
 
 const CODE = String.raw`function Scene({ width, height, durationInFrames, brand, shots, reelTexts, end, texts }) {
   const h = React.createElement;
@@ -218,8 +224,10 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
 
 export const celuiLa: MontageSkill = {
   key: "celui-la",
-  version: 1,
+  version: 2,
   bpm: BPM,
+  // Its original's words are what its voice says: a voice says hers, each at its moments, unless she takes it away.
+  saysWords: { slots: ["appel", "arret", "regarde", "celui", "et", "fin"], default: true },
   // Her display, three to fourteen products, her series together.
   shots: [5, 16],
   files: [5, 16],
@@ -289,7 +297,7 @@ export const celuiLa: MontageSkill = {
       ],
     },
   ],
-  timeline(n, { end, bpm: tempo }) {
+  timeline(n, { end, bpm: tempo, words }) {
     // At another tempo (a longer Reel, a music's own), every landmark counted in beats follows it.
     const bpm = tempo ?? BPM;
     const beat = 60 / bpm;
@@ -314,9 +322,23 @@ export const celuiLa: MontageSkill = {
       ),
       `toute sa série réunie (ou sa pièce préférée posée en dernier), ${comma(duration - series)} s : une main qui pose la dernière pièce et se retire avant le dernier mot, qui tombe ${comma(lastAt - series)} s après le début du plan`,
     ];
+    // What its voice says, as its original's says its words: each one on the frame its code shows it, her stop word on
+    // each of its three pops, her pointing word on each product's cut; her last word, or (none written) her pointing word
+    // with « ! », as its code writes it.
+    const point = words?.celui?.trim();
+    const lastSaid = words && !words.fin?.trim() && point ? { slot: "celui", text: /[!?.…]$/.test(point) ? point : `${point} !` } : { slot: "fin" };
+    const says = [
+      { slot: "appel", at: onFrame(at(HAIL.from)) },
+      ...STOPS.map((b) => ({ slot: "arret", at: onFrame(at(b)) })),
+      { slot: "regarde", at: onFrame(at(LOOK)) },
+      ...spans.slice(1, 1 + products).map((s) => ({ slot: "celui", at: onFrame(s.start) })),
+      { slot: "et", at: onFrame(at(finale + AND.from)) },
+      { ...lastSaid, at: onFrame(lastAt) },
+    ];
     return {
       duration,
       shots: spans.map((s, i) => ({ ...s, want: wants[i]! })),
+      says,
       texts: {
         appel: { from: round(at(HAIL.from)), to: round(at(HAIL.gone)) },
         arret: { from: round(at(STOPS[0]!)), to: round(at(STOPPED)) },

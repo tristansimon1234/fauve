@@ -65,6 +65,13 @@
 // seconds of the recording; the audio is optional, the Reel silent without it), laid as designSkill lays it: the Reel
 // fitted to its last word and a breath (skillVoiceFit; --follow as for her own note, the model fitted to its end), its
 // words subtitled by the engine on the row the scene check finds off the skill's own texts (skillSubtitleRow), printed.
+//
+// A model whose words are what its voice says (« Celui-là, celui-là… »: MontageSkill.saysWords; packages/agent/src/
+// model-voice.ts): --says '{ "audio": "reading.mp3", "words": [{ "w", "start", "end" }] }' (its words read in one go, as
+// ElevenLabs reads the text printed here, each timed as ElevenLabs times it), or --says espeak: a stand-in reading made
+// here by espeak-ng's French voice (never Edith's: to check where each word lands), each word cut out of it on its own
+// sound and laid at its moments on one track as the engine lays it (ffmpeg here, the workshop in production), heard
+// without subtitles, the placements printed.
 
 import { execFileSync, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -101,6 +108,8 @@ import {
 import { pcmSamples, sameTake, TAKE_MAX_SECONDS, TAKE_RATE, takeOffset, wordsOffset } from "../packages/agent/src/takes.ts";
 import { voiceAt, voiceEnd } from "../packages/agent/src/voice.ts";
 import { SKILL_VOICE_TAIL } from "../packages/agent/src/voice-over.ts";
+import { speechGain, speechLevelsFilter } from "../packages/agent/src/mix.ts";
+import { readingSpans, saidPlacements, saidReading, saidSpans, saidTrackFilter, saidTranscript, skillSaysOn } from "../packages/agent/src/model-voice.ts";
 
 const { values } = parseArgs({
   options: {
@@ -133,6 +142,7 @@ const { values } = parseArgs({
     photos: { type: "string" },
     voice: { type: "string" },
     follow: { type: "boolean", default: false },
+    says: { type: "string" },
   },
 });
 /** A JSON option given as text or as the path of a file. */
@@ -395,6 +405,66 @@ const tracks: TracksByClip = Object.fromEntries(
     return f && parsed?.success ? [[f.id, parsed.data]] : [];
   }),
 );
+// Its words said by a voice, each at its moments, on one track (as the engine lays them), heard without subtitles.
+const said = !piece && values.says ? sayHere(values.says) : undefined;
+function sayHere(given: string): { src: string; words: { w: string; start: number; end: number }[] } {
+  const cues = skillSaysOn(skill, plan);
+  if (!cues?.length) throw new Error("--says: this model says no words (MontageSkill.saysWords), or its plan is not its timeline's");
+  const reading = saidReading(cues);
+  console.log(`said words: its reading « ${reading.text} »`);
+  let audio: string;
+  let timed: { w: string; start: number; end: number }[];
+  if (given === "espeak") {
+    // A stand-in: each word read by espeak-ng's French voice, 0,45 s of silence between them, each one's tokens timed by
+    // its share of its letters, roughly, as ElevenLabs' timing is (the engine finds each word on its own sound).
+    const parts = reading.words.map((w, k) => {
+      const wav = `${media}/said-${k}.wav`;
+      execFileSync("espeak-ng", ["-v", "fr", "-s", "150", "-w", wav, /[.!?…]["»]?$/u.test(w) ? w : `${w}.`]);
+      return { wav, seconds: Number(execFileSync("ffprobe", ["-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", wav], { encoding: "utf8" }).trim()) || 0 };
+    });
+    audio = `${media}/said-reading.wav`;
+    const inputs = parts.flatMap((p) => ["-i", p.wav]);
+    const graph = `${parts.map((_, k) => `[${k}:a]aresample=44100,aformat=channel_layouts=mono,apad=pad_dur=0.45[r${k}]`).join(";")};${parts.map((_, k) => `[r${k}]`).join("")}concat=n=${parts.length}:v=0:a=1[out]`;
+    execFileSync("ffmpeg", ["-v", "error", "-y", ...inputs, "-filter_complex", graph, "-map", "[out]", audio]);
+    let at = 0;
+    timed = reading.words.flatMap((w, k) => {
+      const start = at;
+      const seconds = parts[k]!.seconds;
+      at += seconds + 0.45;
+      const tokens = w.split(/\s+/).filter((t) => /[\p{L}\p{N}]/u.test(t));
+      const letters = tokens.reduce((n, t) => n + t.length, 0) || 1;
+      let from = start;
+      return tokens.map((t) => {
+        const span = (seconds * t.length) / letters;
+        const word = { w: t, start: Math.round(from * 1000) / 1000, end: Math.round((from + span) * 1000) / 1000 };
+        from += span;
+        return word;
+      });
+    });
+  } else {
+    const read = json<{ audio: string; words: { w: string; start: number; end: number }[] }>(given);
+    if (!read?.audio || !read.words?.length) throw new Error("--says: { audio, words } (its reading and its words timed), or espeak");
+    audio = resolve(read.audio);
+    timed = read.words;
+  }
+  const aligned = readingSpans(reading.words, { words: timed });
+  if (!aligned) throw new Error(`--says: its words timed do not match its reading (${timed.length} for « ${reading.text} »)`);
+  // Its loudness and its level every 10 ms, as the workshop measures them.
+  const loud = spawnSync("ffmpeg", ["-hide_banner", "-nostats", "-i", audio, "-af", "ebur128", "-f", "null", "-"], { encoding: "utf8" }).stderr ?? "";
+  const lufs = Number(/Summary:[\s\S]*?\bI:\s*(-?[\d.]+)\s*LUFS/.exec(loud)?.[1] ?? Number.NaN);
+  const printed = spawnSync("ffmpeg", ["-hide_banner", "-nostats", "-i", audio, "-af", speechLevelsFilter(0.01), "-f", "null", "-"], { encoding: "utf8" }).stderr ?? "";
+  const levels = [...printed.matchAll(/RMS_level=(-?[\d.]+|-inf)/g)].map((m) => (Number.isFinite(Number(m[1])) ? Number(m[1]) : -120));
+  const spans = saidSpans(aligned, levels);
+  const laid = saidPlacements(cues, Object.fromEntries(reading.words.map((w, i) => [w, spans[i]!])), plan.duration);
+  const track = `${media}/said-${createHash("sha1").update(JSON.stringify([audio, laid])).digest("hex").slice(0, 8)}.mp3`;
+  execFileSync("ffmpeg", ["-v", "error", "-y", "-i", audio, "-filter_complex", saidTrackFilter(laid, { gain: speechGain(Number.isFinite(lufs) ? lufs : null) ?? 0, duration: plan.duration }), "-map", "[out]", "-ac", "1", "-ar", "44100", "-c:a", "libmp3lame", "-b:a", "160k", track]);
+  console.log(`said words: its reading at ${Number.isFinite(lufs) ? lufs : "?"} LUFS, each on its own sound: ${reading.words.map((w, i) => `« ${w} » ${spans[i]!.in}–${spans[i]!.out} s`).join(", ")}`);
+  console.log(`said words: laid ${laid.map((p) => `« ${p.text} » ${p.at} s${p.speed !== 1 ? ` ×${p.speed}` : ""}${p.cut ? " (shortened)" : ""}`).join(", ")}`);
+  // On the plan as the engine sets it: its track from 0, subtitles off (its words are on screen).
+  plan.voice = { media_id: "said", at: 0 };
+  plan.subtitles = false;
+  return { src: `/public/jobs/${job}/${basename(track)}`, words: saidTranscript(laid, plan.duration).words };
+}
 const props = buildReelProps(plan, {
   template: "libre",
   clipUrls: Object.fromEntries(files.map((f) => [f.id, f.src])),
@@ -409,6 +479,8 @@ const props = buildReelProps(plan, {
   ...(Object.keys(tracks).length ? { tracks } : {}),
   // Her words in each clip (on her voice): her subtitles, and what its code reads of what she says (`spoken`).
   ...(Object.keys(spoken).length ? { words: spoken } : {}),
+  // Its words said by its voice, laid on their track (in the bundle), without subtitles.
+  ...(said ? { voice: said } : {}),
   // A voice laid over it: its recording (copied into the bundle) and its words, subtitled by the engine.
   ...(laidVoice
     ? (() => {

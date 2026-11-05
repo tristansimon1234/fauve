@@ -220,6 +220,23 @@ export type SkillSound = {
   hand?: { shot: number; moment: HandMomentKind; within?: [number, number] };
 };
 
+/**
+ * A model whose words are what its voice says (« Celui-là, celui-là… »: its original's voice scans its words on the
+ * beats, « Heeeey… Stop! Stop! Stop! This… this… aaand… this »; Tristan: « par défaut voix off et le user peut changer
+ * de voix »): a voice says the words of its `slots` (as the filler wrote them), each at its moments (SkillTimeline.says),
+ * exactly when the word lands on screen, without subtitles (its words are on screen), her music under it. `default`: a
+ * Reel made on it gets the voice unless she or her business said no voice (model-voice.ts, modelVoiceChoice); else only
+ * when she asks for one.
+ */
+export type SkillSaysWords = { slots: string[]; default: boolean };
+
+/**
+ * One moment its voice says a word (MontageSkill.saysWords): its slot, when (s on the Reel's clock, the frame its code
+ * shows the word on), and `text` when the word said there is not its slot's own (the pointing word with « ! » as the last
+ * word when she wrote none).
+ */
+export type SkillSays = { slot: string; at: number; text?: string };
+
 export type SkillTimeline = {
   /** The Reel's length (s). */
   duration: number;
@@ -234,6 +251,11 @@ export type SkillTimeline = {
    * made once by the sound library and mixed after the render.
    */
   sounds?: SkillSound[];
+  /**
+   * When its voice says its words (MontageSkill.saysWords): each moment one of its slots' words is said, in order, on the
+   * Reel's clock (her words by slot in `words` when they are written, for a text said in place of a slot left empty).
+   */
+  says?: SkillSays[];
   /**
    * How its music is shaped, on the Reel's clock from its beats (music-shape.ts), applied by the mix to whatever music
    * the Reel gets (plan.music_shape):
@@ -363,6 +385,12 @@ export type MontageSkill = {
    * writes and draws of its own there, measured by the scene check on her Reel, leaves another clearer (skillSubtitleRow).
    */
   voiceOver?: { row?: number };
+  /**
+   * Its words are what its voice says (SkillSaysWords: « Celui-là, celui-là… »): a voice says the words of its slots at
+   * their moments (its timeline's `says`), by default, the voice she chose (model-voice.ts). Never with a voice laid over
+   * it (her voice note, the words she gives a voice to say): one voice at a time.
+   */
+  saysWords?: SkillSaysWords;
   /** The tempos it plays at (default: from 0,7 to 1,2 times its own, within 60 to 140). */
   tempo?: [number, number];
   /** What her words can change in it, as a template's variants (its grid, its pace, its order, its colour). */
@@ -1023,10 +1051,12 @@ export function paleSpans(ground: SceneGround | undefined, row: number, frames: 
 /**
  * Her Reel without its voice (« Sans voix », set_voice off: removeVoice): the same plan, its voice left out; a Reel made
  * on a skill loses the subtitles it had for it (never one timed on her filmed talk, whose words are its own), their row
- * and where they were written dark.
+ * and where they were written dark; a model whose voice says its words (`says_words`) loses that voice too, its words
+ * staying on screen.
  */
 export function withoutVoice(plan: EditPlan): EditPlan {
-  const { voice: _voice, ...rest } = plan;
+  const { voice: _voice, says_words: _says, ...rest } = plan;
+  if (plan.says_words) return { ...rest, subtitles: false };
   if (!plan.skill || !plan.voice) return rest;
   const layers = rest.layers?.map((l) => {
     if (!l.compose || l.motion.times_spoken || (l.motion.subtitle_y === undefined && !l.motion.subtitle_pale)) return l;
@@ -1502,6 +1532,7 @@ export const SKILL_FILL_PROMPT = `You fill one of Edith's montage models for a l
 
 First decide "fits": true when the model, filled with her files and her words, gives her what she asked for. Her request may simply ask for this model, give her words, a mood, her files: that fits (the music and the caption are made elsewhere, never a reason for false). A length she asks for inside the model's lengths (« longueurs ») fits: the code has already set the number of slots and its tempo for it. When she asks for something the model does not do and that matters to her (an animation of its own, another layout, a text the model has no slot for, a shot at a precise moment, another ending, a length outside its lengths, and, without « voix_off », a voice-over or subtitles of what she says), "fits" is false and "missing" says what in a few words: the editor then makes her Reel from this model. When in doubt about something she clearly wants, false.
 With « voix_off », a voice is laid over this Reel (her own voice note, or the voice Edith wrote for it from her request): the engine plays it over the model's music and writes its subtitles, so a voice-over, its words and its subtitles fit.
+With « mots_dits », a voice says this model's own words, each at its moments, as its original's voice does: a voice-over, another voice (a man's, hers) or no voice fit (the engine sets the voice), and a change of what the voice says is a change of those words.
 With « recopie », she sent a Reel to copy and this model does its form: what her request describes of that Reel (its opening, its texts, its rhythm, its ending) the model does its own way, never a reason for false; only what she asks beyond that Reel is.
 
 Then cast her files on its slots (« cases », in order: each with its length and what it wants), as a good editor would:
@@ -1519,6 +1550,7 @@ Then write its texts, in French (what her customers read), each in its slot (« 
 - each within its most characters (count them), in normal case: the code sets the capitals when the model has them; a name longer than its place is never cut, write the word that sets it apart instead (« Farine » for « Maison Farine »: never « Maison »);
 - an optional slot (obligatoire false) is left empty unless her request or the Reel needs those words; a required one is always written;
 - a slot the engine writes itself (« ecrit_par_le_moteur », her place's coordinates) is never written by you: leave its text empty, and never repeat those words elsewhere;
+- with « mots_dits », a text marked « dit_par_la_voix » is also heard, that many times in that time (« 3 fois en 1 s »): a voice says about five syllables a second, so its words must be said in time each time (one or two syllables for three times in a second), still as its « dit » asks;
 - with « voix_off », its words go with the voice, never a second message: they show while it speaks (« phrases »: what it says and when; « moment »: when each text shows). A text that opens the Reel (its hook) says what the voice opens on, in its strongest words, never another hook; each other text names what the voice says around its moment, or what it leaves out (a name, a place, a date); never one of its sentences written out whole, nothing it contradicts. The words of the voice (« voix_off.texte », « Texte de la voix » in « contrat ») are heard, never written in a slot as they are.
 "font": only for a slot (or a word of her voice) that asks for one (« police »): the family of « polices » whose « évoque » fits the word or what it names (« croissant » → a bakery's, « soin » → a beauty one, « fort » → a strong condensed one), a different family for each word of one list; empty when none fits (her own fonts then), never a family outside « polices ».
 
@@ -1533,6 +1565,27 @@ A model timed on her voice (« voix »): her talking video is the Reel, cut by t
 "objets": its objects (« objets », when it has some): what in the file you cast on that slot carries its effect (a sign whose letters light up one by one, windows that light up one after the other, lamps that flash), from what the file shows (« montre », « moments »): name it in plain English as the eye sees it, two to four words (« shop sign », « neon sign », « bakery sign », « every window », « string lights », « pendant lamps »); « every » before it when there are several to take one after the other (each window, each lamp); empty when nothing in that file fits (the model does without). Cast on that slot the file that has it, when one does.
 "end": only when the model has an ending (« fin ») and she has something to end on (an offer, an opening, a date, in her request or what we know): its title (40 characters at most) and a subtitle or empty; otherwise null.
 "why": one sentence for her in French (tu), what you chose and why, in plain words.`;
+
+/** What the filler is told when a voice says the model's words (« mots_dits »), in French like the rest of its input. */
+export const SAID_WORDS =
+  "Une voix dit les mots de ce modèle, chacun à ses moments sur le rythme, comme la voix de l'original (les textes marqués « dit_par_la_voix ») : ce qui est écrit à l'écran est aussi entendu.";
+
+/**
+ * How many times and in how long its voice says each of its said slots (French, for the filler): from its first moment
+ * to the next word of another slot (or the Reel's end), « 3 fois en 1 s », « 1 fois en 0,63 s ».
+ */
+export function saidTimes(says: SkillSaysWords, line: Pick<SkillTimeline, "says" | "duration">): Record<string, string> {
+  const moments = [...(line.says ?? [])].filter((m) => says.slots.includes(m.slot) && Number.isFinite(m.at)).sort((a, b) => a.at - b.at);
+  const times: Record<string, string> = {};
+  for (const slot of says.slots) {
+    const own = moments.filter((m) => m.slot === slot);
+    if (!own.length) continue;
+    const first = own[0]!.at;
+    const next = moments.find((m) => m.at > first + 0.005 && m.slot !== slot)?.at ?? line.duration;
+    times[slot] = `${own.length} fois en ${String(round(Math.max(0.1, next - first))).replace(".", ",")} s`;
+  }
+  return times;
+}
 
 /** What the filler is told of a Reel she sent to copy that the model plays (« recopie »), in French like the rest of its input. */
 export const COPIED_REEL =
@@ -1574,12 +1627,19 @@ export function skillFillInput(input: {
    * the Reel's clock. Its words on screen go with it, each text told its moment (never a second hook).
    */
   voiceOver?: { text: string; phrases: { start: number; end: number; text: string }[] };
+  /**
+   * A voice says its words on this Reel (MontageSkill.saysWords, the voice on: modelVoiceChoice): each of its said slots
+   * told how many times and in how long the voice says it, so its words are short enough to be said in time.
+   */
+  says?: boolean;
 }) {
   const voice = input.skill.voice;
   // On her voice, no slot to cast: her talk is its shots.
   const line = voice ? null : input.skill.timeline(input.n, { end: input.skill.end, ...(input.bpm ? { bpm: input.bpm } : {}) });
   // A voice laid over it (never on a skill timed on her filmed talk): its words and when each of its texts shows.
   const laid = !voice && input.voiceOver?.text.trim() ? input.voiceOver : undefined;
+  // Its words said by a voice (never with a voice laid over it): how many times and in how long each one is said.
+  const said = !laid && input.says && input.skill.saysWords && line ? saidTimes(input.skill.saysWords, line) : undefined;
   const besides = line ? besideOf(line) : [];
   const fonts = input.skill.texts.some((t) => t.font) || Boolean(voice?.fonts?.length);
   return {
@@ -1593,6 +1653,7 @@ export function skillFillInput(input: {
     demande: input.request,
     ...(input.contract?.length ? { contrat: input.contract } : {}),
     ...(input.copied ? { recopie: COPIED_REEL } : {}),
+    ...(said ? { mots_dits: SAID_WORDS } : {}),
     ...(laid
       ? {
           voix_off: {
@@ -1637,10 +1698,12 @@ export function skillFillInput(input: {
       // Under a voice laid over it, when it shows (what the voice says then is in voix_off.phrases).
       const at = laid ? line?.texts[t.slot] : undefined;
       const moment = at && at.to > at.from ? { moment: { de: round(at.from), a: round(at.to) } } : {};
+      // Said by the voice: how many times, in how long.
+      const spoken = said?.[t.slot] ? { dit_par_la_voix: said[t.slot] } : {};
       // A fact the engine writes (her coordinates) is shown as written, never to be written again.
       return fact
         ? { slot: t.slot, ecrit_par_le_moteur: fact, obligatoire: false, ...moment }
-        : { slot: t.slot, dit: t.want, max_caracteres: t.max, obligatoire: t.required || Boolean(input.wordsWanted), ...(t.font ? { police: "oui" } : {}), ...moment };
+        : { slot: t.slot, dit: t.want, max_caracteres: t.max, obligatoire: t.required || Boolean(input.wordsWanted), ...(t.font ? { police: "oui" } : {}), ...moment, ...spoken };
     }),
     ...(fonts ? { polices: wordFontsBrief() } : {}),
     ...(input.skill.settings?.length

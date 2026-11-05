@@ -15,6 +15,8 @@ import { forgetModel, keepAsModel, type ModelState } from "@/lib/reel-models";
 import { loadTextLooks } from "@/lib/text-looks";
 import { ownVoiceOf } from "@/lib/voice-clone";
 import { removeVoice } from "@/lib/voice-over";
+import { revoiceModelWords } from "@/lib/model-voice";
+import { queueRerender } from "@/lib/rerender";
 import { getStudioContext } from "@/lib/studio";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
@@ -117,8 +119,15 @@ export async function putVoice(postId: string, voiceId: string, note?: string): 
     await removeVoice(studioId, postId);
     onReel = null;
   }
-  const current = readPostVoice(post.voice_over);
   const extra = noteOf(note);
+  // A model whose voice says its words (« Celui-là, celui-là… »): another voice says them, without a new montage (free,
+  // the video made again); what she wants it to say is a change of its words, a correction like any.
+  if (!extra && post.edit_plan_id && (await revoiceModelWords(studioId, postId, voice.id))) {
+    after(() => queueRerender({ studioId, postId, silent: true }));
+    touched(postId);
+    return { ok: true };
+  }
+  const current = readPostVoice(post.voice_over);
   const wish = extra || current?.wish;
   // Another voice than Edith's one on the Reel (or the same with new words): it is made again, once.
   const { error } = await db

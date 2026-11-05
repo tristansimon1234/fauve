@@ -126,7 +126,14 @@ export async function soundLevel(studioId: string, postId: string): Promise<SfxL
 
 /** The cut of a montage: what the music follows (the clips, scenes and their lengths), not the texts. */
 export function cutSignature(
-  plan: Pick<EditPlan, "segments" | "template" | "transitions"> & { voice?: EditPlan["voice"]; tempo?: number; baked?: EditPlan["baked"]; music_shape?: EditPlan["music_shape"]; duration?: number },
+  plan: Pick<EditPlan, "segments" | "template" | "transitions"> & {
+    voice?: EditPlan["voice"];
+    says_words?: EditPlan["says_words"];
+    tempo?: number;
+    baked?: EditPlan["baked"];
+    music_shape?: EditPlan["music_shape"];
+    duration?: number;
+  },
 ): string {
   // An effect's video is known by the session that drew it: drawn again with her words by its kit, it is a new
   // video with the same cut, and keeps its music (by its video's id, changing a word composed a new piece).
@@ -136,11 +143,11 @@ export function cutSignature(
   // Where its first strong beat lands (its model's mark, a late start's end): the piece is set on it. None at the start,
   // as every Reel before it (their pieces still serve).
   const downbeat = plan.duration ? musicDownbeat(plan.music_shape, plan.duration) : 0;
+  // A voice the cuts follow counts; a model's words said on its own beats do not (another word or another voice keeps its piece).
+  const voice = plan.voice && !plan.says_words ? [plan.voice.media_id] : [];
   // A Reel's own tempo counts (the music is composed at it); a plan without one keeps the signature it had.
   return createHash("sha1")
-    .update(
-      JSON.stringify([plan.template, ...(plan.tempo ? [plan.tempo] : []), plan.transitions, cut, ...(plan.voice ? [plan.voice.media_id] : []), ...(downbeat > 0 ? [["d", downbeat]] : [])]),
-    )
+    .update(JSON.stringify([plan.template, ...(plan.tempo ? [plan.tempo] : []), plan.transitions, cut, ...voice, ...(downbeat > 0 ? [["d", downbeat]] : [])]))
     .digest("hex")
     .slice(0, 16);
 }

@@ -222,12 +222,28 @@ export async function saveEditPlan(postId: string, input: unknown): Promise<Save
   // The editor's sounds and its music's shape stay those of the version she edits, never the browser's.
   const { data: current } = await db.from("posts").select("edit_plan_id").eq("id", postId).maybeSingle();
   const edited = (versions ?? []).find((v) => v.id === current?.edit_plan_id)?.plan as
-    | { sounds?: SfxCue[]; music_shape?: MusicShape; skill?: EditPlan["skill"]; segments?: { clip_id?: string; in?: number; sound?: boolean }[] }
+    | {
+        sounds?: SfxCue[];
+        music_shape?: MusicShape;
+        skill?: EditPlan["skill"];
+        segments?: { clip_id?: string; in?: number; sound?: boolean }[];
+        voice?: EditPlan["voice"];
+        says_words?: EditPlan["says_words"];
+      }
     | undefined;
   delete plan.sounds;
   delete plan.music_shape;
   if (edited?.sounds?.length) plan.sounds = edited.sounds;
   if (edited?.music_shape) plan.music_shape = edited.music_shape;
+  // A model's voice saying its words follows the version she edits, never the browser's: her words changed, the render
+  // makes its track again (refreshModelWords).
+  delete plan.says_words;
+  if (edited?.says_words) {
+    plan.says_words = edited.says_words;
+    if (edited.voice) plan.voice = edited.voice;
+    else delete plan.voice;
+    plan.subtitles = false;
+  }
   // So does which of its shots keep their own sound (a skill's): on the same passage of the same clip, never the browser's.
   const heard = (edited?.segments ?? []).filter((s) => s.sound && s.clip_id);
   plan.segments = plan.segments.map((s) => {

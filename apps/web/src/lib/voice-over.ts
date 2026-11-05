@@ -6,7 +6,6 @@ import {
   CLAUDE_MODEL,
   contractLines,
   clipAnalysisSchema,
-  DEFAULT_VOICE_ID,
   editPlanSchema,
   findVoice,
   fromTtsAlignment,
@@ -15,16 +14,15 @@ import {
   OWN_TEXT_PROMPT,
   ownTextKey,
   ownTextSchema,
-  SIMONE_VOICES,
   VOICE_SPEED,
   verbatimScript,
   scriptFrom,
   SCRIPT_PASS,
+  readingVoice,
   readOwnVoice,
   readPostVoice,
   readVoiceSetting,
   sentencePauses,
-  voiceIn,
   voiceLeftToSimone,
   wantsVoiceOver,
   withPauses,
@@ -75,13 +73,17 @@ async function scriptInput(studioId: string, postId: string, mediaIds?: string[]
     db.from("studios").select("name, business_type, booking_url, memory").eq("id", studioId).single(),
     db.from("brand_profiles").select("profile").eq("studio_id", studioId).order("version", { ascending: false }).limit(1).maybeSingle(),
     // Its last voices, so a new one never takes the same hook, build or turns of phrase.
-    db.from("media_assets").select("transcript").eq("studio_id", studioId).eq("kind", "audio").eq("source", "ai").order("created_at", { ascending: false }).limit(3),
+    db.from("media_assets").select("transcript, ai").eq("studio_id", studioId).eq("kind", "audio").eq("source", "ai").order("created_at", { ascending: false }).limit(8),
   ]);
   if (post.error) throw new Error("Publication introuvable");
-  const recentVoices = (recent.data ?? []).flatMap((r) => {
-    const text = (r.transcript as { text?: string } | null)?.text?.trim();
-    return text ? [text.slice(0, 400)] : [];
-  });
+  // (Not a model's words said by its voice: its scanned words are no voice-over to steer clear of.)
+  const recentVoices = (recent.data ?? [])
+    .filter((r) => (r.ai as { mode?: string } | null)?.mode !== "said_words")
+    .slice(0, 3)
+    .flatMap((r) => {
+      const text = (r.transcript as { text?: string } | null)?.text?.trim();
+      return text ? [text.slice(0, 400)] : [];
+    });
   const ids = mediaIds?.length ? mediaIds : ((post.data.media_ids as string[] | null) ?? []);
   const [media, analyses, copied] = await Promise.all([
     ids.length ? db.from("media_assets").select("id, kind, regions").eq("studio_id", studioId).in("id", ids) : Promise.resolve({ data: [] }),
@@ -290,15 +292,6 @@ async function ownTextScript(
   return { hook: script.split(/(?<=[.!?…])\s+/)[0] ?? script, script };
 }
 
-/** A voice of the gallery that matches what she asked (a man's, a woman's), keeping the chosen one when it does. */
-function voiceFor(voiceId: string, gender: ReelContract["voice_gender"] | undefined): string {
-  if (!gender || gender === "libre") return voiceId;
-  const want = gender === "homme" ? "m" : "f";
-  const current = findVoice(voiceId);
-  if (current && current.gender === want) return voiceId;
-  return SIMONE_VOICES.find((v) => v.gender === want && !v.asmr)?.id ?? voiceId;
-}
-
 /** A voice's own settings in the library, kept when only its speed changes (Tristan: « garde le ton d'origine des voix »). */
 const voiceSettings = new Map<string, Record<string, unknown> | null>();
 async function settingsOf(voiceId: string, key: string): Promise<Record<string, unknown> | null> {
@@ -474,21 +467,31 @@ export async function voiceOverIfWanted(params: {
       photos: (media ?? []).filter((m) => m.kind === "image").length,
       copied: copied?.look.voice,
     });
-  // She chose a voice (for this Reel, or always) but someone speaks in her videos: their words stay, and the delivery says so.
-  if (!wanted && speechInClips && !choices.onReel && !choices.correction && choice?.mode !== "off" && (choice?.mode === "on" || setting.use === "always")) return { spokenKept: true };
-  if (!wanted) return null;
   // Laid on one of Edith's models (the one Edith picked, or hers): the model plays as it is, the voice is written to its
   // length (Tristan: « et sur un modèle on peut ajouter une voix off ? »); a Reel the chain makes, to her footage's.
-  const model = await voiceSkill({ studioId: params.studioId, postId: params.postId, files, contract: params.contract }).catch((error: unknown) => {
-    console.warn("voice: the model it is laid on not read, written for her footage", params.postId, error);
+  let laidOn: Promise<VoiceSkill | null> | undefined;
+  const modelOf = () =>
+    (laidOn ??= voiceSkill({ studioId: params.studioId, postId: params.postId, files, contract: params.contract }).catch((error: unknown) => {
+      console.warn("voice: the model it is laid on not read, written for her footage", params.postId, error);
+      return null;
+    }));
+  // She chose a voice (for this Reel, or always) but someone speaks in her videos: their words stay, and the delivery says
+  // so; a model whose voice says its words never keeps their sound (its shots are silent), its voice says them.
+  if (!wanted && speechInClips && !choices.onReel && !choices.correction && choice?.mode !== "off" && (choice?.mode === "on" || setting.use === "always"))
+    return (await modelOf())?.says ? null : { spokenKept: true };
+  if (!wanted) return null;
+  const model = await modelOf();
+  // A model whose words are what its voice says (« Celui-là, celui-là… »): no voice is written for it, its voice says its
+  // words when it is designed (model-voice.ts), unless she gave her own words for a voice to say.
+  if (model?.says && !ownText) {
+    console.log("voice: the model's voice says its words, none written", params.postId, model.key);
     return null;
-  });
+  }
   if (model) console.log("voice: laid on a model of Edith's", params.postId, model.key, `${model.seconds} s`);
   // A voice of the gallery, or her own (a clone made with her consent) kept as it is; anything else
   // (a voice deleted since, another studio's clone) is read with the default voice.
   const own = readOwnVoice((brand.data?.profile as { own_voice?: unknown } | null)?.own_voice);
-  const picked = voiceIn(choice?.voice_id ?? setting.voice_id, own);
-  const voiceId = picked?.own && !params.contract?.voice_gender ? picked.id : voiceFor(picked?.id ?? DEFAULT_VOICE_ID, params.contract?.voice_gender);
+  const voiceId = readingVoice(choice?.voice_id ?? setting.voice_id, own, params.contract?.voice_gender);
   const voiceName = voiceId === own?.id ? "ta voix" : (findVoice(voiceId)?.name ?? "ta voix");
   try {
     // Her setting leaves it to Edith: told by a voice, or one key message with the music (then nothing is read nor paid);
@@ -528,9 +531,10 @@ export async function removeVoice(studioId: string, postId: string): Promise<boo
     db.from("edit_plans").select("version").eq("post_id", postId).order("version", { ascending: false }).limit(1).single(),
   ]);
   const plan = editPlanSchema.safeParse(current.data?.plan);
-  if (!plan.success || !plan.data.voice) return false;
+  // (A model whose voice says its words may name its voice before its track is made: it goes too.)
+  if (!plan.success || (!plan.data.voice && !plan.data.says_words)) return false;
   if (isBaked(plan.data)) return "agent";
-  // The same plan, its voice left out (and a model's subtitles for it).
+  // The same plan, its voice left out (and a model's subtitles for it, or the voice saying its words).
   const row = await db
     .from("edit_plans")
     .insert({ studio_id: studioId, post_id: postId, version: ((latest.data?.version as number | undefined) ?? 0) + 1, plan: withoutVoice(plan.data) })

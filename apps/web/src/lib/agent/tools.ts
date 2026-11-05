@@ -103,6 +103,7 @@ import { deliverStoryExpress, prepareStoryExpress, StoryExpressError } from "@/l
 import { refinishPost } from "@/lib/finish-options";
 import { resolveLook } from "./look-designer";
 import { removeVoice } from "@/lib/voice-over";
+import { revoiceModelWords } from "@/lib/model-voice";
 import { ownVoiceOf } from "@/lib/voice-clone";
 import { renderSlides, saveSlides } from "@/lib/render/slides";
 import { mediaComments, mediaInsights, recentMedia, replyToComment } from "@/lib/social/instagram";
@@ -1196,6 +1197,19 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
         return json({
           error: "Ce Reel porte sa propre voix (son vocal). Elle reste : pour mettre ta voix à la place, demande-lui d'abord si elle veut retirer la sienne (set_voice off), puis remets-en une (on).",
         });
+      }
+      // A model whose voice says its words (« Celui-là, celui-là… »): another voice, or its voice back, without a new
+      // montage: its words said again by that voice, the video made again, free. What the voice says is the model's words:
+      // another text is a change of its words (a correction).
+      if (post.edit_plan_id && !wish) {
+        const revoiced = await revoiceModelWords(studioId, post_id, chosen?.id);
+        if (revoiced) {
+          ctx.afterReply.push(() => queueRerender({ studioId, postId: post_id, waId: ctx.waId, replyTo: ctx.replyToMessageId, conversationId: ctx.conversationId }));
+          return json({
+            status: "started",
+            note: `Sur ce modèle, la voix dit ses mots : la vidéo se refait avec ${revoiced.name === "ta voix" ? "sa propre voix" : `la voix de ${revoiced.name ?? "Edith"}`} (1 à 2 min), gratuitement, et le lien part tout seul. Dis-le en une phrase.`,
+          });
+        }
       }
       const current = readPostVoice(post.voice_over);
       const voiceId = chosen?.id ?? current?.voice_id;
