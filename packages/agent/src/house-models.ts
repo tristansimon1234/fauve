@@ -17,8 +17,8 @@ import type { z } from "zod";
 
 /** The source of the inspiration row a house model is kept on, per studio (one per model, made when first used). */
 export const HOUSE_SOURCE = "house";
-/** The catalogue's version: a studio's row written by an older one is rewritten when the model is used again (3: its original's sheets; 4: no brand in a model's name; 5: Mots aux quatre coins as its original; 6: Plans fixes at 65 BPM; 7: four renamed; 8: Lieu tapé without its original's orange; 9: Plans fixes on its fiche; 10: Une journée chez toi on its fiche). */
-export const HOUSE_VERSION = 10;
+/** The catalogue's version: a studio's row written by an older one is rewritten when the model is used again (3: its original's sheets; 4: no brand in a model's name; 5: Mots aux quatre coins as its original; 6: Plans fixes at 65 BPM; 7: four renamed; 8: Lieu tapé without its original's orange; 9: Plans fixes on its fiche; 10: Une journée chez toi on its fiche; 11: ten models on their fiches). */
+export const HOUSE_VERSION = 11;
 
 export type HouseModel = {
   key: string;
@@ -34,7 +34,10 @@ export type HouseModel = {
   pair: string;
   /** Its reference composition (house-examples.ts), when it has one. */
   example: string | null;
-  /** Its tempo when the measure found no steady beat (its music is composed at it). */
+  /**
+   * Its tempo (its music is composed at it): as its fiche counts it on its original's music, or the grid of its cuts when
+   * that music has no steady beat; house-measures.ts's bpm, when it has one, wins (the same, for a model on its fiche).
+   */
   tempo?: number;
   /** Its finish, as a look's settings (looks.ts), made into a look when used. */
   finish: Omit<Partial<z.input<typeof reelLookSchema>>, "name"> & { name: string };
@@ -83,100 +86,122 @@ export const HOUSE_MODELS: HouseModel[] = [
   model({
     key: "decode",
     name: "Titre qui se décode",
-    pitch: "Ton nom ou ton lieu apparaît brouillé dans une bande de vidéo, puis se décode lettre à lettre, comme un générique de film.",
-    needs: "3 à 6 vidéos de paysage, de rue ou de ton lieu, filmées en largeur de préférence",
-    files: [3, 8],
+    // 11: written again on its original's fiche (v3 of its skill): horizontal 16:9 on black when her videos are, six bands
+    // landing then folding in three steps, its title decoding on the black, the band that grows behind it with a cut
+    // every 4 images, a calm shot in silence, its ending by layers; an electro-pop beat at 122, cream highlights over
+    // green-blue shadows (not the « cine » preset's orange), no grain nor dark corners; its small words in its title's face.
+    pitch: "Six de tes plans en bandes, puis ton nom qui se décode sur le noir comme un générique, un montage éclair dans une bande qui grandit derrière lui, et une fin où ton lieu change derrière une personne.",
+    needs: "3 à 12 vidéos ou photos de ton lieu, en largeur de préférence : des sujets debout au centre, plein de petits moments, un plan calme, quelqu'un qu'on suit, toi ou quelqu'un de l'équipe en entier, caméra posée, et des photos de tes lieux",
+    files: [3, 12],
     pair: "decodage",
     example: "E-decode",
-    finish: { name: "Ciné", hint: "ombres bleu-vert, peaux chaudes, grain fin, coins sombres", preset: "cine", contrast: 0.12, saturation: -0.05, shadows: "#0F6E7A", highlights: "#FF9A50", split: 0.6, grain: 0.25, grain_size: "fine", vignette: 0.35 },
+    // Measured on its original (docs/fiches/decode.md): its sixteenth notes steady within 28 ms.
+    tempo: 122,
+    // Its skill's own finish sets the same contrast, saturation and lifted blacks.
+    finish: { name: "Vert et crème", hint: "ombres vert-bleu, hautes lumières crème, couleurs douces, noirs un peu levés, sans grain ni coins sombres", contrast: 0.06, saturation: -0.1, fade: 0.05, shadows: "#16261E", highlights: "#EDE9E0", split: 0.3 },
     look: {
       name: "titre qui se décode",
       format: "message",
-      hook: { kind: "mystère", what: "cinq bandes verticales de paysages côte à côte, puis le noir : on attend un titre" },
+      hook: { kind: "mystère", what: "six bandes verticales de vidéo qui entrent une à une, puis se replient en un trait : on attend un titre" },
       text: {
         amount: "une ligne",
-        composition: "trois petits mots espacés sur une ligne (un · ce · titre), et dessous le titre en capitales régulières, centré, dans une bande horizontale de vidéo sur fond noir",
+        composition: "un titre en capitales régulières blanches sur une ligne, sans ombre, et au-dessus trois petits mots en minuscules un peu espacées sur ses bords (le premier à gauche, le dernier à droite), centrés sur le noir",
         case: "upper",
         weight: "regular",
         tracking: "normal",
-        stroke: "thin",
       },
-      layout: "une bande horizontale de vidéo au milieu d'un écran noir, qui grandit jusqu'au plein cadre ; au début, cinq plans en bandes verticales côte à côte",
+      layout: "six bandes verticales côte à côte, puis une bande de vidéo qui s'ouvre derrière le titre et grandit, en 16:9 sur du noir comme l'original quand ses vidéos sont horizontales",
       moments: [
-        { at: 0, what: "cinq plans en bandes verticales égales côte à côte sur toute la hauteur, chacun sa vidéo, 1,4 s" },
-        { at: 1.4, what: "noir complet, 0,3 s" },
-        { at: 1.9, what: "une bande horizontale de vidéo de 440 px s'ouvre au milieu sur fond noir ; trois petits mots en capitales très espacées apparaissent au-dessus du titre" },
-        { at: 2.2, what: "le titre en capitales, brouillé : il reste figé 0,33 s, ses lettres se brouillent mot par mot pendant 0,6 s, puis il se pose en 0,33 s en passant par des caractères qui ressemblent aux vrais (3 pour E, 0 pour O)" },
-        { at: 5, what: "la bande grandit en 1,2 s jusqu'au plein cadre, le titre s'efface ; puis des plans de paysage plein cadre, coupés sur le temps" },
+        { at: 0.13, what: "six bandes verticales de vidéo entrent d'un coup une à une, de gauche à droite, toutes les 0,2 s, chacune avec un déclic" },
+        { at: 2.27, what: "la rangée se replie vers un trait au milieu en trois marches, une par temps, un souffle chacune ; puis le noir" },
+        { at: 3.97, what: "après un impact, trois petits mots et le titre brouillé d'un coup sur le noir ; il se brouille puis se pose en 1,3 s sur des tics" },
+        { at: 5.73, what: "la musique entre, étouffée : une bande de vidéo s'ouvre derrière le titre et grandit à vitesse constante jusqu'au plein cadre ; dedans, une coupe toutes les 4 images" },
+        { at: 13.27, what: "le titre part d'un coup, la musique s'arrête : un plan calme tenu 1,4 s presque en silence" },
+        { at: 14.7, what: "la musique pleine sur un plan qui suit quelqu'un ; le lieu change derrière lui, puis il reste un temps, détouré, sur le plan suivant" },
+        { at: 18.73, what: "la chose du plan suivant arrive détourée en avance, à sa place, avant le reste de son image" },
+        { at: 20.7, what: "une personne détourée surgit au premier plan et reste pendant que le lieu change deux fois derrière elle" },
       ],
       grade: "cool",
       motion: "epure",
-      music: "cinematic indie folk, warm acoustic guitar and soft drums",
-      ending: "un dernier paysage large tenu deux secondes",
-      why: "Le titre se fait attendre puis se résout comme un générique : on reste pour le lire, et le passage du noir au plein cadre donne de l'ampleur au lieu.",
+      music: "upbeat electro-pop travel beat, kick and clap on every beat, 16th-note pulse",
+      ending: "une personne détourée qui reste pendant que ses lieux changent derrière elle, puis la dernière image noire ; la musique pleine jusqu'au bout",
+      why: "Le titre se fait attendre puis se résout comme un générique : on reste pour le lire, la bande qui grandit et son montage éclair donnent de l'ampleur au lieu, et la fin par couches surprend.",
     },
   }),
   model({
     key: "quatre-coins",
     name: "Mots aux quatre coins",
-    pitch: "Une phrase posée mot à mot le long des bords du cadre sur le premier plan de ton lieu, puis ton nom seul sur ta devanture.",
-    needs: "4 à 10 vidéos de ton lieu, de l'équipe au travail et de ta devanture",
+    // 11: written again on its original's fiche (v2 of its skill): horizontal 16:9 on black when her videos are, its words
+    // in cream at one size without a shadow, a fixed camera, its music losing its bass on the whole sentence and back on
+    // the first cut, its front held 7,5 s; its tempo (92), no vignette; no reference composition (« O-bords » cut its words
+    // by the edges at a very large size, which the original never does).
+    pitch: "Une phrase posée mot à mot sur les bords du premier plan de ton lieu, la musique qui retient son souffle, puis la vie du lieu en plans courts et ton nom seul sur ta devanture.",
+    needs: "4 à 12 vidéos, téléphone posé : un plan fixe et vivant de ton lieu, des plans courts de l'équipe, des clients et des détails, et ta devanture de face où quelqu'un entre",
     files: [4, 12],
     pair: "grotesque",
-    example: "O-bords",
-    tempo: 93,
-    finish: { name: "Chaud naturel", hint: "lumière chaude, grain fin, coins doux", contrast: 0.1, saturation: 0.05, warmth: 0.18, vignette: 0.3, grain: 0.25, grain_size: "fine" },
+    example: null,
+    // Measured on its original (docs/fiches/quatre-coins.md): its kick on this grid, a word every three quarters of a beat.
+    tempo: 92,
+    finish: { name: "Chaud naturel", hint: "lumière chaude, hautes lumières crème, grain à peine, sans coins sombres", contrast: 0.1, saturation: 0.05, warmth: 0.18, grain: 0.2, grain_size: "fine" },
     look: {
       name: "mots aux quatre coins",
       format: "pov",
-      hook: { kind: "pov", what: "une phrase qui se pose mot à mot sur les bords du cadre pendant le premier plan du lieu" },
+      hook: { kind: "pov", what: "le premier plan de son lieu, fixe, et une phrase qui se pose mot à mot sur les bords du cadre" },
       text: {
         amount: "un message tenu",
-        composition: "une phrase le long des bords : ses premiers mots en haut (gauche, milieu, droite), son nom au milieu du bord gauche, son quartier au milieu du bord droit, l'adresse en bas ; même taille, jamais coupés ; sans serif grasse serrée, minuscules",
+        composition: "une phrase le long des bords : ses premiers mots en haut (à gauche, au tiers, à droite), son nom et son quartier au milieu (à gauche, à droite), l'adresse en bas sur une ligne ; minuscules crème, même taille, jamais coupés",
         case: "normal",
         weight: "bold",
         tracking: "tight",
         align: "left",
-        shadow: "soft",
+        shadow: "none",
       },
-      layout: "plein cadre, avec des mots posés sur les quatre bords du cadre, le long de chacun, pendant le premier plan",
+      layout: "des mots posés le long des bords du cadre sur le premier plan, en 16:9 sur du noir comme l'original quand ses vidéos sont horizontales",
       moments: [
-        { at: 0, what: "un mot toutes les demi-secondes, d'un coup, sur les bords : en haut à gauche, en haut au milieu, en haut à droite, puis son nom au milieu du bord gauche et son quartier au milieu du bord droit, puis l'adresse en bas" },
-        { at: 5.2, what: "les mots partent tous d'un coup sur la première coupe, puis la vie du lieu en plein écran, coupée sur le temps" },
-        { at: 14.5, what: "la devanture avec son enseigne, tenue jusqu'à la fin, son nom posé seul au milieu" },
+        { at: 0, what: "le premier plan de son lieu, fixe, quelqu'un au travail un peu à gauche du centre, sans un mot les deux tiers d'une seconde" },
+        { at: 0.67, what: "un mot posé d'un coup tous les trois quarts de temps sur les bords : trois en haut (à gauche, au tiers, à droite), son nom et son quartier au milieu, son adresse en bas" },
+        { at: 3.15, what: "la phrase entière tenue ; la musique perd sa basse et sa grosse caisse" },
+        { at: 5.5, what: "première coupe, sur la reprise de la musique : tous les mots partent d'un coup ; puis dix plans de la vie du lieu, plein cadre, sans texte, larges et serrés en alternance, un temps et quart chacun" },
+        { at: 14.33, what: "sa devanture de face, fixe, tenue jusqu'à la fin ; son nom seul au milieu à 15,9 s, quand quelqu'un passe la porte" },
       ],
-      camera: "à la main",
+      camera: "fixe",
       grade: "warm",
-      music: "laid-back indie pop, warm guitar and soft drums",
-      ending: "la devanture et son enseigne, tenue trois secondes",
-      why: "Le lieu se lit comme une couverture de magazine : la phrase qui longe les bords donne de l'échelle et une allure de studio, sans jamais cacher les gens.",
+      music: "downtempo soul, laid-back kick on every beat, heavy round bass, mellow guitar",
+      ending: "sa devanture de face, tenue sept secondes et demie, son nom seul au milieu ; la musique s'arrête avec la dernière image",
+      why: "Le lieu se lit comme une couverture de magazine : la phrase qui longe les bords donne de l'échelle sans cacher les gens, la musique qui retient son souffle fait attendre la coupe, et son nom revient seul sur sa porte.",
     },
   }),
   model({
     key: "mosaique",
     name: "Mosaïque qui change",
-    pitch: "Une grille de cases fines où tes plats ou tes créations se remplacent case par case, en continu.",
-    needs: "5 à 10 photos ou vidéos serrées de tes plats, produits ou réalisations",
+    // 11: written again on its original's fiche (v3 of its skill): prints laid by hand on a light grey paper, taken in
+    // reading order, a picture every 1,2 s never held, each print landing askew then straight, the loop; its tempo (130,
+    // its music's: 100 was its tiles' pace), a matte warm print without the grain nor the corners its original lacks.
+    pitch: "Tes images coupées en douze tirages posés sur du papier, que la suivante remplace case par case, sans arrêt, jusqu'à revenir à la première.",
+    needs: "5 à 10 photos ou vidéos serrées de tes plats, produits ou réalisations, le sujet au centre, la plus belle en premier",
     files: [4, 10],
     pair: "editorial",
     example: "B-continu",
-    tempo: 100,
-    finish: { name: "Chaud doux", hint: "lumière chaude, contraste doux, grain fin", contrast: 0.08, warmth: 0.15, vignette: 0.2, grain: 0.2, grain_size: "fine" },
+    // Measured on its original (docs/fiches/mosaique.md): a neo-soul beat, a hit within 9 ms of each beat; its tiles go
+    // at their own pace, a print every 3 images.
+    tempo: 130,
+    finish: { name: "Tirage mat", hint: "noirs relevés et bruns, lumière chaude, sans grain ni coins sombres", contrast: -0.04, warmth: 0.15, fade: 0.45 },
     look: {
       name: "mosaïque en continu",
       format: "autre",
-      hook: { kind: "geste", what: "la première image déjà coupée en cases par une grille fine, et une case qui change aussitôt" },
+      hook: { kind: "geste", what: "la première image déjà coupée en douze tirages sur du papier gris clair, et une case qui change aussitôt" },
       text: { amount: "aucun", composition: "aucun texte : les images seules" },
-      layout: "une grille de 3 colonnes sur 4 rangées tracée d'un trait fin sur tout le cadre, chaque case montrant son morceau de l'image",
+      layout: "ses images coupées en 3 × 4 tirages posés à la main sur un papier gris clair, une fine marge et un trait clair ; ses images horizontales entières dans un bloc 16:9 au milieu du papier",
       moments: [
-        { at: 0, what: "une grille de 3 × 4 cases tracée d'un trait blanc fin sur toute l'image, qui reste jusqu'à la fin" },
-        { at: 0.6, what: "les cases changent une à une, au hasard, vers l'image suivante, en continu : une nouvelle image toutes les 0,7 s environ, chaque vague aussi longue que l'écart avec la suivante, si bien qu'une case change toujours et que l'image n'est jamais entière" },
+        { at: 0, what: "la première image déjà coupée en 12 tirages sur du papier gris clair" },
+        { at: 0.1, what: "l'image suivante remplace les cases une à une dans l'ordre de lecture, une toutes les 3 images, chacune posée de travers puis droite : une image toutes les 1,2 s, jamais tenue" },
+        { at: 4.9, what: "la dernière vague ramène la première image : le Reel tourne en boucle" },
       ],
       grade: "warm",
       motion: "fait_main",
-      music: "warm nu-jazz, brushed drums and upright bass",
-      ending: "la grille finit sur une image entière, tenue une seconde",
-      why: "L'œil cherche quelle case va changer : on regarde le Reel en entier, et chaque plat passe plusieurs fois sans lasser.",
+      music: "neo-soul lo-fi, soft kick each beat, clap every 4 beats, warm chords, round bass",
+      ending: "une boucle : la dernière vague ramène la première image et sa musique s'arrête net, sans fondu",
+      why: "Une case change toujours : l'œil suit la vague d'un tirage à l'autre, chaque image passe sans jamais s'arrêter, et la boucle fait revoir le Reel sans qu'on le remarque.",
     },
   }),
   model({
@@ -221,35 +246,41 @@ export const HOUSE_MODELS: HouseModel[] = [
   model({
     key: "pile",
     name: "Pile de photos",
-    pitch: "Tes photos s'empilent une à une sur fond blanc derrière quatre grands mots jaunes, puis repartent une à une.",
-    needs: "8 à 12 photos ou vidéos de ton travail",
-    files: [6, 12],
+    // 11: written again on its original's fiche (v2 of its skill): a burst slowing down for its nine last, each photo
+    // leaving 4 s after it landed (no full pile held), the pile empty on a dry hit, her words in her colour (no colours
+    // here: a faithful copy would put the original's yellow back on them), 20 to 40 files; its tempo (120, the grid of its
+    // landmarks: its music has none), no grade.
+    pitch: "Tes photos se posent en rafale sur une page blanche, du haut vers le bas, puis repartent au même rythme, derrière quelques mots en très grand qui disent qui tu es.",
+    needs: "20 à 40 photos (ou courtes vidéos) de ton travail",
+    files: [20, 40],
     pair: "affiche",
     example: "Y-pile-titre",
-    tempo: 110,
-    finish: { name: "Naturel net", hint: "contraste un peu poussé, couleurs franches", contrast: 0.08, saturation: 0.06 },
+    // Its landmarks on this grid (docs/fiches/pile.md): its original's music has no beat, a clicking that slows down.
+    tempo: 120,
+    finish: { name: "Naturel" },
     look: {
       name: "pile de photos et titre",
       format: "collage",
-      hook: { kind: "promesse", what: "quatre grands mots jaunes empilés sur fond blanc et une pile de photos qui grandit derrière eux" },
+      hook: { kind: "promesse", what: "quelques mots en très grandes capitales sur une page blanche, et ses photos qui se posent en rafale derrière eux" },
       text: {
         amount: "un message tenu",
-        composition: "quatre mots courts en capitales très condensées, jaunes, empilés au centre, un par ligne, tenus tout le Reel par-dessus la pile",
+        composition: "2 à 4 mots courts en capitales grasses très étroites, un par ligne en deux paires, au centre, devant toutes les photos de la première image à la dernière",
         case: "upper",
         weight: "black",
         tracking: "tight",
       },
-      colors: ["#ffe100"],
-      layout: "un fond blanc uni, avec des photos posées une à une en pile au centre derrière quatre grands mots",
+      layout: "une page blanche unie où ses photos se posent une à une en zigzag du haut vers le bas, chacune par-dessus la précédente dont elle couvre la moitié, derrière ses mots en très grand",
       moments: [
-        { at: 0, what: "une photo de plus toutes les 0,2 s, posée d'un coup en pile au centre, chacune un peu décalée, sans ombre ni bord" },
-        { at: 4, what: "la pile pleine tenue une demi-seconde" },
-        { at: 4.5, what: "les photos repartent une à une, toutes les 0,2 s, jusqu'au fond blanc et aux quatre mots seuls" },
+        { at: 0, what: "la page blanche et ses mots seuls, trois images" },
+        { at: 0.1, what: "ses photos se posent d'un coup en rafale, une toutes les 2 ou 3 images, du haut de la page vers le bas en zigzag, recadrées au carré, sans bord, sans ombre ni rotation" },
+        { at: 2.53, what: "les neuf dernières de plus en plus lentement, sur un cliquetis qui ralentit" },
+        { at: 4.1, what: "chaque photo repart d'un coup 4 s après s'être posée : la pile se vide par le haut pendant que les dernières se posent en bas, jamais pleine et tenue" },
+        { at: 7.97, what: "la pile vide sur un coup sec, la dernière photo seule un instant, puis ses mots seuls sur le blanc, la musique plus douce" },
       ],
       motion: "energique",
-      music: "upbeat indie electronic, punchy drums",
-      ending: "les quatre mots seuls sur le blanc",
-      why: "Une rafale de travail en neuf secondes : on voit tout sans se lasser, et les quatre mots disent qui on est.",
+      music: "airy minimal electronica, held warm synth chord, dry ticking pulse, no drums",
+      ending: "la pile vide sur un coup sec, puis ses mots seuls sur le blanc une seconde",
+      why: "Une rafale de travail en neuf secondes : on voit tout sans se lasser, la rafale qui ralentit tient l'œil, et les quelques mots disent qui on est.",
     },
   }),
   model({
@@ -311,62 +342,76 @@ export const HOUSE_MODELS: HouseModel[] = [
   model({
     key: "ecran-partage",
     name: "Écran partagé titré",
-    pitch: "Deux plans côte à côte, chacun avec son petit titre en serif : l'équipe d'un côté, le résultat de l'autre.",
-    needs: "des vidéos de toi ou de l'équipe au travail, et des vidéos du résultat (plats, coupes, produits)",
+    // 11: written again on its original's fiche (v2 of its skill): a card cut in two on black (one half above the other
+    // for her horizontal files), both halves always cut together and never one alone, a clean end; its tempo (120, the
+    // grid of its cuts: its music has no drums nor steady beat), a book serif for its titles, no vignette nor grain.
+    pitch: "Une carte coupée en deux : toi ou ton équipe au travail d'un côté, ce que ça donne de l'autre au même moment, et deux petits titres en serif qui se répondent.",
+    needs: "4 à 10 vidéos, deux par deux, en vertical de préférence, téléphone posé : toi ou ton équipe au travail, et pour chaque geste ce qu'il donne (le plat, la coupe, le bouquet), posé devant la caméra",
     files: [4, 10],
-    pair: "editorial",
+    pair: "labeur",
     example: "Q-ecran-partage",
-    finish: { name: "Cuisine du soir", hint: "contraste marqué, couleurs chaudes, grain fin", contrast: 0.14, warmth: 0.12, vignette: 0.3, grain: 0.2, grain_size: "fine" },
+    // Its cuts on this grid (docs/fiches/ecran-partage.md): its music has no steady beat.
+    tempo: 120,
+    finish: { name: "Sombre et chaud", hint: "noirs profonds, tons chauds, plats saturés, sans grain ni coins sombres", contrast: 0.14, warmth: 0.12 },
     look: {
       name: "écran partagé titré",
       format: "autre",
-      hook: { kind: "geste", what: "l'écran coupé en deux : la personne au travail à gauche, le résultat à droite" },
+      hook: { kind: "geste", what: "une carte coupée en deux sur du noir : quelqu'un au travail d'un côté, ce que son geste donne de l'autre, au même moment" },
       text: {
         amount: "une ligne",
-        composition: "un petit titre serif blanc au milieu de chaque moitié (« les mains » à gauche, « l'œuvre » à droite), tenu tout le Reel",
+        composition: "deux petits titres en serif de labeur blanc, romain, la première lettre en capitale, un sur chaque moitié juste sous le milieu de la carte, qui se répondent (qui fait, puis ce que ça donne), tenus tout le Reel",
         weight: "regular",
       },
-      layout: "un écran partagé en deux moitiés verticales aux coins arrondis, la personne qui travaille dans l'une et ce qu'elle fait dans l'autre",
+      layout: "une carte aux coins arrondis sur du noir, coupée en deux moitiés qui se touchent : côte à côte comme l'original, l'une sur l'autre quand ses vidéos sont horizontales",
       moments: [
-        { at: 0, what: "l'écran partagé en deux, chaque moitié avec son petit titre serif ; les deux moitiés coupent chacune de son côté, pas en même temps" },
-        { at: 7, what: "un plan de la personne seul passe en plein cadre une seconde, puis l'écran partagé revient" },
+        { at: 0, what: "la carte et ses deux titres dès la première image : d'un côté quelqu'un au travail, de l'autre le plat qui entre par le bas et se pose au centre" },
+        { at: 2.23, what: "les deux moitiés coupent ensemble sur la même image, jamais l'une sans l'autre, jamais un plan seul en plein cadre : une nouvelle paire toutes les deux à trois secondes et demie" },
+        { at: 10.67, what: "la dernière paire sur le résultat fini, jusqu'à une fin nette" },
       ],
+      camera: "fixe",
       grade: "moody",
-      music: "elegant lo-fi soul, warm keys",
-      ending: "l'écran partagé sur le résultat fini",
-      why: "Le geste et le résultat en même temps : on comprend le savoir-faire sans un mot.",
+      music: "held strings and keys, triplet arpeggios, soft bass on each beat, no drums",
+      ending: "la dernière paire sur le résultat fini, une fin nette : ni carte, ni logo, la musique coupée avec la dernière image",
+      why: "Le geste et son résultat au même moment : on comprend le savoir-faire sans un mot, et les deux titres le disent en deux mots qui se répondent.",
     },
   }),
   model({
     key: "cadre",
     name: "Cadre dans le cadre",
-    pitch: "Un plan en noir et blanc où un cadre s'ouvre au centre sur tes images en couleur, avec deux petites étiquettes.",
-    needs: "une vidéo large de ton lieu (un couloir, une salle), et 3 à 6 autres plans",
-    files: [3, 8],
+    // 11: written again on its original's fiche (v2 of its skill): her widest shot frozen in a dark black and white, a
+    // frame at its middle a notch larger at each cut, half a beat a picture at 90 BPM (v1 counted 120), the last one full
+    // screen at once and the music cut dead; its labels in normal spacing, no grain nor dark corners, no grade over it all.
+    pitch: "Ton lieu figé en noir et blanc, et au milieu un cadre sur tes images en couleur qui grandit à chaque coupe, jusqu'à ta plus belle image en plein écran. Deux petites étiquettes restent fixes.",
+    needs: "un plan large de ton lieu qui fuit vers le centre (un couloir, ta salle vue de l'entrée), si possible avec une porte ou une fenêtre au fond, puis 2 à 10 photos ou courtes vidéos de ce qui se fait, et une belle image large pour finir",
+    files: [4, 12],
     pair: "grotesque",
     example: "J-cadre-dans-le-cadre",
-    finish: { name: "Atelier", hint: "contraste doux, grain fin", contrast: 0.06, grain: 0.2, grain_size: "fine", vignette: 0.2 },
+    // Measured on its original (docs/fiches/cadre.md): its attacks on a grid of sixteenth notes, a cut every eighth note.
+    tempo: 90,
+    finish: { name: "Naturel", hint: "ses images telles quelles, à peine chaudes, sans grain ni coins sombres", warmth: 0.04 },
     look: {
       name: "cadre dans le cadre",
       format: "autre",
-      hook: { kind: "mystère", what: "un plan large en noir et blanc, et un cadre qui s'ouvre au centre sur une image en couleur" },
+      hook: { kind: "mystère", what: "son lieu figé en noir et blanc sombre, et au milieu un petit cadre sans bord sur une image en couleur, qui grandit à chaque coupe" },
       text: {
         amount: "une ligne",
-        composition: "deux petites étiquettes en capitales, de part et d'autre du cadre central, tenues tout le Reel",
+        composition: "deux petites étiquettes en capitales blanches, graisse moyenne, sur la ligne du milieu à 13 % de chaque bord (ce qui se passe à gauche, son nom à droite), fixes tout le Reel, le cadre passant dessous",
         case: "upper",
         weight: "regular",
-        tracking: "wide",
+        tracking: "normal",
       },
-      layout: "un plan large en noir et blanc plein cadre, avec un cadre au centre qui montre d'autres plans en couleur et qui grandit",
+      layout: "son plan large figé en noir et blanc plein écran et, au milieu, un cadre debout sans bord qui montre ses images en couleur et grandit à chaque coupe ; couché quand ses images sont en largeur",
       moments: [
-        { at: 0.4, what: "un cadre s'ouvre au centre du plan noir et blanc, sans bord, avec un plan en couleur dedans" },
-        { at: 1.2, what: "le plan dans le cadre change à chaque coupe, le cadre grandit un peu à chaque fois" },
-        { at: 5.2, what: "le cadre remplit l'écran : on passe dans le dernier plan" },
+        { at: 0, what: "son plan le plus large figé en noir et blanc sombre et contrasté, plein écran ; au milieu, un cadre debout sans bord, à 15 % de la largeur, sur une image en couleur" },
+        { at: 0.33, what: "une nouvelle image en couleur dans le cadre à chaque demi-temps ; à chaque coupe, le cadre grandit d'un coup de 5 % de la largeur, rien ne bouge entre deux, jamais un zoom" },
+        { at: 5.37, what: "le cadre à 95 % de la largeur, sur le premier temps de la troisième mesure" },
+        { at: 5.7, what: "sa plus belle image prend tout l'écran d'un coup, tenue un temps ; la musique coupée net 0,1 s plus tard, la fin muette" },
       ],
-      grade: "moody",
-      music: "minimal electronic, deep pulse",
-      ending: "le dernier plan en plein cadre",
-      why: "Une image dans l'image donne de la profondeur et fait entrer dans le lieu, comme une porte qu'on pousse.",
+      camera: "fixe",
+      grade: "natural",
+      music: "lo-fi boom bap, steady kick, round bass, mellow chords, hi-hats and claps",
+      ending: "sa plus belle image en plein écran d'un coup, tenue un temps, la musique coupée net : la fin muette",
+      why: "Une image dans l'image donne de la profondeur et fait entrer dans le lieu, comme une porte qu'on pousse : le cadre qui grandit à chaque coupe tire l'œil jusqu'au plein écran.",
     },
   }),
   model({
@@ -536,38 +581,51 @@ export const HOUSE_MODELS: HouseModel[] = [
   model({
     key: "titre-derriere",
     // Renamed on its original's fiche (Tristan: « ok »): the city passes in front of the title, not a person.
+    // 11: written again on its fiche (v2 of its skill): horizontal 4:3 on black when her videos are, its title rising onto
+    // a hit in its blood red behind her scenery, the scenery in white paper piece by piece, a wave over its letters, its
+    // music stopped one beat a bar, a burst in sixths of a beat, a dead cut; its tempo (82,9: v1 counted 96), warm and
+    // contrasted with cream highlights and bluish shadows, without the grain nor the dark corners of « Ciné chaud ».
     name: "Titre derrière le décor",
-    pitch: "Un titre géant posé dans ta rue ou ton paysage, derrière les toits, les arbres ou les collines, puis le décor qui devient papier morceau par morceau et une rafale de plans.",
-    needs: "un plan large et fixe de ta rue, de ta devanture, ou d'un paysage quand ça a du sens (tes vignes, ta montagne), avec du ciel en haut et quelqu'un qui y entre, et 8 à 15 autres plans",
+    pitch: "Un titre géant qui monte dans le ciel de ta rue ou de ton paysage, derrière les toits, les arbres ou les collines, puis le décor qui devient papier blanc morceau par morceau et une rafale de plans.",
+    needs: "un plan large et fixe de ta rue, de ta devanture, ou d'un paysage quand ça a du sens (tes vignes, ta montagne), avec du ciel en haut, des toits ou des arbres qui y montent et quelqu'un qui entre, et 10 à 15 autres plans",
     files: [5, 14],
     pair: "geante-script",
     example: "derriere",
-    tempo: 96,
-    finish: { name: "Ciné chaud", hint: "contraste marqué, chaleur, grain, coins sombres", contrast: 0.16, saturation: -0.04, warmth: 0.12, vignette: 0.4, grain: 0.3, grain_size: "fine" },
+    // Measured on its original (docs/fiches/titre-derriere.md): 13 hits on this grid within 28 ms, a stop every bar.
+    tempo: 82.9,
+    finish: { name: "Heure dorée", hint: "chaud et contrasté, hautes lumières crème, ombres un peu bleutées, sans grain ni coins sombres", contrast: 0.16, saturation: -0.04, warmth: 0.12, shadows: "#0B0B13", highlights: "#E9D8C2", split: 0.2 },
     look: {
-      name: "titre derrière la personne",
+      name: "titre derrière le décor",
       format: "pov",
-      hook: { kind: "mystère", what: "un nom de lieu géant posé dans le décor, et quelqu'un qui passe devant lui" },
+      hook: { kind: "mystère", what: "un nom de lieu géant qui monte d'en bas dans le ciel sur un coup, et le décor qui passe devant lui" },
       text: {
         amount: "une ligne",
-        composition: "un nom de lieu en capitales très grasses sur toute la largeur, au tiers haut, avec deux petits mots manuscrits au-dessus",
+        composition: "un nom de lieu en capitales noires très grasses, rouge sang, sur toute la largeur dans le ciel, son pied derrière ce qui monte du décor ; trois petits mots au stylo fin entre deux petites croix de chaque côté, juste au-dessus",
         case: "upper",
         weight: "black",
         tracking: "tight",
       },
-      colors: ["#7a1414"],
-      layout: "plein cadre, avec un titre géant posé dans le décor et la personne détourée qui passe devant lui",
+      colors: ["#640005"],
+      layout: "un titre géant posé dans le ciel du premier plan, derrière le décor qui passe devant lui, en 4:3 sur du noir comme l'original quand ses vidéos sont horizontales",
       moments: [
-        { at: 0, what: "le titre géant apparaît lettre par lettre en clignotant, derrière la personne qui marche : elle passe devant les lettres" },
-        { at: 1.6, what: "une rafale de plans coupés toutes les 0,7 s, avec des coups de fouet entre certains plans" },
+        { at: 0, what: "un plan large et fixe de sa rue, en silence, un souffle grave qui monte" },
+        { at: 0.33, what: "le titre monte d'en bas en trois images, flou, et se pose sur un coup, derrière les toits ; ses petits mots au stylo une image après" },
+        { at: 1.57, what: "dès la reprise de la musique, le décor devient papier blanc morceau par morceau, de gauche à droite, puis une vague blanche passe sur les lettres, une à la fois" },
+        { at: 3.37, what: "le titre part avec la coupe ; un plan calme pendant que la musique s'arrête un temps, comme à chaque mesure" },
+        { at: 4.43, what: "trois plans éclair d'un quart de temps, puis un plan fixe où ce qui se répète blanchit pièce par pièce en remontant" },
+        { at: 6.23, what: "son enseigne qui clignote en blanc une image sur deux quand la musique s'arrête, puis un plan qui avance vers sa porte, ouvert sur un flou de zoom" },
+        { at: 7.37, what: "un mur dont les cadres blanchissent un à un, l'objet devant qui flashe en blanc deux fois, puis la silhouette blanche de la personne du plan suivant, à sa place" },
+        { at: 9.17, what: "cette personne en contre-jour, la musique arrêtée un temps" },
+        { at: 10.2, what: "une rafale de onze plans très courts, un tous les sixièmes de temps" },
+        { at: 11.53, what: "un dernier plan court, quelqu'un de près devant une vue, coupé net après le dernier coup" },
       ],
       camera: "mixte",
-      transitions: "effets",
-      grade: "film",
+      transitions: "coupes nettes",
+      grade: "warm",
       motion: "energique",
-      music: "upbeat indie hip-hop, punchy drums",
-      ending: "un dernier plan large du lieu au coucher du soleil",
-      why: "Le titre derrière la personne fait couverture de magazine dès la première seconde, et la rafale donne envie de voir le lieu.",
+      music: "lo-fi hip-hop beat, dusty drums, warm bass, a kick on every beat",
+      ending: "un dernier plan court, quelqu'un de près devant une vue, coupé net juste après le dernier coup ; ni carte, ni logo",
+      why: "Le titre derrière le décor fait couverture de magazine dès la première seconde, le papier blanc qui court sur les choses tient l'œil, et la rafale finale donne envie de voir le lieu.",
     },
   }),
   model({
@@ -648,62 +706,80 @@ export const HOUSE_MODELS: HouseModel[] = [
   model({
     key: "coups-de-fouet",
     name: "Ville en coups de fouet",
-    pitch: "Un nom de lieu blanc très condensé dans le ciel, puis tes plans enchaînés en coups de fouet, ça file.",
-    needs: "8 à 15 vidéos de ta rue, de ton quartier, de ton lieu, avec du mouvement",
+    // 11: written again on its original's fiche (v2 of its skill): 84 BPM (v1 counted 104), horizontal 4:3 on black when
+    // her videos are, its name still in her sky while the picture pushes in, its whip flashes and white flashes, no grain.
+    pitch: "Ton lieu comme une ville en coups de fouet : son nom en blanc très condensé posé dans le ciel, puis tes plans d'une seconde enchaînés en flashs blancs et fouets éclair, jusqu'à un dernier plan calme.",
+    needs: "8 à 15 vidéos de ta rue et de ton lieu : un plan qui défile, un plan large avec du ciel, des passants, un balayage rapide, un plan calme pour finir",
     files: [6, 16],
     pair: "cinema",
     example: "V-fouet",
-    tempo: 104,
-    finish: { name: "Ville", hint: "contraste marqué, couleurs un peu retenues, grain", contrast: 0.14, saturation: -0.08, warmth: 0.05, vignette: 0.25, grain: 0.3, grain_size: "fine" },
+    // Its grid measured on its original (docs/fiches/coups-de-fouet.md): a double eighth every 0,1786 s.
+    tempo: 84,
+    finish: { name: "Ville", hint: "film retenu, couleurs douces, coins sombres, sans grain", contrast: 0.14, saturation: -0.08, warmth: 0.05, vignette: 0.25 },
     look: {
       name: "ville en coups de fouet",
       format: "pov",
-      hook: { kind: "pov", what: "un grand nom de lieu blanc très condensé posé dans le ciel au-dessus des toits" },
+      hook: { kind: "pov", what: "un plan qui défile, un flash blanc, puis le nom du lieu en capitales blanches très condensées posé au milieu du ciel" },
       text: {
         amount: "une ligne",
-        composition: "un nom de lieu en capitales blanches très condensées, très grand, dans le ciel au tiers haut, sur le premier plan seulement",
+        composition: "le nom du lieu en capitales blanches très condensées, au milieu du ciel du deuxième plan, immobile pendant que l'image avance derrière, 1,1 s",
         case: "upper",
         weight: "black",
         tracking: "tight",
       },
-      layout: "des plans enchaînés par des coups de fouet (un flou de mouvement qui passe d'un plan au suivant), et un nom de lieu posé dans le ciel du premier",
+      layout: "des plans d'une seconde enchaînés par des coupes franches, des flashs blancs et des fouets éclair (deux images floues et claires), en 4:3 sur du noir quand ses vidéos sont horizontales",
       moments: [
-        { at: 0, what: "le nom du lieu sort du flou mot par mot dans le ciel" },
-        { at: 1.5, what: "les plans s'enchaînent toutes les 0,85 s en coups de fouet : un flou de mouvement horizontal d'un quart de seconde à chaque coupe, une fois à gauche, une fois à droite" },
+        { at: 0.67, what: "un flash blanc, puis le nom posé dans le ciel, immobile, l'image qui pousse derrière" },
+        { at: 1.8, what: "un fouet éclair, puis des plans d'une seconde : une contre-plongée en noir et blanc, un plan qui arrive en filant, des flashs blancs" },
+        { at: 8.6, what: "un fouet éclair : la percussion entre sur un détail de couleur ; un passant en noir et blanc, avec des images fantômes" },
+        { at: 10.8, what: "sa rue calme pendant que la percussion se tait, puis un fouet éclair : elle revient sur une rame qui file" },
+        { at: 17.1, what: "un fouet saccadé, ses images tenues, fondu à l'entrée et à la sortie" },
+        { at: 19.9, what: "un dernier plan large et calme tenu 3,4 s, le son qui s'éteint" },
       ],
       camera: "à la main",
       transitions: "effets",
       grade: "film",
       motion: "energique",
-      music: "energetic indie electronic, driving drums",
-      ending: "un ciel au coucher du soleil, tenu deux secondes",
-      why: "L'énergie d'une ville en dix secondes : chaque coup de fouet donne envie de voir le plan suivant.",
+      music: "cinematic ambient pad, light crisp percussion, soft kick on every beat",
+      ending: "un plan large et calme tenu 3,4 s, le son qui s'éteint",
+      why: "L'énergie d'une ville en vingt secondes : chaque fouet éclair et chaque flash donnent envie de voir le plan suivant, et le nom posé dans le ciel dit où l'on est.",
     },
   }),
   model({
     key: "tourne",
     // Renamed on its original's fiche (Tristan: « ok »): two tones (blue-green and cream), its colour kept where it counts.
+    // 11: written again on its fiche (v2 of its skill): its tempo (118,3: v1 took 79), its quarter turn always clockwise,
+    // its strobe, its burst on the beat, its last shot held without a card; its two tones as a finish for the chain (its
+    // code draws them and takes the whole finish out), no grain nor dark corners, no grade over its shots (it would warm
+    // and dull its colour shots under its own tones), its tones in words rather than a black and white.
     name: "Quart de tour, deux tons",
     pitch: "Tes plans en largeur tournés d'un quart de tour pour remplir l'écran, en deux tons bleu-vert et crème, la couleur gardée là où elle compte, coupés sur le rythme.",
     needs: "15 à 25 vidéos filmées en largeur : ta route, ton lieu, ta rue, des matières, des gestes, et deux ou trois plans où la couleur compte",
     files: [6, 16],
     pair: "cinema",
     example: "T-tourne",
-    tempo: 110,
-    finish: { name: "Noir et blanc", hint: "noir et blanc contrasté, grain", preset: "bw", saturation: -1, contrast: 0.3, grain: 0.4, grain_size: "medium", vignette: 0.3 },
+    // Measured on its original (docs/fiches/tourne.md): 14 hits of its beat on a grid of sixteenth notes within 26 ms.
+    tempo: 118.3,
+    finish: { name: "Deux tons", hint: "bleu-vert et crème, noirs profonds, blancs jamais brûlés, sans grain", exposure: -0.08, saturation: -1, shadows: "#6A7F87", highlights: "#87874C", split: 1 },
     look: {
-      name: "noir et blanc tourné",
+      name: "quart de tour, deux tons",
       format: "autre",
-      hook: { kind: "geste", what: "un plan en noir et blanc tourné d'un quart de tour : on met une seconde à reconnaître ce qu'on voit" },
+      hook: { kind: "geste", what: "des plans tournés d'un quart de tour qui filent sous un stroboscope : on met une seconde à reconnaître ce qu'on voit" },
       text: { amount: "aucun", composition: "aucun texte" },
-      effect: "bw",
-      layout: "des plans filmés en largeur tournés d'un quart de tour pour remplir le cadre vertical, en noir et blanc",
-      moments: [{ at: 0, what: "un plan tourné toutes les 0,6 s, coupé net, en noir et blanc très contrasté ; les textures et les gestes avant les plans larges" }],
-      grade: "moody",
+      filter: "deux tons : noirs profonds, ombres bleu-vert, gris vert-de-gris, hautes lumières crème, blancs jamais brûlés ; la couleur gardée sur quelques plans où elle compte",
+      layout: "des plans filmés en largeur tournés d'un quart de tour, toujours dans le même sens, pour remplir le cadre vertical, en deux tons bleu-vert et crème, la couleur gardée sur quelques plans",
+      moments: [
+        { at: 0, what: "quatre plans tournés qui filent sous un stroboscope, une image surexposée sur deux puis plus rarement, sur un roulement qui monte" },
+        { at: 0.8, what: "sept plans d'une à deux secondes sur une musique étouffée : les deux premiers en couleur, chacun sur un grand coup, une vidéo debout retournée la tête en bas, un flou de passage" },
+        { at: 5.03, what: "un flash blanc de deux images après un plan qui se floute" },
+        { at: 6.6, what: "la musique s'ouvre : une rafale de seize plans en huit temps, sur les quarts de temps, avec un zoom coup de poing, un flash, deux plans en couleur et un filé" },
+        { at: 10.63, what: "le dernier flash, la musique de nouveau étouffée : le dernier plan tenu jusqu'au bout" },
+      ],
+      grade: "natural",
       motion: "energique",
-      music: "dark minimal techno, steady kick",
-      ending: "un plan tourné tenu une seconde, qui coupe au noir",
-      why: "Le quart de tour et le noir et blanc rendent étrange ce qu'on voit tous les jours : l'œil cherche, et reste.",
+      music: "cinematic electronic, held pad, dry off-beat hits, deep bass on every beat",
+      ending: "le dernier plan tourné, tenu deux secondes jusqu'au bout, la musique coupée net avec l'image ; ni texte, ni carton",
+      why: "Le quart de tour et les deux tons rendent étrange ce qu'on voit tous les jours, la couleur gardée là où elle compte attire l'œil, et la rafale sur le rythme emporte jusqu'au dernier plan.",
     },
   }),
   model({
@@ -745,29 +821,43 @@ export const HOUSE_MODELS: HouseModel[] = [
   model({
     key: "eventail",
     name: "Éventail de bandes",
-    pitch: "Tes plans en bandes qui convergent en X vers le centre sur un fond de couleur, puis plein cadre en noir et blanc.",
-    needs: "6 à 10 vidéos de ton lieu, en largeur de préférence",
+    // 11: written again on its original's fiche (v2 of its skill): a star of bands landing one a beat on a bordeaux ground,
+    // all windows onto one shot, the whole shot on the drop, its shots two beats each, her name signed on the black; its
+    // tempo (119,8), a festive beat, its black and white with blue blacks and no grain (its code draws it and takes the
+    // whole finish out: no grade over its shots either, its contrast crushed the blue blacks), an editorial serif for its end.
+    pitch: "Ton premier plan apparaît en étoile, une bande par temps sur un fond bordeaux, puis en entier quand la musique entre ; tes plans défilent en noir et blanc sur le rythme, jusqu'à ton nom signé sur le noir.",
+    needs: "5 à 12 vidéos de ton lieu, en largeur de préférence : un plan qui ouvre avec un centre et des lignes qui en partent (vu d'en haut, d'en bas ou en perspective), tes lumières, des gens qui bougent, deux plans qui se répondent",
     files: [5, 12],
-    pair: "grotesque",
+    pair: "editorial",
     example: "L-eventail",
-    finish: { name: "Noir et blanc doux", hint: "noir et blanc, grain fin", preset: "bw", saturation: -1, contrast: 0.2, grain: 0.3, grain_size: "fine" },
+    // Measured on its original (docs/fiches/eventail.md): its intro's hits within 2 ms of this grid, its kicks within 9.
+    tempo: 119.8,
+    finish: { name: "Noir et blanc, noirs bleutés", hint: "noir et blanc, noirs bleu nuit, blancs jamais brûlés, sans grain", saturation: -1, contrast: 0.12 },
     look: {
-      name: "éventail de bandes",
+      name: "étoile de fenêtres sur fond bordeaux",
       format: "autre",
-      hook: { kind: "geste", what: "quatre bandes de vidéo qui arrivent des coins et convergent vers un petit carré au centre, sur un fond bordeaux" },
-      text: { amount: "aucun", composition: "aucun texte, sauf une toute petite ligne à la fin" },
-      colors: ["#5a1418"],
-      layout: "un fond bordeaux, avec des bandes de vidéo posées en X qui convergent vers le centre, puis des plans en plein cadre",
+      hook: { kind: "geste", what: "un petit carré au milieu d'un fond bordeaux, puis une bande par temps posée d'un coup, toutes des fenêtres sur le même plan, en étoile" },
+      text: {
+        amount: "une ligne",
+        composition: "aucun texte avant la fin : sur le noir, son nom en petit serif blanc au milieu, comme une signature, et deux temps après une ligne rouge plus petite dessous",
+        weight: "regular",
+      },
+      colors: ["#420e0f", "#972f34"],
+      layout: "des bandes posées en étoile sur un fond bordeaux, fenêtres sur un seul plan, puis ses plans dans un fin cadre bordeaux, en 16:9 sur du noir comme l'original quand ses vidéos sont horizontales",
       moments: [
-        { at: 0, what: "quatre bandes de vidéo en noir et blanc arrivent des quatre coins en 2,5 s et convergent vers un petit carré au centre, sur un fond bordeaux" },
-        { at: 2.8, what: "le carré central grandit jusqu'au plein cadre ; puis des plans en noir et blanc coupés sur le temps" },
-        { at: 17, what: "un écran sombre avec une toute petite ligne au centre" },
+        { at: 0.13, what: "un petit carré au milieu du fond bordeaux, fenêtre sur le cœur du plan qui ouvre" },
+        { at: 0.63, what: "une bande par temps, posée d'un coup, six en tout, toutes des fenêtres sur ce même plan à sa place : trois traits qui passent par le centre, chacun en deux moitiés, sur sept petits coups de musique seuls" },
+        { at: 3.63, what: "le plan entier d'un coup quand le beat entre, un fin cadre bordeaux posé autour jusqu'à la fin" },
+        { at: 4.63, what: "ses plans en noir et blanc aux noirs bleutés, coupés tous les deux temps sur la grosse caisse" },
+        { at: 8.7, what: "un écran partagé : deux plans qui se répondent côte à côte, chacun une moitié exacte" },
+        { at: 12.63, what: "un second plan aux lignes qui partent du centre, rappel de l'ouverture" },
+        { at: 15.63, what: "un noir bleuté dans le cadre : son nom en petit serif blanc au milieu, d'un coup, puis deux temps après une ligne rouge brique dessous, la musique qui continue" },
       ],
-      grade: "moody",
+      grade: "natural",
       motion: "epure",
-      music: "dark ambient electronic, slow build",
-      ending: "un écran sombre avec une petite ligne centrée",
-      why: "La convergence attire l'œil au centre et fait entrer dans le lieu ; c'est graphique et précis.",
+      music: "festive beat, hand percussion, deep bass, kick on 1 and 3, claps on 2 and 4",
+      ending: "un noir bleuté dans le cadre, son nom en petit serif blanc et une ligne rouge brique dessous, tenus huit temps et demi ; la musique continue dessous",
+      why: "L'étoile qui se construit sur des coups seuls fait attendre le plan entier, qui tombe avec la musique : c'est graphique, ça claque, et sa signature finit comme un générique.",
     },
   }),
   model({
@@ -1125,7 +1215,7 @@ export const HOUSE_WHEN: Record<string, { pour: string; pas_pour: string }> = {
   "photo-dump": { pour: "une semaine, un événement, l'envers du décor en vrac, beaucoup de photos", pas_pour: "un message précis, une offre" },
   table: { pour: "des plats ou des produits présentés comme des tirages posés sur sa table, un moment chaleureux", pas_pour: "un lieu, une rue" },
   "ecran-partage": { pour: "le geste et le résultat côte à côte (l'artisan et sa pièce, la coiffeuse et la coupe, le chef et l'assiette)", pas_pour: "un seul sujet, un lieu" },
-  cadre: { pour: "faire entrer dans un lieu (un couloir, une salle), une ouverture, des travaux", pas_pour: "des produits en gros plan" },
+  cadre: { pour: "faire entrer dans un lieu (un couloir, une salle), une ouverture, des travaux", pas_pour: "sans plan large de son lieu, des produits seuls en gros plan" },
   fenetres: { pour: "une sortie, un quartier, un voyage, des lieux qui défilent", pas_pour: "des produits, une offre" },
   facade: { pour: "une ouverture, un lancement, présenter sa devanture", pas_pour: "sans vidéo fixe de la devanture filmée de face" },
   gaufre: { pour: "une annonce élégante, un nom, une nouvelle collection, comme un faire-part", pas_pour: "un Reel rythmé ou drôle" },

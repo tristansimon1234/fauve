@@ -6069,13 +6069,16 @@ test("house models: each one read like a Reel she sends, measured, finished, set
   const decode = houseModel("decode")!;
   const followed = followedFrom("00000000-0000-4000-8000-000000000000", stolenStyleSchema.parse(houseStyle(decode)));
   assert.equal(followed.house, "decode");
-  assert.deepEqual(followedLook({}, followed), { fonts: { display: "Open Sans", body: "Inter" } });
-  assert.deepEqual(followedLook({ fonts: { display: "Fraunces" } }, followed), { fonts: { display: "Fraunces", body: "Inter" } });
-  assert.deepEqual(followedLook({ fonts: { display: "Open Sans", body: "Inter" } }, followed), {});
+  // Its small words in its title's face (its fiche: the same humanist sans, in lower case).
+  assert.deepEqual(followedLook({}, followed), { fonts: { display: "Open Sans", body: "Open Sans" } });
+  assert.deepEqual(followedLook({ fonts: { display: "Fraunces" } }, followed), { fonts: { display: "Fraunces", body: "Open Sans" } });
+  assert.deepEqual(followedLook({ fonts: { display: "Open Sans", body: "Open Sans" } }, followed), {});
   assert.match(followedForEditor(followed).origine ?? "", /modèle d'Edith/);
-  assert.match(followedForEditor(followed).police ?? "", /Open Sans.*Inter/);
+  assert.match(followedForEditor(followed).police ?? "", /« Open Sans » pour les titres, « Open Sans » pour les petits textes/);
   assert.match(followedLine(followed), /un modèle d'Edith/);
-  // Its look comes with it (no other look on the plan), its tempo from its measure.
-  assert.equal(followed.filter_look?.preset, "cine");
+  // Its look comes with it (no other look on the plan): its original's cream highlights over green-blue shadows, no
+  // longer the « cine » preset's orange; its tempo from its measure.
+  assert.equal(followed.filter_look?.preset, undefined);
+  assert.equal(followed.filter_look?.highlights, "#EDE9E0");
   assert.equal(followed.bpm, 122);
 });
