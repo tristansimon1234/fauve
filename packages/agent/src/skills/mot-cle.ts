@@ -113,6 +113,8 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const places = ideas.map((idea) => placeAt(Math.min(durationInFrames - 1, idea.from + 3)));
   const placeOf = (f) => { const idea = ideaAt(f); return idea && (!hook || f >= hook.to) ? places[idea.k - 1] : hookPlace; };
   const Y = (p, y) => Math.round(p.top + (y * height - TOP0) * p.s);
+  // A size in the block, smaller with it but never under its floor (on a tight frame its spacing shrinks before its letters).
+  const px = (v, floor) => Math.max(floor, Math.round(v));
 
   // White on a dark or coloured wall, in ink on a light one (her wall's light under the block, on her first shot).
   const light = !wide && shots.length ? LightUnder(shots[0], 6, { left: 0, top: 0, width: bw, height: bh }, { x: 140, y: Math.round(hookPlace.top), w: width - 280, h: Math.round((BOT0 - TOP0) * hookPlace.s) }) : null;
@@ -134,7 +136,7 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   };
 
   // 5. Her hook: her first words in bold capitals from the first image, in their place (the original's: its top at 28,9 %).
-  const hookNode = hook && frame >= hook.from && frame < hook.to ? slid("hook", hook.from, Y(hookPlace, 0.271), Math.round(0.072 * height * hookPlace.s), Math.round(0.05 * height * hookPlace.s), hook.text) : null;
+  const hookNode = hook && frame >= hook.from && frame < hook.to ? slid("hook", hook.from, Y(hookPlace, 0.271), px(0.072 * height * hookPlace.s, 92), px(0.05 * height * hookPlace.s, 72), hook.text) : null;
 
   // 6. The idea said now, laid as it is: its keyword (with the small line of her words above it), its list two names at
   // a time, or its number and its words.
@@ -144,7 +146,7 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   if (idea && (!hook || frame >= hook.to)) {
     if (idea.kind === 0) {
       const key = bands.find((t) => inIdea(t, idea) && frame >= t.from && frame < t.to);
-      if (key) laid.push(slid("key" + idea.k, key.from, Y(place, 0.266), Math.round(0.094 * height * place.s), Math.round(0.073 * height * place.s), key.text, own(key, display)));
+      if (key) laid.push(slid("key" + idea.k, key.from, Y(place, 0.266), px(0.094 * height * place.s, 120), px(0.073 * height * place.s, 96), key.text, own(key, display)));
       // Her words said, one by one, on a small line above it: very spaced small words, each on the image it is said, the
       // line laid out whole from its first word (it never moves), emptied at the end of its phrase.
       // (Only the idea's own words, once her hook has gone: what she says after its last word, her goodbye, is not written.)
@@ -165,8 +167,8 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
         return frame >= l[0].from && frame < until;
       });
       if (shown) {
-        const size = Math.round(0.026 * height * place.s);
-        laid.push(h("div", { key: "line" + idea.k, style: { position: "absolute", left: 60, width: width - 120, top: Y(place, 0.196), height: Math.round(0.036 * height * place.s), display: "flex", justifyContent: "center", alignItems: "flex-end", gap: Math.round(0.06 * width * Math.min(1, place.s + 0.2)) } },
+        const size = px(0.026 * height * place.s, 40);
+        laid.push(h("div", { key: "line" + idea.k, style: { position: "absolute", left: 60, width: width - 120, top: Y(place, 0.196), height: px(0.036 * height * place.s, 50), display: "flex", justifyContent: "center", alignItems: "flex-end", gap: Math.round(0.06 * width * Math.min(1, place.s + 0.2)) } },
           shown.map((w, j) => h("span", { key: j, style: { fontFamily: body, fontWeight: 400, fontSize: size, lineHeight: 1.2, color: INK, textShadow: EDGE, whiteSpace: "nowrap", opacity: frame >= w.from ? 1 : 0 } }, String(w.w).replace(/[.!?…,;:]+$/, "")))));
       }
     } else if (idea.kind === 1) {
@@ -174,20 +176,20 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
       // big one, 40 px at least), the second big under it (a last one alone big), from 20 to 34 % of the height; its keyword
       // alone before its list, as a plain one.
       const key = bands.find((t) => inIdea(t, idea) && frame >= t.from && frame < t.to);
-      if (key) laid.push(slid("key" + idea.k, key.from, Y(place, 0.266), Math.round(0.094 * height * place.s), Math.round(0.073 * height * place.s), key.text, own(key, display)));
+      if (key) laid.push(slid("key" + idea.k, key.from, Y(place, 0.266), px(0.094 * height * place.s, 120), px(0.073 * height * place.s, 96), key.text, own(key, display)));
       const list = names.filter((t) => inIdea(t, idea));
       list.forEach((t, j) => {
         if (frame < t.from || frame >= t.to) return;
         const big = j % 2 === 1 || j === list.length - 1;
         laid.push(big
-          ? h(FitText, { key: "n" + idea.k + "_" + j, style: { position: "absolute", left: Math.round(0.125 * width), width: Math.round(0.75 * width), top: Y(place, 0.252), height: Math.round(0.088 * height * place.s) }, innerStyle: { fontFamily: own(t, display), fontWeight: 700, fontSynthesis: "none", fontSize: Math.round(0.078 * height * place.s), lineHeight: 1.05, color: INK, textShadow: EDGE, whiteSpace: "nowrap" } }, t.text)
+          ? h(FitText, { key: "n" + idea.k + "_" + j, style: { position: "absolute", left: Math.round(0.125 * width), width: Math.round(0.75 * width), top: Y(place, 0.252), height: px(0.088 * height * place.s, 110) }, innerStyle: { fontFamily: own(t, display), fontWeight: 700, fontSynthesis: "none", fontSize: px(0.078 * height * place.s, 96), lineHeight: 1.05, color: INK, textShadow: EDGE, whiteSpace: "nowrap" } }, t.text)
           : h("div", { key: "n" + idea.k + "_" + j, "data-fauve-accent": true }, h(FitText, { style: { position: "absolute", left: Math.round(0.25 * width), width: Math.round(0.5 * width), top: Y(place, 0.2), height: Math.max(48, Math.round(0.042 * height * place.s)) }, innerStyle: { fontFamily: own(t, body), fontWeight: 400, fontSynthesis: "none", fontSize: Math.max(40, Math.round(0.031 * height * place.s)), lineHeight: 1.1, color: INK, textShadow: EDGE, whiteSpace: "nowrap" } }, t.text)));
       });
     } else {
       // Her number very condensed and very bold, its words stacked at its right as tall as it, all at once (25 to 33 %).
       const key = bands.find((t) => inIdea(t, idea) && frame >= t.from && frame < t.to);
       const its = names.filter((t) => inIdea(t, idea) && frame >= t.from && frame < t.to);
-      const tall = Math.round(0.081 * height * place.s);
+      const tall = px(0.081 * height * place.s, 110);
       if (key) laid.push(h("div", { key: "num" + idea.k, style: { position: "absolute", left: 60, width: width - 120, top: Y(place, 0.246), height: Math.round(tall * 1.25), display: "flex", justifyContent: "center", alignItems: "center", gap: Math.round(0.03 * width) } },
         h("div", { style: { fontFamily: "'Anton', " + display, fontWeight: 400, fontSize: Math.round(tall * 1.36), lineHeight: 1, color: INK, textShadow: EDGE, whiteSpace: "nowrap" } }, key.text),
         its.length ? h("div", { style: { display: "flex", flexDirection: "column", justifyContent: "center" } },

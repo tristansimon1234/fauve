@@ -59,7 +59,6 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
     const from = mark("said_ref" + (i + 1) + "_from", s.from);
     return { i: talkN + i, idea: mark("said_ref" + (i + 1) + "_idea", 0), item: mark("said_ref" + (i + 1) + "_item", 0), from, to: mark("said_ref" + (i + 1) + "_to", from + s.durationInFrames), shot: s };
   });
-  const ownOf = (k) => refs.filter((r) => r.idea === k && r.item === 0);
   const named = refs.find((r) => r.item > 0 && frame >= r.from && frame < r.to);
   const owned = refs.filter((r) => r.item === 0 && frame >= r.from && frame < r.to);
 
