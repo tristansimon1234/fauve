@@ -154,6 +154,12 @@ test("« Mot clé en grand » draws: each keyword on the image she says it, slid
   // Nobody says anything: its keywords spread on beats over the effect, the first from its first image.
   assert.equal(keywordAt(drawAt(0, { texts }))!.text, "SOINS");
   assert.equal(keywordAt(drawAt(239, { texts }))!.text, "HUILE");
+  // Accents, case and a plural aside: « Crème » she says is « creme » written, « croissants » is « croissant ».
+  const accents = sayFrom(4, "La Crème brûlée et nos croissants.");
+  assert.equal(keywordAt(drawAt(14, { texts: { mot1: "creme" }, spoken: accents }))?.text, "CREME");
+  assert.equal(keywordAt(drawAt(13, { texts: { mot1: "creme" }, spoken: accents })), null);
+  assert.equal(keywordAt(drawAt(53, { texts: { mot1: "brûlée", mot2: "croissant" }, spoken: accents }))?.text, "BRÛLÉE");
+  assert.equal(keywordAt(drawAt(54, { texts: { mot1: "brûlée", mot2: "croissant" }, spoken: accents }))?.text, "CROISSANT");
 });
 
 test("« Mot clé en grand »: her other words one by one on a small line above it, the keyword and one-letter words left out", () => {
