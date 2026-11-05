@@ -21,6 +21,7 @@ How to choose
 - What each model is for (pour) and not for (pas_pour): never one whose pas_pour is her Reel.
 - Her files first: a model can only be made with the footage it needs (il_faut, and its number of files). One that needs someone walking in front of the place, someone talking to the camera, a hand raised to a wall, a fixed shot of the shop front or photos on a plain background is out unless her files have it.
 - Then her request (demande): what people must feel or do; when she names a form (a split screen, a collage, a word in big, black and white, a mosaic…), the model that is that form.
+- Then her taste (ses_gouts, when given): her moodboard and art direction, the Reels she sent to copy, the Reels she kept as models, the models of the Reels she published. Between the models her files and her request allow, the one in that spirit (its energy, its typography, what it puts forward); never against her files or her request, never the same model as one she just published.
 - Then her trade and what her footage shows: the model whose idea makes this business look its best (a mosaic for dishes or creations, fixed cinema shots for a calm place, whip pans for a lively street, a typed name for a place in the sun…).
 - When she asks to surprise, for an effect or to say something (an offer, a name, a moment), a model whose idea is in its words or its effect (a title that decodes, a word you pass through, a title behind the passers-by, words that slam on each cut), never one made of images alone (a mosaic, a photo dump, fixed shots) unless she asks for that.
 - Never one of derniers_modeles (the models of her last Reels): each Reel must look new.
@@ -38,13 +39,37 @@ export type HousePick = z.infer<typeof housePickSchema>;
 export type HousePickFile = { kind: "video" | "photo"; seconds?: number; shows: string; speaks?: boolean; people?: boolean };
 
 /**
- * What the picker reads: her request, her trade, her files, whether a voice is wanted, and the models of her last Reels;
- * `least`, by model, the files a model coded as a montage skill wants at least (its slots), instead of its catalogue's.
+ * Her taste as the picker reads it (Tristan: « attention, le user a aussi un mood board »): the reading of her moodboard
+ * and her art direction (« Ton style »), the Reels she sent to copy and those she kept as models (each its look's name
+ * and hook, as their reading wrote them), the models of the Reels she published. Each kept short; empty parts left out.
  */
-export function housePickInput(input: { request: string; business: string | null; files: HousePickFile[]; voice: boolean; avoid: string[]; least?: Record<string, number> }): string {
+export type HousePickTaste = { moodboard?: string; direction?: string; copied?: string[]; kept?: string[]; published?: string[] };
+
+/** Her taste for the picker, or nothing when it says nothing: each part cut to its length, three at most of each list. */
+export function housePickTaste(taste: HousePickTaste | undefined): Record<string, unknown> | undefined {
+  if (!taste) return undefined;
+  const list = (xs: string[] | undefined, n: number) => (xs ?? []).map((x) => x.trim().slice(0, 160)).filter(Boolean).slice(0, n);
+  const out = {
+    ...(taste.moodboard?.trim() ? { moodboard: taste.moodboard.trim().slice(0, 600) } : {}),
+    ...(taste.direction?.trim() ? { direction_artistique: taste.direction.trim().slice(0, 300) } : {}),
+    ...(list(taste.copied, 3).length ? { reels_envoyes_a_recopier: list(taste.copied, 3) } : {}),
+    ...(list(taste.kept, 3).length ? { reels_gardes_comme_modeles: list(taste.kept, 3) } : {}),
+    ...(list(taste.published, 4).length ? { modeles_de_ses_reels_publies: list(taste.published, 4) } : {}),
+  };
+  return Object.keys(out).length ? out : undefined;
+}
+
+/**
+ * What the picker reads: her request, her trade, her taste, her files, whether a voice is wanted, and the models of her
+ * last Reels; `least`, by model, the files a model coded as a montage skill wants at least (its slots), instead of its
+ * catalogue's.
+ */
+export function housePickInput(input: { request: string; business: string | null; files: HousePickFile[]; voice: boolean; avoid: string[]; least?: Record<string, number>; taste?: HousePickTaste }): string {
+  const taste = housePickTaste(input.taste);
   return JSON.stringify({
     demande: input.request.slice(0, 4000),
     metier: input.business ?? "commerce",
+    ...(taste ? { ses_gouts: taste } : {}),
     fichiers: input.files.slice(0, 20).map((f) => ({
       type: f.kind,
       ...(f.seconds ? { secondes: Math.round(f.seconds) } : {}),

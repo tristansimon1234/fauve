@@ -10322,3 +10322,21 @@ test("« Interrupteur » (v9): its switch as near the middle as her fingertip st
   assert.ok(Math.abs((await centre(600)) - Math.round(1080 * 0.499)) <= 1);
 });
 
+test("the model picker reads her taste: her moodboard, her art direction, the Reels she sent and kept, the models she published", async () => {
+  const { housePickInput, housePickTaste, HOUSE_PICK_PROMPT } = await import("./house-pick.ts");
+  // Nothing said: nothing given (the picker reads as before).
+  assert.equal(housePickTaste(undefined), undefined);
+  assert.equal(housePickTaste({ copied: [" "], kept: [] }), undefined);
+  // Each part kept short, three at most of each list (four for her published Reels' models).
+  const taste = housePickTaste({ moodboard: "x".repeat(900), direction: "Minimal, noir et blanc", copied: ["Titre néon : son nom tapé lettre à lettre", "a", "b", "c"], kept: ["Mosaïque"], published: ["Titre qui se décode"] })!;
+  assert.equal((taste.moodboard as string).length, 600);
+  assert.deepEqual(taste.reels_envoyes_a_recopier, ["Titre néon : son nom tapé lettre à lettre", "a", "b"]);
+  assert.deepEqual([taste.direction_artistique, taste.reels_gardes_comme_modeles, taste.modeles_de_ses_reels_publies], ["Minimal, noir et blanc", ["Mosaïque"], ["Titre qui se décode"]]);
+  const input = JSON.parse(housePickInput({ request: "", business: "fleuriste", files: [], voice: false, avoid: [], taste: { direction: "Minimal" } }));
+  assert.deepEqual(input.ses_gouts, { direction_artistique: "Minimal" });
+  assert.equal("ses_gouts" in JSON.parse(housePickInput({ request: "", business: null, files: [], voice: false, avoid: [] })), false);
+  // The rule: between the models her files and request allow, the one in that spirit; never against them.
+  assert.match(HOUSE_PICK_PROMPT, /ses_gouts/);
+  assert.match(HOUSE_PICK_PROMPT, /never against her files or her request/);
+});
+
