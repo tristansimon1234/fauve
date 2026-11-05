@@ -8,8 +8,12 @@
 //     --words '{"surtitre":"un samedi dans","titre":"le marais"}' [--end '{"title":"…","subtitle":"…"}'] \
 //     [--shots 10] [--bpm 90] [--settings '{"cases":"6x8"}'] [--fonts "Open Sans,Inter"] [--name "Café des Arts"] [--out reel.mp4] [--no-render]
 //     [--named '{"lumieres":"shop sign"}'] [--objects '{"1":{"src":"sign.webm","result":"result.json","id":"sign"}}']
+//     [--cast '[[0,15.4],[0,16.6],[1,1]]']
 //
 // --bpm plays it at another tempo than its own (a longer Reel, a music's tempo), as skillFit would.
+// --cast casts her files by hand as the filler would follow its slots (each shot: its file's place in --clips and where
+// it starts, s), for a skill whose shots want the same video in a row (« Recette cosy »: a step's next gesture); it
+// sets the number of shots.
 // --named names its objects as the filler would (its « @slot » in its code); --objects lays the cut-outs the card made of
 // them (apps/render/track_objects.py, run with OBJECTS_CPU=1), by shot: its file (webm, left out when its code only
 // reads where it is) and its reading in that run's printed result (its boxes, outline and pieces), on that shot's
@@ -45,6 +49,7 @@ const { values } = parseArgs({
     settings: { type: "string" },
     named: { type: "string" },
     objects: { type: "string" },
+    cast: { type: "string" },
     fonts: { type: "string", default: "" },
     name: { type: "string", default: "Studio Test" },
     out: { type: "string" },
@@ -90,11 +95,13 @@ const files: (SkillFile & { src: string; aspect: number; path: string })[] = (va
 });
 if (!files.length) throw new Error("--clips: at least one file");
 
-// A fill made by hand, as the filler would: her files in turn, a video's later moments when it comes back.
-const n = values.shots ? Math.max(skill.shots[0], Math.min(skillLongest(skill), Number(values.shots))) : skillShotCount(skill, files);
+// A fill made by hand, as the filler would: her files in turn, a video's later moments when it comes back; or as cast.
+const cast = values.cast ? (JSON.parse(values.cast) as [number, number][]) : null;
+const n = cast ? cast.length : values.shots ? Math.max(skill.shots[0], Math.min(skillLongest(skill), Number(values.shots))) : skillShotCount(skill, files);
 const seen = new Map<string, number>();
 const fill: SkillFill = {
   shots: Array.from({ length: n }, (_, i) => {
+    if (cast) return { file: files[cast[i]![0]]!.id, at: Math.max(0, cast[i]![1]) };
     const f = files[i % files.length]!;
     const k = seen.get(f.id) ?? 0;
     seen.set(f.id, k + 1);
