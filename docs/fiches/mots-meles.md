@@ -34,7 +34,7 @@ Rien ne s'allume ni ne clignote. La luminosité monte doucement de 79 à 82 sur 
   - Blanc opaque (le sommet d'un A monte à 247 sur 255 : 95 % au moins), sans ombre visible. Si fines, elles paraissent grises de loin.
   - Les lettres de remplissage sont tirées dans tout l'alphabet, presque à parts égales : sur 99, Z 5 fois, Q 4, J 4, X 3, autant que E ou T.
 - **Sur quoi** : rien de particulier dans ses vidéos : la grille se pose sur n'importe quel plan calme. Elle se lit le mieux sur une image sombre et douce (effet 6), avec de grandes zones calmes (un mur, un comptoir, le sol).
-- **Outil** : existant, `WordSearch` (`Type.tsx`), mais loin de l'original. Sa police fait 0,46 de la case (l'original : 0,28). Ses lettres sont blanches à 62 % d'opacité (grises), sa marge fait une demi-case, ses cases sont carrées, ses mots posés au hasard dans quatre sens, sans leurres. La grille codée par la v1 du skill est plus juste (ses mots dans l'ordre de la phrase, de haut en bas, ses leurres) : la garder, aux proportions mesurées ici.
+- **Outil** : existant, `WordSearch` (`Type.tsx`), mais loin de l'original. Sa police fait 0,46 de la case (l'original : 0,28). Ses lettres sont blanches à 62 % d'opacité (grises), sa marge fait une demi-case, ses cases sont carrées, ses mots posés au hasard dans quatre sens (ses leurres, `decoys`, depuis le 5 novembre). La grille codée par la v1 du skill est plus juste (ses mots dans l'ordre de la phrase, de haut en bas, ses leurres) : la garder, aux proportions mesurées ici.
 - **Si rien ne s'y prête** : toujours faisable.
 
 ### 2. Les mots de sa phrase entourés un à un, à la main
@@ -48,18 +48,16 @@ Rien ne s'allume ni ne clignote. La luminosité monte doucement de 79 à 82 sur 
   - Les lettres entourées ne changent pas : même blanc, même graisse avant et après (comparées à la rangée de BLACKBERRY, jamais entourée).
   - La phrase dit ce que montre la vidéo : « un samedi après-midi appelle un yaourt grec », sur quelqu'un qui mange un yaourt.
 - **Sur quoi** : sa phrase à elle, qui dit ce que montre sa vidéo, comme on le dirait : « Samedi matin café croissant » sur une table en terrasse, « Une coupe et un brushing » sur des mains qui coiffent, « Mardi soir yoga doux » sur un cours. Quatre à six mots de 3 à 9 lettres. Ses accents : `WordSearch` les enlève (É devient E, comme dans un mots mêlés imprimé), la v1 les garde ; à choisir.
-- **Outil** : existant, `Scribble kind="capsule"` (un trait fait main, `wobble`, `angle`, immobile sans `boil`). Trois écarts :
-  1. Sa durée : `frames` (14 par défaut, une demi-seconde ; 18 dans la v1), avec un adoucissement qui trace l'essentiel tout de suite (`Easing.out(cubic)`). L'original est deux à cinq fois plus lent, et à vitesse constante.
-  2. Son départ : il part du bas, à gauche, et tourne dans le sens des aiguilles d'une montre. L'original part du haut, au-dessus de la première lettre, dans l'autre sens.
-  3. L'enchaînement : `WordSearch` espace les mots d'un nombre fixe d'images (`every`, 60). L'original les enchaîne, chacun dès que le précédent est fermé.
-
-  **Manquant** : l'allure d'une main dans `Scribble` : une vitesse (en lettres ou en px par image) plutôt qu'un nombre d'images, sans adoucissement, un peu plus vite au retour, avec son point de départ et son sens.
+- **Outil** : existant, `Scribble kind="capsule"` (un trait fait main, `wobble`, `angle`, immobile sans `boil`). Trois écarts, que ses options du 5 novembre comblent (`docs/animations.md`, « Tracés à l'allure d'une main ») :
+  1. Sa durée : `frames` (14 par défaut, une demi-seconde ; 18 dans la v1), avec un adoucissement qui trace l'essentiel tout de suite (`Easing.out(cubic)`). L'original est deux à cinq fois plus lent, et à vitesse constante. Désormais `speed` : une vitesse en px par image (le pas d'une rangée divisé par 4 à 5 : une lettre toutes les 4 à 5 images), sans adoucissement, plus lent dans les bouts, plus vite au retour (aux quarts de son temps, 20, 46 et 71 % du tracé).
+  2. Son départ : il part du bas, à gauche, et tourne dans le sens des aiguilles d'une montre. L'original part du haut, au-dessus de la première lettre, dans l'autre sens. Désormais `start="top-left"` et `direction="ccw"`.
+  3. L'enchaînement : `WordSearch` espace les mots d'un nombre fixe d'images (`every`, 60). L'original les enchaîne, chacun dès que le précédent est fermé. Désormais `Scribble.frames(props)` (sa durée, pour lancer la boucle suivante 3 à 6 images après), et `WordSearch pace` (images par lettre) qui enchaîne les siennes.
 - **Si rien ne s'y prête** : toujours faisable. Une phrase courte (2 ou 3 mots) donne moins de boucles et un Reel plus court, jamais des boucles plus lentes que la main.
 
 ### 3. Un mot sur deux rangées, d'un seul contour
 - **Mesuré** : AFTERNOON est coupé en AFTER (rangée 4, colonnes 1 à 5) et NOON (rangée 5, colonnes 1 à 4), calés à gauche. Un seul trait fermé fait le tour des deux, en escalier, en 74 images. Parti au-dessus du A comme les autres, il descend par la gauche, longe le bas de NOON, contourne son dernier N (18 px au-delà), remonte en marche entre les deux rangées, contourne le R d'AFTER (19 px au-delà) et revient par le haut.
 - **Sur quoi** : un mot de sa phrase trop long pour une rangée (« après-midi », « croissants »), ou deux mots qui vont ensemble.
-- **Outil** : **manquant**, un `Scribble` qui entoure plusieurs rangées d'un seul trait : le contour arrondi de leurs cases, en escalier quand elles n'ont pas la même longueur. Une gélule autour des deux rangées (la v1) fait un gros ovale.
+- **Outil** : `Scribble kind="cells" rows={[after, noon]}` (existant depuis le 5 novembre : un seul trait autour de plusieurs rangées, le contour arrondi de leurs cases, en escalier quand elles n'ont pas la même longueur). Une gélule autour des deux rangées (la v1) fait un gros ovale.
 - **Si rien ne s'y prête** : le mot sur une seule rangée. Trop long pour elle (plus de 9 lettres en vertical) : deux boucles enchaînées.
 
 ### 4. Un mot en diagonale, qui se lit en montant
@@ -71,7 +69,7 @@ Rien ne s'allume ni ne clignote. La luminosité monte doucement de 79 à 82 sur 
 ### 5. Des mots leurres de son monde, cachés sans boucle
 - **Mesuré** : quatre mots de ce qui va avec un yaourt grec, jamais entourés. BLACKBERRY (rangée 2, colonnes 3 à 12). CINNAMON (rangée 10, colonnes 8 à 15). HONEY, en diagonale qui monte, du H de la rangée 6 au Y de la rangée 2, qu'il partage avec BLACKBERRY. DILL, en colonne de haut en bas (colonne 15, rangées 3 à 6). Un second FOR (rangée 10, colonnes 4 à 6) piège l'œil. Le hasard donne aussi de petits mots (YOU, ALOE, AGUA, TEA à l'envers).
 - **Sur quoi** : 2 à 4 mots de son univers : ses produits, ses gestes, son lieu (« brioche », « cannelle » ; « frange », « lissage »).
-- **Outil** : la grille codée par la v1 (`autres`, le long d'une rangée ou d'une colonne). `WordSearch` n'en a pas : **manquant**, petit, des mots placés mais jamais entourés (en rangée, en colonne ou en diagonale).
+- **Outil** : la grille codée par la v1 (`autres`, le long d'une rangée ou d'une colonne). `WordSearch decoys={[…]}` (existant depuis le 5 novembre : des mots placés mais jamais entourés, en rangée, en colonne ou en diagonale, croisant les siens sur une même lettre).
 - **Si rien ne s'y prête** : rien que des lettres au hasard.
 
 ### 6. Sa vidéo dans les gris, la grille seule en blanc
