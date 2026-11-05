@@ -95,11 +95,16 @@ Pistes : il écrit plan et code en un appel, en effort medium, avec un très lon
 ## Prochains chantiers (dans l'ordre)
 
 1. ~~Alléger CLAUDE.md~~ : fait le 4 novembre (voir « Fait »).
-2. **Une librairie de « skills de montage »** (plan validé avec Tristan le 4 novembre, détail ci-dessous) : en cours, le moteur et le premier skill en ligne (voir « Skills de montage : où on en est »).
-3. **Ajouter des skills au fil de l'eau** : un outil d'admin « nouveau skill depuis un lien » (original et planches, lecture, skill écrit sur des plans du banc, aperçu à valider par Tristan avant d'entrer dans la librairie).
-4. **Recopie fidèle des 9 Reels de la landing** par la chaîne, avant/après.
+2. ~~Une librairie de « skills de montage »~~ : faite le 5 novembre, les 33 modèles (voir « Passage de relais » en haut).
+3. **Les nouveaux modèles de Tristan** (ses liens), par la chaîne du « Passage de relais » ; puis les modèles repérés (chantier 3 : candidats sur /admin, brouillon par un agent après son clic).
+4. **Sa validation des 33 sur /admin**, et leurs réglages (la Mosaïque d'abord), puis des ajouts sur n'importe quel modèle (voix off, sous-titres, animation par-dessus).
+5. **Modèle contre chaîne seule** sur les mêmes vidéos (coût, temps, « tu le posterais ? »), puis un ou deux vrais commerces ; la phrase de la landing (« pas de modèle tout fait ») à revoir avec lui, jamais sans lui.
+6. **Recopie fidèle des 9 Reels de la landing** par la chaîne, avant/après.
 
 ## La librairie de skills de montage
+
+**Fait (5 novembre ; ce qui suit, jusqu'au « risque », est le plan du 4 novembre au matin, gardé pour l'histoire)** : les 33 modèles sont des skills complets, sur tout le Reel (7 à 23 s, jusqu'à 24 000 caractères de code, écrits sur leurs fiches mesurées image par image) ; Edith ne fait que les remplir (un petit appel : quel plan dans quelle case, ses mots), le moteur les joue sans motion designer (0,10 à 0,27 € un Reel au banc, contre 0,6 à 0,8 € avant) ; quand sa demande sort du skill, le motion designer part de son code et ne change que ce qu'il faut (consigne `skill` de `packages/agent/src/motion-scene.ts`) ; tous les 33 d'un coup plutôt que dix d'abord, validés par Tristan sur /admin. Reste de ce plan : la comparaison avec la chaîne seule (« Comment savoir si c'est la bonne direction ») et la promesse de la landing (« Le risque »).
+
 
 Tristan : « edith pourrait choisir d'adapter ces modèles comme une librairie de "skills de montage" » ; « sur Edits d'Insta tu as des modèles où le texte est préposé et les photos et vidéos n'ont qu'à être changées ».
 
