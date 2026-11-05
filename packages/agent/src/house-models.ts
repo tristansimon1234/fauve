@@ -17,8 +17,8 @@ import type { z } from "zod";
 
 /** The source of the inspiration row a house model is kept on, per studio (one per model, made when first used). */
 export const HOUSE_SOURCE = "house";
-/** The catalogue's version: a studio's row written by an older one is rewritten when the model is used again (3: its original's sheets; 4: no brand in a model's name; 5: Mots aux quatre coins as its original; 6: Plans fixes at 65 BPM; 7: four renamed; 8: Lieu tapé without its original's orange; 9: Plans fixes on its fiche; 10: Une journée chez toi on its fiche; 11: ten models on their fiches; 12: Façade qui se construit and Coulisses façon fiche on their fiches; 13: Recette cosy on its fiche; 14: Titre gaufré on its fiche; 15: Mots mêlés and Interrupteur on their fiches; 16: Interface minimaliste and Fenêtres et étiquettes on theirs). */
-export const HOUSE_VERSION = 16;
+/** The catalogue's version: a studio's row written by an older one is rewritten when the model is used again (3: its original's sheets; 4: no brand in a model's name; 5: Mots aux quatre coins as its original; 6: Plans fixes at 65 BPM; 7: four renamed; 8: Lieu tapé without its original's orange; 9: Plans fixes on its fiche; 10: Une journée chez toi on its fiche; 11: ten models on their fiches; 12: Façade qui se construit and Coulisses façon fiche on their fiches; 13: Recette cosy on its fiche; 14: Titre gaufré on its fiche; 15: Mots mêlés and Interrupteur on their fiches; 16: Interface minimaliste and Fenêtres et étiquettes on theirs; 17: Mot clé en grand and Face caméra et références on theirs). */
+export const HOUSE_VERSION = 17;
 
 export type HouseModel = {
   key: string;
@@ -571,36 +571,44 @@ export const HOUSE_MODELS: HouseModel[] = [
   model({
     key: "mot-cle",
     name: "Mot clé en grand",
+    // 15: written on its original's fiche (v1 of its skill, timed on her voice): her first two words slide in big from the
+    // first image, each idea's keyword slides in under a small line of her words said one by one, a list two names at a
+    // time each in its own font, a number and its three words, three frames between her ideas, a music that waits for her
+    // first keyword and loses its bass mid-way.
     pitch: "Tu parles face caméra devant un fond uni, et le mot important de chaque phrase s'affiche en grand au-dessus de ta tête.",
-    needs: "une vidéo de toi qui parles face caméra, devant un mur ou un fond uni",
+    needs: "une vidéo de toi qui parles face caméra (20 à 30 s), assise devant un mur uni, téléphone posé, la tête vers le milieu de l'image ; si tu peux, la même prise d'un second téléphone",
     files: [1, 3],
-    pair: "condensee-geometrique",
+    // Its hook, keywords and small words in a bold geometric (the original's Poppins-like), its number condensed (Anton,
+    // brought by its skill): not the condensed Bebas Neue of « condensee-geometrique », which only fits its number.
+    pair: "geometrique",
     example: "K-kinetic",
     finish: { name: "Studio", hint: "couleurs franches, contraste propre", contrast: 0.1, saturation: 0.08 },
     look: {
       name: "mot clé au-dessus de la tête",
       format: "raconte",
       voice: "quelqu'un parle",
-      hook: { kind: "promesse", what: "la personne assise face caméra, et une petite phrase qui s'écrit mot à mot au-dessus de sa tête" },
+      hook: { kind: "promesse", what: "ses deux premiers mots en grandes capitales grasses qui glissent de la gauche dès la première image, au-dessus de sa tête" },
       text: {
         amount: "plusieurs",
-        composition: "au-dessus de la tête, une petite phrase qui apparaît mot à mot, puis le mot clé en très grand, chacun dans la police qu'il évoque ; les sous-titres de ce qui est dit en tout petit en bas",
-        case: "normal",
-        weight: "black",
+        composition: "au-dessus de sa tête : ses premiers mots puis le mot clé de chaque idée en capitales grasses glissant de la gauche, ses mots dits en petit au-dessus ; une liste deux noms à la fois, chacun dans sa police ; ses sous-titres sur sa poitrine",
+        case: "upper",
+        weight: "bold",
         subtitles: true,
       },
-      layout: "un seul plan fixe en plein cadre, la personne assise devant un fond uni, avec des mots posés par-dessus au-dessus de sa tête",
+      layout: "elle assise face caméra devant un mur uni, plein cadre vertical (sa vidéo horizontale entière dans une bande 16:9 sur du noir), un autre cadre entre deux idées, les mots au-dessus de sa tête",
       moments: [
-        { at: 0, what: "une petite phrase blanche apparaît mot à mot au-dessus de la tête, en suivant la voix" },
-        { at: 3.5, what: "le mot clé de la phrase en très grand, blanc, au même endroit, qui remplace la petite phrase ; un nouveau mot clé à chaque idée" },
-        { at: 19, what: "pour finir, un chiffre très condensé à côté de trois mots fins empilés" },
+        { at: 0, what: "ses deux premiers mots glissent de la gauche, flous, rebondissent sur un souffle grave, tenus jusqu'à ce qu'elle dise la suite" },
+        { at: 1.07, what: "ses mots s'écrivent un à un sur une petite ligne très espacée ; le mot clé glisse dessous sur son mot (1,73 s) et reste toute l'idée" },
+        { at: 5.67, what: "coupe sur un autre cadre entre deux idées, rien au-dessus de sa tête jusqu'à la suivante" },
+        { at: 7.1, what: "une liste deux noms à la fois, chacun dans sa police, le premier petit en haut, le second grand dessous, chacun sur son mot" },
+        { at: 17.6, what: "un chiffre très condensé et ses trois mots empilés à sa droite, d'un coup, tenus 4 s" },
       ],
       camera: "fixe",
       grade: "natural",
       motion: "energique",
-      music: "laid-back hip-hop beat, soft and low under the voice",
-      ending: "le chiffre et ses trois mots, tenus deux secondes",
-      why: "Chaque idée a son mot en grand : on retient ce qui est dit même sans le son, et la personne reste au centre.",
+      music: "laid-back hip-hop beat at 108 BPM, deep sub bass, coming in after the hook",
+      ending: "elle dit au revoir, plus rien au-dessus de sa tête, la musique coupée avec l'image",
+      why: "Chaque idée a son mot en grand, chaque nom sa police : on retient ce qui est dit même sans le son, et la personne reste au centre.",
     },
   }),
   model({
@@ -1224,30 +1232,43 @@ export const HOUSE_MODELS: HouseModel[] = [
   model({
     key: "createur",
     name: "Face caméra et références",
-    pitch: "Tu parles face caméra, et ce dont tu parles apparaît en image découpée à côté de toi, avec des sous-titres sobres.",
-    needs: "une vidéo de toi qui parles face caméra, et 3 à 8 images de ce dont tu parles",
+    // 15: written on its original's fiche (v1 of its skill, timed on her voice): her images above her, in the top half
+    // or full frame on the name she says, never beside her nor in a window behind her; her first phrase on bands; no
+    // music (her voice alone); her logo on her name with a chime.
+    pitch: "Tu parles face caméra, et ce dont tu parles apparaît au-dessus de toi, en moitié d'écran ou plein cadre au moment où tu le nommes, avec tes premiers mots en bandeaux.",
+    needs: "une vidéo de toi qui parles face caméra, avec de la place au-dessus de ta tête, et 3 à 8 photos ou vidéos de ce dont tu parles (un objet sur un fond simple se détoure mieux), ton logo",
     files: [2, 10],
-    pair: "grotesque",
+    // Its first phrase in a bold condensed grotesque on black bands, its small subtitles in a semi-bold grotesque.
+    pair: "createur",
     example: "createur",
     tempo: 90,
-    finish: { name: "Studio chaud", hint: "contraste propre, chaleur", contrast: 0.1, warmth: 0.08 },
+    // No common grade (its fiche: the images it shows stay as they are); its skill lays none either.
+    finish: { name: "Net", hint: "image propre, ses images telles quelles", contrast: 0 },
     look: {
       name: "face caméra et références",
       format: "raconte",
       voice: "quelqu'un parle",
-      hook: { kind: "promesse", what: "la personne qui parle, et une image découpée qui apparaît à côté d'elle sur ses premiers mots" },
-      text: { amount: "plusieurs", composition: "des sous-titres blancs sobres sous le visage, et de temps en temps une image ou un nom posé à côté de la personne", weight: "bold", subtitles: true },
-      layout: "la personne détourée qui parle, posée sur un aplat de couleur, avec les images dont elle parle posées par-dessus à côté d'elle",
+      hook: { kind: "promesse", what: "sa première phrase sur des bandeaux noirs, chaque mot qui passe du gris au blanc quand il est dit, ce dont elle parle au-dessus de sa tête" },
+      text: {
+        amount: "plusieurs",
+        composition: "sa première phrase en grasses condensées blanches sur des bandeaux noirs, mot à mot ; puis de petits sous-titres blancs sobres, une phrase à la fois, au milieu de l'image ; son nom sur une carte blanche quand elle le dit",
+        weight: "bold",
+        subtitles: true,
+      },
+      layout: "elle face caméra plein cadre ; ce dont elle parle dans la moitié du haut, détouré au-dessus de sa tête, plein cadre sur chaque nom cité, ou en mur de vignettes derrière elle",
       moments: [
-        { at: 0, what: "la personne détourée qui parle sur un aplat sombre, une image dans une fenêtre aux coins arrondis derrière elle" },
-        { at: 6.9, what: "à chaque idée, une nouvelle image posée à côté d'elle, qui reste le temps de la phrase" },
+        { at: 0, what: "sa première phrase sur des bandeaux noirs, mot à mot ; ce dont elle parle détouré sur son mur au-dessus de sa tête" },
+        { at: 4.03, what: "écran partagé sur le premier mot de l'idée suivante : l'image en haut, elle en bas, les sous-titres sur la ligne de partage" },
+        { at: 6.87, what: "une image plein cadre pour chaque nom qu'elle cite, coupée sur son mot" },
+        { at: 12.07, what: "un autre cadre ; son logo surgit du milieu sur une carte blanche avec un carillon quand elle dit son nom" },
+        { at: 23.8, what: "un mur de vignettes glisse des deux bords derrière elle, détourée devant" },
       ],
       camera: "fixe",
       grade: "natural",
       motion: "epure",
-      music: "chill lo-fi beat, low under the voice",
-      ending: "la personne seule, sa dernière phrase",
-      why: "On voit ce qui est dit : la personne reste au centre et chaque idée a son image.",
+      music: "none (her voice alone, a chime under her logo)",
+      ending: "elle seule, sa dernière phrase",
+      why: "On voit ce qui est dit au moment où c'est dit : chaque nom a son image, la personne reste au centre.",
     },
   }),
   model({
@@ -1357,7 +1378,7 @@ export const HOUSE_WHEN: Record<string, { pour: string; pas_pour: string }> = {
   fenetres: { pour: "une sortie, un quartier, un voyage, des lieux qui défilent, son lieu de jour et de nuit", pas_pour: "des produits seuls, une offre à lire, quelqu'un qui parle" },
   facade: { pour: "une ouverture, un lancement, présenter sa devanture", pas_pour: "sans vidéo fixe de la devanture filmée de face" },
   gaufre: { pour: "une annonce élégante, un nom, une nouvelle collection, comme un faire-part", pas_pour: "un Reel rythmé ou drôle" },
-  "mot-cle": { pour: "quelqu'un qui parle face caméra (un conseil, une explication)", pas_pour: "des images sans parole" },
+  "mot-cle": { pour: "quelqu'un qui parle face caméra (un conseil, une explication, une liste, un chiffre), assis devant un mur uni", pas_pour: "des images sans parole, quelqu'un filmé de loin ou en mouvement" },
   frappe: { pour: "présenter un lieu au soleil, une terrasse, une saison", pas_pour: "un intérieur sombre, des produits seuls" },
   "titre-derriere": { pour: "un nom de lieu, de quartier ou de région en grand, une rue avec des toits, un paysage, un ciel", pas_pour: "sans plan large et fixe avec du ciel en haut" },
   journee: { pour: "raconter une journée du lieu, du matin au soir, son ambiance", pas_pour: "une offre, un produit seul" },
@@ -1374,7 +1395,7 @@ export const HOUSE_WHEN: Record<string, { pour: string; pas_pour: string }> = {
   "mots-meles": { pour: "un jeu, une devinette, un message caché, un lieu calme : quelqu'un qui fait une chose simple", pas_pour: "un Reel rythmé, plusieurs plans, une vidéo qui bouge" },
   aplat: { pour: "présenter une personne (la patronne, l'équipe), une marque qui ose la couleur", pas_pour: "sans vidéo d'elle qui marche" },
   detourages: { pour: "présenter un lieu, un paysage ou une sortie avec de l'élan, un nom à faire retenir", pas_pour: "sans plan large et fixe de son lieu ou de son paysage" },
-  createur: { pour: "quelqu'un qui explique en parlant, avec des images de ce dont il parle", pas_pour: "des images sans parole" },
+  createur: { pour: "quelqu'un qui explique en parlant face caméra et montre ce dont il parle (ses produits, ses réalisations, son lieu, son site)", pas_pour: "des images sans parole, quelqu'un qui parle sans rien à montrer" },
   silhouette: { pour: "se présenter, présenter son métier ou quelqu'un de l'équipe", pas_pour: "des produits, un lieu sans personne" },
   vision: { pour: "un lieu fréquenté, un ton tech ou graphique", pas_pour: "un lieu vide" },
 };

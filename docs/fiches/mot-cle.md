@@ -114,6 +114,20 @@ Pas encore de skill : un Reel avec voix passe par la chaîne (monteur et motion 
 - **Les textes** : « casse normale, graisse black » ; l'accroche et le mot clé sont en capitales grasses d'une géométrique (type Poppins Bold, pas la condensée Bebas Neue de sa paire, qui ne vaut que pour le chiffre), les petits mots en minuscules normales, les noms dans leur casse.
 - **La musique** : le tempo (108) est juste ; il manque son entrée après l'accroche et sa basse coupée au milieu.
 
+## Le modèle v1 (5 novembre)
+Écrit sur cette fiche (`packages/agent/src/skills/mot-cle.ts`, version 1), calé sur sa voix (`voice` : `docs/modeles.md`, « Skills calés sur sa voix »), vérifié sur les mots de l'original posés comme Scribe les donnerait (ses coupes et ses textes à deux images près, `features.test.ts`) et rendu en local sur une vidéo libre (Pexels 4962724 : une femme assise devant un mur de briques blanches, sans son ; ses mots en français posés à la main sur ce qu'on la voit dire) :
+- **Coupes** (effet 7) : sa vidéo coupée par le moteur (ses « euh » et ses longues pauses retirés), le cadre changeant seulement entre deux idées, au milieu de la respiration (5,67 et 16,70 s sur l'original) : son autre prise, sinon un cadre plus serré une idée sur deux.
+- **Accroche** (effet 1) : ses deux ou trois premiers mots en capitales grasses glissent de la gauche dès la première image (−54, −35, −16 % de la largeur, floues, puis +3,5 et −4 %, posées à la sixième), un souffle grave sur le rebond, tenues jusqu'à ce qu'elle dise la suite.
+- **Petite ligne et mot clé** (effets 2 et 3) : ses mots dits s'écrivent un à un sur une petite ligne très espacée (cinq mots au plus, vidée à la fin de sa phrase, sans le mot clé ni les mots d'une lettre) ; le mot clé glisse dessous sur son mot, comme l'accroche, et part sur le dernier mot de son idée.
+- **Liste** (effet 4) : deux noms à la fois, chacun dans la police qu'il évoque (`fonts: ["item"]`, `WORD_FONTS`), le premier en petit en haut, le second en grand dessous, chacun sur son mot ; une paire part sur le premier nom de la suivante, la dernière avec la coupe ; un dernier nom seul en grand.
+- **Chiffre** (effet 5) : une idée dont le mot clé est un chiffre : le chiffre en Anton, ses deux ou trois mots empilés à sa droite, d'un coup, tenus jusqu'à la fin de l'idée ; puis rien au-dessus de sa tête jusqu'à la fin.
+- **Une seule place** (effet 8) : au-dessus de sa tête (son visage suivi, une fois par idée), remontée, puis plus petite, puis devant son buste quand il n'y a plus de place, jamais sur son visage ; en blanc, à l'encre sur un mur clair (sa lumière lue, `LightUnder`).
+- **Sous-titres** (effet 6) : ceux du moteur, sur sa poitrine (rangée 0,75).
+- **Son** (effet 9) : sa musique à 108 BPM attend son premier mot clé et entre sur le temps qui le suit (2,82 s), perd sa basse 16 temps depuis le milieu du Reel, est coupée avec l'image ; un souffle grave sous chaque mot qui glisse.
+- **Format** : réglage `format` (`auto`, `vertical`, `horizontal` : sa vidéo entière dans une bande 16:9 sur du noir, les mots au-dessus).
+- **Léger à rendre** : un seul de ses plans monté à la fois, rien de détouré, la lumière de son mur lue sur son premier plan seulement.
+- **Ce qui manque** : « inter » niché dans le creux de « Tempting » (une mise en page propre à ces deux polices-là) ; les petits « to » et « a » que l'original saute (le modèle saute les mots d'une lettre) ; au catalogue (`models-v2/mot-cle/catalogue-change.ts`) : sa paire (une géométrique grasse, Poppins, pas la Bebas Neue de « condensee-geometrique »), ses deux coupes, ses moments.
+
 ## Ce qu'il faut filmer
 - Elle (ou quelqu'un de l'équipe), face caméra, assise ou debout, téléphone vertical posé (un pied), devant un mur uni, plutôt foncé ou coloré : les mots sont blancs.
 - Cadrée de la tête aux cuisses, **le haut de la tête vers le milieu de l'image** : toute la moitié haute reste libre pour les mots.

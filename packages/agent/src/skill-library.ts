@@ -2,6 +2,7 @@ import type { MontageSkill } from "./skills.ts";
 import { cadre } from "./skills/cadre.ts";
 import { coulisses } from "./skills/coulisses.ts";
 import { coupsDeFouet } from "./skills/coups-de-fouet.ts";
+import { createur } from "./skills/createur.ts";
 import { decode } from "./skills/decode.ts";
 import { ecranPartage } from "./skills/ecran-partage.ts";
 import { eventail } from "./skills/eventail.ts";
@@ -15,6 +16,7 @@ import { journee } from "./skills/journee.ts";
 import { monTravail } from "./skills/mon-travail.ts";
 import { mosaique } from "./skills/mosaique.ts";
 import { motsMeles } from "./skills/mots-meles.ts";
+import { motCle } from "./skills/mot-cle.ts";
 import { nike } from "./skills/nike.ts";
 import { photoDump } from "./skills/photo-dump.ts";
 import { pile } from "./skills/pile.ts";
@@ -33,6 +35,7 @@ export const MONTAGE_SKILLS: Record<string, MontageSkill> = {
   cadre,
   coulisses,
   "coups-de-fouet": coupsDeFouet,
+  createur,
   decode,
   "ecran-partage": ecranPartage,
   eventail,
@@ -46,6 +49,7 @@ export const MONTAGE_SKILLS: Record<string, MontageSkill> = {
   "mon-travail": monTravail,
   mosaique,
   "mots-meles": motsMeles,
+  "mot-cle": motCle,
   nike,
   "photo-dump": photoDump,
   pile,

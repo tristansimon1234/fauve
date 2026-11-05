@@ -144,6 +144,24 @@ export const FONT_PAIRS: FontPair[] = [
     how: "un nom de ville blanc très condensé posé dans le ciel, rien d'autre ou presque",
     fits: "une ville, un film, du noir et blanc",
   },
+  {
+    key: "geometrique",
+    name: "Géométrique grasse",
+    // « Mot clé en grand »: its hook and keyword in bold capitals of a geometric sans, its small words the same face.
+    display: { family: "Poppins", weight: 700, case: "upper", tracking: "normal" },
+    body: { family: "Poppins", weight: 400, case: "normal", tracking: "wide" },
+    how: "ses premiers mots puis un mot clé en capitales grasses au-dessus d'une tête, ses mots dits en petit au-dessus, très espacés",
+    fits: "quelqu'un qui parle face caméra, un mot clé par idée, une liste",
+  },
+  {
+    key: "createur",
+    name: "Créateur face caméra",
+    // « Face caméra et références »: its first phrase in a bold condensed grotesque, its small subtitles semi-bold.
+    display: { family: "Roboto Condensed", weight: 700, case: "normal", tracking: "normal" },
+    body: { family: "Inter Tight", weight: 600 },
+    how: "sa première phrase en grasse condensée sur des bandeaux noirs, puis de petits sous-titres sobres en grotesque demi-grasse",
+    fits: "quelqu'un qui parle face caméra, une explication, des références",
+  },
 ];
 
 const BY_KEY = new Map(FONT_PAIRS.map((p) => [p.key, p]));
