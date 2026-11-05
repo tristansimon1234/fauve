@@ -10600,6 +10600,188 @@ test("a Reel sent to copy that a model plays, its sound kept for Instagram: the 
   assert.equal(keptSoundTempo({ mode: "model" }, null), undefined);
 });
 
+// ——— A voice laid over one of Edith's models (docs/voix.md, « Une voix sur un modèle »; chantier B of docs/reprise.md) ———
+
+test("a voice on one of Edith's models no longer sends it to the chain; one timed on her filmed talk, her layout and a Reel she copies keep theirs", async () => {
+  const { beyondSkills, laysVoice, mayCopyByModel } = await import("./copy-model.ts");
+  const { MONTAGE_SKILLS } = await import("./skill-library.ts");
+  const silhouette = MONTAGE_SKILLS.silhouette!;
+  // Every model lays a voice but the two whose Reel is her own talk to the camera (SkillVoice).
+  for (const skill of Object.values(MONTAGE_SKILLS)) assert.equal(laysVoice(skill), !skill.voice, skill.key);
+  assert.equal(laysVoice(MONTAGE_SKILLS["mot-cle"]), false);
+  assert.equal(laysVoice(MONTAGE_SKILLS.createur), false);
+  assert.equal(laysVoice(undefined), false);
+  const none = { voice_text: null, voice_text_rest: null, layout: null };
+  // A model played: her voice note, Edith's voice, her words to say (once the voice reads them), all laid over it.
+  assert.equal(beyondSkills(none, true, laysVoice(silhouette)), false);
+  assert.equal(beyondSkills({ ...none, voice_text: "Moi c'est Héloïse, fleuriste." }, true, true), false);
+  assert.equal(beyondSkills({ ...none, voice_text_rest: "puis tu présentes la boutique" }, true, true), false);
+  // Her words with no voice recorded for them (its reading failed): the chain, as before.
+  assert.equal(beyondSkills({ ...none, voice_text: "Moi c'est Héloïse, fleuriste." }, false, true), true);
+  // Her own layout stays beyond any model; a voice over a model timed on her talk too.
+  assert.equal(beyondSkills({ ...none, layout: "écran partagé, moi en bas" }, false, true), true);
+  assert.equal(beyondSkills(none, true, laysVoice(MONTAGE_SKILLS["mot-cle"])), true);
+  // Without a model that lays it (a Reel she copies), a voice is still the chain's.
+  assert.equal(beyondSkills(none, true), true);
+  assert.equal(mayCopyByModel({ followed: await sentReel(), voice: true, correction: false }), false);
+});
+
+test("a voice laid over a model is written to its length: a short model a short voice, never the 8 s floor of a free voice", async () => {
+  const { voiceWordsForSkill, voiceWordsFor, SKILL_VOICE_TAIL, VOICE_OVER_PROMPT } = await import("./voice-over.ts");
+  const { VOICE_FIRST_WORD, VOICE_MAX_SECONDS } = await import("./voice.ts");
+  const { MONTAGE_SKILLS } = await import("./skill-library.ts");
+  // « Présente-toi »: 11,1 s at its tempo; its voice from its first word to a breath before its end, 2,2 words a second.
+  const seconds = MONTAGE_SKILLS.silhouette!.timeline(2, { end: false }).duration;
+  const words = voiceWordsForSkill(seconds);
+  assert.equal(words.max, Math.round((seconds - VOICE_FIRST_WORD - SKILL_VOICE_TAIL) * 2.2) + 1);
+  assert.ok(words.max <= 24 && words.min >= words.max - 7, JSON.stringify(words));
+  // A 6 s model (« Cadre dans le cadre »): a dozen words, where a free voice asked for 6 s would say 8 s of them.
+  const short = voiceWordsForSkill(6.3);
+  assert.ok(short.max <= 13, JSON.stringify(short));
+  assert.ok(short.max < voiceWordsFor(0, 6.3).max);
+  // Longer models, longer voices, never past what a voice can be.
+  assert.ok(voiceWordsForSkill(20).max > words.max);
+  assert.ok(voiceWordsForSkill(90).max <= Math.round((VOICE_MAX_SECONDS - 4) * 2.2) + 1);
+  // Its writer knows the model it is laid on, its length set for it, its words on screen written after it.
+  assert.match(VOICE_OVER_PROMPT, /« modele », when given: the Reel is one of Edith's models played as it is/);
+});
+
+test("a voice laid over a model: the Reel lasts to its last word and a breath, the model fitted to it (her note followed), never cut", async () => {
+  const { skillVoiceFit, skillTempos } = await import("./skills.ts");
+  const { voiceEnd } = await import("./voice.ts");
+  const { MONTAGE_SKILLS } = await import("./skill-library.ts");
+  // Where a voice says its last word on the Reel's clock (its silence before its first word cut: `at` negative).
+  assert.equal(voiceEnd({ words: [{ w: "Les", start: 0.5, end: 1 }, { w: "roses.", start: 1.2, end: 3.4 }], duration: 5 }, -0.3), 3.1);
+  assert.equal(voiceEnd({ words: [], duration: 4 }, 0.2), 4.2);
+  const mosaique = MONTAGE_SKILLS.mosaique!;
+  const len = (n: number, bpm = mosaique.bpm) => mosaique.timeline(n, { end: false, ...(bpm !== mosaique.bpm ? { bpm } : {}) }).duration;
+  const own = { n: 8, bpm: mosaique.bpm };
+  // Edith's voice written to its length: the count her files give is kept.
+  assert.deepEqual(skillVoiceFit(mosaique, len(8) - 0.5, own), own);
+  // Longer than it: the fewest shots more that reach it, at its tempo.
+  const more = skillVoiceFit(mosaique, len(8) + 0.3, own)!;
+  assert.equal(more.bpm, mosaique.bpm);
+  assert.ok(more.n > 8 && len(more.n) >= len(8) + 0.25 && len(more.n - 1) < len(8) + 0.25, JSON.stringify(more));
+  // Past its longest at its tempo: slower, within its tempos (longer and calmer).
+  const slower = skillVoiceFit(mosaique, len(10) + 2, own)!;
+  assert.ok(slower.bpm < mosaique.bpm && slower.bpm >= skillTempos(mosaique)[0], JSON.stringify(slower));
+  assert.ok(len(slower.n, slower.bpm) >= len(10) + 1.95);
+  // Past its slowest, or with the tempo of a sound she follows: the chain makes the Reel on her voice.
+  assert.equal(skillVoiceFit(mosaique, 40, own), null);
+  assert.equal(skillVoiceFit(mosaique, len(10) + 2, own, { fixed: true }), null);
+  // Her own note, a fixed length: the model fitted to its end, shorter than her files would make it.
+  const followed = skillVoiceFit(mosaique, 7, { n: 10, bpm: mosaique.bpm }, { follow: true })!;
+  assert.ok(len(followed.n, followed.bpm) >= 6.95 && len(followed.n, followed.bpm) < len(10), JSON.stringify(followed));
+  // A model of one length (« Présente-toi »): a longer voice slows it down, its shots the same.
+  const silhouette = MONTAGE_SKILLS.silhouette!;
+  const once = silhouette.timeline(2, { end: false }).duration;
+  const slowed = skillVoiceFit(silhouette, once + 1.5, { n: 2, bpm: silhouette.bpm })!;
+  assert.equal(slowed.n, 2);
+  assert.ok(slowed.bpm < silhouette.bpm && silhouette.timeline(2, { end: false, bpm: slowed.bpm }).duration >= once + 1.45, JSON.stringify(slowed));
+});
+
+test("a skill's plan with a voice laid over it: the voice, the engine's subtitles off its own texts, its shot's own sound muted under it, its music on its beats", async () => {
+  const { skillPlan, skillSubtitleRow, withoutVoice } = await import("./skills.ts");
+  const { SUBTITLE_ROW } = await import("./retouch.ts");
+  const { cutsOnBeats } = await import("./tempo.ts");
+  const { MONTAGE_SKILLS } = await import("./skill-library.ts");
+  const mosaique = MONTAGE_SKILLS.mosaique!;
+  const files = Array.from({ length: 8 }, (_, i) => ({ id: `v${i}`, photo: false, seconds: 10, moments: [{ start: 1, end: 4 }] }));
+  const fill = { shots: files.map((f) => ({ file: f.id, at: 1 })), texts: { titre: "Bouquets du jour" }, end: null };
+  const voice = { media_id: "voix", at: 0.2 };
+  const plan = skillPlan({ skill: mosaique, name: "Mosaïque qui change", files, fill, voice });
+  assert.deepEqual(plan.voice, voice);
+  assert.equal(plan.subtitles, true);
+  assert.ok(editPlanSchema.safeParse(plan).success);
+  assert.equal(plan.skill?.key, "mosaique");
+  // Without a row of its own it waits for its check (skillSubtitleRow); with one, its author's, in the safe zone.
+  assert.equal(plan.layers![0]!.motion.subtitle_y, undefined);
+  assert.equal(skillPlan({ skill: { ...mosaique, voiceOver: { row: 0.3 } }, name: "M", files, fill, voice }).layers![0]!.motion.subtitle_y, 0.3);
+  assert.equal(skillPlan({ skill: { ...mosaique, voiceOver: { row: 0.9 } }, name: "M", files, fill, voice }).layers![0]!.motion.subtitle_y, 0.72);
+  // Without a voice, as before: no subtitles, no voice.
+  const silent = skillPlan({ skill: mosaique, name: "Mosaïque qui change", files, fill });
+  assert.equal(silent.subtitles, false);
+  assert.equal("voice" in silent, false);
+
+  // Its row: the usual one when nothing of its own is drawn there; the nearest free one when its texts sit on it, never under them.
+  const profile = (from: number, to: number) => Array.from({ length: 96 }, (_, i) => (i >= from * 96 && i < to * 96 ? 1 : 0));
+  assert.equal(skillSubtitleRow(mosaique, undefined, 12), SUBTITLE_ROW.y);
+  assert.equal(skillSubtitleRow(mosaique, profile(0.1, 0.3), 12), SUBTITLE_ROW.y);
+  const moved = skillSubtitleRow(mosaique, profile(0.55, 0.75), 12);
+  assert.ok(moved + SUBTITLE_ROW.h <= 0.55 || moved >= 0.75, `${moved}`);
+  // Its texts everywhere (a grid of letters): nowhere better, the usual row stays.
+  assert.equal(skillSubtitleRow(mosaique, profile(0, 1), 12), SUBTITLE_ROW.y);
+  // Its author's row is kept as it is, whatever was measured.
+  assert.equal(skillSubtitleRow({ voiceOver: { row: 0.3 } }, profile(0.25, 0.4), 12), 0.3);
+
+  // In the Reel: her voice heard, its words the subtitles, on the composition's row; the model's own-sound shot steps
+  // aside under the voice (else raised with it to the level of speech); its composition does not write them (no `spoken`).
+  const laid = { ...plan, segments: plan.segments.map((s, i) => (i === 0 && "clip_id" in s ? { ...s, sound: true } : s)), layers: [{ ...plan.layers![0]!, motion: { ...plan.layers![0]!.motion, subtitle_y: 0.48 } }] };
+  const inputs = { template: "libre" as const, clipUrls: Object.fromEntries(files.map((f) => [f.id, `/${f.id}.mp4`])), brand: { name: "Atelier Rose" } };
+  const props = buildReelProps(laid, { ...inputs, voice: { src: "/voix.mp3", words: [{ w: "Les", start: 0, end: 0.2 }, { w: "roses", start: 0.25, end: 0.6 }] } });
+  assert.equal(props.voice?.src, "/voix.mp3");
+  assert.deepEqual(props.words.map((w) => w.w), ["Les", "roses"]);
+  assert.equal(props.subtitleY, 0.48);
+  assert.equal(props.layers?.[0]?.spoken, undefined);
+  const first = props.segments[0]!;
+  assert.ok(first.type === "clip" && !first.speech);
+  const quiet = buildReelProps({ ...laid, voice: undefined, subtitles: false }, inputs);
+  const heard = quiet.segments[0]!;
+  assert.ok(heard.type === "clip" && heard.speech);
+  // Its music keeps its tempo exactly and its beats on its cuts under the voice; a Reel the editor cut on a voice follows its phrases.
+  assert.equal(cutsOnBeats(plan), true);
+  assert.equal(cutsOnBeats({ voice }), false);
+  assert.equal(cutsOnBeats({}), true);
+
+  // « Sans voix »: the same model, its voice, its subtitles and their row gone; a Reel the editor made keeps its subtitles.
+  const gone = withoutVoice(laid);
+  assert.equal("voice" in gone, false);
+  assert.equal(gone.subtitles, false);
+  assert.equal(gone.layers![0]!.motion.subtitle_y, undefined);
+  assert.deepEqual(gone.segments, laid.segments);
+  const { skill: _skill, ...edited } = laid;
+  const chain = withoutVoice(edited);
+  assert.equal("voice" in chain, false);
+  assert.equal(chain.subtitles, true);
+});
+
+test("a voice laid over a model: its filler hears it and writes the same message on screen, its words at their moments; a voice there fits", async () => {
+  const { skillFillInput, SKILL_FILL_PROMPT } = await import("./skills.ts");
+  const { MONTAGE_SKILLS } = await import("./skill-library.ts");
+  const silhouette = MONTAGE_SKILLS.silhouette!;
+  const files = [{ id: "f1", photo: false, seconds: 6, shows: "une fleuriste de profil", aspect: 9 / 16 }];
+  const voiceOver = { text: "Moi c'est Héloïse. Je fais des bouquets qui racontent quelque chose.", phrases: [{ start: 0.2, end: 1.4, text: "Moi c'est Héloïse." }, { start: 1.8, end: 4.3, text: "Je fais des bouquets qui racontent quelque chose." }] };
+  type Input = { voix_off?: { texte: string; phrases: { de: number; a: number; dit: string }[] }; textes: { slot: string; moment?: { de: number; a: number } }[] };
+  const base = { skill: silhouette, name: "Présente-toi", n: 2, files, business: { name: "Atelier Rose", activity: "fleuriste" }, request: "Un Reel pour présenter Héloïse, la fleuriste de l'Atelier Rose" };
+  const input = skillFillInput({ ...base, voiceOver }) as Input;
+  assert.equal(input.voix_off?.texte, voiceOver.text);
+  assert.deepEqual(input.voix_off?.phrases[0], { de: 0.2, a: 1.4, dit: "Moi c'est Héloïse." });
+  // Each of its texts told when it shows, to go with what the voice says then.
+  const timed = input.textes.filter((t) => t.moment);
+  assert.ok(timed.length >= 3 && timed.every((t) => t.moment!.a > t.moment!.de), JSON.stringify(input.textes));
+  // Without a voice: neither.
+  const plain = skillFillInput(base) as Input;
+  assert.equal("voix_off" in plain, false);
+  assert.ok(plain.textes.every((t) => !t.moment));
+  // Never over a model timed on her filmed talk.
+  assert.equal("voix_off" in (skillFillInput({ ...base, skill: MONTAGE_SKILLS["mot-cle"]!, voiceOver }) as Input), false);
+  // A voice laid over it fits; its words on screen say what it says, never another hook.
+  assert.match(SKILL_FILL_PROMPT, /With « voix_off », a voice is laid over this Reel/);
+  assert.match(SKILL_FILL_PROMPT, /without « voix_off », a voice-over or subtitles of what she says/);
+  assert.match(SKILL_FILL_PROMPT, /says what the voice opens on, in its strongest words, never another hook/);
+});
+
+test("a voice over a model that plays without music is still brought to the level of a voice in the mix", async () => {
+  const { soundsOnlyFilter } = await import("./mix.ts");
+  const effect = { at: 1, gain: -3, onset: 0, end: 0.5 };
+  // Her voice alone, levelled, its peaks held.
+  assert.match(soundsOnlyFilter(true, 12, [], 9.5), /^\[0:a\]aformat=sample_rates=44100:channel_layouts=stereo,volume=9\.5dB\[pre\];\[pre\]alimiter=limit=0\.891:level=false\[a\]$/);
+  // With the model's sounds over it.
+  assert.match(soundsOnlyFilter(true, 12, [effect], 9.5), /volume=9\.5dB\[pre\];\[1:a\]atrim=/);
+  // As before without a voice: its own sound as it is.
+  assert.doesNotMatch(soundsOnlyFilter(true, 12, [effect]), /volume=[^;]*\[pre\]/);
+});
+
 
 // ——— The bank of ready-to-play effects (pieces.ts, piece-library.ts; docs/modeles.md, « Banque d'effets prêts à jouer ») ———
 

@@ -41,6 +41,13 @@ import {
   hasSpeech,
   saidCurrent,
   skillTalk,
+  laysVoice,
+  MAX_REEL_SECONDS,
+  SKILL_VOICE_TAIL,
+  skillSubtitleRow,
+  skillVoiceFit,
+  voiceEnd,
+  voicePhrases,
   type BrandProfile,
   type ClipAnalysis,
   type EditPlan,
@@ -54,6 +61,7 @@ import {
   type SkillFile,
   type SkillFillAnswer,
   type SkillTalk,
+  type VoiceTranscript,
 } from "@fauve/agent";
 import { outputFormat, readAnswer } from "@fauve/agent/answer";
 import { MONTAGE_SKILLS, skillFor } from "@fauve/agent/skills";
@@ -65,6 +73,7 @@ import { studioPlace } from "@/lib/geo";
 import { copyNearest } from "@/lib/model-scout";
 import { readPostMusic } from "@/lib/render/music";
 import { skillGate } from "@/lib/skill-reviews";
+import { postStyle } from "@/lib/steal";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { noteGap } from "@/lib/toolkit";
 import { syncTakes } from "@/lib/video/takes";
@@ -74,16 +83,41 @@ import { anthropic, logClaudeCost } from "./run";
 // A Reel made on a montage skill (packages/agent/src/skills.ts): one of Edith's models coded once for the whole Reel,
 // like an Edits or CapCut template. One small call (Sonnet) says whether her request is served by it, casts her files
 // on its shots and writes its words; the plan is code; its composition is played as it is, only checked (never written
-// again by the motion designer). Anything else (a voice, another layout, more than its slots), the editor, whose motion
-// designer starts from the skill's code.
+// again by the motion designer). A voice is laid over it (her voice note, Edith's voice written to its length: the model
+// played as it is, its music under the voice, the engine's subtitles off its texts; docs/voix.md). Anything else
+// (another layout, more than its slots), the editor, whose motion designer starts from the skill's code.
 
 export type SkillDesign = { plan: EditPlan; editPlanId: string; version: number; rationale: string };
 
-/** The skill a Reel can be made on before anything is asked: one of Edith's models with a skill, without a voice nor a layout of hers. */
+/**
+ * The skill a Reel can be made on before anything is asked: one of Edith's models with a skill, without a layout of
+ * hers; with a voice (hers, Edith's, the words she gives to say) only one that lays it (never one timed on her filmed
+ * talk: laysVoice).
+ */
 export function skillCandidate(followed: FollowedStyle | undefined, contract: ReelContract | undefined, voice: boolean): MontageSkill | undefined {
   const skill = skillFor(followed?.house);
-  if (!skill || beyondSkills(contract, voice)) return undefined;
+  if (!skill || beyondSkills(contract, voice, laysVoice(skill))) return undefined;
   return skill;
+}
+
+/** The model a voice is written for, before it is recorded: its name, how it goes and its length (s, without its ending card). */
+export type VoiceSkill = { key: string; name: string; how: string; seconds: number };
+
+/**
+ * Before Edith's voice is written (the model is picked before it, ensureEdithModel): the model this Reel will be played
+ * by with a voice laid over it (skillCandidate with a voice: one of Edith's models this studio plays, that lays one), and
+ * its length at her files (her passages, as designSkill counts them) or at the length she asked, without its ending
+ * card, at its tempo: the voice is written to stop a breath before it (voiceWordsForSkill), never the model cut on the
+ * voice. Null when the chain will make the Reel (the voice written for her footage, as before).
+ */
+export async function voiceSkill(input: { studioId: string; postId: string; files: SkillFile[]; contract?: ReelContract }): Promise<VoiceSkill | null> {
+  if (!input.files.length) return null;
+  const [followed, gate] = await Promise.all([postStyle(input.studioId, input.postId).catch(() => undefined), skillGate(input.studioId)]);
+  const skill = gate(skillCandidate(followed, input.contract, true));
+  if (!skill) return null;
+  const fit = input.contract?.duration ? skillFit(skill, input.contract.duration) : { n: skillShotCount(skill, input.files), bpm: skill.bpm };
+  const seconds = skill.timeline(fit.n, { end: false, ...(fit.bpm !== skill.bpm ? { bpm: fit.bpm } : {}) }).duration;
+  return { key: skill.key, name: houseModel(skill.key)?.name ?? skill.key, how: skill.how, seconds: Math.round(seconds * 100) / 100 };
 }
 
 /**
@@ -208,9 +242,16 @@ export async function designSkill(params: {
    * (its fonts and colours, or her charter when she asked for it); its words when it has some; said in one sentence.
    */
   copied?: boolean;
+  /**
+   * A voice laid over it (docs/voix.md, « Une voix sur un modèle »): her voice note, or Edith's voice written to its
+   * length, from `at` on the Reel's clock (its words, `transcript`); `own`, her note (a fixed length the model fits to).
+   */
+  voice?: { media_id: string; at: number; transcript: VoiceTranscript; own: boolean };
 }): Promise<SkillDesign | null> {
   const { skill } = params;
   const name = houseModel(skill.key)?.name ?? skill.key;
+  // A voice over a model timed on her filmed talk is the chain's (skillCandidate never sends one here).
+  if (params.voice && !laysVoice(skill)) return null;
   const files = measuredFiles(skillFiles(params.mediaIds, params.clips, params.photos), ...(await measuredOf(params.studioId, params.postId, skill, params.mediaIds, params.clips)));
   if (!files.length) return null;
   // Timed on her voice: her talking video cut as a creator cuts it, her other angles of the same take synced on their sound.
@@ -225,13 +266,26 @@ export async function designSkill(params: {
   // following a sound, its tempo (its own, halved or doubled, nearest the model's), the count closest to her length at it.
   // On her voice, her talk's pieces and her length (its music under her voice, at its own tempo).
   const soundBpm = params.sound && !skill.voice ? soundTempo(params.sound.bpm, skill.bpm) : undefined;
-  const fit = talk
+  let fit = talk
     ? { n: talk.pieces.length, bpm: skill.bpm }
     : soundBpm
       ? { n: params.contract?.duration ? skillFitAt(skill, params.contract.duration, soundBpm) : skillShotCount(skill, files), bpm: soundBpm }
       : params.contract?.duration
         ? skillFit(skill, params.contract.duration)
         : { n: skillShotCount(skill, files), bpm: skill.bpm };
+  // A voice laid over it lasts to its last word and a breath (never cut by a shorter model): her own note, a fixed
+  // length, has the model fit to it (its shots, then its tempo); Edith's, written to its length, moves it only when it
+  // came out longer. Longer than the model can play: the chain makes the Reel on it.
+  const laid = params.voice;
+  if (laid) {
+    const needed = voiceEnd(laid.transcript, laid.at) + SKILL_VOICE_TAIL;
+    const reach = needed <= MAX_REEL_SECONDS ? skillVoiceFit(skill, needed, fit, { follow: laid.own && !params.contract?.duration, fixed: Boolean(soundBpm) }) : null;
+    if (!reach) {
+      console.log("skill: her voice is longer than this model plays, the editor makes the Reel", params.postId, skill.key, `${needed} s`);
+      return null;
+    }
+    fit = reach;
+  }
   // Its first beat: the Reel's first image held that long, then every cut on the sound's beats.
   const lead = params.sound && soundBpm ? soundLead(params.sound.offset, soundBpm) : 0;
   const n = fit.n;
@@ -261,6 +315,8 @@ export async function designSkill(params: {
     ...(talk ? { talk } : {}),
     ...(known ? { facts: known } : {}),
     ...(params.copied ? { copied: true } : {}),
+    // The voice laid over it, written before it: its words on screen go with what it says, when it says it.
+    ...(laid ? { voiceOver: { text: laid.transcript.text, phrases: voicePhrases(laid.transcript, laid.at) } } : {}),
   });
   // One small call fills it; `again`: its answer and what the check said of it, for a second try.
   const fillIt = async (again?: { answer: SkillFillAnswer; note: string }): Promise<SkillFillAnswer | null> => {
@@ -293,7 +349,8 @@ export async function designSkill(params: {
     // The model's lettering when she chose it (her charter's when Edith picked it), and its finish (its grade, its grain)
     // without what its code does itself (its own black and white, with its red over it); else her own look. On her voice,
     // her talk cut is its shots.
-    const plan = dressSkillPlan(leadPlan(skillPlan({ skill, name, files, fill, ...(bpm ? { bpm } : {}), ...(talk ? { talk } : {}) }), lead), skill, params.followed, params.profile.look);
+    const voiced = laid ? { voice: { media_id: laid.media_id, at: laid.at } } : {};
+    const plan = dressSkillPlan(leadPlan(skillPlan({ skill, name, files, fill, ...(bpm ? { bpm } : {}), ...(talk ? { talk } : {}), ...voiced }), lead), skill, params.followed, params.profile.look);
     // Each shot framed on its subject and its light corrected, as any montage.
     const durations = Object.fromEntries(files.map((f) => [f.id, f.photo ? plan.duration : f.seconds]));
     Object.assign(plan, finishPlan(plan, facts, durations));
@@ -303,7 +360,10 @@ export async function designSkill(params: {
     }));
     if ("error" in checked) return { plan, error: checked.error };
     const layer = plan.layers![0]!;
-    plan.layers = [{ ...layer, motion: { ...layer.motion, js: checked.js, ...(checked.fonts.length ? { fonts: checked.fonts } : {}) } }];
+    // A voice laid over it: its subtitles for the whole Reel on the skill's row, else off what its composition writes
+    // and draws of its own on her Reel (the check measured it; the render keeps a composition's row as it is).
+    const row = laid ? { subtitle_y: skillSubtitleRow(skill, checked.own, plan.duration) } : {};
+    plan.layers = [{ ...layer, motion: { ...layer.motion, js: checked.js, ...(checked.fonts.length ? { fonts: checked.fonts } : {}), ...row } }];
     return { plan };
   };
 
@@ -373,7 +433,10 @@ async function placeFacts(studioId: string): Promise<SkillFacts | undefined> {
   return place ? { coordinates: place.label } : undefined;
 }
 
-/** The scene check of a skill's composition on her Reel (its shots as grey cards, its texts and marks): its js, or what it refused. */
+/**
+ * The scene check of a skill's composition on her Reel (its shots as grey cards, its texts and marks): its js, and what it
+ * writes and draws of its own row by row (`own`, for a voice's subtitles laid over it), or what it refused.
+ */
 async function checkSkill(
   studioId: string,
   plan: EditPlan,
@@ -382,7 +445,7 @@ async function checkSkill(
   business: string,
   name: string,
   asked?: string,
-): Promise<{ js: string; fonts: string[] } | { error: string }> {
+): Promise<{ js: string; fonts: string[]; own?: number[] } | { error: string }> {
   const layer = plan.layers?.find((l) => l.compose);
   if (!layer?.motion.code) return { error: "pas de composition" };
   const timeline = planTimeline(plan);
@@ -408,7 +471,7 @@ async function checkSkill(
   };
   const [result] = await designMotionScenes(studioId, [request], undefined, brand, [], { look: { template, ...(plan.tempo ? { tempo: plan.tempo } : {}) } });
   if (!result?.js) return { error: result?.error ?? "le contrôle n'a rien rendu" };
-  return { js: result.js, fonts: result.fonts ?? [] };
+  return { js: result.js, fonts: result.fonts ?? [], ...(result.own?.length ? { own: result.own } : {}) };
 }
 
 /**

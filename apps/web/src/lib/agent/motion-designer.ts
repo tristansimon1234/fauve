@@ -130,6 +130,11 @@ export type SceneResult = {
   sounds?: SfxCue[];
   /** Its code reads what is said: the share of the words said the scene check found written at their moment. */
   spokenShare?: number;
+  /**
+   * A draft played as it is (a montage skill's composition): what it writes and draws of its own, row by row (the scene
+   * check's, her pictures left out), for the row of a voice's subtitles laid over it.
+   */
+  own?: number[];
 };
 
 /** What already exists, so that a new scene takes another idea. */
@@ -581,7 +586,12 @@ async function checkScenes(
       (e: unknown): SceneChecks => ({ errors: Object.fromEntries(results.map((r) => [r.id, `smoke indisponible : ${String(e)}`])), faces: {}, cover: {} }),
     );
     results = results.map((r) => {
-      if (!r.js || !checks.errors[r.id]) return checks.spoken?.[r.id] !== undefined && r.js ? { ...r, spokenShare: checks.spoken[r.id] } : r;
+      if (!r.js || !checks.errors[r.id]) {
+        if (!r.js) return r;
+        // A kept draft (a montage skill) gets what it draws of its own: a voice laid over it sets its subtitles off it.
+        const own = requestOf(r.id).keep && checks.own?.[r.id]?.length ? { own: checks.own[r.id] } : {};
+        return checks.spoken?.[r.id] !== undefined || "own" in own ? { ...r, ...(checks.spoken?.[r.id] !== undefined ? { spokenShare: checks.spoken[r.id] } : {}), ...own } : r;
+      }
       return working.get(r.id) ?? { ...r, js: null, error: checks.errors[r.id]! };
     });
     if (round === 1) break;

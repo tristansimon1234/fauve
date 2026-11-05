@@ -496,20 +496,26 @@ const alpha = (color: string) => (color.startsWith("rgba") ? Number(color.slice(
 /**
  * What a copy of the scene draws, row by row: the share of the subtitles' width (the safe zone's)
  * covered by its texts, its pictures and its painted shapes. A backdrop over most of the frame does
- * not count: subtitles read on it, as on her footage.
+ * not count: subtitles read on it, as on her footage. `own`: the same without her pictures (her shots'
+ * cards, her photos, her cut-outs): what the scene writes and draws of its own, its texts and its marks,
+ * where a voice laid over a model must not set its subtitles (two texts one over the other do not read).
  */
-function drawn(copy: HTMLElement, width: number, height: number): number[] {
+function drawn(copy: HTMLElement, width: number, height: number): { all: number[]; own: number[] } {
   const origin = copy.getBoundingClientRect();
   const [left, right] = [SAFE_ZONE.side, width - SAFE_ZONE.side];
   const rows: [number, number][][] = Array.from({ length: COVER_ROWS }, () => []);
-  const add = (r: DOMRect) => {
+  const ownRows: [number, number][][] = Array.from({ length: COVER_ROWS }, () => []);
+  const add = (r: DOMRect, picture = false) => {
     if (r.width * r.height > width * height * 0.6) return;
     const x0 = Math.max(left, r.left - origin.left);
     const x1 = Math.min(right, r.right - origin.left);
     if (x1 <= x0) return;
     const from = Math.max(0, Math.floor(((r.top - origin.top) / height) * COVER_ROWS));
     const to = Math.min(COVER_ROWS, Math.ceil(((r.bottom - origin.top) / height) * COVER_ROWS));
-    for (let i = from; i < to; i++) rows[i]!.push([x0, x1]);
+    for (let i = from; i < to; i++) {
+      rows[i]!.push([x0, x1]);
+      if (!picture) ownRows[i]!.push([x0, x1]);
+    }
   };
   // Effective opacity, top down: a faded element and all it holds do not count.
   const opacity = new Map<Element, number>();
@@ -521,7 +527,9 @@ function drawn(copy: HTMLElement, width: number, height: number): number[] {
     if (seen < 0.15) return;
     opacity.set(el, seen);
     const border = ["Top", "Right", "Bottom", "Left"].some((side) => parseFloat(style.getPropertyValue(`border-${side.toLowerCase()}-width`)) > 0) && alpha(style.borderTopColor) > 0.15;
-    if (SHAPES.has(el.tagName.toLowerCase()) || alpha(style.backgroundColor) > 0.15 || style.backgroundImage !== "none" || border) add(el.getBoundingClientRect());
+    // Her pictures: a photo, a video, a cut-out, one of her shots as the check draws it (a grey card), her silhouette's box.
+    const picture = PICTURES.has(el.tagName.toLowerCase()) || el.hasAttribute("data-fauve-shot") || el.hasAttribute("data-fauve-subject");
+    if (SHAPES.has(el.tagName.toLowerCase()) || alpha(style.backgroundColor) > 0.15 || style.backgroundImage !== "none" || border) add(el.getBoundingClientRect(), picture);
     for (const child of Array.from(el.children)) visit(child, seen);
   };
   for (const child of Array.from(copy.children)) visit(child, 1);
@@ -532,17 +540,19 @@ function drawn(copy: HTMLElement, width: number, height: number): number[] {
     range.selectNodeContents(node);
     for (const r of Array.from(range.getClientRects())) if (r.width >= 1 && r.height >= 1) add(r);
   }
-  return rows.map((spans) => {
-    // The width the spans cover together, overlaps counted once.
-    let covered = 0;
-    let end = -Infinity;
-    for (const [a, b] of spans.sort((p, q) => p[0] - q[0])) {
-      if (b <= end) continue;
-      covered += b - Math.max(a, end);
-      end = b;
-    }
-    return covered / (right - left);
-  });
+  const shares = (all: [number, number][][]) =>
+    all.map((spans) => {
+      // The width the spans cover together, overlaps counted once.
+      let covered = 0;
+      let end = -Infinity;
+      for (const [a, b] of spans.sort((p, q) => p[0] - q[0])) {
+        if (b <= end) continue;
+        covered += b - Math.max(a, end);
+        end = b;
+      }
+      return covered / (right - left);
+    });
+  return { all: shares(rows), own: shares(ownRows) };
 }
 
 const waitFrame = () => new Promise((resolve) => requestAnimationFrame(() => resolve(null)));
@@ -780,8 +790,11 @@ export function SceneCheck({ js, texts, durationInFrames, brand, photos = [], cu
         }
         // What it draws, row by row, over its length (each row: the share of the subtitles' width it covers, on average).
         const copies = Array.from(document.querySelectorAll<HTMLElement>("[data-check-frame]")).map((copy) => drawn(copy, width, height));
-        const cover = Array.from({ length: COVER_ROWS }, (_, i) => Math.round((copies.reduce((sum, c) => sum + c[i]!, 0) / Math.max(1, copies.length)) * 100) / 100);
-        console.log(`FAUVE_COVER ${JSON.stringify(cover)}`);
+        const average = (pick: (c: { all: number[]; own: number[] }) => number[]) =>
+          Array.from({ length: COVER_ROWS }, (_, i) => Math.round((copies.reduce((sum, c) => sum + pick(c)[i]!, 0) / Math.max(1, copies.length)) * 100) / 100);
+        console.log(`FAUVE_COVER ${JSON.stringify(average((c) => c.all))}`);
+        // Its own texts and marks, her pictures left out: where a voice laid over a model sets its subtitles.
+        console.log(`FAUVE_OWN ${JSON.stringify(average((c) => c.own))}`);
         return continueRender(handle);
       }
       const detail = failures

@@ -149,8 +149,9 @@ const defaultBrand = {
 const scenes = JSON.parse(readFileSync(process.argv[2], "utf8"));
 const results = {};
 const faces = {};
-// What each scene draws, row by row: where a voice's subtitles leave it room.
+// What each scene draws, row by row: where a voice's subtitles leave it room; `own`, its texts and marks alone (her pictures left out).
 const cover = {};
+const own = {};
 // For a scene whose code reads what is said (probeSpoken): the share of the words said it writes at their moment.
 const spoken = {};
 for (const scene of scenes) {
@@ -242,6 +243,8 @@ if (browser) {
             if (note) faces[scene.id] = [faces[scene.id], JSON.parse(note)].filter(Boolean).join("\n");
             const drawn = /^FAUVE_COVER (\[.*\])$/.exec(log.text)?.[1];
             if (drawn) cover[scene.id] = JSON.parse(drawn);
+            const marks = /^FAUVE_OWN (\[.*\])$/.exec(log.text)?.[1];
+            if (marks) own[scene.id] = JSON.parse(marks);
             // Its code reads what is said: the share of the words said it writes at their moment.
             const written = /^FAUVE_SPOKEN ([0-9.]+)$/.exec(log.text)?.[1];
             if (written) spoken[scene.id] = Number(written);
@@ -259,4 +262,4 @@ if (browser) {
     await browser.close({ silent: true });
   }
 }
-console.log(JSON.stringify({ results, faces, cover, spoken }));
+console.log(JSON.stringify({ results, faces, cover, own, spoken }));

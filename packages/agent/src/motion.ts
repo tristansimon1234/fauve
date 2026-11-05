@@ -775,7 +775,8 @@ export function buildReelProps(plan: EditPlan, inputs: ReelInputs): ReelProps {
     const speed = s.speed && Math.abs(s.speed - 1) > 0.01 ? s.speed : undefined;
     // Someone speaks in this passage: its sound stays (unless her voice is over the Reel, or the shot plays at another speed);
     // or she wants the sound of her videos all along (never slowed down), or none of it; or its model hears this shot
-    // (a skill's `sound` shot: the metro under its title), at its own pace, unless she wants none of her videos' sound.
+    // (a skill's `sound` shot: the metro under its title), at its own pace, unless she wants none of her videos' sound or
+    // a voice is laid over the model (it would be raised with the voice to the level of speech).
     const heard = plan.finish?.video_sound ?? "speech";
     // A shot laid beside another (the other half of a split screen) is seen, never heard: the main line's sound plays.
     const speech =
@@ -783,7 +784,7 @@ export function buildReelProps(plan: EditPlan, inputs: ReelInputs): ReelProps {
       (heard === "all"
         ? !speed
         : (heard === "speech" && !plan.voice && !speed && (inputs.words?.[s.clip_id] ?? []).some((w) => w.start >= s.in && w.end <= s.out)) ||
-          (heard !== "none" && Boolean(s.sound) && !speed && !s.ramp));
+          (heard !== "none" && Boolean(s.sound) && !plan.voice && !speed && !s.ramp));
     // Only a composition draws a shot laid beside the others: the plain montage skips it.
     const beside = s.beside ? { beside: true as const } : {};
     const zoom = s.zoom === "light" || plan.transitions === "light_zoom";

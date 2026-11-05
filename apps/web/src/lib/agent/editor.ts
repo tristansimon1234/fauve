@@ -90,6 +90,7 @@ import {
   SPOKEN_WRITTEN,
   soundLead,
   soundTempo,
+  laysVoice,
   type MontageSkill,
 } from "@fauve/agent";
 import { outputFormat } from "@fauve/agent/answer";
@@ -126,7 +127,7 @@ import { LAYER_ROLE, markTemplatesUsed, OVERLAY_ROLE, PHOTO_ROLE, recentlyShownT
 import { timeLeft } from "@/lib/step-clock";
 import { anthropic, CACHE_AN_HOUR, logClaudeCost } from "./run";
 
-/** The voice note a post carries (a voice leads the Reel: never a montage skill). */
+/** The voice note a post carries (a voice leads the Reel, unless one of Edith's models lays it: laysVoice). */
 const voiceIdOf = (post: { voice_media_id?: unknown }) => (typeof post.voice_media_id === "string" ? post.voice_media_id : null);
 
 /** Whether the post follows one of Edith's models that has its montage skill, one this studio plays (its inspiration's row, read once). */
@@ -382,7 +383,9 @@ export async function designEdit(params: {
   // only if the editor takes the Reel.
   // The skills this studio plays: those Tristan added to the library (the team's and the lab's play them all).
   const gate = await skillGate(params.studioId);
-  const skilledBy = !voiceIdOf(post.data) && post.data.inspiration_id ? await skillOfInspiration(params.studioId, post.data.inspiration_id as string, gate) : undefined;
+  const inspired = post.data.inspiration_id ? await skillOfInspiration(params.studioId, post.data.inspiration_id as string, gate) : undefined;
+  // A voice over it: played by a model that lays one (never one timed on her filmed talk), else by the editor.
+  const skilledBy = !voiceIdOf(post.data) || laysVoice(inspired) ? inspired : undefined;
   const skilled = Boolean(skilledBy);
   const startTracks = () => (clips.length ? ensureTracks(params.studioId, clips.map((c) => c.media_id)).catch((e: unknown) => console.warn("tracks: not ready", e)) : null);
   // A skill timed on her voice sets its words over her head: where her face is, followed now (its render reads it).
@@ -485,6 +488,11 @@ export async function designEdit(params: {
       const read = await Promise.race([earlySpeech, new Promise<null>((resolve) => setTimeout(() => resolve(null), SPEECH_WAIT_MS))]);
       if (read) clips = read;
     }
+    // A voice laid over the model (docs/voix.md): her own note (a fixed length the model fits to), or Edith's, written to its length.
+    const laid =
+      voice && voiceId
+        ? { media_id: voiceId, at: voiceStart, transcript: voice, own: (await db.from("media_assets").select("source").eq("id", voiceId).maybeSingle()).data?.source !== "ai" }
+        : undefined;
     const made = await designSkill({
       studioId: params.studioId,
       postId: params.postId,
@@ -500,6 +508,7 @@ export async function designEdit(params: {
       profile,
       ...(skillSound ? { sound: skillSound } : {}),
       ...(copiedBy ? { copied: true } : {}),
+      ...(laid ? { voice: laid } : {}),
     });
     if (made) return { editPlanId: made.editPlanId, version: made.version, plan: made.plan, rationale: made.rationale, newScenes: 0, reusedScenes: 0 };
   }

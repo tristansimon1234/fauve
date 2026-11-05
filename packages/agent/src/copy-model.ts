@@ -15,9 +15,24 @@ export const COPY_BY_MODEL_AT = 8;
 /** The nearest of Edith's models for a Reel she sent to copy (its key), and how close its form is, 0 to 10. */
 export type CopyNearest = { key: string; closeness: number };
 
-/** Her request asks for what no montage skill does: a voice over her Reel, a layout of her own, the words of a voice. */
-export function beyondSkills(contract: Pick<ReelContract, "layout" | "voice_text" | "voice_text_rest"> | undefined, voice: boolean): boolean {
-  return voice || Boolean(contract?.layout || contract?.voice_text || contract?.voice_text_rest);
+/**
+ * A skill that lays a voice over its Reel (her voice note, Edith's voice, the words she gives it to say: docs/voix.md,
+ * « Une voix sur un modèle »; Tristan: « et sur un modèle on peut ajouter une voix off ? »): any of Edith's models but
+ * the two timed on her own filmed talk (SkillVoice: « Mot clé en grand », « Face caméra et références »), whose Reel is
+ * what she says to the camera, where a voice off makes no sense.
+ */
+export const laysVoice = (skill: Pick<MontageSkill, "voice"> | null | undefined): boolean => Boolean(skill && !skill.voice);
+
+/**
+ * Her request asks for what no montage skill does: a layout of her own; a voice over her Reel or the words of a voice,
+ * unless the skill playing it lays one (`laid`: one of Edith's models she or Edith chose, laysVoice), when the voice is
+ * there (her words with no voice recorded for them, its reading failed, stay the chain's, as before). A Reel she sent
+ * to copy keeps the chain for a voice.
+ */
+export function beyondSkills(contract: Pick<ReelContract, "layout" | "voice_text" | "voice_text_rest"> | undefined, voice: boolean, laid = false): boolean {
+  if (contract?.layout) return true;
+  const words = Boolean(contract?.voice_text || contract?.voice_text_rest);
+  return laid ? words && !voice : voice || words;
 }
 
 /**

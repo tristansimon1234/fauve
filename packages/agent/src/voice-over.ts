@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { VOICE_MAX_SECONDS, type VoiceTranscript } from "./voice.ts";
+import { VOICE_FIRST_WORD, VOICE_MAX_SECONDS, type VoiceTranscript } from "./voice.ts";
 
 // Edith's voice over a Reel (ElevenLabs text to speech): she writes what a
 // creator would say over these images, a voice reads it with the time of every
@@ -29,6 +29,26 @@ export function voiceWordsFor(footageSeconds: number, askedSeconds?: number | nu
   const words = Math.round(seconds * 2.2);
   return { min: Math.max(20, words - 10), max: Math.min(VOICE_OVER_WORDS.max, words + 3) };
 }
+
+/** What a voice laid on one of Edith's models leaves after its last word, before the model ends (s): its last image seen in silence. */
+export const SKILL_VOICE_TAIL = 0.8;
+
+/**
+ * How many words a voice laid on one of Edith's models says (Tristan: « et sur un modèle on peut ajouter une voix off ? »):
+ * the model plays as it is, so the voice is written to its length (`seconds`: its length at her files, or at the length
+ * she asked, without its ending card), from its first word to a breath before its end, at about 2.2 words a second. A
+ * short model gets a short voice: no floor of 8 s here, a voice longer than the model would make it longer.
+ */
+export function voiceWordsForSkill(seconds: number): { min: number; max: number } {
+  const spoken = Math.min(VOICE_MAX_SECONDS - 4, Math.max(1, seconds - VOICE_FIRST_WORD - SKILL_VOICE_TAIL));
+  const words = Math.max(3, Math.round(spoken * 2.2));
+  return { min: Math.max(2, words - 6), max: words + 1 };
+}
+
+/** A voice written to a model's length is rewritten once when it says this many words more than its ceiling (a free voice: VOICE_OVER_SLACK). */
+export const SKILL_VOICE_SLACK = 2;
+/** A free voice is rewritten once when it says this many words more than its ceiling. */
+export const VOICE_OVER_SLACK = 4;
 
 /**
  * Edith's voices, ElevenLabs library voices picked by ear: natural French voices
@@ -217,7 +237,7 @@ If her request already says the form (a voice that tells, no voice, a single mes
 
 export const VOICE_OVER_PROMPT = `You write the voice-over of an Instagram Reel for a neighbourhood business: what a real person says over its images, like a creator talking to their followers, never like an ad. This voice makes people stay to the end: it must make them want to come, not sell. You write it in French.
 
-What you get: the business (name, trade, what we know about it), the post's idea and, when there are some, the request made for this Reel (« publication.demande », often in the words of the person who runs it) and what she wants to hear (« consigne_voix »), the business's tone, what her images show (« images », in the order they were filmed: to know what the person watching already sees, never a list to narrate), the image the Reel opens on (« ouverture », the strongest shot to hook), the length to aim for (« longueur »: from mots_min to mots_max words) and, when she copies one, the Reel she sent (« reel_a_recopier »: the form of its hook and its ending), and this business's latest voices (« voix_recentes »).
+What you get: the business (name, trade, what we know about it), the post's idea and, when there are some, the request made for this Reel (« publication.demande », often in the words of the person who runs it) and what she wants to hear (« consigne_voix »), the business's tone, what her images show (« images », in the order they were filmed: to know what the person watching already sees, never a list to narrate), the image the Reel opens on (« ouverture », the strongest shot to hook), the length to aim for (« longueur »: from mots_min to mots_max words) and, when she copies one, the Reel she sent (« reel_a_recopier »: the form of its hook and its ending), and this business's latest voices (« voix_recentes »). « modele », when given: the Reel is one of Edith's models played as it is (its name, how it goes, its length), and your voice is laid over it: « longueur » is set for that model, your voice runs from its first image and stops a breath before its end, and its words on screen are written after your voice, from it (one message for both, never two).
 
 « contrat », when there is one, is what she fixed herself for this Reel: it comes before everything else, these rules included. A person (« je »: the voice speaks in her name, in the first person, and the rule of the creator who talks about the business does not apply), an invitation (« aucune »: no invitation nor call to comment; « la sienne »: her words), an ending, a length, her requests: you follow them to the letter.
 

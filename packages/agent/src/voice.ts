@@ -41,6 +41,12 @@ export function voiceAt(t: Pick<VoiceTranscript, "words">): number {
 /** The longest voice note used on a Reel: past it, it would not fit (MAX_REEL_SECONDS with the end card). */
 export const VOICE_MAX_SECONDS = 42;
 
+/** Where a voice laid from `at` on the Reel's clock says its last word (s): what the Reel must reach not to cut it. */
+export function voiceEnd(t: Pick<VoiceTranscript, "words" | "duration">, at: number): number {
+  const last = t.words.reduce((end, w) => Math.max(end, w.end), 0) || t.duration;
+  return round(at + Math.min(last, VOICE_MAX_SECONDS));
+}
+
 const scribeSchema = z.object({
   text: z.string().catch(""),
   language_code: z.string().nullable().optional(),

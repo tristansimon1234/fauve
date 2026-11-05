@@ -3,6 +3,7 @@ import { wordFont, wordFontsBrief } from "./font-pairs.ts";
 import { planLook, type ReelLook } from "./looks.ts";
 import { REEL_FPS } from "./motion.ts";
 import { readMusicShape, type MusicShape } from "./music-shape.ts";
+import { SUBTITLE_ROW, subtitleRowAmong } from "./retouch.ts";
 import type { ClipSegment, ClipSpeech, EditPlan, HandMomentKind, MotionDrawn, PlanSegment, SfxCue } from "./schemas.ts";
 import { BURST_MAX, soundSeconds } from "./sfx.ts";
 import { laterAudio } from "./sound-follow.ts";
@@ -354,6 +355,14 @@ export type MontageSkill = {
    * Its shots are her talk's pieces (never cast by the filler), its length hers (45 s at most), its music under her voice.
    */
   voice?: SkillVoice;
+  /**
+   * A voice laid over it (her voice note, Edith's voice, the words she gives it to say; never over a skill timed on her
+   * voice, laysVoice): played over its music, ducked under it, its subtitles drawn by the engine in its lettering (the
+   * Reel's fonts and case: its pairing, or her charter's when Edith picked it). `row`: where they run (share of the
+   * height, 0.1 to 0.72), its author's choice off its texts; without it, the usual row unless what its composition
+   * writes and draws of its own there, measured by the scene check on her Reel, leaves another clearer (skillSubtitleRow).
+   */
+  voiceOver?: { row?: number };
   /** The tempos it plays at (default: from 0,7 to 1,2 times its own, within 60 to 140). */
   tempo?: [number, number];
   /** What her words can change in it, as a template's variants (its grid, its pace, its order, its colour). */
@@ -631,6 +640,36 @@ export function skillFitAt(skill: Pick<MontageSkill, "shots" | "long" | "timelin
   return at.reduce((a, b) => (Math.abs(b.duration - seconds) < Math.abs(a.duration - seconds) - 0.01 ? b : a)).n;
 }
 
+/**
+ * The count and tempo of a skill for a voice laid over it (her voice note, Edith's voice): its Reel lasts at least to
+ * `needed` (s: a breath after the voice's last word, its ending card after it), never cutting the voice (a Reel shorter
+ * than its voice ends it mid-sentence). From `from`, the count and tempo it would play at (her files', or her length's):
+ * kept when it lasts that long; `follow` (her own note, a fixed length, with no length asked): from the length closest
+ * to the voice's (skillFit), the Reel ending with her voice. Too short: the fewest shots more that reach it at that tempo
+ * (up to its longest), else the fastest tempo within its range that does (slower is longer and calmer; never with a tempo
+ * set elsewhere, `fixed`: the sound she follows). Null when even that does not (the chain makes the Reel on her voice).
+ */
+export function skillVoiceFit(
+  skill: Pick<MontageSkill, "shots" | "long" | "timeline" | "bpm" | "tempo">,
+  needed: number,
+  from: { n: number; bpm: number },
+  options: { follow?: boolean; fixed?: boolean } = {},
+): { n: number; bpm: number } | null {
+  const reaches = (n: number, bpm: number) => skill.timeline(n, { end: false, ...(Math.abs(bpm - skill.bpm) > 0.005 ? { bpm } : {}) }).duration >= needed - 0.05;
+  const start = options.follow && !options.fixed ? skillFit(skill, needed) : from;
+  if (reaches(start.n, start.bpm)) return start;
+  const counts = Array.from({ length: Math.max(0, skillLongest(skill) - start.n + 1) }, (_, k) => start.n + k);
+  const more = counts.find((n) => reaches(n, start.bpm));
+  if (more !== undefined) return { n: more, bpm: start.bpm };
+  if (options.fixed) return null;
+  const [slow] = skillTempos(skill);
+  for (let bpm = Math.ceil(start.bpm) - 1; bpm >= slow; bpm--) {
+    const n = counts.find((c) => reaches(c, bpm));
+    if (n !== undefined) return { n, bpm };
+  }
+  return null;
+}
+
 /** @deprecated The count alone: skillFit, which may also move its tempo. */
 export const skillShotsFor = (skill: Pick<MontageSkill, "shots" | "long" | "timeline" | "bpm" | "tempo">, seconds: number) => skillFit(skill, seconds).n;
 
@@ -732,13 +771,17 @@ export const skillBrief = (name: string) => `Le modèle « ${name} » joué tel 
 
 /**
  * Her Reel on a skill, built by code: her files in its shots (on its beats), her words in its texts at their moments,
- * its composition over the whole Reel drawing everything (shots, texts, ending), its tempo for the music.
+ * its composition over the whole Reel drawing everything (shots, texts, ending), its tempo for the music. `voice`: a
+ * voice laid over it (her voice note, Edith's voice; laysVoice), from `at` on the Reel's clock: heard over its music,
+ * its words subtitled by the engine at the skill's row (MontageSkill.voiceOver; else set once its composition is checked).
  */
-export function skillPlan(input: { skill: MontageSkill; name: string; files: SkillFile[]; fill: SkillFill; bpm?: number; talk?: SkillTalk }): EditPlan {
+export function skillPlan(input: { skill: MontageSkill; name: string; files: SkillFile[]; fill: SkillFill; bpm?: number; talk?: SkillTalk; voice?: { media_id: string; at: number } }): EditPlan {
   const { skill, fill } = input;
   const voice = skill.voice;
   if (voice && (!input.talk || !fill.said)) throw new Error("Ce modèle se cale sur sa voix : il lui faut une vidéo où elle parle");
   if (!voice && !fill.shots.length) throw new Error("Aucun plan pour ce modèle");
+  // A voice laid over it: never over a skill timed on her filmed talk (her words are its Reel).
+  const laid = !voice && input.voice ? input.voice : undefined;
   const bpm = input.bpm && input.bpm !== skill.bpm && !voice ? input.bpm : undefined;
   const settings = skillSettings(skill, fill.settings);
   const chosen = Object.keys(settings).length ? settings : undefined;
@@ -784,9 +827,11 @@ export function skillPlan(input: { skill: MontageSkill; name: string; files: Ski
     texts,
     images: [],
     transitions: "cut",
-    // On her voice, what she says is subtitled (the engine's, unless its code writes them: SkillVoice.subtitles).
-    subtitles: Boolean(said),
+    // On her voice, what she says is subtitled (the engine's, unless its code writes them: SkillVoice.subtitles); a voice
+    // laid over it too, by the engine, over its composition.
+    subtitles: Boolean(said) || Boolean(laid),
     music: null,
+    ...(laid ? { voice: { media_id: laid.media_id, at: laid.at } } : {}),
     ...(fill.end ? { end_card: { title: fill.end.title, ...(fill.end.subtitle ? { subtitle: fill.end.subtitle } : {}) } } : {}),
     layers: [
       {
@@ -808,6 +853,8 @@ export function skillPlan(input: { skill: MontageSkill; name: string; files: Ski
           // On her voice: its code gets her words said, each at its frame (`spoken`), whether or not it writes them all.
           ...(voice ? { times_spoken: true, writes_spoken: voice.subtitles === "own" } : {}),
           ...(voice?.row ? { subtitle_y: Math.min(0.8, Math.max(0.1, voice.row)) } : {}),
+          // A voice laid over it: its subtitles on the row its author gave it (else the one its check finds: skillSubtitleRow).
+          ...(laid && skill.voiceOver?.row !== undefined ? { subtitle_y: voiceOverRow(skill.voiceOver.row) } : {}),
         },
       },
     ],
@@ -925,6 +972,37 @@ function saidTexts(said: SkillSaid, line: SkillTimeline, duration: number): Edit
 
 /** A Reel made on a skill (its correction is filled again on the same skill). */
 export const skillOf = (plan: Pick<EditPlan, "skill">) => plan.skill ?? null;
+
+/** A row for a voice's subtitles over a skill, inside the safe zone: never under 0.72, where Instagram's caption starts. */
+const voiceOverRow = (y: number) => Math.round(Math.min(0.72, Math.max(0.1, y)) * 1000) / 1000;
+
+/**
+ * Where the engine's subtitles of a voice laid over a skill run, for the whole Reel (share of the height): the row its
+ * author gave it (MontageSkill.voiceOver), else the usual row unless what its composition writes and draws of its own
+ * there over her Reel (`own`: its texts and marks row by row, her pictures left out, as the scene check measured them
+ * over its `seconds`) leaves another one clearer, the nearest (subtitleRowAmong: they move as little as they can). Two
+ * texts one over the other do not read: the skill's words keep their place, the subtitles take the free row.
+ */
+export function skillSubtitleRow(skill: Pick<MontageSkill, "voiceOver">, own: number[] | undefined, seconds: number): number {
+  if (skill.voiceOver?.row !== undefined) return voiceOverRow(skill.voiceOver.row);
+  if (!own?.length || !(seconds > 0)) return SUBTITLE_ROW.y;
+  return voiceOverRow(subtitleRowAmong(SUBTITLE_ROW.y, { faces: [], animations: [{ seconds, profile: own }], texts: [] }));
+}
+
+/**
+ * Her Reel without its voice (« Sans voix », set_voice off: removeVoice): the same plan, its voice left out; a Reel made
+ * on a skill loses the subtitles it had for it (never one timed on her filmed talk, whose words are its own) and its row.
+ */
+export function withoutVoice(plan: EditPlan): EditPlan {
+  const { voice: _voice, ...rest } = plan;
+  if (!plan.skill || !plan.voice) return rest;
+  const layers = rest.layers?.map((l) => {
+    if (!l.compose || l.motion.times_spoken || l.motion.subtitle_y === undefined) return l;
+    const { subtitle_y: _row, ...motion } = l.motion;
+    return { ...l, motion };
+  });
+  return { ...rest, subtitles: false, ...(layers ? { layers } : {}) };
+}
 
 /** The most sounds a skill gives one Reel (the plan keeps 40). */
 const SKILL_SOUNDS = 40;
@@ -1390,7 +1468,8 @@ export type SkillFillAnswer = z.infer<typeof skillFillSchema>;
 
 export const SKILL_FILL_PROMPT = `You fill one of Edith's montage models for a local business: a whole Reel coded once, like an Edits or CapCut template. Its shots are slots timed on its music, its texts have their place, its look, its signature moment and its ending are in its code. You only choose which of her files plays in each slot and from where, and write its words: the code plays everything else exactly as the model does.
 
-First decide "fits": true when the model, filled with her files and her words, gives her what she asked for. Her request may simply ask for this model, give her words, a mood, her files: that fits (the music and the caption are made elsewhere, never a reason for false). A length she asks for inside the model's lengths (« longueurs ») fits: the code has already set the number of slots and its tempo for it. When she asks for something the model does not do and that matters to her (a voice-over, subtitles of what she says, an animation of its own, another layout, a text the model has no slot for, a shot at a precise moment, another ending, a length outside its lengths), "fits" is false and "missing" says what in a few words: the editor then makes her Reel from this model. When in doubt about something she clearly wants, false.
+First decide "fits": true when the model, filled with her files and her words, gives her what she asked for. Her request may simply ask for this model, give her words, a mood, her files: that fits (the music and the caption are made elsewhere, never a reason for false). A length she asks for inside the model's lengths (« longueurs ») fits: the code has already set the number of slots and its tempo for it. When she asks for something the model does not do and that matters to her (an animation of its own, another layout, a text the model has no slot for, a shot at a precise moment, another ending, a length outside its lengths, and, without « voix_off », a voice-over or subtitles of what she says), "fits" is false and "missing" says what in a few words: the editor then makes her Reel from this model. When in doubt about something she clearly wants, false.
+With « voix_off », a voice is laid over this Reel (her own voice note, or the voice Edith wrote for it from her request): the engine plays it over the model's music and writes its subtitles, so a voice-over, its words and its subtitles fit.
 With « recopie », she sent a Reel to copy and this model does its form: what her request describes of that Reel (its opening, its texts, its rhythm, its ending) the model does its own way, never a reason for false; only what she asks beyond that Reel is.
 
 Then cast her files on its slots (« cases », in order: each with its length and what it wants), as a good editor would:
@@ -1407,7 +1486,8 @@ Then write its texts, in French (what her customers read), each in its slot (« 
 - otherwise words a good creator would write for this business: concrete, specific to it, never an ad slogan, a promise or a formula; nothing invented (no price, hour, place, offer or review that is not given);
 - each within its most characters (count them), in normal case: the code sets the capitals when the model has them; a name longer than its place is never cut, write the word that sets it apart instead (« Farine » for « Maison Farine »: never « Maison »);
 - an optional slot (obligatoire false) is left empty unless her request or the Reel needs those words; a required one is always written;
-- a slot the engine writes itself (« ecrit_par_le_moteur », her place's coordinates) is never written by you: leave its text empty, and never repeat those words elsewhere.
+- a slot the engine writes itself (« ecrit_par_le_moteur », her place's coordinates) is never written by you: leave its text empty, and never repeat those words elsewhere;
+- with « voix_off », its words go with the voice, never a second message: they show while it speaks (« phrases »: what it says and when; « moment »: when each text shows). A text that opens the Reel (its hook) says what the voice opens on, in its strongest words, never another hook; each other text names what the voice says around its moment, or what it leaves out (a name, a place, a date); never one of its sentences written out whole, nothing it contradicts. The words of the voice (« voix_off.texte », « Texte de la voix » in « contrat ») are heard, never written in a slot as they are.
 "font": only for a slot (or a word of her voice) that asks for one (« police »): the family of « polices » whose « évoque » fits the word or what it names (« croissant » → a bakery's, « soin » → a beauty one, « fort » → a strong condensed one), a different family for each word of one list; empty when none fits (her own fonts then), never a family outside « polices ».
 
 A model timed on her voice (« voix »): her talking video is the Reel, cut by the engine (her « euh » and long pauses out), so there are no slots to cast (« cases » empty: "shots" empty) and its words are her own, chosen in what she says (« ce_qu_elle_dit »: her words numbered, phrase by phrase). Her voice and the subtitles of what she says are this model's (they fit), its length is hers (« longueurs »). Answer "voice":
@@ -1457,10 +1537,17 @@ export function skillFillInput(input: {
    * that Reel, which the model does its own way.
    */
   copied?: boolean;
+  /**
+   * A voice laid over it (her voice note, or Edith's voice written before the fill): what it says, phrase by phrase on
+   * the Reel's clock. Its words on screen go with it, each text told its moment (never a second hook).
+   */
+  voiceOver?: { text: string; phrases: { start: number; end: number; text: string }[] };
 }) {
   const voice = input.skill.voice;
   // On her voice, no slot to cast: her talk is its shots.
   const line = voice ? null : input.skill.timeline(input.n, { end: input.skill.end, ...(input.bpm ? { bpm: input.bpm } : {}) });
+  // A voice laid over it (never on a skill timed on her filmed talk): its words and when each of its texts shows.
+  const laid = !voice && input.voiceOver?.text.trim() ? input.voiceOver : undefined;
   const besides = line ? besideOf(line) : [];
   const fonts = input.skill.texts.some((t) => t.font) || Boolean(voice?.fonts?.length);
   return {
@@ -1474,6 +1561,14 @@ export function skillFillInput(input: {
     demande: input.request,
     ...(input.contract?.length ? { contrat: input.contract } : {}),
     ...(input.copied ? { recopie: COPIED_REEL } : {}),
+    ...(laid
+      ? {
+          voix_off: {
+            texte: laid.text.trim().slice(0, 1500),
+            phrases: laid.phrases.slice(0, 30).map((p) => ({ de: round(p.start), a: round(p.end), dit: p.text.slice(0, 240) })),
+          },
+        }
+      : {}),
     modele: {
       nom: input.name,
       deroule: input.skill.how,
@@ -1507,10 +1602,13 @@ export function skillFillInput(input: {
       : {}),
     textes: input.skill.texts.map((t) => {
       const fact = t.fact ? skillFact(t, input.facts) : undefined;
+      // Under a voice laid over it, when it shows (what the voice says then is in voix_off.phrases).
+      const at = laid ? line?.texts[t.slot] : undefined;
+      const moment = at && at.to > at.from ? { moment: { de: round(at.from), a: round(at.to) } } : {};
       // A fact the engine writes (her coordinates) is shown as written, never to be written again.
       return fact
-        ? { slot: t.slot, ecrit_par_le_moteur: fact, obligatoire: false }
-        : { slot: t.slot, dit: t.want, max_caracteres: t.max, obligatoire: t.required || Boolean(input.wordsWanted), ...(t.font ? { police: "oui" } : {}) };
+        ? { slot: t.slot, ecrit_par_le_moteur: fact, obligatoire: false, ...moment }
+        : { slot: t.slot, dit: t.want, max_caracteres: t.max, obligatoire: t.required || Boolean(input.wordsWanted), ...(t.font ? { police: "oui" } : {}), ...moment };
     }),
     ...(fonts ? { polices: wordFontsBrief() } : {}),
     ...(input.skill.settings?.length

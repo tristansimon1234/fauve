@@ -687,6 +687,8 @@ export type SceneChecks = {
   errors: Record<string, string | null>;
   faces: Record<string, string>;
   cover: Record<string, number[]>;
+  /** The same rows without her pictures: what it writes and draws of its own (a model's composition: where a voice laid over it sets its subtitles). */
+  own?: Record<string, number[]>;
   /** For a scene whose code reads what is said: the share of the words said it was seen writing at their moment. */
   spoken?: Record<string, number>;
 };
@@ -713,11 +715,18 @@ export async function smokeTestScenes(
           results?: Record<string, string | null>;
           faces?: Record<string, string>;
           cover?: Record<string, number[]>;
+          own?: Record<string, number[]>;
           spoken?: Record<string, number>;
         } & Record<string, unknown>;
         // A workshop still on the previous checker prints the errors alone.
         if (parsed.results && typeof parsed.results === "object")
-          return { errors: parsed.results, faces: parsed.faces ?? {}, cover: parsed.cover ?? {}, ...(parsed.spoken ? { spoken: parsed.spoken } : {}) };
+          return {
+            errors: parsed.results,
+            faces: parsed.faces ?? {},
+            cover: parsed.cover ?? {},
+            ...(parsed.own && typeof parsed.own === "object" ? { own: parsed.own } : {}),
+            ...(parsed.spoken ? { spoken: parsed.spoken } : {}),
+          };
         return { errors: parsed as Record<string, string | null>, faces: {}, cover: {} };
       } catch {
         const output = (await result.output("both").catch(() => "")).slice(-400);
@@ -1054,7 +1063,8 @@ export async function muxAudioInSandbox(
   } = {},
 ): Promise<Buffer> {
   const sounds = options.sounds ?? [];
-  if (!audio && !sounds.length) return mp4;
+  // A voice over a Reel without music (a model that plays without any) is still brought to the level of a voice.
+  if (!audio && !sounds.length && !options.voiceOver) return mp4;
   const sandbox = await jobSandbox();
   const dir = `${ROOT}/jobs/${id}-mux`;
   try {
@@ -1077,9 +1087,11 @@ export async function muxAudioInSandbox(
     const placed: SoundInMix[] = sounds.map((s) => ({ at: s.at, gain: s.gain, onset: s.onset, end: s.end, ...(s.burst ? { burst: s.burst } : {}) }));
     const inputs = files.flatMap((f) => ["-i", f]);
     if (!audio) {
-      // No music of hers: the effects over the video's own sound (or silence), the picture copied.
-      const filter = soundsOnlyFilter((printed(measured, "audio") ?? 0) > 0, duration ?? 60, placed);
-      console.info("mix", id, measured.trim(), { sounds: placed.length });
+      // No music of hers: the effects over the video's own sound (or silence), the picture copied; a voice laid over it
+      // (her voice note is levelled nowhere else) at the level of a voice.
+      const voiced = options.voiceOver ? (speechGain(printed(measured, "speech")) ?? 0) : 0;
+      const filter = soundsOnlyFilter((printed(measured, "audio") ?? 0) > 0, duration ?? 60, placed, voiced);
+      console.info("mix", id, measured.trim(), { sounds: placed.length, ...(voiced ? { speechGain: voiced } : {}) });
       await bash(
         sandbox,
         `cd "$1" && ${ROOT}/ffmpeg -loglevel error -y -i in.mp4 ${inputs.map((_, i) => `"\${${i + 3}}"`).join(" ")} -filter_complex "$2" -map 0:v:0 -map "[a]" -c:v copy -c:a aac -b:a 192k -shortest -movflags +faststart out.mp4`,
