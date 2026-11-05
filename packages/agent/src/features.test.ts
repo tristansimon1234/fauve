@@ -3494,15 +3494,18 @@ test("« Titre derrière le décor » (v2): its scenery named by the filler pass
   const withHer = (y: number) => drawnNodes(frameBox(draw(30, { ...read, boxes: { ...read.boxes, "0": { x: 400, y, w: 200, h: 500 } } }))).some((n) => n.type === "Subject" && n.props.shot === 0 && !n.props.object && !n.props.fill);
   assert.equal(withHer(240), true);
   assert.equal(withHer(60), false);
-  // From the music's return: its pieces in paper white one at a time, left to right, three images each.
+  // From the music's return: its pieces in paper white one at a time, left to right, three images each: the picture
+  // kit's Subject part, the k-th of SubjectParts (here out of order), cut to its own outline when the card read it
+  // apart, else to its box (slices of it when the scenery is in one piece).
   const lit = (f: number) => {
-    const clip = drawnNodes(frameBox(draw(f))).find((n) => n.type === "div" && /inset/.test(String(styleOf(n).clipPath)) && drawnNodes(n).some((m) => m.type === "Subject" && m.props.fill === "#EFEDE9"));
-    return clip ? Number(/inset\(\d+px \d+px \d+px (\d+)px\)/.exec(String(styleOf(clip).clipPath))![1]) : null;
+    const piece = drawnNodes(frameBox(draw(f))).find((n) => n.type === "Subject" && n.props.fill === "#EFEDE9" && typeof n.props.part === "number");
+    if (!piece) return null;
+    assert.deepEqual([piece.props.shot, piece.props.object, piece.props.slices], [0, "rooftops", 5]);
+    return read.parts["0#rooftops"][piece.props.part as number]!.x;
   };
   const chase = line.marks.chase!;
   assert.equal(lit(chase - 1), null);
-  const pad = Math.round(810 * 0.012);
-  assert.deepEqual([0, 3, 6, 9, 12].map((d) => lit(chase + d)), [100, 300, 500, 700, 900].map((x) => x - pad));
+  assert.deepEqual([0, 3, 6, 9, 12].map((d) => lit(chase + d)), [100, 300, 500, 700, 900]);
   assert.equal(lit(chase + 15), null);
   // Then the white wave: one letter at a time, never two, left to right, 2 or 3 images each.
   const wave = line.marks.wave!;
