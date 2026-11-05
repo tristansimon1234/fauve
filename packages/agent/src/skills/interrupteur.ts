@@ -231,24 +231,31 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
     : null;
 
   // 5. Her shot as filmed, the light never changing; she passes in front of what is drawn on her wall (her cut-out over
-  // it, only from just before the flip: the switch is out of her reach until then). Once she has left (nobody seen for
-  // six images after the flip), her wall is held on that image to the end, as the original ends on its wall alone:
+  // it, only from just before the flip: the switch is out of her reach until then). Once she has left (gone from her
+  // cut-out, else from her track, eight images in a row after the flip), her wall is held on that image to the end, as the original ends on its wall alone:
   // nothing of hers comes back into the picture (Tristan, on its first bench: « une main qui traîne à la fin »).
   const GONE = (() => {
     if (!n) return null;
+    const cut = (f) => (typeof SubjectBox === "function" ? SubjectBox(shots[0], f, box) : null);
+    const tracked = (f) => {
+      if (typeof track !== "function") return null;
+      const seen = track(f, { shot: 0, ...box }) || {};
+      if (!seen.bodies && !seen.hands && !seen.faces) return null;
+      return Boolean((seen.bodies || []).length || (seen.hands || []).length || (seen.faces || []).length);
+    };
+    // What says she is there: her cut-out when it was made (it holds her at the flip), else her track when it saw her
+    // at the flip (a pose read loses her when she turns her back: v3 froze a Reel where she never left).
+    const byCut = Boolean(cut(ON));
+    if (!byCut && tracked(ON) !== true) return null;
     const seenAt = (f) => {
-      if (typeof track === "function") {
-        const seen = track(f, { shot: 0, ...box }) || {};
-        if ((seen.bodies || []).length || (seen.hands || []).length || (seen.faces || []).length) return true;
-        if (seen.bodies || seen.hands || seen.faces) return false;
-      }
-      const b = typeof SubjectBox === "function" ? SubjectBox(shots[0], f, box) : null;
+      if (!byCut) return tracked(f) !== false;
+      const b = cut(f);
       return Boolean(b && b.w * b.h > box.width * box.height * 0.01);
     };
     let run = 0;
     for (let f = ON + 6; f < until; f++) {
       if (seenAt(f)) run = 0;
-      else if (++run >= 6) return f - 5;
+      else if (++run >= 8) return f - 7;
     }
     return null;
   })();
@@ -267,7 +274,9 @@ export const interrupteur: MontageSkill = {
   key: "interrupteur",
   // 2: written again on its original's fiche (its music stopped and back, its beep, its flip in one image, its poster, her in front, its format).
   // 3: once she has left, her wall held on that image to the end (a hand had come back into the picture at its bench).
-  version: 3,
+  // 4: she is gone when her cut-out is (else her track, when it saw her at the flip), eight images in a row: v3 read her
+  // track alone and froze a Reel where she never left.
+  version: 4,
   bpm: BPM,
   shots: [1, 1],
   files: [1, 2],

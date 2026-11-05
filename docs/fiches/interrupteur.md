@@ -122,3 +122,5 @@ Le téléphone posé ou sur pied, en vertical, l'exposition bloquée (un appui l
 Et aussi son logo (un PNG détouré), ce qu'elle annonce en une ligne, et une date ou un détail.
 
 **Version 3** (5 novembre, après son premier banc, une femme qui colle des photos sur un mur blanc ; Tristan : « une main qui traîne à la fin sur l'interrupteur ») : dès qu'elle est sortie (personne vu pendant six images après la bascule, lu sur son suivi, sinon sur son détourage), son mur est tenu sur cette image jusqu'à la fin, comme l'original finit sur son mur seul : rien d'elle ne revient dans l'image.
+
+**Version 4** (5 novembre ; Tristan sur la v3, au banc d'une friperie : « ça a figé toute l'image ») : la v3 lisait sa présence sur le suivi de son corps, qui la perd quand elle est de dos ou à moitié sortie, et avait figé un Reel où elle ne partait pas. Elle est maintenant partie quand son détourage ne la tient plus (sinon son suivi, s'il la voyait à la bascule), huit images de suite ; rien ne dit qu'elle était là : jamais figé.
