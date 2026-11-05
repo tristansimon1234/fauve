@@ -1405,6 +1405,55 @@ export const HOUSE_MODELS: HouseModel[] = [
       why: "Son lieu ordinaire vu comme par une machine : le stroboscope de regards intrigue, chaque passe montre autre chose, et la personne immobile au milieu tient l'œil.",
     },
   }),
+  model({
+    key: "bientot",
+    name: "Teaser qui se charge",
+    // Written on its original's fiche (v1 of its skill, docs/fiches/bientot.md): Tristan's teaser of a sewing atelier, 64
+    // flashes of a tenth of a second in black and white, a small serif counter that climbs to 88 % on its own clock, her
+    // word in its place, her logo then her name on the black; no steady beat in its music (79 BPM, its cuts' grid).
+    pitch: "Tes gestes en éclairs de noir et blanc pendant qu'un petit compteur charge jusqu'à 88 %, puis ce qui arrive, ton logo et ton nom sur le noir.",
+    needs: "une dizaine de vidéos de tes gestes de près (tes mains au travail, tes outils, tes matières), trois ou quatre de ton lieu ou de ce qui arrive, ton logo, et ce qui arrive en deux à quatre mots",
+    files: [6, 20],
+    pair: "editorial",
+    // Its skill's code is its reference (no composition of the lot 5 for it).
+    example: null,
+    // Its music has no steady beat: the grid of its cuts (docs/fiches/bientot.md: its 64 cuts within an image at 79).
+    tempo: 79,
+    finish: { name: "Noir et blanc dense", hint: "noir et blanc contrasté, noirs bouchés, blancs tenus, sans grain ni coins sombres", saturation: -1, contrast: 0.22, exposure: -0.03 },
+    look: {
+      name: "teaser qui se charge",
+      format: "message",
+      hook: { kind: "mystère", what: "un petit compteur blanc qui charge au centre (1 %, 3 %, 6 %…) sur des éclairs de gestes en noir et blanc : on attend ce qui arrive" },
+      text: {
+        amount: "une ligne",
+        composition: "un petit compteur en serif blanc au centre exact, qui monte de 3 % toutes les 3 images jusqu'à 88 %, puis le mot de ce qui arrive à sa place, dans la même lettre ; à la fin, son nom en petites capitales espacées sur le noir",
+        case: "normal",
+        weight: "regular",
+      },
+      effect: "bw",
+      layout: "des éclairs de 0,1 s en noir et blanc comme filmés (plein cadre, une horizontale entière dans une bande sur du noir), un petit compteur au centre, puis le noir",
+      moments: [
+        { at: 0, what: "des éclairs de 2 ou 3 images (64 en 6 s) de gestes, de mains et de matières de près, en noir et blanc ; au centre exact, un petit compteur blanc en serif à 1 %" },
+        { at: 0.1, what: "le compteur monte de 3 % toutes les 3 images, sur sa propre horloge et pas sur les coupes, jusqu'à 88 %, jamais 100 %" },
+        { at: 3.07, what: "le mot de ce qui arrive à la place du compteur, même lettre, même place ; les éclairs plus rapides" },
+        { at: 4.33, what: "sept éclairs du début reviennent d'affilée, presque à reculons, sur un coup sourd ; puis le lieu et ce qui arrive (des étagères, des produits en rangées)" },
+        { at: 5.9, what: "le noir, le logo en blanc, grand et centré ; un roulement de clics monte" },
+        { at: 6.29, what: "un boum grave qui descend, les clics s'arrêtent ; le nom en petites capitales fines espacées au centre" },
+      ],
+      sounds: [
+        { at: 0.68, what: "deep 808 bass hit" },
+        { at: 4.32, what: "deep 808 bass hit, as earlier flashes come back" },
+        { at: 5.92, what: "a roll of short mechanical ticks, 25 a second, rising to the boom" },
+        { at: 6.29, what: "deep 808 boom falling in pitch, the clicks stop" },
+      ],
+      camera: "à la main",
+      transitions: "coupes nettes",
+      motion: "epure",
+      music: "dark minimal teaser beat, fast mechanical ticks, a low hum, deep 808 hits",
+      ending: "le noir, son logo en blanc, puis son nom en petites capitales fines espacées au centre, un boum grave qui sonne jusqu'au bout",
+      why: "Le compteur qui charge sans finir promet quelque chose sans le dire ; les éclairs de gestes à toute vitesse montrent le travail qui le prépare, et le noir, le logo et le boum font la révélation.",
+    },
+  }),
 ];
 
 const BY_KEY = new Map(HOUSE_MODELS.map((m) => [m.key, m]));
@@ -1476,6 +1525,7 @@ export const HOUSE_WHEN: Record<string, { pour: string; pas_pour: string }> = {
   createur: { pour: "quelqu'un qui explique en parlant face caméra et montre ce dont il parle (ses produits, ses réalisations, son lieu, son site)", pas_pour: "des images sans parole, quelqu'un qui parle sans rien à montrer" },
   silhouette: { pour: "se présenter (elle ou quelqu'un de son équipe), présenter son métier et ce qu'elle fait, un lancement, un ton de studio graphique", pas_pour: "des produits seuls, un lieu sans personne, une offre à lire" },
   vision: { pour: "son lieu fréquenté filmé de haut, quelqu'un d'immobile au milieu et des gens qui passent autour ; un ton tech ou graphique", pas_pour: "un lieu vide, un plan qui bouge, des produits en gros plan, un message à lire" },
+  bientot: { pour: "annoncer ce qui arrive (une ouverture, une nouvelle collection, une nouvelle carte, un événement) avec ses gestes de métier, un teaser élégant", pas_pour: "un message à lire en détail, quelqu'un qui parle, un lieu calme montré lentement, trop peu de vidéos" },
 };
 
 /** The models for Edith: their key, name, what they do, what they want, and what only she can film for one. */

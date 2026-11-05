@@ -42,4 +42,11 @@ export const HOUSE_MEASURES: Record<string, ReelMeasures> = {
   "silhouette": { duration: 11.15, cuts: [0.47, 1.07, 3.9, 5.37, 9.57], bpm: null, lufs: -14.1 },
   "vision": { duration: 8.55, cuts: [0.2, 0.7, 1.2, 1.5, 1.77, 2.1, 2.63, 3, 3.27, 3.63, 4.67, 5.13, 5.37, 5.67, 5.93, 6.53, 6.87, 7.13, 8.03], bpm: null, lufs: -14.1 },
   "detourages": { duration: 16.47, cuts: [6.23, 6.6, 6.83, 7.2, 7.53, 7.97, 8.27, 8.6, 8.93, 9.67, 10, 10.27, 10.93, 11.37, 11.73, 12.17, 12.67, 13.13, 13.47, 13.77, 14.4, 14.83], bpm: 140, lufs: -14.2 },
+  // Its 64 flashes, its logo on the black and its name, by the image each starts on (docs/fiches/bientot.md); no steady beat.
+  "bientot": {
+    duration: 6.63,
+    cuts: [3, 5, 8, 11, 14, 17, 20, 23, 26, 29, 31, 34, 37, 40, 43, 46, 49, 52, 54, 57, 60, 63, 66, 69, 72, 75, 78, 80, 83, 86, 89, 91, 93, 96, 99, 101, 104, 106, 109, 112, 114, 116, 119, 121, 124, 127, 130, 132, 134, 136, 139, 142, 145, 147, 150, 153, 156, 159, 162, 165, 168, 171, 174, 177, 195].map((f) => Math.round((f / 30) * 100) / 100),
+    bpm: null,
+    lufs: -14.2,
+  },
 };
