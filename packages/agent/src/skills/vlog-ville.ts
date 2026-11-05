@@ -247,7 +247,7 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   // apps' buttons), her first two word by word; a voice laid over it is written there instead, where it speaks.
   const display = "'" + brand.displayFont + "', 'Inter Tight', sans-serif";
   const body = "'" + brand.bodyFont + "', 'Inter Tight', sans-serif";
-  const keep = (s) => String(s || "").replace(/(\d) (?=\d)/g, "$1 ").replace(/ ([:;!?»])/g, " $1");
+  const keep = (s) => String(s || "").replace(/(\d) (?=\d)/g, "$1\u00a0").replace(/ ([:;!?»])/g, "\u00a0$1");
   const hook = reelTexts.find((t) => t.role === "hook");
   const caps = reelTexts.filter((t) => t.role === "caption");
   const bands = reelTexts.filter((t) => t.role === "band");

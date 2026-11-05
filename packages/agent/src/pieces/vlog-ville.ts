@@ -82,7 +82,7 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   // second one's last word (her place's name) held over the burst.
   const body = "'" + brand.bodyFont + "', 'Inter Tight', sans-serif";
   const display = "'" + brand.displayFont + "', 'Inter Tight', sans-serif";
-  const keep = (s) => String(s || "").replace(/(\d) (?=\d)/g, "$1 ");
+  const keep = (s) => String(s || "").replace(/(\d) (?=\d)/g, "$1\u00a0");
   const oneByOne = (text, a, b, hold) => {
     const words = String(text).split(/\s+/).filter(Boolean);
     if (!words.length || frame < a || frame >= b) return null;
@@ -119,7 +119,8 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
         line ? h(FitText, { key: "g-" + line, style: { position: "absolute", left: 140, top: CY + Math.round(NH / 2) + 16, width: 800, height: 40 }, innerStyle: { fontFamily: body, fontWeight: 700, fontSize: 28, lineHeight: 1, whiteSpace: "nowrap", color: RED } }, h("span", { "data-fauve-accent": "" }, keep(line))) : null)
     : null;
 
-  return h(AbsoluteFill, null, picture, title, subtitle);
+  // Over the montage, which plays her shots under it (nothing of its own before her first word).
+  return h(AbsoluteFill, { style: { pointerEvents: "none" } }, picture, title, subtitle);
 }`;
 
 export const vlogVille: EffectPiece = {
