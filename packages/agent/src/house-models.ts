@@ -1447,8 +1447,6 @@ export const HOUSE_MODELS: HouseModel[] = [
       music: "playful pizzicato and finger-snap groove with a cheeky staccato bass, 96 BPM",
       ending: "toute sa série réunie, le dernier mot seul au milieu jusqu'à la fin",
       why: "Le même mot répété sur chaque produit fait sourire et donne le rythme : chacun a son temps de gloire, et l'hésitation de la fin fait attendre le dernier, toute la série.",
-      to_film: "chacun de tes produits posé au même endroit, filmé du même angle, l'un après l'autre, puis tous ensemble à la fin",
-      to_film_else: "sinon, des photos ou de courtes vidéos de chacun de tes produits, même prises à des endroits différents",
     },
   }),
 ];
