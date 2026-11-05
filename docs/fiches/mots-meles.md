@@ -135,3 +135,5 @@ Le skill (`skills/mots-meles.ts`, version 1, un brouillon hors de la bibliothèq
 
 ## Ce qu'il faut filmer
 Une seule vidéo calme, le téléphone posé (un pied, une étagère, une table), 20 s ou plus sans le toucher, à l'horizontale de préférence. Quelqu'un qui fait une chose simple dans son lieu : manger, boire un café, lire, des mains au travail, une posture tenue. De la place autour. Une lumière douce plutôt qu'un plein soleil. Et sa phrase : ce que montre la vidéo, en 4 à 6 mots de 3 à 9 lettres, plus 2 à 4 mots de son monde à cacher.
+
+**Version 3** (5 novembre, après son premier banc au café Párisi Udvar ; Tristan : « un peu plus grosse et parfois on voit pas ») : en 16:9, ses lettres 1,4 fois plus grandes que l'original (4 % de la hauteur, 24 px) et un peu plus grasses ; sous ses lettres un halo sombre doux, et sous chaque boucle le même trait plus sombre et plus large, pour qu'elles se lisent aussi sur une partie claire du plan (une verrière). Sans filtre, donc aussi léger à rendre.

@@ -67,7 +67,9 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const py = bh / (ROWS - 1 + 2 * M);
   const cx = (c) => (M + c) * px;
   const cy = (r) => by + (M + r) * py;
-  const SIZE = wide ? Math.max(14, Math.round(bh * 0.0275)) : 48;
+  // A little bigger than the original's on the 16:9 frame (Tristan, on its first bench: « un peu plus grosse »): 4 % of
+  // its height, 24 px; 48 px on the vertical one.
+  const SIZE = wide ? Math.max(20, Math.round(bh * 0.04)) : 48;
   // Where her words may lie: on the 16:9 frame anywhere but under the apps' buttons (its two last columns on its five
   // bottom rows); on the vertical one, each letter whole inside the safe zone, left of the buttons below the middle.
   const readable = (c, r) => {
@@ -262,8 +264,9 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const frameBox = h("div", { key: "frame", style: { position: "absolute", left: 0, top: by, width: bw, height: bh, overflow: "hidden", backgroundColor: "#141414" } },
     film, veil > 0 ? h("div", { style: { position: "absolute", left: 0, top: 0, width: bw, height: bh, backgroundColor: "#000000", opacity: Number(veil.toFixed(3)) } }) : null);
 
-  // The letters, each centred in its cell, the same white from the first image to the last (ringed or not).
-  const LETTER = { fontFamily: body, fontWeight: wide ? 400 : 300, fontSize: SIZE, lineHeight: 1, color: "#ffffff" };
+  // The letters, each centred in its cell, the same white from the first image to the last (ringed or not), with a soft
+  // dark halo so they read on a bright part of her shot too (« parfois on voit pas » under a glass roof, its first bench).
+  const LETTER = { fontFamily: body, fontWeight: wide ? 500 : 400, fontSize: SIZE, lineHeight: 1, color: "#ffffff", textShadow: "0 0 6px rgba(0,0,0,0.55), 0 1px 2px rgba(0,0,0,0.45)" };
   const cell = (key, c, r, ch) => h("div", { key, style: { position: "absolute", left: Math.round(cx(c) - px / 2), top: Math.round(cy(r) - py / 2), width: Math.ceil(px), height: Math.ceil(py), display: "flex", alignItems: "center", justifyContent: "center", ...LETTER } }, ch);
   const unseen = (key, ch) => h("span", { key, style: { position: "absolute", left: 0, top: 0, opacity: 0, fontSize: 1 } }, ch);
   const spell = (word, key) => {
@@ -299,13 +302,17 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
           : null)
     : null;
 
-  return h(AbsoluteFill, { style: { backgroundColor: "#000000" } }, frameBox, decor, words, rings, extra, ending);
+  // Under each loop, the same stroke darker and wider: a soft halo like its letters', without a filter (light to render).
+  const halos = loops.map((l, i) => (frame < l.at ? null : h(Scribble, { key: "halo" + i, ...l.shape, at: l.at, speed: l.speed, start: "top-left", direction: "ccw", color: "rgba(0,0,0,0.32)", width: Math.round(WIDTH * 3.2 * 10) / 10, wobble: 0.45, seed: l.seed })));
+  return h(AbsoluteFill, { style: { backgroundColor: "#000000" } }, frameBox, decor, words, halos, rings, extra, ending);
 }`;
 
 export const motsMeles: MontageSkill = {
   key: "mots-meles",
   // 2: written again on its original's fiche (its grid, its hand's pace, its sentence held, its light, its format).
-  version: 2,
+  // 3: its letters 1,4 times bigger on the 16:9 frame and a soft dark halo under its letters and loops, to read on a
+  // bright shot (Tristan, on its first bench: « un peu plus grosse et parfois on voit pas »).
+  version: 3,
   bpm: BPM,
   // A calm music without marked drums: its length follows it (21,4 s at 70 BPM, 16,7 s at 90), its loops the hand.
   tempo: [70, 90],

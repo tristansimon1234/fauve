@@ -7403,7 +7403,7 @@ function gridLetters(tree: unknown) {
 test("« Mots mêlés » (v2): one calm shot of 25 beats at 80 BPM as its 18,67 s original, no cut, its sentence held, its card after the hold", async () => {
   const { motsMeles } = await import("./skills/mots-meles.ts");
   const { skillPlan } = await import("./skills.ts");
-  assert.equal(motsMeles.version, 2);
+  assert.equal(motsMeles.version, 3);
   assert.equal(motsMeles.bpm, 80);
   const line = motsMeles.timeline(1, { end: false });
   // One shot, no cut (the original has none, measured image by image): 25 of its beats, the original's 560 images and three.
@@ -7425,7 +7425,7 @@ test("« Mots mêlés » (v2): one calm shot of 25 beats at 80 BPM as its 18,67 
   assert.equal(plan.sounds, undefined);
   assert.equal(plan.music_shape, undefined);
   assert.deepEqual(motsMeles.settings?.map((s) => [s.name, s.choices.map((c) => c.value)]), [["format", ["auto", "horizontal", "vertical"]]]);
-  assert.deepEqual(plan.skill, { key: "mots-meles", version: 2 });
+  assert.deepEqual(plan.skill, { key: "mots-meles", version: 3 });
 });
 
 test("« Mots mêlés » (v2): its loops at the original's hand, chained 3 to 6 images apart, from just above each first letter, the letters never changing", async () => {
@@ -7435,7 +7435,8 @@ test("« Mots mêlés » (v2): its loops at the original's hand, chained 3 to 6 
   const { draw, Scribble, frames } = await kitScene(motsMeles.code);
   const props = { width: 1080, height: 1920, durationInFrames: 563, brand: { name: "Le Studio", displayFont: "Inter Tight", bodyFont: "Inter Tight" }, shots: rallumeShots(line), reelTexts: MM_WORDS, end: null, texts: marks };
   type Loop = { at: number; speed: number; kind: string; angle?: number; start: string; direction: string; width: number; color: string; box?: { x: number; y: number; w: number; h: number }; rows?: { x: number; y: number; w: number; h: number }[] };
-  const loops = (f: number, p: Record<string, unknown> = props) => drawnNodes(draw(f, p)).filter((n) => n.type === Scribble).map((n) => n.props as Loop);
+  // Its white loops (under each one, the same stroke darker and wider: its halo, v3).
+  const loops = (f: number, p: Record<string, unknown> = props) => drawnNodes(draw(f, p)).filter((n) => n.type === Scribble && (n.props as { color?: string }).color === "#ffffff").map((n) => n.props as Loop);
   const all = loops(562);
   // Six loops, one a word, « AFTERNOON » in one stroke round two rows, « GREEK » up a diagonal (41,7° in the original).
   assert.equal(all.length, 6);
@@ -7471,7 +7472,7 @@ test("« Mots mêlés » (v2): its loops at the original's hand, chained 3 to 6 
   // The letters never change: the same letters, the same white, before and after their loop.
   const letters = (f: number) => gridLetters(draw(f, props)).map((l) => `${l.left},${l.top}:${l.ch}`).sort().join("|");
   assert.equal(letters(10), letters(500));
-  assert.ok(gridLetters(draw(500, props)).every((l) => l.size === 17));
+  assert.ok(gridLetters(draw(500, props)).every((l) => l.size === 24));
 });
 
 test("« Mots mêlés » (v2): 16 × 10 on her horizontal video in a 16:9 band as the original, 9 × 16 full frame otherwise; her words in order, her other words hidden", async () => {
@@ -7495,7 +7496,7 @@ test("« Mots mêlés » (v2): 16 × 10 on her horizontal video in a 16:9 band a
   const first = [...cells.values()].sort((a, b) => a.top - b.top || a.left - b.left)[0]!;
   assert.ok(Math.abs(first.left + first.width / 2 - 0.73 * step) < 1.5 && Math.abs(first.top + first.height / 2 - (656 + 0.73 * row)) < 1.5, JSON.stringify(first));
   // There all its letters are decor, at the original's size (2 % of its height); upright, her words are read at 48 px.
-  assert.ok(gridLetters(wide).every((l) => l.decor && l.size === 17));
+  assert.ok(gridLetters(wide).every((l) => l.decor && l.size === 24));
   const tall = draw(300, props(9 / 16));
   assert.deepEqual(band(tall), { top: 0, height: 1920 });
   const upright = gridLetters(tall);
