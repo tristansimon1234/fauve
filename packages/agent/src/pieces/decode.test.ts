@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { editPlanSchema } from "../schemas.ts";
-import { pieceTestPlan } from "../pieces.ts";
+import { pieceMusicShape, pieceTestPlan } from "../pieces.ts";
 import { decode, decodeMoments } from "./decode.ts";
 
 // « Titre qui se décode », the effect of the bank (decode.ts): its own checks, beside the bank's (features.test.ts).
@@ -12,12 +12,14 @@ const run = (n: number) => [
   { file: "after", at: 2, seconds: 1.8 },
 ];
 
-test("« Titre qui se décode » (effect v1): its layer over a run of shots, its title on the black, then its band on a beat, full at its end", () => {
-  const plan = pieceTestPlan({ piece: decode, shots: run(8), span: [1.2, 6], fill: { texts: { titre: "le Marais", surtitre: "un matin dans" }, objects: {}, settings: {} }, bpm: 100 });
+test("« Titre qui se décode » (effect v2): its layer over a run of shots, its title on the black, then its band on a beat, full at its end", () => {
+  const fill = { texts: { titre: "le Marais", surtitre: "un matin dans" }, objects: {}, settings: {} };
+  const plan = pieceTestPlan({ piece: decode, shots: run(8), span: [1.2, 6], fill, bpm: 100 });
   assert.ok(editPlanSchema.safeParse(plan).success);
   const motion = plan.layers![0]!.motion;
-  // It cuts nothing out and follows nothing: its band shows her shots as filmed (Footage).
+  // It cuts nothing out and follows nothing: its band shows her shots as filmed (Footage), the eight under it.
   assert.equal(motion.drawn, undefined);
+  assert.equal(motion.texts!.mine, "1,2,3,4,5,6,7,8");
   assert.equal(motion.texts!.titre, "le Marais");
   assert.equal(motion.texts!.surtitre, "un matin dans");
   // 4,8 s at 100 BPM: its title just after the cut, decoded in its original's 2,64 beats (12, 19 and 8 of its images at
@@ -28,12 +30,20 @@ test("« Titre qui se décode » (effect v1): its layer over a run of shots, its
   assert.equal(marks.open, 72);
   assert.ok(marks.show! + marks.hold! + marks.scramble! + marks.resolve! < marks.open!);
   assert.equal(marks.full, 142);
-  // Its sounds: an impact on the cut, then a tick every three images while it scrambles, all within its span.
-  const sounds = motion.sounds ?? [];
-  assert.equal(sounds[0]?.at, 0);
-  assert.match(sounds[0]!.sound, /impact/);
-  assert.ok(sounds.length >= 3 && sounds.length <= 16);
-  assert.ok(sounds.slice(1).every((s) => /tick/.test(s.sound) && s.at > 0 && s.at * 30 <= marks.show! + marks.hold! + marks.scramble! + marks.resolve! + 1));
+  // Its sounds: an impact on the cut, then a burst of ticks, one every three images while it scrambles, within it.
+  const [impact, ticks] = motion.sounds ?? [];
+  assert.equal(impact?.at, 0);
+  assert.match(impact!.sound, /impact/);
+  assert.match(ticks!.sound, /tick/);
+  assert.equal(ticks!.at, Math.round(((marks.show! + marks.hold!) / 30) * 1000) / 1000);
+  const times = ticks!.burst!.times;
+  assert.ok(times.length >= 8 && times.every((t, i) => i === 0 || Math.abs(t - times[i - 1]! - 0.1) < 0.02), JSON.stringify(times));
+  assert.ok(ticks!.at + times.at(-1)! <= (marks.show! + marks.hold! + marks.scramble! + marks.resolve! + 1) / 30);
+  // Its music, as its skill's: silent from the cut to black to the beat its band opens on, then muffled to the cut back.
+  assert.deepEqual(pieceMusicShape({ piece: decode, fill, plan, layer: plan.layers![0]!, bpm: 100 }), {
+    pauses: [{ from: 1.2, to: 3.6 }],
+    filters: [{ kind: "radio", from: 3.6, to: 6, open: 0.05 }],
+  });
   // A mask that grows, never a zoom: nothing in its code scales or moves a picture.
   assert.doesNotMatch(decode.code, /transform|scale\(/);
 });
@@ -43,9 +53,8 @@ test("« Titre qui se décode »: its small words optional, a short span keeps i
   const alone = pieceTestPlan({ piece: decode, shots: run(5), span: [1.2, 4.2], fill: { texts: { titre: "Lune" }, objects: {}, settings: {} }, bpm: 100 });
   assert.ok(editPlanSchema.safeParse(alone).success);
   assert.equal(alone.layers![0]!.motion.texts!.surtitre, undefined);
-  for (const bpm of [60, 90, 100, 122, 140]) {
-    // A beat, or a half-beat on a slow Reel (its decoding keeps about its original's pace).
-    const beat = (1800 / bpm) * (bpm < 86 ? 0.5 : 1);
+  for (const bpm of [60, 72, 90, 100, 122, 140]) {
+    const beat = 1800 / bpm;
     for (const seconds of [2.4, 3, 4, 5, 6, 8]) {
       const frames = Math.round(seconds * 30);
       const at = decodeMoments(frames, bpm);
@@ -53,8 +62,12 @@ test("« Titre qui se décode »: its small words optional, a short span keeps i
       assert.ok(at.lands < at.open, `${bpm} BPM, ${seconds} s: lands ${at.lands}, opens ${at.open}`);
       assert.ok(at.open <= frames * 0.55 + 1, `${bpm} BPM, ${seconds} s: opens at ${at.open} of ${frames}`);
       assert.ok(at.full > at.open && at.full <= frames);
-      // On a beat whenever it can be (the editor's cuts are on the beat).
-      if (seconds >= 4) assert.ok(Math.abs(at.open / beat - Math.round(at.open / beat)) < 0.05, `${bpm} BPM, ${seconds} s: ${at.open} off its beat`);
+      // Its music back on a whole beat of the Reel (a silence ending off the beat moves the music off the cuts), never
+      // after its band opens; on that very beat whenever it can be.
+      if (at.back) assert.ok(Math.abs(at.back / beat - Math.round(at.back / beat)) < 0.01 && at.back <= at.open + 0.5, `${bpm} BPM, ${seconds} s: back at ${at.back}`);
+      if (seconds >= 4) assert.ok(Math.abs(at.open / beat - Math.round(at.open / beat)) < 0.05 && at.back > 0, `${bpm} BPM, ${seconds} s: ${at.open} off its beat`);
+      // Its decoding never slower than its original's by much (a half-beat pace on a slow Reel).
+      assert.ok(at.lands - at.show <= (39 / 14.754) * 21.2 + 1, `${bpm} BPM, ${seconds} s: decoded in ${at.lands - at.show}`);
     }
   }
 });

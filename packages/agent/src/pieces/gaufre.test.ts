@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { editPlanSchema } from "../schemas.ts";
-import { pieceTestPlan, readPieceFill } from "../pieces.ts";
+import { pieceMusicShape, pieceTestPlan, readPieceFill } from "../pieces.ts";
 import { gaufre, gaufreMoments } from "./gaufre.ts";
 
 // « Titre gaufré », the effect of the bank (gaufre.ts): its own checks, beside the bank's (features.test.ts).
@@ -12,8 +12,9 @@ const run = (n: number) => [
   { file: "after", at: 2, seconds: 1.8 },
 ];
 
-test("« Titre gaufré » (effect v1): its paper over the shots under it, her name inked in its original's order, then held to be read", () => {
-  const plan = pieceTestPlan({ piece: gaufre, shots: run(3), span: [1.2, 5.4], fill: { texts: { titre: "Farine", ligne: "pâtisserie · paris 11e" }, objects: {}, settings: {} }, bpm: 100 });
+test("« Titre gaufré » (effect v2): its paper over the shots under it, her name inked in its original's order, then held to be read", () => {
+  const fill = { texts: { titre: "Farine", ligne: "pâtisserie · paris 11e" }, objects: {}, settings: {} };
+  const plan = pieceTestPlan({ piece: gaufre, shots: run(3), span: [1.2, 5.4], fill, bpm: 100 });
   assert.ok(editPlanSchema.safeParse(plan).success);
   const motion = plan.layers![0]!.motion;
   // A drawn paper: it covers her shots and draws none of them, cuts nothing out, follows nothing; no sound of its own.
@@ -29,6 +30,8 @@ test("« Titre gaufré » (effect v1): its paper over the shots under it, her na
   assert.ok(at.second! < at.first! && at.first! < at.last! && at.last! < at.dots! && at.dots! < at.inked! && at.inked! <= at.line_to!);
   assert.ok(at.line_from! > at.second! && at.line_from! < at.last!);
   assert.equal(126 - at.line_to!, 27);
+  // Its music stopped dead on the beat before her name is inked whole (its 5th, at 95 images), back on its last (its 7th).
+  assert.deepEqual(pieceMusicShape({ piece: gaufre, fill, plan, layer: plan.layers![0]!, bpm: 100 }), { pauses: [{ from: 4.2, to: 5.4 }] });
   // Its paper's colours on her word only: the original's peach by default, her charter's when the brief or her request asks.
   assert.equal(motion.texts!.papier, undefined);
   const read = readPieceFill(gaufre, { fits: true, missing: "", texts: [{ slot: "titre", text: "Farine" }], objects: [], settings: [{ name: "papier", value: "charte" }, { name: "papier", value: "rose" }] })!;
@@ -51,6 +54,13 @@ test("« Titre gaufré »: short, its ink runs faster; long, never more than a q
       assert.ok(at.hold >= Math.min(beat * 1.5, frames * 0.22) - 1, `${bpm} BPM, ${seconds} s: held ${at.hold}`);
       // Its pace: the first letter's ink lasts 6 of its original's beats, never more than a quarter slower than its own.
       assert.ok(at.first - at.ink <= 6 * ORIGINAL * 1.25 + 1);
+      // Its silence on whole beats of the Reel (a silence ending off the beat moves the music off the cuts), a beat long
+      // at least, from before her name is inked whole, within the effect.
+      const whole = 1800 / bpm;
+      if (at.quiet) {
+        const [from, to] = at.quiet;
+        assert.ok([from, to].every((f) => Math.abs(f / whole - Math.round(f / whole)) < 0.01) && to - from >= whole - 0.5 && from <= at.inked && to <= frames, `${bpm} BPM, ${seconds} s: ${from}–${to}`);
+      }
     }
   }
 });

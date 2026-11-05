@@ -10,12 +10,14 @@ import type { EffectPiece } from "../pieces.ts";
 // pieces of all her shots under it (Footage `at`), as many of each, taken across each one's passage, in an order that
 // never loops, never the same shot twice in a row. Then the title goes at once with the effect, and the montage takes
 // over on her next shot full frame, as the original's calm shot does. Its sounds are the original's: an impact on the
-// cut to black and a digital tick every three images while the title scrambles. It keeps its skill's title (its size,
-// its face, its thin dark edge for her pale pictures), its decoding, its band and its flash montage; it leaves the six
-// bands and their fold, the music's shape (late, filtered, stopped: a piece does not own the Reel's music), the calm
-// shot and the ending by layers, and its 16:9 format (a piece plays in her vertical Reel). Short, it shortens its
-// title's decoding so that its band still has at least 45 % of it. Nothing of the original's own: « A · Summer · In »
-// and « THE CANADIAN ROCKIES » give way to her words.
+// cut to black and a digital tick every three images while the title scrambles. Its music (v2), as its skill's: silent
+// under the title on the black (its impact and its ticks alone), in on the beat the band opens, muffled as out of a
+// small speaker (« radio ») while it grows, whole again when the montage takes over. It keeps its skill's title (its
+// size, its face, its thin dark edge for her pale pictures), its decoding, its band, its flash montage and its music's
+// shape under them; it leaves the six bands and their fold, the music's stop on the calm shot, the ending by layers, and
+// its 16:9 format (a piece plays in her vertical Reel). Short, it shortens its title's decoding so that its band still
+// has at least 45 % of it. Nothing of the original's own: « A · Summer · In » and « THE CANADIAN ROCKIES » give way to
+// her words.
 
 /** Its decoding, in beats of the Reel: its original's 12 images still, 19 scrambling, 8 landing, at its 122 BPM (14,75 images a beat). */
 const DECODE_BEATS = 39 / 14.754;
@@ -28,36 +30,43 @@ const AFTER_LANDING = 0.4;
 const TITLE_SHARE = 0.55;
 /** The band is full this many images before the end (the original's is full as its calm shot cuts in). */
 const FULL_BEFORE = 2;
-/** Its sounds: a deep impact on the cut, a digital tick every three images while the title scrambles (14 at most). */
+/** Its sounds: a deep impact on the cut, a digital tick every three images while the title scrambles (a burst, 40 at most). */
 const IMPACT = { sound: "deep dry impact", seconds: 0.5 };
 const TICK = { sound: "digital glitch tick", seconds: 0.5, gain: -9 };
 const TICK_EVERY = 3;
-const MOST_TICKS = 14;
+const MOST_TICKS = 40;
 
 /** Its original's beat, in frames (122 BPM). */
 const ORIGINAL_BEAT = 1800 / 122;
 
+/** The music comes back (with the band) at least this long after the cut, else it is not stopped at all (frames). */
+const SHORTEST_SILENCE = 12;
+
 /**
- * Its moments in frames from its start for a span of `frames` at a tempo: the title shows, decodes, lands; the band
- * opens on a beat after it (on a slow Reel, a half-beat: its decoding keeps about its original's pace) and is full by
- * the end.
+ * Its moments in frames from its start for a span of `frames` at a tempo: the title shows, decodes (in the Reel's beats,
+ * half-beats on a slow one: it keeps about its original's pace), lands; the band opens on a whole beat of the Reel after
+ * it (the music comes back there: a silence ending off the beat would move her music off the cuts) and is full by the
+ * end; `back`, the whole beat the music comes back on (the band's, or the one before it when the band could not wait for
+ * one), 0 when it is not stopped.
  */
-export function decodeMoments(frames: number, bpm: number): { show: number; hold: number; scramble: number; resolve: number; lands: number; open: number; full: number } {
-  let beat = 1800 / Math.min(140, Math.max(60, bpm));
-  while (beat / ORIGINAL_BEAT > 1.42) beat /= 2;
-  const total = DECODE_BEATS * beat;
-  let open = Math.ceil((SHOW + total + AFTER_LANDING * beat) / beat) * beat;
+export function decodeMoments(frames: number, bpm: number): { show: number; hold: number; scramble: number; resolve: number; lands: number; open: number; full: number; back: number } {
+  const beat = 1800 / Math.min(140, Math.max(60, bpm));
+  let pace = beat;
+  while (pace / ORIGINAL_BEAT > 1.42) pace /= 2;
+  const total = DECODE_BEATS * pace;
+  let open = Math.ceil((SHOW + total + AFTER_LANDING * pace) / beat) * beat;
   // Short: the band opens on the last beat that leaves it its share (else at the middle), the decoding shortened to land before it.
   if (open > frames * TITLE_SHARE) {
     const k = Math.floor((frames * TITLE_SHARE) / beat);
-    open = k >= 1 && k * beat >= frames * 0.35 ? k * beat : frames * 0.5;
+    open = k >= 1 && k * beat >= frames * 0.3 ? k * beat : frames * 0.5;
   }
   open = Math.round(open);
-  const decoding = Math.max(9, Math.min(total, open - SHOW - Math.max(4, 0.3 * beat)));
+  const decoding = Math.max(9, Math.min(total, open - SHOW - Math.max(4, 0.3 * pace)));
   const hold = Math.round((decoding * DECODE.hold) / 39);
   const resolve = Math.max(1, Math.round((decoding * DECODE.resolve) / 39));
   const scramble = Math.max(1, Math.round(decoding) - hold - resolve);
-  return { show: SHOW, hold, scramble, resolve, lands: SHOW + hold + scramble + resolve, open, full: Math.max(open + 1, frames - FULL_BEFORE) };
+  const onBeat = Math.floor(open / beat + 0.02) * beat;
+  return { show: SHOW, hold, scramble, resolve, lands: SHOW + hold + scramble + resolve, open, full: Math.max(open + 1, frames - FULL_BEFORE), back: onBeat >= SHORTEST_SILENCE ? onBeat : 0 };
 }
 
 const CODE = String.raw`function Scene({ width, height, durationInFrames, brand, shots, texts }) {
@@ -67,8 +76,9 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const mark = (k, d) => { const v = Number(texts && texts[k]); return Number.isFinite(v) ? v : d; };
   const F = durationInFrames;
   const BEAT = Math.max(6, mark("beat", 18));
-  // Its shots: those that play during it, in order; each one flashes in its band.
-  const mine = shots.map((s, i) => i).filter((i) => shots[i].from < F && shots[i].from + shots[i].durationInFrames > 0);
+  // Its shots: those that play during it, in order, as the engine counts them (else those it finds); each one flashes in its band.
+  const counted = String((texts && texts.mine) || "").split(",").filter((x) => x !== "").map(Number).filter((i) => Number.isInteger(i) && i >= 0 && i < shots.length);
+  const mine = counted.length ? counted : shots.map((s, i) => i).filter((i) => shots[i].from < F && shots[i].from + shots[i].durationInFrames > 0);
 
   // Its moments (its timeline's marks; else about the same: the band on its 4th beat, half of it at most).
   const SHOW = Math.max(0, Math.round(mark("show", 2)));
@@ -155,9 +165,11 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
 
 export const decode: EffectPiece = {
   key: "decode",
-  version: 1,
+  // 2: its music shaped as its skill's (silent under the title, muffled under the band), its band on a whole beat of
+  // the Reel, its ticks one burst, its shots as the engine counts them.
+  version: 2,
   name: "Titre qui se décode",
-  how: "son plan coupe sur du noir ; ses petits mots et son titre en capitales y apparaissent d'un coup, le titre brouillé qui se décode comme un générique de film ; sur un temps, une bande de vidéo s'ouvre derrière lui et grandit jusqu'au plein écran, un montage éclair de ses plans y défile (une coupe toutes les 4 images) ; le titre part avec la bande pleine et le montage reprend.",
+  how: "son plan coupe sur du noir ; ses petits mots et son titre en capitales y apparaissent d'un coup, le titre brouillé qui se décode comme un générique de film ; sur un temps, une bande de vidéo s'ouvre derrière lui et grandit jusqu'au plein écran, un montage éclair de ses plans y défile (une coupe toutes les 4 images) ; le titre part avec la bande pleine et le montage reprend. La musique se tait sous le titre, revient étouffée avec la bande, entière quand le montage reprend.",
   needs: "son nom, son lieu ou son quartier en quelques mots, et des vidéos variées de son lieu (des gestes, des visages, des détails, la salle, la rue) pour les éclairs de la bande.",
   lays: "le plus souvent au début du Reel, sur 3 à 10 de ses plans d'un temps chacun, variés (chacun passe en éclairs dans la bande ; ses photos restent fixes) ; il les couvre de noir le temps du titre, et le plan d'après reprend en plein écran",
   shots: [1, 16],
@@ -174,15 +186,23 @@ export const decode: EffectPiece = {
   ],
   timeline({ frames, bpm }) {
     const at = decodeMoments(frames, bpm);
-    // Its ticks while the title scrambles and lands, one every three images (14 at most, spread over it).
+    const s = (f: number) => Math.round((f / 30) * 1000) / 1000;
+    // Its ticks while the title scrambles and lands, one every three images (a burst of the same tick).
     const scrambling = at.lands - (at.show + at.hold);
-    const ticks = Math.min(MOST_TICKS, Math.max(2, Math.round(scrambling / TICK_EVERY) + 1));
+    const ticks = Math.min(MOST_TICKS, Math.max(2, Math.floor(scrambling / TICK_EVERY) + 1));
+    // Her music silent under the title (from the cut to black), back on the beat the band opens, muffled as out of a small
+    // speaker while it grows, whole on the cut back to the montage.
+    const back = at.back || at.open;
     return {
       marks: { show: at.show, hold: at.hold, scramble: at.scramble, resolve: at.resolve, open: at.open, full: at.full },
       sounds: [
         { at: 0, ...IMPACT },
-        ...Array.from({ length: ticks }, (_, i) => ({ at: Math.round(((at.show + at.hold + (i * scrambling) / (ticks - 1)) / 30) * 1000) / 1000, ...TICK })),
+        { at: s(at.show + at.hold), ...TICK, burst: { times: Array.from({ length: ticks }, (_, i) => s((i * scrambling) / (ticks - 1))) } },
       ],
+      music: {
+        ...(at.back ? { pauses: [{ from: 0, to: s(at.back) }] } : {}),
+        filters: [{ kind: "radio" as const, from: s(back), to: s(frames), open: 0.05 }],
+      },
     };
   },
   code: CODE,

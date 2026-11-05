@@ -12,8 +12,10 @@ import type { EffectPiece } from "../pieces.ts";
 // covers whatever plays under it: nothing of her shots is drawn. It keeps its skill's paper, its relief, its ink and
 // its timings, as shares of the paper's 7 beats in the original (its first letter slow, the others 0,4 s apart at five
 // letters, the dots last, the line along), faster in a short span, never slower than its original by more than a quarter
-// (the rest held inked); it leaves the front built piece by piece on the black (« Façade qui se construit »), the music's
-// shape and the ending card. Its paper and its ink are the original's peach and rust; on her word, her charter's light
+// (the rest held inked); it leaves the front built piece by piece on the black (« Façade qui se construit ») and the
+// ending card. Its music (v2), as its skill's on its paper: its groove stopped dead on the beat before her name is inked
+// whole, the end of the ink and the inked card in silence, back on the cut (on the last whole beat of the effect) when
+// the montage takes over. Its paper and its ink are the original's peach and rust; on her word, her charter's light
 // colour and her main one (`papier`). Nothing of the original's own: « Still » and « IN THE MOMENT » give way to her
 // name and her line.
 
@@ -27,14 +29,21 @@ const SLOWEST = (1800 / 113.2) * 1.25;
 const HOLD_BEATS = 1.5;
 const HOLD_SHARE = 0.22;
 
-/** Its moments in frames from its start (the first letter's ink starts before it) for a span of `frames` at a tempo (its hold counted in half-beats on a slow Reel). */
-export function gaufreMoments(frames: number, bpm: number): Record<keyof typeof INK, number> & { hold: number } {
-  let beat = 1800 / Math.min(140, Math.max(60, bpm));
+/**
+ * Its moments in frames from its start (the first letter's ink starts before it) for a span of `frames` at a tempo (its
+ * hold counted in half-beats on a slow Reel); `quiet`, its music's silence on whole beats of the Reel (from the last one
+ * before her name is inked whole, to the last one of the effect), a beat long at least, else none.
+ */
+export function gaufreMoments(frames: number, bpm: number): Record<keyof typeof INK, number> & { hold: number; quiet: [number, number] | null } {
+  const whole = 1800 / Math.min(140, Math.max(60, bpm));
+  let beat = whole;
   while (beat / (1800 / 113.2) > 1.42) beat /= 2;
   const hold = Math.min(HOLD_BEATS * beat, frames * HOLD_SHARE);
   const pace = Math.min(SLOWEST, (frames - hold) / ACT);
   const at = Object.fromEntries(Object.entries(INK).map(([k, v]) => [k, Math.round(v * pace)])) as Record<keyof typeof INK, number>;
-  return { ...at, hold: frames - at.line_to };
+  const stop = Math.floor(at.inked / whole + 0.02) * whole;
+  const back = Math.floor(frames / whole + 0.02) * whole;
+  return { ...at, hold: frames - at.line_to, quiet: stop > 0 && back - stop >= whole - 0.5 ? [stop, back] : null };
 }
 
 const CODE = String.raw`function Scene({ width, height, durationInFrames, brand, texts }) {
@@ -241,9 +250,10 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
 
 export const gaufre: EffectPiece = {
   key: "gaufre",
-  version: 1,
+  // 2: its music stopped dead on the beat before her name is inked whole, back on the cut (its skill's paper).
+  version: 2,
   name: "Titre gaufré",
-  how: "une coupe franche sur un papier pêche en plein écran, son nom pressé en creux dedans dès la première image, une petite ligne en capitales dessous ; l'encre entre dans chaque lettre (la première lentement, les autres en montant, le point d'un i en dernier), sèche du brun au rouille et la lettre se soulève ; la ligne s'encre de gauche à droite ; la carte encrée tenue un temps et demi, puis le montage reprend.",
+  how: "une coupe franche sur un papier pêche en plein écran, son nom pressé en creux dedans dès la première image, une petite ligne en capitales dessous ; l'encre entre dans chaque lettre (la première lentement, les autres en montant, le point d'un i en dernier), sèche du brun au rouille et la lettre se soulève ; la ligne s'encre de gauche à droite ; la carte encrée tenue un temps et demi, la musique coupée net dessus, puis le montage reprend avec elle.",
   needs: "son nom ou 1 à 3 mots qui la disent (le mieux, un mot court), et si elle veut une ligne courte : son métier et son quartier, une date, sa devise ; rien à filmer : le papier est dessiné et couvre les plans dessous.",
   lays: "sur 1 à 3 de ses plans qu'il couvre en entier (un papier dessiné) : en fin de Reel comme une signature, en ouverture, ou comme un carton entre deux moments ; le plan d'après reprend en plein écran",
   shots: [1, 12],
@@ -274,8 +284,10 @@ export const gaufre: EffectPiece = {
     },
   ],
   timeline({ frames, bpm }) {
-    const { hold: _hold, ...marks } = gaufreMoments(frames, bpm);
-    return { marks };
+    const { hold: _hold, quiet, ...marks } = gaufreMoments(frames, bpm);
+    const s = (f: number) => Math.round((f / 30) * 1000) / 1000;
+    // Its groove stopped dead on a beat as her name is inked whole, back on the last beat of the effect.
+    return { marks, ...(quiet ? { music: { pauses: [{ from: s(quiet[0]), to: s(quiet[1]) }] } } : {}) };
   },
   code: CODE,
 };
