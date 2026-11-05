@@ -1,4 +1,5 @@
 import type { MontageSkill } from "./skills.ts";
+import { aplat } from "./skills/aplat.ts";
 import { cadre } from "./skills/cadre.ts";
 import { coulisses } from "./skills/coulisses.ts";
 import { coupsDeFouet } from "./skills/coups-de-fouet.ts";
@@ -27,6 +28,7 @@ import { tourne } from "./skills/tourne.ts";
 // checked by the scene check and rendered locally before it joins (scripts/skill-render.mts).
 
 export const MONTAGE_SKILLS: Record<string, MontageSkill> = {
+  aplat,
   cadre,
   coulisses,
   "coups-de-fouet": coupsDeFouet,
