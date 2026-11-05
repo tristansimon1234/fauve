@@ -132,3 +132,5 @@ Il jouait à 100 BPM (sa mesure n'avait pas trouvé de tempo) et durait environ 
 
 ## Ce qu'il faut filmer
 Presque rien. Sa photo de profil (son visage net, bien éclairé, au centre) ou son logo ; mieux, 2 à 3 s d'elle qui regarde la caméra, qui joueront dans le rond. Et ses mots : son @ (jamais inventé), son nom, son métier en un mot, trois choses qu'elle fait, une annonce et sa promesse en une phrase chacune.
+
+**Version 3** (5 novembre ; Tristan : « oui s'abonner ») : le bouton de sa carte de profil dit « S'abonner », puis « Abonné(e) » après le clic, comme le dit la description du modèle (la v2 disait « Suivre », puis « Suivi(e) »).

@@ -18,9 +18,9 @@ import { toFrame, type MontageSkill, type SkillSound } from "../skills.ts";
 //               two), its last words in the italic; the caret never blinks and fades out after it; the music opens;
 //   217 – 270   the app's icon lands on her last word, glides to the middle and swallows her promise, then opens into her
 //               profile card: her account, her round photo, her name, her trade, her list and her promise as its bio,
-//               « Suivre » turning blue, « Message »;
-//   270 – 305   the whole card zooms 1,5 times onto « Suivre »; the card goes but her photo and the button; an arrow
-//               glides up in an arc and clicks on beat 18 (no ring): the blue fades, « Suivi(e) » rises;
+//               « S'abonner » turning blue, « Message »;
+//   270 – 305   the whole card zooms 1,5 times onto « S'abonner »; the card goes but her photo and the button; an arrow
+//               glides up in an arc and clicks on beat 18 (no ring): the blue fades, « Abonné(e) » rises;
 //   305 – 381   the button and her photo fold into a white pill with her account and a tick; the pill fades, her photo
 //               shrinks into a dot that becomes the « @ » of her account, in the blue gradient, « À SUIVRE » over it.
 // Her texts are the original's sizes where they read (a little over the engine's 48 px), its small labels and its card
@@ -179,7 +179,7 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   });
   const typedLayer = promise && pw.length && frame >= ERASE - 2 && frame < ICON + o(18) ? h(FitText, { key: "typed", style: abs(140, 960 - S, 800, S * 2), innerStyle: line(S) }, h("span", null, typed)) : null;
 
-  // 5. The icon opens into her card (its bio decor: read before); a zoom as a camera onto « Suivre », the rest gone.
+  // 5. The icon opens into her card (its bio decor: read before); a zoom as a camera onto « S'abonner », the rest gone.
   const CW = 768, CH = 485, CX = 156, CY = 718, B0 = { x: CX + 41, y: CY + 380, w: 337, h: 62 }, bx = B0.x + B0.w / 2, by = B0.y + B0.h / 2;
   const grow = Easing.bezier(0.5, 0, 0.12, 1)(k01(CARD, CARD + o(14))), landed = ek(ICON, ICON + o(3)), zoom = both(k01(ZOOM, ZOOM + o(24))), s = 1 + 0.5 * zoom;
   const cam = (x, y) => ({ x: mix(bx, 540, zoom) + s * (x - bx), y: mix(by, 960, zoom) + s * (y - by) });
@@ -210,7 +210,7 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
         h("div", { style: { ...box(392, 380), width: 333, height: 62, borderRadius: 14, background: "#ebecf1", ...flex, ...small(27, { fontWeight: 700 }), ...fx(row(3)) } }, acc("Message")))
     : null;
 
-  // 6. The click (no ring), « Suivi(e) »; photo and button fold into a pill; her photo shrinks into the « @ ».
+  // 6. The click (no ring), « Abonné(e) »; photo and button fold into a pill; her photo shrinks into the « @ ».
   const fold = both(k01(PILL, PILL + o(13))), atGo = k01(AT, AT + o(15)), pdot = k01(AT + o(7), AT + o(10));
   const ES = 54, EW = mn(780, est((handle ? "@" : "") + who, ES)), atX = 540 - EW / 2 + est("@", ES) / 2;
   const PH = 96, PWD = mx(321, mn(700, est(who, 32) + 177)), pillX = 540 - PWD / 2;
@@ -235,8 +235,8 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const button = frame >= CARD && frame < AT + o(15)
     ? h("div", { key: "btn", style: { ...abs(px(btn.x), px(btn.y), px(btn.w), px(btn.h)), borderRadius: px(btn.r), background: grad(BTN), boxShadow: white > 0 ? "0 14px 34px rgba(20,24,60," + px(10 * white) / 100 + ")" : "none", opacity: frame < ZOOM ? ek(CARD + o(14), CARD + o(20)) : 1 - atGo, overflow: "hidden" } },
         h("div", { style: { ...all, background: "#ffffff", opacity: frame < CLICK ? 0.65 - 0.65 * ek(CARD + o(16), CARD + o(23)) : white } }),
-        frame < PILL + o(11) ? h("div", { style: centred({ ...small(R(bs), { fontWeight: 700, color: "#ffffff" }), opacity: 1 - white }) }, acc("Suivre")) : null,
-        frame >= CLICK + o(6) && frame < PILL + o(11) ? h("div", { style: centred({ ...small(R(bs), { fontWeight: 700 }), ...fx(ek(CLICK + o(6), CLICK + o(10)) * (1 - k01(PILL + o(7), PILL + o(10))), 24) }) }, acc("Suivi(e)")) : null,
+        frame < PILL + o(11) ? h("div", { style: centred({ ...small(R(bs), { fontWeight: 700, color: "#ffffff" }), opacity: 1 - white }) }, acc("S'abonner")) : null,
+        frame >= CLICK + o(6) && frame < PILL + o(11) ? h("div", { style: centred({ ...small(R(bs), { fontWeight: 700 }), ...fx(ek(CLICK + o(6), CLICK + o(10)) * (1 - k01(PILL + o(7), PILL + o(10))), 24) }) }, acc("Abonné(e)")) : null,
         frame >= PILL + o(7) ? h(FitText, { style: abs(99, 0, mx(80, PWD - 169), PH), innerStyle: { alignItems: "flex-start", ...small(32, { fontWeight: 700 }), ...fx(ek(PILL + o(8), PILL + o(11))) } }, acc(keep(who))) : null,
         frame >= PILL + o(11) ? h("svg", { width: 34, height: 34, viewBox: "0 0 24 24", style: { position: "absolute", right: 24, top: (PH - 34) / 2, opacity: ek(PILL + o(11), PILL + o(13)) } }, h("path", { d: "M5 12.5 L10 17 L19 7.5", fill: "none", stroke: "#69768b", strokeWidth: 2, strokeLinecap: "round" })) : null)
     : null;
@@ -276,13 +276,14 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
 
 export const interfaceSkill: MontageSkill = {
   key: "interface",
-  version: 2,
+  // 3: « S'abonner » on her profile's button, then « Abonné(e) » (Tristan: « oui s'abonner »), as its pitch says.
+  version: 3,
   bpm: BPM,
   // Her profile photo (or her logo, or a video of her looking at the camera): it plays in the round of her card.
   shots: [1, 1],
   files: [1, 2],
   fonts: ["Instrument Serif"],
-  how: "Pur motion design sur un fond clair, sans coupe, comme une appli : ses premiers mots sortent du flou lettre à lettre au centre, le dernier en italique, qui devient la petite étiquette de sa liste ; sa liste défile sur la ligne du milieu, celui du milieu net, les autres flous, le dernier souligné d'un trait bleu qui s'effile ; son annonce monte sur deux lignes, mot à mot ; un curseur bleu tape sa promesse, avalée par l'icône d'Instagram qui s'ouvre en carte de profil (sa photo ronde, son nom, son métier, sa liste et sa promesse) ; zoom sur « Suivre », une flèche clique, « Suivi(e) » ; tout se replie en pastille, sa photo devient le « @ » de son compte, en bleu, sous « À SUIVRE ».",
+  how: "Pur motion design sur un fond clair, sans coupe, comme une appli : ses premiers mots sortent du flou lettre à lettre au centre, le dernier en italique, qui devient la petite étiquette de sa liste ; sa liste défile sur la ligne du milieu, celui du milieu net, les autres flous, le dernier souligné d'un trait bleu qui s'effile ; son annonce monte sur deux lignes, mot à mot ; un curseur bleu tape sa promesse, avalée par l'icône d'Instagram qui s'ouvre en carte de profil (sa photo ronde, son nom, son métier, sa liste et sa promesse) ; zoom sur « S'abonner », une flèche clique, « Abonné(e) » ; tout se replie en pastille, sa photo devient le « @ » de son compte, en bleu, sous « À SUIVRE ».",
   end: true,
   texts: [
     {
@@ -364,7 +365,7 @@ export const interfaceSkill: MontageSkill = {
     const per = (60 / bpm / (60 / BPM)) / TYPING;
     const sounds: SkillSound[] = [
       { at: round3(typing), sound: "soft keyboard click", seconds: 0.5, gain: -8, burst: { times: Array.from({ length: Math.ceil(letters / 2) }, (_, k) => round3(k * 2 * per)) } },
-      // Its double click on « Suivre », the second on the beat.
+      // Its double click on « S'abonner », the second on the beat.
       { at: round3(seconds(at.click) - 0.045 * (beat / (60 / BPM))), sound: "soft mouse click", seconds: 0.5, gain: -4 },
       { at: round3(seconds(at.click) + 0.045 * (beat / (60 / BPM))), sound: "soft mouse click", seconds: 0.5, gain: -4 },
     ];

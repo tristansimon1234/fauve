@@ -8026,7 +8026,7 @@ const ifSeen = (n: Drawn) => Number(styleOf(n).opacity ?? 1);
 
 test("« Interface minimaliste » (v2) lays its moments where its original does, on its own music (110,5 BPM), two holds lengthened for a phone", async () => {
   const { interfaceSkill, interfaceImages } = await import("./skills/interface.ts");
-  assert.equal(interfaceSkill.version, 2);
+  assert.equal(interfaceSkill.version, 3);
   assert.equal(interfaceSkill.bpm, 110.5);
   const line = interfaceSkill.timeline(1, { end: false, words: IF_WORDS });
   // Each moment on the original's image, within two, its announcement held two beats longer and its typed promise one
@@ -8121,7 +8121,7 @@ test("« Interface minimaliste » (v2): each element becomes the next, through t
   const open = ["left", "top", "width", "height"].map((k) => Number(styleOf(plate(m.card! + 20)!)[k]));
   assert.ok([156, 718, 768, 485].every((v, i) => Math.abs(open[i]! - v) <= 1), open.join(" "));
   const card = at(m.card! + 25);
-  for (const w of ["atelier.argile", "Atelier Argile", "Céramiste", "Message", "Suivre"]) assert.ok(heldText(card).includes(w), w);
+  for (const w of ["atelier.argile", "Atelier Argile", "Céramiste", "Message", "S'abonner"]) assert.ok(heldText(card).includes(w), w);
   assert.ok(ifFind(card, (n) => "data-fauve-decor" in n.props).some((n) => heldText(n).includes("Tournage. Émail. Cuisson.")));
   // The zoom as a camera: « Suivre » to the middle 1,5 times larger, the card gone but her photo and the button.
   const btn = (f: number) => styleOf(ifFind(at(f), (n) => n.type === "div" && n.props.key === "btn")[0]!);
@@ -8133,7 +8133,7 @@ test("« Interface minimaliste » (v2): each element becomes the next, through t
   assert.deepEqual([Number(arrow(m.zoom! + 1).left) + 3, Number(arrow(m.zoom! + 1).top) + 3], [702, 1651]);
   assert.deepEqual([Number(arrow(m.zoom! + 23).left) + 3, Number(arrow(m.zoom! + 23).top) + 3], [648, 979]);
   assert.ok(!drawnNodes(at(m.click!)).some((n) => n.type === "Cursor"));
-  assert.ok(heldText(at(m.click! + 9)).includes("Suivi(e)"));
+  assert.ok(heldText(at(m.click! + 9)).includes("Abonné(e)"));
   // Folded into a white pill with her account and a tick, round at its ends; then her account alone in the gradient
   // with its « @ », « À SUIVRE » over it.
   const pill = btn(m.pill! + 14);
@@ -8181,7 +8181,7 @@ test("« Interface minimaliste » (v2): her photo in the round, her colour on he
   const files = [{ id: "her", photo: true, seconds: 0, aspect: 9 / 16 }];
   const plan = skillPlan({ skill: interfaceSkill, name: "Interface minimaliste", files, fill: { shots: [{ file: "her", at: 0 }], texts: IF_WORDS, end: null } });
   assert.ok(editPlanSchema.safeParse(plan).success);
-  assert.deepEqual(plan.skill, { key: "interface", version: 2 });
+  assert.deepEqual(plan.skill, { key: "interface", version: 3 });
   assert.equal(plan.texts.length, 7);
   assert.equal(plan.sounds?.length, 3);
   assert.equal(plan.music_shape?.filters?.[0]?.kind, "soft");
