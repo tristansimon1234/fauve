@@ -45,7 +45,9 @@ import { env } from "@/lib/env";
 import { timeLeft } from "@/lib/step-clock";
 import { REMOTION_SOURCE_FILES, REMOTION_SOURCE_HASH } from "./remotion-source.generated";
 import { FIRST_TRY, PATIENT_TRY, RENDER_LEASE_MS, RENDERS_PER_SANDBOX, remotionFlags, renderBoundSeconds, secondTryFits, type RenderTry } from "./render-tries";
-import { withSlot } from "@/lib/work-slots";
+import { extensionMs, IDLE_TAIL_MS, KEEP_ALIVE_MS, seatsOf } from "./sandbox-life";
+import { logIdleTail, noteBusyEnd } from "./sandbox-idle";
+import { placesHeld, withSlot } from "@/lib/work-slots";
 
 // The render worker: a persistent Vercel Sandbox (Firecracker microVM) holding a
 // static ffmpeg build and the fonts. Nothing heavy runs in the Vercel function
@@ -67,7 +69,7 @@ const REMOTION_POOL = [NAME, `${NAME}-2`, `${NAME}-3`];
 const CHROME_PER_SANDBOX = 2;
 /** vCPUs of the render sandbox (2 GB of memory each). */
 const VCPUS = 4;
-/** A session stops at its deadline, even in the middle of a render: each job starts with this much time left. */
+/** The longest a light Chrome job is expected to hold its place (its lease adds 6 minutes). */
 const JOB_MS = 6 * 60_000;
 const ROOT = "/vercel/sandbox/fauve";
 // Static ffmpeg 7 (johnvansickle build): libx264 + libass, no drawtext.
@@ -163,8 +165,45 @@ const SLOW_NORMALIZE = [
   'rm -f "$1.src"',
 ].join("\n");
 
+/** This instance's commands running in each sandbox (by name), and the timer that keeps its session up meanwhile. */
+const running = new Map<string, { count: number; sandbox: Sandbox; timer: ReturnType<typeof setInterval> }>();
+
+/**
+ * Runs a command in `sandbox`, its session kept up while it runs (withTimeLeft every KEEP_ALIVE_MS, as long as this
+ * instance runs a command there): nothing else keeps it up, so it stops about IDLE_TAIL_MS after the last one, and the
+ * next command resumes it from its snapshot. When the last one ends, when it ended is noted for its idle tail.
+ */
+async function keptUp<T>(sandbox: Sandbox, command: () => Promise<T>): Promise<T> {
+  const name = sandbox.name;
+  let entry = running.get(name);
+  if (!entry) {
+    const fresh: { count: number; sandbox: Sandbox; timer: ReturnType<typeof setInterval> } = {
+      count: 0,
+      sandbox,
+      timer: setInterval(() => void withTimeLeft(fresh.sandbox).catch(() => {}), KEEP_ALIVE_MS),
+    };
+    entry = fresh;
+    running.set(name, entry);
+  }
+  entry.sandbox = sandbox;
+  entry.count++;
+  try {
+    await withTimeLeft(sandbox);
+    return await command();
+  } finally {
+    if (--entry.count === 0) {
+      clearInterval(entry.timer);
+      running.delete(name);
+      noteBusyEnd(sandbox);
+    }
+  }
+}
+
+/** A command whose exit code its caller reads, its sandbox kept up while it runs. */
+const runIn = (sandbox: Sandbox, params: { cmd: string; args: string[] }) => keptUp(sandbox, () => sandbox.runCommand(params));
+
 async function bash(sandbox: Sandbox, script: string, args: string[] = []) {
-  const result = await sandbox.runCommand({ cmd: "bash", args: ["-c", script, "bash", ...args] });
+  const result = await runIn(sandbox, { cmd: "bash", args: ["-c", script, "bash", ...args] });
   if (result.exitCode !== 0) {
     // The cause is often on the first lines (a long stack follows): keep both ends.
     const output = await result.output("both").catch(() => "");
@@ -181,11 +220,25 @@ async function bash(sandbox: Sandbox, script: string, args: string[] = []) {
  */
 const KEEP_SNAPSHOTS = { count: 2, expiration: 14 * 24 * 3600_000, deleteEvicted: true };
 
-/** The policy on a sandbox made before it (getOrCreate only sets it on a new one). */
+/**
+ * The snapshot policy and the short sessions on a sandbox made before them (getOrCreate only sets them on a new one).
+ * A shorter timeout applies to its next sessions: the running one keeps its deadline (an increase alone extends it).
+ */
 async function keepFewSnapshots(sandbox: Sandbox): Promise<void> {
-  if (sandbox.keepLastSnapshots?.count === KEEP_SNAPSHOTS.count) return;
-  await sandbox.update({ keepLastSnapshots: KEEP_SNAPSHOTS }).catch((error: unknown) => console.warn("sandbox: snapshot policy not set", error));
+  const change = {
+    ...(sandbox.keepLastSnapshots?.count === KEEP_SNAPSHOTS.count ? {} : { keepLastSnapshots: KEEP_SNAPSHOTS }),
+    ...(sandbox.timeout === IDLE_TAIL_MS ? {} : { timeout: IDLE_TAIL_MS }),
+  };
+  if (!Object.keys(change).length) return;
+  await sandbox.update(change).catch((error: unknown) => console.warn("sandbox: snapshot policy or timeout not set", sandbox.name, error));
 }
+
+/** The memory of each sandbox (2 GB a vCPU): what its idle time costs. */
+const memoryGb = (vcpus: number) => vcpus * 2;
+
+/** When a sandbox resumes: the idle tail of its session before (logIdleTail), never in the way of the resume. */
+const onResume = (vcpus: number) => (sandbox: Sandbox) =>
+  logIdleTail(sandbox, memoryGb(vcpus)).catch((error: unknown) => console.warn("sandbox: idle tail not read", sandbox.name, error));
 
 /**
  * Deletes the snapshots the policy would not keep, now, for the sandboxes in service (their
@@ -233,8 +286,9 @@ export function renderSandbox(name = NAME): Promise<Sandbox> {
       persistent: true,
       region: SANDBOX_REGION,
       resources: { vcpus: VCPUS },
-      timeout: 15 * 60_000,
+      timeout: IDLE_TAIL_MS,
       keepLastSnapshots: KEEP_SNAPSHOTS,
+      onResume: onResume(VCPUS),
     });
     await keepFewSnapshots(sandbox);
     await bash(sandbox, SETUP);
@@ -249,15 +303,24 @@ export function renderSandbox(name = NAME): Promise<Sandbox> {
 }
 
 /**
- * Gives the running session time for one more job, extending it only by what is missing
- * (a stopped one is resumed by the next command, with its full timeout).
+ * Gives the running session IDLE_TAIL_MS ahead, extending it only by what is missing (a stopped one is resumed by the
+ * next command, with that timeout): before each job and each command, and every KEEP_ALIVE_MS while a command runs
+ * (keptUp), so that a session never stops under a job, and stops soon after its last one.
  */
 async function withTimeLeft(sandbox: Sandbox): Promise<Sandbox> {
-  if (sandbox.status !== "running") return sandbox;
+  // A handle without a session yet: its next command starts one.
+  const status = (() => {
+    try {
+      return sandbox.status;
+    } catch {
+      return null;
+    }
+  })();
+  if (status !== "running") return sandbox;
   const left = (sandbox.expiresAt?.getTime() ?? Number.POSITIVE_INFINITY) - Date.now();
-  if (left < JOB_MS) {
-    // At least a minute: the API refuses an extension under a second (a session just short of the job's time).
-    await sandbox.extendTimeout(Math.max(60_000, JOB_MS - Math.max(0, left))).catch((error: unknown) => console.warn("render sandbox: timeout not extended", error));
+  const more = extensionMs(left);
+  if (more > 0) {
+    await sandbox.extendTimeout(more).catch((error: unknown) => console.warn("render sandbox: timeout not extended", error));
   }
   return sandbox;
 }
@@ -334,11 +397,11 @@ const remotionReady = new Map<string, Promise<Sandbox>>();
 
 async function prepareRemotion(name: string): Promise<Sandbox> {
   const sandbox = await withTimeLeft(await renderSandbox(name));
-  const current = await sandbox.runCommand({ cmd: "bash", args: ["-c", `cat ${REMOTION}/.hash 2>/dev/null || true`] });
+  const current = await runIn(sandbox, { cmd: "bash", args: ["-c", `cat ${REMOTION}/.hash 2>/dev/null || true`] });
   if ((await current.stdout()).trim() === REMOTION_SOURCE_HASH) return sandbox;
   // New templates (a deploy changed them): the other render sandboxes are updated alongside, in the
   // background, so that they are ready before the first time a busy moment needs them.
-  if (name === NAME) for (const other of REMOTION_POOL.slice(1)) void remotionSandbox(other).catch((error: unknown) => console.warn("render pool: warm-up failed", other, error));
+  if (name === NAME) for (const other of REMOTION_POOL.slice(1)) void warmSpare(other).catch((error: unknown) => console.warn("render pool: warm-up failed", other, error));
 
   await bash(
     sandbox,
@@ -365,8 +428,26 @@ export function remotionSandbox(name = NAME): Promise<Sandbox> {
   return making;
 }
 
-/** Installs the Remotion templates in every render sandbox (the warm-up after a deploy that changed them). */
-export const warmRemotionPool = () => Promise.all(REMOTION_POOL.map((name) => remotionSandbox(name)));
+/**
+ * A spare render sandbox brought up to date in the background, then stopped at once unless a job is on it (a place
+ * held there, or a command of this instance running): persistent, its snapshot keeps the new templates and it resumes
+ * with them the first time a busy moment needs it. Left up, the two spares idled until their timeout after each
+ * deploy that changed the templates.
+ */
+async function warmSpare(name: string): Promise<void> {
+  const sandbox = await remotionSandbox(name);
+  const slot = REMOTION_POOL.indexOf(name);
+  if (slot < 1 || running.has(name)) return;
+  if ((await placesHeld("render", seatsOf(slot, RENDERS_PER_SANDBOX))) || (await placesHeld("remotion", seatsOf(slot, CHROME_PER_SANDBOX)))) return;
+  if (running.has(name)) return;
+  await sandbox.stop().then(
+    () => console.log("render pool: spare stopped after its warm-up", name),
+    (error: unknown) => console.warn("render pool: spare not stopped", name, error instanceof Error ? error.message : error),
+  );
+}
+
+/** Installs the Remotion templates in every render sandbox (the warm-up after a deploy that changed them); the spares stop after it. */
+export const warmRemotionPool = () => Promise.all([remotionSandbox(NAME), ...REMOTION_POOL.slice(1).map((name) => warmSpare(name))]);
 
 /**
  * Runs a light Chrome job in a render sandbox with a free place (two jobs each, the first sandbox filled
@@ -621,7 +702,7 @@ export async function smokeTestScenes(
     const file = `${ROOT}/jobs/smoke-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.json`;
     try {
       await sandbox.writeFiles([{ path: file, content: JSON.stringify(scenes.map((s) => ({ ...s, brand: brand ?? s.brand }))) }]);
-      const result = await sandbox.runCommand({ cmd: "bash", args: ["-c", `cd ${REMOTION} && timeout 150 node smoke.mjs "$1"`, "bash", file] });
+      const result = await runIn(sandbox, { cmd: "bash", args: ["-c", `cd ${REMOTION} && timeout 150 node smoke.mjs "$1"`, "bash", file] });
       const lastLine = (await result.stdout()).trim().split("\n").at(-1) ?? "";
       try {
         const parsed = JSON.parse(lastLine) as {
@@ -659,7 +740,7 @@ export async function renderStillsInSandbox(
       await bash(sandbox, 'rm -rf "$1" && mkdir -p "$1"', [dir]);
       const list = jobs.map((j) => ({ id: j.id, frame: j.frame, props: j.props, out: `${dir}/${j.id}.jpg` }));
       await sandbox.writeFiles([{ path: `${dir}/jobs.json`, content: JSON.stringify(list) }]);
-      const result = await sandbox.runCommand({ cmd: "bash", args: ["-c", `cd ${REMOTION} && timeout 240 node stills.mjs "$1/jobs.json"`, "bash", dir] });
+      const result = await runIn(sandbox, { cmd: "bash", args: ["-c", `cd ${REMOTION} && timeout 240 node stills.mjs "$1/jobs.json"`, "bash", dir] });
       const lastLine = (await result.stdout()).trim().split("\n").at(-1) ?? "";
       let errors: Record<string, string | null>;
       try {
@@ -701,7 +782,7 @@ export async function reelFramesInSandbox(id: string, props: ReelProps, frames: 
       const local = await localMedia(sandbox, id, props);
       const jobs = frames.map((frame, i) => ({ id: `f${i}`, frame, out: `${dir}/f${i}.jpg`, scale }));
       await sandbox.writeFiles([{ path: `${dir}/frames.json`, content: JSON.stringify({ props: local, jobs }) }]);
-      const result = await sandbox.runCommand({ cmd: "bash", args: ["-c", `cd ${REMOTION} && timeout 240 node stills.mjs "$1/frames.json"`, "bash", dir] });
+      const result = await runIn(sandbox, { cmd: "bash", args: ["-c", `cd ${REMOTION} && timeout 240 node stills.mjs "$1/frames.json"`, "bash", dir] });
       const lastLine = (await result.stdout()).trim().split("\n").at(-1) ?? "";
       let errors: Record<string, string | null>;
       try {
@@ -1232,7 +1313,7 @@ export async function pageInSandbox(id: string, url: string): Promise<{ capture:
     const dir = `${ROOT}/jobs/${id}`;
     try {
       await bash(sandbox, 'rm -rf "$1" && mkdir -p "$1"', [dir]);
-      const result = await sandbox.runCommand({
+      const result = await runIn(sandbox, {
         cmd: "bash",
         args: [
           "-c",
@@ -1280,7 +1361,7 @@ export async function fontSheetInSandbox(id: string, words: string, fonts: strin
     try {
       await bash(sandbox, 'rm -rf "$1" && mkdir -p "$1"', [dir]);
       await sandbox.writeFiles([{ path: `${dir}/in.json`, content: JSON.stringify({ words, fonts }) }]);
-      const result = await sandbox.runCommand({
+      const result = await runIn(sandbox, {
         cmd: "bash",
         args: [
           "-c",
@@ -1348,7 +1429,7 @@ export async function screenshotInSandbox(id: string, url: string): Promise<Buff
 // (BiRefNet lite, MIT, rembg's ONNX export) on the CPU, with onnxruntime-node. In its
 // own persistent sandbox: the model needs about 6.5 GB at its fixed 1024 px input
 // (measured), which the 8 GB render sandbox cannot spare (it was killed, exit 137).
-// It only runs for a collage's photos, each once, and stops 5 minutes after its last job.
+// It only runs for a collage's photos, each once, and stops soon after its last job (IDLE_TAIL_MS).
 // ---------------------------------------------------------------------------
 
 const CUTOUT_NAME = "fauve-cutout-paris";
@@ -1386,8 +1467,10 @@ export function cutoutSandbox(): Promise<Sandbox> {
       persistent: true,
       region: SANDBOX_REGION,
       resources: { vcpus: CUTOUT_VCPUS },
-      timeout: 5 * 60_000,
+      // Its 16 GB paid while it is up: it stops soon after its last command, as the render sandboxes do.
+      timeout: IDLE_TAIL_MS,
       keepLastSnapshots: KEEP_SNAPSHOTS,
+      onResume: onResume(CUTOUT_VCPUS),
     });
     await keepFewSnapshots(sandbox);
     await bash(sandbox, CUTOUT_SETUP);
@@ -1441,7 +1524,7 @@ export async function cutoutsInSandbox(
       await Promise.all(photos.map((p, i) => bash(sandbox, FETCH, [`${dir}/in${i}`, p.url])));
       const jobs = photos.map((p, i) => ({ id: p.id, src: `${dir}/in${i}`, out: `${dir}/out${i}` }));
       await sandbox.writeFiles([{ path: `${dir}/jobs.json`, content: JSON.stringify(jobs) }]);
-      const run = await sandbox.runCommand({
+      const run = await runIn(sandbox, {
         cmd: "bash",
         args: ["-c", `cd ${CUTOUT_ROOT} && CUTOUT_HOME=${CUTOUT_ROOT} FFMPEG=${CUTOUT_ROOT}/ffmpeg timeout 600 node cutout.mjs "$1/jobs.json"`, "bash", dir],
       });
@@ -1642,7 +1725,7 @@ export async function subjectsInSandbox(
         ...(p.trackUrl ? { track: `${dir}/track${tracks.indexOf(p.trackUrl)}.json` } : {}),
       }));
       await sandbox.writeFiles([{ path: `${dir}/jobs.json`, content: JSON.stringify(jobs) }]);
-      const run = await sandbox.runCommand({
+      const run = await runIn(sandbox, {
         cmd: "bash",
         args: [
           "-c",
@@ -1691,7 +1774,7 @@ export async function tracksInSandbox(id: string, videos: { id: string; url: str
       await Promise.all(videos.map((v, i) => bash(sandbox, FETCH, [`${dir}/in${i}`, v.url])));
       const jobs = videos.map((v, i) => ({ id: v.id, src: `${dir}/in${i}`, out: `${dir}/out${i}.json` }));
       await sandbox.writeFiles([{ path: `${dir}/jobs.json`, content: JSON.stringify(jobs) }]);
-      const run = await sandbox.runCommand({
+      const run = await runIn(sandbox, {
         cmd: "bash",
         args: ["-c", `cd ${TRACK_ROOT} && TRACK_MODELS=${TRACK_ROOT}/models FFMPEG=${CUTOUT_ROOT}/ffmpeg timeout 480 py/bin/python -I track.py "$1/jobs.json"`, "bash", dir],
       });
@@ -1847,7 +1930,7 @@ export async function stealReelInSandbox(id: string, source: { link: string } | 
   const dir = `${ROOT}/jobs/${id}`;
   try {
     await bash(sandbox, 'rm -rf "$1" && mkdir -p "$1"', [dir]);
-    const run = await sandbox.runCommand({
+    const run = await runIn(sandbox, {
       cmd: "bash",
       args: ["-c", STEAL_JOB, "bash", dir, link ? source.link : source.file, link ? "link" : "file", bassLevelsFilter(BEAT_STEP)],
     });

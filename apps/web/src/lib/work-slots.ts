@@ -89,3 +89,23 @@ export async function withSlot<T>(spec: SlotSpec, work: (slot: number, held: boo
     );
   }
 }
+
+/**
+ * Whether a place of `kind` among `seats` is held now: a job is on that machine, or about to be. True when the
+ * database cannot say (better a sandbox left up than one stopped under a job).
+ */
+export async function placesHeld(kind: string, seats: number[]): Promise<boolean> {
+  try {
+    const { data, error } = await supabaseAdmin()
+      .from("work_slots")
+      .select("seat")
+      .eq("kind", kind)
+      .in("seat", seats)
+      .not("holder", "is", null)
+      .gt("expires_at", new Date().toISOString())
+      .limit(1);
+    return Boolean(error) || (data?.length ?? 0) > 0;
+  } catch {
+    return true;
+  }
+}
