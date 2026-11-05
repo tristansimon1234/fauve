@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Vercel's ignoreCommand (apps/web/vercel.json): exit 0 skips the build, any other code builds (Tristan: « ba oui »,
 # each build is paid in CPU minutes). Skipped when nothing the app uses changed since the last good deployment
-# (VERCEL_GIT_PREVIOUS_SHA): Markdown, docs/, the local skill render tool, the fiche measures, and the drafts of montage skills
+# (VERCEL_GIT_PREVIOUS_SHA): Markdown, docs/, the session settings (.claude/), the local skill render tool, the fiche measures, and the drafts of montage skills
 # (packages/agent/src/skills/<key>.ts that skill-library.ts imports neither before nor after). Anything else builds,
 # and so does a base the clone does not have.
 set -u
@@ -14,7 +14,7 @@ in_library() { git show "$1:$library" 2>/dev/null | grep -qF "\"./skills/$2.ts\"
 while IFS= read -r file; do
   [ -z "$file" ] && continue
   case "$file" in
-    *.md | docs/*) ;;
+    *.md | docs/* | .claude/*) ;;
     scripts/skill-render.mts | scripts/fiche/*) ;;
     packages/agent/src/skills/*/*) exit 1 ;;
     packages/agent/src/skills/*.ts)

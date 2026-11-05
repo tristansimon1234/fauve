@@ -1,5 +1,16 @@
 {
   "permissions": {
-    "allow": ["mcp__Supabase", "mcp__github", "mcp__Vercel", "Bash", "WebFetch", "WebSearch"]
+    "allow": [
+      "mcp__Supabase",
+      "mcp__github",
+      "mcp__Vercel",
+      "Bash",
+      "WebFetch",
+      "WebSearch",
+      "Monitor",
+      "Agent",
+      "SendUserFile",
+      "Skill"
+    ]
   }
 }
