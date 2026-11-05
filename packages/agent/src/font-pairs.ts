@@ -171,6 +171,16 @@ export const FONT_PAIRS: FontPair[] = [
     how: "sa première phrase en grasse condensée sur des bandeaux noirs, puis de petits sous-titres sobres en grotesque demi-grasse",
     fits: "quelqu'un qui parle face caméra, une explication, des références",
   },
+  {
+    // « Court métrage » (docs/fiches/court-metrage.md, effect 2): its film's title card in one serif family, its title in
+    // big capitals on two tight lines, one small word in spaced capitals over it, its credit in small italic under it.
+    key: "generique",
+    name: "Générique de film",
+    display: { family: "Cormorant Garamond", weight: 600, case: "upper", tracking: "tight" },
+    body: { family: "Cormorant Garamond", weight: 500, case: "upper", tracking: "wide" },
+    how: "un titre de film en grandes capitales serif sur deux lignes serrées, un petit mot en capitales très espacées au-dessus, une signature en petit italique dessous, dans la même famille",
+    fits: "un court métrage, une journée racontée comme un film, un générique d'ouverture",
+  },
 ];
 
 const BY_KEY = new Map(FONT_PAIRS.map((p) => [p.key, p]));

@@ -1405,6 +1405,57 @@ export const HOUSE_MODELS: HouseModel[] = [
       why: "Son lieu ordinaire vu comme par une machine : le stroboscope de regards intrigue, chaque passe montre autre chose, et la personne immobile au milieu tient l'œil.",
     },
   }),
+  model({
+    key: "court-metrage",
+    name: "Court métrage",
+    // Written on its original's fiche (v1 of its skill, docs/fiches/court-metrage.md): a short travel film projected as on
+    // an old projector, its picture with rounded corners on a soft black, opened from a slit, its title card in lemon
+    // yellow, its film burns, the film slipping in the gate in its middle, a shot a bar, its fade to black.
+    pitch: "Ta journée en court métrage projeté : l'image s'ouvre depuis une fente, le titre de ton film en jaune, une brûlure de pellicule, un plan par mesure, la pellicule qui saute au milieu, puis un fondu au noir.",
+    needs: "5 à 10 vidéos de ta journée à l'horizontale, dans une belle lumière (le matin, l'heure dorée, un contre-jour) : un intérieur calme pour ouvrir, ta rue, ton trajet, tes gestes, une vue calme pour finir",
+    files: [4, 10],
+    pair: "generique",
+    // Its skill's code is its reference.
+    example: null,
+    // Its cuts' grid (docs/fiches/court-metrage.md): seven cuts within an image at 85,5 (its music's onsets say 85,3).
+    tempo: 85.5,
+    finish: { name: "Pellicule dorée", hint: "chaud et doux, noirs relevés, hautes lumières retenues, sans grain ni coins sombres", warmth: 0.05, fade: 0.08, contrast: -0.03 },
+    look: {
+      name: "court métrage projeté",
+      format: "pov",
+      hook: { kind: "promesse", what: "l'image qui s'ouvre depuis une fente au milieu, dans une pellicule aux coins arrondis, et le titre du film en jaune qui s'y pose d'un coup" },
+      text: {
+        amount: "une ligne",
+        composition: "un générique sur le premier plan : un petit mot en capitales très espacées en haut, le titre en grandes capitales serif sur deux lignes serrées au milieu, une signature en petit italique en bas, en jaune citron",
+        case: "upper",
+        weight: "bold",
+        tracking: "tight",
+      },
+      colors: ["#f2ea4a"],
+      layout: "chaque plan dans une image de pellicule 1,94:1 aux coins arrondis sur un noir doux, au milieu du cadre quand ses vidéos sont horizontales",
+      moments: [
+        { at: 0, what: "le noir avec un déclic, puis l'image qui s'ouvre depuis une fente au milieu, deux bandes noires qui s'écartent à vitesse égale en 2,3 s, le bruit d'un projecteur" },
+        { at: 2.57, what: "sur le temps, le titre du film posé d'un coup en jaune : un petit mot espacé en haut, le titre en grandes capitales serif au milieu, une signature en italique en bas, avec un déclic" },
+        { at: 3.83, what: "une brûlure de pellicule entre par la gauche (rouge-orangé, orange, ambre, puis jaune pâle) et blanchit l'image sur la coupe ; la musique entre" },
+        { at: 4, what: "un plan par mesure, coupé sur chaque accord, dans une lumière dorée : la rue, le trajet, les gestes" },
+        { at: 15.03, what: "la pellicule saute dans le projecteur : une brûlure, l'image qui remonte par à-coups pendant six images, ses lignes noires et ses perforations qui passent, une image crème brûlée, une dernière brûlure" },
+        { at: 20.87, what: "un dernier plan calme et large, en fondu au noir avec la musique" },
+      ],
+      sounds: [
+        { at: 0.13, what: "film projector switch click, on the black" },
+        { at: 0.2, what: "old film projector running, under the opening slit" },
+        { at: 2.54, what: "film projector click, as the title lands" },
+        { at: 14.95, what: "film reel flutter, as the film slips in the gate" },
+      ],
+      camera: "mixte",
+      transitions: "effets",
+      grade: "film",
+      motion: "epure",
+      music: "lo-fi felt piano and pads, soft kick, round bass, off-beat shaker, 85 BPM",
+      ending: "un dernier plan calme et large qui s'éteint en fondu au noir avec la musique",
+      why: "On ouvre un film plutôt qu'une vidéo : la fente qui s'ouvre, le titre et la brûlure promettent une histoire, la pellicule qui saute relance au milieu, et la lumière dorée donne envie d'y être.",
+    },
+  }),
 ];
 
 const BY_KEY = new Map(HOUSE_MODELS.map((m) => [m.key, m]));
@@ -1476,6 +1527,7 @@ export const HOUSE_WHEN: Record<string, { pour: string; pas_pour: string }> = {
   createur: { pour: "quelqu'un qui explique en parlant face caméra et montre ce dont il parle (ses produits, ses réalisations, son lieu, son site)", pas_pour: "des images sans parole, quelqu'un qui parle sans rien à montrer" },
   silhouette: { pour: "se présenter (elle ou quelqu'un de son équipe), présenter son métier et ce qu'elle fait, un lancement, un ton de studio graphique", pas_pour: "des produits seuls, un lieu sans personne, une offre à lire" },
   vision: { pour: "son lieu fréquenté filmé de haut, quelqu'un d'immobile au milieu et des gens qui passent autour ; un ton tech ou graphique", pas_pour: "un lieu vide, un plan qui bouge, des produits en gros plan, un message à lire" },
+  "court-metrage": { pour: "raconter sa journée, son quartier ou une sortie comme un petit film, une ouverture, une saison, de belles lumières (le matin, l'heure dorée)", pas_pour: "une offre à lire, quelqu'un qui parle, des vidéos sombres ou toutes en gros plan" },
 };
 
 /** The models for Edith: their key, name, what they do, what they want, and what only she can film for one. */
