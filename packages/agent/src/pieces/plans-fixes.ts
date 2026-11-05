@@ -76,8 +76,9 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const frame = useCurrentFrame();
   const word = (k) => { const v = texts && texts[k]; return typeof v === "string" ? v.trim() : ""; };
   const mark = (k, d) => { const v = Number(texts && texts[k]); return Number.isFinite(v) && v > 0 ? v : d; };
-  // Its shots: those that play during it, in order; the first one carries its title.
-  const mine = shots.map((s, i) => i).filter((i) => shots[i].from < durationInFrames && shots[i].from + shots[i].durationInFrames > 0);
+  // Its shots: those that play during it, in order (one that only grazes it by a frame left out, as the engine counts
+  // the shots under it); the first one carries its title.
+  const mine = shots.map((s, i) => i).filter((i) => shots[i].from < durationInFrames - 1 && shots[i].from + shots[i].durationInFrames > 1);
   if (!mine.length) return null;
   const first = mine[0];
   const BEAT = mark("beat", 18);
