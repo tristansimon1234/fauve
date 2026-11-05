@@ -81,7 +81,7 @@ import { bakedReel, insertPlanVersion } from "@/lib/edit-plans";
 import { effectRoute } from "@/lib/agent/effects-agent";
 import { fewSubjects } from "@/lib/agent/copy-design";
 import { skillTooShort, skillWantsMore } from "@/lib/agent/skill-design";
-import { keepModelSound } from "@/lib/model-sound";
+import { keepModelSound, keepsModelSound } from "@/lib/model-sound";
 import { followSound } from "@/lib/sound-follow";
 import { skillGate } from "@/lib/skill-reviews";
 import { MONTAGE_SKILLS } from "@fauve/agent/skills";
@@ -235,6 +235,8 @@ function photoNotes(regions: unknown): string | undefined {
 
 /** Her answer to « garder son son ? » (its buttons, or her words). */
 const SOUND_ANSWER = /^(garder son son|ta musique|ma musique|son du mod[eè]le|garde (son|le) son|mets ta musique)\b/i;
+/** Her words asking for Edith's music on the Reel she copies (its sound is kept without asking otherwise). */
+const EDITH_MUSIC = /^(ta musique|ma musique|mets ta musique|avec ta musique)\b/i;
 
 const COSTLY_TOOLS = [
   "analyze_clips",
@@ -695,8 +697,13 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
         if (!known.data) return "Inspiration introuvable : reprends un inspiration_id de list_inspirations.";
         check(await db.from("posts").update({ inspiration_id }).eq("id", post_id).eq("studio_id", studioId));
       }
-      // Her answer to « garder son son ? » for a Reel copied from Instagram: no music of Edith's, she posts it herself.
-      const sound = son ? await keepModelSound(studioId, post_id, son === "modele").catch(() => null) : null;
+      // The sound of the Instagram Reel she copies is kept without asking her (keepsModelSound: nobody speaks on it, no
+      // voice on hers), unless she has asked for Edith's music; her answer, when she gave one, decides. No music of
+      // Edith's then: she posts it herself and adds its sound in Instagram.
+      const askedMusic = (ctx.exchange ?? []).some((r) => r.direction === "inbound" && EDITH_MUSIC.test(r.body?.trim() ?? ""));
+      const keptByDefault = !son && !correction && !variant && !post.edit_plan_id && !askedMusic && (await keepsModelSound(studioId, post_id).catch(() => false));
+      const choice = son ?? (keptByDefault ? "modele" : undefined);
+      const sound = choice ? await keepModelSound(studioId, post_id, choice === "modele").catch(() => null) : null;
       if ((correction || variant) && !post.edit_plan_id) return "Pas encore de montage pour cette publication : lance d'abord un montage (correction: false).";
       // A model coded as a montage skill takes a few files at least: with fewer, she is asked first whether she has others
       // (Tristan: « tu n'as que 3 plans, en as-tu d'autres pour moi ? », else she makes it with those), nothing launched meanwhile.
@@ -784,7 +791,8 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
         ...(route === "agent" ? { atelier: "effet dessiné image par image, sur ce qui bouge dans sa vidéo", duree: `${minutes} min` } : level ? { niveau: level.label, duree: `${minutes} min` } : {}),
         ...(job.effort && job.effort !== wanted && route !== "agent" ? { attention: `Le solde ne permettait pas le niveau ${EFFORTS[wanted].label} : lancé en ${level?.label}.` } : {}),
         ...(son === "modele" && !sound ? { son: "Ce Reel ne recopie pas un Reel d'Instagram : il n'y a pas de son à garder, il part avec ta musique. Dis-le en une phrase." } : {}),
-        ...(son === "modele" && sound?.business ? { son: "Sans ta musique, pour son son. Son compte Instagram est un compte Entreprise, où Instagram ne propose pas tous les sons : dis-lui que si « Utiliser l'audio » n'apparaît pas, elle te dit « mets ta musique »." } : {}),
+        ...(keptByDefault && sound && !sound.business ? { son: "Son son est gardé d'office : la vidéo sortira sans ta musique, sur ses coupes, et la livraison lui dira comment l'ajouter dans Instagram. N'en parle pas ; si elle veut ta musique, set_music on." } : {}),
+        ...(choice === "modele" && sound?.business ? { son: "Sans ta musique, pour son son. Son compte Instagram est un compte Entreprise, où Instagram ne propose pas tous les sons : dis-lui que si « Utiliser l'audio » n'apparaît pas, elle te dit « mets ta musique »." } : {}),
         ...(subjects !== null
           ? {
               peu_de_sujets: `Le Reel qu'elle recopie pose un sujet détouré (un objet, une personne) sur presque chaque plan, et ses photos n'en montrent que ${subjects}. Dis-le en une phrase : ça part quand même, avec plus de plans sans détourage, et 4 ou 5 photos d'objets ou de personnes sur un fond simple le rendraient plus varié.`,
@@ -1469,7 +1477,7 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
         ...(soundAnswer ? { son_deja_choisi: `Elle a déjà répondu pour le son : « ${soundAnswer} ». Ne le redemande pas.` } : {}),
         ...(link && /instagram\.com\//i.test(link) && !soundAnswer
           ? {
-              son: "Un Reel d'Instagram : dans cette même réponse, demande-lui une fois si elle veut garder son son, avec deux boutons (reply_with) « Garder son son » et « Ta musique ». Garder son son : sa vidéo sortira sans musique, sur ses coupes, et elle ajoutera le son dans Instagram avec « Utiliser l'audio » en la publiant elle-même. Sa réponse va à montage (son) ; si le montage est déjà lancé, à set_music (model, ou on).",
+              son: "Un Reel d'Instagram : son son est gardé d'office quand personne n'y parle (sa vidéo sortira sans musique, sur ses coupes, et elle l'ajoutera dans Instagram avec « Utiliser l'audio » en la publiant elle-même). Ne lui demande pas. Si elle veut ta musique : montage (son edith), ou set_music on une fois lancé.",
             }
           : {}),
       });

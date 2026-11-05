@@ -1,4 +1,5 @@
 import "server-only";
+import { stolenStyleSchema } from "@fauve/agent";
 import { readPostMusic } from "@/lib/render/music";
 import { SENT_TO_COPY } from "@/lib/steal";
 import { supabaseAdmin } from "@/lib/supabase/admin";
@@ -52,6 +53,25 @@ export async function keepModelSound(studioId: string, postId: string, keep: boo
   const { error } = await db.from("posts").update(update).eq("id", postId).eq("studio_id", studioId).not("status", "in", "(published,measured)");
   if (error) throw new Error(error.message);
   return sound;
+}
+
+/**
+ * Whether this Reel keeps the sound of the Instagram Reel it copies without asking her (Tristan: « si il veut copier un
+ * Reel on reprend direct son son ? » : « oui »): only when nobody speaks on the model (someone else's voice on her Reel
+ * makes no sense, as a sound she follows: lib/sound-follow.ts), her Reel carries no voice (hers or Edith's: a song added
+ * in Instagram would replace it), and its music is still the default one (she has not asked for Edith's, nor for none).
+ */
+export async function keepsModelSound(studioId: string, postId: string): Promise<boolean> {
+  const db = supabaseAdmin();
+  const { data: post } = await db.from("posts").select("inspiration_id, voice_media_id, voice_over, music").eq("id", postId).eq("studio_id", studioId).maybeSingle();
+  if (!post?.inspiration_id || post.voice_media_id || (post.voice_over as { mode?: string } | null)?.mode === "on") return false;
+  const music = readPostMusic(post.music);
+  if (music.mode !== "on" || music.sound || music.wish) return false;
+  const { data: inspiration } = await db.from("inspirations").select("source, url, style").eq("id", post.inspiration_id as string).eq("studio_id", studioId).maybeSingle();
+  const link = inspiration?.url as string | null | undefined;
+  if (!link || !INSTAGRAM.test(link) || !SENT_TO_COPY.includes(inspiration?.source as string)) return false;
+  const style = stolenStyleSchema.safeParse(inspiration?.style);
+  return style.success && style.data.look.voice === "aucune";
 }
 
 /** What the delivery tells her of a Reel without music for the model's sound: how to add it, and the Business caveat. */

@@ -227,7 +227,7 @@ export const toolSpecs = {
       son: z
         .enum(["modele", "edith"])
         .optional()
-        .describe("Pour un Reel qui en recopie un d'Instagram, sa réponse à « garder son son ? » : modele (la vidéo sort sans musique, sur ses coupes, et elle ajoute le son dans Instagram avec « Utiliser l'audio » en la publiant elle-même), edith (ta musique). Seulement ce qu'elle a répondu : sans réponse, laisse vide (ta musique), jamais un choix fait pour elle"),
+        .describe("Pour un Reel qui en recopie un d'Instagram : modele (la vidéo sort sans musique, sur ses coupes, et elle ajoute le son dans Instagram avec « Utiliser l'audio » en la publiant elle-même), edith (ta musique). Seulement ce qu'elle a demandé : sans rien de sa part, laisse vide (son son est gardé d'office quand personne n'y parle)"),
       max_new_scenes: z.number().int().min(0).max(8).optional().describe("Nouvelles animations sur mesure permises (3 crédits chacune, débitées seulement si elles sont créées). Par défaut : autant que d'animations dans le plan (au moins 2 pour le tout premier Reel) ; sans plan, 1 pour un nouveau montage et 0 pour une correction. 0 si elle veut économiser (le monteur réutilise sa bibliothèque)."),
       effort: effortSchema
         .optional()
@@ -424,7 +424,7 @@ export const toolSpecs = {
   },
   set_music: {
     description:
-      "Musique d'un Reel, composée par Edith pour ce montage (ElevenLabs, calée sur les images, libre de droits, sans voix) : on (par défaut, aussi quand elle dit « mets ta musique »), off (Reel muet), another (une nouvelle musique), model (un Reel qui en recopie un d'Instagram : garder son son, la vidéo sans musique sur ses coupes, qu'elle publie elle-même en ajoutant le son avec « Utiliser l'audio »). bruitages : les petits sons posés là où quelque chose se passe (un pop, un whoosh), light (légers, par défaut), more (plus présents), off (aucun) ; sans post_id, pour tous ses prochains Reels. Refait la vidéo, gratuit.",
+      "Musique d'un Reel, composée par Edith pour ce montage (ElevenLabs, calée sur les images, libre de droits, sans voix) : on (par défaut, aussi quand elle dit « mets ta musique »), off (Reel muet), another (une nouvelle musique), model (un Reel qui en recopie un d'Instagram, d'office quand personne n'y parle : garder son son, la vidéo sans musique sur ses coupes, qu'elle publie elle-même en ajoutant le son avec « Utiliser l'audio »). bruitages : les petits sons posés là où quelque chose se passe (un pop, un whoosh), light (légers, par défaut), more (plus présents), off (aucun) ; sans post_id, pour tous ses prochains Reels. Refait la vidéo, gratuit.",
     input: z.object({
       post_id: z.string().uuid().optional(),
       mode: z.enum(["on", "off", "another", "model"]).optional(),
