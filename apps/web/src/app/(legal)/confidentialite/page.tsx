@@ -43,6 +43,10 @@ export default function PrivacyPage() {
         <li>Cloner ta voix : ton consentement, que tu peux retirer à tout moment en supprimant ta voix.</li>
         <li>Connexion sécurisée par WhatsApp : exécution du contrat et sécurité.</li>
         <li>Prévenir les abus (limite de messages, nouveaux numéros) et suivre nos coûts : intérêt légitime.</li>
+        <li>
+          Imaginer de nouveaux modèles d’Edith : un Reel que tu envoies en exemple par son lien peut en inspirer un ; l’équipe garde alors le lien public de ce Reel et sa
+          lecture, sans rien qui dise qui l’a envoyé : intérêt légitime.
+        </li>
         <li>Facturation et obligations comptables : obligation légale.</li>
       </ul>
       <p>Nous ne vendons aucune donnée et ne faisons pas de publicité ciblée avec tes données.</p>
@@ -78,7 +82,10 @@ export default function PrivacyPage() {
           pour tes meilleures vidéos, gardées pour tes prochains Reels). Les photos de ton site restent tant que ton compte existe.
         </li>
         <li>Enregistrement fait pour cloner ta voix : supprimé dès que la voix est clonée. Voix clonée : jusqu’à ce que tu la supprimes, ou que ton compte soit supprimé.</li>
-        <li>Reel envoyé en exemple : seule sa lecture (sa forme, son rythme) est gardée ; sa vidéo est supprimée une fois lue.</li>
+        <li>
+          Reel envoyé en exemple : seule sa lecture (sa forme, son rythme) est gardée ; sa vidéo est supprimée une fois lue. Envoyé par son lien, le lien public de ce Reel et
+          sa lecture peuvent aussi rester chez l’équipe comme idée de modèle, sans rien qui te concerne, même après la suppression de ton compte.
+        </li>
         <li>Liens de connexion envoyés par Edith : à usage unique, 15 minutes à 24 heures selon leur usage.</li>
         <li>Factures : 10 ans (obligation légale).</li>
       </ul>
