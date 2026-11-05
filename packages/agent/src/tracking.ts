@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { isClipSegment, isMotionSegment, type CameraMove, type ClipAnalysis, type EditPlan } from "./schemas.ts";
+import { isClipSegment, isMotionSegment, type CameraMove, type ClipAnalysis, type EditPlan, type HandMomentKind } from "./schemas.ts";
 import type { ReelSegment } from "./motion.ts";
 
 // What moves in her videos: hands (21 points each, fingertips included), faces and bodies,
@@ -191,6 +191,8 @@ export function sceneTrack(plan: Pick<EditPlan, "segments">, segments: ReelSegme
 export function layerTrack(plan: Pick<EditPlan, "segments">, segments: ReelSegment[], from: number, length: number, tracks: TracksByClip): TrackPiece[] {
   return segments.flatMap((segment, i): TrackPiece[] => {
     if (segment.startAt >= from + length || segment.startAt + segment.durationInFrames <= from) return [];
+    // A shot laid beside another is not under the animation: the plain montage plays the main line.
+    if ((segment.type === "clip" || segment.type === "image") && segment.beside) return [];
     const s = plan.segments[i];
     if (segment.type === "clip" && s && isClipSegment(s)) {
       const file = tracks[s.clip_id];
@@ -381,6 +383,150 @@ export function handMoves(t: Pick<FootageTracks, "fps" | "from" | "frames" | "as
   return told.slice(0, MAX_HAND_MOVES).map(({ start, end, what }) => ({ start, end: Math.max(end, Math.round((start + 0.1) * 10) / 10), what }));
 }
 
+/** What each moment of handMoves is, by the words it tells it in. */
+const MOVE_OF: Record<Exclude<HandMomentKind, "highest" | "lowest">, { what: (w: string) => boolean; edge: "start" | "end" }> = {
+  raised: { what: (w) => w === "la main monte", edge: "end" },
+  lowered: { what: (w) => w === "la main descend", edge: "end" },
+  toward: { what: (w) => w === "la main avance vers la caméra", edge: "end" },
+  away: { what: (w) => w === "la main recule", edge: "end" },
+  spread: { what: (w) => w.startsWith("le pouce et l'index s'écartent"), edge: "start" },
+  pinch: { what: (w) => w === "le pouce et l'index restent pincés", edge: "start" },
+};
+
+/** Her body's wrists and fingers (pose points 15 to 22): where her hand is when no hand was found. */
+const BODY_HANDS = [15, 16, 17, 18, 19, 20, 21, 22];
+
+/**
+ * When her hand does it in a passage of a clip (`from` to `to`, its seconds), read on its tracks: `highest`, the image
+ * where a hand is highest in the picture (any of its points; her body's wrists and fingers when no hand was found there):
+ * the top of a reach or of a jump, her hand on a switch drawn high on the wall; `lowest`, the opposite; the others, the
+ * first move of that kind handMoves tells (raised: once it has gone up; lowered: come down; toward the camera; away;
+ * spread: as thumb and index open; pinch: as a pinch starts being held). In seconds of the clip (to the image for highest
+ * and lowest, to a tenth for the others); null when nothing of the kind is read (three images seen at least).
+ */
+export function handMoment(file: TracksFile, from: number, to: number, moment: HandMomentKind): number | null {
+  const first = Math.max(file.from, Math.floor(from * file.fps));
+  const last = Math.min(file.from + file.frames.length, Math.ceil(to * file.fps));
+  if (last - first < 3) return null;
+  if (moment === "highest" || moment === "lowest") {
+    const sign = moment === "highest" ? 1 : -1;
+    // Per image, the highest (or lowest) point of a hand, in thousandths of the picture's height (0 at its top).
+    const seen: { frame: number; y: number }[] = [];
+    for (let n = first; n < last; n++) {
+      const row = file.frames[n - file.from];
+      const hands = (row?.h ?? []).flatMap((h) => h.slice(1).filter((_, k) => k % 2 === 1));
+      const body = (row?.b ?? []).flatMap((b) => BODY_HANDS.flatMap((p) => ((b[1 + 3 * p + 2] ?? 0) >= 50 ? [b[1 + 3 * p + 1]!] : [])));
+      const ys = (hands.length ? hands : body).filter((y) => Number.isFinite(y));
+      if (ys.length) seen.push({ frame: n, y: sign > 0 ? Math.min(...ys) : Math.max(...ys) });
+    }
+    if (seen.length < 3) return null;
+    // The median of each image and its neighbours: one point read wrong does not make the top; among the images it
+    // flattens the top over, the one read highest.
+    const smooth = seen.map((s, i) => {
+      const around = seen.slice(Math.max(0, i - 1), i + 2).map((x) => x.y).sort((a, b) => a - b);
+      return around[Math.floor(around.length / 2)]!;
+    });
+    let best = 0;
+    smooth.forEach((y, i) => {
+      if (sign * (smooth[best]! - y) > 0 || (y === smooth[best] && sign * (seen[best]!.y - seen[i]!.y) > 0)) best = i;
+    });
+    return Math.round((seen[best]!.frame / file.fps) * 1000) / 1000;
+  }
+  const passage = sliceTracks(file, first, last);
+  if (!passage) return null;
+  const kind = MOVE_OF[moment];
+  const move = handMoves(passage).find((m) => kind.what(m.what));
+  return move ? move[kind.edge] : null;
+}
+
+// ---------------------------------------------------------------------------
+// What the heads do, measured the same way (« Silhouette »: she lowers, raises or turns her head, and its erasing and
+// its eye are timed on it): its nose against its ears, from the body's points when it faces the camera, else the
+// face's own. Mirror of headMovesOf in apps/render/src/reading.ts, which a composition reads with HeadMoves.
+// ---------------------------------------------------------------------------
+
+/** A head lowers or raises when its nose moves this much of its ears' gap down or up against them within HEAD_WITHIN s; it turns when its nose crosses this much of it sideways. */
+const NOD = 0.22;
+const TURN = 0.35;
+const HEAD_WITHIN = 0.8;
+const MAX_HEAD_MOVES = 12;
+
+/** What a head move is, in the editor's and the filler's words. */
+const HEAD_WORDS = { down: "la tête se baisse", up: "la tête se relève", left: "la tête tourne vers la gauche de l'image", right: "la tête tourne vers la droite de l'image" } as const;
+
+type HeadSample = { frame: number; pitch: number; yaw: number };
+
+/** Each head's pose image by image: how far its nose sits below its ears (pitch, in their gap) and to their side (yaw); a body's head first. */
+function headSeries(frames: TracksFile["frames"], aspect: number): HeadSample[][] {
+  const byId = new Map<string, HeadSample[]>();
+  frames.forEach((row, frame) => {
+    for (const b of row.b ?? []) {
+      const p = (k: number) => ({ x: ((b[1 + 3 * k] ?? 0) / 1000) * aspect, y: (b[2 + 3 * k] ?? 0) / 1000, v: (b[3 + 3 * k] ?? 0) / 100 });
+      const [nose, leftEar, rightEar] = [p(0), p(7), p(8)];
+      if (Math.min(nose.v, leftEar.v, rightEar.v) < 0.5) continue;
+      const gap = Math.hypot(leftEar.x - rightEar.x, leftEar.y - rightEar.y);
+      if (gap <= 0.005) continue;
+      const list = byId.get(`b${b[0]}`) ?? [];
+      list.push({ frame, pitch: (nose.y - (leftEar.y + rightEar.y) / 2) / gap, yaw: (nose.x - (leftEar.x + rightEar.x) / 2) / gap });
+      byId.set(`b${b[0]}`, list);
+    }
+    for (const f of row.f ?? []) {
+      const p = (k: number) => ({ x: ((f[5 + 2 * k] ?? 0) / 1000) * aspect, y: (f[6 + 2 * k] ?? 0) / 1000 });
+      const [nose, rightEar, leftEar] = [p(2), p(4), p(5)];
+      const gap = Math.hypot(leftEar.x - rightEar.x, leftEar.y - rightEar.y);
+      if (f.length < 17 || !(gap > 0.005)) continue;
+      const list = byId.get(`f${f[0]}`) ?? [];
+      list.push({ frame, pitch: (nose.y - (leftEar.y + rightEar.y) / 2) / gap, yaw: (nose.x - (leftEar.x + rightEar.x) / 2) / gap });
+      byId.set(`f${f[0]}`, list);
+    }
+  });
+  return [...byId.entries()].sort((a, b) => (a[0][0] === b[0][0] ? b[1].length - a[1].length : a[0][0] === "b" ? -1 : 1)).map(([, list]) => list);
+}
+
+/** A head move in frames of the tracks given, and its way. */
+export type HeadMoveFrames = { from: number; to: number; what: keyof typeof HEAD_WORDS };
+
+/** What the heads do in tracks (frames from their first image): lowered, raised, turned toward a side of the picture; one move told once even when two ids saw it. */
+export function headMoveFrames(frames: TracksFile["frames"], aspect: number, fps = TRACK_FPS): HeadMoveFrames[] {
+  const within = Math.round(fps * HEAD_WITHIN);
+  const out: HeadMoveFrames[] = [];
+  for (const samples of headSeries(frames, aspect)) {
+    if (samples.length < 6) continue;
+    const pitch = smooth(samples.map((s) => s.pitch));
+    const yaw = smooth(samples.map((s) => s.yaw));
+    for (let i = 0; i < samples.length; ) {
+      let found = false;
+      for (let j = i + 1; j < samples.length && samples[j]!.frame - samples[i]!.frame <= within; j++) {
+        const dp = pitch[j]! - pitch[i]!;
+        const dy = yaw[j]! - yaw[i]!;
+        const what: HeadMoveFrames["what"] | null = Math.abs(dy) >= TURN && Math.abs(dy) >= Math.abs(dp) ? (dy > 0 ? "right" : "left") : Math.abs(dp) >= NOD ? (dp > 0 ? "down" : "up") : null;
+        if (!what) continue;
+        // From where it starts moving (the last image still about where it was), to where it stops moving that way.
+        const series = what === "down" || what === "up" ? pitch : yaw;
+        const least = (what === "down" || what === "up" ? NOD : TURN) / 4;
+        let s = j;
+        while (s > i && Math.abs(series[s - 1]! - series[i]!) > least) s--;
+        let k = j;
+        const step = (a: number, b: number) => (what === "down" ? pitch[b]! - pitch[a]! : what === "up" ? pitch[a]! - pitch[b]! : what === "right" ? yaw[b]! - yaw[a]! : yaw[a]! - yaw[b]!);
+        while (k + 1 < samples.length && samples[k + 1]!.frame - samples[k]!.frame <= 3 && step(k, k + 1) > 0) k++;
+        const move = { from: samples[Math.max(i, s - 1)]!.frame, to: samples[k]!.frame, what };
+        if (!out.some((m) => m.what === move.what && m.from <= move.to && move.from <= m.to)) out.push(move);
+        i = k + 1;
+        found = true;
+        break;
+      }
+      if (!found) i++;
+    }
+  }
+  return out.sort((a, b) => a.from - b.from).slice(0, MAX_HEAD_MOVES);
+}
+
+/** What the heads do in a clip's tracks (or a passage of them), measured on their points, in seconds of the clip and in words, like handMoves. */
+export function headMoves(t: Pick<FootageTracks, "fps" | "from" | "frames" | "aspect">): HandMove[] {
+  const time = (frame: number) => Math.round(((t.from + frame) / t.fps) * 10) / 10;
+  return headMoveFrames(t.frames, t.aspect, t.fps).map((m) => ({ start: time(m.from), end: Math.max(time(m.to), Math.round((time(m.from) + 0.1) * 10) / 10), what: HEAD_WORDS[m.what] }));
+}
+
 // ---------------------------------------------------------------------------
 // The motion designer's summary: where things are, now and then, and the gestures Gemini saw.
 // ---------------------------------------------------------------------------
@@ -530,7 +676,8 @@ export function movesForDesigner(
   };
   // The gestures Gemini saw in these passages, and what the hands do there, measured on their points.
   const gestures = pieces.flatMap((p) => (p.clip ? (actions[p.clip] ?? []) : []).flatMap((a) => onScene(p, a)));
-  const measured_gestures = pieces.flatMap((p) => handMoves(p.tracks).flatMap((m) => onScene(p, m)));
+  // Her hands' and her head's (lowered, raised, turned), both measured on their points.
+  const measured_gestures = pieces.flatMap((p) => [...handMoves(p.tracks), ...headMoves(p.tracks)].flatMap((m) => onScene(p, m)));
   if (!hands.length && !faces.length && !bodies.length && !gestures.length && !measured_gestures.length) return null;
   return {
     ...(gestures.length ? { gestures } : {}),

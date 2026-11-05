@@ -112,35 +112,20 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
     h("div", { style: { ...full, backgroundColor: NIGHT, mixBlendMode: "lighten" } }),
     h("div", { style: { ...full, backgroundColor: "#e8e9ea", mixBlendMode: "darken" } }));
 
-  // 1. The star: her opening shot through a small square at the middle (on its heart, what the filler named there when
-  // it is found small, read once and pulled within an eighth of the frame; else the very middle, where she films it),
-  // then a band a beat, each set at once, all of them windows onto that one shot at its place, in the original's order:
-  // a line through the middle in two halves (« \ »), the other (« / »), then the upright one, each half cut square short
-  // of the square, so their ends draw a hexagon around it. Measured on the original's short side: the square 9,4 %; the
-  // diagonals 36° from the horizontal (54° turned upright), 14 % wide, ending 13,5 % from the middle; the upright ones
-  // 15,5 % wide, ending 11,5 % from it.
+  // 1. The star (the picture kit's WindowStar): her opening shot through a small square at the middle (on its heart,
+  // what the filler named there when it is found small, read once and pulled within an eighth of the frame; else the
+  // very middle, where she films it), then a band a beat, each set at once, all of them windows onto that one shot at
+  // its place, in the original's order: a line through the middle in two halves (« \ »), the other (« / »), then the
+  // upright one, each half cut square short of the square, so their ends draw a hexagon around it. Measured on the
+  // original's short side (WindowStar's own): the square 9,4 %; the diagonals 36° from the horizontal (54° turned
+  // upright), 14 % wide, ending 13,5 % from the middle; the upright ones 15,5 % wide, ending 11,5 % from it.
   const found = n ? SubjectBox(shots[0], 0, laid, "@coeur") : null;
   const heart = found && found.w < bw / 3 && found.h < bh / 3 ? found : null;
   const pull = (v, mid, room) => Math.max(mid - room, Math.min(mid + room, v));
   const cx = heart ? pull(heart.x + heart.w / 2, bw / 2, bw / 8) : bw / 2;
   const cy = heart ? pull(heart.y + heart.h / 2, bh / 2, bh / 8) : bh / 2;
-  const ANGLES = [36, 216, 144, 324, 270, 90].map((a) => a + (wide ? 0 : 90));
-  const SQ = 0.094 * S;
-  const band = (k) => {
-    const upright = k >= 4;
-    const w = (upright ? 0.155 : 0.14) * S;
-    const r0 = (upright ? 0.115 : 0.135) * S;
-    const r1 = bw + bh;
-    const a = (ANGLES[k] * Math.PI) / 180;
-    const ux = Math.cos(a);
-    const uy = Math.sin(a);
-    const at = (r, s) => (cx + ux * r - uy * s).toFixed(1) + " " + (cy + uy * r + ux * s).toFixed(1);
-    return "M" + at(r0, -w / 2) + " L" + at(r1, -w / 2) + " L" + at(r1, w / 2) + " L" + at(r0, w / 2) + " Z";
-  };
-  const square = "M" + (cx - SQ / 2).toFixed(1) + " " + (cy - SQ / 2).toFixed(1) + " h" + SQ.toFixed(1) + " v" + SQ.toFixed(1) + " h" + (-SQ).toFixed(1) + " Z";
-  const landed = [0, 1, 2, 3, 4, 5].filter((k) => frame >= Math.round((k + 1) * BEAT));
   const star = frame < WHOLE && n
-    ? h("div", { key: "star", style: { ...full, clipPath: "path('" + [square].concat(landed.map(band)).join(" ") + "')" } }, picture(h(Footage, { shot: 0, style: { ...full, filter: BW } })))
+    ? h(WindowStar, { key: "star", box: { x: 0, y: 0, w: bw, h: bh }, center: { x: cx, y: cy }, upright: !wide, at: 0, every: BEAT }, picture(h(Footage, { shot: 0, style: { ...full, filter: BW } })))
     : null;
 
   // 2. The whole shot at once on the drop, at the same place and size, then her shots one after the other, cut every two

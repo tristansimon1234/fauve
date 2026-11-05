@@ -44,11 +44,13 @@ export function leadPlan(plan: EditPlan, lead: number): EditPlan {
       ? { ...first, duration: round(first.duration + lead) }
       : first!;
   const later = <T extends { from: number; to: number }>(t: T): T => ({ ...t, from: round(t.from + lead), to: round(t.to + lead) });
+  // A shot laid beside another starts on its own moment: that much later too (one beside the first shot shows its first image when the composition starts).
+  const moved = rest.map((s) => (isClipSegment(s) && s.beside ? { ...s, beside: { at: round(s.beside.at + lead) } } : s));
   return {
     ...plan,
     duration: round(plan.duration + lead),
     beat_at: lead,
-    segments: [longer, ...rest] as EditPlan["segments"],
+    segments: [longer, ...moved] as EditPlan["segments"],
     texts: plan.texts.map(later),
     images: plan.images.map(later),
     ...(plan.layers ? { layers: plan.layers.map((l) => ({ ...later(l), ...(l.compose && l.from <= 0 ? { hold_first: true } : {}) })) } : {}),

@@ -96,6 +96,17 @@ const scope = {
   // Nobody is seen here: no box; a sketch draws what it wraps.
   Detect: () => null,
   Sketch: ({ children }) => React.createElement("div", null, children),
+  // The picture kit (Picture.tsx): what each piece shows is drawn, an echo its element; a burn, a shadow and a dot grid carry nothing to read.
+  Burn: () => null,
+  LensEdges: ({ children }) => React.createElement("div", null, drawn(children, config)),
+  Smear: ({ children }) => React.createElement("div", null, drawn(children, config)),
+  Punch: ({ children }) => React.createElement("div", null, drawn(children, config)),
+  WindowStar: ({ children, box }) => React.createElement("div", null, drawn(children, { width: box?.w ?? config.width, height: box?.h ?? config.height })),
+  LumaFade: ({ children }) => React.createElement("div", null, children),
+  Echo: ({ draw }) => React.createElement("div", null, typeof draw === "function" ? draw(frame, 0) : null),
+  CastShadow: () => null,
+  DotGrid: () => null,
+  Ascii: ({ children }) => React.createElement("div", null, children),
   // The effects kit (Effects.tsx): what it wraps is drawn, its labels written.
   Letterbox: () => null,
   ColorPop: ({ children }) => React.createElement("div", null, children),
@@ -110,9 +121,18 @@ const scope = {
   SubjectParts: () => [],
   // Where a text can be set in a shot (its clear areas, read before the render): its fallback here, where the scene puts it without them.
   ClearBox: (shot, frame, laid, options) => options?.fallback ?? null,
+  // Its sky, its skyline, its vanishing point, its light, its depth as a mask, her head's moves (read before the render): none here.
+  Skyline: () => null,
+  SkylineAt: () => null,
+  Near: () => null,
+  VanishingPoint: (shot, frame, laid, options) => options?.fallback ?? null,
+  LightUnder: () => null,
+  HeadMoves: () => [],
   Outline: () => null,
   // What is said, written: the words themselves are what the check reads.
   Captions: ({ words = [] }) => React.createElement("div", null, (Array.isArray(words) ? words : []).map((w) => String(w?.w ?? "")).join(" ")),
+  // A ready look on one passage (laid by the render): what it wraps is drawn, at its box's size.
+  Look: ({ style, children }) => React.createElement("div", { style }, drawn(children, { width: style?.width ?? config.width, height: style?.height ?? config.height })),
 };
 
 const defaultBrand = {

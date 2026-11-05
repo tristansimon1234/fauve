@@ -9,8 +9,9 @@
 // it fades out, so it lands on the frame of what it punctuates and sits at its level.
 
 import type { EditPlan, SfxCue, SfxLevel } from "./schemas.ts";
-import { isMotionSegment } from "./schemas.ts";
+import { isClipSegment, isMotionSegment, screenTime } from "./schemas.ts";
 import type { MixCase } from "./mix.ts";
+import { handMoment, type TracksByClip } from "./tracking.ts";
 
 /** A sound's length when its writer gives none (s). */
 export const SFX_DEFAULT_SECONDS = 1;
@@ -22,9 +23,9 @@ export const SFX_MAX_NEW = 8;
 export const SFX_RULES: Record<Exclude<SfxLevel, "off">, { gap: number; perSecond: number; max: number; underSpeech: number | null; target: Record<MixCase, number> }> = {
   // About 8 LU under the music, 10 under a voice: heard, never on top.
   // Measured on a test mix (music at -14 LUFS): the Reel's loudness moves 0.1 LU, its peaks stay far under -1 dBFS.
-  light: { gap: 1.5, perSecond: 1 / 2.5, max: 6, underSpeech: null, target: { music: -20, voice_over: -23, speech_in_clips: -20, ambient: -20 } },
+  light: { gap: 1.5, perSecond: 1 / 2.5, max: 6, underSpeech: null, target: { music: -20, voice_over: -23, speech_in_clips: -20, ambient: -20, shot_sound: -20 } },
   // Present like a creator who punctuates everything, still under the voice.
-  more: { gap: 0.35, perSecond: 1 / 1.2, max: 14, underSpeech: -8, target: { music: -16, voice_over: -20, speech_in_clips: -17, ambient: -16 } },
+  more: { gap: 0.35, perSecond: 1 / 1.2, max: 14, underSpeech: -8, target: { music: -16, voice_over: -20, speech_in_clips: -17, ambient: -16, shot_sound: -16 } },
 };
 
 /** A sound's peak after its gain (dBFS): the mix's limiter (-1 dBFS) never has to squash it. */
@@ -53,8 +54,33 @@ export type SoundFacts = {
 /** The longest build-up a sound may have before its loudest moment (s). */
 export const SFX_LEAD_MAX = 0.6;
 
-/** A sound placed on the Reel: its library key, when the part of its file played starts (s), its gain (dB) and that part (s in the file). */
-export type SoundPlacement = { key: string; at: number; gain: number; onset: number; end: number };
+/**
+ * A sound placed on the Reel: its library key, when the part of its file played starts (s), its gain (dB) and that part
+ * (s in the file); `burst`: laid again at each of `times` (s after `at`), each at its own gain (dB from `gain`).
+ */
+export type SoundPlacement = { key: string; at: number; gain: number; onset: number; end: number; burst?: { times: number[]; gains: number[] } };
+
+/** The most hits of one burst (a clicking of 40 a second over three seconds). */
+export const BURST_MAX = 120;
+
+/**
+ * A burst's moments (s from its first) for a sound repeated at a pace that changes evenly over `seconds`: `from` hits a
+ * second at its start, `to` at its end (the pace multiplied by the same factor every instant: a wheel that slows down, a
+ * roll that speeds up), its first at 0, BURST_MAX at most. A pace that stays is the same on both.
+ */
+export function burstTimes(from: number, to: number, seconds: number): number[] {
+  if (!(from > 0) || !(to > 0) || !(seconds > 0)) return [0];
+  const growth = Math.log(to / from) / seconds;
+  const times: number[] = [];
+  // Its n-th hit when the hits counted so far (the integral of its pace) reach n.
+  for (let n = 0; times.length < BURST_MAX; n++) {
+    const t = Math.abs(growth) < 1e-9 ? n / from : Math.log(1 + (n * growth) / from) / growth;
+    if (!Number.isFinite(t) || t > seconds + 1e-9) break;
+    // (0 over a falling pace is −0.)
+    times.push(round3(t) || 0);
+  }
+  return times;
+}
 
 const clamp = (n: number, min: number, max: number) => Math.min(max, Math.max(min, n));
 const round1 = (n: number) => Math.round(n * 10) / 10;
@@ -81,14 +107,41 @@ export function soundKey(sound: string, seconds?: number): string {
 export type CueSource = "animation" | "editor" | "skill";
 
 /**
+ * When a skill's sound on her gesture lands (s, the Reel's clock): the moment her hand does it in its shot, read on that
+ * clip's tracks (handMoment), within `within` when it says; null when the shot is not one of her videos, has no tracks, or
+ * nothing of the kind is read there (its own `at`, its beat, then stands).
+ */
+export function handCueAt(
+  plan: Pick<EditPlan, "segments">,
+  starts: { start: number; length: number }[],
+  hand: NonNullable<SfxCue["hand"]>,
+  tracks: TracksByClip | undefined,
+): number | null {
+  const s = plan.segments[hand.shot];
+  const span = starts[hand.shot];
+  if (!s || !span || !isClipSegment(s)) return null;
+  const file = tracks?.[s.clip_id];
+  if (!file) return null;
+  // Its window on the clip's clock (a shot at another speed: its passage read at that speed).
+  const speed = s.speed ?? 1;
+  const clip = (reel: number) => s.in + Math.max(0, reel - span.start) * speed;
+  const [from, to] = hand.within ? [Math.max(s.in, clip(hand.within[0])), Math.min(s.out, clip(hand.within[1]))] : [s.in, s.out];
+  if (!(to > from)) return null;
+  const at = handMoment(file, from, to, hand.moment);
+  return at === null ? null : round3(span.start + screenTime(s, at));
+}
+
+/**
  * Every sound a plan asks for, on the Reel's clock, in order: each animation's from its own start
  * (`starts`, the start and length of each segment, from planTimeline), the editor's pulled onto the
  * cut or the text it was meant for when one is near (its cuts are snapped on the beat after it writes),
- * a montage skill's where its timeline puts it (a key click on each typed letter is never moved).
+ * a montage skill's where its timeline puts it (a key click on each typed letter is never moved), or on her gesture read
+ * on her hands (`tracks`, when given: a click as her hand touches the switch), its burst with it.
  */
 export function planCues(
   plan: Pick<EditPlan, "segments" | "texts" | "layers" | "sounds" | "duration">,
   starts: { start: number; length: number }[],
+  tracks?: TracksByClip,
 ): (SfxCue & { key: string; from: CueSource })[] {
   const events = [...starts.map((s) => s.start).filter((t) => t > 0), ...plan.texts.map((t) => t.from)];
   const snap = (at: number) => {
@@ -109,9 +162,14 @@ export function planCues(
       ...(c.asked ? { asked: true } : {}),
       ...(c.skill ? { skill: true } : {}),
       ...(c.gain ? { gain: c.gain } : {}),
+      ...(c.burst ? { burst: c.burst } : {}),
     });
   };
-  for (const c of plan.sounds ?? []) add(c, c.skill ? c.at : snap(c.at), c.skill ? "skill" : "editor");
+  for (const c of plan.sounds ?? []) {
+    // A skill's sound on her gesture: where her hand does it, else its own moment.
+    const at = c.skill && c.hand ? (handCueAt(plan, starts, c.hand, tracks) ?? c.at) : c.at;
+    add(c, c.skill ? at : snap(at), c.skill ? "skill" : "editor");
+  }
   plan.segments.forEach((s, i) => {
     const span = starts[i];
     if (!isMotionSegment(s) || !span) return;
@@ -177,7 +235,7 @@ export function sfxGain(facts: Pick<SoundFacts, "lufs" | "peak">, mix: MixCase, 
  * level, each one the library has, at its gain for the mix, its attack on its moment.
  */
 export function placeSounds(
-  cues: { at: number; key: string; asked?: boolean; skill?: boolean; gain?: number }[],
+  cues: { at: number; key: string; asked?: boolean; skill?: boolean; gain?: number; burst?: SfxCue["burst"] }[],
   options: { level: SfxLevel; mix: MixCase; duration: number; speech: [number, number][]; library: Record<string, SoundFacts> },
 ): SoundPlacement[] {
   if (options.level === "off") return [];
@@ -191,7 +249,19 @@ export function placeSounds(
     const onset = facts.onset + Math.max(0, -start);
     const at = Math.max(0, start);
     const end = Math.min(facts.end, onset + SFX_EDGE.max, onset + Math.max(0.05, options.duration - at));
-    return { key: c.key, at: round3(at), gain: sfxGain(facts, options.mix, level, c.under, c.gain ?? 0), onset: round3(onset), end: round3(Math.max(onset + 0.05, end)) };
+    const gain = sfxGain(facts, options.mix, level, c.under, c.gain ?? 0);
+    // A burst: every hit plays its whole sound, each at its own moment from the first (those before the Reel's start or
+    // in its last 0,15 s left out), BURST_MAX at most.
+    const hits = (c.burst?.times ?? [])
+      .map((t, k) => ({ t: round3(t + start - at), gain: Math.round(clamp(c.burst!.gains?.[k] ?? 0, -24, 6) * 10) / 10 }))
+      .filter((h) => h.t >= -1e-6 && at + h.t < options.duration - 0.15)
+      .sort((a, b) => a.t - b.t)
+      .slice(0, BURST_MAX);
+    if (hits.length > 1) {
+      const whole = Math.min(facts.end, facts.onset + SFX_EDGE.max);
+      return { key: c.key, at: round3(at), gain, onset: round3(facts.onset), end: round3(Math.max(facts.onset + 0.05, whole)), burst: { times: hits.map((h) => Math.max(0, h.t)), gains: hits.map((h) => h.gain) } };
+    }
+    return { key: c.key, at: round3(at), gain, onset: round3(onset), end: round3(Math.max(onset + 0.05, end)) };
   });
 }
 

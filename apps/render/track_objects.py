@@ -10,8 +10,10 @@
 # « every window » follows each window seen (at most EVERY_MAX), together one object; an object in separate pieces (the
 # letters of a sign, the bulbs of a garland, each of « every … ») gives them in reading order (`parts`), so an
 # animation lights them one by one (Tristan: « enseigne, fenêtre, image qui a de quoi faire un effet stylé »).
+# Each of « every … » whose box overlaps another's there also gets its own outline at every image (`pieces`), so an
+# animation shows one alone (Subject part).
 # Usage: python -I track_objects.py jobs.json → prints {"<id>": { still, frames, keys, people, top, boxes, contours,
-# found, parts?, uploaded } | { error }}. jobs.json: [{ id, url (the clip or the photo, signed) or src (a local file), from, to,
+# found, parts?, pieces?, uploaded } | { error }}. jobs.json: [{ id, url (the clip or the photo, signed) or src (a local file), from, to,
 # name, photo?, upload?: { webm, png }, out? }]. DETECTOR_MODEL and TRACKER_MODEL: the models' folders; OBJECTS_CPU=1
 # runs on a CPU. A job with `clear` (and no name) reads the clear areas of its passage instead (clear_area.py, ClearBox:
 # { clear, frames, still }), in the same machine, without loading the models.
@@ -268,6 +270,36 @@ def parts_of(each, k, picture=None):
     return pieces_inside(picture, whole)
 
 
+def piece_outlines(each, k):
+    """
+    Each of « every … » apart (the picture kit's Subject part draws one alone): its own outline at every image (as the
+    object's, half its points, shares of the picture), in the pieces' reading order on image k (that of `parts`), for
+    the pieces whose box there overlaps another's (two towers, two gondolas: their boxes alone whitened them together),
+    None for the others (their box is enough); None when no box overlaps another.
+    """
+    import numpy as np
+
+    import matte
+
+    seen = []
+    for j, e in enumerate(each):
+        py, px = np.nonzero(e[k] > 0.5)
+        if len(px):
+            seen.append((int(px.min()), int(py.min()), int(px.max() - px.min()) + 1, int(py.max() - py.min()) + 1, j))
+    ordered = reading_order(seen)[:PARTS_MAX]
+
+    def overlap(a, b):
+        return min(a[0] + a[2], b[0] + b[2]) - max(a[0], b[0]) > 1 and min(a[1] + a[3], b[1] + b[3]) - max(a[1], b[1]) > 1
+
+    out = []
+    for a in ordered:
+        if any(b is not a and overlap(a, b) for b in ordered):
+            out.append([None if c is None else [v for i in range(0, len(c), 4) for v in c[i:i + 2]] for c in matte.contours_of(each[a[4]])])
+        else:
+            out.append(None)
+    return out if any(o is not None for o in out) else None
+
+
 def photo_frames(src, w, h):
     """A photo as one image at w × h, RGB (read by ffmpeg, as photo_cut.py reads it for her cut-out)."""
     import numpy as np
@@ -321,9 +353,16 @@ def follow(job, device, dtype, detector, tracker):
     masks = [masks[0]] + [0.6 * masks[i] + 0.2 * masks[i - 1] + 0.2 * masks[min(n - 1, i + 1)] for i in range(1, n)]
     pieces = relative(found, masks[k])
     log(f"followed through {n} images in {time.time() - tracked:.1f} s" + (f", in {len(pieces) // 4} pieces" if pieces else ""))
+    # Each of « every … » apart where their boxes overlap (Subject part); an outline missing leaves their boxes, never the object.
+    apart = None
+    if len(each) > 1 and pieces:
+        try:
+            apart = piece_outlines(each, k)
+        except Exception as error:  # noqa: BLE001
+            log(f"pieces' outlines not read: {error}")
     # A photo's object: one still image (a PNG the size of the photo, laid exactly over it).
     r = matte.finish(job, frames, masks, photo, n, False, started, ow, oh)
-    return r | {"found": round(score, 2)} | ({"parts": pieces} if pieces else {})
+    return r | {"found": round(score, 2)} | ({"parts": pieces} if pieces else {}) | ({"pieces": apart} if apart else {})
 
 
 if __name__ == "__main__":

@@ -45,8 +45,8 @@ const MOTION_MAX = 8;
  */
 export function snapToTempo(plan: EditPlan, clipDurations: Record<string, number>, fixed?: (s: EditPlan["segments"][number]) => boolean): EditPlan {
   const beat = planBeat(plan);
-  // A copied Reel remade by code keeps the model's own cut times (its sound lands on them).
-  if (!beat || plan.voice || plan.copy || !plan.segments.length) return plan;
+  // A copied Reel remade by code keeps the model's own cut times (its sound lands on them), as do shots laid side by side (a montage skill's, already on its beats).
+  if (!beat || plan.voice || plan.copy || !plan.segments.length || plan.segments.some((s) => isClipSegment(s) && s.beside)) return plan;
   // Worked in frames, as the composition plays it (a crossfade overlaps whole frames).
   const frames = (t: number) => Math.round(t * REEL_FPS);
   // The sound she follows starts its beats `lead` in (beat_at): every cut on lead + k beats, the first shot that much longer.

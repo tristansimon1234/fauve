@@ -16,11 +16,14 @@ import { Fit } from "./Fit";
 import { makeKit } from "./Kit";
 import { makeType } from "./Type";
 import { makeGraphic } from "./Graphic";
-import { ClearBox, makeEffects, SubjectBox, SubjectOutline, SubjectParts } from "./Effects";
+import { ClearBox, HeadMoves, LightUnder, makeEffects, SkylineAt, SubjectBox, SubjectOutline, SubjectParts, SubjectPiece, VanishingPoint } from "./Effects";
 import { objectName } from "./outline";
 import { Marker } from "./Marker";
 import { Captions } from "./Captions";
 import { PaperCutout, type RimSpec } from "./PaperCutout";
+import { makeLooks, PassageLooksContext } from "./PassageLook";
+import { makePicture } from "./Picture";
+import { pieceInset } from "./picture-kit";
 import { SceneView } from "./Scene";
 import type { Theme } from "./theme";
 import { footageTrack, type TrackFn, type TrackPiece } from "./track";
@@ -68,6 +71,10 @@ export type FootageSource = {
   object?: (shot: ComposeShot, name: string, size: { width: number; height: number }) => ReactNode;
   /** Its depth at every image (depth_video.py: near white, far black), drawn exactly like the shot; nothing when it has none. */
   depth?: (shot: ComposeShot, size: { width: number; height: number }) => ReactNode;
+  /** The shot without its sky at every image (shot_read.py), drawn exactly like the shot; nothing when it has none. */
+  ground?: (shot: ComposeShot, size: { width: number; height: number }) => ReactNode;
+  /** The shot with its depth as its transparency (depth_video.py: near opaque), drawn exactly like the shot; nothing when it has none. */
+  near?: (shot: ComposeShot, size: { width: number; height: number }) => ReactNode;
 };
 
 /** Given by the Reel to a collage's composition only; none in the scene check (a grey card stands in for each shot). */
@@ -144,6 +151,81 @@ function Depth({ shot, style, invert = false, hold, at }: { shot: number; style?
   );
 }
 
+/** A shot's own media for a layer, played at its moment (or from `at`), each image held `hold` frames: what Depth, Skyline and Near share. */
+function Played({ info, media, at, hold }: { info: ComposeShot; media: ReactNode; at?: number; hold?: number }) {
+  const frame = useCurrentFrame();
+  const start = startOf(info, at);
+  const local = frame - start;
+  const step = hold && hold > 1 ? Math.round(hold) : 0;
+  return local >= 0 && local < info.durationInFrames && step ? (
+    <Freeze frame={Math.floor(local / step) * step}>{media}</Freeze>
+  ) : local >= 0 && local < info.durationInFrames ? (
+    <Sequence from={start} durationInFrames={info.durationInFrames} layout="none">
+      {media}
+    </Sequence>
+  ) : (
+    <Freeze frame={Math.max(0, Math.min(info.durationInFrames - 1, local))}>{media}</Freeze>
+  );
+}
+
+/**
+ * One of her shots without its sky, read at every image before the render (shot_read.py): its roofs, poles, wires,
+ * trees and passers-by, drawn exactly where and how Footage draws the shot in the same box (its framing, its camera
+ * move, its light); its sky transparent. A title laid between its Footage and it sits in the sky, behind everything
+ * else, none of it named (« LOS ANGELES » behind the city, a pole through its E). Nothing when the shot has no sky or
+ * was not read: the title then simply stays in front.
+ */
+function Skyline({ shot, style, hold, at }: { shot: number; style?: CSSProperties; hold?: number; at?: number }) {
+  const source = useContext(FootageContext);
+  const { width, height } = useVideoConfig();
+  const info = source?.shots[shot];
+  if (!info) return null;
+  const media = source?.ground?.(info, { width: px(style?.width) ?? width, height: px(style?.height) ?? height });
+  if (!media) return null;
+  return (
+    <div style={{ position: "absolute", overflow: "hidden", ...style }}>
+      <Played info={info} media={media} at={at} hold={hold} />
+    </div>
+  );
+}
+
+/**
+ * One of her video shots kept only as near as a distance, by its depth read at every image before the render
+ * (depth_video.py): `depth` 0 keeps its nearest thing alone, 1 all of it, so a depth that grows rebuilds the shot from
+ * the nearest to the farthest (on a flat colour, over another shot), and a fixed one keeps its whole foreground (the
+ * road and its firs, the rock and its walker, over the next shot's ground); `from="far"` the other way, the farthest
+ * first; `soft` the depth over which its edge fades (0.04). Drawn exactly where and how Footage draws the shot in the
+ * same box. Nothing when it has none (a photo, a passage at another speed, the card unavailable): the composition must
+ * still work.
+ */
+function Near({ shot, style, depth = 1, soft = 0.04, from = "near", hold, at }: { shot: number; style?: CSSProperties; depth?: number; soft?: number; from?: "near" | "far"; hold?: number; at?: number }) {
+  const source = useContext(FootageContext);
+  const { width, height } = useVideoConfig();
+  const id = useId().replace(/[^a-zA-Z0-9_-]/g, "");
+  const info = source?.shots[shot];
+  if (!info) return null;
+  const media = source?.near?.(info, { width: px(style?.width) ?? width, height: px(style?.height) ?? height });
+  if (!media) return null;
+  // Its transparency is its nearness (1 nearest): seen where it is at least 1 − depth, fading over `soft` below that.
+  const d = Math.max(0, Math.min(1, Number.isFinite(depth) ? depth : 1));
+  const s = Math.max(0.005, Math.min(1, Number.isFinite(soft) ? soft : 0.04));
+  const [slope, intercept] = from === "far" ? [-1 / s, 1 + d / s] : [1 / s, 1 - (1 - d) / s];
+  return (
+    <div style={{ position: "absolute", overflow: "hidden", ...style }}>
+      <svg width={0} height={0} style={{ position: "absolute" }} aria-hidden="true">
+        <filter id={`n${id}`} x="0" y="0" width="1" height="1" colorInterpolationFilters="sRGB">
+          <feComponentTransfer>
+            <feFuncA type="linear" slope={slope} intercept={intercept} />
+          </feComponentTransfer>
+        </filter>
+      </svg>
+      <div style={{ position: "absolute", inset: 0, filter: `url(#n${id})` }}>
+        <Played info={info} media={media} at={at} hold={hold} />
+      </div>
+    </div>
+  );
+}
+
 /**
  * The subject of one of her shots cut out at every image (a person walking, a hill under a title), drawn exactly
  * where and how Footage draws the shot in the same box: a text laid between the two passes behind her; laid alone
@@ -162,12 +244,20 @@ function Subject({
   hold,
   object,
   at,
+  part,
+  slices,
 }: {
   shot: number;
   /** It plays from that frame instead of its shot's own moment, as Footage at={…} does (the same box, the same frame). */
   at?: number;
   /** An object followed through the shot instead of her (a cup she lifts, a product she shows), by the name its code gives it. */
   object?: string;
+  /**
+   * One piece of that object alone (the k-th of SubjectParts, in reading order: one window, one tower, one letter): its
+   * own outline when the card read its pieces apart, else its box (`slices`: of an object in one piece, that many slices).
+   */
+  part?: number;
+  slices?: number;
   style?: CSSProperties;
   rim?: number;
   rimColor?: string;
@@ -194,8 +284,17 @@ function Subject({
   const filtered = r > 0 || shadow || Boolean(fill) || Boolean(tint);
   const body = fill ? "sil" : tint ? "tinted" : "SourceGraphic";
   const step = hold && hold > 1 ? Math.round(hold) : 0;
+  // One piece alone (picture kit): its outline, else its box and a pad round it, in this box's own px; not there: nothing.
+  let clip: string | undefined;
+  if (name && typeof part === "number") {
+    const laid = { left: typeof style?.left === "number" ? style.left : 0, top: typeof style?.top === "number" ? style.top : 0, width: size.width, height: size.height };
+    const piece = SubjectPiece(info, frame, laid, name, part, slices ?? 0, true);
+    if (!piece) return null;
+    clip = "path" in piece ? `path('${piece.path}')` : (pieceInset(piece.box, { left: 0, top: 0, width: laid.width, height: laid.height }, Math.max(2, Math.round(laid.height * 0.012))) ?? undefined);
+    if (!clip) return null;
+  }
   return (
-    <div style={{ position: "absolute", overflow: "hidden", ...style }}>
+    <div style={{ position: "absolute", overflow: "hidden", ...style, ...(clip ? { clipPath: clip } : {}) }}>
       {filtered ? (
         <svg width={0} height={0} style={{ position: "absolute" }} aria-hidden="true">
           <filter id={`s${id}`} x="-10%" y="-10%" width="120%" height="120%">
@@ -256,11 +355,16 @@ function Subject({
 // (line pictograms of her trade, drawing themselves), its hand-made pieces.
 const kit = makeKit({ useCurrentFrame, useVideoConfig });
 const type = makeType({ useCurrentFrame, useVideoConfig });
+// Burn, LensEdges, Smear, Punch, WindowStar, LumaFade, Echo, CastShadow, DotGrid, Ascii: the picture kit (Picture.tsx),
+// image effects measured on the models' originals; Flash expose, Turn 180, Tiles reading and land, Subject part with them.
+const picture = makePicture({ useCurrentFrame, useVideoConfig });
 // Cursor, Toggle, Button, ProfileCard, WordList, Timeline, Grid, Fan, Turn, Whip, ZoomThrough, Through, Flash, Tint: the
 // interface, graphics and transitions kit (Graphic.tsx).
 const graphic = makeGraphic({ useCurrentFrame, useVideoConfig });
 // Letterbox, ColorPop, MaskReveal, Glitch, Callout, Brackets, Outline: the effects kit (Effects.tsx, lot 7).
 const effects = makeEffects({ useCurrentFrame, useVideoConfig });
+// Look: a ready look on one passage (PassageLook.tsx), from the looks the Reel gives (props.looks).
+const looks = makeLooks({ useCurrentFrame, useVideoConfig });
 export const SCOPE = {
   AbsoluteFill,
   Sequence,
@@ -313,6 +417,16 @@ export const SCOPE = {
   Tint: graphic.Tint,
   Detect: graphic.Detect,
   Sketch: graphic.Sketch,
+  Burn: picture.Burn,
+  LensEdges: picture.LensEdges,
+  Smear: picture.Smear,
+  Punch: picture.Punch,
+  WindowStar: picture.WindowStar,
+  LumaFade: picture.LumaFade,
+  Echo: picture.Echo,
+  CastShadow: picture.CastShadow,
+  DotGrid: picture.DotGrid,
+  Ascii: picture.Ascii,
   Captions,
   Letterbox: effects.Letterbox,
   ColorPop: effects.ColorPop,
@@ -325,6 +439,13 @@ export const SCOPE = {
   SubjectOutline,
   SubjectParts,
   ClearBox,
+  Skyline,
+  SkylineAt,
+  Near,
+  VanishingPoint,
+  LightUnder,
+  HeadMoves,
+  Look: looks.Look,
 };
 
 export type SceneComponent = (props: {
@@ -436,10 +557,12 @@ export function MotionScene(p: {
       spoken={p.spoken ?? []}
     />
   );
+  // The ready looks its Look lays on a passage, when the Reel gives them.
+  const looked = p.props.looks ? <PassageLooksContext.Provider value={p.props.looks}>{scene}</PassageLooksContext.Provider> : scene;
   return (
     <Fallback fallback={fixed}>
       <AbsoluteFill style={p.shift ? { transform: `translateY(${Math.round(p.shift * p.props.height)}px)` } : undefined}>
-        {p.footage ? <FootageContext.Provider value={p.footage}>{scene}</FootageContext.Provider> : scene}
+        {p.footage ? <FootageContext.Provider value={p.footage}>{looked}</FootageContext.Provider> : looked}
       </AbsoluteFill>
     </Fallback>
   );

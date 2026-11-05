@@ -4,28 +4,36 @@ import {
   clearMapSchema,
   clearPassages,
   depthPassages,
+  groundKey,
   isClipSegment,
   mediaSubjectsSchema,
   mediaTracksSchema,
+  nearPassages,
+  OBJECT_CARD,
   objectKey,
   objectPassages,
+  objectsWithinBudget,
   PHOTO_OBJECT_MAX,
   photoKey,
+  readPassages,
+  shotReadingSchema,
   subjectPassages,
   wantsClear,
   wantsDepth,
+  wantsNear,
   wantsObjects,
   type ClearMap,
   type ClearPassage,
   type EditPlan,
   type MediaSubjects,
   type ObjectPassage,
+  type ShotReading,
   type SubjectPassage,
 } from "@fauve/agent";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { costMeta } from "@/lib/cost-scope";
 import { timeLeft } from "@/lib/step-clock";
-import { depthVideosOnGpu, GPU_START_MS, gpuCostEur, gpuReady, objectsOnGpu, subjectsOnGpu } from "./gpu";
+import { depthVideosOnGpu, GPU_START_MS, gpuCostEur, gpuReady, objectsOnGpu, pieceOutlines, subjectsOnGpu, type PieceOutlines } from "./gpu";
 import { cutoutCostEur, subjectsInSandbox } from "./sandbox";
 
 // Her subject cut out at every image of the passages a composition draws it on (Subject), made in the cut-out
@@ -51,12 +59,15 @@ export const subjectPath = (studioId: string, mediaId: string, key: string, stil
 
 /**
  * Keeps a passage's outline at each image beside its cut-out ({path}.contour.json), for a line along its edge
- * (Outline); its path, or nothing when there is none or it could not be kept (the line is then simply not drawn).
+ * (Outline); its path, or nothing when there is none or it could not be kept (the line is then simply not drawn). An
+ * object read in pieces apart keeps their outlines in the same file ({ contours, pieces }: Subject part draws one
+ * alone), so the retention removes them with it.
  */
-async function keepContour(studioId: string, mediaId: string, key: string, contours: (number[] | null)[] | undefined): Promise<string | undefined> {
+async function keepContour(studioId: string, mediaId: string, key: string, contours: (number[] | null)[] | undefined, pieces?: PieceOutlines): Promise<string | undefined> {
   if (!contours?.some(Boolean)) return undefined;
   const path = `${subjectPath(studioId, mediaId, key, false).replace(/\.webm$/, "")}.contour.json`;
-  const saved = await supabaseAdmin().storage.from("media").upload(path, JSON.stringify(contours), { contentType: "application/json", upsert: true });
+  const body = pieces ? JSON.stringify({ contours, pieces }) : JSON.stringify(contours);
+  const saved = await supabaseAdmin().storage.from("media").upload(path, body, { contentType: "application/json", upsert: true });
   if (saved.error) {
     console.warn("subject outline not kept", key, saved.error.message);
     return undefined;
@@ -82,7 +93,7 @@ type Row = { id: string; kind: string; storage_path: string | null; subjects: un
  * (merge_media_subjects): her cut-out, an object followed and its depth are made at the same time on the same clip,
  * and a whole record written back by one erased what another had just kept (the cup of the Text Brush test).
  */
-async function mergeSubjects(studioId: string, updates: Map<string, MediaSubjects>): Promise<void> {
+export async function mergeSubjects(studioId: string, updates: Map<string, MediaSubjects>): Promise<void> {
   const db = supabaseAdmin();
   await Promise.all(
     [...updates].map(async ([id, patch]) => {
@@ -289,41 +300,66 @@ async function readClear(path: string): Promise<ClearMap | undefined> {
   }
 }
 
-/** A passage's outline at each image, read from its file (nothing when it is missing or unreadable). */
-async function readContour(path: string): Promise<(number[] | null)[] | undefined> {
+/** A passage's readings (its sky, vanishing point and light: lib/render/readings.ts), read from their file (nothing when it is missing or unreadable). */
+async function readShotReading(path: string): Promise<ShotReading | undefined> {
   const { data } = await supabaseAdmin().storage.from("media").download(path);
   if (!data) return undefined;
   try {
-    const parsed: unknown = JSON.parse(await data.text());
-    return Array.isArray(parsed) ? (parsed.map((c) => (Array.isArray(c) && c.every((v) => typeof v === "number") ? (c as number[]) : null)) as (number[] | null)[]) : undefined;
+    return shotReadingSchema.safeParse(JSON.parse(await data.text())).data;
   } catch {
     return undefined;
   }
 }
 
-/** What the render reads of a passage: its cut-out signed, its boxes, outline and pieces; or its clear areas (no file to draw). */
-type SubjectInput = { src: string; still?: boolean; top?: number; boxes?: (number[] | null)[]; contours?: (number[] | null)[]; parts?: number[]; clear?: ClearMap };
+/**
+ * A passage's outline at each image, read from its file, and an object's pieces' outlines when it keeps them (nothing
+ * when it is missing or unreadable): the file holds the outlines alone, or { contours, pieces }.
+ */
+async function readContour(path: string): Promise<{ contours?: (number[] | null)[]; pieces?: PieceOutlines } | undefined> {
+  const { data } = await supabaseAdmin().storage.from("media").download(path);
+  if (!data) return undefined;
+  try {
+    const parsed: unknown = JSON.parse(await data.text());
+    const kept = Array.isArray(parsed) ? parsed : parsed && typeof parsed === "object" && Array.isArray((parsed as { contours?: unknown }).contours) ? (parsed as { contours: unknown[] }).contours : null;
+    if (!kept) return undefined;
+    const contours = kept.map((c) => (Array.isArray(c) && c.every((v) => typeof v === "number") ? (c as number[]) : null)) as (number[] | null)[];
+    const pieces = Array.isArray(parsed) ? undefined : pieceOutlines((parsed as { pieces?: unknown }).pieces);
+    return { contours, ...(pieces ? { pieces } : {}) };
+  } catch {
+    return undefined;
+  }
+}
 
-/** The cut-outs this plan can draw, signed for the render and the live preview (by passage, subjectKey), with their outlines; and the clear areas its texts are set in (clearKey). */
+/** What the render reads of a passage: its cut-out signed, its boxes, outline and pieces (their outlines apart); or its clear areas or its readings (no file to draw). */
+type SubjectInput = { src: string; still?: boolean; top?: number; boxes?: (number[] | null)[]; contours?: (number[] | null)[]; parts?: number[]; pieces?: PieceOutlines; clear?: ClearMap; reading?: ShotReading };
+
+/**
+ * The cut-outs this plan can draw, signed for the render and the live preview (by passage, subjectKey), with their
+ * outlines; the clear areas its texts are set in (clearKey); the readings of the shots it reads (readKey: their sky,
+ * vanishing point and light), their grounds (groundKey) and the nearness of the shots it rebuilds by depth (nearKey).
+ */
 export async function subjectInputs(studioId: string, plan: Plan): Promise<Record<string, SubjectInput>> {
   const { passages: herPassages, rows, isVideo } = await planned(studioId, plan);
   // The objects its compositions follow too (a cup, a product, one found on a photo), kept the same way under their own keys, the shots they show in depth and those they set a text in the clear area of.
-  const passages = [...herPassages, ...objectPassages(plan, isVideo), ...depthPassages(plan, isVideo), ...clearPassages(plan, isVideo)];
+  const reads = readPassages(plan, isVideo).flatMap((p) => [p, ...(p.kinds.includes("ground") ? [{ ...p, key: groundKey(p.clip_id, p.from, p.to) }] : [])]);
+  const passages = [...herPassages, ...objectPassages(plan, isVideo), ...depthPassages(plan, isVideo), ...clearPassages(plan, isVideo), ...nearPassages(plan, isVideo), ...reads];
   const found = passages.flatMap((p) => {
     const k = kept(rows.get(p.clip_id))[p.key];
     return k && "path" in k && k.path.startsWith(`${studioId}/`)
-      ? [{ key: p.key, path: k.path, still: k.still, top: k.top, boxes: k.boxes, parts: k.parts, contour: k.contour?.startsWith(`${studioId}/`) ? k.contour : undefined, clear: k.clear === true }]
+      ? [{ key: p.key, path: k.path, still: k.still, top: k.top, boxes: k.boxes, parts: k.parts, contour: k.contour?.startsWith(`${studioId}/`) ? k.contour : undefined, clear: k.clear === true, read: k.read === true }]
       : [];
   });
   if (!found.length) return {};
-  const [signed, contours, clears] = await Promise.all([
+  const [signed, contours, clears, readings] = await Promise.all([
     supabaseAdmin().storage.from("media").createSignedUrls(found.map((f) => f.path), 7200).then((r) => r.data ?? []),
     Promise.all(found.map((f) => (f.contour ? readContour(f.contour).catch(() => undefined) : undefined))),
     Promise.all(found.map((f) => (f.clear ? readClear(f.path).catch(() => undefined) : undefined))),
+    Promise.all(found.map((f) => (f.read ? readShotReading(f.path).catch(() => undefined) : undefined))),
   ]);
   return Object.fromEntries(
     found.flatMap((f, i): [string, SubjectInput][] => {
       if (f.clear) return clears[i] ? [[f.key, { src: "", clear: clears[i] }]] : [];
+      if (f.read) return readings[i] ? [[f.key, { src: "", reading: readings[i] }]] : [];
       const src = signed[i]?.signedUrl;
       if (!src) return [];
       return [
@@ -335,7 +371,8 @@ export async function subjectInputs(studioId: string, plan: Plan): Promise<Recor
             ...(f.top !== undefined ? { top: f.top } : {}),
             ...(f.boxes?.length ? { boxes: f.boxes } : {}),
             ...(f.parts?.length ? { parts: f.parts } : {}),
-            ...(contours[i]?.length ? { contours: contours[i] } : {}),
+            ...(contours[i]?.contours?.length ? { contours: contours[i]!.contours } : {}),
+            ...(contours[i]?.pieces ? { pieces: contours[i]!.pieces } : {}),
           },
         ],
       ];
@@ -346,10 +383,10 @@ export async function subjectInputs(studioId: string, plan: Plan): Promise<Recor
 // ——— Objects she shows (a cup, a product): followed on the card ————————————————————————————————————————
 
 /** On the card: the object found on one image and followed both ways through its passage (SAM 2), then its edge made, a second of video. */
-const OBJECT_LOAD_MS = 60_000;
-const OBJECT_WORK_PER_SECOND = 12;
+const OBJECT_LOAD_MS = OBJECT_CARD.load * 1000;
+const OBJECT_WORK_PER_SECOND = OBJECT_CARD.perSecond;
 /** An object found on a photo: one image read, its edge made at full size (a few seconds with its fetch and its send). */
-const PHOTO_OBJECT_MS = 8_000;
+const PHOTO_OBJECT_MS = OBJECT_CARD.photo * 1000;
 
 /**
  * Follows the objects a Reel's compositions name (Subject, SubjectBox, SubjectOutline or Outline given its name)
@@ -408,7 +445,10 @@ const CLEAR_WORK_PER_SECOND = 1;
  * The objects of these passages followed (or found on her photos) on the card, and the clear areas of `clears` read in
  * the same machine (without a card when there is no object), kept on their media, the machine's time billed.
  */
-async function followObjects(studioId: string, postId: string, missing: ObjectPassage[], rows: Map<string, Row>, clears: ClearPassage[] = []): Promise<void> {
+async function followObjects(studioId: string, postId: string, asked: ObjectPassage[], rows: Map<string, Row>, clears: ClearPassage[] = []): Promise<void> {
+  // The card's cost held to its budget (OBJECT_MAX_EUR, at its price a second): the objects its code names first are followed first.
+  const missing = objectsWithinBudget(asked, gpuCostEur(1));
+  if (missing.length < asked.length) console.warn("objects left out, over the card's budget", postId, asked.filter((p) => !missing.includes(p)).map((p) => p.key));
   if (!missing.length && !clears.length) return;
   const db = supabaseAdmin();
   const left = timeLeft();
@@ -477,7 +517,7 @@ async function followObjects(studioId: string, postId: string, missing: ObjectPa
       continue;
     }
     done++;
-    const contour = await keepContour(studioId, p.clip_id, p.key, result.contours);
+    const contour = await keepContour(studioId, p.clip_id, p.key, result.contours, result.pieces);
     record(p, {
       path: subjectPath(studioId, p.clip_id, p.key, result.still),
       still: result.still,
@@ -539,7 +579,7 @@ export async function photoObjectInputs(studioId: string, mediaIds: string[]): P
     const src = signed[i]?.signedUrl;
     if (!src) return;
     const [x, y, w, h] = f.box as [number, number, number, number];
-    const contour = contours[i]?.[0] ?? undefined;
+    const contour = contours[i]?.contours?.[0] ?? undefined;
     (out[f.media] ??= {})[f.name] = { cutout: src, box: { x, y, w, h }, ...(contour?.length ? { contour } : {}) };
   });
   return out;
@@ -553,38 +593,47 @@ export const depthPath = (studioId: string, mediaId: string, key: string) => `${
 /** On the card: the depth model loaded (2 s) and the clip fetched, then a second of video (its 30 images read, about 1 s on an A10G). */
 const DEPTH_LOAD_MS = 30_000;
 const DEPTH_WORK_PER_SECOND = 3;
+/** Its nearness, besides: each image read at the cut-out's size, its edge snapped to the picture, encoded with its transparency (the card's 2 CPUs). */
+const NEAR_WORK_PER_SECOND = 8;
+
+/** Where a passage's nearness is kept (her shot with its depth as its transparency, beside its cut-outs). */
+export const nearPath = (studioId: string, mediaId: string, key: string) => `${studioId}/subjects/${mediaId}-${createHash("sha1").update(key).digest("hex").slice(0, 12)}.near.webm`;
 
 /**
  * Reads in depth, at every image, the shots a Reel's compositions show with Depth (the grey pass of a computer-vision
- * Reel, a fog or a light by distance), on the rented card only (on the sandbox's CPUs it takes about 2 s an image):
- * kept beside the clip (media_assets.subjects, under `subjectKey~depth`). Never fails a render: a shot without its
- * depth simply draws nothing there.
+ * Reel, a fog or a light by distance) or rebuild by their depth with Near (her shot with its depth as its transparency:
+ * a WebM at the cut-out's size), on the rented card only (on the sandbox's CPUs it takes about 2 s an image): kept
+ * beside the clip (media_assets.subjects, under `subjectKey~depth` and `subjectKey~near`). Never fails a render: a shot
+ * without its depth simply draws nothing there.
  */
 export async function ensureDepths(studioId: string, postId: string, plan: Plan): Promise<void> {
-  if (!gpuReady() || !wantsDepth(plan) || plan.finish?.steady === "off") return;
+  if (!gpuReady() || !(wantsDepth(plan) || wantsNear(plan)) || plan.finish?.steady === "off") return;
   const db = supabaseAdmin();
   const ids = [...new Set(plan.segments.flatMap((s) => (isClipSegment(s) ? [s.clip_id] : [])))];
   const { data } = await db.from("media_assets").select("id, kind, storage_path, subjects, tracks").eq("studio_id", studioId).in("id", ids);
   const rows = new Map(((data ?? []) as Row[]).map((r) => [r.id, r]));
-  const missing = depthPassages(plan, (id) => rows.get(id)?.kind === "video").filter((p) => {
+  const isVideo = (id: string) => rows.get(id)?.kind === "video";
+  const due = (p: SubjectPassage) => {
     const k = kept(rows.get(p.clip_id))[p.key];
     return !k || ("failed_at" in k && Date.now() - Date.parse(k.failed_at) > RETRY_MS);
-  });
+  };
+  const missing = [...depthPassages(plan, isVideo).map((p) => ({ ...p, near: false })), ...nearPassages(plan, isVideo).map((p) => ({ ...p, near: true }))].filter(due);
   if (!missing.length) return;
   const left = timeLeft();
   const budget = (Number.isFinite(left) ? left : 800_000) - RENDER_MARGIN_MS;
-  const work = missing.reduce((n, p) => n + (p.to - p.from) * DEPTH_WORK_PER_SECOND * 1000, 0);
+  const work = missing.reduce((n, p) => n + (p.to - p.from) * (p.near ? NEAR_WORK_PER_SECOND : DEPTH_WORK_PER_SECOND) * 1000, 0);
   const deadline = Math.min(budget, GPU_START_MS + DEPTH_LOAD_MS + 2 * work);
   if (deadline < GPU_START_MS) return;
   const clips = [...new Set(missing.map((p) => p.clip_id))];
   const clipPaths = clips.map((id) => rows.get(id)?.storage_path ?? "");
   const signed = (await db.storage.from("media").createSignedUrls(clipPaths.filter(Boolean), 3600)).data ?? [];
+  const pathOf = (p: (typeof missing)[number]) => (p.near ? nearPath(studioId, p.clip_id, p.key) : depthPath(studioId, p.clip_id, p.key));
   const jobs = (
     await Promise.all(
       missing.map(async (p) => {
         const url = signed.find((x) => x.path === clipPaths[clips.indexOf(p.clip_id)])?.signedUrl;
-        const upload = await db.storage.from("media").createSignedUploadUrl(depthPath(studioId, p.clip_id, p.key), { upsert: true });
-        return url && upload.data?.signedUrl ? [{ key: p.key, url, from: p.from, to: p.to, upload: { mp4: upload.data.signedUrl } }] : [];
+        const upload = await db.storage.from("media").createSignedUploadUrl(pathOf(p), { upsert: true });
+        return url && upload.data?.signedUrl ? [{ key: p.key, url, from: p.from, to: p.to, upload: p.near ? { webm: upload.data.signedUrl } : { mp4: upload.data.signedUrl } }] : [];
       }),
     )
   ).flat();
@@ -598,11 +647,11 @@ export async function ensureDepths(studioId: string, postId: string, plan: Plan)
     if (!result) continue;
     const next = updates.get(p.clip_id) ?? {};
     if (result instanceof Error) {
-      console.warn("depth not read", p.key, result.message);
+      console.warn(p.near ? "nearness not read" : "depth not read", p.key, result.message);
       next[p.key] = { failed_at: at, error: result.message.slice(0, 200) };
     } else {
       done++;
-      next[p.key] = { path: depthPath(studioId, p.clip_id, p.key), still: false, at, frames: result.frames, depth: true };
+      next[p.key] = { path: pathOf(p), still: false, at, frames: result.frames, ...(p.near ? { near: true } : { depth: true }) };
     }
     updates.set(p.clip_id, next);
   }
@@ -615,6 +664,6 @@ export async function ensureDepths(studioId: string, postId: string, plan: Plan)
       provider: "modal",
       units: Math.round(seconds),
       cost_eur: gpuCostEur(seconds, gpu),
-      meta: costMeta({ post_id: postId, passages: jobs.length, done, gpu, seconds_of_video: Math.round(missing.reduce((n, p) => n + p.to - p.from, 0) * 10) / 10 }),
+      meta: costMeta({ post_id: postId, passages: jobs.length, near: missing.filter((p) => p.near).length, done, gpu, seconds_of_video: Math.round(missing.reduce((n, p) => n + p.to - p.from, 0) * 10) / 10 }),
     });
 }

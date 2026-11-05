@@ -139,16 +139,6 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const mapped = (id, curve) => h("filter", { key: id, id, x: "0", y: "0", width: "1", height: "1", colorInterpolationFilters: "sRGB" },
     h("feColorMatrix", { type: "matrix", values: luma }),
     h("feComponentTransfer", null, ["R", "G", "B"].map((c, i) => h("feFunc" + c, { key: c, type: "table", tableValues: table(curve, i) }))));
-  // 7. Its lens edges, at the top and the bottom of the frame (the sides of her shot before its quarter turn, as an
-  // anamorphic lens): the picture streaked along the height and split green and magenta, the magenta outward (6 px
-  // apart at the top, 5 at the bottom, as the original's near its edges at 1080).
-  const edgeFilter = (id, out) => h("filter", { key: id, id, colorInterpolationFilters: "sRGB" },
-    h("feGaussianBlur", { in: "SourceGraphic", stdDeviation: "0 2", result: "streak" }),
-    h("feColorMatrix", { in: "streak", type: "matrix", values: "1 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 1 0", result: "magenta" }),
-    h("feOffset", { in: "magenta", dx: 0, dy: out, result: "m" }),
-    h("feColorMatrix", { in: "streak", type: "matrix", values: "0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 1 0", result: "green" }),
-    h("feOffset", { in: "green", dx: 0, dy: -out, result: "g" }),
-    h("feBlend", { in: "m", in2: "g", mode: "screen" }));
   const defs = h("svg", { key: "defs", width: 0, height: 0, style: { position: "absolute" }, "aria-hidden": "true" },
     h("defs", null,
       mapped("tourne-duo", (y) => y),
@@ -157,11 +147,7 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
         h("feComponentTransfer", null,
           h("feFuncR", { type: "table", tableValues: "0.02 0.235 0.515 0.765 0.905" }),
           h("feFuncG", { type: "table", tableValues: "0.02 0.245 0.5 0.74 0.885" }),
-          h("feFuncB", { type: "table", tableValues: "0.04 0.27 0.48 0.69 0.835" }))),
-      h("filter", { key: "s", id: "tourne-streak", x: "0", y: "-0.2", width: "1", height: "1.4", colorInterpolationFilters: "sRGB" },
-        h("feGaussianBlur", { stdDeviation: "0 46" })),
-      edgeFilter("tourne-edge-top", -3),
-      edgeFilter("tourne-edge-bottom", 2.5)));
+          h("feFuncB", { type: "table", tableValues: "0.04 0.27 0.48 0.69 0.835" })))));
 
   // 1. Every shot filmed in width turned a quarter, clockwise (the top of the scene on the right of the screen), whole:
   // a 16:9 video turned fills the vertical frame exactly; it never turns while it plays. A video filmed upright plays
@@ -172,7 +158,7 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
     if (!s) return null;
     const draw = (size) => h(Footage, { shot: i, style: { position: "absolute", left: 0, top: 0, width: size.width, height: size.height } });
     if (wideOf(s)) return h(Turn, { angle: BOTH_WAYS && i % 2 ? -90 : 90, draw });
-    return h("div", { style: { ...full, ...(i === FLIP ? { transform: "rotate(180deg)" } : {}) } }, draw({ width, height }));
+    return i === FLIP ? h(Turn, { angle: 180, draw }) : h("div", { style: full }, draw({ width, height }));
   };
 
   // 4. The passage blur, copies of the shot blurred, not fades ([the slot it leads into, the blur (px) of the outgoing
@@ -193,31 +179,22 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const FLASHES = [[mark("flash_0", -9), 2, "rgba(250,248,251,0.9)"], [mark("flash_1", -9), 1, "rgba(232,234,237,0.74)"], [mark("flash_2", -9), 1, "rgba(250,248,251,0.9)"]];
   const flashing = FLASHES.filter(([k, length]) => k >= 1 && k < n && frame >= cutAt(k) && frame < cutAt(k) + length);
 
-  // 5. Its punch zoom in one shot: its first image wide, then ×2,3 about the middle over eight images (×1,06, ×1,2,
-  // ×1,41… as the original's), a zoom blur while it rushes, then the close shot held.
-  const zoomAt = (t) => { const x = Math.max(0, Math.min(1, t / ZOOM_IN)); return 1 + 1.3 * x * x * (3 - 2 * x); };
+  // 5. Its punch zoom in one shot (the picture kit's Punch): its first image wide, then ×2,3 about the middle over
+  // eight images (×1,06, ×1,2, ×1,41… as the original's), a zoom blur while it rushes, then the close shot held.
   const picture = (i) => {
     const px = blurOf(i);
     const lit = flashing.some(([k]) => k === i);
     const tone = COLOURS.includes(i) ? "url(#tourne-colour)" : STROBES.includes(frame) ? "url(#tourne-lit)" : "url(#tourne-duo)";
     const filter = [tone, lit ? "brightness(1.6)" : "", px ? "blur(" + px + "px)" : ""].filter(Boolean).join(" ");
-    let body = drawn(i);
-    if (i === ZOOM && shots[i]) {
-      const t = frame - cutAt(i);
-      const s = zoomAt(t);
-      const smear = Math.min(0.2, (s - zoomAt(t - 1)) / s);
-      const scaled = (k, z) => h("div", { key: "z" + k, style: { ...full, transform: "scale(" + z.toFixed(4) + ")", transformOrigin: "50% 50%", ...(k ? { opacity: 0.3 } : {}) } }, drawn(i));
-      body = smear > 0.005 ? h(React.Fragment, null, [0, 1, 2, 3].map((k) => scaled(k, s * (1 + (smear * k) / 3)))) : s > 1 ? scaled(0, s) : body;
-    }
+    const body = i === ZOOM && shots[i] ? h(Punch, { at: cutAt(i), frames: ZOOM_IN, scale: 2.3 }, drawn(i)) : drawn(i);
     // A blurred shot a little larger, so its edges stay off the frame.
     return h("div", { key: "p" + i, style: { ...full, overflow: "hidden", filter, ...(px ? { transform: "scale(" + (1 + (3 * px) / width).toFixed(3) + ")" } : {}) } }, body);
   };
 
-  // 5. A filé: her shot smeared along the frame's height and sliding, as a camera swept fast: the opening's, over all
-  // its images; its burst's whip, its first image and its last four, then a hard cut. Enlarged 1,3 times, it slides an
-  // eighth of the height at most, so it always covers the frame.
-  const filed = (i, p, way) => h("div", { key: "f" + i, style: { ...full, overflow: "hidden" } },
-    h("div", { style: { ...full, transform: "translateY(" + Math.round(way * Math.max(0, Math.min(1, p)) * height * 0.12) + "px) scale(1.3)", filter: "url(#tourne-streak)" } }, picture(i)));
+  // 5. A filé (the picture kit's Smear): her shot smeared along the frame's height and sliding, as a camera swept fast:
+  // the opening's, over all its images; its burst's whip, its first image and its last four, then a hard cut. Enlarged
+  // 1,3 times, it slides an eighth of the height at most, so it always covers the frame.
+  const filed = (i, p, way) => h(Smear, { key: "f" + i, progress: p, direction: way < 0 ? "up" : "down", blur: 46, travel: 0.12, scale: 1.3 }, picture(i));
 
   // 2 and 3. Her shots, turned, cut on its beats (the strobe over the opening, the filés, the zoom, the blurs), black
   // after the last one when the Reel ends on a card.
@@ -229,15 +206,12 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
     if (cur === WHIP && cur + 1 < n && (frame === c || frame >= next - 4)) return filed(cur, frame === c ? 0.4 : (frame - next + 5) / 4, 1);
     return picture(cur);
   })();
-  // Its lens edges over her shots in two tones (laid after the tones: a grey picture has no colour to split), from the
-  // edge of the frame fading out by a quarter of its height; the middle stays sharp. Its outermost 8 px left to the
-  // shot itself (a copy shifted inward leaves a bare line there).
-  const BAND = Math.round(height * 0.25);
-  const fade = (side) => "linear-gradient(" + (side === "top" ? "to bottom" : "to top") + ", transparent 0px, #000 8px, #000 32%, transparent 100%)";
-  const edge = (side) => film && !COLOURS.includes(cur)
-    ? h("div", { key: "e" + side, style: { position: "absolute", left: 0, top: side === "top" ? 0 : height - BAND, width, height: BAND, overflow: "hidden", filter: "url(#tourne-edge-" + side + ")", WebkitMaskImage: fade(side), maskImage: fade(side) } },
-        h("div", { style: { position: "absolute", left: 0, top: side === "top" ? 0 : BAND - height, width, height } }, film))
-    : null;
+  // 7. Its lens edges over her shots in two tones (the picture kit's LensEdges, laid after the tones: a grey picture has
+  // no colour to split), at the top and the bottom of the frame (the sides of her shot before its quarter turn, as an
+  // anamorphic lens): the picture streaked along the height and split green and magenta, the magenta outward (6 px
+  // apart at the top, 5 at the bottom, as the original's near its edges at 1080), full on the tenth of the frame by its
+  // edge, fading out by a quarter of its height; the middle stays sharp, its outermost 8 px left to the shot itself.
+  const lensed = film && !COLOURS.includes(cur) ? h(LensEdges, { key: "lens", split: [6, 5] }, film) : film;
   const flashes = flashing.map(([k, length, colour]) => h(Flash, { key: "w" + k, at: cutAt(k), frames: length, color: colour }));
 
   // Its optional title (the original has no text): turned a quarter like the shots, in condensed cream capitals along
@@ -272,7 +246,7 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
           : null)
     : null;
 
-  return h(AbsoluteFill, { style: { backgroundColor: "#000000" } }, defs, film, edge("top"), edge("bottom"), ...flashes, title, extra, ending);
+  return h(AbsoluteFill, { style: { backgroundColor: "#000000" } }, defs, lensed, ...flashes, title, extra, ending);
 }`;
 
 export const tourne: MontageSkill = {
@@ -285,6 +259,8 @@ export const tourne: MontageSkill = {
   bpm: BPM,
   shots: [20, 28],
   files: [6, 16],
+  // How colourful each of her files is (video_read.py): its slots left in colour get her most colourful ones.
+  reads: ["colour"],
   how: "Tous ses plans filmés en largeur tournés d'un quart de tour, toujours dans le sens des aiguilles d'une montre, pour remplir l'écran en entier, en deux tons bleu-vert et crème, la couleur gardée sur cinq plans où elle compte : quatre plans qui filent sous un stroboscope ; sept plans d'une à deux secondes sur une musique étouffée, les deux premiers en couleur, une vidéo debout retournée la tête en bas, un flou de passage, un plan en couleur qui se floute dans un flash blanc ; puis, quand la musique s'ouvre, une rafale de seize plans sur le rythme avec un zoom coup de poing, un flash, deux plans en couleur, quelque chose qui tourne, un filé, et le dernier qui se floute dans un dernier flash ; le dernier plan tenu jusqu'à la fin, la musique coupée avec l'image. Sans texte, avec des bords d'objectif en haut et en bas.",
   end: true,
   texts: [

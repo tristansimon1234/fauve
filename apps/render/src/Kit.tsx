@@ -1,6 +1,7 @@
 import React, { type CSSProperties, type ReactNode } from "react";
 import { Easing, interpolate, random } from "remotion";
 import { almondPath } from "./handmade";
+import { landPose } from "./picture-kit";
 
 // The layout kit of the animations (Tristan: « crée les outils toi-même, laisse pas faire l'API »):
 // tiles and strips, windows, stacks of photos and split screens, written once and tested, so that an
@@ -23,10 +24,13 @@ const num = (v: unknown, fallback: number) => (typeof v === "number" && Number.i
 
 // ——— Tiles ———————————————————————————————————————————————————————————————————————————
 
-/** The order tiles change in, as a share of the wave (0 first, 1 last). */
-export type Wave = "center" | "edges" | "random" | "top" | "bottom" | "left" | "right" | "diagonal" | "checker" | "groups" | "all";
-/** How a tile shows its new picture: cut (at once), fade, pop (grows into place), flip (turns like a card), slide (comes up inside the tile). */
-export type Reveal = "cut" | "fade" | "pop" | "flip" | "slide";
+/** The order tiles change in, as a share of the wave (0 first, 1 last); reading: one tile after the other, left to right and top to bottom. */
+export type Wave = "center" | "edges" | "random" | "top" | "bottom" | "left" | "right" | "diagonal" | "checker" | "groups" | "all" | "reading";
+/**
+ * How a tile shows its new picture: cut (at once), fade, pop (grows into place), flip (turns like a card), slide (comes
+ * up inside the tile), land (laid at once a little askew and off its place, then straight: a print laid by hand).
+ */
+export type Reveal = "cut" | "fade" | "pop" | "flip" | "slide" | "land";
 /** A picture of the tiles: from `at` (frame), each tile switches to `show` along the wave, over `spread` frames. */
 export type TileStep = { at: number; show: Draw; wave?: Wave; spread?: number; reveal?: Reveal; frames?: number };
 
@@ -56,6 +60,8 @@ export function waveOrder(wave: Wave, c: number, r: number, cols: number, rows: 
       return random(`${seed}-g-${Math.floor(c / 2)}-${Math.floor(r / 2)}`);
     case "all":
       return 0;
+    case "reading":
+      return (r * cols + c) / Math.max(1, cols * rows - 1);
     default:
       return random(`${seed}-r-${c}-${r}`);
   }
@@ -82,7 +88,7 @@ type TilesProps = {
  * tile shows its own piece of the picture, in place, so the tiles join up into the whole picture.
  */
 function TilesOf(hooks: KitHooks) {
-  return function Tiles({ cols = 6, rows, steps, gap = 0, lines, jitter = 0.25, box, seed = "tiles" }: TilesProps) {
+  return function Tiles({ cols = 6, rows, steps, gap = 0, lines, jitter, box, seed = "tiles" }: TilesProps) {
   const frame = hooks.useCurrentFrame();
   const video = hooks.useVideoConfig();
   const area: Box = box ?? { x: 0, y: 0, w: video.width, h: video.height };
@@ -93,26 +99,47 @@ function TilesOf(hooks: KitHooks) {
   const size: Size = { width: area.w, height: area.h };
   const ordered = [...steps].filter((s) => s && Number.isFinite(s.at)).sort((a, b) => a.at - b.at);
   const j = Math.max(0, Math.min(1, num(jitter, 0.25)));
-  // Each tile: the step it has settled on, and the step it is turning to (with its progress).
+  // A tile's place in a step's wave (0 to 1); a wave in reading order keeps it exactly unless a jitter is asked for.
+  const orderOf = (k: number, col: number, row: number) => {
+    const step = ordered[k]!;
+    const jj = jitter === undefined && step.wave === "reading" ? 0 : j;
+    return (1 - jj) * waveOrder(step.wave ?? "random", col, row, c, r, `${seed}-${k}`) + jj * random(`${seed}-j-${k}-${row * c + col}`);
+  };
+  // For the tiles that land (picture kit): each one's rank in the order its step's tiles change in, so they lean one way
+  // then the other.
+  const ranks = new Map<number, number[]>();
+  const rankOf = (k: number, tile: number) => {
+    if (!ranks.has(k)) {
+      const all = Array.from({ length: c * r }, (_, t) => ({ t, o: orderOf(k, t % c, Math.floor(t / c)) })).sort((a, b) => a.o - b.o || a.t - b.t);
+      const rank = new Array<number>(c * r);
+      all.forEach((x, i) => (rank[x.t] = i));
+      ranks.set(k, rank);
+    }
+    return ranks.get(k)![tile]!;
+  };
+  // Each tile: the step it has settled on, and the step it is turning to (with its progress). A tile landing shows only
+  // itself, askew: what lies under the tiles shows at its corners, as the paper under a print being laid.
   const settled = new Map<number, number[]>();
   const turning: { tile: number; step: number; from: number; t: number }[] = [];
   for (let row = 0; row < r; row++) {
     for (let col = 0; col < c; col++) {
       const tile = row * c + col;
       let current = -1;
+      let landing = false;
       for (let k = 0; k < ordered.length; k++) {
         const step = ordered[k]!;
-        const order = (1 - j) * waveOrder(step.wave ?? "random", col, row, c, r, `${seed}-${k}`) + j * random(`${seed}-j-${k}-${tile}`);
+        const order = orderOf(k, col, row);
         const start = step.at + order * Math.max(0, num(step.spread, 18));
-        const frames = step.reveal && step.reveal !== "cut" ? Math.max(1, num(step.frames, 8)) : 0;
+        const frames = step.reveal && step.reveal !== "cut" ? Math.max(1, num(step.frames, step.reveal === "land" ? 3 : 8)) : 0;
         if (frame < start) break;
         if (frames && frame < start + frames) {
           turning.push({ tile, step: k, from: current, t: (frame - start) / frames });
+          landing = step.reveal === "land";
           break;
         }
         current = k;
       }
-      if (current >= 0) settled.set(current, [...(settled.get(current) ?? []), tile]);
+      if (current >= 0 && !landing) settled.set(current, [...(settled.get(current) ?? []), tile]);
     }
   }
   const rect = (tile: number) => {
@@ -149,8 +176,10 @@ function TilesOf(hooks: KitHooks) {
             <div style={{ position: "absolute", left: -q.x, top: -q.y, width: area.w, height: area.h }}>{drawAt(ordered[k]!.show, size)}</div>
           </div>
         );
-        const over =
-          reveal === "fade"
+        const pose = reveal === "land" ? landPose(rankOf(step, tile), step, tile, c * r, seed) : null;
+        const over = pose
+          ? piece(step, { transform: `translate(${pose.dx}px, ${pose.dy}px) rotate(${pose.angle}deg)` })
+          : reveal === "fade"
             ? piece(step, { opacity: p })
             : reveal === "pop"
               ? piece(step, { transform: `scale(${0.55 + 0.45 * p})`, opacity: Math.min(1, p * 2) })

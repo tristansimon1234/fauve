@@ -119,6 +119,19 @@ export const editPlanSegmentSchema = z.object({
    * (`finish.cuts` off, and what a correction shows the editor).
    */
   jump: z.object({ in: z.number().min(0), out: z.number().positive(), move: cameraMoveSchema.optional() }).optional(),
+  /**
+   * A shot laid beside the others, on the same moment (a split screen's other half: two passages at once, each at its
+   * own speed): it starts `at` seconds into the Reel, whatever the shots before it, and adds nothing to its length (its
+   * time is counted once). Only a composition draws it (Footage, Subject…); the plain montage and the ffmpeg engine play
+   * the main line without it. Set by the engine from a montage skill's timeline (SkillShot.beside), never by the editor.
+   */
+  beside: z.object({ at: z.number().min(0).max(90) }).optional(),
+  /**
+   * Its own sound kept in the mix (a montage skill's shot whose passage is heard: the metro under its title, a tram going
+   * by), the music stepping back under it, at its own pace only. Set by the engine from a skill's timeline (SkillShot.sound),
+   * never by the editor nor the browser.
+   */
+  sound: z.boolean().optional(),
 });
 
 /**
@@ -174,6 +187,14 @@ export const editPlanSceneSegmentSchema = z.object({
 export const SLOT_NAME = /^[a-z][a-z0-9_]{0,23}$/;
 
 /**
+ * The moments of her hands a sound can land on (tracking.ts, handMoment): a hand at its highest in the picture (a reach,
+ * the top of a jump, her hand on the switch) or its lowest, a hand that has gone up, come down, come toward the camera or
+ * moved away, thumb and index that spread, a pinch held.
+ */
+export const HAND_MOMENTS = ["highest", "lowest", "raised", "lowered", "toward", "away", "spread", "pinch"] as const;
+export type HandMomentKind = (typeof HAND_MOMENTS)[number];
+
+/**
  * A light sound effect on something seen (sfx.ts): `at` seconds (from its animation's start on an animation, on the
  * Reel's clock on the plan), `sound` a short generic description in English (« soft pop », « paper whoosh »), the key
  * of the shared library with `seconds`, its length. Written by the motion designer and the editor, never the browser.
@@ -191,12 +212,41 @@ export const sfxCueSchema = z.object({
   skill: z.boolean().optional(),
   /** How loud, from the loudness of its level in the mix (dB): a soft tick under it, an impact over it (its peak still capped). */
   gain: z.number().min(-24).max(6).optional(),
+  /**
+   * A montage skill's burst: the same sound laid again at each of `times` (s after `at`, in order, the first at 0), each at
+   * its own gain (dB from the sound's): a clicking that slows down, a roll, denser than a frame (one cue for all of them).
+   */
+  burst: z
+    .object({ times: z.array(z.number().min(0).max(12)).min(1).max(120), gains: z.array(z.number().min(-24).max(6)).max(120).optional() })
+    .optional(),
+  /**
+   * A montage skill's sound on a gesture of hers: when her hand does it in that shot (its index in the plan's segments),
+   * read on her hands' tracks (tracking.ts, handMoment), its loudest moment there; else at `at` (its beat). `within`: only
+   * then (s, the Reel's clock).
+   */
+  hand: z
+    .object({ shot: z.number().int().min(0).max(80), moment: z.enum(HAND_MOMENTS), within: z.tuple([z.number().min(0), z.number().min(0)]).optional() })
+    .optional(),
 });
 export type SfxCue = z.infer<typeof sfxCueSchema>;
 
 /** How present the sound effects are: light (the default), more, or none. */
 export const sfxLevelSchema = z.enum(["light", "more", "off"]);
 export type SfxLevel = z.infer<typeof sfxLevelSchema>;
+
+/**
+ * What a composition's code draws of her shots, when its montage skill's timeline says it (skills.ts, skillDrawn):
+ * `subjects`, the shots it draws her cut out on (by their number in shots), and `objects`, each object it follows on
+ * its shot (the filler's name for her file). Only those passages are cut out and followed before the render, where
+ * its code, writing a shot as a variable, would have every shot under it read. Kept for `shots` shots: over another
+ * number (its code kept over the editor's new shots), it no longer says which, and its code is read again.
+ */
+export const motionDrawnSchema = z.object({
+  shots: z.number().int().min(1).max(200),
+  subjects: z.array(z.number().int().min(0).max(199)).max(200).optional(),
+  objects: z.array(z.object({ shot: z.number().int().min(0).max(199), name: z.string().min(1).max(60) })).max(24).optional(),
+});
+export type MotionDrawn = z.infer<typeof motionDrawnSchema>;
 
 /** Free motion-design scene: the editor writes the brief, the motion designer (Opus) writes the code. */
 export const editPlanMotionSegmentSchema = z.object({
@@ -240,8 +290,19 @@ export const editPlanMotionSegmentSchema = z.object({
      * (set by the engine; false: it only times its own words on them, and the engine's subtitles stay). It follows its code.
      */
     writes_spoken: z.boolean().optional(),
+    /**
+     * Its code times its own drawing on what is said (a montage skill timed on her voice, skills.ts): it always gets the
+     * words said under it (`spoken`), and the engine's subtitles stay under it unless it writes them (writes_spoken).
+     * Set by the engine; it follows its code, never the browser.
+     */
+    times_spoken: z.boolean().optional(),
     /** Its sound effects, from its own start (the motion designer's answer): they follow its code, never the browser. */
     sounds: z.array(sfxCueSchema).max(16).optional(),
+    /**
+     * What its code draws of her shots, as its montage skill's timeline says it for that many shots (motionDrawnSchema):
+     * the shots it cuts her out on and the objects it follows, read instead of its code. Set by the engine.
+     */
+    drawn: motionDrawnSchema.optional(),
   }),
   duration: z.number().min(1).max(8),
   /**
@@ -276,6 +337,11 @@ export const editPlanTextSchema = z.object({
   backdrop: z.boolean().optional(),
   /** A look of its own (copied from an example, or one of brand.text_looks), instead of the template's style. */
   look: textLookSchema.optional(),
+  /**
+   * A font of its own for its words, picked by a montage skill's filler for what they evoke (WORD_FONTS of font-pairs.ts,
+   * a Google Fonts family): the skill's composition draws it in it (reelTexts[i].font), the render loads it.
+   */
+  font: z.string().regex(LOOK_FONT).optional(),
   ...listFields,
 });
 
@@ -574,6 +640,27 @@ export function speedPieces(s: Pick<ClipSegment, "in" | "out" | "speed" | "ramp"
 /** How long a segment lasts in the video (a shot at another speed lasts its clip time divided by the speed; a ramp, each passage at its own). */
 export const segmentSeconds = (s: PlanSegment) => (isClipSegment(s) ? speedPieces(s).reduce((sum, p) => sum + (p.to - p.from) / p.speed, 0) : s.duration);
 
+/** A shot laid beside the others on the same moment (ClipSegment.beside): its time is counted once, only a composition draws it. */
+export const isBeside = (s: PlanSegment): boolean => isClipSegment(s) && Boolean(s.beside);
+
+/**
+ * When each segment starts in the video and how long it plays (seconds, without the fades' overlap), and where the
+ * video ends: the main line one shot after the other, a shot laid beside the others (beside) at its own moment, adding
+ * nothing to the length. The plain sum of the segments for a plan without any (every plan made before).
+ */
+export function segmentSpans(segments: PlanSegment[]): { spans: { start: number; length: number }[]; end: number } {
+  let cursor = 0;
+  let end = 0;
+  const spans = segments.map((s) => {
+    const length = Math.max(0, segmentSeconds(s));
+    const start = isClipSegment(s) && s.beside ? s.beside.at : cursor;
+    if (!(isClipSegment(s) && s.beside)) cursor += length;
+    end = Math.max(end, start + length, cursor);
+    return { start, length };
+  });
+  return { spans, end };
+}
+
 /** When a moment of the clip (`clip`, seconds) shows in a shot, in seconds from the shot's start (its speed and its ramp counted). */
 export function screenTime(s: Pick<ClipSegment, "in" | "out" | "speed" | "ramp">, clip: number): number {
   let seconds = 0;
@@ -601,9 +688,9 @@ export function scenePhotoIds(plan: Pick<EditPlan, "segments"> & { layers?: Edit
   return [...new Set([...plan.segments.flatMap((s) => (isMotionSegment(s) ? (s.motion.photos ?? []) : [])), ...(plan.layers ?? []).flatMap((l) => l.motion.photos ?? [])])];
 }
 
-/** The plan with its motion-design scenes removed (what the ffmpeg engine can render). */
+/** The plan with its motion-design scenes removed (what the ffmpeg engine can render): its main line of shots, one after the other (a shot laid beside them is a composition's to draw). */
 export function withoutScenes(plan: EditPlan): EditPlan {
-  return { ...plan, segments: plan.segments.filter(isClipSegment) };
+  return { ...plan, segments: plan.segments.filter((s) => isClipSegment(s) && !s.beside) };
 }
 
 // ---------------------------------------------------------------------------
@@ -670,6 +757,14 @@ export const clipSpeechSchema = z.object({
   path: z.string().max(300).optional(),
   /** That copy keeps only the voice (the music and noise behind removed by ElevenLabs' voice isolator), not just denoised. */
   isolated: z.boolean().optional(),
+  /**
+   * Her other videos measured against this one for one take filmed by two phones (takes.ts): each one's offset (s: its
+   * time = this one's + offset), how sure (its onsets' correlation) and whether it is the same take. Measured once.
+   */
+  takes: z
+    .array(z.object({ media_id: z.string().min(1).max(80), offset: z.number().min(-600).max(600), score: z.number().min(-1).max(1), same: z.boolean() }))
+    .max(8)
+    .optional(),
 });
 export type ClipSpeech = z.infer<typeof clipSpeechSchema>;
 
