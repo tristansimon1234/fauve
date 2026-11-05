@@ -122,6 +122,12 @@ export const GPU = "A10G";
  */
 const SECOND_GPU = "L40S";
 const HEDGE_MS = 20_000;
+/**
+ * Past THIRD_HEDGE_MS with neither, an A100 too (about the L40S's price a second): on November 5 at 9:24 neither came in
+ * 90 s, and « La pièce qui se rallume » lost its lamps lit one by one (its plan B lit the whole room at once).
+ */
+const THIRD_GPU = "A100";
+const THIRD_HEDGE_MS = 45_000;
 const CORES = 2;
 const MEMORY_GIB = 8;
 
@@ -234,7 +240,8 @@ async function onCard(
   const upBy = Math.min(deadline, started + startMs);
   // A name of its own for each card asked for, to end one allotted after we stopped waiting for it.
   const name = `cut-${randomUUID().slice(0, 13)}`;
-  const cards = gpu === GPU ? [GPU, SECOND_GPU] : [gpu];
+  const cards = gpu === GPU ? [GPU, SECOND_GPU, THIRD_GPU] : [gpu];
+  const hedgeAt = [0, HEDGE_MS, THIRD_HEDGE_MS];
   const names = cards.map((_, i) => (i ? `${name}-${i}` : name));
   let sandbox: Sandbox | undefined;
   let upAt = 0;
@@ -265,20 +272,22 @@ async function onCard(
           name: names[i],
         })
         .then((s) => ({ s, card: cards[i] ?? null }));
-    // The card asked for; past HEDGE_MS without it, the second kind too.
+    // The card asked for; past HEDGE_MS without it, the second kind too, past THIRD_HEDGE_MS the third.
     let won = false;
-    let hedge: ReturnType<typeof setTimeout> | undefined;
+    const hedges: ReturnType<typeof setTimeout>[] = [];
     const asked = [ask(0)];
-    if (cards.length > 1)
+    for (let i = 1; i < cards.length; i++)
       asked.push(
         new Promise((resolve, reject) => {
-          hedge = setTimeout(
-            () => {
-              if (won) return;
-              say(`no ${cards[0]} after ${HEDGE_MS / 1000} s: an ${cards[1]} asked for too`);
-              ask(1).then(resolve, reject);
-            },
-            Math.max(0, Math.min(HEDGE_MS, upBy - Date.now())),
+          hedges.push(
+            setTimeout(
+              () => {
+                if (won) return;
+                say(`no ${cards.slice(0, i).join(" nor ")} after ${hedgeAt[i]! / 1000} s: an ${cards[i]} asked for too`);
+                ask(i).then(resolve, reject);
+              },
+              Math.max(0, Math.min(hedgeAt[i]!, upBy - Date.now())),
+            ),
           );
         }),
       );
@@ -287,7 +296,7 @@ async function onCard(
       first = await before(upBy, Promise.any(asked), gpu ? `no ${cards.join(" nor ")} card free after ${startMs / 1000} s` : `no machine started after ${startMs / 1000} s`);
     } finally {
       won = true;
-      clearTimeout(hedge);
+      for (const h of hedges) clearTimeout(h);
       // Every card asked for and not used (the other kind, or all of them when none came in time): ended as soon as it comes.
       for (const other of asked) void other.then(({ s }) => (first && s === first.s ? undefined : s.terminate())).catch(() => undefined);
     }
