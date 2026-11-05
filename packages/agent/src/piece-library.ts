@@ -1,5 +1,6 @@
 import type { EffectPiece } from "./pieces.ts";
 import { cadre } from "./pieces/cadre.ts";
+import { carteFeutre } from "./pieces/carte-feutre.ts";
 import { photoDump } from "./pieces/photo-dump.ts";
 import { pile } from "./pieces/pile.ts";
 
@@ -9,7 +10,7 @@ import { pile } from "./pieces/pile.ts";
 // (scripts/skill-render.mts --piece); a new model of Edith's brings its own (docs/reprise.md, « Passage de relais »).
 
 /** The bank, in the order the editor is offered them on a tie (pieces.ts, piecesOffered). */
-export const EFFECT_PIECES: Record<string, EffectPiece> = { cadre, "photo-dump": photoDump, pile };
+export const EFFECT_PIECES: Record<string, EffectPiece> = { cadre, "photo-dump": photoDump, pile, "carte-feutre": carteFeutre };
 
 /** The piece of the bank a model's key names, if it has one. */
 export const pieceFor = (key: string | null | undefined): EffectPiece | undefined => (key ? EFFECT_PIECES[key] : undefined);
