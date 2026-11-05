@@ -1405,6 +1405,49 @@ export const HOUSE_MODELS: HouseModel[] = [
       why: "Son lieu ordinaire vu comme par une machine : le stroboscope de regards intrigue, chaque passe montre autre chose, et la personne immobile au milieu tient l'œil.",
     },
   }),
+  model({
+    key: "petites-lumieres",
+    name: "Petites lumières",
+    // Written on its original's fiche (v1 of its skill, docs/fiches/petites-lumieres.md): three still pictures of a city at
+    // dusk where only lights move, on a beat that stops dead three times; its second example is the same song.
+    pitch: "Trois images immobiles de ton lieu le soir où seules tes lumières bougent sur la musique : ta lampe ou ton enseigne qui clignote, tes fenêtres qui s'allument en rouge, un soleil derrière tes toits, puis tout s'éteint d'un coup.",
+    needs: "3 photos ou vidéos fixes de ton lieu le soir : une de tes lumières de près (lampe, enseigne, néon), ta rue ou ta façade avec des fenêtres et un peu de ciel, une façade de face",
+    files: [3, 4],
+    pair: "editorial",
+    // Its original's skill is its reference: no composition of its own.
+    example: null,
+    // Its music's tempo, measured on its original (the fiche: its hits on the grid, its three stops on its beats).
+    tempo: 83,
+    finish: { name: "Sarcelle du soir", hint: "teal et orange du soir : ombres bleu-vert, hautes lumières chaudes, contrasté, ses rouges francs, sans grain ni coins sombres", contrast: 0.14, saturation: 0.06, shadows: "#0a2626", highlights: "#f2c693", split: 0.3 },
+    look: {
+      name: "petites lumières",
+      format: "autre",
+      hook: { kind: "mystère", what: "une image immobile de la ville au crépuscule où seule une lampe s'allume quatre images sur le premier coup de la musique, puis clignote quand elle revient" },
+      text: {
+        amount: "aucun",
+        composition: "aucun texte dans l'original ; quand il faut des mots, son nom allumé comme un néon dans le ciel ou la partie calme du dernier plan, qui reste allumé quand tout s'éteint",
+        case: "normal",
+        weight: "regular",
+        tracking: "normal",
+      },
+      layout: "trois images fixes en plein cadre vertical, l'une après l'autre ; seules leurs lumières changent, posées dessus",
+      moments: [
+        { at: 0, what: "un lampadaire devant un ciel de couchant, éteint ; il s'allume quatre images sur le coup grave de l'ouverture, s'éteint quand la musique s'arrête" },
+        { at: 1.1, what: "trois clignotements de quatre images, deux éteinte entre eux, quand la musique revient, puis allumé 1,4 s ; éteint juste après la caisse claire, avant le deuxième arrêt" },
+        { at: 4.13, what: "coupe sur la reprise : une cour d'immeubles vue d'en bas, un disque rouge plat dans son ciel, derrière les immeubles, qui rétrécit lentement ; ses fenêtres se remplissent de rouge en six vagues du bas vers le haut" },
+        { at: 6.67, what: "coupe sur le tic du troisième arrêt : des tours au couchant ; une colonne de fenêtres s'allume en cramoisi du bas vers le haut, en quatre pas" },
+        { at: 8.9, what: "toutes les fenêtres s'éteignent d'un coup ; la musique se coupe, l'image reste immobile jusqu'à la fin" },
+      ],
+      sounds: [{ at: 6.62, what: "a short high rim click, alone in the music's third stop" }],
+      camera: "fixe",
+      transitions: "coupes nettes",
+      grade: "moody",
+      motion: "epure",
+      music: "dark lo-fi trap beat, deep 808, crisp hats, dry snare, about 83 BPM",
+      ending: "tout s'éteint d'un coup, la musique se coupe, l'image reste seule et immobile",
+      why: "Rien ne bouge sauf la lumière : l'œil cherche ce qui va s'allumer, chaque lumière tombe sur un coup de la musique, et la ville le soir devient une petite chorégraphie.",
+    },
+  }),
 ];
 
 const BY_KEY = new Map(HOUSE_MODELS.map((m) => [m.key, m]));
@@ -1476,6 +1519,7 @@ export const HOUSE_WHEN: Record<string, { pour: string; pas_pour: string }> = {
   createur: { pour: "quelqu'un qui explique en parlant face caméra et montre ce dont il parle (ses produits, ses réalisations, son lieu, son site)", pas_pour: "des images sans parole, quelqu'un qui parle sans rien à montrer" },
   silhouette: { pour: "se présenter (elle ou quelqu'un de son équipe), présenter son métier et ce qu'elle fait, un lancement, un ton de studio graphique", pas_pour: "des produits seuls, un lieu sans personne, une offre à lire" },
   vision: { pour: "son lieu fréquenté filmé de haut, quelqu'un d'immobile au milieu et des gens qui passent autour ; un ton tech ou graphique", pas_pour: "un lieu vide, un plan qui bouge, des produits en gros plan, un message à lire" },
+  "petites-lumieres": { pour: "son lieu le soir et ses lumières (sa devanture, son enseigne, ses fenêtres, ses lampes, sa terrasse), une ambiance de ville, l'hiver, une soirée", pas_pour: "un lieu en plein jour sans aucune lumière, quelqu'un qui parle, des produits en gros plan, un message à lire en détail" },
 };
 
 /** The models for Edith: their key, name, what they do, what they want, and what only she can film for one. */
