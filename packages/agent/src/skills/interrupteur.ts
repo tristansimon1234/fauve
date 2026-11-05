@@ -245,12 +245,16 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
     };
     // What says she is there: her cut-out when it was made (it holds her at the flip), else her track when it saw her
     // at the flip (a pose read loses her when she turns her back: v3 froze a Reel where she never left).
-    const byCut = Boolean(cut(ON));
+    const atFlip = cut(ON);
+    const byCut = Boolean(atFlip && atFlip.w * atFlip.h > 0);
     if (!byCut && tracked(ON) !== true) return null;
+    // Gone when what her cut-out holds is under a quarter of what it held at the flip: her hand coming back into the
+    // picture (the bench's) is not her.
+    const her = byCut ? atFlip.w * atFlip.h : 0;
     const seenAt = (f) => {
       if (!byCut) return tracked(f) !== false;
       const b = cut(f);
-      return Boolean(b && b.w * b.h > box.width * box.height * 0.01);
+      return Boolean(b && b.w * b.h > her * 0.25);
     };
     let run = 0;
     for (let f = ON + 6; f < until; f++) {
@@ -275,8 +279,9 @@ export const interrupteur: MontageSkill = {
   // 2: written again on its original's fiche (its music stopped and back, its beep, its flip in one image, its poster, her in front, its format).
   // 3: once she has left, her wall held on that image to the end (a hand had come back into the picture at its bench).
   // 4: she is gone when her cut-out is (else her track, when it saw her at the flip), eight images in a row: v3 read her
-  // track alone and froze a Reel where she never left.
-  version: 4,
+  // track alone and froze a Reel where she never left. 5: gone under a quarter of her cut-out at the flip (her hand
+  // coming back into the picture is not her).
+  version: 5,
   bpm: BPM,
   shots: [1, 1],
   files: [1, 2],
