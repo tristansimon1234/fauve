@@ -204,7 +204,8 @@ test("« Teaser qui se charge »: its counter at the centre on its own clock, 1 
   assert.equal(Number(s.top) + Number(s.height) / 2, 960);
   assert.deepEqual([s.left, s.width, s.color, s.fontSize, s.fontVariantNumeric], [140, 800, "#ffffff", 87, "lining-nums"]);
   assert.ok(Math.abs((0.708 * Number(s.fontSize)) / 1920 - 0.032) < 0.001);
-  assert.match(String(s.textShadow), /0 1px 5px/);
+  // Its halo tight (a blur of 6 px at most: the scene check counts it as an outline, so a white shot never loses it).
+  assert.match(String(s.textShadow), /^0 0 6px rgba\(0,0,0,0\.75\), 0 1px 3px/);
   // Her word from its beat to her logo, the same place, its capitals 2,8 % of the height, inside x 140 – 940.
   const word = (f: number) => fits(drawAt(f)).find((n) => String(n.props.key).startsWith("w-"));
   assert.equal(word(LINE.marks.word! - 1), undefined);

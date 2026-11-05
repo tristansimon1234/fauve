@@ -76,7 +76,7 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   // A phone number or a date never breaks between its digits, nor « Paris 3e » before its number.
   const keep = (s) => String(s || "").replace(/(\d) (?=\d)/g, "$1 ").replace(/ (\d+(?:er|e))\b/g, " $1");
   // White words with no box, as the original's; a tight dark halo keeps them on a white shot (it hardly shows on a dark one).
-  const SHADOW = "0 1px 5px rgba(0,0,0,0.6)";
+  const SHADOW = "0 0 6px rgba(0,0,0,0.75), 0 1px 3px rgba(0,0,0,0.55)";
   const centred = (tall) => ({ position: "absolute", left: 140, top: Math.round(H / 2 - tall / 2), width: W - 280, height: Math.round(tall) });
 
   // 1. Her shots, one flash after the other as its slots fall (an eighth of a beat, a ninth after her word), each in its

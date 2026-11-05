@@ -32,7 +32,8 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const display = "'" + brand.displayFont + "', 'Playfair Display', serif";
   // A phone number or a date never breaks between its digits, nor « Paris 3e » before its number.
   const keep = (s) => String(s || "").replace(/(\d) (?=\d)/g, "$1 ").replace(/ (\d+(?:er|e))\b/g, " $1");
-  const SHADOW = "0 1px 5px rgba(0,0,0,0.6)";
+  // White words with no box, as the original's; a tight dark halo keeps them on a white shot (it hardly shows on a dark one).
+  const SHADOW = "0 0 6px rgba(0,0,0,0.75), 0 1px 3px rgba(0,0,0,0.55)";
   const centred = (tall) => ({ position: "absolute", left: 140, top: Math.round(H / 2 - tall / 2), width: W - 280, height: Math.round(tall) });
 
   // 1. Its flashes: before her word one every FLASH frames, after it one every FAST; flash j is her shot j mod n, at its
