@@ -4105,11 +4105,14 @@ test("« Écran partagé titré » (v2): its layout as a setting her words ask, 
 /** Its shots as a composition gets them, on its timeline, all of one shape. */
 const rallumeShots = (line: { shots: { start: number; end: number }[] }, aspect = 16 / 9) =>
   line.shots.map((s, i) => ({ src: `/v${i}.mp4`, aspect, from: Math.round(s.start * 30), durationInFrames: Math.round((s.end - s.start) * 30), kind: "video", segment: i }));
-/** What it lights at a frame: for each object drawn cut to its lit pieces, its name and the number of pieces lit. */
+/** What it lights at a frame: for each object drawn at its own light cut to its lit pieces, its name and the number of pieces lit. */
 const litPieces = (tree: Drawn) =>
   drawnNodes(tree)
-    .filter((n) => n.type === "div" && /^path\(/.test(String(styleOf(n).clipPath ?? "")))
-    .map((n) => [String(drawnNodes(n).find((m) => m.type === "Subject")?.props.object), (String(styleOf(n).clipPath).match(/M/g) ?? []).length] as const);
+    .filter((n) => n.type === "div" && /^brightness\(1\.18\)/.test(String(styleOf(n).filter ?? "")))
+    .map((n) => {
+      const cut = drawnNodes(n).find((m) => m.type === "div" && /^path\(/.test(String(styleOf(m).clipPath ?? "")))!;
+      return [String(drawnNodes(cut).find((m) => m.type === "Subject")?.props.object), (String(styleOf(cut).clipPath).match(/M/g) ?? []).length] as const;
+    });
 /** The filter its room shot is drawn with (empty: as filmed). */
 const filmTone = (tree: Drawn) => String(styleOf(drawnNodes(tree).find((n) => n.type === "Footage")!).filter ?? "");
 
@@ -4194,9 +4197,11 @@ test("« La pièce qui se rallume » (v1): dark, then her things lit one by one 
   assert.deepEqual(litPieces(draw(55)), [["every pendant lamp", 10]]);
   assert.deepEqual(litPieces(draw(58)), [["every pendant lamp", 10], ["every bottle", 2]]);
   assert.deepEqual(litPieces(draw(74)), [["every pendant lamp", 10], ["every bottle", 3]]);
-  // Each piece at its own light, a soft edge of it, never pushed into white; a warm pool spilling from each, in screen.
-  const litLayer = drawnNodes(draw(30)).find((n) => n.type === "div" && /drop-shadow/.test(String(styleOf(n).filter)))!;
-  assert.match(String(styleOf(litLayer).filter), /^brightness\(1\.18\) saturate\(1\.1\)/);
+  // Each piece at its own light, never pushed into white, and a bloom of its own highlights blurred in screen (no glow
+  // drawn round its shape: its brass cap lit like a sticker); a warm pool spilling from each, in screen.
+  const layers = drawnNodes(draw(30)).filter((n) => n.type === "div" && /^(brightness|contrast)\(/.test(String(styleOf(n).filter ?? "")));
+  assert.deepEqual(layers.map((n) => [styleOf(n).filter, styleOf(n).mixBlendMode ?? null]), [["brightness(1.18) saturate(1.1)", null], ["contrast(2.6) brightness(1.1) blur(12px)", "screen"]]);
+  assert.ok(layers.every((n) => drawnNodes(n).some((m) => m.type === "Subject" && m.props.object === "every pendant lamp")));
   const pools = drawnNodes(draw(30)).find((n) => styleOf(n).mixBlendMode === "screen")!;
   assert.equal((String(styleOf(pools).background).match(/radial-gradient/g) ?? []).length, 5);
   // A lamp's pool flickers on as a bulb does: half, too bright, a little less, itself.
@@ -4209,7 +4214,7 @@ test("« La pièce qui se rallume » (v1): dark, then her things lit one by one 
   assert.equal(filmTone(draw(77)), "");
   assert.ok(drawnNodes(draw(75)).some((n) => styleOf(n).mixBlendMode === "screen" && styleOf(n).background === "#fff1dc"));
   const cutOuts = (f: number) => drawnNodes(draw(f)).filter((n) => n.type === "Subject").length;
-  assert.deepEqual([74, 75, 120].map(cutOuts), [2, 0, 0]);
+  assert.deepEqual([74, 75, 120].map(cutOuts), [4, 0, 0]);
   assert.deepEqual([75, 80].map(alpha), [0.5, 0.25]);
   assert.equal(drawnNodes(draw(85)).filter((n) => styleOf(n).mixBlendMode === "screen").length, 0);
   // Her name catches like a neon with it (off, on, almost off, on, half, on), above its 16:9 picture on the black,

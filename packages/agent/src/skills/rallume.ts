@@ -103,12 +103,14 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const night = dark ? h("div", { style: { ...full, background: "#a9b5d4", mixBlendMode: "multiply" } }) : null;
   const bloom = cur === 0 && since >= 0 && since < 2 ? h("div", { style: { ...full, background: "#fff1dc", mixBlendMode: "screen", opacity: [0.2, 0.08][since] } }) : null;
 
-  // 3. Each piece lit at its own light (a little brighter and warmer, its glow soft and wide: a tight bright edge drew
-  // a sticker's outline round a lamp on the bench), cut to its own box; a warm pool of light spills from it on the room,
-  // flickering on as a bulb does; on the beat, the room's own light takes over and the pools fade.
-  const near = Math.max(2, Math.round(bh * 0.004));
-  const far = Math.max(8, Math.round(bh * 0.024));
-  const ownLight = "brightness(1.18) saturate(1.1) drop-shadow(0 0 " + near + "px rgba(255,230,190,0.45)) drop-shadow(0 0 " + far + "px rgba(255,190,120,0.5))";
+  // 3. Each piece lit at its own light (a little brighter and warmer), cut to its own box, with a bloom made of its own
+  // picture, its highlights only (a strong contrast first), blurred and laid in screen: what shines in it (a bulb, its
+  // glass) glows, what does not (a lamp's brass cap, a bottle's label) stays as it is (a glow drawn round its shape lit
+  // the caps like stickers on the bench). A warm pool
+  // of light spills from it on the room, flickering on as a bulb does; on the beat, the room's own light takes over and
+  // the pools fade.
+  const ownLight = "brightness(1.18) saturate(1.1)";
+  const bloomLight = "contrast(2.6) brightness(1.1) blur(" + Math.max(6, Math.round(bh * 0.02)) + "px)";
   const pad = Math.max(4, Math.round(bh * 0.012));
   const rect = (b) => {
     const x0 = Math.max(0, Math.round(b.x - pad)), y0 = Math.max(0, Math.round(b.y - pad));
@@ -117,9 +119,11 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   };
   const litKinds = KINDS.map((k, kind) => {
     const mine = lit.filter((p) => p.kind === kind);
-    return mine.length
-      ? h("div", { key: "l" + kind, style: { ...full, filter: ownLight } }, h("div", { style: { ...full, clipPath: "path('" + mine.map((p) => rect(p.box)).join(" ") + "')" } }, k[2]()))
-      : null;
+    if (!mine.length) return null;
+    const cut = () => h("div", { style: { ...full, clipPath: "path('" + mine.map((p) => rect(p.box)).join(" ") + "')" } }, k[2]());
+    return h(React.Fragment, { key: "l" + kind },
+      h("div", { style: { ...full, filter: ownLight } }, cut()),
+      h("div", { style: { ...full, filter: bloomLight, mixBlendMode: "screen", opacity: 0.85 } }, cut()));
   });
   const WARMUP = [0.5, 1.35, 0.85];
   const pool = (p, a) => {
