@@ -9,6 +9,7 @@ import { facade } from "./skills/facade.ts";
 import { frappe } from "./skills/frappe.ts";
 import { gaufre } from "./skills/gaufre.ts";
 import { journee } from "./skills/journee.ts";
+import { monTravail } from "./skills/mon-travail.ts";
 import { mosaique } from "./skills/mosaique.ts";
 import { nike } from "./skills/nike.ts";
 import { photoDump } from "./skills/photo-dump.ts";
@@ -34,6 +35,7 @@ export const MONTAGE_SKILLS: Record<string, MontageSkill> = {
   frappe,
   gaufre,
   journee,
+  "mon-travail": monTravail,
   mosaique,
   nike,
   "photo-dump": photoDump,
