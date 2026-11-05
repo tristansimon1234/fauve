@@ -31,7 +31,7 @@ export const HOUSE_MEASURES: Record<string, ReelMeasures> = {
   "frappe": { duration: 13.37, cuts: [4.87, 7.87, 8.4, 8.77, 10.17, 11.6, 11.93, 12.27, 12.6], bpm: 82.4, lufs: -14.1 },
   "coups-de-fouet": { duration: 23.31, cuts: [0.67, 1.87, 2.87, 3.53, 4.43, 5.37, 6.3, 7.53, 8.63, 9.13, 9.97, 11, 12.2, 13.03, 13.77, 14.63, 15.53, 16.47, 17.1, 18.1, 19.13, 19.87], bpm: 84, lufs: -14.2 },
   "table": { duration: 8.93, cuts: [2.03, 2.33, 2.47, 2.5, 2.53, 3.37, 4, 4.77, 5.43, 6.1, 6.67, 6.7], bpm: 110, lufs: -14.2 },
-  "aplat": { duration: 8.87, cuts: [1.97, 2.53, 3.67, 4, 5.93, 8.37], bpm: null, lufs: -14.2 },
+  "aplat": { duration: 8.8, cuts: [4, 5.93, 7.87, 8.37], bpm: 123, lufs: -14.2 },
   "pile": { duration: 9.2, cuts: [], bpm: null, lufs: -14.2 },
   "mon-travail": { duration: 9.17, cuts: [], bpm: null, lufs: -14.1 },
   "interrupteur": { duration: 9.2, cuts: [], bpm: 71.85, lufs: -14.3 },
@@ -41,5 +41,5 @@ export const HOUSE_MEASURES: Record<string, ReelMeasures> = {
   "createur": { duration: 31, cuts: [4.03, 6.87, 7.8, 8.67, 9.67, 12.07, 14.97, 15.1, 18.3, 20.67, 21.7, 23, 24.73, 25.73, 26.37, 26.9, 27.7, 30.03, 30.8], bpm: null, lufs: -14.3 },
   "silhouette": { duration: 11.15, cuts: [0.47, 1.07, 3.9, 5.37, 9.57], bpm: null, lufs: -14.1 },
   "vision": { duration: 8.55, cuts: [0.2, 0.7, 1.2, 1.5, 1.77, 2.1, 2.63, 3, 3.27, 3.63, 4.67, 5.13, 5.37, 5.67, 5.93, 6.53, 6.87, 7.13, 8.03], bpm: null, lufs: -14.1 },
-  "detourages": { duration: 16.53, cuts: [6.23, 6.6, 6.83, 7.2, 7.53, 8.27, 8.6, 8.93, 9.67, 10, 10.27, 10.93, 11.37, 11.73, 12.17, 12.67, 13.13, 13.77, 14.4, 14.83], bpm: 94, lufs: -14.2 },
+  "detourages": { duration: 16.47, cuts: [6.23, 6.6, 6.83, 7.2, 7.53, 7.97, 8.27, 8.6, 8.93, 9.67, 10, 10.27, 10.93, 11.37, 11.73, 12.17, 12.67, 13.13, 13.47, 13.77, 14.4, 14.83], bpm: 140, lufs: -14.2 },
 };

@@ -145,6 +145,15 @@ export const FONT_PAIRS: FontPair[] = [
     fits: "une ville, un film, du noir et blanc",
   },
   {
+    key: "ronde-large",
+    name: "Grotesque ronde et large",
+    // « Ton nom qui clignote » v2 (docs/fiches/detourages.md, effect 2): its name in very bold, round and wide capitals.
+    display: { family: "Montserrat", weight: 800, case: "upper", tracking: "normal" },
+    body: { family: "Montserrat", weight: 500 },
+    how: "un seul nom en capitales très grasses, rondes et larges, qui remplit la largeur du cadre, rien d'autre",
+    fits: "un paysage, un voyage, un nom qui s'allume derrière le décor",
+  },
+  {
     key: "geometrique",
     name: "Géométrique grasse",
     // « Mot clé en grand »: its hook and keyword in bold capitals of a geometric sans, its small words the same face.

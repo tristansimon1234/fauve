@@ -1248,7 +1248,7 @@ test("each of Edith's models shows its original's frames as a Reel she sends: sh
   const { HOUSE_MEASURES } = await import("./house-measures.ts");
   const { stolenStyleSchema } = await import("./steal.ts");
   // A studio's row written before the sheets is rewritten (11: ten models written again on their originals' fiches).
-  assert.equal(HOUSE_VERSION, 19);
+  assert.equal(HOUSE_VERSION, 20);
   for (const m of HOUSE_MODELS) {
     const sheets = houseSheets(m.key);
     // A model written as a design has no original, so no sheets (its row names none).
@@ -5793,8 +5793,8 @@ test("a font per word: a library of Google Fonts families by what they evoke, on
   assert.equal(wordFont("Comic Sans"), undefined);
   assert.equal(wordFont(""), undefined);
   assert.match(wordFontsBrief().find((l) => l.startsWith("Anton"))!, /^Anton : condensée très grasse, en capitales ; évoque sport, force/);
-  // The pairs (two added on November 5: « Mot clé en grand »'s and « Face caméra et références »').
-  assert.equal(FONT_PAIRS.length, 17);
+  // The pairs (three added on November 5: « Mot clé en grand »'s, « Face caméra et références »' and « Ton nom qui clignote »').
+  assert.equal(FONT_PAIRS.length, 18);
   // A slot that asks for one: the filler's family when it is one of the library; none otherwise, nor on a slot that does not ask.
   const skill = {
     key: "test",

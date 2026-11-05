@@ -17,8 +17,8 @@ import type { z } from "zod";
 
 /** The source of the inspiration row a house model is kept on, per studio (one per model, made when first used). */
 export const HOUSE_SOURCE = "house";
-/** The catalogue's version: a studio's row written by an older one is rewritten when the model is used again (3: its original's sheets; 4: no brand in a model's name; 5: Mots aux quatre coins as its original; 6: Plans fixes at 65 BPM; 7: four renamed; 8: Lieu tapé without its original's orange; 9: Plans fixes on its fiche; 10: Une journée chez toi on its fiche; 11: ten models on their fiches; 12: Façade qui se construit and Coulisses façon fiche on their fiches; 13: Recette cosy on its fiche; 14: Titre gaufré on its fiche; 15: Mots mêlés and Interrupteur on their fiches; 16: Interface minimaliste and Fenêtres et étiquettes on theirs; 17: Mot clé en grand and Face caméra et références on theirs; 18: Photos posées sur la table and Carte au feutre on theirs; 19: « S'abonner » in Interface minimaliste). */
-export const HOUSE_VERSION = 19;
+/** The catalogue's version: a studio's row written by an older one is rewritten when the model is used again (3: its original's sheets; 4: no brand in a model's name; 5: Mots aux quatre coins as its original; 6: Plans fixes at 65 BPM; 7: four renamed; 8: Lieu tapé without its original's orange; 9: Plans fixes on its fiche; 10: Une journée chez toi on its fiche; 11: ten models on their fiches; 12: Façade qui se construit and Coulisses façon fiche on their fiches; 13: Recette cosy on its fiche; 14: Titre gaufré on its fiche; 15: Mots mêlés and Interrupteur on their fiches; 16: Interface minimaliste and Fenêtres et étiquettes on theirs; 17: Mot clé en grand and Face caméra et références on theirs; 18: Photos posées sur la table and Carte au feutre on theirs; 19: « S'abonner » in Interface minimaliste; 20: the last four on their fiches, Aplat, Détourages, Silhouette and Vision machine). */
+export const HOUSE_VERSION = 20;
 
 export type HouseModel = {
   key: string;
@@ -1189,60 +1189,84 @@ export const HOUSE_MODELS: HouseModel[] = [
   model({
     key: "aplat",
     name: "Toi sur un aplat de couleur",
+    // 15: written again on its original's fiche (v2 of its skill): 123 BPM, a pure red (or her vivid colour), her shot
+    // rebuilt from the nearest to the farthest, the next shot's still pieces one an eighth, a frame closing at a constant
+    // speed, the frozen world in a new look on each note, no text of its own; 4:3 on black when her videos are horizontal.
     pitch: "Ta silhouette détourée qui marche sur un grand aplat de couleur vive, puis tes plans encadrés de la même couleur.",
-    needs: "une vidéo de toi de dos ou de profil qui marche, et 4 à 8 autres plans",
+    needs: "une vidéo de quelqu'un qui marche, de dos ou de profil, un plan large de ton lieu avec plusieurs choses au premier plan, et quelqu'un devant un fond qui fait un geste",
     files: [3, 10],
     pair: "affiche",
     example: "aplat",
-    tempo: 100,
-    finish: { name: "Couleurs franches", hint: "contraste et couleurs poussés", contrast: 0.14, saturation: 0.14 },
+    // Its music measured on its original (docs/fiches/aplat.md): 122,99 BPM, a melody without drums in phrases of a bar.
+    tempo: 123,
+    finish: { name: "Couleurs franches", hint: "contraste et couleurs poussés, sans grain ni coins sombres", contrast: 0.14, saturation: 0.14 },
     look: {
       name: "personne sur aplat",
       format: "collage",
-      hook: { kind: "geste", what: "une personne détourée qui marche sur un aplat rouge vif" },
+      hook: { kind: "geste", what: "une personne qui marche, détourée sur un aplat rouge pur, blanche et lumineuse trois images, puis à ses couleurs avec son ombre" },
       text: { amount: "aucun", composition: "aucun texte" },
-      colors: ["#e30613"],
-      layout: "la personne détourée qui marche, posée sur un aplat rouge plein cadre, puis des plans encadrés de rouge",
+      colors: ["#ff0000"],
+      layout: "en 4:3 sur du noir quand ses vidéos sont horizontales : la silhouette sur l'aplat, son plan qui revient autour d'elle, le plan suivant posé morceau par morceau, un cadre rouge qui se referme",
       moments: [
-        { at: 0, what: "la personne détourée qui marche, seule sur un aplat rouge vif plein cadre, avec son ombre" },
-        { at: 1.7, what: "le vrai plan revient autour d'elle" },
-        { at: 4.4, what: "un plan dans un cadre rouge épais, puis les plans en plein cadre" },
+        { at: 0, what: "sa silhouette blanche dans un halo pendant trois images sur un aplat rouge pur, puis à ses couleurs, seule avec son ombre" },
+        { at: 0.5, what: "son plan revient autour d'elle du plus près au plus loin : le sol sous ses pieds, le chemin, puis tout le sol en blanc, le ciel en blanc, le plan entier" },
+        { at: 2.8, what: "le plan suivant se pose dessus morceau par morceau, figé, un par croche, chacun blanc une image, puis il arrive entier, surexposé deux images" },
+        { at: 4.5, what: "un cadre rouge se referme sur lui par les quatre côtés à vitesse constante, sans réduire l'image" },
+        { at: 5.9, what: "quelqu'un devant un fond : le décor se fige derrière lui et change de look sur chaque note pendant qu'il bouge" },
+        { at: 8.3, what: "l'aplat rouge plein cadre jusqu'à la fin, sur lequel le Reel reboucle" },
       ],
       camera: "à la main",
       motion: "energique",
-      music: "upbeat indie rock, driving guitars",
-      ending: "un dernier plan large tenu deux secondes",
-      why: "La personne seule sur la couleur arrête le pouce, et la couleur revient en cadre pour signer le Reel.",
+      music: "bright synth melody in one-bar phrases, held notes, gliding runs, no drums",
+      ending: "l'aplat rouge plein cadre, sur lequel le Reel reboucle",
+      why: "La silhouette seule sur la couleur arrête le pouce, son plan qui se reconstruit et le décor qui change de look retiennent, et la couleur qui revient signe le Reel.",
     },
   }),
   model({
     key: "detourages",
     // Renamed on its original's fiche (Tristan: « ok »): no cut-out pops in it; a window opens on the place, the name
     // blinks letter by letter behind its scenery, then a burst on the beat.
+    // 15: written again on its fiche (v2 of its skill): 140 BPM, its slit, its name flashing letter by letter behind her
+    // sky, its burst on the dotted rhythm with its two sweeps, its rounded window on black, a soft film grade.
     name: "Ton nom qui clignote",
     pitch: "Une fenêtre s'ouvre sur ton lieu ou ton paysage, ton nom s'y allume lettre par lettre derrière le décor, puis une rafale de plans sur le rythme.",
     needs: "un plan large et fixe de ton lieu, ou d'un paysage quand ça a du sens (ta plage, ta vallée), avec du ciel au-dessus, et 10 à 20 plans courts qui bougent (des gestes, des matières, ta rue)",
     files: [6, 16],
-    pair: "feutre",
-    example: "collage",
-    finish: { name: "Ville chaude", hint: "contraste doux, chaleur, grain", contrast: 0.1, warmth: 0.1, grain: 0.3, grain_size: "fine" },
+    // Its name in very bold, round and wide capitals (the original's, Montserrat ExtraBold-like): the new pair below;
+    // until it exists, « geante-script » (Archivo Black) is the nearest.
+    pair: "ronde-large",
+    // Its reference composition was the v1's (a print on paper, a cut-out, a marker word): none now, its skill's code is it.
+    example: null,
+    // Its music measured on its original (docs/fiches/detourages.md): 140,3 BPM, six bars of 1,711 s in a row.
+    tempo: 140,
+    finish: { name: "Film doux", hint: "blancs crème jamais purs, noirs à peine levés, couleurs un peu éteintes, sans grain ni coins sombres", contrast: -0.03, saturation: -0.1, shadows: "#1c1d17", highlights: "#d1cfc3", split: 0.3 },
     look: {
-      name: "détourages qui surgissent",
-      format: "collage",
-      hook: { kind: "geste", what: "un plan de rue et un objet détouré qui surgit en grand par-dessus" },
-      text: { amount: "une ligne", composition: "un petit mot manuscrit blanc à côté d'un détourage, de temps en temps", weight: "regular", stroke: "thin" },
-      layout: "plein cadre, avec des objets ou des personnes détourés d'autres images posés en grand par-dessus certains plans, avec un bord blanc",
+      name: "nom qui clignote",
+      format: "pov",
+      hook: { kind: "mystère", what: "une fente noire qui s'ouvre lentement sur un plan large et fixe, puis un nom en très grandes capitales blanches qui s'allume lettre par lettre derrière le décor" },
+      text: {
+        amount: "une ligne",
+        composition: "un seul mot en capitales blanches très grasses, rondes et larges, sur près de 90 % de la largeur dans le ciel du premier plan, derrière ce qui s'y dresse, chaque lettre qui clignote, s'éteint puis tient",
+        case: "upper",
+        weight: "black",
+        tracking: "normal",
+      },
+      layout: "une fenêtre un peu plus large que haute aux coins arrondis sur du noir quand ses vidéos sont horizontales, sinon plein cadre aux coins arrondis ; ses plans en coupes franches",
       moments: [
-        { at: 0, what: "des plans de rue coupés toutes les 0,8 s" },
-        { at: 1.6, what: "un objet détouré surgit en grand au centre, avec un bord blanc de ciseau, et reste un plan ; un nouveau détourage toutes les 2 s environ, chaque fois à une autre place" },
+        { at: 0, what: "noir, puis une fente verticale au milieu qui s'élargit à vitesse constante jusqu'à toute la largeur, sur un plan large et fixe" },
+        { at: 3.6, what: "le nom s'allume lettre par lettre dans le désordre, de plus en plus vite : chacune clignote, s'éteint puis tient, derrière le décor" },
+        { at: 6.2, what: "le drop : une rafale de plans courts coupés sur le rythme pointé de la chanson, des gens qui font un geste, des matières de près, des vues d'en haut" },
+        { at: 9.7, what: "un balayage très rapide, tout flou, puis la rafale reprend" },
+        { at: 13.1, what: "un deuxième balayage, de côté, puis trois plans vus d'en haut" },
+        { at: 14.8, what: "un dernier plan tenu, quelqu'un de dos devant son lieu, les bras levés ; la basse s'arrête puis repart" },
       ],
-      camera: "à la main",
+      camera: "mixte",
       transitions: "coupes nettes",
-      grade: "warm",
-      motion: "fait_main",
-      music: "groovy indie funk, bouncy bass",
-      ending: "un dernier détourage posé sur le plan final",
-      why: "Les détourages qui surgissent donnent un rythme de collage fait main et mettent en avant chaque produit.",
+      grade: "film",
+      motion: "energique",
+      music: "indie electro song, a soft drumless intro opening up, then a dotted driving beat",
+      ending: "un dernier plan tenu, quelqu'un de dos les bras levés, coupé net sur la mesure : le Reel reboucle sur la fente noire",
+      why: "La fenêtre qui s'ouvre et le nom qui clignote derrière le décor intriguent, puis la rafale sur le rythme donne de l'élan et envie d'y aller.",
     },
   }),
   model({
@@ -1290,57 +1314,95 @@ export const HOUSE_MODELS: HouseModel[] = [
   model({
     key: "silhouette",
     // Renamed on its original's fiche (Tristan: « ok »): a presentation, a word inside her head, her name behind her.
+    // Written again on its fiche (v2 of its skill): its opening as a layout program and its negative, her profile in one
+    // midnight tone with « Je suis » in it, her name typed behind her head, the letter that becomes an eye, the almond on
+    // the drop, her trades on the hits, her name receding, her logo on the blue; 84,5 BPM, its break, its last hit.
     name: "Présente-toi",
     pitch: "Ton profil en silhouette d'un seul ton, un mot dans ta tête, puis ton nom qui s'écrit derrière toi et ce que tu fais qui défile.",
     needs: "une vidéo de toi de profil devant un fond clair, téléphone posé (5 s : tu baisses la tête puis tu la relèves), ton nom, ton métier en un mot et 3 à 5 choses que tu fais",
     files: [1, 4],
     pair: "grotesque",
-    example: "silhouette",
-    tempo: 90,
-    finish: { name: "Net", hint: "image propre", contrast: 0.04 },
+    // Its old reference composition flickered a word letter by letter (nothing flickers in the original): the skill's
+    // code is its reference now.
+    example: null,
+    // Its fiche's tempo (84,5 BPM, its bars on 1,06 · 3,90 · 6,74 · 9,58 s; house-measures.ts has no bpm for it).
+    tempo: 84.5,
+    finish: { name: "Aplats", hint: "deux aplats exacts, sans grain ni coins sombres", contrast: 0 },
     look: {
-      name: "silhouette et mot",
-      format: "collage",
-      hook: { kind: "geste", what: "une silhouette noire qui marche sur un fond pâle, et un mot qui s'inverse sur elle" },
-      text: { amount: "une ligne", composition: "un seul mot très gras, serré, au centre, blanc, qui s'inverse en passant sur la silhouette", weight: "black", tracking: "tight" },
-      layout: "un fond pâle uni, avec la personne détourée en silhouette noire et un mot posé par-dessus",
+      name: "présente-toi",
+      format: "autre",
+      hook: { kind: "geste", what: "sur un bleu nuit, une boîte de texte de logiciel de mise en page où son premier mot se tape, puis tout passe en négatif d'un coup" },
+      text: {
+        amount: "plusieurs",
+        composition: "une grotesque demi-grasse au milieu : son premier mot tapé qui grandit, un mot blanc dans sa silhouette, son nom tapé derrière sa tête (prénom en romain, nom en gras), ce qu'elle fait en gras qui change sur les coups",
+        case: "normal",
+        weight: "bold",
+        tracking: "normal",
+      },
+      colors: ["#0d0d1b", "#f3f4f9", "#d99868"],
+      layout: "deux aplats, un bleu nuit et un pâle froid ; sa silhouette de profil d'un seul bleu nuit en bas du cadre, coupée par le bas ; les mots au milieu ; un œil dessiné qui s'ouvre sur le pâle",
       moments: [
-        { at: 0, what: "la silhouette noire qui marche sur un fond gris très pâle" },
-        { at: 0.2, what: "le mot s'allume lettre par lettre en clignotant au centre ; il s'inverse là où la silhouette passe dessous" },
+        { at: 0, what: "sur un bleu nuit, une boîte de texte de logiciel (repères en tirets à travers le cadre, cotes en px qui défilent) ; son premier mot se tape, une lettre seule puis une rafale, un clic par lettre, et grandit de moitié avec une traîne pêche ; une main en points salue à côté" },
+        { at: 0.47, what: "tout passe en négatif en une image : fond pâle, mot à l'encre, repères gris clair" },
+        { at: 1.07, what: "coupe sur le premier temps : sa silhouette de profil d'un seul bleu nuit sur le pâle, « Je suis » en blanc dans sa tête, qui s'efface quand elle baisse la tête ; son nom se tape derrière sa tête, posé sur ses cheveux, son nom de famille s'en va" },
+        { at: 2.67, what: "son prénom se réduit à une lettre ronde qui grossit avec sa traîne et devient l'o de « Votre » ; ses lettres rebondissent autour ; l'o se remplit de pêche, une pupille y grandit, et l'œil monte pendant le break de la musique" },
+        { at: 3.9, what: "sur le drop, des paupières bleu nuit se ferment sur l'image en amande ; l'œil se plisse, sa pupille devient une fente de chat, il s'ouvre grand, son métier n'apparaît que dans l'iris, puis l'œil ouvert devient le fond pâle" },
+        { at: 5.47, what: "son métier fixe, ce qu'elle fait en gras à côté qui change sur les coups de plus en plus vite, un trait ondulé tracé dessous puis repris, une pastille pêche puis le pictogramme de son métier au bout du mot" },
+        { at: 7.8, what: "son nom seul, petit, au milieu du pâle, qui recule" },
+        { at: 9.57, what: "coupe sur la dernière mesure : son logo blanc, petit, sur le bleu nuit, puis le bleu seul pendant que la musique s'éteint" },
       ],
       camera: "fixe",
+      transitions: "coupes nettes",
       motion: "epure",
-      music: "minimal deep house, soft and hypnotic",
-      ending: "le mot seul sur le fond pâle",
-      why: "Graphique et énigmatique : une silhouette et un mot suffisent à faire un générique.",
+      music: "slow half-time electronic beat, deep held bass, a short break then the drop",
+      ending: "son logo blanc sur le bleu nuit, la musique arrêtée sur son dernier coup qui résonne",
+      why: "Une présentation en motion design : en onze secondes on retient son profil, son nom et son métier, et l'œil qui s'ouvre sur la suite surprend.",
     },
   }),
   model({
     key: "vision",
     name: "Vision machine",
-    pitch: "Les gens de ta vidéo teintés de bleu dans des cadres de détection, reliés par des traits, puis l'image au trait.",
-    needs: "une vidéo fixe d'un lieu où des gens passent",
+    // Written on its original's fiche (v1 of its skill, docs/fiches/vision.md): one fixed shot through some ten machine
+    // looks taking turns in a strobe of clean cuts; its frames blue or dotted (not the people tinted), characters and dots
+    // (not a line drawing), its labels dropping letters, its place built and erased tile by tile; its beep at 155 BPM.
+    pitch: "Ton lieu vu par une machine : chaque passant dans un cadre qui clignote en bleu, reliés par des fils, puis des points, des caractères et ton lieu qui s'efface dalle par dalle.",
+    needs: "un seul plan fixe de 8 à 10 s de ton lieu filmé de haut (une mezzanine, un escalier), téléphone posé : quelqu'un qui ne bouge pas au milieu et des gens qui passent autour, un sol à carreaux ou à dalles",
     files: [1, 3],
     pair: "technique",
-    example: "vision",
-    tempo: 120,
-    finish: { name: "Net", hint: "image propre", contrast: 0.04 },
+    // Its old reference composition (people tinted blue, a decoding title, a line drawing) is what its fiche corrects:
+    // the skill's code is its reference now.
+    example: null,
+    // Its fiche's tempo, a beat every two of its beeps (155 BPM; house-measures.ts has no bpm for it).
+    tempo: 77.5,
+    finish: { name: "Tel que filmé", hint: "sans étalonnage, sans grain ni coins sombres", contrast: 0 },
     look: {
       name: "vision machine",
-      format: "collage",
-      hook: { kind: "mystère", what: "des gens dans des cadres de détection, comme vus par une machine" },
-      text: { amount: "une ligne", composition: "une petite étiquette technique en haut et un mot ou un chiffre en sans serif très grasse qui se décode", case: "normal", weight: "black", tracking: "tight" },
-      layout: "un fond blanc, avec les personnes détourées teintées de bleu dans des cadres de détection reliés par des traits, puis le plan redessiné au trait",
+      format: "autre",
+      hook: { kind: "mystère", what: "la personne immobile seule sur blanc dans des cadres qui clignotent entre bleu et noir à points, puis son lieu qui se construit dalle par dalle autour d'elle" },
+      text: {
+        amount: "aucun",
+        composition: "aucun titre : de toutes petites étiquettes en capitales pixel sur des onglets bleu nuit au-dessus des cadres, qui perdent leurs lettres à chaque image, et des codes binaires, en décor",
+        case: "upper",
+        weight: "regular",
+        tracking: "normal",
+      },
+      colors: ["#142754", "#aabcdd", "#07070e"],
+      layout: "son plan plein cadre vu par une dizaine de regards de machine : fonds blancs et noirs, cadres bleus ou à points sur chaque passant, profondeur grise, réseau, graphe, caractères",
       moments: [
-        { at: 0, what: "le vrai plan, des cadres noirs autour de chaque personne avec une étiquette" },
-        { at: 0.7, what: "le plan disparaît : les personnes seules, teintées de bleu, sur blanc, dans leurs cadres reliés par des traits fins" },
-        { at: 1.4, what: "le plan redessiné en traits noirs sur blanc, les personnes toujours teintées" },
+        { at: 0, what: "la personne immobile et ce sur quoi elle est, seuls sur blanc dans leurs cadres, qui clignotent : bleu, noir à points, bleu, des noirs entre" },
+        { at: 0.47, what: "son lieu se construit dalle par dalle autour d'elle, la moitié d'un coup, les autres en fondu depuis le blanc, le fond laissé blanc" },
+        { at: 1.2, what: "un premier clignotement de coupes franches d'une à huit images : un cadre sur chaque passant, bleu en deux tons ou noir à points, une étiquette qui perd ses lettres ; la profondeur en gris ; le réseau des passants reliés par des fils ; les passants en points ; la personne en caractères ; des noirs" },
+        { at: 3.63, what: "le graphe seul sur blanc, un point par passant relié aux autres par des fils, des codes binaires ; puis les passants dans leurs cadres dessus" },
+        { at: 4.53, what: "un second clignotement plus serré, une passe toutes les deux images quand le bip double ; toute la place en caractères clairs sur noir" },
+        { at: 7.23, what: "son lieu s'efface dalle par dalle, du fond vers la personne immobile, jusqu'à elle seule" },
+        { at: 8.03, what: "la personne en caractères clairs sur noir, puis le noir" },
       ],
       camera: "fixe",
-      motion: "epure",
-      music: "glitchy minimal electronic, precise clicks",
-      ending: "le plan au trait, les cadres reliés",
-      why: "L'image vue par une machine intrigue : c'est moderne et ça donne une lecture neuve d'un lieu ordinaire.",
+      transitions: "coupes nettes",
+      motion: "energique",
+      music: "a held high beep retriggered on every beat, 155 BPM, a deep rumble, no drums",
+      ending: "son lieu effacé dalle par dalle jusqu'à la personne immobile, en caractères clairs sur noir, puis le noir",
+      why: "Son lieu ordinaire vu comme par une machine : le stroboscope de regards intrigue, chaque passe montre autre chose, et la personne immobile au milieu tient l'œil.",
     },
   }),
 ];
@@ -1409,11 +1471,11 @@ export const HOUSE_WHEN: Record<string, { pour: string; pas_pour: string }> = {
   interface: { pour: "faire suivre son compte, une nouvelle page, un lancement, ce qu'on fait en trois mots", pas_pour: "montrer son lieu ou ses produits en vidéo (une seule photo, petite et ronde), quelqu'un qui parle" },
   pixel: { pour: "une recette, une préparation en étapes, une ambiance chaleureuse", pas_pour: "un lieu, une rue, quelqu'un qui parle, des vidéos filmées à la main" },
   "mots-meles": { pour: "un jeu, une devinette, un message caché, un lieu calme : quelqu'un qui fait une chose simple", pas_pour: "un Reel rythmé, plusieurs plans, une vidéo qui bouge" },
-  aplat: { pour: "présenter une personne (la patronne, l'équipe), une marque qui ose la couleur", pas_pour: "sans vidéo d'elle qui marche" },
+  aplat: { pour: "présenter une personne (la patronne, l'équipe) et son lieu avec de la couleur, une marque qui ose la couleur", pas_pour: "sans vidéo de quelqu'un qui marche, une offre à lire en détail" },
   detourages: { pour: "présenter un lieu, un paysage ou une sortie avec de l'élan, un nom à faire retenir", pas_pour: "sans plan large et fixe de son lieu ou de son paysage" },
   createur: { pour: "quelqu'un qui explique en parlant face caméra et montre ce dont il parle (ses produits, ses réalisations, son lieu, son site)", pas_pour: "des images sans parole, quelqu'un qui parle sans rien à montrer" },
-  silhouette: { pour: "se présenter, présenter son métier ou quelqu'un de l'équipe", pas_pour: "des produits, un lieu sans personne" },
-  vision: { pour: "un lieu fréquenté, un ton tech ou graphique", pas_pour: "un lieu vide" },
+  silhouette: { pour: "se présenter (elle ou quelqu'un de son équipe), présenter son métier et ce qu'elle fait, un lancement, un ton de studio graphique", pas_pour: "des produits seuls, un lieu sans personne, une offre à lire" },
+  vision: { pour: "son lieu fréquenté filmé de haut, quelqu'un d'immobile au milieu et des gens qui passent autour ; un ton tech ou graphique", pas_pour: "un lieu vide, un plan qui bouge, des produits en gros plan, un message à lire" },
 };
 
 /** The models for Edith: their key, name, what they do, what they want, and what only she can film for one. */
