@@ -21,8 +21,8 @@ test("« La mosaïque » (effect v1): its layer over a run of 3 to 12 shots, the
     assert.deepEqual(layerShots(plan, layer), Array.from({ length: n }, (_, i) => i + 1));
     const motion = layer.motion;
     assert.deepEqual(motion.piece, { key: "mosaique", version: 1 });
-    // No title asked: its only text is the beat (its settings at their defaults are left out).
-    assert.deepEqual(motion.texts, { beat: "18" });
+    // No title asked: its only texts are the beat and its shots as the engine counts them (its settings at their defaults are left out).
+    assert.deepEqual(motion.texts, { beat: "18", mine: Array.from({ length: n }, (_, i) => i + 1).join(",") });
     // It lays her shots as the montage plays them (Footage): nothing cut out, no object, no sound, no font of its own.
     assert.equal(motion.drawn, undefined);
     assert.equal(motion.sounds, undefined);
@@ -52,7 +52,7 @@ test("« La mosaïque »: its settings as its filler sets them, its title option
   // Cut at the last word that fits its 24 characters.
   assert.equal(read.texts.titre, "nos fraisiers du samedi");
   const plan = pieceTestPlan({ piece: mosaique, shots: run(4), span: [1.2, 6], fill: read, bpm: 100 });
-  assert.deepEqual(plan.layers![0]!.motion.texts, { beat: "18", cases: "4x6", ordre: "spirale", titre: "nos fraisiers du samedi" });
+  assert.deepEqual(plan.layers![0]!.motion.texts, { beat: "18", mine: "1,2,3,4", cases: "4x6", ordre: "spirale", titre: "nos fraisiers du samedi" });
   // Without a title, none is written (it is optional).
   assert.deepEqual(readPieceFill(mosaique, { ...answer, texts: [], settings: [] })!.texts, {});
   // Its code reads each setting by its name, its default the first choice (the one the engine never passes on).
