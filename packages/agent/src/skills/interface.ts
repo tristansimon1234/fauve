@@ -1,386 +1,414 @@
-import { beatSpans, toFrame, type MontageSkill } from "../skills.ts";
+import { toFrame, type MontageSkill, type SkillSound } from "../skills.ts";
 
-// « Interface minimaliste », written on its original (house/originals/interface.mp4, 12,7 s of pure motion design on a
-// pale blue-grey, looked at image by image): two words come out of the blur at the middle, a grotesque and its last word
-// in a serif italic (« A new beginning »), and go back into it; a tiny spaced label in capitals over a list that rolls
-// through the middle line, the one there sharp, its neighbours blurred above and below, the last one underlined by hand
-// in blue; a sentence out of the blur on two lines, then another typed letter by letter behind a blue caret (« Giving
-// brands a story worth watching », its end in the italic), which blurs away into an app's icon in a white rounded
-// square; the icon opens into a white profile card (its handle and icons, a round photo, a name, a bio of two lines, a
-// blue « Follow » and a grey « Message »); the card goes but the photo and the button, which come forward, an arrow
-// glides onto it and clicks: « Followed »; the photo and the button fold into a white pill, the handle and a tick, then
-// the handle alone, and it ends on « FOLLOW ALONG », tiny, over the handle in blue. Here the two sentences are one, typed
-// (her promise), in French and big enough for a phone; the photo is hers (her profile photo or her logo, a video plays
-// in it), the card her name, her list and her promise; the end her account, or her name when it is not known, her
-// logo over it when it reads on the pale ground. Its ending card (an offer, an announcement) comes out of the blur after it.
+// « Interface minimaliste », version 2, written on its original's fiche (docs/fiches/interface.md: 12,7 s of pure motion
+// design on a pale blue-grey, measured image by image at 30 i/s, its sound read by bands; Tristan: « c'est un effet que
+// l'on veut pouvoir faire, pas exactement reproduire l'image »). No cut: one shot of motion design where each element
+// becomes the next, everything coming in and going out through the blur, on the beats of its music (110,5 BPM, its first
+// beat at 0,04 s). Every moment below is its original's image (30 a second) counted in beats at that tempo, so a slower
+// tempo stretches them all; two holds are a few beats longer for a phone (its announcement two beats, its typed promise
+// one: the engine reads a sentence in 0,8 s plus 0,3 s a word, the original holds them 0,8 and 0,5 s):
+//   4 – 44      her first words out of the blur letter by letter at the middle, small, the last one in a serif italic;
+//   44 – 69     her first words go left into the blur; the last one rises, halves and greys, then turns into the small
+//               spaced label of her list letter by letter; her list's first item rises out of the blur on beat 3;
+//   69 – 121    her list steps through the middle line on beats 4 and 5, the item there sharp and black, its neighbours
+//               pale and blurred; the last one underlined by a stroke that tapers, blue to indigo, drawn from the left;
+//   121 – 172   her list goes up into the blur while her announcement rises on two lines, word by word, its two last
+//               words in the italic; read whole, it is erased letter by letter from the left;
+//   172 – 217   a blue caret types her promise from the left edge (38 letters a second, each one blurred an image or
+//               two), its last words in the italic; the caret never blinks and fades out after it; the music opens;
+//   217 – 270   the app's icon lands on her last word, glides to the middle and swallows her promise, then opens into her
+//               profile card: her account, her round photo, her name, her trade, her list and her promise as its bio,
+//               « Suivre » turning blue, « Message »;
+//   270 – 305   the whole card zooms 1,5 times onto « Suivre »; the card goes but her photo and the button; an arrow
+//               glides up in an arc and clicks on beat 18 (no ring): the blue fades, « Suivi(e) » rises;
+//   305 – 381   the button and her photo fold into a white pill with her account and a tick; the pill fades, her photo
+//               shrinks into a dot that becomes the « @ » of her account, in the blue gradient, « À SUIVRE » over it.
+// Her texts are the original's sizes where they read (a little over the engine's 48 px), its small labels and its card
+// as accents (20 px at least) or decor. Its photo is hers (her profile photo or her logo; a video of her plays in the
+// round), in black and white as the original's; with none, her logo or her initial. Its blue is the original's royal blue
+// to indigo, hers on her word. Its sounds are the original's: a soft typing as the caret types, a double click; its
+// music soft until it opens, fading over its last second. Nothing of the original's own is copied: its handle, its name
+// and its words are hers. Its ending card (an offer, an announcement), in option, comes out of the blur after it.
 
-const BPM = 100;
-/** Its sections (beats at its tempo), each never shorter than its words need to be read on a phone (s). */
-const SECTIONS: { beats: number; seconds: number }[] = [
-  // Her first words out of the blur.
-  { beats: 4, seconds: 2.2 },
-  // The label and her list rolling.
-  { beats: 4, seconds: 2.2 },
-  // Her promise typed.
-  { beats: 5, seconds: 2.8 },
-  // The app's icon, opening into her card.
-  { beats: 2, seconds: 1 },
-  // Her profile card (its bio read: her list and her promise).
-  { beats: 3.5, seconds: 2.2 },
-  // The click on « S'abonner ».
-  { beats: 2.5, seconds: 1.4 },
-  // The pill with her account.
-  { beats: 2, seconds: 1 },
-  // Her account in blue, at the end.
-  { beats: 3.5, seconds: 2 },
-];
-/** The engine's ending card: the Reel's last 1,6 s. */
+const BPM = 110.5;
+/** Its original's images in a beat at its tempo (30 i/s). */
+const IMAGES = (30 * 60) / BPM;
+/** Its moments, its original's images (docs/fiches/interface.md), before its longer holds. */
+const AT = { hook: 4, out: 44, list: 51, line: 95, ann: 121, erase: 165, type: 172, icon: 217, card: 234, zoom: 270, click: 295, pill: 305, at: 332, end: 381 };
+/** Its music opens 4,3 images before the icon lands (7,09 s), on a downbeat; its first beat at 0,04 s. */
+const OPENS = 4.3;
+const FIRST_BEAT = 1.2;
+/** Its holds lengthened for a phone (beats): its announcement read whole two beats more, its promise typed one more. */
+const ANN_MORE = 2;
+const TYPED_MORE = 1;
+/** Its typing, letters a second (the original's 37 in 29 images), a soft key click every other letter. */
+const TYPING = 38;
+/** The engine's ending card: the Reel's last 1,6 s, on the half-beat grid. */
 const CARD_SECONDS = 1.6;
 const round = (n: number) => Math.round(n * 100) / 100;
+const round3 = (n: number) => Math.round(n * 1000) / 1000;
+
+/** Its moments in images of the original, its longer holds counted in (before the announcement's erase, and after its promise). */
+export function interfaceImages(): Record<keyof typeof AT, number> {
+  const more = (at: number) => at + (at >= AT.erase ? ANN_MORE * IMAGES : 0) + (at >= AT.icon ? TYPED_MORE * IMAGES : 0);
+  return Object.fromEntries(Object.entries(AT).map(([k, v]) => [k, more(v)])) as Record<keyof typeof AT, number>;
+}
 
 const CODE = String.raw`function Scene({ width, height, durationInFrames, brand, shots, reelTexts, end, texts }) {
-  const h = React.createElement;
-  const frame = useCurrentFrame();
+  const h = React.createElement, frame = useCurrentFrame(), R = Math.round, mn = Math.min, mx = Math.max;
   const mark = (k, d) => { const v = Number(texts && texts[k]); return Number.isFinite(v) ? v : d; };
-  const BEAT = Math.max(4, mark("beat", 18));
-  // Its sections (frames): her list, her promise typed, the icon, her card, the click, the pill, her account.
-  const LIST = mark("list", Math.round(4 * BEAT));
-  const TYPE = mark("type", LIST + Math.round(4 * BEAT));
-  const ICON = mark("icon", TYPE + Math.round(5 * BEAT));
-  const CARD = mark("card", ICON + Math.round(2 * BEAT));
-  const CLICK = mark("click", CARD + Math.round(3.5 * BEAT));
-  const PILL = mark("pill", CLICK + Math.round(2.5 * BEAT));
-  const FIN = mark("fin", PILL + Math.round(2 * BEAT));
-  const n = shots.length;
-  const endAt = end ? end.from : durationInFrames + 1;
-  const clamp = { extrapolateLeft: "clamp", extrapolateRight: "clamp" };
-  const ease = Easing.bezier(0.22, 1, 0.36, 1);
-  const inOut = Easing.bezier(0.65, 0, 0.35, 1);
-  const k01 = (a, b) => interpolate(frame, [a, b], [0, 1], clamp);
-  const mix = (a, b, t) => a + (b - a) * t;
-  const sans = "'" + brand.bodyFont + "', 'Inter Tight', 'Inter', sans-serif";
-  const serif = "'Instrument Serif', '" + brand.displayFont + "', Georgia, serif";
-  // The model's own colours: a pale blue-grey ground, near-black type, a grey, its blue.
-  const GROUND = "#f4f5fa";
-  const INK = "#121317";
-  const GREY = "#868a96";
-  const BLUE = "#1f45c9";
-  const BLUE2 = "#2b2e8c";
-  const full = { position: "absolute", left: 0, top: 0, width, height };
-  // A phone number or a date never breaks between its digits, nor « Paris 3e » before its number, nor a line before a « · ».
-  const keep = (s) => String(s || "").replace(/(\d) (?=\d)/g, "$1\u00a0").replace(/ (\d+(?:er|e))\b/g, "\u00a0$1").replace(/ ([·•|–—]) /g, "\u00a0$1 ");
-  const wordsOf = (s) => String(s || "").split(/[ \t\n]+/).filter(Boolean);
-  // A sentence, an item of her list: its first letter a capital, as an interface writes them.
+  const setting = (k, d) => { const v = texts && texts[k]; return typeof v === "string" && v ? v : d; };
+  // Its moments (frames); o: its original's images at its tempo.
+  const K = mark("beat", 16.29) / 16.29, o = (x) => R(x * K);
+  const [IN, OUT, LIST, LINE, ANN, ERASE, TYPE, ICON, CARD, ZOOM, CLICK, PILL, AT] = "hook out list line ann erase type icon card zoom click pill at".split(" ").map((k, i) => mark(k, [4, 44, 51, 95, 121, 198, 205, 266, 283, 319, 344, 354, 381][i]));
+  const endAt = end ? end.from : durationInFrames + 1, n = shots.length;
+  const cl = { extrapolateLeft: "clamp", extrapolateRight: "clamp" }, ease = Easing.bezier(0.22, 1, 0.36, 1), both = Easing.bezier(0.65, 0, 0.35, 1);
+  const at01 = (f, a, b) => interpolate(f, [a, b], [0, 1], cl), k01 = (a, b) => at01(frame, a, b), ek = (a, b) => ease(k01(a, b));
+  const mix = (a, b, t) => a + (b - a) * t, px = (v) => R(v * 10) / 10, blur = (b) => (b > 0.05 ? "blur(" + px(b) + "px)" : "none");
+  const abs = (l, t, w, hh, x) => ({ position: "absolute", left: l, top: t, width: w, height: hh, ...x });
+  const acc = (x) => h("span", { "data-fauve-accent": "" }, x);
+  const sans = "'" + brand.displayFont + "', 'Inter Tight', 'Inter', sans-serif", serif = "'Instrument Serif', '" + brand.displayFont + "', Georgia, serif";
+  // One accent: the original's royal blue to indigo, or hers on her word (unless too pale).
+  const GROUND = "#f4f5fa", INK = "#121317", GREY = "#87888e";
+  const hx = /^#?([0-9a-f]{6})$/i.exec(String(brand.accent || "")), rgb = hx ? [0, 2, 4].map((i) => parseInt(hx[1].slice(i, i + 2), 16)) : null;
+  const deep = (t) => "rgb(" + rgb.map((v) => R(v * t)).join(",") + ")";
+  const hers = setting("couleur", "bleu") === "sienne" && rgb && (0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2]) / 255 < 0.6;
+  const LINEC = hers ? [deep(1), deep(0.55)] : ["#1051c4", "#222853"], BTN = hers ? [deep(1), deep(0.6)] : ["#0450d1", "#332b7f"], ACC = hers ? [deep(0.85), deep(0.45)] : ["#0c3a83", "#181744"];
+  const grad = (c) => "linear-gradient(100deg, " + c[0] + ", " + c[1] + ")";
+  const keep = (s) => String(s || "").replace(/(\d) (?=\d)/g, "$1 ");
+  const wordsOf = (s) => String(s || "").split(/[ \t\n]+/).filter(Boolean), letters = (s) => Array.from(String(s));
   const cap = (s) => { const t = String(s || "").trim(); return t ? t.charAt(0).toUpperCase() + t.slice(1) : t; };
-  const unseen = (key, s) => h("span", { key, style: { position: "absolute", left: 0, top: 0, opacity: 0, fontSize: 1 } }, s);
+  // A text's width (px), told from its letters.
+  const est = (s, size, it) => letters(s).reduce((w, c) => w + (/[ il.,;:'’!|fjtrI1]/.test(c) ? 0.3 : /[mwMW@]/.test(c) ? 0.84 : /[A-Z]/.test(c) ? 0.66 : 0.55), 0) * size * (it ? 0.97 : 1);
+  // Out of the blur (p 0 to 1), rising a little.
+  const fx = (p, rise) => ({ opacity: mn(1, mx(0, p * 1.25)), filter: blur((1 - p) * 9), transform: rise && p < 0.995 ? "translateY(" + px((1 - p) * rise) + "px)" : undefined });
+  const S = 50;
+  const IT = (size) => ({ fontFamily: serif, fontStyle: "italic", fontWeight: 400, fontSize: R(size * 1.16), letterSpacing: "-0.01em" });
+  const line = (size, x) => ({ fontFamily: sans, fontWeight: 600, fontSize: size, lineHeight: 1.2, letterSpacing: "-0.03em", color: INK, whiteSpace: "nowrap", ...x });
+  const full = abs(0, 0, width, height), all = abs(0, 0, "100%", "100%"), F = React.Fragment;
+  const hook = reelTexts.find((t) => t.role === "hook"), band = reelTexts.find((t) => t.role === "band"), caps = reelTexts.filter((t) => t.role === "caption");
+  const within = (a, b) => caps.find((t) => t.from >= a && t.from < b);
+  const label = within(LIST - 2, ANN - 2), ann = within(ANN - 2, ERASE), promise = within(ERASE, ICON), metier = within(CARD - 2, CARD + 3), account = within(CARD + 3, durationInFrames + 1);
+  const mine = [hook, band, label, ann, promise, metier, account], others = reelTexts.filter((t) => mine.indexOf(t) < 0);
+  const lit = (c, j, style) => h("span", { key: j, style: { display: "inline-block", whiteSpace: "pre", ...style } }, c);
+  const flex = { display: "flex", alignItems: "center", justifyContent: "center" };
+  // A small label in spaced capitals (an accent), each letter out of the blur at p(its share of the word).
+  const tag = (top, text, p, x) => h("div", { style: { ...abs(140, top, 800, 32), ...flex, fontFamily: sans, fontWeight: 600, fontSize: 21, letterSpacing: "0.4em", textTransform: "uppercase", color: GREY, whiteSpace: "nowrap", ...x } },
+    h("span", { "data-fauve-accent": "", style: { marginRight: "-0.4em" } }, letters(text).map((c, j, a) => lit(c, j, fx(p(j / a.length))))));
 
-  // Out of the blur over "len" frames from "a" (its blur and its opacity), back into it from "b".
-  const focus = (a, len, b) => {
-    const p = Math.min(ease(k01(a, a + len)), b === undefined ? 1 : 1 - k01(b, b + 8));
-    return { filter: p > 0.995 ? "none" : "blur(" + ((1 - p) * 16).toFixed(1) + "px)", opacity: Math.min(1, p * 1.4) };
+  // 1. Her first words out of the blur; the last (italic) rises, halves and greys into the label it becomes.
+  const hw = wordsOf(cap(hook ? hook.text : ""));
+  const lastW = hw.length > 1 ? hw[hw.length - 1] : "", firstW = hw.length > 1 ? hw.slice(0, -1).join(" ") + " " : hw.join(" ");
+  const wide = est(firstW, S) + est(lastW, S, true) * 1.16;
+  const HS = R(S * mn(1, 760 / mx(1, wide)));
+  const LY = 822, hasLabel = Boolean(label && label.text), morph = OUT + o(13);
+  const moveT = both(k01(OUT + o(4), OUT + o(12))), lastX = 540 + (wide * HS) / S / 2 - (est(lastW, HS, true) * 1.16) / 2;
+  let li = 0;
+  const hookLetter = (c, j, it, total) => {
+    const a = IN + R(li++ * 0.87 * K), go = (j / mx(1, total)) * (it && hasLabel ? o(12) : o(6)), from = it && hasLabel ? morph : OUT;
+    return lit(c, j, fx(mn(ek(a, a + o(5)), 1 - ek(from + go, from + go + (it && hasLabel ? o(3) : o(4)))), 14));
   };
-  const italic = (size) => ({ fontFamily: serif, fontStyle: "italic", fontWeight: 400, fontSize: Math.round(size * 1.16), letterSpacing: "-0.01em" });
-  // A line a word at a time out of the blur from the left, its last "last" words in the serif italic.
-  const blurred = (text, a, b, last, size) => {
-    const ws = wordsOf(text);
-    return ws.map((w, i) => h(React.Fragment, { key: i }, i ? " " : null,
-      h("span", { style: { display: "inline-block", ...focus(a + i * 3, 10, b === undefined ? undefined : b + i * 2), ...(i >= ws.length - last ? italic(size) : {}) } }, keep(w))));
-  };
-
-  const hook = reelTexts.find((t) => t.role === "hook");
-  const band = reelTexts.find((t) => t.role === "band");
-  const captions = reelTexts.filter((t) => t.role === "caption");
-  const label = captions.find((t) => t.from >= LIST - 3 && t.from < TYPE - 3);
-  const promise = captions.find((t) => t.from >= TYPE - 3 && t.from < ICON - 3);
-  const account = captions.find((t) => t.from >= ICON - 3);
-  const others = reelTexts.filter((t) => t !== hook && t !== band && t !== label && t !== promise && t !== account);
-
-  // 1. Her first words out of the blur at the middle, the last one in the serif italic; back into it before the list.
-  const SIZE1 = 74;
-  const opening = hook && frame < LIST + 8
-    ? h(FitText, { key: "hook", style: { position: "absolute", left: 140, top: 880, width: width - 280, height: 160 }, innerStyle: { fontFamily: sans, fontWeight: 600, fontSize: SIZE1, lineHeight: 1.12, letterSpacing: "-0.035em", color: INK, whiteSpace: "nowrap" } },
-        h("span", null, blurred(cap(hook.text), 2, LIST - 12, 1, SIZE1)))
+  const lastStyle = lastW && hasLabel && frame >= OUT + o(4) ? { transform: "translate(" + px((540 - lastX) * moveT) + "px," + px((LY + 14 - 960) * moveT) + "px) scale(" + (1 - 0.5 * moveT).toFixed(3) + ")", color: frame >= OUT + o(8) ? GREY : INK } : {};
+  const hookLine = hook && frame < morph + o(16)
+    ? h("div", { key: "hook", style: { ...abs(0, R(960 - HS * 0.62 - 10 * (1 - ek(IN, OUT))), width), textAlign: "center", ...line(HS) } },
+        h("span", null, letters(firstW).map((c, j, a) => hookLetter(c, j, false, a.length))),
+        lastW ? h("span", { style: { display: "inline-block", transformOrigin: "50% 60%", ...IT(HS), ...lastStyle } }, letters(lastW).map((c, j, a) => hookLetter(c, j, true, a.length))) : null)
     : null;
 
-  // 2. Its small label in spaced capitals, and her list rolling through the middle line: the one there sharp, its
-  // neighbours blurred above and below; the last one underlined by hand in blue. Every item is in the page all along
-  // (her separators too), the far ones unseen.
-  const parts = band ? String(band.text).split(/(\s*[,;·\/\n]\s*)/) : [];
-  const items = [];
+  // 2. Her list through the middle line, a step a beat, the last underlined by a tapering stroke (her separators unseen).
+  const parts = band ? String(band.text).split(/(\s*[,;·\/\n]\s*)/) : [], items = [];
   parts.forEach((p, i) => { if (i % 2 === 0 && p.trim()) items.push(i); });
-  const m = Math.max(1, items.length);
-  const firstAt = LIST + Math.round(0.5 * BEAT);
-  const stepL = m > 1 ? Math.max(8, Math.min(Math.round(0.8 * BEAT), Math.floor((TYPE - firstAt - Math.round(1.6 * BEAT)) / (m - 1)))) : 0;
+  const m = mx(1, items.length), gap = mn(o(17), Math.floor(o(44) / mx(1, m - 1)));
   let pos = 0;
-  for (let j = 1; j < m; j++) pos += ease(k01(firstAt + j * stepL, firstAt + j * stepL + 8));
-  const lineAt = firstAt + (m - 1) * stepL + Math.round(0.4 * BEAT);
-  const listOut = TYPE - 9;
-  const ROW = 118;
-  const underline = (word, at) => {
-    const drawn = ease(k01(at, at + 10));
-    return h("span", { style: { position: "relative", display: "inline-block" } }, word,
-      h("svg", { viewBox: "0 0 200 20", preserveAspectRatio: "none", "data-fauve-decor": "", style: { position: "absolute", left: "-3%", width: "106%", top: "100%", height: "0.2em", overflow: "visible", opacity: drawn > 0 ? 1 : 0 } },
-        h("path", { d: "M 2 12 C 50 4, 120 3, 198 9", fill: "none", stroke: BLUE, strokeWidth: 6, strokeLinecap: "round", pathLength: 1, strokeDasharray: "1 1", strokeDashoffset: (1 - drawn).toFixed(3) })));
-  };
-  const list = band && frame >= LIST && frame < TYPE + 2
-    ? h("div", { key: "list", style: full },
+  for (let j = 1; j < m; j++) pos += both(k01(LIST + j * gap, LIST + j * gap + o(8)));
+  const lineAt = mx(LINE, LIST + (m - 1) * gap + o(10)), gone = ek(ANN, ANN + o(13));
+  const drawn = k01(lineAt, lineAt + o(5)) * 0.6 + k01(lineAt + o(5), lineAt + o(11)) * 0.4;
+  const stroke = (word) => h("span", { style: { position: "relative", display: "inline-block" } }, word,
+    drawn > 0 ? h("span", { style: { position: "absolute", left: -12, right: -24, top: "92%", height: 15, clipPath: "inset(0 " + px((1 - drawn) * 100) + "% 0 0)" } },
+      h("span", { style: { position: "absolute", inset: 0, background: "linear-gradient(90deg, " + LINEC[0] + ", " + LINEC[1] + ")", clipPath: "polygon(0% 8%, 100% 50%, 100% 56%, 0% 92%)" } })) : null);
+  const listLayer = band && frame >= LIST - 2 && frame < ANN + o(14)
+    ? h("div", { key: "list", style: { ...full, transform: gone > 0 ? "translateY(" + px(-150 * gone) + "px)" : undefined } },
         parts.map((p, i) => {
-          const j = items.indexOf(i);
-          if (j < 0) return unseen("s" + i, p);
-          const d = j - pos;
-          const enter = firstAt + Math.max(0, j - 1) * stepL;
-          const seen = ease(k01(enter, enter + 8)) * (1 - k01(listOut, listOut + 8));
-          const near = Math.min(1, Math.abs(d));
-          if (Math.abs(d) > 1.5 || seen <= 0) return unseen("w" + i, p);
-          const word = j === m - 1 ? underline(cap(p), lineAt) : cap(p);
-          return h(FitText, { key: "w" + i, style: { position: "absolute", left: 140, top: Math.round(960 - ROW / 2 + d * ROW), width: width - 280, height: ROW }, innerStyle: { fontFamily: sans, fontWeight: 600, fontSize: 82, letterSpacing: "-0.035em", color: INK, whiteSpace: "nowrap", opacity: seen * (1 - 0.7 * near), filter: "blur(" + (7 * near + 14 * (1 - seen)).toFixed(1) + "px)" } }, word);
+          const j = items.indexOf(i), d = j - pos;
+          if (j < 0 || Math.abs(d) > 1.4) return h("span", { key: i, style: { ...abs(0, 0), opacity: 0, fontSize: 1 } }, p);
+          const come = j === 0 ? ek(LIST, LIST + o(9)) : 1, near = mn(1, Math.abs(d));
+          return h(FitText, { key: i, style: abs(140, R(922 + d * 75 + (1 - come) * 102), 800, 75), innerStyle: line(S, { opacity: px(come * (1 - gone) * (1 - 0.88 * near) * 100) / 100, filter: blur(7 * near + 9 * (1 - come) + 9 * gone) }) },
+            j === m - 1 ? stroke(cap(p)) : cap(p));
         }),
-        label
-          ? h(FitText, { key: "label", style: { position: "absolute", left: 140, top: 960 - ROW / 2 - ROW - 64, width: width - 280, height: 48 }, innerStyle: { fontFamily: sans, fontWeight: 600, fontSize: 26, letterSpacing: "0.32em", textTransform: "uppercase", color: GREY, whiteSpace: "nowrap", ...focus(LIST + 2, 10, listOut) } },
-              h("span", { "data-fauve-accent": "", style: { marginRight: "-0.32em" } }, label.text))
-          : null)
+        hasLabel ? tag(LY - 16, label.text, (r) => ek(morph + r * o(12), morph + r * o(12) + o(4)), { filter: blur(9 * gone), opacity: 1 - gone }) : null)
     : null;
 
-  // 3. Her promise typed letter by letter at the middle behind a blue caret, its last words in the serif italic; it
-  // blurs away, and the app's icon is there in its place.
-  const SIZE3 = 66;
-  const typed = (text, a, per) => {
-    const ws = wordsOf(text);
-    const last = ws.length >= 4 ? 2 : 1;
-    const total = ws.reduce((s, w) => s + Array.from(w).length, 0);
-    const shown = Math.max(0, Math.min(total, Math.floor((frame - a) / per) + 1));
-    const blink = shown < total || Math.floor((frame - a - total * per) / 14) % 2 === 0;
-    const caret = h("span", { key: "caret", style: { display: "inline-block", width: 0, position: "relative" } },
-      h("span", { style: { position: "absolute", left: "0.05em", bottom: "-0.1em", width: "0.07em", height: "1.05em", backgroundColor: BLUE, opacity: frame >= a && blink ? 1 : 0 } }));
-    let k = 0;
-    return ws.map((w, i) => {
-      const letters = Array.from(w).map((c, j) => {
-        const at = k++;
-        return h(React.Fragment, { key: j }, h("span", { style: { opacity: at < shown ? 1 : 0 } }, c), at === shown - 1 ? caret : null);
-      });
-      return h(React.Fragment, { key: i }, i ? " " : null, h("span", { style: { whiteSpace: "nowrap", ...(i >= ws.length - last ? italic(SIZE3) : {}) } }, i === 0 && shown === 0 ? caret : null, letters));
-    });
-  };
-  const perLetter = promise ? Math.max(0.8, Math.min(2.2, (Math.round(1.1 * 30)) / Math.max(1, Array.from(String(promise.text)).length))) : 1;
-  const promiseLine = promise && frame >= TYPE && frame < ICON + 2
-    ? h(FitText, { key: "promise", style: { position: "absolute", left: 140, top: 860, width: width - 280, height: 200 }, innerStyle: { fontFamily: sans, fontWeight: 600, fontSize: SIZE3, lineHeight: 1.16, letterSpacing: "-0.03em", color: INK, textWrap: "balance" } },
-        h("span", { style: focus(TYPE, 1, ICON - 8) }, typed(cap(promise.text), TYPE + 3, perLetter)))
+  // 3. Her announcement rising on two lines word by word, its two last words italic; then erased from the left.
+  const aw = wordsOf(ann ? ann.text : "");
+  let cut = aw.length, best = 1e9;
+  if (aw.length > 3) for (let k = 1; k < aw.length; k++) {
+    const a = aw.slice(0, k).join(" ").length, b = aw.slice(k).join(" ").length, score = Math.abs(a - 1.2 * b) + (a < b ? 20 : 0);
+    if (score < best) { best = score; cut = k; }
+  }
+  let wi = 0;
+  const annLayer = ann && aw.length && frame >= ANN - 2 && frame < ERASE + o(9)
+    ? h(FitText, { key: "ann", style: abs(140, R(888 + 150 * (1 - ek(ANN, ANN + o(20)))), 800, 145), innerStyle: line(S, { lineHeight: 1.42 }) },
+        h("div", null, [aw.slice(0, cut), aw.slice(cut)].filter((l) => l.length).map((ws, l) => {
+          const chars = ws.join(" ").length;
+          let ci = 0;
+          return h("div", { key: l }, ws.map((w, k) => {
+            const a = ANN + R(wi * mn(o(2.3), o(20) / mx(1, aw.length))), italic = wi++ >= aw.length - 2 && aw.length > 2;
+            return h(F, { key: k }, k ? " " : null, h("span", { style: { display: "inline-block", ...(italic ? IT(S) : {}), ...fx(ek(a, a + o(8))) } },
+              letters(w).map((c, j) => h("span", { key: j, style: { opacity: frame >= ERASE + R((ci++ / mx(1, chars)) * o(8)) ? 0 : 1 } }, c))));
+          }));
+        })))
     : null;
 
-  // 4. The app's icon in a white rounded square, opening into her profile card.
-  const glyph = (s, color) => h("svg", { width: s, height: s, viewBox: "0 0 24 24", style: { display: "block" } },
-    h("rect", { x: 3, y: 3, width: 18, height: 18, rx: 5.2, fill: "none", stroke: color, strokeWidth: 1.7 }),
-    h("circle", { cx: 12, cy: 12, r: 4.1, fill: "none", stroke: color, strokeWidth: 1.7 }),
-    h("circle", { cx: 17.1, cy: 6.9, r: 1.05, fill: color }));
-  const I = 132;
-  const CX = 110;
-  const CY = 640;
-  const CW = width - 220;
-  const CH = 640;
-  const grow = inOut(k01(ICON + Math.round(0.7 * BEAT), CARD));
-  const shown4 = ease(k01(ICON - 4, ICON + 4)) * (1 - k01(CLICK, CLICK + 8));
-  const shape = frame >= ICON - 4 && frame < CLICK + 8
-    ? h("div", { key: "shape", style: { position: "absolute", left: mix(width / 2 - I / 2, CX, grow), top: mix(960 - I / 2, CY, grow), width: mix(I, CW, grow), height: mix(I, CH, grow), borderRadius: mix(34, 44, grow), backgroundColor: "#ffffff", boxShadow: "0 24px 60px rgba(20,24,60,0.10), 0 2px 6px rgba(20,24,60,0.06)", opacity: shown4, transform: "scale(" + (0.7 + 0.3 * ease(k01(ICON - 4, ICON + 4))).toFixed(4) + ")" } },
-        grow < 0.6 ? h("div", { style: { position: "absolute", left: "50%", top: "50%", width: 64, height: 64, marginLeft: -32, marginTop: -32, opacity: 1 - grow / 0.6 } }, glyph(64, "#1c1c1e")) : null)
-    : null;
+  // 4. Her promise typed from the line's left edge, its caret never blinking; the icon lands on it and swallows it.
+  const pw = wordsOf(cap(promise ? promise.text : "")), lastN = pw.length >= 4 ? 2 : 1;
+  const total = pw.reduce((s, w) => s + letters(w).length, 0), per = (K * 30) / 38, typedEnd = TYPE + R(total * per);
+  const shown = mx(0, mn(total, Math.floor((frame - TYPE) / per) + 1));
+  const caretOn = frame >= ERASE + 1 ? 1 - k01(typedEnd + o(7), typedEnd + o(11)) : 0;
+  const ww = pw.map((w, i) => (i >= pw.length - lastN ? est(w, S, true) * 1.16 : est(w, S)));
+  const PW = ww.reduce((s, w) => s + w, 0) + est(" ", S) * mx(0, pw.length - 1), PS = mn(1, 780 / mx(1, PW));
+  const wordX = [];
+  ww.reduce((x, w) => { wordX.push(x + (w * PS) / 2); return x + (w + est(" ", S)) * PS; }, 540 - (PW * PS) / 2);
+  const iconX = mix(wordX.length ? mn(900, wordX[wordX.length - 1]) : 540, 540, ek(ICON + o(3), ICON + o(14)));
+  const caret = h("span", { key: "c", style: { display: "inline-block", width: 0, position: "relative" } }, h("span", { style: { position: "absolute", left: "0.04em", bottom: "-0.24em", width: 3, height: "1.15em", background: LINEC[0], opacity: caretOn } }));
+  let ti = 0;
+  const typed = pw.map((w, i) => {
+    const q = frame >= ICON + o(3) ? ek(ICON + o(3) + i * o(2), ICON + o(10) + i * o(2)) : 0;
+    return h(F, { key: i }, i ? " " : null, h("span", { style: { display: "inline-block", whiteSpace: "nowrap", ...(i >= pw.length - lastN ? IT(S) : {}), ...(q > 0 ? { transform: "translateX(" + px((iconX - wordX[i]) * 0.75 * q) + "px)", opacity: 1 - q, filter: blur(9 * q) } : {}) } },
+      i === 0 && shown === 0 ? caret : null,
+      letters(w).map((c, j) => { const t = ti++, age = frame - (TYPE + t * per); return h(F, { key: j }, h("span", { style: { opacity: t < shown ? 1 : 0, filter: t < shown && age < 2 ? blur(age < 1 ? 3 : 1.5) : undefined } }, c), t === shown - 1 ? caret : null); })));
+  });
+  const typedLayer = promise && pw.length && frame >= ERASE - 2 && frame < ICON + o(18) ? h(FitText, { key: "typed", style: abs(140, 960 - S, 800, S * 2), innerStyle: line(S) }, h("span", null, typed)) : null;
 
-  // 5. Her card: her account at the top and its icons, her photo round, her name, her list and her promise as its bio,
-  // « S'abonner » and « Écrire ».
-  const handleOf = (s) => { const t = String(s || "").trim(); return /^@?[A-Za-z0-9._]{2,30}$/.test(t) ? t.replace(/^@/, "") : ""; };
+  // 5. The icon opens into her card (its bio decor: read before); a zoom as a camera onto « Suivre », the rest gone.
+  const CW = 768, CH = 485, CX = 156, CY = 718, B0 = { x: CX + 41, y: CY + 380, w: 337, h: 62 }, bx = B0.x + B0.w / 2, by = B0.y + B0.h / 2;
+  const grow = Easing.bezier(0.5, 0, 0.12, 1)(k01(CARD, CARD + o(14))), landed = ek(ICON, ICON + o(3)), zoom = both(k01(ZOOM, ZOOM + o(24))), s = 1 + 0.5 * zoom;
+  const cam = (x, y) => ({ x: mix(bx, 540, zoom) + s * (x - bx), y: mix(by, 960, zoom) + s * (y - by) });
+  const box = (x, y) => { const c = cam(CX + x, CY + y); return { position: "absolute", left: px(c.x), top: px(c.y), transform: "scale(" + s + ")", transformOrigin: "0 0" }; };
+  const restGone = k01(ZOOM + o(5), ZOOM + o(10)), row = (k) => ek(CARD + o(8) + k * o(2), CARD + o(14) + k * o(2)) * (1 - restGone);
+  const handleOf = (t) => { const v = String(t || "").trim(); return /^@?[A-Za-z0-9._]{2,30}$/.test(v) ? v.replace(/^@/, "") : ""; };
   const handle = account ? handleOf(account.text) : "";
-  const NAME = brand.name || (account ? account.text : "") || (hook ? hook.text : "");
-  const who = handle || (account ? account.text : NAME);
+  const NAME = brand.name || (account && !handle ? account.text : "") || (hook ? hook.text : ""), who = handle || (account ? account.text : NAME);
+  const small = (size, x) => ({ fontFamily: sans, fontWeight: 600, fontSize: size, lineHeight: 1.15, letterSpacing: "-0.01em", color: INK, whiteSpace: "nowrap", ...x });
+  const glyph = h("svg", { width: 56, height: 56, viewBox: "0 0 24 24" }, h("g", { fill: "none", stroke: "#1e1e21", strokeWidth: 1.7 }, h("rect", { x: 3, y: 3, width: 18, height: 18, rx: 5.2 }), h("circle", { cx: 12, cy: 12, r: 4.1 })), h("circle", { cx: 17.1, cy: 6.9, r: 1.05, fill: "#1e1e21" }));
+  const shape = frame >= ICON && frame < ZOOM + o(9)
+    ? (() => {
+        const w = frame < CARD ? 119 : mix(119, CW, grow), hh = frame < CARD ? 114 : mix(114, CH, grow), c = cam(frame < CARD ? iconX : 540, 960);
+        return h("div", { key: "shape", style: { ...abs(px(c.x - (w * s) / 2), px(c.y - (hh * s) / 2), px(w * s), px(hh * s)), borderRadius: 30 * s, background: "#ffffff", boxShadow: "0 40px 60px rgba(20,24,60,0.05), 0 2px 6px rgba(20,24,60,0.05)", opacity: mn(landed, 1 - k01(ZOOM + o(6), ZOOM + o(8))), transform: frame < ICON + o(3) ? "scale(" + px(0.6 + 0.4 * landed) + ")" : undefined, ...flex } },
+          grow < 0.5 ? h("div", { style: { opacity: 1 - grow * 2 } }, glyph) : null);
+      })()
+    : null;
   const listLine = items.map((i) => cap(parts[i]).replace(/[.!?…]+$/, "")).join(". ") + (items.length ? "." : "");
-  // Its content comes in out of the blur as the card opens, and goes as the card does.
-  const opened = ease(k01(CARD - 6, CARD + 4));
-  const content = opened * (1 - k01(CLICK, CLICK + 8));
-  const icon = (key, x, kind) => h("svg", { key, width: 40, height: 40, viewBox: "0 0 24 24", style: { position: "absolute", left: x, top: CY + 44 } },
-    kind === "plus"
-      ? h("g", { fill: "none", stroke: INK, strokeWidth: 1.6, strokeLinecap: "round" }, h("rect", { x: 3.5, y: 3.5, width: 17, height: 17, rx: 5 }), h("path", { d: "M12 8 V16 M8 12 H16" }))
-      : h("path", { d: "M4 7 H20 M4 12 H20 M4 17 H20", fill: "none", stroke: INK, strokeWidth: 1.6, strokeLinecap: "round" }));
-  const card = content > 0
-    ? h("div", { key: "card", style: { ...full, opacity: content, filter: opened < 0.995 ? "blur(" + ((1 - opened) * 10).toFixed(1) + "px)" : "none" } },
-        h(FitText, { style: { position: "absolute", left: CX + 44, top: CY + 38, width: 560, height: 52 }, innerStyle: { alignItems: "flex-start", fontFamily: sans, fontWeight: 700, fontSize: 38, letterSpacing: "-0.02em", color: INK, whiteSpace: "nowrap" } },
-          h("span", { "data-fauve-accent": "" }, who, h("svg", { width: 26, height: 26, viewBox: "0 0 24 24", style: { display: "inline-block", marginLeft: 10, verticalAlign: "middle" } }, h("path", { d: "M6 9 L12 15 L18 9", fill: "none", stroke: INK, strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round" })))),
-        icon("plus", CX + CW - 144, "plus"),
-        icon("menu", CX + CW - 84, "menu"),
-        h(FitText, { style: { position: "absolute", left: CX + 44 + 176 + 34, top: CY + 152, width: CW - 44 - 176 - 34 - 44, height: 80 }, innerStyle: { alignItems: "flex-start", fontFamily: sans, fontWeight: 700, fontSize: 54, letterSpacing: "-0.03em", color: INK, whiteSpace: "nowrap" } },
-          h("span", { "data-fauve-accent": "" }, keep(NAME))),
-        h(FitText, { style: { position: "absolute", left: CX + 44, top: CY + 304, width: CW - 88, height: 190 }, innerStyle: { alignItems: "flex-start", justifyContent: "flex-start", textAlign: "left", fontFamily: sans, fontWeight: 500, fontSize: 48, lineHeight: 1.24, letterSpacing: "-0.02em", color: INK } },
-          h("div", null, keep(listLine)),
-          promise ? h("div", null, keep(cap(promise.text))) : null),
-        h("div", { style: { position: "absolute", left: CX + CW / 2 + 12, top: CY + 520, width: CW / 2 - 56, height: 86, borderRadius: 22, backgroundColor: "#ececf1", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: sans, fontWeight: 600, fontSize: 40, color: INK } },
-          h("span", { "data-fauve-accent": "" }, "Écrire")))
+  const cardText = frame >= CARD && frame < ZOOM + o(11)
+    ? h("div", { key: "card", style: full },
+        h("div", { style: { ...box(42, 48), display: "flex", alignItems: "center", gap: 10, ...small(27), ...fx(row(0)) } }, acc(keep(who)),
+          h("svg", { width: 20, height: 20, viewBox: "0 0 24 24" }, h("path", { d: "M6 9 L12 15 L18 9", fill: "none", stroke: INK, strokeWidth: 2.2, strokeLinecap: "round" }))),
+        h("svg", { width: 98, height: 32, viewBox: "0 0 98 32", style: { ...box(636, 47), ...fx(row(0)) } },
+          h("g", { fill: "none", stroke: INK, strokeWidth: 2.2, strokeLinecap: "round" }, h("rect", { x: 3, y: 3, width: 26, height: 26, rx: 8 }), h("path", { d: "M16 10 V22 M10 16 H22 M66 7 H94 M66 16 H94 M66 25 H94" }))),
+        h("div", { style: { ...box(212, 146), ...fx(row(1)) } }, h("div", { style: small(30, { fontWeight: 700 }) }, acc(keep(NAME))),
+          metier && metier.text ? h("div", { style: { ...IT(26), color: "#939393", marginTop: 4, whiteSpace: "nowrap" } }, acc(keep(cap(metier.text)))) : null),
+        h("div", { "data-fauve-decor": "", style: { ...box(42, 272), ...small(25, { fontWeight: 500, lineHeight: 1.45 }), ...fx(row(2)) } }, h("div", null, keep(listLine)), promise ? h("div", null, keep(cap(promise.text))) : null),
+        h("div", { style: { ...box(392, 380), width: 333, height: 62, borderRadius: 14, background: "#ebecf1", ...flex, ...small(27, { fontWeight: 700 }), ...fx(row(3)) } }, acc("Message")))
     : null;
 
-  // 6. The card goes but her photo and the button, which come forward; the arrow glides onto it and clicks: « Abonné(e) ».
-  // 7. They fold into a white pill, her account and a tick; then her account alone.
-  const toFocus = inOut(k01(CLICK, CLICK + 12));
-  const toPill = inOut(k01(PILL, PILL + 12));
-  const pillGone = k01(FIN - 10, FIN);
-  const clickAt = CLICK + Math.round(1.3 * BEAT);
-  const AV0 = { x: CX + 44, y: CY + 104, s: 176 };
-  const AV1 = { x: width / 2 - 130, y: 640, s: 260 };
-  const PILLBOX = { x: width / 2 - 260, y: 900, w: 520, h: 120 };
-  const AV2 = { x: PILLBOX.x + 20, y: PILLBOX.y + 18, s: 84 };
-  const av = {
-    x: frame < PILL ? mix(AV0.x, AV1.x, toFocus) : mix(AV1.x, AV2.x, toPill),
-    y: frame < PILL ? mix(AV0.y, AV1.y, toFocus) : mix(AV1.y, AV2.y, toPill),
-    s: frame < PILL ? mix(AV0.s, AV1.s, toFocus) : mix(AV1.s, AV2.s, toPill),
-  };
-  const avShown = opened * (1 - pillGone);
-  const avatar = n && frame >= CARD - 6 && frame < FIN
-    ? h("div", { key: "avatar", style: { position: "absolute", left: Math.round(av.x), top: Math.round(av.y), width: Math.round(av.s), height: Math.round(av.s), borderRadius: "50%", overflow: "hidden", backgroundColor: "#e6e7ee", opacity: avShown } },
-        h(Footage, { shot: 0, style: { left: 0, top: 0, width: Math.round(av.s), height: Math.round(av.s) } }))
+  // 6. The click (no ring), « Suivi(e) »; photo and button fold into a pill; her photo shrinks into the « @ ».
+  const fold = both(k01(PILL, PILL + o(13))), atGo = k01(AT, AT + o(15)), pdot = k01(AT + o(7), AT + o(10));
+  const ES = 54, EW = mn(780, est((handle ? "@" : "") + who, ES)), atX = 540 - EW / 2 + est("@", ES) / 2;
+  const PH = 96, PWD = mx(321, mn(700, est(who, 32) + 177)), pillX = 540 - PWD / 2;
+  const pc = cam(CX + 109, CY + 178);
+  const photoC = { x: mix(mix(pc.x, pillX + 46, fold), atX, pdot), y: mix(mix(pc.y, 960, fold), 958, pdot), d: mix(mix(134 * s, 57, fold), 16, pdot) };
+  const rush = frame > PILL && frame < PILL + o(13) ? (fold - both(at01(frame - 1, PILL, PILL + o(13)))) * 260 : 0, appear = ek(CARD + o(10), CARD + o(16));
+  // Her photo in the round, on her face (as tracked, else the upper middle of an upright one), in black and white.
+  const sh = shots[0] || {}, asp = Number(sh.aspect) || 1, fz = sh.face, Z = asp < 0.9 ? 1.5 : 1, Wd = photoC.d * Z * mx(1, asp), Hd = Wd / asp;
+  const fl = mn(0, mx(photoC.d - Wd, photoC.d / 2 - Wd * (fz ? fz.x + fz.w / 2 : 0.5))), ft = mn(0, mx(photoC.d - Hd, photoC.d / 2 - Hd * (fz ? fz.y + fz.h / 2 : asp < 0.9 ? 0.36 : 0.5)));
+  const face = n
+    ? h(Footage, { shot: 0, style: { left: px(fl), top: px(ft), width: px(Wd), height: px(Hd), filter: "grayscale(1) contrast(1.08)" } })
+    : brand.logoUrl
+      ? h(Img, { src: brand.logoUrl, maxRetries: 1, onError: () => null, style: { ...abs("14%", "14%", "72%", "72%"), objectFit: "contain" } })
+      : h("div", { style: { ...all, background: rgb ? "rgb(" + rgb.join(",") + ")" : INK, color: "#ffffff", ...flex, fontFamily: sans, fontWeight: 700, fontSize: R(photoC.d * 0.45) } }, (NAME || "·").charAt(0).toUpperCase());
+  const photo = frame >= CARD && frame < AT + o(15)
+    ? h("div", { key: "photo", style: { ...abs(px(photoC.x - photoC.d / 2), px(photoC.y - photoC.d / 2), px(photoC.d), px(photoC.d)), borderRadius: "50%", overflow: "hidden", background: n ? "#d9dbe3" : "#ffffff", opacity: mn(1, appear * 1.25) * (1 - k01(AT + o(10), AT + o(14))), filter: blur((1 - appear) * 9 + mn(3, rush)) } },
+        face, pdot > 0 ? h("div", { style: { ...all, background: "#a9bce6", opacity: pdot } }) : null)
     : null;
-  const BT0 = { x: CX + 44, y: CY + 520, w: CW / 2 - 56, h: 86, f: 40 };
-  const BT1 = { x: width / 2 - 250, y: 960, w: 500, h: 118, f: 54 };
-  const bt = {
-    x: frame < PILL ? mix(BT0.x, BT1.x, toFocus) : mix(BT1.x, PILLBOX.x, toPill),
-    y: frame < PILL ? mix(BT0.y, BT1.y, toFocus) : mix(BT1.y, PILLBOX.y, toPill),
-    w: frame < PILL ? mix(BT0.w, BT1.w, toFocus) : mix(BT1.w, PILLBOX.w, toPill),
-    h: frame < PILL ? mix(BT0.h, BT1.h, toFocus) : mix(BT1.h, PILLBOX.h, toPill),
-    f: frame < PILL ? mix(BT0.f, BT1.f, toFocus) : BT1.f,
-  };
-  const clicked = frame >= clickAt + 2;
-  const press = frame >= clickAt && frame < clickAt + 6 ? 1 - 0.05 * Math.sin(((frame - clickAt) / 6) * Math.PI) : 1;
-  const button = frame >= CARD - 6 && frame < FIN
-    ? h("div", { key: "button", style: { position: "absolute", left: Math.round(bt.x), top: Math.round(bt.y), width: Math.round(bt.w), height: Math.round(bt.h), borderRadius: Math.round(mix(22, bt.h / 2, toPill)), background: clicked ? "#ffffff" : "linear-gradient(100deg, " + BLUE + ", " + BLUE2 + ")", boxShadow: clicked ? "0 18px 44px rgba(20,24,60,0.12), 0 2px 6px rgba(20,24,60,0.06)" : "none", opacity: opened * (1 - pillGone), transform: "scale(" + press.toFixed(4) + ")" } },
-        frame < PILL + 6
-          ? h("div", { style: { position: "absolute", left: 0, top: 0, width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: sans, fontWeight: 600, fontSize: Math.round(bt.f), letterSpacing: "-0.02em", color: clicked ? INK : "#ffffff", whiteSpace: "nowrap", opacity: 1 - k01(PILL, PILL + 6) } },
-              h("span", { "data-fauve-accent": "" }, clicked ? "Abonné(e)" : "S'abonner"))
-          : null)
+  const bc = cam(bx, by), white = k01(CLICK + o(1), CLICK + o(3)), bs = mix(27, 40, zoom);
+  const btn = { x: mix(bc.x - (B0.w * s) / 2, pillX, fold), y: mix(bc.y - (B0.h * s) / 2, 960 - PH / 2, fold), w: mix(B0.w * s, PWD, fold), h: mix(B0.h * s, PH, fold), r: mix(14 * s, PH / 2, fold) };
+  const centred = (x) => ({ ...all, ...flex, ...x });
+  const button = frame >= CARD && frame < AT + o(15)
+    ? h("div", { key: "btn", style: { ...abs(px(btn.x), px(btn.y), px(btn.w), px(btn.h)), borderRadius: px(btn.r), background: grad(BTN), boxShadow: white > 0 ? "0 14px 34px rgba(20,24,60," + px(10 * white) / 100 + ")" : "none", opacity: frame < ZOOM ? ek(CARD + o(14), CARD + o(20)) : 1 - atGo, overflow: "hidden" } },
+        h("div", { style: { ...all, background: "#ffffff", opacity: frame < CLICK ? 0.65 - 0.65 * ek(CARD + o(16), CARD + o(23)) : white } }),
+        frame < PILL + o(11) ? h("div", { style: centred({ ...small(R(bs), { fontWeight: 700, color: "#ffffff" }), opacity: 1 - white }) }, acc("Suivre")) : null,
+        frame >= CLICK + o(6) && frame < PILL + o(11) ? h("div", { style: centred({ ...small(R(bs), { fontWeight: 700 }), ...fx(ek(CLICK + o(6), CLICK + o(10)) * (1 - k01(PILL + o(7), PILL + o(10))), 24) }) }, acc("Suivi(e)")) : null,
+        frame >= PILL + o(7) ? h(FitText, { style: abs(99, 0, mx(80, PWD - 169), PH), innerStyle: { alignItems: "flex-start", ...small(32, { fontWeight: 700 }), ...fx(ek(PILL + o(8), PILL + o(11))) } }, acc(keep(who))) : null,
+        frame >= PILL + o(11) ? h("svg", { width: 34, height: 34, viewBox: "0 0 24 24", style: { position: "absolute", right: 24, top: (PH - 34) / 2, opacity: ek(PILL + o(11), PILL + o(13)) } }, h("path", { d: "M5 12.5 L10 17 L19 7.5", fill: "none", stroke: "#69768b", strokeWidth: 2, strokeLinecap: "round" })) : null)
     : null;
-  const cursor = frame >= CLICK && frame < PILL + 8
-    ? h(Cursor, { key: "cursor", path: [{ x: width - 250, y: 1560, at: CLICK + 6 }, { x: width / 2 + 40, y: 1032, at: clickAt - 4 }, { x: width / 2 + 60, y: 1050, at: clickAt + 10 }], clicks: [clickAt], kind: "arrow", size: 84, color: "#111111", outline: "#ffffff", out: PILL + 2 })
-    : null;
-  // Her account in the pill, a tick after it; then alone, where it ends.
-  const pillText = frame >= PILL + 4 && frame < FIN + 2
-    ? h("div", { key: "pill-text", style: { ...full, opacity: k01(PILL + 4, PILL + 10) * (1 - k01(FIN - 2, FIN + 2)) } },
-        h(FitText, { style: { position: "absolute", left: PILLBOX.x + 120, top: PILLBOX.y + 22, width: PILLBOX.w - 120 - 76, height: 76 }, innerStyle: { alignItems: "flex-start", fontFamily: sans, fontWeight: 600, fontSize: 48, letterSpacing: "-0.02em", color: INK, whiteSpace: "nowrap" } },
-          h("span", { "data-fauve-accent": "" }, keep(who))),
-        h("svg", { width: 40, height: 40, viewBox: "0 0 24 24", style: { position: "absolute", left: PILLBOX.x + PILLBOX.w - 64, top: PILLBOX.y + 40, opacity: 1 - pillGone } },
-          h("path", { d: "M5 12.5 L10 17 L19 7.5", fill: "none", stroke: INK, strokeWidth: 1.9, strokeLinecap: "round", strokeLinejoin: "round" })))
+  // The arrow, up from the bottom right in an arc, blurred while it rushes.
+  const q = (a, b, c, t) => (1 - t) * (1 - t) * a + 2 * (1 - t) * t * b + t * t * c;
+  const tip = (f) => { const t = both(at01(f, ZOOM + o(1), ZOOM + o(23))), l = ease(at01(f, PILL + o(7), PILL + o(15))); return { x: q(702, 930, 648, t) + 140 * l, y: q(1651, 1180, 979, t) + 260 * l, l }; };
+  const now = tip(frame), was = tip(frame - 1), fast = Math.hypot(now.x - was.x, now.y - was.y);
+  const arrow = frame > ZOOM && frame < PILL + o(16)
+    ? h("svg", { key: "arrow", width: 40, height: 56, viewBox: "0 0 20 28", style: { ...abs(px(now.x - 3), px(now.y - 3)), opacity: 1 - now.l, filter: blur(fast > 12 ? mn(2.5, fast / 25) : 0) } },
+        h("path", { d: "M1.5 1.5 L1.5 22 L6.6 17.4 L10.2 25.8 L13.6 24.3 L10.1 16.2 L17.2 16.2 Z", fill: "#111111", stroke: "#ffffff", strokeWidth: 1.6, strokeLinejoin: "round" }))
     : null;
 
-  // 8. The end: « À suivre », small and spaced, over her account in blue (her name when it is not known), her logo over
-  // them when it reads on the pale ground.
-  const shownEnd = (a) => focus(a, 10, end ? endAt - 8 : undefined);
-  const darkLogo = brand.logoUrl && (brand.logoOnDark === "white" || brand.logoOnDark === "plate");
-  const final = frame >= FIN
-    ? h("div", { key: "final", style: full },
-        darkLogo
-          ? h("div", { style: { position: "absolute", left: width / 2 - 150, top: 690, width: 300, height: 150, ...shownEnd(FIN + 2) } },
-              h(Img, { src: brand.logoUrl, maxRetries: 1, onError: () => null, style: { width: "100%", height: "100%", objectFit: "contain" } }))
-          : null,
-        h(FitText, { style: { position: "absolute", left: 140, top: 878, width: width - 280, height: 48 }, innerStyle: { fontFamily: sans, fontWeight: 600, fontSize: 26, letterSpacing: "0.34em", color: GREY, whiteSpace: "nowrap", ...shownEnd(FIN + 4) } },
-          h("span", { "data-fauve-accent": "", style: { marginRight: "-0.34em" } }, "À SUIVRE")),
-        h(FitText, { style: { position: "absolute", left: 140, top: 930, width: width - 280, height: 130 }, innerStyle: { fontFamily: sans, fontWeight: 700, fontSize: 94, letterSpacing: "-0.04em", whiteSpace: "nowrap", ...shownEnd(FIN) } },
-          h("span", { style: { backgroundImage: "linear-gradient(100deg, " + BLUE + ", " + BLUE2 + ")", WebkitBackgroundClip: "text", backgroundClip: "text", color: "transparent", paddingBottom: "0.08em" } }, keep(handle ? "@" + handle : who))))
+  // 7. Her account in the gradient (her name, without « @ », when not known), « À SUIVRE » over it.
+  const shownEnd = (a) => fx(ek(a, a + o(6)) * (end ? 1 - k01(endAt - 8, endAt) : 1));
+  const inked = { backgroundImage: grad(ACC), WebkitBackgroundClip: "text", backgroundClip: "text", color: "transparent", paddingBottom: "0.08em" };
+  const fin = frame >= AT + o(9) && frame < endAt
+    ? h("div", { key: "fin", style: full },
+        tag(852, "À SUIVRE", (r) => ek(AT + o(15) + r * o(10), AT + o(18) + r * o(10)), { color: "#919297", ...(end ? shownEnd(AT + o(15)) : {}) }),
+        h(FitText, { style: abs(140, 924, 800, 74), innerStyle: { fontFamily: sans, fontWeight: 700, fontSize: ES, lineHeight: 1.15, letterSpacing: "-0.035em", whiteSpace: "nowrap", ...shownEnd(AT + o(9)) } },
+          h("span", null, handle ? h("span", { style: { ...inked, opacity: k01(AT + o(10), AT + o(14)) } }, "@") : null, h("span", { style: inked }, keep(who)))))
     : null;
 
-  // Any other text of the Reel (none in its slots): a plain line in the upper third, so nothing she wrote is lost.
-  const extra = others.filter((t) => frame >= t.from && frame < Math.min(t.to, endAt)).map((t, i) =>
-    h(FitText, { key: "x" + i, style: { position: "absolute", left: 140, top: 320 + i * 112, width: width - 280, height: 100 }, innerStyle: { fontFamily: sans, fontWeight: 600, fontSize: 52, color: INK, textAlign: "center" } }, keep(t.text)));
-
-  // Its ending card, out of the blur after her account: its title in the grotesque, its line in grey under it.
+  // Any other text of the Reel: a plain line, so nothing she wrote is lost; its ending card out of the blur.
+  const extra = others.filter((t) => frame >= t.from && frame < mn(t.to, endAt)).map((t, i) =>
+    h(FitText, { key: "x" + i, style: abs(140, 320 + i * 112, 800, 100), innerStyle: line(52, { textAlign: "center", whiteSpace: "normal" }) }, keep(t.text)));
   const ending = end && frame >= endAt
-    ? h(React.Fragment, { key: "end" },
-        h(FitText, { style: { position: "absolute", left: 140, top: end.subtitle ? 700 : 790, width: width - 280, height: 300 }, innerStyle: { justifyContent: end.subtitle ? "flex-end" : "center", fontFamily: sans, fontWeight: 700, fontSize: 92, lineHeight: 1.04, letterSpacing: "-0.04em", color: INK, textAlign: "center", textWrap: "balance" } },
-          h("span", { style: { display: "inline-block", ...focus(endAt + 2, 10) } }, keep(end.title))),
+    ? h(F, { key: "end" },
+        h(FitText, { style: abs(140, end.subtitle ? 700 : 790, 800, 300), innerStyle: { justifyContent: end.subtitle ? "flex-end" : "center", ...line(88, { fontWeight: 700, lineHeight: 1.04, letterSpacing: "-0.04em", textAlign: "center", whiteSpace: "normal", textWrap: "balance" }) } },
+          h("span", { style: { display: "inline-block", ...fx(ek(endAt + 2, endAt + 12)) } }, keep(end.title))),
         end.subtitle
-          ? h(FitText, { style: { position: "absolute", left: 140, top: 1024, width: width - 280, height: 170 }, innerStyle: { justifyContent: "flex-start", fontFamily: sans, fontWeight: 500, fontSize: 50, lineHeight: 1.2, letterSpacing: "-0.02em", color: GREY, textAlign: "center", textWrap: "balance" } },
-              h("span", { style: { display: "inline-block", ...focus(endAt + 6, 10) } }, keep(end.subtitle)))
+          ? h(FitText, { style: abs(140, 1024, 800, 170), innerStyle: { justifyContent: "flex-start", ...line(50, { fontWeight: 500, color: GREY, textAlign: "center", whiteSpace: "normal", textWrap: "balance" }) } },
+              h("span", { style: { display: "inline-block", ...fx(ek(endAt + 6, endAt + 16)) } }, keep(end.subtitle)))
           : null)
     : null;
-
-  // Her photo over the button: it sits at the left end of the pill they fold into.
-  return h(AbsoluteFill, { style: { backgroundColor: GROUND } }, opening, list, promiseLine, shape, card, button, avatar, cursor, pillText, final, extra, ending);
+  return h(AbsoluteFill, { style: { backgroundColor: GROUND } }, hookLine, listLayer, annLayer, typedLayer, shape, cardText, button, photo, arrow, fin, extra, ending);
 }`;
 
 export const interfaceSkill: MontageSkill = {
   key: "interface",
-  version: 1,
+  version: 2,
   bpm: BPM,
+  // Her profile photo (or her logo, or a video of her looking at the camera): it plays in the round of her card.
   shots: [1, 1],
   files: [1, 2],
   fonts: ["Instrument Serif"],
-  how: "Pur motion design sur un fond clair, comme une appli : ses premiers mots sortent du flou au centre, le dernier en italique ; une petite étiquette et sa liste qui défile, celui du milieu net, les autres flous, le dernier souligné en bleu ; sa phrase tapée lettre à lettre derrière un curseur bleu, qui laisse place à l'icône d'Instagram ; l'icône s'ouvre en carte de profil (sa photo ronde, son nom, sa liste et sa phrase) ; un curseur clique « S'abonner », qui devient « Abonné(e) » ; puis son compte seul en bleu, sous « À suivre ».",
+  how: "Pur motion design sur un fond clair, sans coupe, comme une appli : ses premiers mots sortent du flou lettre à lettre au centre, le dernier en italique, qui devient la petite étiquette de sa liste ; sa liste défile sur la ligne du milieu, celui du milieu net, les autres flous, le dernier souligné d'un trait bleu qui s'effile ; son annonce monte sur deux lignes, mot à mot ; un curseur bleu tape sa promesse, avalée par l'icône d'Instagram qui s'ouvre en carte de profil (sa photo ronde, son nom, son métier, sa liste et sa promesse) ; zoom sur « Suivre », une flèche clique, « Suivi(e) » ; tout se replie en pastille, sa photo devient le « @ » de son compte, en bleu, sous « À SUIVRE ».",
   end: true,
   texts: [
     {
       slot: "accroche",
       role: "hook",
-      want: "2 à 4 mots qui sortent du flou au début, le dernier en italique : ce qui commence ou qui elle est (une forme comme « un nouveau départ », « bienvenue chez Lune », « la rentrée arrive »)",
+      want: "2 à 4 mots qui sortent du flou lettre à lettre au début, le dernier en italique, qui devient ensuite l'étiquette de sa liste : ce qui commence ou qui elle est (une forme comme « un nouveau départ », « bienvenue chez Lune », « la rentrée arrive »)",
       max: 24,
       required: true,
     },
     {
       slot: "liste",
       role: "band",
-      want: "trois choses qu'elle fait ou propose, séparées par des virgules, 1 ou 2 mots chacune (une forme comme « coupe, couleur, soin ») : elles défilent l'une après l'autre, puis forment la bio de son profil",
+      want: "trois choses qu'elle fait ou propose, séparées par des virgules, 1 ou 2 mots chacune (une forme comme « coupe, couleur, soin ») : elles défilent l'une après l'autre sur la ligne du milieu, la dernière soulignée, puis forment la bio de son profil",
       max: 40,
-      required: true,
-    },
-    {
-      slot: "promesse",
-      role: "caption",
-      want: "une phrase de 3 à 6 mots tapée lettre à lettre, comme sa bio : ce qu'elle apporte, ses derniers mots en italique (une forme comme « des coupes qui vous ressemblent »)",
-      max: 32,
       required: true,
     },
     {
       slot: "etiquette",
       role: "caption",
-      want: "facultatif : 1 à 3 petits mots en capitales espacées au-dessus de la liste (une forme comme « ce qu'on fait », « au menu », « nos soins »)",
+      want: "facultatif : 1 à 3 petits mots en capitales espacées au-dessus de sa liste, en lesquels le dernier mot de l'accroche se change (une forme comme « ce qu'on fait », « au menu », « nos soins »)",
       max: 18,
+      required: false,
+    },
+    {
+      slot: "annonce",
+      role: "caption",
+      want: "facultatif : son annonce en une phrase de 5 à 7 mots, qui monte sur deux lignes mot à mot, ses deux derniers mots en italique (une forme comme « j'ouvre ma page pour montrer mes pièces »)",
+      max: 44,
+      required: false,
+    },
+    {
+      slot: "promesse",
+      role: "caption",
+      want: "une phrase de 3 à 6 mots tapée lettre à lettre, comme sa bio : ce qu'elle apporte, ses derniers mots en italique (une forme comme « des coupes qui vous ressemblent »)",
+      max: 34,
+      required: true,
+    },
+    {
+      slot: "metier",
+      role: "caption",
+      want: "facultatif : son métier en un ou deux mots, sous son nom dans sa carte de profil (une forme comme « céramiste », « fleuriste », « salon de coiffure »)",
+      max: 22,
       required: false,
     },
     {
       slot: "compte",
       role: "caption",
-      want: "son compte Instagram avec @ quand on le sait (jamais inventé), sinon son nom : il est en haut de sa carte de profil et finit le Reel en bleu, sous « À suivre »",
+      want: "son compte Instagram avec @ quand on le sait (jamais inventé), sinon son nom : il est en haut de sa carte de profil, dans la pastille après le clic, puis finit le Reel en bleu sous « À SUIVRE »",
       max: 30,
       required: false,
     },
   ],
-  timeline(n, { end, bpm: tempo }) {
-    // At another tempo (a longer Reel, or a music's own): every length in beats follows it, each section kept long
-    // enough to read at a fast tempo (on the half-beat grid).
+  settings: [
+    {
+      name: "couleur",
+      want: "la couleur de son accent (le trait sous sa liste, le curseur, le bouton, son compte à la fin)",
+      choices: [
+        { value: "bleu", says: "le dégradé bleu roi vers indigo de l'original" },
+        { value: "sienne", says: "sa couleur à elle (celle de sa charte ; le bleu si elle est trop pâle pour se lire sur le fond clair)" },
+      ],
+    },
+  ],
+  // Its pale ground and its ink as they are: none of the catalogue's contrast, grain or corners laid over them.
+  finish: { contrast: 0, saturation: 0, warmth: 0, grain: 0, vignette: 0, fade: 0 },
+  timeline(_n, { end, bpm: tempo, words }) {
+    // At another tempo (a longer Reel, or a music's own): every moment, counted in beats, follows it.
     const bpm = tempo ?? BPM;
     const beat = 60 / bpm;
-    const beats = SECTIONS.map((s) => Math.max(s.beats, Math.ceil((s.seconds / beat) * 2) / 2));
-    const starts = beats.map((_, i) => beats.slice(0, i).reduce((a, b) => a + b, 0));
+    const at = interfaceImages();
+    const seconds = (images: number) => (images / IMAGES) * beat;
+    const frames = (images: number) => toFrame(seconds(images));
     // With an ending card, its time after her account (the engine's 1,6 s at least, rounded up on the half-beat grid).
-    const card = end ? Math.ceil(((CARD_SECONDS + 0.05) / beat) * 2) / 2 : 0;
-    const spans = beatSpans(bpm, [beats.reduce((a, b) => a + b, 0) + card]);
-    const duration = spans[0]!.end;
-    const at = (i: number) => round(starts[i]! * beat);
-    const lit = round(end ? duration - CARD_SECONDS : duration);
+    const card = end ? (Math.ceil(((CARD_SECONDS + 0.05) / beat) * 2) / 2) * beat : 0;
+    const lit = round(seconds(at.end));
+    const duration = round(lit + card);
+    // Her promise's letters (as written, when they are): a soft key click on every other one as the caret types them.
+    const letters = Math.max(6, Array.from(String(words?.promesse ?? "des coupes qui vous ressemblent")).length);
+    const typing = seconds(at.type);
+    const per = (60 / bpm / (60 / BPM)) / TYPING;
+    const sounds: SkillSound[] = [
+      { at: round3(typing), sound: "soft keyboard click", seconds: 0.5, gain: -8, burst: { times: Array.from({ length: Math.ceil(letters / 2) }, (_, k) => round3(k * 2 * per)) } },
+      // Its double click on « Suivre », the second on the beat.
+      { at: round3(seconds(at.click) - 0.045 * (beat / (60 / BPM))), sound: "soft mouse click", seconds: 0.5, gain: -4 },
+      { at: round3(seconds(at.click) + 0.045 * (beat / (60 / BPM))), sound: "soft mouse click", seconds: 0.5, gain: -4 },
+    ];
+    const opens = round3(seconds(at.icon - OPENS));
     return {
       duration,
-      shots: spans.map((s) => ({
-        ...s,
-        want: "sa photo de profil, son logo en image, ou une photo d'elle bien éclairée, son visage au centre : elle apparaît ronde dans sa carte de profil Instagram à la fin du Reel (une vidéo y joue aussi)",
-      })),
-      // Each text in its section: her first words, the list and its label, her promise, her account from her card on.
+      shots: [
+        {
+          start: 0,
+          end: duration,
+          want: "sa photo de profil, son logo en image, ou une photo d'elle bien éclairée, son visage au centre (une vidéo de 2 à 3 s d'elle qui regarde l'objectif y joue aussi) : elle apparaît ronde et en noir et blanc dans sa carte de profil Instagram, puis devient le « @ » de son compte",
+        },
+      ],
+      // Each text in its moment: her first words, her list and its label, her announcement, her promise, her trade on her
+      // card, her account from the pill to the end (or to her ending card).
       texts: {
-        accroche: { from: 0, to: at(1) },
-        liste: { from: at(1), to: at(2) },
-        etiquette: { from: at(1), to: at(2) },
-        promesse: { from: at(2), to: at(3) },
-        compte: { from: at(4), to: lit },
+        accroche: { from: 0, to: round(seconds(at.list)) },
+        liste: { from: round(seconds(at.list)), to: round(seconds(at.ann + 13)) },
+        etiquette: { from: round(seconds(at.list + 6)), to: round(seconds(at.ann + 13)) },
+        annonce: { from: round(seconds(at.ann)), to: round(seconds(at.erase + 8)) },
+        promesse: { from: round(seconds(at.type)), to: round(seconds(at.icon + 14)) },
+        metier: { from: round(seconds(at.card)), to: round(seconds(at.zoom + 10)) },
+        compte: { from: round(seconds(at.pill)), to: lit },
       },
       marks: {
-        beat: beat * 30,
-        list: toFrame(at(1)),
-        type: toFrame(at(2)),
-        icon: toFrame(at(3)),
-        card: toFrame(at(4)),
-        click: toFrame(at(5)),
-        pill: toFrame(at(6)),
-        fin: toFrame(at(7)),
+        beat: round3(beat * 30),
+        hook: frames(at.hook),
+        out: frames(at.out),
+        list: frames(at.list),
+        line: frames(at.line),
+        ann: frames(at.ann),
+        erase: frames(at.erase),
+        type: frames(at.type),
+        icon: frames(at.icon),
+        card: frames(at.card),
+        zoom: frames(at.zoom),
+        click: frames(at.click),
+        pill: frames(at.pill),
+        at: frames(at.at),
       },
+      sounds,
+      // Soft until the icon lands (10 dB under), then open, on a downbeat (its bars from its first beat); fading over its
+      // last second, as the original's.
+      music: { downbeat: round3(seconds(FIRST_BEAT)), filters: [{ kind: "soft", db: -10, from: 0, to: opens, open: 0.05 }], end: { at: duration, fade: end ? 0.6 : 1 } },
     };
   },
   code: CODE,

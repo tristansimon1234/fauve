@@ -9,6 +9,7 @@ import { facade } from "./skills/facade.ts";
 import { fenetres } from "./skills/fenetres.ts";
 import { frappe } from "./skills/frappe.ts";
 import { gaufre } from "./skills/gaufre.ts";
+import { interfaceSkill } from "./skills/interface.ts";
 import { journee } from "./skills/journee.ts";
 import { monTravail } from "./skills/mon-travail.ts";
 import { mosaique } from "./skills/mosaique.ts";
@@ -37,6 +38,7 @@ export const MONTAGE_SKILLS: Record<string, MontageSkill> = {
   fenetres,
   frappe,
   gaufre,
+  interface: interfaceSkill,
   journee,
   "mon-travail": monTravail,
   mosaique,

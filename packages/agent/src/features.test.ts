@@ -7571,3 +7571,193 @@ test("« Fenêtres et étiquettes » (v2): horizontal 16:9 on black as its origi
   assert.ok(fenetres.code.length <= 24000, `${fenetres.code.length}`);
   assert.doesNotMatch(fenetres.code, /scale\(|FEET|32\.9585|Shinkun/i);
 });
+
+// ——— « Interface minimaliste » v2, written on its original's fiche (docs/fiches/interface.md) ———————————————————————
+
+/** Its original's moments (its images at 30 i/s, measured image by image), before the two holds its model lengthens. */
+const IF_AT = { hook: 4, out: 44, list: 51, line: 95, ann: 121, erase: 165, type: 172, icon: 217, card: 234, zoom: 270, click: 295, pill: 305, at: 332, end: 381 };
+/** Her words, as the filler writes them for « Atelier Argile ». */
+const IF_WORDS: Record<string, string> = { accroche: "Un nouveau départ", liste: "tournage, émail, cuisson", etiquette: "ce que je fais", annonce: "j'ouvre ma page pour montrer mes pièces", promesse: "des pièces qui durent", metier: "céramiste", compte: "@atelier.argile" };
+/** Its composition at a frame on its timeline, her words at their moments, her photo (or none), as turnedAt runs it. */
+async function interfaceAt(options: { end?: boolean; photo?: boolean; words?: Record<string, string>; settings?: Record<string, string>; brand?: Record<string, unknown> } = {}) {
+  const { interfaceSkill } = await import("./skills/interface.ts");
+  const words = options.words ?? IF_WORDS;
+  const line = interfaceSkill.timeline(1, { end: Boolean(options.end), words });
+  const durationInFrames = Math.round(line.duration * 30);
+  const reelTexts = interfaceSkill.texts.flatMap((t) => (words[t.slot] && line.texts[t.slot] ? [{ text: words[t.slot]!, role: t.role, from: Math.round(line.texts[t.slot]!.from * 30), to: Math.round(line.texts[t.slot]!.to * 30), emphasis: [] }] : []));
+  const props = {
+    durationInFrames,
+    brand: { name: "Atelier Argile", displayFont: "Inter Tight", bodyFont: "Inter Tight", accent: "#b5543a", ...options.brand },
+    shots: options.photo === false ? [] : [{ src: "/her.jpg", aspect: 9 / 16, from: 0, durationInFrames, kind: "photo", segment: 0 }],
+    reelTexts,
+    end: options.end ? { title: "Atelier ouvert samedi", subtitle: "de 10 h à 18 h", from: durationInFrames - 48 } : null,
+    texts: { ...Object.fromEntries(Object.entries(line.marks).map(([k, v]) => [k, String(v)])), ...(options.settings ?? {}) },
+  };
+  return { interfaceSkill, line, durationInFrames, at: (f: number) => turnedAt(interfaceSkill.code, f, props) };
+}
+/** The nodes of a tree whose style matches, and a node's words. */
+const ifFind = (tree: Drawn, test: (n: Drawn) => boolean) => drawnNodes(tree).filter(test);
+const ifSeen = (n: Drawn) => Number(styleOf(n).opacity ?? 1);
+
+test("« Interface minimaliste » (v2) lays its moments where its original does, on its own music (110,5 BPM), two holds lengthened for a phone", async () => {
+  const { interfaceSkill, interfaceImages } = await import("./skills/interface.ts");
+  assert.equal(interfaceSkill.version, 2);
+  assert.equal(interfaceSkill.bpm, 110.5);
+  const line = interfaceSkill.timeline(1, { end: false, words: IF_WORDS });
+  // Each moment on the original's image, within two, its announcement held two beats longer and its typed promise one
+  // (the engine reads a sentence in 0,8 s and 0,3 s a word: the original holds them 0,8 and 0,5 s).
+  const beat = (30 * 60) / 110.5;
+  for (const [k, f] of Object.entries(IF_AT)) {
+    const more = (f >= IF_AT.erase ? 2 * beat : 0) + (f >= IF_AT.icon ? beat : 0);
+    if (k !== "end") assert.ok(Math.abs(line.marks[k]! - (f + more)) <= 2, `${k}: image ${line.marks[k]}, the original's ${f} + ${Math.round(more)}`);
+  }
+  assert.deepEqual(interfaceImages().end, IF_AT.end + 3 * beat);
+  assert.ok(Math.abs(line.duration * 30 - (IF_AT.end + 3 * beat)) <= 1, `${line.duration} s`);
+  // Its one shot, her photo, the whole Reel long; each of her texts in its moment.
+  assert.deepEqual(line.shots.map((s) => [s.start, s.end]), [[0, line.duration]]);
+  assert.deepEqual(Object.keys(line.texts), ["accroche", "liste", "etiquette", "annonce", "promesse", "metier", "compte"]);
+  assert.ok(line.texts.accroche!.to <= line.texts.liste!.from && line.texts.annonce!.from < line.texts.promesse!.from && line.texts.compte!.to === line.duration);
+  // Its sounds, its original's: a soft key click every other letter of her promise as the caret types it (38 a second),
+  // a double click on « Suivre », the second just after its beat.
+  const [typing, click1, click2] = line.sounds!;
+  assert.ok(Math.abs(typing!.at - line.marks.type! / 30) < 1 / 30);
+  assert.equal(typing!.burst!.times.length, Math.ceil(Array.from(IF_WORDS.promesse!).length / 2));
+  assert.ok(Math.abs(typing!.burst!.times[1]! - 2 / 38) < 0.002);
+  assert.ok(click1!.at < line.marks.click! / 30 && click2!.at > line.marks.click! / 30 && Math.abs(click2!.at - click1!.at - 0.09) < 0.002);
+  assert.equal(line.sounds!.length, 3);
+  // Its music soft (10 dB under) until the icon lands, open on a downbeat of its bars (from its first beat at 0,04 s),
+  // fading over its last second.
+  const music = line.music!;
+  assert.equal(music.downbeat, 0.04);
+  const opens = music.filters![0]!;
+  assert.deepEqual([opens.kind, opens.db, opens.from], ["soft", -10, 0]);
+  const bars = (opens.to - 0.04) / (60 / 110.5) / 4;
+  assert.ok(Math.abs(bars - Math.round(bars)) < 0.02 && Math.abs(opens.to * 30 - (line.marks.icon! - 4.3)) < 0.5, `${opens.to} s`);
+  assert.deepEqual(music.end, { at: line.duration, fade: 1 });
+  // With an ending card, its moments the same, the card's 1,6 s after her account; at another tempo all of it follows.
+  const ended = interfaceSkill.timeline(1, { end: true, words: IF_WORDS });
+  assert.deepEqual(ended.marks, line.marks);
+  assert.ok(ended.duration - line.duration >= 1.6 && ended.texts.compte!.to === line.duration);
+  const slower = interfaceSkill.timeline(1, { end: false, bpm: 92 });
+  assert.ok(Math.abs(slower.marks.pill! / line.marks.pill! - 110.5 / 92) < 0.01 && Math.abs(slower.duration / line.duration - 110.5 / 92) < 0.01);
+});
+
+test("« Interface minimaliste » (v2): each element becomes the next, through the blur, on the original's places and sizes", async () => {
+  const { line, at } = await interfaceAt();
+  const m = line.marks as Record<string, number>;
+  // Her first words a letter an image from image 4, at the middle, its last word in the serif italic.
+  const letters = (f: number) => ifFind(at(f), (n) => n.type === "span" && styleOf(n).display === "inline-block" && styleOf(n).whiteSpace === "pre" && ifSeen(n) > 0.05).map(drawnText).join("");
+  assert.equal(letters(3), "");
+  assert.ok(letters(8).length >= 3 && letters(8).length < letters(14).length, `${letters(8)} / ${letters(14)}`);
+  assert.equal(letters(30).replace(/\s/g, ""), "Unnouveaudépart");
+  const italic = ifFind(at(30), (n) => n.type === "span" && styleOf(n).fontStyle === "italic")[0]!;
+  assert.equal(heldText(italic).replace(/\s/g, ""), "départ");
+  assert.match(String(styleOf(italic).fontFamily), /Instrument Serif/);
+  // Its last word rises into the label's place, halved and grey; the label in small spaced capitals (an accent) takes
+  // its place letter by letter.
+  const moved = ifFind(at(m.out! + 12), (n) => n.type === "span" && styleOf(n).fontStyle === "italic")[0]!;
+  assert.match(String(styleOf(moved).transform), /scale\(0\.500\)/);
+  assert.equal(styleOf(moved).color, "#87888e");
+  const label = ifFind(at(m.list! + 20), (n) => n.type === "div" && styleOf(n).letterSpacing === "0.4em")[0]!;
+  assert.equal(heldText(label).replace(/\s/g, ""), "cequejefais");
+  assert.deepEqual([styleOf(label).fontSize, styleOf(label).top, styleOf(label).textTransform], [21, 806, "uppercase"]);
+  assert.ok(drawnNodes(label).some((n) => "data-fauve-accent" in n.props));
+  // Her list through the middle line: the item there sharp and black, its neighbours 75 px above and below, pale and
+  // blurred; a step a beat; the last underlined by a tapering stroke in the blue's gradient, drawn from the left.
+  const items = (f: number) => ifFind(at(f), (n) => n.type === "FitText" && (n.props.style as { height: number }).height === 75).map((n) => ({ text: heldText(n).trim(), top: (n.props.style as { top: number }).top, opacity: Number((n.props.innerStyle as Record<string, unknown>).opacity), filter: String((n.props.innerStyle as Record<string, unknown>).filter) }));
+  const settled = items(m.list! + 26);
+  const middle = settled.find((x) => x.top === 922)!;
+  assert.equal(middle.text, "Émail");
+  assert.ok(middle.opacity === 1 && middle.filter === "none");
+  assert.ok(settled.filter((x) => x.top !== 922).every((x) => Math.abs(x.top - 922) === 75 && x.opacity <= 0.15 && /blur/.test(x.filter)), JSON.stringify(settled));
+  const stroke = ifFind(at(m.line! + 12), (n) => /polygon\(0% 8%, 100% 50%/.test(String(styleOf(n).clipPath)))[0]!;
+  assert.match(String(styleOf(stroke).background), /#1051c4, #222853/);
+  assert.equal(items(m.line! + 12).find((x) => x.top === 922)!.text, "Cuisson");
+  // Her announcement on two lines rising word by word, its two last words italic, then erased from the left.
+  const ann = ifFind(at(m.ann! + 30), (n) => n.type === "FitText" && n.props.key === "ann")[0]!;
+  assert.equal(drawnNodes(ann).filter((n) => n.type === "div" && n.props.key !== undefined).length, 2);
+  assert.equal(drawnNodes(ann).filter((n) => n.type === "span" && styleOf(n).fontStyle === "italic").map((n) => heldText(n).replace(/\s/g, "")).join(" "), "mes pièces");
+  const erased = (f: number) => drawnNodes(ifFind(at(f), (n) => n.type === "FitText" && n.props.key === "ann")[0]).filter((n) => n.type === "span" && styleOf(n).opacity === 0).length;
+  assert.ok(erased(m.erase! + 3) > 0 && erased(m.erase! + 3) < erased(m.erase! + 7));
+  // Her promise typed from the type mark, 38 letters a second, behind a blue caret that never blinks and fades after it.
+  const typedCount = (f: number) => drawnNodes(ifFind(at(f), (n) => n.type === "FitText" && n.props.key === "typed")[0]).filter((n) => n.type === "span" && styleOf(n).opacity === 1 && !styleOf(n).position).map(drawnText).join("").length;
+  assert.ok(Math.abs(typedCount(m.type! + 8) - Math.floor((8 * 38) / 30 + 1)) <= 1, `${typedCount(m.type! + 8)}`);
+  assert.equal(typedCount(m.type! - 1), 0);
+  const caret = (f: number) => ifFind(at(f), (n) => n.type === "span" && styleOf(n).width === 3)[0];
+  assert.ok([m.type! + 5, m.type! + 9, m.type! + 13, m.type! + 20].every((f) => styleOf(caret(f)!).opacity === 1), "never blinks");
+  assert.equal(styleOf(caret(m.icon! + 2)!).opacity, 0);
+  assert.equal(styleOf(caret(m.type! + 5)!).background, "#1051c4");
+  // The app's icon lands on her last word, glides to the middle; it opens into her card (768 × 485 at the middle).
+  const plate = (f: number) => ifFind(at(f), (n) => n.type === "div" && n.props.key === "shape")[0];
+  const p0 = styleOf(plate(m.icon! + 1)!);
+  assert.ok(Number(p0.left) + Number(p0.width) / 2 > 600 && Number(p0.width) === 119, JSON.stringify(p0));
+  const p1 = styleOf(plate(m.icon! + 15)!);
+  assert.ok(Math.abs(Number(p1.left) + Number(p1.width) / 2 - 540) < 1, JSON.stringify(p1));
+  const open = ["left", "top", "width", "height"].map((k) => Number(styleOf(plate(m.card! + 20)!)[k]));
+  assert.ok([156, 718, 768, 485].every((v, i) => Math.abs(open[i]! - v) <= 1), open.join(" "));
+  const card = at(m.card! + 25);
+  for (const w of ["atelier.argile", "Atelier Argile", "Céramiste", "Message", "Suivre"]) assert.ok(heldText(card).includes(w), w);
+  assert.ok(ifFind(card, (n) => "data-fauve-decor" in n.props).some((n) => heldText(n).includes("Tournage. Émail. Cuisson.")));
+  // The zoom as a camera: « Suivre » to the middle 1,5 times larger, the card gone but her photo and the button.
+  const btn = (f: number) => styleOf(ifFind(at(f), (n) => n.type === "div" && n.props.key === "btn")[0]!);
+  const zoomed = btn(m.zoom! + 24);
+  assert.ok(Math.abs(Number(zoomed.left) + Number(zoomed.width) / 2 - 540) < 1 && Math.abs(Number(zoomed.top) + Number(zoomed.height) / 2 - 960) < 1 && Math.abs(Number(zoomed.width) - 505.5) < 1, JSON.stringify(zoomed));
+  assert.equal(plate(m.zoom! + 10), undefined);
+  // An arrow, no ring, from the bottom right in an arc onto its right part; the blue fades, « Suivi(e) » rises.
+  const arrow = (f: number) => styleOf(ifFind(at(f), (n) => n.props.key === "arrow")[0]!);
+  assert.deepEqual([Number(arrow(m.zoom! + 1).left) + 3, Number(arrow(m.zoom! + 1).top) + 3], [702, 1651]);
+  assert.deepEqual([Number(arrow(m.zoom! + 23).left) + 3, Number(arrow(m.zoom! + 23).top) + 3], [648, 979]);
+  assert.ok(!drawnNodes(at(m.click!)).some((n) => n.type === "Cursor"));
+  assert.ok(heldText(at(m.click! + 9)).includes("Suivi(e)"));
+  // Folded into a white pill with her account and a tick, round at its ends; then her account alone in the gradient
+  // with its « @ », « À SUIVRE » over it.
+  const pill = btn(m.pill! + 14);
+  assert.ok(Number(pill.height) === 96 && Number(pill.borderRadius) === 48 && Math.abs(Number(pill.left) + Number(pill.width) / 2 - 540) < 1, JSON.stringify(pill));
+  assert.ok(heldText(at(m.pill! + 14)).includes("atelier.argile"));
+  const fin = at(m.at! + 30);
+  assert.ok(heldText(fin).includes("@") && heldText(fin).includes("atelier.argile") && heldText(fin).replace(/\s/g, "").includes("ÀSUIVRE"));
+  assert.ok(ifFind(fin, (n) => /#0c3a83, #181744/.test(String(styleOf(n).backgroundImage))).length === 2);
+});
+
+test("« Interface minimaliste » (v2): her photo in the round, her colour on her word, her name without « @ » when her account is not known, nothing of its original's", async () => {
+  const { interfaceSkill, line, at } = await interfaceAt();
+  const m = line.marks as Record<string, number>;
+  // Her photo in its round, in black and white, on her face (the upper middle of an upright one).
+  const face = ifFind(at(m.card! + 25), (n) => n.type === "Footage")[0]!;
+  assert.match(String(styleOf(face).filter), /grayscale\(1\)/);
+  assert.ok(Number(styleOf(face).width) > 134 && Number(styleOf(face).top) < 0, JSON.stringify(styleOf(face)));
+  // No photo: her initial on her colour.
+  const none = (await interfaceAt({ photo: false })).at(m.card! + 25);
+  assert.ok(!drawnNodes(none).some((n) => n.type === "Footage") && drawnNodes(none).some((n) => drawnText(n) === "A" && /rgb\(181,84,58\)/.test(String(styleOf(n).background))));
+  // Her colour on her word (the blue when hers is too pale to read on the ground).
+  const hers = (await interfaceAt({ settings: { couleur: "sienne" } })).at(m.line! + 12);
+  assert.ok(ifFind(hers, (n) => /rgb\(181,84,58\)/.test(String(styleOf(n).background))).length > 0);
+  const pale = (await interfaceAt({ settings: { couleur: "sienne" }, brand: { accent: "#f4efe6" } })).at(m.line! + 12);
+  assert.ok(ifFind(pale, (n) => /#1051c4/.test(String(styleOf(n).background))).length > 0);
+  assert.deepEqual(interfaceSkill.settings?.map((s) => [s.name, s.choices.map((c) => c.value)]), [["couleur", ["bleu", "sienne"]]]);
+  // Her account not known: her name, without « @ ».
+  const named = (await interfaceAt({ words: { ...IF_WORDS, compte: "Atelier Argile" } })).at(m.at! + 30);
+  assert.ok(heldText(named).includes("Atelier Argile") && !heldText(named).includes("@"));
+  // Its ending card, out of the blur after her account.
+  const ended = await interfaceAt({ end: true });
+  const card = ended.at(ended.durationInFrames - 10);
+  assert.ok(heldText(card).includes("Atelier ouvert samedi") && heldText(card).includes("de 10 h à 18 h") && !heldText(card).includes("SUIVRE"));
+  // Its words where they read, a little over the engine's 48 px; its labels and its card as accents (20 px at least) or decor.
+  const sizes = drawnNodes(at(m.list! + 26)).flatMap((n) => (n.type === "FitText" ? [Number((n.props.innerStyle as Record<string, unknown>).fontSize)] : []));
+  assert.ok(sizes.every((s) => s === 50), sizes.join(" "));
+  // Its pale ground as it is; Instrument Serif brought; its code within a plan's 24 000 characters; nothing of its
+  // original's words, handle or name; no flash, no grain.
+  assert.deepEqual(interfaceSkill.finish, { contrast: 0, saturation: 0, warmth: 0, grain: 0, vignette: 0, fade: 0 });
+  assert.deepEqual(interfaceSkill.fonts, ["Instrument Serif"]);
+  assert.ok(interfaceSkill.code.length <= 24000, `${interfaceSkill.code.length}`);
+  assert.doesNotMatch(interfaceSkill.code + JSON.stringify(interfaceSkill.texts), /Follow|tejya|Tejas|WHAT I DO|Giving brands|Editor\b|beginning/);
+  // On her plan: valid, its one shot her photo, its sounds and its music.
+  const { skillPlan } = await import("./skills.ts");
+  const files = [{ id: "her", photo: true, seconds: 0, aspect: 9 / 16 }];
+  const plan = skillPlan({ skill: interfaceSkill, name: "Interface minimaliste", files, fill: { shots: [{ file: "her", at: 0 }], texts: IF_WORDS, end: null } });
+  assert.ok(editPlanSchema.safeParse(plan).success);
+  assert.deepEqual(plan.skill, { key: "interface", version: 2 });
+  assert.equal(plan.texts.length, 7);
+  assert.equal(plan.sounds?.length, 3);
+  assert.equal(plan.music_shape?.filters?.[0]?.kind, "soft");
+});
