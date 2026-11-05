@@ -10,8 +10,10 @@ import type { EffectPiece, PieceTimeline, PieceTimelineInput } from "../pieces.t
 // under it. Then the montage takes over. Kept from the skill: its words' row and size (48 px, white, a tight shade), its
 // words' rhythm (each word as long as it is, the last held, the second sentence's last word over the burst), its burst
 // (the same nine framings, its pieces' lengths), its sweep, its title (its sizes on the frame's width, its colour: hers
-// when vivid, else a film title's red), its music held back then dropping on her name, muffled under the title. Left:
-// its 4:3 frame (the effect plays in the Reel's frame), its 31 roles, its recalls, its other bursts, its loop.
+// when vivid, else a film title's red; its lettering its own, the model's extended black capitals, Unbounded, over the
+// Reel's charter: set in a light serif of hers, the title was no longer a film's), its music held back then dropping on
+// her name, muffled under the title. Left: its 4:3 frame (the effect plays in the Reel's frame), its 31 roles, its
+// recalls, its other bursts, its loop.
 
 /** Its burst's pieces (images each, the original's) and the part of her shot each one is framed on (% of its width and height). */
 export const VLOG_RUN = [2, 3, 2, 3, 2, 3, 2, 3, 2];
@@ -81,7 +83,8 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   // 2. Her two sentences as small white subtitles, one word at a time, each word as long as it is, the last held; the
   // second one's last word (her place's name) held over the burst.
   const body = "'" + brand.bodyFont + "', 'Inter Tight', sans-serif";
-  const display = "'" + brand.displayFont + "', 'Inter Tight', sans-serif";
+  // Its title's lettering is its own (the original's extended black capitals, which make the title), her fonts behind it.
+  const display = "'Unbounded', '" + brand.displayFont + "', 'Inter Tight', sans-serif";
   const keep = (s) => String(s || "").replace(/(\d) (?=\d)/g, "$1\u00a0");
   const oneByOne = (text, a, b, hold) => {
     const words = String(text).split(/\s+/).filter(Boolean);
@@ -152,4 +155,6 @@ export const vlogVille: EffectPiece = {
     };
   },
   code: CODE,
+  // Its title's face (the model's pairing, film-large of font-pairs.ts), whatever the Reel's charter.
+  fonts: ["Unbounded"],
 };
