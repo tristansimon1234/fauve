@@ -1487,7 +1487,7 @@ export const HOUSE_MODELS: HouseModel[] = [
         shadow: "soft",
       },
       colors: ["#f2e9dc"],
-      layout: "plein cadre : ses gros plans du plat l'un après l'autre sur ce qu'elle dit, et elle à table face caméra, le plat devant elle, quand elle goûte et qu'elle parle",
+      layout: "elle à table face caméra, le plat devant elle, et ses gros plans du plat posés plein cadre sur ce qu'elle dit, l'un après l'autre ; ses mots sur une seule ligne au milieu",
       moments: [
         { at: 0, what: "le plat qui se finit, un geste entier par plan (verser, saupoudrer, poser), neuf gros plans de 0,5 à 1,7 s sous sa voix, ses mots deux à quatre à la fois au milieu, posés d'un coup" },
         { at: 8.23, what: "la bouchée prise à la cuillère, deux très gros plans" },
