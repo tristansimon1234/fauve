@@ -94,6 +94,7 @@ export * from "./sfx.ts";
 export * from "./font-pairs.ts";
 export * from "./house-models.ts";
 export * from "./house-pick.ts";
+export * from "./model-scout.ts";
 export * from "./house-measures.ts";
 export * from "./house-sheets.ts";
 export * from "./skills.ts";

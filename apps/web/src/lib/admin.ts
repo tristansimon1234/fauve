@@ -3,6 +3,7 @@ import { HOUSE_MODELS, houseOriginalPath, JOB_STALE_MINUTES, type FeedbackKind }
 import { MONTAGE_SKILLS } from "@fauve/agent/skills";
 import type { SkillReviewStatus } from "@/lib/skill-reviews";
 import { brakeSettings, type BrakeSettings } from "@/lib/brake-settings";
+import { scoutView, type ScoutView } from "@/lib/model-scout";
 import { providerBudgets, type ProviderBudget } from "@/lib/provider-budgets";
 import { teamToday } from "@/lib/reply-cap";
 import { getStudioContext } from "@/lib/studio";
@@ -47,6 +48,8 @@ export type AdminView = {
   }[];
   /** What people said of Edith and the app, the newest first: those not done yet. */
   feedback: { id: string; studio: string; kind: FeedbackKind; words: string; at: string; status: "new" | "seen"; source: string; byEdith: boolean }[];
+  /** The Reels that may become one of Edith's models (« Modèles repérés », lib/model-scout.ts). */
+  scout: ScoutView;
 };
 
 const name = (studio: unknown) => {
@@ -58,7 +61,7 @@ export async function adminView(): Promise<AdminView> {
   const db = supabaseAdmin();
   const since = await teamToday();
   const fresh = new Date(Date.now() - JOB_STALE_MINUTES * 60_000).toISOString();
-  const [settings, providers, signups, spent, montages, waitlist, recent, feedback, skills] = await Promise.all([
+  const [settings, providers, signups, spent, montages, waitlist, recent, feedback, skills, scout] = await Promise.all([
     brakeSettings(),
     providerBudgets(),
     db.from("members").select("id", { count: "exact", head: true }).gte("created_at", since),
@@ -80,12 +83,14 @@ export async function adminView(): Promise<AdminView> {
       .order("created_at", { ascending: false })
       .limit(60),
     skillsView(),
+    scoutView(),
   ]);
   const jobs = montages.data ?? [];
   return {
     settings,
     providers,
     skills,
+    scout,
     today: {
       signups: signups.count ?? 0,
       spent: Number(spent.data ?? 0),

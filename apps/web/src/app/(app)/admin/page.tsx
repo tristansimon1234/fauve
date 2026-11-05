@@ -6,6 +6,7 @@ import { formatPhone, formatShortDateTime } from "@/lib/format";
 import type { ProviderBudget } from "@/lib/provider-budgets";
 import { FEEDBACK_LABELS } from "@fauve/agent";
 import { dropWaiting, letIn, markFeedback, reviewSkill, saveBrakes, setBudget, setOriginalLink } from "./actions";
+import { ScoutSection } from "./scout-section";
 
 export const metadata: Metadata = { title: "Admin" };
 
@@ -43,6 +44,7 @@ async function Admin() {
       <Today view={view} />
       <Feedback view={view} />
       <Skills view={view} />
+      <ScoutSection view={view.scout} />
       <Providers providers={view.providers} />
       <Brakes view={view} />
       <Waitlist view={view} />

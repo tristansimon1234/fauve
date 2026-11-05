@@ -3,6 +3,7 @@ import { after } from "next/server";
 import { z } from "zod";
 import { stolenStyleMessage } from "@fauve/agent";
 import { env } from "@/lib/env";
+import { scoutSteal } from "@/lib/model-scout";
 import { messageStudio, notifyFailure, notifyStudio } from "@/lib/render/deliver";
 import { dropExample, missMessage, stealStyle } from "@/lib/steal";
 import { supabaseAdmin } from "@/lib/supabase/admin";
@@ -70,6 +71,14 @@ export async function POST(request: Request) {
   const parsed = bodySchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return Response.json({ error: "invalid job" }, { status: 400 });
   const job = parsed.data;
-  after(() => run(job));
+  after(async () => {
+    try {
+      await run(job);
+    } finally {
+      // Once everything she sees is done: whether this Reel would make one of Edith's models (lib/model-scout.ts), never
+      // told to her, never thrown; a reading made again for a Reel she sent before (quiet) is not a new request.
+      if (!job.quiet) await scoutSteal(job.studioId, job.inspirationId);
+    }
+  });
   return Response.json({ queued: "steal" }, { status: 202 });
 }
