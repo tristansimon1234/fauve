@@ -1405,6 +1405,57 @@ export const HOUSE_MODELS: HouseModel[] = [
       why: "Son lieu ordinaire vu comme par une machine : le stroboscope de regards intrigue, chaque passe montre autre chose, et la personne immobile au milieu tient l'œil.",
     },
   }),
+  model({
+    key: "nuit",
+    name: "La nuit sous tous les angles",
+    // Written on its original's fiche (v1 of its skill, docs/fiches/nuit.md): a city at night, 136,8 BPM in half time
+    // (Gemini heard 85), one object at one place in six angles on a roll that speeds up, round things at one place, a lens
+    // that flashes, the drop on a film burn, its night in white flashes, burns and a passer-by's hidden cut, a photographer's
+    // flash that turns a silhouette white, the loop; no text in the original (its name in option), no grain (measured).
+    pitch: "Ton enseigne sous tous les angles, toujours au même endroit, coupée de plus en plus vite, puis tes choses rondes qui se remplacent, un flash, le noir, et ta nuit qui tombe sur une brûlure de pellicule, en flashs blancs, jusqu'à la boucle.",
+    needs: "4 à 6 vidéos de ton enseigne (ou de ton néon, ta porte) prises de différents endroits, des gros plans de choses rondes (un verre, une assiette, une lampe), et 8 à 15 vidéos de ta nuit : ta rue, ton comptoir, des passants, quelqu'un qui prend une photo, un plan large pour finir",
+    files: [6, 20],
+    pair: "didone",
+    // No reference composition was written for it: its skill's code is its reference.
+    example: null,
+    // Measured on its original (docs/fiches/nuit.md): its hi-hats on every eighth from the drop, its snare every fourth beat.
+    tempo: 136.8,
+    finish: { name: "Nuit", hint: "nuit de cinéma : noirs relevés, blancs retenus, couleurs éteintes sauf ses lumières, sans grain", contrast: 0.1, saturation: -0.35, warmth: -0.05, fade: 0.04, vignette: 0.15 },
+    look: {
+      name: "nuit sous tous les angles",
+      format: "pov",
+      hook: { kind: "geste", what: "le même objet sous six angles, toujours au même endroit et à la même taille, coupé de plus en plus vite sur un roulement, puis des choses rondes au même endroit et un objectif qui flashe" },
+      text: {
+        amount: "aucun",
+        composition: "aucun texte dans l'original ; son nom en option, en capitales fines et espacées au milieu du premier plan de la nuit, juste après la brûlure",
+        case: "upper",
+        weight: "bold",
+        tracking: "wide",
+      },
+      filter: "nuit de cinéma : couleurs très éteintes sauf les lumières (néons, phares, taxi), noirs relevés, blancs retenus ; flashs blancs, brûlures de pellicule chaudes, une lumière orange",
+      layout: "son objet au même endroit dans chaque angle, puis des plans d'une demi-seconde à une seconde en flashs blancs, brûlures de pellicule et coupes cachées, en 16:9 sur du noir quand ses vidéos le sont",
+      moments: [
+        { at: 0, what: "le même objet (un feu piéton) sous six angles, au même endroit et à la même taille, coupé sur chaque coup d'un roulement qui accélère, de 5 images à 2 ; le dernier tour filé" },
+        { at: 1.53, what: "un flou sombre, puis des choses rondes au même endroit, une ou deux images chacune (un objectif, un bagel, une horloge, un café), et l'objectif tenu : son verre s'éclaire en blanc, l'image passe en négatif" },
+        { at: 2.2, what: "le noir et un silence, puis la musique tombe sur une brûlure de pellicule chaude qui glisse vers la droite" },
+        { at: 2.6, what: "la ville la nuit : un flash blanc qui brûle le plan suivant, un panneau de lumière chaude, une coupe cachée par un passant tout près de l'objectif, un métro qui passe" },
+        { at: 7.97, what: "une lumière orange, deux images blanches et une enseigne au néon ; un étal qui arrive surexposé ; un taxi qui passe devant quelqu'un de dos" },
+        { at: 10.07, what: "quelqu'un prend une photo : son appareil devient blanc, l'image passe sous un voile gris, sa silhouette devient blanche, puis le noir et la brûlure" },
+        { at: 11.13, what: "un dernier plan large de la ville la nuit coupé par la même brûlure, puis la première image du Reel : il boucle" },
+      ],
+      sounds: [
+        { at: 0.13, what: "un roulement de charleston qui accélère, un coup sur chaque coupe" },
+        { at: 2.1, what: "un déclencheur d'appareil photo sur l'objectif qui flashe" },
+      ],
+      camera: "à la main",
+      transitions: "effets",
+      grade: "moody",
+      motion: "energique",
+      music: "half-time lo-fi trap, deep 808, crisp hi-hats, vocal chop, kick on every beat",
+      ending: "un plan large de la nuit coupé d'une brûlure, puis la première image du Reel : il boucle",
+      why: "L'objet qui reste au même endroit pendant que tout change autour accroche dès la première seconde, le roulement qui accélère tient jusqu'au noir, la nuit qui tombe sur le drop donne envie d'y être, et la boucle fait revoir.",
+    },
+  }),
 ];
 
 const BY_KEY = new Map(HOUSE_MODELS.map((m) => [m.key, m]));
@@ -1476,6 +1527,7 @@ export const HOUSE_WHEN: Record<string, { pour: string; pas_pour: string }> = {
   createur: { pour: "quelqu'un qui explique en parlant face caméra et montre ce dont il parle (ses produits, ses réalisations, son lieu, son site)", pas_pour: "des images sans parole, quelqu'un qui parle sans rien à montrer" },
   silhouette: { pour: "se présenter (elle ou quelqu'un de son équipe), présenter son métier et ce qu'elle fait, un lancement, un ton de studio graphique", pas_pour: "des produits seuls, un lieu sans personne, une offre à lire" },
   vision: { pour: "son lieu fréquenté filmé de haut, quelqu'un d'immobile au milieu et des gens qui passent autour ; un ton tech ou graphique", pas_pour: "un lieu vide, un plan qui bouge, des produits en gros plan, un message à lire" },
+  nuit: { pour: "un lieu le soir ou la nuit (un bar, un restaurant, une boutique ouverte tard), son enseigne ou son néon, sa rue la nuit, une soirée", pas_pour: "sans plusieurs angles de son enseigne ou d'un objet qui la représente, un lieu calme de jour, un long message à lire" },
 };
 
 /** The models for Edith: their key, name, what they do, what they want, and what only she can film for one. */

@@ -42,4 +42,6 @@ export const HOUSE_MEASURES: Record<string, ReelMeasures> = {
   "silhouette": { duration: 11.15, cuts: [0.47, 1.07, 3.9, 5.37, 9.57], bpm: null, lufs: -14.1 },
   "vision": { duration: 8.55, cuts: [0.2, 0.7, 1.2, 1.5, 1.77, 2.1, 2.63, 3, 3.27, 3.63, 4.67, 5.13, 5.37, 5.67, 5.93, 6.53, 6.87, 7.13, 8.03], bpm: null, lufs: -14.1 },
   "detourages": { duration: 16.47, cuts: [6.23, 6.6, 6.83, 7.2, 7.53, 7.97, 8.27, 8.6, 8.93, 9.67, 10, 10.27, 10.93, 11.37, 11.73, 12.17, 12.67, 13.13, 13.47, 13.77, 14.4, 14.83], bpm: 140, lufs: -14.2 },
+  // Its fiche's cuts (docs/fiches/nuit.md): its stutter and its round things on its roll, the black, the burn, its night (each flash counted with the shot it burns, the leak with the shot it ends).
+  "nuit": { duration: 12, cuts: [0.13, 0.3, 0.43, 0.5, 0.63, 0.77, 0.93, 1, 1.1, 1.17, 1.27, 1.33, 1.43, 1.5, 1.53, 1.63, 1.67, 1.7, 1.77, 1.8, 1.87, 1.93, 1.97, 2.2, 2.47, 2.6, 3.2, 4.2, 4.63, 5.17, 5.47, 6.8, 7.13, 8, 8.33, 8.63, 8.93, 9.17, 9.27, 10.07, 10.93, 11, 11.13, 11.47, 11.6, 11.93], bpm: 136.8, lufs: -14.3 },
 };
