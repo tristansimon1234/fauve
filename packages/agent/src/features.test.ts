@@ -7316,3 +7316,417 @@ test("kit: the hand-made pieces are in the scope and told to the motion designer
   // A pictogram goes with its word, never an icon floating on its own (what looks cheap).
   assert.match(MOTION_DESIGNER_PROMPT, /never an icon floating on its own/);
 });
+
+// ——— « Carte au feutre » v2 and « Photos posées sur la table » v2, written again on their originals' fiches ——————————
+
+/**
+ * A composition run at any frame with every piece of the motion designer's scope as a named element (Handwriting,
+ * LumaFade…; random seeded as Remotion's, interpolate clamped), as cutoutsDrawn lays its scope: its tree.
+ */
+async function kitScene(code: string): Promise<(frame: number, props: Record<string, unknown>) => Drawn> {
+  const { MOTION_SCOPE } = await import("./motion-scene.ts");
+  return (frame, props) => {
+    const React = { createElement: (type: unknown, p: Record<string, unknown> | null, ...children: unknown[]): Drawn => ({ type, props: p ?? {}, children }), Fragment: "Fragment" };
+    const scope: Record<string, unknown> = Object.fromEntries(MOTION_SCOPE.filter((n) => n !== "React").map((n) => [n, n]));
+    Object.assign(scope, {
+      useCurrentFrame: () => frame,
+      interpolate: (x: number, [a, b]: [number, number], [y0, y1]: [number, number]) => y0 + (y1 - y0) * Math.min(1, Math.max(0, (x - a) / (b - a || 1))),
+      random: (seed: string) => [...seed].reduce((x, c) => Math.imul(x ^ c.charCodeAt(0), 16777619) >>> 0, 2166136261) / 4294967296,
+    });
+    const make = new Function("React", ...Object.keys(scope), `"use strict";\n${code}\nreturn Scene;`) as (...args: unknown[]) => (p: Record<string, unknown>) => Drawn;
+    return make(React, ...Object.values(scope))(props);
+  };
+}
+/** A timeline's marks as its composition gets them (its slot texts). */
+const marksOf = (line: { marks: Record<string, number> }) => Object.fromEntries(Object.entries(line.marks).map(([k, v]) => [k, String(v)]));
+/** The frames from which a function of the frame changes, over a Reel. */
+const changesOf = (frames: number, at: (f: number) => unknown) =>
+  Array.from({ length: frames }, (_, f) => f).filter((f) => f > 0 && JSON.stringify(at(f)) !== JSON.stringify(at(f - 1)));
+
+/** « Carte au feutre »: the original's words land on its images 27 (« PUT »), 52, 72, 99, 123, 147 and 177 (« BURGER NIGHT »). */
+const CARTE_WORDS = [27, 52, 72, 99, 123, 147, 177];
+const CARTE_TEXTS = [
+  { text: "put that phone down & come to", role: "hook", from: 0, to: 270, emphasis: [] },
+  { text: "burger night", role: "caption", from: 177, to: 270, emphasis: [] },
+];
+const carteProps = (line: { shots: { start: number; end: number }[]; marks: Record<string, number> }, extra: Record<string, unknown> = {}) => ({
+  width: 1080,
+  height: 1920,
+  durationInFrames: 270,
+  brand: { name: "Le Salon", displayFont: "Permanent Marker", bodyFont: "Inter Tight", accent: "#d2122e" },
+  shots: pileShots(line, 9 / 16, "photo"),
+  reelTexts: CARTE_TEXTS,
+  end: null,
+  texts: marksOf(line),
+  ...extra,
+});
+const handsOf = (tree: Drawn) => drawnNodes(tree).filter((n) => n.type === "Handwriting");
+const notebookAngle = (tree: Drawn) => Number(/^rotate\((-?[\d.]+)deg\)/.exec(String(styleOf(drawnNodes(tree).find((n) => n.type === "div" && /^rotate\(/.test(String(styleOf(n).transform ?? "")))!).transform))![1]);
+
+test("« Carte au feutre » (v2) writes its words where its original does, a photo every 3 images, on its music (135 BPM in half time)", async () => {
+  const { carteFeutre } = await import("./skills/carte-feutre.ts");
+  const { skillPlan } = await import("./skills.ts");
+  assert.equal(carteFeutre.version, 2);
+  assert.equal(carteFeutre.bpm, 135);
+  const line = carteFeutre.timeline(23, { end: false });
+  // Its 23 photos, one a slot, over its 9 s (270 images).
+  assert.equal(line.shots.length, 23);
+  assert.equal(Math.round(line.duration * 30), 270);
+  // Its words' moments, the original's within two images (in its beats: at another tempo they follow it).
+  const marks = [0, 1, 2, 3, 4, 5].map((k) => line.marks[`a${k}`]!).concat(line.marks.name!);
+  marks.forEach((f, k) => assert.ok(Math.abs(f - CARTE_WORDS[k]!) <= 2, `word ${k + 1}: image ${f}, the original's ${CARTE_WORDS[k]}`));
+  // Its code writes the original's sentence word by word on those images, each on a change of photo (its 52 an image
+  // early), « & COME » at once, « TO » alone, the name at once; a new photo every 3 images in its order, round after round
+  // (the original's 89 cuts, every one of them).
+  const draw = await kitScene(carteFeutre.code);
+  const props = carteProps(line);
+  const shown = (f: number) => handsOf(draw(f, props)).map((n) => n.props.upTo);
+  const lands = changesOf(270, shown);
+  assert.deepEqual(lands, [27, 51, 72, 99, 123, 147, 177]);
+  lands.forEach((f, k) => assert.ok(Math.abs(f - CARTE_WORDS[k]!) <= 2 && f % 3 === 0, `word ${k + 1} at ${f}`));
+  assert.deepEqual(shown(123), [19, 6]);
+  assert.deepEqual(shown(147), [19, 9]);
+  assert.deepEqual(shown(269), [19, 9, 12]);
+  const shotAt = (f: number) => drawnNodes(draw(f, props)).filter((n) => n.type === "Footage").map((n) => n.props.shot);
+  for (let f = 0; f < 270; f++) assert.deepEqual(shotAt(f), [Math.floor(f / 3) % 23], `image ${f}`);
+  assert.deepEqual(changesOf(270, shotAt), Array.from({ length: 89 }, (_, k) => 3 * (k + 1)));
+  // Its music: in after nine silent images, its first bass hit on beat 1,5 (0,67 s); stopped dead a beat for the name,
+  // which lands in that blank two images before the reprise on a bar's first beat; its sound fading over the last second.
+  assert.deepEqual(line.music, { downbeat: 0.667, pauses: [{ from: 0, to: 0.289 }, { from: 5.556, to: 6 }], end: { at: 9, fade: 1 } });
+  assert.ok(177 / 30 > 5.556 && 6 - 177 / 30 < 0.11);
+  // No sound of its own (none when a word lands, measured); its message from the first image, its name from its landing.
+  assert.equal(line.sounds, undefined);
+  assert.deepEqual(line.texts, { message: { from: 0, to: 9 }, nom: { from: 5.9, to: 9 } });
+  assert.deepEqual(carteFeutre.texts.map((t) => [t.slot, t.role, t.max, t.required]), [["message", "hook", 32, true], ["nom", "caption", 16, true]]);
+  // With an ending card (the original has none), four whole beats more for its 1,6 s, its words up to it.
+  const ended = carteFeutre.timeline(23, { end: true });
+  assert.ok(Math.abs(ended.duration - line.duration - (4 * 60) / 135) < 0.04, `${ended.duration} s`);
+  assert.equal(ended.texts.message!.to, Math.round((ended.duration - 1.6) * 100) / 100);
+  // At another tempo its words follow its beats; its photos keep their pace of 3 images.
+  const slower = carteFeutre.timeline(23, { end: false, bpm: 108 });
+  assert.ok(Math.abs(slower.duration / line.duration - 135 / 108) < 0.01 && slower.marks.name! > line.marks.name!);
+  // On her plan, for every count it takes, with or without its card: valid, its music shaped, no sound.
+  for (let n = carteFeutre.shots[0]; n <= carteFeutre.shots[1]; n++) {
+    for (const end of [false, true]) {
+      const files = Array.from({ length: n }, (_, i) => ({ id: `p${i}`, photo: i % 3 > 0, seconds: i % 3 > 0 ? 0 : 6 }));
+      const plan = skillPlan({ skill: carteFeutre, name: "Carte au feutre", files, fill: { shots: files.map((f) => ({ file: f.id, at: 0 })), texts: { message: "ce jeudi on vous attend pour la", nom: "soirée jazz" }, end: end ? { title: "Ouvert dimanche" } : null } });
+      const parsed = editPlanSchema.safeParse(plan);
+      assert.ok(parsed.success, `n=${n} end=${end}: ${parsed.success ? "" : parsed.error.message.slice(0, 300)}`);
+      assert.equal(plan.music_shape?.pauses?.length, 2);
+      assert.equal(plan.sounds, undefined);
+    }
+  }
+});
+
+test("« Carte au feutre » (v2): an open notebook laid over her pictures, a new pose with each word, two lines a page, a hand that never repeats", async () => {
+  const { carteFeutre } = await import("./skills/carte-feutre.ts");
+  const line = carteFeutre.timeline(23, { end: false });
+  const draw = await kitScene(carteFeutre.code);
+  const props = carteProps(line);
+  // Its eight poses, the original's: tilted left while empty, then left and right in turn with each word, straight when
+  // the sentence is whole; still between two words (7 to 10 photos pass under it).
+  assert.deepEqual([0, 27, 51, 72, 99, 123, 147, 177].map((f) => notebookAngle(draw(f, props))), [-7.3, 4, -4.3, -0.3, 4.5, 4.3, -5.3, -0.4]);
+  assert.deepEqual(changesOf(270, (f) => notebookAngle(draw(f, props))), [27, 51, 72, 99, 123, 147, 177]);
+  // 66,5 % of the width by 41 % of the height at the middle (its centre as the original's, within 3 %): its grey paper,
+  // its binding across the middle with its stitches, the top page darker just before it, a notch at the fold, no shadow;
+  // its perspective an outline, never a 3D transform.
+  const notebook = drawnNodes(draw(200, props)).find((n) => n.type === "div" && /^rotate\(/.test(String(styleOf(n).transform ?? "")))!;
+  const box = styleOf(notebook) as { left: number; top: number; width: number; height: number };
+  assert.deepEqual([box.width, box.height], [718, 787]);
+  assert.ok(Math.abs(box.left + 359 - 540) <= 0.03 * 1080 && Math.abs(box.top + 393 - 0.515 * 1920) <= 0.03 * 1920, JSON.stringify(box));
+  const paper = drawnNodes(notebook).find((n) => /^path\('M/.test(String(styleOf(n).clipPath ?? "")))!;
+  assert.match(String(styleOf(paper).background), /#b7b6ad 49\.3%/);
+  assert.ok(drawnNodes(paper).some((n) => /repeating-linear-gradient/.test(String(styleOf(n).background))));
+  assert.doesNotMatch(carteFeutre.code, /boxShadow|perspective\(|rotateX\(/);
+  // Two lines a page, each across its width: its top page, its third line under the binding, then the name she announces,
+  // the biggest line (written apart, stretched further, filling the rest of the page, its letters tighter); in the
+  // original's red, a hand that never repeats in Covered By Your Grace, a grease pencil's grain, stretched to their height.
+  const hands = handsOf(draw(200, props));
+  assert.deepEqual(hands.map((n) => [n.props.text, n.props.color, n.props.grain, n.props.align]), [
+    ["PUT THAT\nPHONE DOWN", "#b20b21", 0.6, "left"],
+    ["& COME TO", "#b20b21", 0.6, "left"],
+    ["BURGER NIGHT", "#b20b21", 0.6, "left"],
+  ]);
+  assert.ok(hands.every((n) => /^'Covered By Your Grace'/.test(String((n.props.style as Record<string, string>).fontFamily)) && !n.props.bend));
+  const blocks = drawnNodes(notebook).filter((n) => n.type === "div" && /^scaleY\(/.test(String(styleOf(n).transform ?? ""))).map((n) => ({ top: Number(styleOf(n).top), height: Number(styleOf(n).height), stretch: Number(/scaleY\(([\d.]+)\)/.exec(String(styleOf(n).transform))![1]), slot: (drawnNodes(n).find((c) => c.type === "Handwriting")!.props.box as TdBox).h }));
+  const visible = blocks.map((b) => b.slot * b.stretch);
+  assert.deepEqual(blocks.map((b) => b.stretch), [1.45, 1.45, blocks[2]!.stretch]);
+  assert.ok(blocks[2]!.stretch > 1.45 && visible[2]! > visible[1]! * 1.3 && visible[2]! > visible[0]! / 2, JSON.stringify(blocks));
+  assert.ok(blocks[0]!.top + visible[0]! < 0.495 * 787 && blocks[1]!.top > 0.495 * 787 && blocks[2]!.top >= blocks[1]!.top + visible[1]! && blocks[2]!.top + visible[2]! <= 787, JSON.stringify(blocks));
+  assert.equal((hands[2]!.props.style as Record<string, string>).letterSpacing, "-0.02em");
+  assert.deepEqual(carteFeutre.fonts, ["Covered By Your Grace"]);
+  // Nothing written while it is empty, the bottom page only once its words come.
+  assert.equal(handsOf(draw(20, props)).length, 0);
+  assert.equal(handsOf(draw(100, props)).length, 1);
+  // Her colour as its ink when it is dark enough to read on its grey paper; else, or on her word, the original's red.
+  const inkOf = (brand: Record<string, string>, texts: Record<string, string> = {}) => handsOf(draw(200, { ...props, brand: { ...props.brand, ...brand }, texts: { ...props.texts, ...texts } }))[0]!.props.color;
+  assert.equal(inkOf({ accent: "#1F3A5F" }), "#1f3a5f");
+  assert.equal(inkOf({ accent: "#e8b4c8" }), "#b20b21");
+  assert.equal(inkOf({ accent: "#1F3A5F" }, { encre: "rouge" }), "#b20b21");
+  // A shorter message: its lines on the top page, the name alone on the bottom one; the word before the name alone.
+  const short = { ...props, reelTexts: [{ ...CARTE_TEXTS[0]!, text: "viens goûter la" }, { ...CARTE_TEXTS[1]!, text: "pizza du jeudi" }] };
+  assert.deepEqual(handsOf(draw(200, short)).map((n) => n.props.text), ["VIENS GOÛTER LA", "PIZZA DU JEUDI"]);
+  assert.deepEqual(changesOf(270, (f) => handsOf(draw(f, short)).map((n) => n.props.upTo)), [27, 87, 147, 177]);
+  // Its ending card, when she has one: the notebook straight, her title and its line written at once.
+  const card = draw(250, { ...props, end: { title: "Ouvert dimanche", subtitle: "dès 19 h", from: 222 } });
+  assert.equal(notebookAngle(card), 0);
+  assert.deepEqual(handsOf(card).map((n) => n.props.text), ["OUVERT DIMANCHE", "DÈS 19 H"]);
+  assert.deepEqual(handsOf(draw(250, { ...props, end: { title: "Soirée jazz tous les jeudis", subtitle: null, from: 222 } })).map((n) => n.props.text), ["SOIRÉE JAZZ\nTOUS LES JEUDIS"]);
+  assert.doesNotMatch(carteFeutre.code + JSON.stringify(carteFeutre.texts), /PUT|BURGER|PHONE/i);
+});
+
+test("« Carte au feutre » (v2): full frame as the original, two bands when her pictures are in width, a video in stop motion, light to render", async () => {
+  const { carteFeutre } = await import("./skills/carte-feutre.ts");
+  const { dressSkillPlan, skillPlan, skillSettings } = await import("./skills.ts");
+  const { houseStyle } = await import("./house-models.ts");
+  const { subjectsDrawn, objectsDrawn, clearsDrawn, depthsDrawn } = await import("./subject.ts");
+  const { checkMotionCode } = await import("./motion-scene.ts");
+  const line = carteFeutre.timeline(23, { end: false });
+  const draw = await kitScene(carteFeutre.code);
+  const pictures = (f: number, extra: Record<string, unknown> = {}) =>
+    drawnNodes(draw(f, carteProps(line, extra))).filter((n) => n.type === "Footage").map((n) => ({ shot: n.props.shot, at: n.props.at, box: [styleOf(n).top, styleOf(n).height] }));
+  // Her pictures upright: each full frame, as the original's.
+  assert.deepEqual(pictures(30), [{ shot: 10, at: 30, box: [0, 1920] }]);
+  // Mostly in width: two bands above and under the notebook (a 16:9 picture almost whole in each), changing one after
+  // the other, still a change every 3 images; on her word, either way.
+  const wide = { shots: pileShots(line, 16 / 9, "photo") };
+  assert.deepEqual(pictures(30, wide).map((p) => [p.shot, ...p.box]), [[10, 0, 640], [11, 1280, 640]]);
+  assert.deepEqual(pictures(33, wide).map((p) => p.shot), [12, 11]);
+  assert.deepEqual(pictures(36, wide).map((p) => p.shot), [12, 13]);
+  assert.equal(pictures(30, { ...wide, texts: { ...marksOf(line), format: "vertical" } }).length, 1);
+  assert.equal(pictures(30, { texts: { ...marksOf(line), format: "bandes" } }).length, 2);
+  assert.deepEqual(carteFeutre.settings?.map((s) => [s.name, s.choices.map((c) => c.value)]), [["format", ["auto", "vertical", "bandes"]], ["encre", ["sienne", "rouge"]]]);
+  assert.deepEqual(skillSettings(carteFeutre, [{ name: "format", value: "auto" }, { name: "encre", value: "rouge" }]), { encre: "rouge" });
+  // A photo the same image each round; a video 3 images further on its passage each time it comes back (stop motion).
+  const videos = { shots: pileShots(line, 9 / 16, "video") };
+  assert.deepEqual([5, 74, 143].map((f) => { const p = pictures(f, videos)[0]!; return [p.shot, f - Number(p.at)]; }), [[1, 0], [1, 3], [1, 6]]);
+  assert.deepEqual([5, 74].map((f) => f - Number(pictures(f)[0]!.at)), [0, 0]);
+  // Warm and saturated on her pictures only: none of its model's finish on the whole Reel (its flash and its grain would
+  // light the notebook and move on it).
+  assert.match(carteFeutre.code, /filter: tone/);
+  const files = Array.from({ length: 23 }, (_, i) => ({ id: `p${i}`, photo: true, seconds: 0 }));
+  const plan = skillPlan({ skill: carteFeutre, name: "Carte au feutre", files, fill: { shots: files.map((f) => ({ file: f.id, at: 0 })), texts: { message: "ce jeudi on vous attend pour la", nom: "soirée jazz" }, end: null } });
+  const dressed = dressSkillPlan(plan, carteFeutre, followedFrom("local", houseStyle(houseModel("carte-feutre")!)));
+  assert.ok(dressed.look && dressed.look.flash === 0 && dressed.look.grain === 0 && dressed.look.warmth === 0 && dressed.look.contrast === 0, JSON.stringify(dressed.look));
+  // Light to render: one picture a frame (two in bands), three written blocks at most, each mounted once it has letters,
+  // nothing cut out, followed, read or in depth; no 3D transform, its hand without its costly bend.
+  for (let f = 0; f < 270; f += 3) {
+    const tree = draw(f, carteProps(line, wide));
+    assert.ok(drawnNodes(tree).filter((n) => n.type === "Footage").length <= 2 && handsOf(tree).length <= 3 && handsOf(tree).every((n) => Number(n.props.upTo) > 0), `image ${f}`);
+  }
+  assert.deepEqual([subjectsDrawn(carteFeutre.code), objectsDrawn(carteFeutre.code), clearsDrawn(carteFeutre.code), depthsDrawn(carteFeutre.code)], [[], [], [], []]);
+  assert.deepEqual(checkMotionCode(carteFeutre.code), []);
+  assert.equal(plan.layers![0]!.motion.drawn, undefined);
+  assert.deepEqual(plan.skill, { key: "carte-feutre", version: 2 });
+});
+
+/** « Photos posées sur la table »: the original's cuts on its main line (its images at 30 i/s, measured), its ten prints' landings. */
+const TABLE_CUTS = [0, 61, 70, 76, 101, 120, 143, 163, 183, 200];
+const TABLE_PRINTS = [13, 14, 16, 19, 21, 24, 28, 30, 33, 38];
+/** Its shots as its composition gets them: her table, her prints as photos (3:4), her videos of that shape. */
+const tableShots = (line: { shots: { start: number; end: number }[] }, aspect = 16 / 9, prints = 10) =>
+  pileShots(line, aspect).map((s, i) => (i >= 1 && i <= prints ? { ...s, kind: "photo", aspect: 0.75 } : s));
+const tableProps = (line: { shots: { start: number; end: number }[]; marks: Record<string, number> }, extra: Record<string, unknown> = {}) => ({
+  width: 1080,
+  height: 1920,
+  durationInFrames: 268,
+  brand: { name: "Atelier Argile", displayFont: "Instrument Serif", bodyFont: "Inter Tight" },
+  shots: tableShots(line),
+  reelTexts: [
+    { text: "voici", role: "caption", from: 9, to: 76, emphasis: [] },
+    { text: "Argile", role: "hook", from: 9, to: 76, emphasis: [] },
+  ],
+  end: null,
+  texts: marksOf(line),
+  ...extra,
+});
+/** Its prints at a frame: each one's box and angle, and the shot it shows. */
+const tablePrints = (tree: Drawn) =>
+  drawnNodes(tree)
+    .filter((n) => n.type === "div" && /^rotate\(/.test(String(styleOf(n).transform ?? "")) && styleOf(n).overflow === "hidden")
+    .map((n) => ({ shot: drawnNodes(n).find((c) => c.type === "Footage")!.props.shot as number, angle: Number(/rotate\((-?[\d.]+)deg/.exec(String(styleOf(n).transform))![1]), box: styleOf(n) as { left: number; top: number; width: number; height: number } }));
+/** Its halves at a frame: each box (left, top, width, height in its frame, on black) and the shot laid in it. */
+const tableHalves = (tree: Drawn) =>
+  drawnNodes(tree)
+    .filter((n) => n.type === "div" && styleOf(n).overflow === "hidden" && !styleOf(n).transform && styleOf(n).backgroundColor !== "#000000" && n.children.flat(Infinity).some((c) => (c as Drawn)?.type === "Footage"))
+    .map((n) => { const s = styleOf(n); const f = drawnNodes(n).find((c) => c.type === "Footage")!; return { box: [s.left, s.top, s.width, s.height], shot: f.props.shot, style: styleOf(f) }; });
+
+test("« Photos posées sur la table » (v2) cuts where its original does, its prints and its halves laid on the same moment, on its music (110 BPM)", async () => {
+  const { table, tableParts, printLandings } = await import("./skills/table.ts");
+  const { besideOf, skillPlan } = await import("./skills.ts");
+  assert.equal(table.version, 2);
+  assert.equal(table.bpm, 110);
+  const line = table.timeline(25, { end: false });
+  // The original's 25 shots in its 8,93 s (268 images): its table, ten prints, two quick shots, five pairs, the gesture's
+  // half alone, its last shot.
+  assert.equal(line.shots.length, 25);
+  assert.equal(Math.round(line.duration * 30), 268);
+  assert.deepEqual(tableParts(25), { prints: 10, pairs: 5 });
+  // Its main line cuts where the original's do, within two images (here to the image): the bare table at 61, the quick
+  // shots, each pair cutting together, the gesture alone at 183, its last shot at 200.
+  const main = line.shots.filter((s) => !s.beside).map((s) => Math.round(s.start * 30));
+  assert.equal(main.length, TABLE_CUTS.length);
+  main.forEach((f, k) => assert.ok(Math.abs(f - TABLE_CUTS[k]!) <= 2, `cut ${k + 1}: image ${f}, the original's ${TABLE_CUTS[k]}`));
+  // Its prints laid beside its table (time counted once), each from its landing, the original's within two images, to
+  // the bare table; each pair's place beside its gesture, the last one held until an image after the last shot comes in.
+  const prints = line.shots.slice(1, 11);
+  assert.ok(prints.every((s) => s.beside));
+  prints.forEach((s, k) => assert.ok(Math.abs(Math.round(s.start * 30) - TABLE_PRINTS[k]!) <= 2 && Math.round(s.end * 30) === 58, `print ${k + 1}: ${s.start}–${s.end}`));
+  assert.deepEqual(printLandings(10).map((b) => Math.round(b * (1800 / 110))), TABLE_PRINTS);
+  assert.deepEqual(besideOf(line), [null, ...Array<number>(10).fill(0), null, null, null, 13, null, 15, null, 17, null, 19, null, 21, null, null]);
+  for (let j = 0; j < 5; j++) {
+    const [g, p] = [line.shots[13 + 2 * j]!, line.shots[14 + 2 * j]!];
+    assert.equal(p.start, g.start);
+    assert.equal(Math.round(p.end * 30), j < 4 ? Math.round(g.end * 30) : 201);
+  }
+  // Its code's marks: its pile's fade by light at 54, its burn at 74.
+  assert.deepEqual([line.marks.prints, line.marks.pairs, line.marks.fade, line.marks.burn], [10, 5, 54, 74]);
+  // Its words from image 9 (fading in before the first print) to the split screen; its music's first beat at 0,13 s, 4 dB
+  // softer until its bass line comes in on the third pair's cut (image 120), cut dead two images before the end; its
+  // prints' clicking, its own, one burst from the first print as measured on its sound.
+  assert.deepEqual(line.texts, { gauche: { from: 0.3, to: 2.53 }, droite: { from: 0.3, to: 2.53 } });
+  assert.deepEqual(line.music, { downbeat: 0.13, filters: [{ kind: "soft", from: 0, to: 4, db: -4 }], end: { at: 8.863 } });
+  assert.equal(line.sounds?.length, 1);
+  const burst = line.sounds![0]!;
+  assert.deepEqual([burst.at, burst.sound, burst.burst?.times.length, burst.burst?.times.at(-1)], [0.43, "light click", 18, 0.845]);
+  // Fewer shots: fewer prints over the same burst, fewer pairs, every cut kept still on one of the original's.
+  for (let n = table.shots[0]; n <= table.shots[1]; n++) {
+    const fewer = table.timeline(n, { end: false });
+    const { prints: p, pairs: k } = tableParts(n);
+    assert.equal(fewer.shots.length, n);
+    assert.equal(p + 2 * k + 5, n);
+    assert.ok(p >= 4 && k >= 2 && k <= 5);
+    const lands = fewer.shots.slice(1, 1 + p).map((s) => Math.round(s.start * 30));
+    assert.ok(lands[0] === 13 && lands.at(-1) === 38, `${n}: ${lands}`);
+    const cuts = fewer.shots.filter((s) => !s.beside).map((s) => Math.round(s.start * 30));
+    assert.deepEqual(cuts.slice(0, 4), [0, 61, 70, 76], `${n}`);
+  }
+  // With an ending card (the original has none), its last shot held three whole beats longer for the card's 1,6 s.
+  const ended = table.timeline(25, { end: true });
+  assert.ok(Math.abs(ended.duration - line.duration - (3 * 60) / 110) < 0.04, `${ended.duration} s`);
+  assert.deepEqual(ended.shots.slice(0, 24), line.shots.slice(0, 24));
+  // At another tempo, all of it follows its beats.
+  const slower = table.timeline(25, { end: false, bpm: 88 });
+  assert.ok(Math.abs(slower.duration / line.duration - 110 / 88) < 0.01 && Math.abs(slower.sounds![0]!.burst!.times.at(-1)! - 0.845 * 1.25) < 0.002);
+  // On her plan, for every count, with or without its card: valid, its prints and places laid beside on their moments.
+  for (let n = table.shots[0]; n <= table.shots[1]; n++) {
+    for (const end of [false, true]) {
+      const files = Array.from({ length: n }, (_, i) => ({ id: `f${i}`, photo: i >= 1 && i <= tableParts(n).prints, seconds: 8 }));
+      const plan = skillPlan({ skill: table, name: "Photos posées sur la table", files, fill: { shots: files.map((f) => ({ file: f.id, at: f.photo ? 0 : 1 })), texts: { gauche: "voici", droite: "Atelier Argile" }, end: end ? { title: "Ouvert dimanche" } : null } });
+      const parsed = editPlanSchema.safeParse(plan);
+      assert.ok(parsed.success, `n=${n} end=${end}: ${parsed.success ? "" : parsed.error.message.slice(0, 300)}`);
+      assert.equal(plan.segments.filter((s) => "beside" in s && s.beside).length, tableParts(n).prints + tableParts(n).pairs);
+      assert.ok(Math.abs(plan.duration - (end ? ended : table.timeline(n, { end: false })).duration) < 0.02 || n !== 25);
+    }
+  }
+});
+
+test("« Photos posées sur la table » (v2): its prints at once at the centre at the original's angles, gone by their light; its words by hand on either side", async () => {
+  const { table } = await import("./skills/table.ts");
+  const line = table.timeline(25, { end: false });
+  const draw = await kitScene(table.code);
+  const props = tableProps(line);
+  // Each print at once on its image, on the others, at the original's boxes: its ten angles (left as minus), its centres
+  // at the middle, eight in 2:3, its 5th almost square and its 7th in 3:4, heights from 42 to 53 % of its 4:3 frame
+  // (32 % for the square one); no border, no shadow.
+  const lands = Array.from({ length: 10 }, (_, k) => changesOf(60, (f) => tablePrints(draw(f, props)).length > k)[0]);
+  assert.deepEqual(lands, TABLE_PRINTS);
+  const pile = tablePrints(draw(50, props));
+  assert.deepEqual(pile.map((p) => p.angle), [0, -14.9, -9.9, -7.1, 7.8, -13.1, 11, -1.9, 0, 0]);
+  assert.deepEqual(pile.map((p) => p.shot), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+  for (const p of pile) {
+    assert.ok(Math.abs(p.box.left + p.box.width / 2 - 540) <= 15 && Math.abs(p.box.top + p.box.height / 2 - 0.513 * 810) <= 15, JSON.stringify(p.box));
+    assert.ok(p.box.height >= 0.32 * 810 - 1 && p.box.height <= 0.53 * 810 + 1, JSON.stringify(p.box));
+  }
+  assert.deepEqual(pile.map((p) => Math.round((p.box.width / p.box.height) * 100) / 100).filter((a) => a !== 0.67), [0.96, 0.75]);
+  assert.doesNotMatch(table.code, /boxShadow|border:/);
+  // The pile goes by its light from image 54 in four images (the dark first, a plate's white last), the table bare after.
+  const fade = drawnNodes(draw(55, props)).find((n) => n.type === "LumaFade")!;
+  assert.deepEqual([fade.props.at, fade.props.frames], [54, 4]);
+  assert.equal(tablePrints(draw(58, props)).length, 0);
+  // Its two words written by hand from image 9, cream, fading in over 8 images: the words that bring her name left of the
+  // pile against it, her name right of it, above the middle (clear of the apps' buttons), gone with the split screen.
+  const words = (f: number) => handsOf(draw(f, props)).map((n) => ({ text: n.props.text, align: n.props.align, box: n.props.box as TdBox, color: n.props.color, font: String((n.props.style as Record<string, string>).fontFamily) }));
+  assert.equal(words(8).length, 0);
+  const pair = words(40);
+  assert.deepEqual(pair.map((w) => [w.text, w.align, w.color]), [["voici", "right", "#fff0d6"], ["Argile", "left", "#fff0d6"]]);
+  assert.ok(pair.every((w) => /^'Shadows Into Light'/.test(w.font)));
+  const [left, right] = pair as [(typeof pair)[number], (typeof pair)[number]];
+  assert.ok(left.box.x >= 40 && left.box.x + left.box.w <= 0.34 * 1080 && right.box.x >= 0.68 * 1080 && right.box.x + right.box.w <= 1040, JSON.stringify(pair.map((w) => w.box)));
+  assert.ok(555 + right.box.y + right.box.h <= 960, JSON.stringify(right.box));
+  const opacity = (f: number) => Number(styleOf(drawnNodes(draw(f, props)).find((n) => n.type === "div" && n.children.flat(Infinity).some((c) => (c as Drawn)?.type === "Handwriting"))!).opacity);
+  assert.deepEqual([9, 13, 17, 60].map(opacity), [0, 0.5, 1, 1]);
+  assert.deepEqual([75, 76].map((f) => words(f).length), [2, 0]);
+  // A long name on two lines, growing upward (its bottom where one line's is), never smaller.
+  const long = handsOf(draw(40, { ...props, reelTexts: [props.reelTexts[0]!, { ...props.reelTexts[1]!, text: "Maison Farine Lyon" }] }))[1]!;
+  assert.equal(long.props.text, "Maison\nFarine Lyon");
+  const tall = long.props.box as TdBox;
+  assert.equal(tall.y + tall.h, right.box.y + right.box.h);
+  // Its quick shots jerky (each image held three), the second burned on image 74, then black on the left and white on
+  // the right on image 75, its words still over them.
+  assert.deepEqual([61, 66, 70, 73].map((f) => drawnNodes(draw(f, props)).find((n) => n.type === "Footage")!.props.hold), [3, 3, 3, 3]);
+  const burned = drawnNodes(draw(74, props));
+  assert.match(String(styleOf(burned.find((n) => n.type === "Footage")!).filter), /^brightness\(3\.2\) contrast\(3\.4\)/);
+  assert.ok(burned.some((n) => styleOf(n).mixBlendMode === "multiply" && styleOf(n).background === "#ecfcff"));
+  const black = drawnNodes(draw(75, props));
+  assert.ok(!black.some((n) => n.type === "Footage") && black.some((n) => /linear-gradient\(90deg, #000000 30%, #f2fdff 41%\)/.test(String(styleOf(n).background))));
+  // None of its original's own words or name.
+  assert.doesNotMatch(table.code + JSON.stringify(table.texts), /Joe Taylor|this is/i);
+});
+
+test("« Photos posées sur la table » (v2): horizontal 4:3 on black when her table is in width, full frame otherwise or on her word; its halves; light to render", async () => {
+  const { table } = await import("./skills/table.ts");
+  const { skillFillInput, skillSettings, skillPlan } = await import("./skills.ts");
+  const { subjectsDrawn, objectsDrawn, clearsDrawn, depthsDrawn } = await import("./subject.ts");
+  const { checkMotionCode } = await import("./motion-scene.ts");
+  const line = table.timeline(25, { end: false });
+  const draw = await kitScene(table.code);
+  const frameOf = (tree: Drawn) => {
+    const b = drawnNodes(tree).find((n) => n.type === "div" && styleOf(n).overflow === "hidden" && styleOf(n).backgroundColor === "#000000")!;
+    return [styleOf(b).top, styleOf(b).height];
+  };
+  const upright = { shots: tableShots(line, 9 / 16) };
+  // Her table in width: the original's 4:3 band in the middle of the screen; upright: the whole frame; her setting either way.
+  assert.deepEqual(frameOf(draw(100, tableProps(line))), [555, 810]);
+  assert.deepEqual(frameOf(draw(100, tableProps(line, upright))), [0, 1920]);
+  assert.deepEqual(frameOf(draw(100, tableProps(line, { texts: { ...marksOf(line), format: "vertical" } }))), [0, 1920]);
+  assert.deepEqual(frameOf(draw(100, tableProps(line, { ...upright, texts: { ...marksOf(line), format: "horizontal" } }))), [555, 810]);
+  assert.deepEqual(table.settings?.map((s) => [s.name, s.choices.map((c) => c.value)]), [["format", ["auto", "horizontal", "vertical"]]]);
+  assert.deepEqual(skillSettings(table, [{ name: "format", value: "vertical" }]), { format: "vertical" });
+  // Its halves, each at its own speed (no `at`): side by side, her place on the left and the gesture on the right (2:3
+  // each); in vertical the gesture above her place (9:8 each).
+  const halves = (f: number, extra: Record<string, unknown> = {}) => tableHalves(draw(f, tableProps(line, extra))).map((h) => [h.shot, ...h.box]);
+  assert.deepEqual(halves(110), [[16, 0, 0, 540, 810], [15, 540, 0, 540, 810]]);
+  assert.deepEqual(halves(110, upright), [[16, 0, 960, 1080, 960], [15, 0, 0, 1080, 960]]);
+  assert.ok(tableHalves(draw(110, tableProps(line))).every((h) => h.style.left === 0 && !("at" in h)));
+  // The gesture's half still bright two images after the burn; then it cuts alone (183), her place held.
+  const lit = (f: number) => tableHalves(draw(f, tableProps(line))).find((h) => h.box[0] === 540)!.style.filter;
+  assert.deepEqual([76, 77, 78].map(lit), ["brightness(1.14)", "brightness(1.14)", undefined]);
+  assert.deepEqual(halves(170), [[22, 0, 0, 540, 810], [21, 540, 0, 540, 810]]);
+  assert.deepEqual(halves(190), [[22, 0, 0, 540, 810], [23, 540, 0, 540, 810]]);
+  // Its last shot takes the gesture's half on image 200 (its whole frame seen through it, in place), the whole frame an
+  // image later, to the end.
+  const through = tableHalves(draw(200, tableProps(line)));
+  assert.deepEqual(through.map((h) => [h.shot, h.style.left, h.style.width]), [[22, 0, 540], [24, -540, 1080]]);
+  assert.deepEqual(drawnNodes(draw(201, tableProps(line))).filter((n) => n.type === "Footage").map((n) => [n.props.shot, styleOf(n).width]), [[24, 1080]]);
+  // The filler sees which half plays with which, and where each is.
+  const files = Array.from({ length: 16 }, (_, i) => ({ id: `f${i}`, photo: i >= 1 && i <= 8, seconds: i >= 1 && i <= 8 ? 0 : 10, aspect: i >= 1 && i <= 8 ? 0.75 : 9 / 16 }));
+  const input = skillFillInput({ skill: table, name: "Photos posées sur la table", n: 25, files, business: {}, request: "" });
+  assert.equal(input.cases.filter((c) => "en_meme_temps_que" in c).length, 15);
+  assert.match(input.cases[13]!.veut, /^la moitié de droite \(du haut quand le Reel est vertical\) de l'écran partagé : un geste/);
+  assert.match(input.cases[14]!.veut, /^la moitié de gauche \(du bas quand le Reel est vertical\) de l'écran partagé : son lieu/);
+  assert.match(table.timeline(25, { end: false, settings: { format: "vertical" } }).shots[13]!.want, /^la moitié du haut/);
+  // Its grade without vignette nor grain; light to render: her prints mounted only while the pile is seen (inside one
+  // light fade), two shots at once in the split screen, nothing cut out, followed, read or in depth.
+  assert.deepEqual(table.finish, { vignette: 0, grain: 0 });
+  for (let f = 0; f < 268; f++) {
+    const n = drawnNodes(draw(f, tableProps(line))).filter((x) => x.type === "Footage").length;
+    assert.ok(f < 13 ? n === 1 : f < 58 ? n <= 11 : n <= 2, `image ${f}: ${n}`);
+  }
+  assert.deepEqual([subjectsDrawn(table.code), objectsDrawn(table.code), clearsDrawn(table.code), depthsDrawn(table.code)], [[], [], [], []]);
+  assert.deepEqual(checkMotionCode(table.code), []);
+  assert.doesNotMatch(table.code, /scale\(|translate|Whip|Punch|ZoomThrough/);
+  const plan = skillPlan({ skill: table, name: "Photos posées sur la table", files, fill: { shots: Array.from({ length: 25 }, (_, i) => ({ file: files[i % 16]!.id, at: 0 })), texts: { gauche: "voici", droite: "Argile" }, end: null, settings: { format: "vertical" } } });
+  assert.deepEqual(plan.skill, { key: "table", version: 2, settings: { format: "vertical" } });
+  assert.equal(plan.layers![0]!.motion.texts!.format, "vertical");
+});
