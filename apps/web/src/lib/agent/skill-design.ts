@@ -66,11 +66,12 @@ export function skillCandidate(followed: FollowedStyle | undefined, contract: Re
   return skill;
 }
 
-/** Her files as a skill casts them: a video's length, what it shows and its moments worth showing (best first); a photo's reading. */
+/** Her files as a skill casts them: a video's length, what it shows and its moments worth showing (best first); a photo's reading; each one's shape. */
 export function skillFiles(mediaIds: string[], clips: { media_id: string; analysis: ClipAnalysis }[], photos: MediaFacts["photos"]): SkillFile[] {
   return mediaIds.flatMap((id): SkillFile[] => {
     const photo = photos[id];
-    if (photo) return [{ id, photo: true, seconds: 0, shows: (photo.detection.notes ?? "").slice(0, 200) }];
+    // Its shape (width / height): a slot laid in a box of another shape (a tall half) keeps only its middle.
+    if (photo) return [{ id, photo: true, seconds: 0, shows: (photo.detection.notes ?? "").slice(0, 200), aspect: photo.width / Math.max(1, photo.height) }];
     const clip = clips.find((c) => c.media_id === id);
     if (!clip) return [];
     const a = clip.analysis;
@@ -82,6 +83,7 @@ export function skillFiles(mediaIds: string[], clips: { media_id: string; analys
         seconds: a.duration,
         shows: a.summary.slice(0, 200),
         moments: [...a.best_moments.map((m) => ({ start: m.start, end: m.end, what: m.why.slice(0, 120) })), ...shots.map((s) => ({ start: s.start, end: s.end, what: s.description.slice(0, 120) }))],
+        aspect: a.orientation === "landscape" ? 16 / 9 : a.orientation === "square" ? 1 : 9 / 16,
       },
     ];
   });
