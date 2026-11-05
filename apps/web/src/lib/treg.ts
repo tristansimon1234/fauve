@@ -36,15 +36,23 @@ export async function instagramVideo(link: string): Promise<{ video: string | nu
 
 /**
  * One call of a Treg catalog tool with a JSON body (POST https://treg.to/call/<id>), and what it cost;
- * null without a key. Treg's answer is returned as is ({ output, … }), or null when refused.
+ * null without a key. Treg's answer is returned as is ({ output, … }), or null when refused. A provider's
+ * own GET endpoint (tikhub.x.…, scrapecreators.x.…) takes its parameters in the query instead (`method` GET:
+ * Treg passes method, query and body to the provider unchanged).
  */
-export async function tregCall(id: string, body: Record<string, unknown>, maxCostUsd = MAX_COST_USD): Promise<{ answer: unknown; costUsd: number } | null> {
+export async function tregCall(
+  id: string,
+  body: Record<string, unknown>,
+  maxCostUsd = MAX_COST_USD,
+  method: "POST" | "GET" = "POST",
+): Promise<{ answer: unknown; costUsd: number } | null> {
   const token = env("TREG_API_KEY");
   if (!token) return null;
-  const response = await fetch(`https://treg.to/call/${id}`, {
-    method: "POST",
-    headers: { "X-Treg-Token": token, "X-Treg-Route-Max-Cost": String(maxCostUsd), "Content-Type": "application/json" },
-    body: JSON.stringify(body),
+  const query = method === "GET" ? `?${new URLSearchParams(Object.entries(body).map(([k, v]) => [k, String(v)]))}` : "";
+  const response = await fetch(`https://treg.to/call/${id}${query}`, {
+    method,
+    headers: { "X-Treg-Token": token, "X-Treg-Route-Max-Cost": String(maxCostUsd), ...(method === "POST" ? { "Content-Type": "application/json" } : {}) },
+    ...(method === "POST" ? { body: JSON.stringify(body) } : {}),
     signal: AbortSignal.timeout(45_000),
   }).catch((error: unknown) => {
     console.warn("treg: call failed", id, error instanceof Error ? error.message : error);
