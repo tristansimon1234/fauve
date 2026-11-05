@@ -31,8 +31,11 @@ test("« Teaser qui se charge » (v1): 56 slots and eight replays on its cuts' g
   // Under the counter an eighth of a beat each (2 or 3 images), after her word a ninth (faster), in her place an eighth.
   const lengths = starts.slice(1).map((f, i) => f - starts[i]!);
   assert.ok(lengths.every((l) => l === 2 || l === 3), lengths.join(" "));
-  // Which slot each replay shows: the original's (its still at 99 again at 104, then seven of the first flashes, nearly backwards).
-  assert.deepEqual([1, 2, 3, 4, 5, 6, 7, 8].map((k) => line.marks[`replay${k}_shot`]), [35, 34, 30, 18, 8, 7, 12, 10]);
+  // Which slot each replay shows: its still again two flashes later (the original's 99 at 104), then seven earlier
+  // flashes, nearly backwards, two in a row never from one file whatever rotation of 4 to 12 files the filler made.
+  const shown = [1, 2, 3, 4, 5, 6, 7, 8].map((k) => line.marks[`replay${k}_shot`]!);
+  assert.deepEqual(shown, [35, 34, 31, 18, 5, 2, 15, 12]);
+  for (let files = 4; files <= 12; files++) shown.slice(1).forEach((s, i) => i && assert.notEqual(s % files, shown[i]! % files, `${files} files: slots ${shown[i]} and ${s}`));
   assert.ok([1, 2, 3, 4, 5, 6, 7, 8].every((k) => line.marks[`replay${k}_to`]! - line.marks[`replay${k}_at`]! >= 2));
   // A replay's time belongs to the slot before it on the main line (slot 36 before the still, slot 45 before the run).
   assert.equal(Math.round(line.shots[45]!.start * 30), 127);
@@ -118,7 +121,7 @@ function drawAt(frame: number, props: { texts?: Record<string, string>; brand?: 
     width: 1080,
     height: 1920,
     durationInFrames: duration,
-    brand: { name: "Atelier Rose", displayFont: "Instrument Serif", bodyFont: "Inter Tight", ...props.brand },
+    brand: { name: "Atelier Rose", displayFont: "Playfair Display", bodyFont: "Jost", ...props.brand },
     shots,
     reelTexts: props.reelTexts ?? [
       { text: "Nouvelle collection", role: "hook", from: 91, to: 177, emphasis: [] },
@@ -155,7 +158,7 @@ test("« Teaser qui se charge »: her flashes one after the other in black and w
   const still = footage(drawAt(LINE.marks.replay1_at!))!;
   assert.deepEqual([still.props.shot, still.props.at], [35, LINE.marks.replay1_at]);
   const run = [2, 3, 4, 5, 6, 7, 8].map((k) => footage(drawAt(LINE.marks[`replay${k}_at`]! + 1))!);
-  assert.deepEqual(run.map((f) => f.props.shot), [34, 30, 18, 8, 7, 12, 10]);
+  assert.deepEqual(run.map((f) => f.props.shot), [34, 31, 18, 5, 2, 15, 12]);
   assert.deepEqual(run.map((f) => f.props.at), [2, 3, 4, 5, 6, 7, 8].map((k) => LINE.marks[`replay${k}_at`]));
   // Slot 45 shows only on its own flash, then the run; its next slot after it.
   assert.equal(footage(drawAt(127))!.props.shot, 45);
@@ -194,12 +197,13 @@ test("« Teaser qui se charge »: its counter at the centre on its own clock, 1 
   // To 100 % when her words say it is ready.
   assert.equal(counterAt(drawAt(LINE.marks.off! - 1, { texts: { compteur: "100" } })), "100%");
   assert.equal(counterAt(drawAt(0, { texts: { compteur: "100" } })), "1%");
-  // At the very centre, white, its figures 3,2 % of the height (a serif's capitals 0,72 of its size), a tight shadow.
+  // At the very centre, white, its figures lining and 3,2 % of the height (Playfair Display's capitals are 0,708 of its
+  // size), a tight shadow.
   const c = flatten(drawAt(40)).find((n) => n.props.key === "count")!;
   const s = styleOf(c);
   assert.equal(Number(s.top) + Number(s.height) / 2, 960);
-  assert.deepEqual([s.left, s.width, s.color, s.fontSize], [140, 800, "#ffffff", 85]);
-  assert.ok(Math.abs((0.72 * Number(s.fontSize)) / 1920 - 0.032) < 0.001);
+  assert.deepEqual([s.left, s.width, s.color, s.fontSize, s.fontVariantNumeric], [140, 800, "#ffffff", 87, "lining-nums"]);
+  assert.ok(Math.abs((0.708 * Number(s.fontSize)) / 1920 - 0.032) < 0.001);
   assert.match(String(s.textShadow), /0 1px 5px/);
   // Her word from its beat to her logo, the same place, its capitals 2,8 % of the height, inside x 140 – 940.
   const word = (f: number) => fits(drawAt(f)).find((n) => String(n.props.key).startsWith("w-"));
@@ -208,7 +212,7 @@ test("« Teaser qui se charge »: its counter at the centre on its own clock, 1 
   assert.equal(textOf(w), "Nouvelle collection");
   const ws = styleOf(w);
   assert.deepEqual([ws.left, ws.width, Number(ws.top) + Number(ws.height) / 2], [140, 800, 960]);
-  assert.ok(Math.abs((0.72 * Number((w.props.innerStyle as Record<string, number>).fontSize)) / 1920 - 0.028) < 0.001);
+  assert.ok(Math.abs((0.708 * Number((w.props.innerStyle as Record<string, number>).fontSize)) / 1920 - 0.028) < 0.001);
   assert.ok(word(LINE.marks.logo! - 1));
   assert.equal(word(LINE.marks.logo!), undefined);
 });
@@ -224,13 +228,15 @@ test("« Teaser qui se charge »: its ending on black, her logo then her name in
   assert.deepEqual([ls.left, ls.top, ls.width, ls.height, ls.objectFit, ls.filter], [162, 595, 756, 826, "contain", "none"]);
   assert.equal(styleOf(logoAt(180, { ...withLogo, logoOnDark: "white" })!).filter, "brightness(0) invert(1)");
   assert.equal(logoAt(LINE.marks.name!, withLogo), null);
-  // Her name from its beat (from the black when she has no logo), in spaced capitals of her text face, at the centre.
+  // Her name from its beat (from the black when she has no logo), in thin spaced capitals of her text face, at the
+  // centre, as tall as the original's (3,3 % of the height: Jost's capitals are 0,7 of its size).
   assert.equal(nameAt(LINE.marks.name! - 1, { brand: withLogo }), null);
   const name = nameAt(LINE.marks.name!, { brand: withLogo })!;
   assert.equal(textOf(name), "Atelier Rose");
   const inner = name.props.innerStyle as Record<string, string | number>;
-  assert.deepEqual([inner.textTransform, inner.letterSpacing, inner.fontSize, inner.fontWeight], ["uppercase", "0.16em", 64, 400]);
-  assert.match(String(inner.fontFamily), /^'Inter Tight'/);
+  assert.deepEqual([inner.textTransform, inner.letterSpacing, inner.fontSize, inner.fontWeight], ["uppercase", "0.08em", 90, 300]);
+  assert.ok(Math.abs((0.7 * Number(inner.fontSize)) / 1920 - 0.033) < 0.001);
+  assert.match(String(inner.fontFamily), /^'Jost'/);
   assert.ok(nameAt(LINE.marks.logo!));
   // Nothing of the original's own is ever drawn: no badge, no butterfly, no « MAISON », no « Coming soon ».
   assert.doesNotMatch(bientot.code, /MAISON|Coming soon|butterfly|papillon|LIFE/);

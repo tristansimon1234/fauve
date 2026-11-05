@@ -5793,8 +5793,8 @@ test("a font per word: a library of Google Fonts families by what they evoke, on
   assert.equal(wordFont("Comic Sans"), undefined);
   assert.equal(wordFont(""), undefined);
   assert.match(wordFontsBrief().find((l) => l.startsWith("Anton"))!, /^Anton : condensée très grasse, en capitales ; évoque sport, force/);
-  // The pairs (three added on November 5: « Mot clé en grand »'s, « Face caméra et références »' and « Ton nom qui clignote »').
-  assert.equal(FONT_PAIRS.length, 18);
+  // The pairs (three added on November 5: « Mot clé en grand »'s, « Face caméra et références »' and « Ton nom qui clignote »'; then « Teaser qui se charge »').
+  assert.equal(FONT_PAIRS.length, 19);
   // A slot that asks for one: the filler's family when it is one of the library; none otherwise, nor on a slot that does not ask.
   const skill = {
     key: "test",

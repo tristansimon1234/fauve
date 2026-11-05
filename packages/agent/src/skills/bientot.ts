@@ -33,8 +33,14 @@ const FLASHES: number[] = SECTIONS.reduce((out, [count, unit]) => {
   for (let i = 0; i < count; i++) out.push(out[out.length - 1]! + unit);
   return out;
 }, [0]);
-/** The flashes that replay an earlier one, as the original reuses eight of its clips (flash → the flash it replays). */
-const REPLAYS: Record<number, number> = { 37: 35, 47: 34, 48: 30, 49: 18, 50: 8, 51: 7, 52: 12, 53: 10 };
+/**
+ * The flashes that replay an earlier one, as the original reuses eight of its clips (flash → the flash it replays): its
+ * still seen again two flashes later, then its run of seven earlier flashes, nearly backwards. The original's run took
+ * flashes 34, 30, 18, 8, 7, 12 and 10; here two in a row are always 3 or 13 slots apart, so they come from two different
+ * files whatever rotation of 4 to 12 files the filler made (the original's 34 then 30 were one file in a rotation of 4,
+ * and its first render read as four held shots instead of seven flashes).
+ */
+const REPLAYS: Record<number, number> = { 37: 35, 47: 34, 48: 31, 49: 18, 50: 5, 51: 2, 52: 15, 53: 12 };
 /** Its slots: the flashes that are not replays (56), in order. */
 const SLOTS = FLASHES.slice(0, -1).flatMap((_, f) => (f in REPLAYS ? [] : [f]));
 /** Its landmarks, in beats: the counter gone, her word, her logo on the black, the boom, her name, its end. */
@@ -65,8 +71,8 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const LOGO = Math.max(WORD + 1, Math.round(mark("logo", 7.75 * BEAT)));
   const NAME = Math.max(LOGO, Math.round(mark("name", 8.5 * BEAT)));
   const endAt = end ? end.from : durationInFrames + 1;
-  const display = "'" + brand.displayFont + "', 'Instrument Serif', serif";
-  const body = "'" + brand.bodyFont + "', 'Inter Tight', sans-serif";
+  const display = "'" + brand.displayFont + "', 'Playfair Display', serif";
+  const body = "'" + brand.bodyFont + "', 'Jost', sans-serif";
   // A phone number or a date never breaks between its digits, nor « Paris 3e » before its number.
   const keep = (s) => String(s || "").replace(/(\d) (?=\d)/g, "$1 ").replace(/ (\d+(?:er|e))\b/g, " $1");
   // White words with no box, as the original's; a tight dark halo keeps them on a white shot (it hardly shows on a dark one).
@@ -76,10 +82,11 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   // 1. Her shots, one flash after the other as its slots fall (an eighth of a beat, a ninth after her word), each in its
   // box as filmed: upright full frame, a horizontal one whole in its band on black (as the original's one), a square one
   // in its square; or all full frame, or all in a 16:9 band, as her words ask. In dense black and white unless she wants
-  // her colours. Some flashes replay an earlier slot from its first image, as the original reuses its clips.
+  // her colours (its blacks crushed, its whites held: a little lighter, then more contrast). Some flashes replay an
+  // earlier slot from its first image, as the original reuses its clips.
   const format = setting("format", "auto");
   const colour = setting("couleur", "noir-et-blanc") === "couleur";
-  const GREY = "grayscale(1) contrast(1.22) brightness(0.95)";
+  const GREY = "grayscale(1) brightness(1.06) contrast(1.22)";
   const FULL = { left: 0, top: 0, width: W, height: H };
   const band = (aspect) => { const bh = Math.round(W / aspect); return { left: 0, top: Math.round((H - bh) / 2), width: W, height: bh }; };
   const boxOf = (s) => {
@@ -106,13 +113,13 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
 
   // 2. The counter, small at the very centre, on its own clock (not the cuts): 30 values from 1 % to 88 % (3 % a tenth of
   // a second; the original's one jump of 4, from 78 to 82), or to 100 % when her words say it is ready; gone just before
-  // her word. Its figures 3,2 % of the frame's height (a serif's capitals are 0,72 of its size).
+  // her word. Its figures lining, 3,2 % of the frame's height (a display serif's capitals are about 0,71 of its size).
   const target = setting("compteur", "88") === "100" ? 100 : 88;
   const valueAt = (k) => (k <= 0 ? 1 : target === 100 ? Math.round(1 + (99 * k) / 29) : k <= 26 ? 3 * k : 3 * k + 1);
-  const C = Math.round(H * 0.0445);
+  const C = Math.round(H * 0.0453);
   const step = Math.min(29, Math.floor((Math.max(0, frame) * 30) / OFF));
   const counter = n && frame < OFF
-    ? h("div", { key: "count", style: { ...centred(2 * C), display: "flex", alignItems: "center", justifyContent: "center", fontFamily: display, fontSize: C, lineHeight: 1, color: "#ffffff", textShadow: SHADOW, whiteSpace: "nowrap" } }, valueAt(step) + " %")
+    ? h("div", { key: "count", style: { ...centred(2 * C), display: "flex", alignItems: "center", justifyContent: "center", fontFamily: display, fontSize: C, lineHeight: 1, fontVariantNumeric: "lining-nums", color: "#ffffff", textShadow: SHADOW, whiteSpace: "nowrap" } }, valueAt(step) + " %")
     : null;
 
   // 3. Her word in the counter's place, the same face a little smaller (the original's word: its capitals 2,8 % of the
@@ -120,21 +127,21 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const hook = reelTexts.find((t) => t.role === "hook");
   const name = reelTexts.find((t) => t.role === "caption");
   const others = reelTexts.filter((t) => t !== hook && t !== name);
-  const WS = Math.round(H * 0.039);
+  const WS = Math.round(H * 0.0395);
   const word = hook && frame >= Math.min(WORD, hook.from) && frame < LOGO
     ? h(FitText, { key: "w-" + hook.text, style: centred(2.4 * WS), innerStyle: { fontFamily: display, fontSize: WS, lineHeight: 1.15, color: "#ffffff", textShadow: SHADOW, whiteSpace: "nowrap", textAlign: "center" } }, keep(hook.text))
     : null;
 
   // 4. Its ending on black: her logo, centred and large (the original's round badge is its own, never drawn), white when
-  // it is a dark one-colour logo; then her name in small spaced capitals at the centre (from the logo's beat when she has
-  // no logo); then her ending card when the Reel has one.
+  // it is a dark one-colour logo; then her name in thin spaced capitals at the centre, as tall as the original's (3,3 %
+  // of the height), from the logo's beat when she has no logo; then her ending card when the Reel has one.
   const logo = brand.logoUrl && frame >= LOGO && frame < NAME && frame < endAt
     ? h(Img, { key: "logo", src: brand.logoUrl, maxRetries: 1, onError: () => null, style: { position: "absolute", left: Math.round(W * 0.15), top: Math.round(H * 0.31), width: Math.round(W * 0.7), height: Math.round(H * 0.43), objectFit: "contain", filter: brand.logoOnDark === "white" ? "brightness(0) invert(1)" : "none" } })
     : null;
-  const NS = Math.round(H * 0.0333);
+  const NS = Math.round(H * 0.047);
   const named = name ? name.text : "";
   const signed = named && frame >= (brand.logoUrl ? NAME : LOGO) && frame < endAt
-    ? h(FitText, { key: "n-" + named, style: centred(2.2 * NS), innerStyle: { fontFamily: body, fontWeight: 400, fontSize: NS, lineHeight: 1.2, letterSpacing: "0.16em", textIndent: "0.16em", textTransform: "uppercase", color: "#ffffff", whiteSpace: "nowrap", textAlign: "center" } }, keep(named))
+    ? h(FitText, { key: "n-" + named, style: centred(2 * NS), innerStyle: { fontFamily: body, fontWeight: 300, fontSize: NS, lineHeight: 1.2, letterSpacing: "0.08em", textIndent: "0.08em", textTransform: "uppercase", color: "#ffffff", whiteSpace: "nowrap", textAlign: "center" } }, keep(named))
     : null;
   const card = end && frame >= endAt
     ? h(React.Fragment, { key: "card" },

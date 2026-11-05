@@ -1414,7 +1414,8 @@ export const HOUSE_MODELS: HouseModel[] = [
     pitch: "Tes gestes en éclairs de noir et blanc pendant qu'un petit compteur charge jusqu'à 88 %, puis ce qui arrive, ton logo et ton nom sur le noir.",
     needs: "une dizaine de vidéos de tes gestes de près (tes mains au travail, tes outils, tes matières), trois ou quatre de ton lieu ou de ce qui arrive, ton logo, et ce qui arrive en deux à quatre mots",
     files: [6, 20],
-    pair: "editorial",
+    // Its counter and word in a wide high-contrast serif, its name in thin spaced capitals (font-pairs.ts, « mode »).
+    pair: "mode",
     // Its skill's code is its reference (no composition of the lot 5 for it).
     example: null,
     // Its music has no steady beat: the grid of its cuts (docs/fiches/bientot.md: its 64 cuts within an image at 79).

@@ -171,6 +171,17 @@ export const FONT_PAIRS: FontPair[] = [
     how: "sa première phrase en grasse condensée sur des bandeaux noirs, puis de petits sous-titres sobres en grotesque demi-grasse",
     fits: "quelqu'un qui parle face caméra, une explication, des références",
   },
+  {
+    // « Teaser qui se charge » (docs/fiches/bientot.md, effects 1, 4 and 6): its counter and its word in a wide serif of
+    // strong contrast with a large x-height (0,72 of its capitals; Instrument Serif is a fifth narrower), set small at the
+    // centre, its figures lining; its name in thin capitals of a geometric sans on the black.
+    key: "mode",
+    name: "Serif de mode et capitales fines",
+    display: { family: "Playfair Display", weight: 400, case: "normal", tracking: "normal" },
+    body: { family: "Jost", weight: 300, case: "upper", tracking: "wide" },
+    how: "un petit compteur et un mot en serif à fort contraste au centre de l'image, une signature en capitales fines espacées sur le noir",
+    fits: "un teaser, une nouvelle collection, la mode, un atelier, une boutique",
+  },
 ];
 
 const BY_KEY = new Map(FONT_PAIRS.map((p) => [p.key, p]));
