@@ -1405,6 +1405,52 @@ export const HOUSE_MODELS: HouseModel[] = [
       why: "Son lieu ordinaire vu comme par une machine : le stroboscope de regards intrigue, chaque passe montre autre chose, et la personne immobile au milieu tient l'œil.",
     },
   }),
+  model({
+    key: "celui-la",
+    name: "Celui-là, celui-là…",
+    // Tristan's model of 5 November (a ceramist's Reel and a second one on the same template; its skill v1,
+    // docs/fiches/celui-la.md): her products one a beat, the same playful word popping on each at a new place, her
+    // stretched hail and hesitation typed letter by letter, its music shaped as the original's voice.
+    pitch: "Tes produits un par un sur le rythme, et sur chacun le même petit mot qui tombe chaque fois ailleurs (« Celui-là »), puis une hésitation… et le dernier.",
+    needs: "une photo ou une courte vidéo de chacun de tes produits (cinq au moins, posés au même endroit si tu peux), ton présentoir vide et toute ta série réunie",
+    files: [5, 16],
+    pair: "editorial",
+    // Its skill's code is its reference.
+    example: null,
+    // The original's voice chants on a steady pulse, a « this » a beat (its fiche).
+    tempo: 96.5,
+    finish: { name: "Naturel", hint: "lumière du jour douce, couleurs vraies, contraste doux, sans grain ni coins sombres", contrast: 0.03, warmth: 0.03 },
+    look: {
+      name: "un mot sur chaque produit",
+      format: "autre",
+      hook: { kind: "mystère", what: "son présentoir encore vide et un appel étiré tapé lettre à lettre, puis un mot qui l'arrête, trois fois, chaque fois ailleurs dans l'image" },
+      text: {
+        amount: "plusieurs",
+        composition: "un seul mot à la fois, en grande serif étroite crème, en casse normale, posé chaque fois à un autre endroit de l'image, sans fond ni boîte ; les mots étirés tapés lettre à lettre puis fondus",
+        case: "normal",
+        weight: "regular",
+        tracking: "normal",
+      },
+      colors: ["#fffcc0"],
+      layout: "ses produits l'un après l'autre en vertical plein cadre, un mot posé sur chacun à un autre endroit de l'image, sur lui ou à côté",
+      moments: [
+        { at: 0, what: "son présentoir vide, plan fixe ; un appel étiré tapé lettre à lettre à gauche du milieu, puis effacé en fondu" },
+        { at: 0.7, what: "un mot qui l'arrête, trois fois en 0,4 s, chaque fois ailleurs (en haut à gauche, à droite, en bas à gauche), le troisième un peu plus grand" },
+        { at: 1.73, what: "« regarde » seul au milieu jusqu'au premier produit" },
+        { at: 2.3, what: "sept produits, un par temps (0,62 s), coupes sèches ; sur chacun le même mot pointé, posé d'un coup chaque fois à un autre endroit, sur le produit ou à côté" },
+        { at: 6.77, what: "toute la série réunie, une main pose la dernière pièce ; une hésitation tapée lettre à lettre, tenue, puis effacée, la musique coupée" },
+        { at: 8.27, what: "le dernier mot seul au milieu, la musique repart, jusqu'à la fin" },
+      ],
+      camera: "fixe",
+      transitions: "coupes nettes",
+      motion: "chaleureux",
+      music: "playful pizzicato and finger-snap groove with a cheeky staccato bass, 96 BPM",
+      ending: "toute sa série réunie, le dernier mot seul au milieu jusqu'à la fin",
+      why: "Le même mot répété sur chaque produit fait sourire et donne le rythme : chacun a son temps de gloire, et l'hésitation de la fin fait attendre le dernier, toute la série.",
+      to_film: "chacun de tes produits posé au même endroit, filmé du même angle, l'un après l'autre, puis tous ensemble à la fin",
+      to_film_else: "sinon, des photos ou de courtes vidéos de chacun de tes produits, même prises à des endroits différents",
+    },
+  }),
 ];
 
 const BY_KEY = new Map(HOUSE_MODELS.map((m) => [m.key, m]));
@@ -1476,6 +1522,7 @@ export const HOUSE_WHEN: Record<string, { pour: string; pas_pour: string }> = {
   createur: { pour: "quelqu'un qui explique en parlant face caméra et montre ce dont il parle (ses produits, ses réalisations, son lieu, son site)", pas_pour: "des images sans parole, quelqu'un qui parle sans rien à montrer" },
   silhouette: { pour: "se présenter (elle ou quelqu'un de son équipe), présenter son métier et ce qu'elle fait, un lancement, un ton de studio graphique", pas_pour: "des produits seuls, un lieu sans personne, une offre à lire" },
   vision: { pour: "son lieu fréquenté filmé de haut, quelqu'un d'immobile au milieu et des gens qui passent autour ; un ton tech ou graphique", pas_pour: "un lieu vide, un plan qui bouge, des produits en gros plan, un message à lire" },
+  "celui-la": { pour: "montrer ses produits un par un avec humour et en rythme (une collection, des nouveautés, ses pièces, ses gâteaux, ses bouquets, ses réalisations)", pas_pour: "un lieu, quelqu'un qui parle, une offre à lire en détail, un seul produit" },
 };
 
 /** The models for Edith: their key, name, what they do, what they want, and what only she can film for one. */
