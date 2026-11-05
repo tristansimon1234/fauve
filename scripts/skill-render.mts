@@ -83,6 +83,7 @@ import { clearPassages, layerObjects, objectKey, objectPassages, readPassages, s
 import { tracksFileSchema, type TracksByClip } from "../packages/agent/src/tracking.ts";
 import {
   dressSkillPlan,
+  paleSpans,
   readSaid,
   skillLongest,
   skillPlan,
@@ -91,6 +92,7 @@ import {
   skillTalk,
   skillVoiceFit,
   type MontageSkill,
+  type SceneGround,
   type SkillFile,
   type SkillFill,
   type SkillFillAnswer,
@@ -445,6 +447,8 @@ writeFileSync(
       ...(layer.end ? { end: layer.end } : {}),
       // Its code reads what is said: checked with words said under it, as the engine checks it.
       ...(readsSpoken(layer.js) ? { probeSpoken: true } : {}),
+      // A voice laid over it: the pale grounds its composition paints, where its subtitles are written dark.
+      ...(laidVoice ? { probeGround: true } : {}),
     },
   ]),
 );
@@ -475,20 +479,27 @@ if (refused) {
 // A voice laid over it: its subtitles on the skill's row, else off what its composition writes and draws of its own on
 // this Reel (the check's `own`, her pictures left out), as designSkill sets them.
 if (laidVoice) {
-  const own = (() => {
+  const measured = (() => {
     try {
-      return (JSON.parse(verdict) as { own?: Record<string, number[]> }).own?.skill;
+      return JSON.parse(verdict) as { own?: Record<string, number[]>; ground?: Record<string, SceneGround> };
     } catch {
-      return undefined;
+      return {};
     }
   })();
+  const own = measured.own?.skill;
   const row = skillSubtitleRow(skill, own, plan.duration);
   const composed = plan.layers?.find((l) => l.compose);
-  if (composed) composed.motion.subtitle_y = row;
+  const pale = composed ? paleSpans(measured.ground?.skill, row, Math.round((composed.to - composed.from) * 30)) : [];
+  if (composed) {
+    composed.motion.subtitle_y = row;
+    if (pale.length) composed.motion.subtitle_pale = pale;
+  }
   props.subtitleY = row;
+  if (pale.length) props.subtitlePale = pale.map(([a, b]) => [a + Math.round((composed?.from ?? 0) * 30), b + Math.round((composed?.from ?? 0) * 30)]);
   writeFileSync(`${out}.plan.json`, JSON.stringify(plan, null, 1));
   writeFileSync(`${out}.props.json`, JSON.stringify(props));
   console.log(`the voice's subtitles at ${row} of the height${skill.voiceOver?.row !== undefined ? " (the skill's own row)" : own ? " (off its own texts and marks)" : " (the usual row: nothing measured)"}`);
+  console.log(`written dark on its pale grounds: ${pale.length ? pale.map(([a, b]) => `${(a / 30).toFixed(2)}–${(b / 30).toFixed(2)} s`).join(", ") : "none"}`);
 }
 
 if (!values["no-render"]) {

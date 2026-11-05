@@ -440,6 +440,8 @@ export type ReelProps = {
   logo?: "top" | "bottom" | null;
   /** Where a voice's subtitles sit for the whole Reel (top, share of the height): off the faces, never moving. */
   subtitleY?: number;
+  /** Where they sit on a pale ground a model's composition paints (frames, spans): written dark there, white elsewhere. */
+  subtitlePale?: [number, number][];
   /** What is said written like a creator (plan.captions, her finish first): each phrase around the person, or on labels; absent, the apps' own captions. */
   captions?: "kinetic" | "stickers";
   /**
@@ -729,6 +731,15 @@ export function brandLooks(
 
 /** Where a voice's subtitles sit: the row its composition chose (it knows where its faces are), else the plan's. */
 const subtitleRow = (plan: EditPlan): number | undefined => plan.layers?.find((l) => l.compose)?.motion.subtitle_y ?? plan.subtitle_y;
+
+/** Where they sit on a pale ground its composition paints (a model's, measured by its check): its spans on the Reel's frames. */
+function subtitlePale(plan: EditPlan): [number, number][] | undefined {
+  const layer = plan.layers?.find((l) => l.compose);
+  const spans = layer?.motion.subtitle_pale;
+  if (!layer || !spans?.length) return undefined;
+  const from = toFrames(layer.from);
+  return spans.map(([a, b]) => [a + from, b + from]);
+}
 
 export function buildReelProps(plan: EditPlan, inputs: ReelInputs): ReelProps {
   const fps = REEL_FPS;
@@ -1109,6 +1120,7 @@ export function buildReelProps(plan: EditPlan, inputs: ReelInputs): ReelProps {
     // The ready looks an animation lays on one of its passages (Look), when its code names them.
     ...(usesPassageLooks(plan) ? { looks: passageLooks(inputs.today) } : {}),
     ...(subtitleRow(plan) !== undefined ? { subtitleY: subtitleRow(plan) } : {}),
+    ...(words.length && subtitlePale(plan) ? { subtitlePale: subtitlePale(plan)! } : {}),
     // An animation that times its own words on what is said without writing it all (a big word per phrase behind her):
     // the engine writes the rest as the apps' plain subtitles, never a second set of big words over its own.
     ...(words.length && captionStyle(plan) && !(plan.layers ?? []).some((l) => readsSpoken(l.motion.js) && l.motion.writes_spoken === false)

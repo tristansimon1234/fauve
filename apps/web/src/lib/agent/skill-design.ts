@@ -43,6 +43,7 @@ import {
   skillTalk,
   laysVoice,
   MAX_REEL_SECONDS,
+  paleSpans,
   SKILL_VOICE_TAIL,
   skillSubtitleRow,
   skillVoiceFit,
@@ -61,6 +62,7 @@ import {
   type SkillFile,
   type SkillFillAnswer,
   type SkillTalk,
+  type SceneGround,
   type VoiceTranscript,
 } from "@fauve/agent";
 import { outputFormat, readAnswer } from "@fauve/agent/answer";
@@ -361,8 +363,11 @@ export async function designSkill(params: {
     if ("error" in checked) return { plan, error: checked.error };
     const layer = plan.layers![0]!;
     // A voice laid over it: its subtitles for the whole Reel on the skill's row, else off what its composition writes
-    // and draws of its own on her Reel (the check measured it; the render keeps a composition's row as it is).
-    const row = laid ? { subtitle_y: skillSubtitleRow(skill, checked.own, plan.duration) } : {};
+    // and draws of its own on her Reel (the check measured it; the render keeps a composition's row as it is), written
+    // dark where its composition paints a pale ground under them.
+    const subtitleY = laid ? skillSubtitleRow(skill, checked.own, plan.duration) : undefined;
+    const pale = subtitleY !== undefined ? paleSpans(checked.ground, subtitleY, Math.round((layer.to - layer.from) * 30)) : [];
+    const row = subtitleY !== undefined ? { subtitle_y: subtitleY, ...(pale.length ? { subtitle_pale: pale } : {}) } : {};
     plan.layers = [{ ...layer, motion: { ...layer.motion, js: checked.js, ...(checked.fonts.length ? { fonts: checked.fonts } : {}), ...row } }];
     return { plan };
   };
@@ -445,7 +450,7 @@ async function checkSkill(
   business: string,
   name: string,
   asked?: string,
-): Promise<{ js: string; fonts: string[]; own?: number[] } | { error: string }> {
+): Promise<{ js: string; fonts: string[]; own?: number[]; ground?: SceneGround } | { error: string }> {
   const layer = plan.layers?.find((l) => l.compose);
   if (!layer?.motion.code) return { error: "pas de composition" };
   const timeline = planTimeline(plan);
@@ -471,7 +476,7 @@ async function checkSkill(
   };
   const [result] = await designMotionScenes(studioId, [request], undefined, brand, [], { look: { template, ...(plan.tempo ? { tempo: plan.tempo } : {}) } });
   if (!result?.js) return { error: result?.error ?? "le contrôle n'a rien rendu" };
-  return { js: result.js, fonts: result.fonts ?? [], ...(result.own?.length ? { own: result.own } : {}) };
+  return { js: result.js, fonts: result.fonts ?? [], ...(result.own?.length ? { own: result.own } : {}), ...(result.ground ? { ground: result.ground } : {}) };
 }
 
 /**

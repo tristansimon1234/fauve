@@ -1404,6 +1404,14 @@ const subtitleEdge = (k: number): CSSProperties => ({
   textShadow: `0 ${(2 * k).toFixed(2)}px ${(4 * k).toFixed(2)}px rgba(0,0,0,0.35)`,
 });
 
+/** Its words on a pale ground a model paints (« Présente-toi »'s pale between its midnight blues): dark ink, a thin light edge. */
+const PALE_INK = "#16121F";
+const paleEdge = (k: number): CSSProperties => ({
+  WebkitTextStroke: `${(2 * k).toFixed(2)}px rgba(255,255,255,0.65)`,
+  paintOrder: "stroke fill",
+  textShadow: "none",
+});
+
 /** A phrase's end: the next words start a new line of subtitles. */
 const PHRASE_END = /[.,!?;:…]$/;
 
@@ -1427,6 +1435,9 @@ function Subtitles({ props, words, theme, k }: { props: ReelProps; words: ReelPr
   const shot = props.segments.find((seg) => start >= seg.startAt && start < seg.startAt + seg.durationInFrames);
   const y =
     props.subtitleY ?? (shot && (shot.type === "clip" || shot.type === "image") && shot.subtitleY !== undefined ? shot.subtitleY : SUBTITLE_Y);
+  // On a pale ground a model's composition paints there now (measured by its check), its words are written dark.
+  const pale = props.subtitlePale?.some(([a, b]) => frame >= a && frame < b) ?? false;
+  const onGround = pale ? "white" : "footage";
   return (
     <div
       style={{
@@ -1440,8 +1451,8 @@ function Subtitles({ props, words, theme, k }: { props: ReelProps; words: ReelPr
         fontSize: s.size * k,
         textTransform: s.uppercase ? "uppercase" : "none",
         lineHeight: 1.3,
-        color: "#fff",
-        ...subtitleEdge(k),
+        color: pale ? PALE_INK : "#fff",
+        ...(pale ? paleEdge(k) : subtitleEdge(k)),
       }}
     >
       {chunk.map((word, i) => {
@@ -1453,11 +1464,11 @@ function Subtitles({ props, words, theme, k }: { props: ReelProps; words: ReelPr
             : s.highlight === "serif"
               ? // Its display font's italic, a touch larger (serif faces run small), like the words its site sets apart.
                 { fontFamily: `"${props.brand.displayFont}", serif`, fontStyle: "italic", fontWeight: 400, fontSize: "1.1em", textTransform: "none" }
-              : { color: legible(props.brand.accent, "footage") };
+              : { color: legible(props.brand.accent, onGround) };
         return (
           <span key={i} style={{ display: "inline-block", margin: `0 ${8 * k}px`, ...style }}>
             {active && s.highlight === "marker" ? (
-              <Marker color={legible(props.brand.accent, "footage")} from={word.from} shape="underline">
+              <Marker color={legible(props.brand.accent, onGround)} from={word.from} shape="underline">
                 {word.w}
               </Marker>
             ) : (

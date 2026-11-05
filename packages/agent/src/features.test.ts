@@ -10734,15 +10734,43 @@ test("a skill's plan with a voice laid over it: the voice, the engine's subtitle
   assert.equal(cutsOnBeats({}), true);
 
   // « Sans voix »: the same model, its voice, its subtitles and their row gone; a Reel the editor made keeps its subtitles.
-  const gone = withoutVoice(laid);
+  const gone = withoutVoice({ ...laid, layers: [{ ...laid.layers[0]!, motion: { ...laid.layers[0]!.motion, subtitle_pale: [[30, 90]] } }] });
   assert.equal("voice" in gone, false);
   assert.equal(gone.subtitles, false);
   assert.equal(gone.layers![0]!.motion.subtitle_y, undefined);
+  assert.equal(gone.layers![0]!.motion.subtitle_pale, undefined);
   assert.deepEqual(gone.segments, laid.segments);
   const { skill: _skill, ...edited } = laid;
   const chain = withoutVoice(edited);
   assert.equal("voice" in chain, false);
   assert.equal(chain.subtitles, true);
+});
+
+test("a voice laid over a model: its subtitles written dark where its composition paints a pale ground under them, white elsewhere", async () => {
+  const { paleSpans, skillPlan } = await import("./skills.ts");
+  const { MONTAGE_SKILLS } = await import("./skill-library.ts");
+  // The check's rows at each image sampled, every 30 frames: a pale ground under the usual row (0,64) from frame 30 to 90.
+  const rows = (paleFrom: number, paleTo: number) => Array.from({ length: 96 }, (_, i) => (i >= paleFrom * 96 && i < paleTo * 96 ? "1" : "0")).join("");
+  const dark = "0".repeat(96);
+  const ground = { frames: [0, 30, 60, 90, 120], pale: [dark, rows(0.5, 0.8), rows(0.5, 0.8), dark, rows(0, 0.3)] };
+  assert.deepEqual(paleSpans(ground, 0.64, 150), [[30, 90]]);
+  // At a row the pale ground does not reach: none; the last image runs to the end.
+  assert.deepEqual(paleSpans(ground, 0.22, 150), [[120, 150]]);
+  assert.deepEqual(paleSpans({ frames: [0, 30], pale: [rows(0.5, 0.8), rows(0.5, 0.8)] }, 0.64, 75), [[0, 75]]);
+  // Nothing measured (an older workshop, a check unavailable): white all along.
+  assert.deepEqual(paleSpans(undefined, 0.64, 150), []);
+  assert.deepEqual(paleSpans({ frames: [0, 30], pale: [dark] }, 0.64, 150), []);
+  // In the Reel: the spans of its composition, written dark there by the render (Subtitles in Reel.tsx).
+  const mosaique = MONTAGE_SKILLS.mosaique!;
+  const files = Array.from({ length: 6 }, (_, i) => ({ id: `p${i}`, photo: true, seconds: 0 }));
+  const plan = skillPlan({ skill: mosaique, name: "Mosaïque qui change", files, fill: { shots: files.map((f) => ({ file: f.id, at: 0 })), texts: {}, end: null }, voice: { media_id: "voix", at: 0.2 } });
+  const pale = { ...plan, layers: [{ ...plan.layers![0]!, motion: { ...plan.layers![0]!.motion, subtitle_y: 0.64, subtitle_pale: [[30, 90]] as [number, number][] } }] };
+  assert.ok(editPlanSchema.safeParse(pale).success);
+  const inputs = { template: "libre" as const, clipUrls: Object.fromEntries(files.map((f) => [f.id, `/${f.id}.jpg`])), photoIds: files.map((f) => f.id), brand: { name: "Atelier Rose" } };
+  const props = buildReelProps(pale, { ...inputs, voice: { src: "/voix.mp3", words: [{ w: "Les", start: 0, end: 0.4 }] } });
+  assert.deepEqual(props.subtitlePale, [[30, 90]]);
+  // Without a voice's words, nothing to write: none.
+  assert.equal(buildReelProps({ ...pale, voice: undefined, subtitles: false }, inputs).subtitlePale, undefined);
 });
 
 test("a voice laid over a model: its filler hears it and writes the same message on screen, its words at their moments; a voice there fits", async () => {

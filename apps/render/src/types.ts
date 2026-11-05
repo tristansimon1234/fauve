@@ -298,6 +298,8 @@ export type ReelProps = {
   logo?: "top" | "bottom" | null;
   /** Where a voice's subtitles sit for the whole Reel (top, share of the height): off the faces, never moving. */
   subtitleY?: number;
+  /** Where they sit on a pale ground a model's composition paints (frames, spans): written dark there, white elsewhere. */
+  subtitlePale?: [number, number][];
   /**
    * Animations over several shots, above the montage and under its texts: from `from`
    * (frames) for `durationInFrames`, with the frames where the shot changes under them (`cuts`, from their start).

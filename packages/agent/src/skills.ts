@@ -990,15 +990,47 @@ export function skillSubtitleRow(skill: Pick<MontageSkill, "voiceOver">, own: nu
 }
 
 /**
+ * What the scene check read of the grounds a composition paints itself (FAUVE_GROUND of apps/render/src/SceneCheck.tsx):
+ * at each image it sampled (`frames`, from its start), its rows from the top ('1': a pale ground of its own on top in
+ * the middle of the frame there; '0': a dark one, one of her pictures, her cut-out, or nothing).
+ */
+export type SceneGround = { frames: number[]; pale: string[] };
+
+/**
+ * Where a voice's subtitles laid over a skill sit on a pale ground its composition paints (frames from its start, as
+ * spans): each image the check sampled whose band at their row (from `row`, SUBTITLE_ROW.h tall) is mostly pale, until
+ * the next image sampled. White subtitles would not read there (« Présente-toi »: its pale ground between its midnight
+ * blues): the engine writes them dark. None measured: white all along, as on her footage.
+ */
+export function paleSpans(ground: SceneGround | undefined, row: number, frames: number): [number, number][] {
+  if (!ground?.frames.length || ground.frames.length !== ground.pale.length) return [];
+  const rows = ground.pale[0]?.length ?? 0;
+  if (!rows) return [];
+  const from = Math.max(0, Math.floor(row * rows));
+  const to = Math.min(rows, Math.ceil((row + SUBTITLE_ROW.h) * rows));
+  const sampled = ground.frames.map((frame, i) => ({ frame, band: ground.pale[i]!.slice(from, to) })).sort((a, b) => a.frame - b.frame);
+  const spans: [number, number][] = [];
+  sampled.forEach(({ frame, band }, i) => {
+    if (!band.length || [...band].filter((c) => c === "1").length * 2 <= band.length) return;
+    const end = Math.min(frames, sampled[i + 1]?.frame ?? frames);
+    const last = spans.at(-1);
+    if (last && last[1] >= frame) last[1] = Math.max(last[1], end);
+    else spans.push([Math.max(0, frame), end]);
+  });
+  return spans.filter(([a, b]) => b > a).slice(0, 60);
+}
+
+/**
  * Her Reel without its voice (« Sans voix », set_voice off: removeVoice): the same plan, its voice left out; a Reel made
- * on a skill loses the subtitles it had for it (never one timed on her filmed talk, whose words are its own) and its row.
+ * on a skill loses the subtitles it had for it (never one timed on her filmed talk, whose words are its own), their row
+ * and where they were written dark.
  */
 export function withoutVoice(plan: EditPlan): EditPlan {
   const { voice: _voice, ...rest } = plan;
   if (!plan.skill || !plan.voice) return rest;
   const layers = rest.layers?.map((l) => {
-    if (!l.compose || l.motion.times_spoken || l.motion.subtitle_y === undefined) return l;
-    const { subtitle_y: _row, ...motion } = l.motion;
+    if (!l.compose || l.motion.times_spoken || (l.motion.subtitle_y === undefined && !l.motion.subtitle_pale)) return l;
+    const { subtitle_y: _row, subtitle_pale: _pale, ...motion } = l.motion;
     return { ...l, motion };
   });
   return { ...rest, subtitles: false, ...(layers ? { layers } : {}) };

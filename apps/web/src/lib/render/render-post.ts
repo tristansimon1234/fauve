@@ -516,6 +516,8 @@ export async function renderPost(studioId: string, postId: string, options: { ed
           return !error;
         });
         props.layers = layers.length ? layers : undefined;
+        // The pale grounds a model's composition paints are gone with it: its subtitles go back to white over her footage.
+        if (!props.layers?.some((l) => l.compose)) delete props.subtitlePale;
       }
       // Where an animation sits over her footage is its designer's (it looked at it on her images): the engine no longer
       // moves it (a move kept on an older plan stays, motion.shift).

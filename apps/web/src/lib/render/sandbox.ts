@@ -45,6 +45,7 @@ import {
   type ComposeText,
   type ReelProps,
   type ReelUnder,
+  type SceneGround,
   type ScenePhoto,
   type MotionTemplate,
   type TrackPiece,
@@ -673,6 +674,8 @@ export type SmokeScene = {
   backdrop?: SceneBackdrop;
   /** Its code reads what is said (`spoken`): the check gives it words said under it and measures whether it writes them. */
   probeSpoken?: boolean;
+  /** A montage skill's composition: the pale grounds it paints are measured, for a voice's subtitles laid over it (`ground`). */
+  probeGround?: boolean;
   /** Its own brand, when the scenes are checked on several (a tool proven on three charters); else the call's. */
   brand?: Pick<ReelProps["brand"], "name" | "accent" | "accentInk" | "displayFont" | "bodyFont" | "logoUrl">;
 };
@@ -689,6 +692,8 @@ export type SceneChecks = {
   cover: Record<string, number[]>;
   /** The same rows without her pictures: what it writes and draws of its own (a model's composition: where a voice laid over it sets its subtitles). */
   own?: Record<string, number[]>;
+  /** At each image sampled (`frames`), the rows where it paints a pale ground of its own on top ('1'): those subtitles are written dark there. */
+  ground?: Record<string, SceneGround>;
   /** For a scene whose code reads what is said: the share of the words said it was seen writing at their moment. */
   spoken?: Record<string, number>;
 };
@@ -716,6 +721,7 @@ export async function smokeTestScenes(
           faces?: Record<string, string>;
           cover?: Record<string, number[]>;
           own?: Record<string, number[]>;
+          ground?: Record<string, SceneGround>;
           spoken?: Record<string, number>;
         } & Record<string, unknown>;
         // A workshop still on the previous checker prints the errors alone.
@@ -725,6 +731,7 @@ export async function smokeTestScenes(
             faces: parsed.faces ?? {},
             cover: parsed.cover ?? {},
             ...(parsed.own && typeof parsed.own === "object" ? { own: parsed.own } : {}),
+            ...(parsed.ground && typeof parsed.ground === "object" ? { ground: parsed.ground } : {}),
             ...(parsed.spoken ? { spoken: parsed.spoken } : {}),
           };
         return { errors: parsed as Record<string, string | null>, faces: {}, cover: {} };
