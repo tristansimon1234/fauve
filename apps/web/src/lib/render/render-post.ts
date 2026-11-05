@@ -42,7 +42,9 @@ import {
   voiceTranscriptSchema,
   wantsClear,
   wantsDepth,
+  wantsNear,
   wantsObjects,
+  wantsReads,
   wantsSubjects,
 } from "@fauve/agent";
 import { z } from "zod";
@@ -55,12 +57,14 @@ import { usableFonts } from "@/lib/fonts";
 import { makeSceneSprite } from "./scene-sprite";
 import { copyCutoutInputs, ensureCutoutContours, ensureCutouts, overlayPhotoInputs, sceneCutoutInputs, stickerInputs } from "./cutout";
 import { ensureDepths, ensureObjects, ensureSubjects, subjectInputs } from "./subjects";
+import { ensureShotReadings } from "./readings";
 import { ensureReliefs, reliefInputs } from "./relief";
 import { smoothSlowMotion } from "./smooth";
 import { ensureCleanCopies } from "@/lib/video/speech";
-import { loadTracks } from "./tracks";
+import { ensureTracks, loadTracks } from "./tracks";
 import { postStyle } from "@/lib/steal";
 import { renderInSandbox, renderReelInSandbox, sandboxCostEur, smokeTestScenes, type SceneChecks } from "./sandbox";
+import { withoutCompositions } from "./render-tries";
 import { costMeta } from "@/lib/cost-scope";
 
 const extensionByMime: Record<string, string> = { "video/mp4": "mp4", "video/quicktime": "mov", "video/webm": "webm", "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp" };
@@ -183,8 +187,10 @@ export async function loadMontageInputs(
   const depth = moving.length ? await sceneCutoutInputs(studioId, moving).catch(() => ({})) : undefined;
   // The same photos with their depth read on the card for their shots (relief.py), when it was.
   const reliefs = moving.length ? await reliefInputs(studioId, plan).catch(() => ({})) : undefined;
-  // Her subject cut out at every image, for the compositions that draw it (Subject), and the clear areas their texts are set in (ClearBox).
-  const subjects = wantsSubjects(plan) || wantsObjects(plan) || wantsDepth(plan) || wantsClear(plan) ? await subjectInputs(studioId, plan).catch(() => ({})) : undefined;
+  // Her subject cut out at every image, for the compositions that draw it (Subject), the clear areas their texts are set in (ClearBox), and what
+  // else they read on her shots (their sky, their lines, their light, their depth as a mask).
+  const subjects =
+    wantsSubjects(plan) || wantsObjects(plan) || wantsDepth(plan) || wantsClear(plan) || wantsReads(plan) || wantsNear(plan) ? await subjectInputs(studioId, plan).catch(() => ({})) : undefined;
   // Each photo's shape, from its reading.
   const photoAspects = Object.fromEntries(
     assets.flatMap((a) => {
@@ -366,16 +372,29 @@ export async function prepareRenderAssets(studioId: string, postId: string, plan
   if (toCut.length) await ensureCutouts(studioId, toCut);
   // The photos whose subject an animation draws: their cut-out's outline, read once (a word runs along it).
   if (subjectPhotoIds(plan).length) await ensureCutoutContours(studioId, subjectPhotoIds(plan));
+  // A model's sound on her gesture (a click as her hand touches the switch) lands where her hands do it: the shots it is
+  // read on followed first (once per clip, the cut-out sandbox; a clip with nobody in it is not).
+  const gestures = [
+    ...new Set(
+      (plan.sounds ?? []).flatMap((c) => {
+        const s = c.hand ? plan.segments[c.hand.shot] : undefined;
+        return s && isClipSegment(s) ? [s.clip_id] : [];
+      }),
+    ),
+  ];
   // A composition that draws her subject over her shots (Subject): its passages cut out at every image, as many as
   // the step has time for before its render.
   // The objects its compositions follow by name (a cup she lifts), on the rented card, at the same time (and in the same
-  // machine, the clear areas of the shots their texts are set in: ClearBox), the shots they show in depth (Depth), and
-  // its moving photos drawn in relief by their depth.
+  // machine, the clear areas of the shots their texts are set in: ClearBox), the shots they show in depth (Depth), its
+  // moving photos drawn in relief by their depth, and the hands its gestures' sounds are read on.
   await Promise.all([
     wantsSubjects(plan) ? ensureSubjects(studioId, postId, plan) : null,
     wantsObjects(plan) || wantsClear(plan) ? ensureObjects(studioId, postId, plan) : null,
-    wantsDepth(plan) ? ensureDepths(studioId, postId, plan) : null,
+    wantsDepth(plan) || wantsNear(plan) ? ensureDepths(studioId, postId, plan) : null,
+    // What else its compositions read on her shots (their sky and its matte, their vanishing point, their light), on the cut-out sandbox's CPUs.
+    wantsReads(plan) ? ensureShotReadings(studioId, postId, plan) : null,
     depthPhotoIds(plan).length ? ensureReliefs(studioId, postId, plan).catch((e: unknown) => console.warn("reliefs unavailable", e instanceof Error ? e.message : e)) : null,
+    gestures.length ? ensureTracks(studioId, gestures).catch((e: unknown) => console.warn("tracks for its gestures' sounds unavailable", e instanceof Error ? e.message : e)) : null,
   ]);
 }
 
@@ -441,7 +460,7 @@ export async function renderPost(studioId: string, postId: string, options: { ed
       durationMs = Math.round(plan.duration * 1000);
     } else if (motion.success) {
       const sfxLevel = post.kind === "reel" || post.kind === "story" ? await soundLevel(studioId, postId).catch(() => "off" as const) : "off";
-      const cues = sfxLevel === "off" ? [] : planCues(plan, planTimeline(plan).segments);
+      const cues = sfxLevel === "off" ? [] : planCues(plan, planTimeline(plan).segments, tracks);
       if (cues.length) {
         sounds.library = await ensureSounds({ studioId, postId, cues }).catch((error: unknown) => {
           console.warn("sound effects unavailable, none on this Reel", renderId, error);
@@ -510,31 +529,29 @@ export async function renderPost(studioId: string, postId: string, options: { ed
         console.warn("slow motion on the card unavailable", e instanceof Error ? e.message.slice(0, 300) : e);
         return {};
       });
+      // Remotion always gets a second, more patient try (a frame of her video waited on a busy workshop: the Reel fell
+      // back to ffmpeg, which draws neither her black bars nor the hook's animation), in the same place, on her files
+      // already copied, when its step has the time for it. A collage's composition that broke the render gives way to
+      // the printed collage, and the animation that draws the texts of a copied Reel goes with it (the engine draws them
+      // again). Photos, blurred zones or her voice: the ffmpeg engine cannot render them; anything else falls back to it
+      // only after that second try.
+      const composed = Boolean(props.layers?.some((l) => l.compose));
       try {
-        mp4 = await renderReelInSandbox({ id: renderId, props, slowmo });
+        mp4 = await renderReelInSandbox({
+          id: renderId,
+          props,
+          slowmo,
+          again: (local, error) => {
+            console.error("remotion render failed, trying again", renderId, composed ? "without its composition" : "", error);
+            return withoutCompositions(local);
+          },
+        });
         engine = "remotion";
         durationMs = Math.round((props.durationInFrames / props.fps) * 1000);
       } catch (error) {
-        // Remotion always gets a second, more patient try (a frame of her video waited on a busy workshop: the Reel
-        // fell back to ffmpeg, which draws neither her black bars nor the hook's animation). A collage's composition
-        // that broke the render gives way to the printed collage. Photos, blurred zones or her voice: the ffmpeg
-        // engine cannot render them; anything else falls back to it only after that second try.
-        const composed = Boolean(props.layers?.some((l) => l.compose));
-        console.error("remotion render failed, trying again", renderId, composed ? "without its composition" : "", error);
-        // The animation that draws the texts of a copied Reel goes with it: the engine draws them again.
-        const layers = props.layers?.filter((l) => !l.compose && !l.drawsTexts);
-        const again = await renderReelInSandbox({ id: `${renderId}-again`, props: { ...props, layers: layers?.length ? layers : undefined }, patient: true, slowmo }).catch(
-          (second: unknown) => {
-            if (composed || needsBlur || photoIds.length || plan.voice) throw second;
-            console.error("remotion failed twice, falling back to ffmpeg", renderId, second);
-            return null;
-          },
-        );
-        if (again) {
-          mp4 = again;
-          engine = "remotion";
-          durationMs = Math.round((props.durationInFrames / props.fps) * 1000);
-        } else mp4 = await ffmpegRender();
+        if (composed || needsBlur || photoIds.length || plan.voice) throw error;
+        console.error("remotion failed twice, falling back to ffmpeg", renderId, error);
+        mp4 = await ffmpegRender();
       }
     } else {
       mp4 = await ffmpegRender();
@@ -546,11 +563,16 @@ export async function renderPost(studioId: string, postId: string, options: { ed
           sounds.library,
         ).catch(() => [])
       : [];
-    // The sound of her videos kept all along with nobody speaking (finish.video_sound « all ») stays under it as an ambience.
-    const ambient =
-      plan.finish?.video_sound === "all" &&
-      !plan.voice &&
-      !plan.segments.some((s) => isClipSegment(s) && (words[s.clip_id] ?? []).some((w) => w.start >= s.in && w.end <= s.out));
+    // The sound of her videos kept all along with nobody speaking (finish.video_sound « all ») stays under it as an ambience;
+    // a model's shots that keep their own sound (a skill's `sound` shots), nobody speaking in its Reel, are heard on their
+    // shot, the music stepping back under them.
+    const spoken = plan.segments.some((s) => isClipSegment(s) && (words[s.clip_id] ?? []).some((w) => w.start >= s.in && w.end <= s.out));
+    const ambient: boolean | "shots" =
+      plan.finish?.video_sound === "all"
+        ? !plan.voice && !spoken
+        : !plan.voice && !spoken && plan.finish?.video_sound !== "none" && plan.segments.some((s) => isClipSegment(s) && s.sound && !s.speed && !s.beside)
+          ? "shots"
+          : false;
     const voiced = await withMusic({ studioId, postId, kind: post.kind as PostKind, plan, mp4, renderId, fresh: options.freshMusic, sounds: effects, ambient }).catch((error: unknown) => {
       console.warn("music unavailable, silent Reel", renderId, error);
       return { mp4, music: "none" as const };

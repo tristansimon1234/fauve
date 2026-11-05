@@ -97,3 +97,5 @@ export * from "./house-measures.ts";
 export * from "./house-sheets.ts";
 export * from "./skills.ts";
 export * from "./director.ts";
+export * from "./takes.ts";
+export * from "./geo.ts";

@@ -3,6 +3,7 @@ import { Easing, interpolate, random } from "remotion";
 import { affineOf, cameraAt, chooseClear, clearRoom, placeClear, readableMap, withCamera, type ClearMap, type ClearOptions } from "./clear";
 import type { Box, KitHooks } from "./Kit";
 import { objectName, outlinePath } from "./outline";
+import { lightIn, readingPlace, shotHeadMoves, skylineIn, vanishIn, type HeadMove } from "./reading";
 import { coverLayout } from "./Retouch";
 import { about, burnsMotion, cameraMotion, faceFocus, framingPercent, punchScale, straightening } from "./track";
 import type { ComposeShot } from "./types";
@@ -510,6 +511,59 @@ export function ClearBox(shot: ComposeShot | undefined, frame: number, laid?: La
   if (!areas.has(key)) areas.set(key, chooseClear(map, project, n, clearRoom(L, asked.within, asked.origin), { ...asked, avoid: shot.face ? [shot.face] : [] }));
   const area = areas.get(key);
   return area ? placeClear(area, project(Math.max(0, Math.min(n - 1, Math.round(frame - shot.from))))) : fallback;
+}
+
+// ——— What else is read on her shot: its skyline, its vanishing point, its light, her head's moves ————————————————————
+
+/** Where a shot's reading falls at a frame of the composition: the shot's own image there, its camera's move, the Reel's drawing in the box. */
+function readPlace(shot: ComposeShot, frame: number, laid?: Laid) {
+  const L = laid ?? { left: 0, top: 0, width: 1080, height: 1920 };
+  const t = Math.max(0, Math.min(Math.max(0, Math.round(shot.durationInFrames) - 1), Math.round(frame - shot.from)));
+  return readingPlace(shot.read ?? {}, affineOf(placer(shot, L, shot.from + t).at), t);
+}
+
+/**
+ * Where her shot's sky ends at a frame of the composition, in the box it was laid in with Footage (the whole frame by
+ * default): the y (px) of the top of the highest thing that stands under its sky between `from` and `to` (px of the
+ * same space; the whole box by default): a roof, a hill, her head; never a wire, a pole or a mast (the reading leaves
+ * them out, so a title's foot sits under the roofs, a pole passing through it). It moves with the camera. Null when the
+ * shot has no sky or was not read (a passage at another speed, the scene check): keep a place of your own.
+ */
+export function SkylineAt(shot: ComposeShot | undefined, frame: number, laid?: Laid, span?: { from?: number; to?: number }): number | null {
+  if (!shot?.read) return null;
+  return skylineIn(shot.read, readPlace(shot, frame, laid), span?.from ?? -Infinity, span?.to ?? Infinity);
+}
+
+/**
+ * Where the lines of her shot run to at a frame of the composition (the end of a street, of a corridor, of a pier, the
+ * middle of a hall), in the box it was laid in: { x, y } px, moving with the camera, maybe a little outside the box;
+ * `least` how sure it must be (0 to 1, 0.25 by default); `fallback` (another point: an object's box centre, the middle)
+ * when its lines run nowhere (a facade seen from the front, a field) or it was not read, else null.
+ */
+export function VanishingPoint(shot: ComposeShot | undefined, frame: number, laid?: Laid, options?: { least?: number; fallback?: { x: number; y: number } | null }): { x: number; y: number } | null {
+  const fallback = options?.fallback ?? null;
+  if (!shot?.read) return fallback;
+  return vanishIn(shot.read, readPlace(shot, frame, laid), options?.least ?? 0.25) ?? fallback;
+}
+
+/**
+ * How bright her shot is under a box at a frame of the composition, over its passage: { mean, high } from 0 (black) to 1
+ * (white), its mean light there and that of its brightest tenth, read on its images (a wall lit by the sun, a dark
+ * corner); `box` in px of the space the shot was laid in (none: the whole shot as laid). A shadow only where it is
+ * bright, a veil as dark as the picture needs. Null when it was not read: keep a dose of your own.
+ */
+export function LightUnder(shot: ComposeShot | undefined, frame: number, laid?: Laid, box?: Box | null): { mean: number; high: number } | null {
+  if (!shot?.read) return null;
+  return lightIn(shot.read, readPlace(shot, frame, laid), box, laid ?? { left: 0, top: 0, width: 1080, height: 1920 });
+}
+
+/**
+ * What her head does in one of her video shots, measured on what the tracker saw (her ears, her nose): `down` it lowers,
+ * `up` it rises, `left` or `right` it turns toward that side of the picture; each { from, to, what } in frames of the
+ * composition, in order. Empty when nobody was followed there: time your effect on the shot's own moments then.
+ */
+export function HeadMoves(shot: ComposeShot | undefined): HeadMove[] {
+  return shotHeadMoves(shot);
 }
 
 // ——— Outline: a line along her edge ——————————————————————————————————————————————————————

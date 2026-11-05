@@ -4,8 +4,12 @@
 # that falls with distance, a reveal from the nearest to the farthest). The same images as the Reel plays (matte.py's
 # decode: the Reel's rate, NORMALIZE's tone mapping), scaled per passage (2 % clipped at each end, measured on images
 # spread through it, so a near object never makes the room flicker) and smoothed over a few images.
+# A job marked `near` writes instead her shot itself at the cut-out's size with its depth as its transparency (near
+# opaque, far clear: a WebM VP9 with its alpha), its depth's edge snapped to the picture's (matte.py's guided filter on
+# its light), for a composition to keep only what is nearer than a distance that recedes (Near in the animations' scope:
+# a shot rebuilt from the nearest to the farthest, a whole foreground kept over another shot's ground).
 # Usage: python -I depth_video.py jobs.json → prints {"<id>": { frames, w, h, uploaded } | { error }}.
-# jobs.json: [{ id, url (signed) or src (a local file), from, to (seconds of the clip), upload?: { mp4 }, out? }].
+# jobs.json: [{ id, url (signed) or src (a local file), from, to (seconds of the clip), near?, upload?: { mp4 | webm }, out? }].
 # DEPTH_MODEL: the model's folder; DEPTH_CPU=1 runs on a CPU; HDR_FILTER: an iPhone's HDR made SDR, as the render does.
 import json
 import os
@@ -65,6 +69,8 @@ def passage(job, model, processor, device):
     w0, h0, hdr = matte.probe(job["src"])
     w, h = size_of(w0, h0)
     start, end = float(job["from"]), float(job["to"])
+    if job.get("near"):
+        end = min(end, start + NEAR_SECONDS)
     frames = matte.decode(job["src"], start, max(0.04, end - start), w, h, hdr)
     raw = depths(model, processor, frames, device)
     # Its scale, measured once on images spread through the passage: the same near and far for every image.
@@ -72,6 +78,8 @@ def passage(job, model, processor, device):
     sample = np.concatenate([raw[i][::4, ::4].ravel() for i in picks])
     lo, hi = np.percentile(sample, [2, 98])
     span = max(1e-6, float(hi - lo))
+    if job.get("near"):
+        return nearness(job, raw, lo, span, w0, h0, hdr, start, end, started)
     file = f"{job['out']}.mp4"
     enc = subprocess.Popen(
         [FFMPEG, "-v", "error", "-y", "-f", "rawvideo", "-pix_fmt", "gray", "-s", f"{w}x{h}", "-r", str(matte.FPS), "-i", "pipe:0",
@@ -90,6 +98,66 @@ def passage(job, model, processor, device):
         raise RuntimeError(f"vidéo : {enc.stderr.read().decode(errors='replace')[:200]}")
     log(f"depth of {len(raw)} images at {w}×{h} in {time.time() - started:.1f} s")
     return {"file": file, "frames": len(raw), "w": w, "h": h}
+
+
+# Her shot with its depth as its transparency: at the cut-out's size (matte.py's OUT_LONG), NEAR_SECONDS at most.
+NEAR_SECONDS = 12.0
+
+
+def nearness(job, raw, lo, span, w0, h0, hdr, start, end, started):
+    """
+    Her shot at the cut-out's size, each image with its depth as its transparency (near opaque, far clear), its depth
+    upscaled and snapped to the picture's own edges by a guided filter on its light (the depth is read at 960 px: its
+    edges were soft and a little off), smoothed over time like the grey pass; a WebM VP9 with its alpha.
+    """
+    import cv2
+    import numpy as np
+
+    import matte
+
+    scale = min(1.0, matte.OUT_LONG / max(w0, h0))
+    ow, oh = max(2, int(round(w0 * scale / 2)) * 2), max(2, int(round(h0 * scale / 2)) * 2)
+    seconds = min(NEAR_SECONDS, max(0.04, end - start))
+    file = f"{job['out']}.webm"
+    enc = subprocess.Popen(
+        [FFMPEG, "-v", "error", "-y", "-f", "rawvideo", "-pix_fmt", "rgba", "-s", f"{ow}x{oh}", "-r", str(matte.FPS), "-i", "-",
+         "-c:v", "libvpx-vp9", "-pix_fmt", "yuva420p", "-b:v", "0", "-crf", "24", "-deadline", "realtime", "-cpu-used", "8",
+         "-row-mt", "1", "-auto-alt-ref", "0", file],
+        stdin=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+    reach = max(4, ow // 135)
+    previous = None
+    count = 0
+    # Her images one by one at full size (twenty seconds of them at 1920 px would not hold in memory at once).
+    chain = ",".join(filter(None, [os.environ.get("HDR_FILTER", "") if hdr else "", f"fps={matte.FPS}", f"scale={ow}:{oh}:flags=lanczos", "format=rgb24"]))
+    proc = subprocess.Popen([FFMPEG, "-v", "error", "-i", job["src"], "-ss", f"{start:.3f}", "-t", f"{seconds:.3f}", "-vf", chain, "-f", "rawvideo", "-"], stdout=subprocess.PIPE)
+    size = ow * oh * 3
+    try:
+        for d in raw:
+            data = proc.stdout.read(size)
+            if len(data) < size:
+                break
+            rgb = np.frombuffer(data, np.uint8).reshape(oh, ow, 3)
+            n = np.clip((d.astype(np.float32) - lo) / span, 0, 1)
+            n = n if previous is None else SMOOTH * previous + (1 - SMOOTH) * n
+            previous = n
+            light = cv2.cvtColor(rgb, cv2.COLOR_RGB2GRAY).astype(np.float32) / 255.0
+            up = cv2.resize(n, (ow, oh), interpolation=cv2.INTER_LINEAR)
+            near = np.clip(matte.guided(light, up, reach, 1e-3), 0, 1)
+            enc.stdin.write(np.dstack([rgb, (near * 255 + 0.5).astype(np.uint8)]).tobytes())
+            count += 1
+    finally:
+        proc.stdout.close()
+        proc.wait()
+        enc.stdin.close()
+        failed = enc.wait() != 0
+    if failed or not count:
+        raise RuntimeError(f"proximité : {enc.stderr.read().decode(errors='replace')[:200]}")
+    from portrait import log
+
+    log(f"nearness of {count} images at {ow}×{oh} in {time.time() - started:.1f} s")
+    return {"file": file, "frames": count, "w": ow, "h": oh}
 
 
 if __name__ == "__main__":
@@ -118,7 +186,10 @@ if __name__ == "__main__":
                 fetch(job["url"], src)
             r = passage({**job, "src": src, "out": job.get("out") or os.path.join(work, f"depth{i}")}, model, processor, device)
             if job.get("upload"):
-                send(r["file"], job["upload"]["mp4"], "video/mp4")
+                if job.get("near"):
+                    send(r["file"], job["upload"]["webm"], "video/webm")
+                else:
+                    send(r["file"], job["upload"]["mp4"], "video/mp4")
                 r = {k: v for k, v in r.items() if k != "file"} | {"uploaded": True}
             results[job["id"]] = r
         except Exception as error:  # noqa: BLE001 — one passage that fails never stops the others

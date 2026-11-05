@@ -84,6 +84,11 @@ async function fetchPublic(input: string, accept: RegExp, signal: AbortSignal): 
   return { url, body: await readCapped(res) };
 }
 
+/** A public web page's HTML (2 MB at most), with the same safety checks as a site's reading (every hop on the public web). */
+export async function readPublicPage(input: string, signal: AbortSignal): Promise<{ url: string; body: string }> {
+  return fetchPublic(input, /text\/html|application\/xhtml/i, signal);
+}
+
 /** An image of a public site (8 MB at most), with the same safety checks as its pages. */
 export async function fetchPublicImage(input: string, signal: AbortSignal): Promise<Buffer> {
   const { res } = await openPublic(input, /^image\/(jpeg|png|webp|avif)/i, signal, "image/avif,image/webp,image/jpeg,image/png;q=0.9");

@@ -5,7 +5,7 @@ import { designEdit } from "@/lib/agent/editor";
 import { depthVideosOnGpu, gpuCostEur, gpuReady, objectsOnGpu, photosOnGpu, reliefsOnGpu, smoothOnGpu, subjectsOnGpu, upscaleOnGpu } from "@/lib/render/gpu";
 import { reliefOf } from "@fauve/agent";
 import { renderPost } from "@/lib/render/render-post";
-import { cleanSpeechInSandbox, dropSandbox, pruneSnapshots, trackSandbox, warmRemotionPool } from "@/lib/render/sandbox";
+import { cleanSpeechInSandbox, cutoutCostEur, dropSandbox, fileReadsInSandbox, pruneSnapshots, shotReadsInSandbox, trackSandbox, warmRemotionPool } from "@/lib/render/sandbox";
 import { isolateVoice } from "@/lib/voice";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { adminKeyAuthorized } from "@/lib/test-studio";
@@ -25,7 +25,10 @@ import { adminKeyAuthorized } from "@/lib/test-studio";
 // an object followed by its name (« gpu object »). And POST ?action=gpu-relief&media=<photo>&move=in|out|left|right
 // &seconds=<s>: a photo drawn in relief by its depth (« gpu relief »). And POST ?action=gpu-slowmo&media=<video>&from=<s>
 // &seconds=<s>: a passage made at 60 i/s by RIFE (« gpu slowmo »). And POST ?action=gpu-clear&media=…&from=<s>&to=<s>:
-// where a text can be set in it (ClearBox), on a machine without a card (« gpu clear »).
+// where a text can be set in it (ClearBox), on a machine without a card (« gpu clear »). And POST ?action=read-shot
+// &media=…&from=<s>&to=<s>&read=ground,sky,vanish,light: its sky as a matte, its skyline, its vanishing point, its light, in
+// the cut-out sandbox (« read shot »); ?action=read-file&media=<id>,…: her camera's fast moves, her lens covered, her
+// colours (« read file »); ?action=gpu-near&media=…&from=<s>&to=<s>: her shot with its depth as its transparency (« gpu near »).
 
 export const maxDuration = 800;
 
@@ -276,6 +279,91 @@ export async function POST(request: NextRequest) {
         "gpu clear",
         JSON.stringify({ media, from, to, gpu: used ?? "none", seconds: Math.round(seconds), cost_eur: Math.round(cost * 10000) / 10000, sky: share("2"), calm: share("1"), moved: map?.motion?.slice(-3) ?? null, rows, error: result instanceof Error ? result.message : undefined }),
       );
+    });
+    return Response.json({ ok: true, started: true }, { status: 202 });
+  }
+  // ?action=read-shot&media=<video or photo id>&from=<s>&to=<s>&read=ground,sky,vanish,light: what a composition reads on a
+  // passage (shot_read.py, in the cut-out sandbox): its readings in the logs (« read shot »: its sky's share and skyline,
+  // its vanishing point, its light), and its ground (the shot without its sky) in {studio}/lab-read/ with a 24 h link.
+  if (action === "read-shot") {
+    const media = request.nextUrl.searchParams.get("media") ?? "";
+    const from = Number(request.nextUrl.searchParams.get("from") ?? "0");
+    const to = Number(request.nextUrl.searchParams.get("to") ?? "3");
+    const read = (request.nextUrl.searchParams.get("read") ?? "ground,vanish,light").split(",").filter((k): k is "ground" | "sky" | "vanish" | "light" => ["ground", "sky", "vanish", "light"].includes(k));
+    if (!/^[0-9a-f-]{36}$/.test(media) || !(from >= 0) || !(to >= from) || to - from > 20 || !read.length) return Response.json({ error: "media=<uuid>&from&to (20 s at most)&read=ground,sky,vanish,light" }, { status: 400 });
+    after(async () => {
+      const db = supabaseAdmin();
+      const { data: row } = await db.from("media_assets").select("studio_id, storage_path, kind").eq("id", media).maybeSingle();
+      if (!row?.storage_path) return console.error("read shot: no such media", media);
+      const file = await db.storage.from("media").createSignedUrl(row.storage_path, 3600);
+      if (!file.data?.signedUrl) return console.error("read shot: link refused");
+      const photo = row.kind === "image";
+      const started = Date.now();
+      const { results, seconds } = await shotReadsInSandbox(`lab-read-${randomUUID()}`, [{ key: "lab", url: file.data.signedUrl, from: photo ? 0 : from, to: photo ? 0 : to, read, ...(photo ? { photo: true as const } : {}) }]);
+      const result = results.lab;
+      const cost = cutoutCostEur(seconds);
+      await db.from("cost_events").insert({ studio_id: row.studio_id, kind: "shot_reading", provider: "vercel_sandbox", units: Math.round(seconds), cost_eur: cost, meta: { lab: true, media, from, to, read } });
+      let link: string | null = null;
+      if (result && !(result instanceof Error) && result.ground) {
+        const path = `${row.studio_id}/lab-read/ground-${media}.${result.ground.still ? "png" : "webm"}`;
+        const up = await db.storage.from("media").upload(path, result.ground.file, { contentType: result.ground.still ? "image/png" : "video/webm", upsert: true });
+        if (!up.error) link = (await db.storage.from("media").createSignedUrl(path, 86_400)).data?.signedUrl ?? null;
+      }
+      const reading = result && !(result instanceof Error) ? (result.reading as { sky?: unknown; vanish?: unknown; light?: { mean?: number; high?: number }; motion?: number[] }) : null;
+      console.log(
+        "read shot",
+        JSON.stringify({
+          media, from, to, read, seconds: Math.round(seconds), wall: Math.round((Date.now() - started) / 1000), cost_eur: Math.round(cost * 10000) / 10000, link,
+          sky: reading?.sky ?? null, vanish: reading?.vanish ?? null, light: reading?.light ? { mean: reading.light.mean, high: reading.light.high } : null, moved: reading?.motion?.slice(-3) ?? null,
+          error: result instanceof Error ? result.message : undefined,
+        }),
+      );
+    });
+    return Response.json({ ok: true, started: true }, { status: 202 });
+  }
+  // ?action=read-file&media=<id>,<id>…: what the filler reads of her files (video_read.py, in the cut-out sandbox): her
+  // camera's fast moves, the moments her lens is covered, her colours, in the logs (« read file »), nothing kept.
+  if (action === "read-file") {
+    const ids = (request.nextUrl.searchParams.get("media") ?? "").split(",").filter((id) => /^[0-9a-f-]{36}$/.test(id)).slice(0, 8);
+    if (!ids.length) return Response.json({ error: "media=<uuid>,<uuid>… (8 at most)" }, { status: 400 });
+    after(async () => {
+      const db = supabaseAdmin();
+      const { data: rows } = await db.from("media_assets").select("id, studio_id, storage_path, kind").in("id", ids);
+      const usable = (rows ?? []).filter((r) => r.storage_path);
+      if (!usable.length) return console.error("read file: no such media", ids.join(","));
+      const signed = (await db.storage.from("media").createSignedUrls(usable.map((r) => r.storage_path as string), 3600)).data ?? [];
+      const files = usable.flatMap((r) => {
+        const url = signed.find((s) => s.path === r.storage_path)?.signedUrl;
+        return url ? [{ id: r.id as string, url, ...(r.kind === "image" ? { photo: true } : {}) }] : [];
+      });
+      const { results, seconds } = await fileReadsInSandbox(`lab-file-${randomUUID()}`, files);
+      const cost = cutoutCostEur(seconds);
+      await db.from("cost_events").insert({ studio_id: usable[0]!.studio_id, kind: "file_reading", provider: "vercel_sandbox", units: Math.round(seconds), cost_eur: cost, meta: { lab: true, files: files.length } });
+      console.log("read file", JSON.stringify({ seconds: Math.round(seconds), cost_eur: Math.round(cost * 10000) / 10000, results: Object.fromEntries(Object.entries(results).map(([id, r]) => [id, r instanceof Error ? { error: r.message } : r])) }));
+    });
+    return Response.json({ ok: true, started: true }, { status: 202 });
+  }
+  // ?action=gpu-near&media=<video id>&from=<s>&to=<s>: her shot with its depth as its transparency (Near: depth_video.py on
+  // the card), its WebM in {studio}/lab-gpu/ (« gpu near »).
+  if (action === "gpu-near") {
+    const media = request.nextUrl.searchParams.get("media") ?? "";
+    const from = Number(request.nextUrl.searchParams.get("from") ?? "0");
+    const to = Number(request.nextUrl.searchParams.get("to") ?? "3");
+    if (!/^[0-9a-f-]{36}$/.test(media) || !(from >= 0) || !(to > from) || to - from > 12) return Response.json({ error: "media=<uuid>&from&to (12 s at most)" }, { status: 400 });
+    if (!gpuReady()) return Response.json({ error: "MODAL_TOKEN_ID / MODAL_TOKEN_SECRET not set" }, { status: 400 });
+    after(async () => {
+      const db = supabaseAdmin();
+      const { data: row } = await db.from("media_assets").select("studio_id, storage_path, kind").eq("id", media).maybeSingle();
+      if (!row?.storage_path || row.kind !== "video") return console.error("gpu near: no such video", media);
+      const path = `${row.studio_id}/lab-gpu/near-${media}.webm`;
+      const [file, upload] = await Promise.all([db.storage.from("media").createSignedUrl(row.storage_path, 3600), db.storage.from("media").createSignedUploadUrl(path, { upsert: true })]);
+      if (!file.data?.signedUrl || !upload.data?.signedUrl) return console.error("gpu near: links refused");
+      const { results, seconds, gpu: used } = await depthVideosOnGpu([{ key: "lab", url: file.data.signedUrl, from, to, upload: { webm: upload.data.signedUrl } }], 700_000, { startMs: 600_000 });
+      const result = results.lab;
+      const cost = gpuCostEur(seconds, used);
+      if (seconds > 0) await db.from("cost_events").insert({ studio_id: row.studio_id, kind: "depth_video", provider: "modal", units: Math.round(seconds), cost_eur: cost, meta: { lab: true, media, near: true, gpu: used } });
+      const link = await db.storage.from("media").createSignedUrl(path, 86_400);
+      console.log("gpu near", JSON.stringify({ link: result && !(result instanceof Error) ? link.data?.signedUrl : null, media, gpu: used, card_seconds: Math.round(seconds), cost_eur: Math.round(cost * 1000) / 1000, result: result instanceof Error ? result.message : result }));
     });
     return Response.json({ ok: true, started: true }, { status: 202 });
   }

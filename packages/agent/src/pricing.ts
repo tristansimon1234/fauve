@@ -130,7 +130,10 @@ export const SANDBOX_REGION = "cdg1";
 
 // Vercel Sandbox on Pro, USD (vercel.com/docs/sandbox/pricing, October 2026), by region:
 // active CPU per hour (only while the CPU works) and provisioned memory per GB-hour
-// (2 GB per vCPU, for the whole time the session runs).
+// (2 GB per vCPU, for the whole time the session runs, idle included, by the minute).
+// Checked 5 November 2026: the page (10 September) still gives iad1's $0.128 and $0.0212;
+// Paris is the same factor above it for both (0.177 / 0.128 = 0.0292 / 0.0212), and the
+// October bill came to $24.95 for 871.9 GB-hours of memory, $0.0286 each.
 const SANDBOX_RATES_USD: Record<string, { cpuHour: number; memoryGbHour: number }> = {
   iad1: { cpuHour: 0.128, memoryGbHour: 0.0212 },
   cdg1: { cpuHour: 0.177, memoryGbHour: 0.0292 },
@@ -139,11 +142,17 @@ const SANDBOX_RATES_USD: Record<string, { cpuHour: number; memoryGbHour: number 
 /**
  * What `seconds` of work in the sandbox cost: the memory for that time, and the CPU
  * counted busy on every vCPU (a render keeps them busy; an upper bound). The time a
- * session stays up after its last job, until its timeout, is billed too and not counted here.
+ * session stays up after its last job, until it stops, is billed too: sandboxMemoryCostUsd.
  */
 export function sandboxCostUsd(seconds: number, vcpus: number, region: string = SANDBOX_REGION): number {
   const rate = SANDBOX_RATES_USD[region] ?? SANDBOX_RATES_USD[SANDBOX_REGION]!;
   return (Math.max(0, seconds) / 3600) * vcpus * (rate.cpuHour + 2 * rate.memoryGbHour);
+}
+
+/** What `seconds` of a sandbox's provisioned memory cost with nothing running (its CPU idle): `memoryGb` of it. */
+export function sandboxMemoryCostUsd(seconds: number, memoryGb: number, region: string = SANDBOX_REGION): number {
+  const rate = SANDBOX_RATES_USD[region] ?? SANDBOX_RATES_USD[SANDBOX_REGION]!;
+  return (Math.max(0, seconds) / 3600) * memoryGb * rate.memoryGbHour;
 }
 
 // Modal (modal.com/pricing, November 2026), USD a second: its cards (« A10 » on the page, A10G in the API), and a

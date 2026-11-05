@@ -10,8 +10,8 @@ import { placeSounds, planCues, type SoundFacts, type SoundPlacement } from "./s
 import type { SfxLevel } from "./schemas.ts";
 import { faceZone, layerTrack, sceneTrack, shotTrack, type FaceZone, type ShotTrack, type TrackPiece, type TracksByClip } from "./tracking.ts";
 import { DEPTH_MOVES, reliefOf } from "./depth.ts";
-import { clearKey, depthKey, photoKey, subjectKey, type ClearMap } from "./subject.ts";
-import { lookMatrix, lookStamp, planLook, type ReelLook } from "./looks.ts";
+import { clearKey, depthKey, groundKey, nearKey, photoKey, readKey, subjectKey, type ClearMap, type ShotReading } from "./subject.ts";
+import { LOOK_PRESETS, lookMatrix, lookStamp, planLook, type ReelLook } from "./looks.ts";
 
 // Edit plan → props of the Remotion "Reel" composition (apps/render). Everything
 // is converted to frames on the output timeline here, so the templates only
@@ -106,6 +106,12 @@ export type ReelSegment =
       objects?: Record<string, { src: string; still?: boolean }>;
       /** Its depth at every image of the passage (depth_video.py: a grey video, near white), drawn like the shot by a composition's Depth. */
       depthMap?: { src: string };
+      /** Her shot without its sky at every image (shot_read.py: a transparent video, or one image), drawn like the shot by Skyline. */
+      ground?: { src: string; still?: boolean };
+      /** Her shot with its depth as its transparency at every image (depth_video.py: near opaque), drawn like the shot by Near. */
+      near?: { src: string };
+      /** Laid beside another shot on the same moment (a split screen's other half): only a composition draws it, the plain montage skips it. */
+      beside?: true;
     }
   /**
    * A photo: a carousel slide (with its retouch and blurred zones), or a photo in a Reel (zoom: a slow Ken Burns move).
@@ -130,6 +136,10 @@ export type ReelSegment =
       depth?: { src: string; box: { x: number; y: number; w: number; h: number } };
       /** A moving photo with its depth read on the card: the video of every pixel moved by its depth (relief.py), as long as the shot. */
       relief?: { src: string; frames: number };
+      /** The photo without its sky (shot_read.py, an image framed like the photo), drawn exactly over it by Skyline. */
+      ground?: { src: string; still?: boolean };
+      /** Laid beside another shot on the same moment: only a composition draws it, the plain montage skips it. */
+      beside?: true;
     }
   /**
    * Animations play over her footage when there is some (`under`), else on the studio's colours. composed: an engine
@@ -191,6 +201,8 @@ export type ComposeShot = ScenePhoto & {
   camera?: ShotCamera;
   /** Where a text can be set in it (its sky, an empty wall, any calm area) and how its camera moves, read before the render: ClearBox chooses its area on it. */
   clear?: ClearMap;
+  /** Its sky's skyline, its vanishing point and its light, and how its camera moves, read before the render: SkylineAt, VanishingPoint and LightUnder read them. */
+  read?: ShotReading;
 };
 
 /** How the Reel moves a shot as it draws it, so what is read on its picture follows it: mirror of apps/render/src/types.ts. */
@@ -205,8 +217,28 @@ export type ShotCamera = {
   straighten?: number;
 };
 
-/** An animation's code that draws one of her shots or what is cut out of it (her, an object, its depth). */
-const DRAWS_SHOTS = /\b(?:Footage|Subject|SubjectBox|SubjectOutline|SubjectParts|Outline|Depth|ClearBox)\b/;
+/** An animation's code that draws one of her shots or what is cut out of it (her, an object, its depth, its ground), or reads it (its sky, its lines, its light, her head). */
+const DRAWS_SHOTS = /\b(?:Footage|Subject|SubjectBox|SubjectOutline|SubjectParts|Outline|Depth|ClearBox|Skyline|SkylineAt|Near|VanishingPoint|LightUnder|HeadMoves)\b/;
+
+/** An animation's code that lays a ready look on one of its passages (Look in the scope, PassageLook.tsx). */
+const LAYS_LOOK = /\bLook\b/;
+
+/** A plan whose animations lay a ready look on a passage (a composition, one over the montage, a scene). */
+export const usesPassageLooks = (plan: Pick<EditPlan, "segments"> & { layers?: EditPlan["layers"] }) =>
+  (plan.layers ?? []).some((l) => LAYS_LOOK.test(l.motion.js ?? "")) || plan.segments.some((s) => isMotionSegment(s) && LAYS_LOOK.test(s.motion.js ?? ""));
+
+/**
+ * The ready looks (LOOK_PRESETS) as an animation's Look draws them on one passage, by key: each one's settings, its
+ * grade as one colour matrix, and the date its camera prints (`today`, as for a look over the whole Reel).
+ */
+export function passageLooks(today?: string): Record<string, { look: ReelLook & { matrix: number[] }; stamp?: string }> {
+  return Object.fromEntries(
+    (Object.entries(LOOK_PRESETS) as [string, ReelLook][]).map(([key, look]) => {
+      const stamp = lookStamp(look, today);
+      return [key, { look: { ...look, matrix: lookMatrix(look) }, ...(stamp ? { stamp } : {}) }];
+    }),
+  );
+}
 
 /** What a composition reads of an object followed through a shot: its box and its outline at every image, its pieces (and their outlines, when read apart). */
 const objectReading = (o: NonNullable<ReelInputs["subjects"]>[string]) => ({
@@ -227,7 +259,16 @@ function passageObjects(subjects: ReelInputs["subjects"], key: string): [string,
  * band, a caption), when (frames from the composition's start), the words to stress and, for a
  * message, its lines. Mirrors apps/render/src/types.ts.
  */
-export type ComposeText = { text: string; role: "hook" | "band" | "caption"; from: number; to: number; emphasis: string[]; items?: ListItem[] };
+export type ComposeText = {
+  text: string;
+  role: "hook" | "band" | "caption";
+  from: number;
+  to: number;
+  emphasis: string[];
+  items?: ListItem[];
+  /** A font of its own, picked for what its words evoke (a skill's filler, WORD_FONTS): a Google Fonts family, loaded. */
+  font?: string;
+};
 /** The Reel's end (an offer, an announcement) that a composition draws itself: its title and line, from its frame. */
 export type ComposeEnd = { title: string; subtitle: string | null; from: number };
 
@@ -240,6 +281,7 @@ export function composeTexts(texts: ReelText[], from = 0): ComposeText[] {
     to: t.from + t.durationInFrames - from,
     emphasis: t.emphasis,
     ...(t.items?.length ? { items: t.items } : {}),
+    ...(t.font ? { font: t.font } : {}),
   }));
 }
 
@@ -288,6 +330,8 @@ export type ReelText = {
   bullet?: Bullet;
   /** In a Reel, a text with items is a message: its own words are its title, its items under it (on a photo, a list's text is only its name). */
   message?: boolean;
+  /** A font of its own for its words (a skill's filler picked it for what they evoke): its composition draws it, the render loads it. */
+  font?: string;
 };
 export type ReelWord = { w: string; from: number; to: number };
 
@@ -387,6 +431,11 @@ export type ReelProps = {
   look?: (ReelLook & { matrix: number[] }) | null;
   /** The date a look prints, in its camera's format (« '26 10 29 », « 29 OCT. 2026 »). */
   stamp?: string;
+  /**
+   * The ready looks (LOOK_PRESETS, by key) an animation lays on one passage with Look, drawn like a look over the whole
+   * Reel, with the date each camera prints: given only when an animation's code uses Look (passageLooks).
+   */
+  looks?: Record<string, { look: ReelLook & { matrix: number[] }; stamp?: string }>;
   /** The studio's logo over the whole video or still (carousel slides). */
   logo?: "top" | "bottom" | null;
   /** Where a voice's subtitles sit for the whole Reel (top, share of the height): off the faces, never moving. */
@@ -422,6 +471,8 @@ export type ReelProps = {
     end?: ComposeEnd | null;
     /** The words said under it (frames from its start), when its code writes them (`spoken`): the engine's captions step aside. */
     spoken?: ReelWord[];
+    /** Its code only times its own words on them (a skill timed on her voice, its subtitles the engine's): the captions stay. */
+    captionsStay?: true;
   }[];
   /** Components of the studio's bank placed on a still: drawn at their design width (base), then scaled into their box (shares of the frame). */
   /** A simple copied Reel remade by code (copy.ts), in frames (mirror of the render's). */
@@ -514,8 +565,13 @@ export type ReelInputs = {
   depth?: Record<string, { src: string; box: { x: number; y: number; w: number; h: number } }>;
   /** The moving photos whose depth the card read for their shot (reliefJobs: `{media}#{key}`), signed, with their length in images. */
   reliefs?: Record<string, { src: string; frames: number }>;
-  /** The passages of her clips cut out at every image (subjectKey: clip, in, out), signed: what a composition's Subject draws; and their clear areas (clearKey), what ClearBox reads. */
-  subjects?: Record<string, { src: string; still?: boolean; top?: number; boxes?: (number[] | null)[]; contours?: (number[] | null)[]; parts?: number[]; pieces?: ((number[] | null)[] | null)[]; clear?: ClearMap }>;
+  /**
+   * The passages of her clips cut out at every image (subjectKey: clip, in, out), signed: what a composition's Subject
+   * draws (an object's pieces read apart too, `pieces`: Subject part); their clear areas (clearKey), what ClearBox reads;
+   * their readings (readKey: their sky, vanishing point and light), what SkylineAt, VanishingPoint and LightUnder read;
+   * their ground (groundKey) and nearness (nearKey), what Skyline and Near draw.
+   */
+  subjects?: Record<string, { src: string; still?: boolean; top?: number; boxes?: (number[] | null)[]; contours?: (number[] | null)[]; parts?: number[]; pieces?: ((number[] | null)[] | null)[]; clear?: ClearMap; reading?: ShotReading }>;
 };
 
 /** A clip's width / height as the Reel frames it, from its analysis (phones film 16:9 or 9:16). */
@@ -589,16 +645,33 @@ function frameLengths(plan: Pick<EditPlan, "segments" | "transitions">) {
   return { lengths, fadeFrames };
 }
 
-/** When each segment starts in the video and how long it lasts (seconds), fades included, and the video's length. */
-export function planTimeline(plan: Pick<EditPlan, "segments" | "transitions">): { segments: { start: number; length: number }[]; duration: number } {
+/**
+ * Each segment's first frame and the video's length in frames: the main line one after the other (overlapped by its
+ * fades), a shot laid beside the others (beside, a split screen's other half) on its own moment, its time counted once.
+ */
+function frameStarts(plan: Pick<EditPlan, "segments" | "transitions">): { starts: number[]; lengths: number[]; fadeFrames: number; total: number } {
   const { lengths, fadeFrames } = frameLengths(plan);
   let cursor = 0;
-  const segments = lengths.map((length) => {
+  let total = 0;
+  const starts = plan.segments.map((s, i) => {
+    const length = lengths[i]!;
+    if (isClipSegment(s) && s.beside) {
+      const start = toFrames(s.beside.at);
+      total = Math.max(total, start + length);
+      return start;
+    }
     const start = cursor;
     cursor += length - fadeFrames;
-    return { start: start / REEL_FPS, length: length / REEL_FPS };
+    total = Math.max(total, cursor + fadeFrames);
+    return start;
   });
-  return { segments, duration: (cursor + fadeFrames) / REEL_FPS };
+  return { starts, lengths, fadeFrames, total };
+}
+
+/** When each segment starts in the video and how long it lasts (seconds), fades included, and the video's length (a shot laid beside the others counted once). */
+export function planTimeline(plan: Pick<EditPlan, "segments" | "transitions">): { segments: { start: number; length: number }[]; duration: number } {
+  const { starts, lengths, total } = frameStarts(plan);
+  return { segments: starts.map((start, i) => ({ start: start / REEL_FPS, length: lengths[i]! / REEL_FPS })), duration: total / REEL_FPS };
 }
 
 /**
@@ -609,7 +682,7 @@ export function planTimeline(plan: Pick<EditPlan, "segments" | "transitions">): 
  */
 export function textsOnShots<P extends Pick<EditPlan, "segments" | "transitions" | "texts">>(plan: P): P {
   const { segments } = planTimeline(plan);
-  const later = plan.segments.flatMap((s, i) => (isClipSegment(s) && i > 0 && segments[i] ? [segments[i]!] : []));
+  const later = plan.segments.flatMap((s, i) => (isClipSegment(s) && !s.beside && i > 0 && segments[i] ? [segments[i]!] : []));
   const texts = plan.texts.flatMap((t, i) => (t.from > 0.05 ? [{ t, i }] : []));
   if (texts.length < 3 || !(texts.length === later.length || texts.length === later.length - 1)) return plan;
   if (texts.some(({ t }) => t.to - t.from > 3) || texts.some(({ t }, k) => k > 0 && t.from < texts[k - 1]!.t.from)) return plan;
@@ -660,7 +733,8 @@ const subtitleRow = (plan: EditPlan): number | undefined => plan.layers?.find((l
 export function buildReelProps(plan: EditPlan, inputs: ReelInputs): ReelProps {
   const fps = REEL_FPS;
   const brand = resolveReelBrand(plan, inputs.template, inputs.brand);
-  const { lengths, fadeFrames } = frameLengths(plan);
+  // Each segment's first frame: the main line one after the other, a shot laid beside the others on its own moment.
+  const { starts: firstFrames, lengths, fadeFrames, total } = frameStarts(plan);
   const look = planLook(plan);
 
   // The footage under an animation: the passage of her clip (or the photo) the plan names.
@@ -674,10 +748,8 @@ export function buildReelProps(plan: EditPlan, inputs: ReelInputs): ReelProps {
     return { type: "clip", src, startFrom: toFrames(over.in ?? 0), ...(retouch?.adjust ? { adjust: retouch.adjust } : {}), ...(aspect ? { aspect } : {}) };
   };
 
-  let cursor = 0;
   const segments: ReelSegment[] = plan.segments.map((s, i) => {
-    const startAt = cursor;
-    cursor += lengths[i]! - fadeFrames;
+    const startAt = firstFrames[i]!;
     if (isMotionSegment(s)) {
       const fallback = s.motion.fallback ?? { kind: "title" as const, title: inputs.brand.name || " ", background: "accent" as const };
       const under = underOf(s.over);
@@ -702,10 +774,18 @@ export function buildReelProps(plan: EditPlan, inputs: ReelInputs): ReelProps {
     if (!src) throw new Error(`No URL for clip ${s.clip_id}`);
     const speed = s.speed && Math.abs(s.speed - 1) > 0.01 ? s.speed : undefined;
     // Someone speaks in this passage: its sound stays (unless her voice is over the Reel, or the shot plays at another speed);
-    // or she wants the sound of her videos all along (never slowed down), or none of it.
+    // or she wants the sound of her videos all along (never slowed down), or none of it; or its model hears this shot
+    // (a skill's `sound` shot: the metro under its title), at its own pace, unless she wants none of her videos' sound.
     const heard = plan.finish?.video_sound ?? "speech";
+    // A shot laid beside another (the other half of a split screen) is seen, never heard: the main line's sound plays.
     const speech =
-      heard === "all" ? !speed : heard === "speech" && !plan.voice && !speed && (inputs.words?.[s.clip_id] ?? []).some((w) => w.start >= s.in && w.end <= s.out);
+      !s.beside &&
+      (heard === "all"
+        ? !speed
+        : (heard === "speech" && !plan.voice && !speed && (inputs.words?.[s.clip_id] ?? []).some((w) => w.start >= s.in && w.end <= s.out)) ||
+          (heard !== "none" && Boolean(s.sound) && !speed && !s.ramp));
+    // Only a composition draws a shot laid beside the others: the plain montage skips it.
+    const beside = s.beside ? { beside: true as const } : {};
     const zoom = s.zoom === "light" || plan.transitions === "light_zoom";
     const move: CameraMove = s.move ?? (zoom ? "in" : "none");
     // A photo in a Reel: the move the engine chose (photoMoves: most held still); a plan from before those moves keeps its slow zoom.
@@ -718,6 +798,7 @@ export function buildReelProps(plan: EditPlan, inputs: ReelInputs): ReelProps {
         src,
         startAt,
         durationInFrames: lengths[i]!,
+        ...beside,
         zoom: s.move === undefined,
         ...(s.move ? { move: s.move } : {}),
         ...(s.photo ? { edit: s.photo } : {}),
@@ -735,6 +816,8 @@ export function buildReelProps(plan: EditPlan, inputs: ReelInputs): ReelProps {
         ...(passageObjects(inputs.subjects, photoKey(s.clip_id)).length
           ? { objects: Object.fromEntries(passageObjects(inputs.subjects, photoKey(s.clip_id)).map(([name, o]) => [name, { src: o.src }])) }
           : {}),
+        // The photo without its sky, for Skyline: drawn exactly over it.
+        ...(inputs.subjects?.[groundKey(s.clip_id, 0, 0)]?.src ? { ground: { src: inputs.subjects[groundKey(s.clip_id, 0, 0)]!.src, still: true } } : {}),
       };
     }
     const ramp = rampFrames(s, lengths[i]!);
@@ -744,6 +827,7 @@ export function buildReelProps(plan: EditPlan, inputs: ReelInputs): ReelProps {
       startFrom: toFrames(s.in),
       startAt,
       durationInFrames: lengths[i]!,
+      ...beside,
       zoom,
       ...(move !== "none" ? { move } : {}),
       ...(speed ? { speed } : {}),
@@ -761,9 +845,14 @@ export function buildReelProps(plan: EditPlan, inputs: ReelInputs): ReelProps {
         : {}),
       // Its depth, image for image (as its cut-out): only at its own pace.
       ...(!ramp && !speed && inputs.subjects?.[depthKey(s.clip_id, s.in, s.out)] ? { depthMap: { src: inputs.subjects[depthKey(s.clip_id, s.in, s.out)]!.src } } : {}),
+      // Her shot without its sky, and with its depth as its transparency: image for image too.
+      ...(!ramp && !speed && inputs.subjects?.[groundKey(s.clip_id, s.in, s.out)]?.src
+        ? { ground: { src: inputs.subjects[groundKey(s.clip_id, s.in, s.out)]!.src, ...(inputs.subjects[groundKey(s.clip_id, s.in, s.out)]!.still ? { still: true } : {}) } }
+        : {}),
+      ...(!ramp && !speed && inputs.subjects?.[nearKey(s.clip_id, s.in, s.out)]?.src ? { near: { src: inputs.subjects[nearKey(s.clip_id, s.in, s.out)]!.src } } : {}),
     };
   });
-  const durationInFrames = cursor + fadeFrames;
+  const durationInFrames = total;
   // What moves in the footage under each animation, cut to its passage: its code follows it with `track`.
   const tracks = inputs.tracks ?? {};
   if (Object.keys(tracks).length) {
@@ -791,6 +880,7 @@ export function buildReelProps(plan: EditPlan, inputs: ReelInputs): ReelProps {
         backdrop: t.backdrop,
         ...brandLooks(t, brand),
         ...(t.items?.length ? { message: true } : {}),
+        ...(t.font ? { font: t.font } : {}),
       };
     })
     .filter((t) => t.durationInFrames > 0);
@@ -808,7 +898,8 @@ export function buildReelProps(plan: EditPlan, inputs: ReelInputs): ReelProps {
     }
   } else if (plan.subtitles) {
     plan.segments.forEach((s, i) => {
-      if (!isClipSegment(s)) return;
+      // A shot laid beside another is never heard: its words are not the Reel's.
+      if (!isClipSegment(s) || s.beside) return;
       for (const word of inputs.words?.[s.clip_id] ?? []) {
         if (word.start < s.in || word.end > s.out) continue;
         const from = segments[i]!.startAt + toFrames(screenTime(s, word.start));
@@ -831,15 +922,21 @@ export function buildReelProps(plan: EditPlan, inputs: ReelInputs): ReelProps {
           .map((w) => ({ from: segment.startAt + toFrames(w.start - s.in), to: segment.startAt + toFrames(w.end - s.in) }));
       });
   const ambient = plan.finish?.video_sound === "all" && segments.some((s) => s.type === "clip" && s.speech);
-  const mix: MixCase = voice ? "voice_over" : spoken.length ? "speech_in_clips" : ambient ? "ambient" : "music";
+  // The shots its model hears (a skill's `sound` shots): the music steps back under them, as in the mix.
+  const heardShots: [number, number][] = segments.flatMap((seg, i) => {
+    const s = plan.segments[i];
+    return seg.type === "clip" && seg.speech && s && isClipSegment(s) && s.sound ? [[seg.startAt, seg.startAt + seg.durationInFrames] as [number, number]] : [];
+  });
+  const mix: MixCase = voice ? "voice_over" : spoken.length ? "speech_in_clips" : ambient ? "ambient" : heardShots.length ? "shot_sound" : "music";
   const speech = speechWindows(spoken.filter((w) => w.from < durationInFrames), toFrames(0.5));
   // Its model's shape on the music, as the mix sets it: silent in its pauses and after its end (its filters are the render's).
   const envelope = musicEnvelope(plan.music_shape, plan.duration, fps);
-  const music = { ...previewMusic(mix, speech), ...(envelope.length ? { envelope } : {}) };
-  // Its sound effects, placed once for the preview and the mix alike: at its level, never on top of what is said.
+  const music = { ...previewMusic(mix, mix === "shot_sound" ? heardShots : speech), ...(envelope.length ? { envelope } : {}) };
+  // Its sound effects, placed once for the preview and the mix alike: at its level, never on top of what is said; a
+  // skill's sound on her gesture where her hands do it.
   const sfx =
     inputs.sfx && inputs.sfx.level !== "off"
-      ? placeSounds(planCues(plan, planTimeline(plan).segments), {
+      ? placeSounds(planCues(plan, planTimeline(plan).segments, inputs.tracks), {
           level: inputs.sfx.level,
           mix,
           duration: durationInFrames / fps,
@@ -879,6 +976,7 @@ export function buildReelProps(plan: EditPlan, inputs: ReelInputs): ReelProps {
               ? { objects: Object.fromEntries(found.map(([name, o]) => [name, objectReading(o)])) }
               : {}),
             ...(inputs.subjects?.[clearKey(s.clip_id, 0, 0)]?.clear ? { clear: inputs.subjects[clearKey(s.clip_id, 0, 0)]!.clear } : {}),
+            ...(inputs.subjects?.[readKey(s.clip_id, 0, 0)]?.reading ? { read: inputs.subjects[readKey(s.clip_id, 0, 0)]!.reading } : {}),
           },
         ];
       }
@@ -905,12 +1003,15 @@ export function buildReelProps(plan: EditPlan, inputs: ReelInputs): ReelProps {
               }
             : {}),
           ...(inputs.subjects?.[clearKey(s.clip_id, s.in, s.out)]?.clear ? { clear: inputs.subjects[clearKey(s.clip_id, s.in, s.out)]!.clear } : {}),
+          // Its sky, vanishing point and light (shot_read.py), at its own pace only (a speed changes which images show).
+          ...(!s.ramp && !(s.speed && Math.abs(s.speed - 1) > 0.01) && inputs.subjects?.[readKey(s.clip_id, s.in, s.out)]?.reading ? { read: inputs.subjects[readKey(s.clip_id, s.in, s.out)]!.reading } : {}),
         },
       ];
     });
 
   // Animations over several shots: their span in frames and the cuts under them (from their start).
-  const starts = segments.slice(1).map((s) => s.startAt);
+  // (Two shots laid side by side cut on the same frame: one cut, in order.)
+  const starts = [...new Set(segments.slice(1).map((s) => s.startAt))].sort((a, b) => a - b);
   const endCard = plan.end_card
     ? {
         title: frenchSpaces(keepName(plan.end_card.title, inputs.brand.name)),
@@ -952,9 +1053,14 @@ export function buildReelProps(plan: EditPlan, inputs: ReelInputs): ReelProps {
           : {}),
         ...(track.length ? { track } : {}),
         ...(l.motion.fonts?.length ? { fonts: l.motion.fonts } : {}),
-        // An animation that writes what is said itself (Captions, around her or behind her): the words under it.
-        ...(writesSpoken(l.motion) && words.some((w) => w.from >= from && w.from < from + length)
-          ? { spoken: words.filter((w) => w.from >= from && w.from < from + length).map((w) => ({ w: w.w, from: w.from - from, to: w.to - from })) }
+        // An animation that writes what is said itself (Captions, around her or behind her): the words under it. A montage
+        // skill timed on her voice gets them whether it writes them or not (its keywords set on them): the engine's
+        // subtitles stay under it then.
+        ...((writesSpoken(l.motion) || l.motion.times_spoken) && words.some((w) => w.from >= from && w.from < from + length)
+          ? {
+              spoken: words.filter((w) => w.from >= from && w.from < from + length).map((w) => ({ w: w.w, from: w.from - from, to: w.to - from })),
+              ...(writesSpoken(l.motion) ? {} : { captionsStay: true as const }),
+            }
           : {}),
       },
     ];
@@ -999,6 +1105,8 @@ export function buildReelProps(plan: EditPlan, inputs: ReelInputs): ReelProps {
     ...(voice ? { voice: { src: voice.src, from: voice.from } } : {}),
     ...(look ? { look: { ...look, matrix: lookMatrix(look) } } : {}),
     ...(lookStamp(look, inputs.today) ? { stamp: lookStamp(look, inputs.today)! } : {}),
+    // The ready looks an animation lays on one of its passages (Look), when its code names them.
+    ...(usesPassageLooks(plan) ? { looks: passageLooks(inputs.today) } : {}),
     ...(subtitleRow(plan) !== undefined ? { subtitleY: subtitleRow(plan) } : {}),
     // An animation that times its own words on what is said without writing it all (a big word per phrase behind her):
     // the engine writes the rest as the apps' plain subtitles, never a second set of big words over its own.
