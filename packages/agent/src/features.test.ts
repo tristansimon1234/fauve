@@ -7580,7 +7580,7 @@ test("« Mots mêlés » (v2): its picture darkened to its own light, as filmed,
 test("« Interrupteur » (v2): one shot of 9,1 s on its original's grid (143,7 BPM, one beat in two), its music stopped dead and back as she lands, its beep", async () => {
   const { interrupteur } = await import("./skills/interrupteur.ts");
   const { skillPlan } = await import("./skills.ts");
-  assert.equal(interrupteur.version, 2);
+  assert.equal(interrupteur.version, 3);
   assert.equal(interrupteur.bpm, 71.85);
   const line = interrupteur.timeline(1, { end: false });
   // One fixed shot, no cut (the original has none): its 275 images less its last two, a rest of its edit.
@@ -9149,4 +9149,30 @@ test("« Photos posées sur la table » (v2): horizontal 4:3 on black when her t
   const plan = skillPlan({ skill: table, name: "Photos posées sur la table", files, fill: { shots: Array.from({ length: 25 }, (_, i) => ({ file: files[i % 16]!.id, at: 0 })), texts: { gauche: "voici", droite: "Argile" }, end: null, settings: { format: "vertical" } } });
   assert.deepEqual(plan.skill, { key: "table", version: 2, settings: { format: "vertical" } });
   assert.equal(plan.layers![0]!.motion.texts!.format, "vertical");
+});
+
+test("« Interrupteur » (v3): once she has left, her wall held on that image to the end, nothing of hers coming back", async () => {
+  const { interrupteur } = await import("./skills/interrupteur.ts");
+  assert.equal(interrupteur.version, 3);
+  const line = interrupteur.timeline(1, { end: false });
+  const marks = Object.fromEntries(Object.entries(line.marks).map(([k, v]) => [k, String(v)]));
+  const brand = { name: "Atelier Rose", displayFont: "Inter Tight", bodyFont: "Inter Tight", accent: "#7a2e3b", palette: { secondary: "#2c4a3e", light: "#f4efe9", dark: "#1d1d1b" } };
+  const reelTexts = [{ text: "Atelier Rose", role: "hook", from: 123, to: 273, emphasis: [] }];
+  const props = { width: 1080, height: 1920, durationInFrames: 273, brand, shots: rallumeShots(line, 9 / 16), reelTexts, end: null, texts: marks };
+  // She is seen until image 200, gone from 201, and her hand comes back into the picture on 240.
+  const track = (f: number) => ({
+    hands: (f >= 60 && f <= 160) || f >= 240 ? [{ points: { index_tip: { x: 640, y: f < 110 ? 1100 - (f - 60) * 14 : 400 + (f - 110) * 14 }, wrist: { x: 640, y: 1300 } } }] : [],
+    bodies: f >= 40 && f <= 200 ? [{ points: { left_shoulder: { x: 560, y: 900, visible: true }, right_shoulder: { x: 700, y: 900, visible: true } } }] : [],
+  });
+  const { draw } = await kitScene(interrupteur.code, { track });
+  const footageAt = (f: number) => drawnNodes(draw(f, props)).find((n) => n.props.key === "wall")!.props.at as number | undefined;
+  // While she is there, her shot plays as filmed; from her leaving, the image of that moment, whatever comes after.
+  assert.equal(footageAt(150), undefined);
+  assert.equal(footageAt(195), undefined);
+  const held = [210, 240, 272].map((f) => f - (footageAt(f) ?? f));
+  assert.ok(held.every((h) => h === held[0]) && held[0]! >= 201 && held[0]! <= 207, held.join(" "));
+  // Seen to the end: her shot plays to the end.
+  const stays = (f: number) => ({ ...track(f), bodies: f >= 40 ? track(Math.min(f, 200)).bodies : [] });
+  const { draw: there } = await kitScene(interrupteur.code, { track: stays });
+  assert.equal(drawnNodes(there(250, props)).find((n) => n.props.key === "wall")!.props.at, undefined);
 });

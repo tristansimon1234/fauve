@@ -231,9 +231,30 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
     : null;
 
   // 5. Her shot as filmed, the light never changing; she passes in front of what is drawn on her wall (her cut-out over
-  // it, only from just before the flip: the switch is out of her reach until then).
-  const wall = n ? h(Footage, { key: "wall", shot: 0, style: box }) : null;
-  const her = n && frame >= ON - 20 ? h(Subject, { key: "her", shot: 0, style: box }) : null;
+  // it, only from just before the flip: the switch is out of her reach until then). Once she has left (nobody seen for
+  // six images after the flip), her wall is held on that image to the end, as the original ends on its wall alone:
+  // nothing of hers comes back into the picture (Tristan, on its first bench: « une main qui traîne à la fin »).
+  const GONE = (() => {
+    if (!n) return null;
+    const seenAt = (f) => {
+      if (typeof track === "function") {
+        const seen = track(f, { shot: 0, ...box }) || {};
+        if ((seen.bodies || []).length || (seen.hands || []).length || (seen.faces || []).length) return true;
+        if (seen.bodies || seen.hands || seen.faces) return false;
+      }
+      const b = typeof SubjectBox === "function" ? SubjectBox(shots[0], f, box) : null;
+      return Boolean(b && b.w * b.h > box.width * box.height * 0.01);
+    };
+    let run = 0;
+    for (let f = ON + 6; f < until; f++) {
+      if (seenAt(f)) run = 0;
+      else if (++run >= 6) return f - 5;
+    }
+    return null;
+  })();
+  const held = GONE !== null && frame >= GONE ? { at: frame - (GONE - shots[0].from) } : {};
+  const wall = n ? h(Footage, { key: "wall", shot: 0, style: box, ...held }) : null;
+  const her = n && frame >= ON - 20 ? h(Subject, { key: "her", shot: 0, style: box, ...held }) : null;
 
   // Any other text of the Reel (none in its slots): a plain line away from the poster, so nothing she wrote is lost.
   const extra = others.filter((t) => frame >= t.from && frame < Math.min(t.to, endAt)).map((t, i) =>
@@ -245,7 +266,8 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
 export const interrupteur: MontageSkill = {
   key: "interrupteur",
   // 2: written again on its original's fiche (its music stopped and back, its beep, its flip in one image, its poster, her in front, its format).
-  version: 2,
+  // 3: once she has left, her wall held on that image to the end (a hand had come back into the picture at its bench).
+  version: 3,
   bpm: BPM,
   shots: [1, 1],
   files: [1, 2],

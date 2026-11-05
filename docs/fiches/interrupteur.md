@@ -120,3 +120,5 @@ Le téléphone posé ou sur pied, en vertical, l'exposition bloquée (un appui l
 5. 3 à 4 s de mur vide.
 
 Et aussi son logo (un PNG détouré), ce qu'elle annonce en une ligne, et une date ou un détail.
+
+**Version 3** (5 novembre, après son premier banc, une femme qui colle des photos sur un mur blanc ; Tristan : « une main qui traîne à la fin sur l'interrupteur ») : dès qu'elle est sortie (personne vu pendant six images après la bascule, lu sur son suivi, sinon sur son détourage), son mur est tenu sur cette image jusqu'à la fin, comme l'original finit sur son mur seul : rien d'elle ne revient dans l'image.
