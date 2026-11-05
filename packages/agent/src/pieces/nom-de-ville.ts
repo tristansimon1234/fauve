@@ -81,7 +81,7 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const caps = Math.round(0.72 * F * scale);
 
   // 2. Its place: its foot a fifth of its capitals under her roofs (the median of what stands under her sky across its
-  // width, at the image it lands), never deeper than half a capital under the second highest of them, behind them; a
+  // width, at the image it lands), never more than 45 % of a letter hidden by the highest of them, behind them; a
   // scenery too high for it (no room above for its small words) leaves it in front, at the bottom of her sky or calm
   // area, else at the original's place; one lower than it may go has it as low in her sky as it may.
   const top0 = 100;
@@ -98,11 +98,15 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   }
   tops.sort((a, b) => a - b);
   const median = tops.length >= COLS / 2 ? tops[Math.floor((tops.length - 1) / 2)] : null;
-  const under = median === null ? null : Math.round(Math.min(median + 0.2 * caps, tops[1] + 0.5 * caps));
+  const under = median === null ? null : Math.round(Math.min(median + 0.2 * caps, tops[0] + 0.45 * caps));
   const behind = under !== null && under >= footMin;
   const SKY = { prefer: "top", min: { w: Math.round(width * 0.5), h: Math.round(height * 0.06) }, within: { x: 0, y: 0, w: width, h: footMax }, pad: 4, fallback: null };
   const sky = behind ? null : ClearBox(list[g], LOOK, laid, SKY);
   const foot = Math.round(within(behind ? under : sky ? sky.y + sky.h : height * 0.42, footMin, footMax));
+  // How deep its deepest letter is behind her scenery once landed, and so how far under its place it rises from: 0,4 of
+  // its capitals over a flat roofline, never more than 65 % of a letter hidden at its first image.
+  const deepest = behind ? Math.max(0, ...tops.map((y) => (foot - y) / caps)) : 0;
+  const RISE = behind ? within(0.65 - deepest, 0, 0.4) : 0.4;
 
   // 3. Its colour: her main colour as it is when it stands out 2:1 from her sky under it, else a shade of it a step at a
   // time on its own side of her sky (the other side if that one never gets there); its small words white with a tight
@@ -126,7 +130,7 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   // them all once), their baselines on one line; rising from 0,4 of its capitals under its place, easing out until it
   // lands; its small words above it, drifting up a little.
   const p = within((frame - START) / Math.max(1, LAND - START), 0, 1);
-  const rise = 0.288 * Math.pow(1 - p, 3);
+  const rise = RISE * 0.72 * Math.pow(1 - p, 3);
   const drift = within((frame - START) / Math.max(1, END - START), 0, 1);
   const words = (s) => String(s || "").split(/\s+/).filter((w) => /[\p{L}\p{N}]/u.test(w)).length;
   const label = small ? words(small) <= 4 : false;

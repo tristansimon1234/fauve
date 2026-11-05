@@ -116,11 +116,11 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const caps = Math.round(0.72 * F * scale);
 
   // 4. Its place: its foot (the letters' baseline) a fifth of its capitals under her roofs, the median of what stands
-  // under her sky across its width at the image it lands (eight columns), never deeper than half a capital under the
-  // second highest of them (a mountain, a tower or a tree bites half its letters at most), behind them; its small words
-  // above it under the top margin. A scenery too high for it (no room above it for its small words) leaves it in front:
-  // at the bottom of her sky or calm area (ClearBox), else at the original's place; one only lower than it may go (a
-  // beach, low hills) has it as low in her sky as it may.
+  // under her sky across its width at the image it lands (eight columns), never more than 45 % of a letter hidden by
+  // the highest of them (a mountain range behind her town, a tower: they bite its letters, never swallow one), behind
+  // them; its small words above it under the top margin. A scenery too high for it (no room above it for its small
+  // words) leaves it in front: at the bottom of her sky or calm area (ClearBox), else at the original's place; one only
+  // lower than it may go (a beach, low hills) has it as low in her sky as it may.
   const top0 = band ? Math.round(bh * 0.05) : 100;
   // From its foot to the top of its small words (its capitals, the gap and their line), in its capitals.
   const reach = small ? 2.15 : 1.1;
@@ -135,11 +135,16 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   }
   tops.sort((a, b) => a - b);
   const median = tops.length >= COLS / 2 ? tops[Math.floor((tops.length - 1) / 2)] : null;
-  const under = median === null ? null : Math.round(Math.min(median + 0.2 * caps, tops[1] + 0.5 * caps));
+  const under = median === null ? null : Math.round(Math.min(median + 0.2 * caps, tops[0] + 0.45 * caps));
   const behind = under !== null && under >= footMin;
   const SKY = { prefer: "top", min: { w: Math.round(bw * 0.5), h: Math.round(bh * 0.08) }, within: { x: 0, y: 0, w: bw, h: footMax }, origin: { x: 0, y: by }, pad: 4, fallback: null };
   const sky = !behind && shots[0] ? ClearBox(shots[0], LAND, laid, SKY) : null;
   const foot = Math.round(within(behind ? under : sky ? sky.y + sky.h : bh * (band ? 0.475 : 0.42), footMin, footMax));
+  // How deep its deepest letter is behind her scenery once landed (a share of its capitals), and so how far under its
+  // place it rises from: 0,4 of its capitals as the original over a flat roofline, never more than 65 % of a letter
+  // hidden at its first image (the hook reads).
+  const deepest = behind ? Math.max(0, ...tops.map((y) => (foot - y) / caps)) : 0;
+  const RISE = behind ? within(0.65 - deepest, 0, 0.4) : 0.4;
 
   // 5. Its colour: hers, flat and full (the model's red when she chose it), as it is when it stands out 2:1 from her sky
   // under it (the original's red on its pale sky), else a shade of it a step at a time on its own side of her sky,
@@ -161,11 +166,11 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const EDGE = whiteOn ? "0 0 1px rgba(0,0,0,0.6), 0 1px 3px rgba(0,0,0,0.35)" : "none";
 
   // 6. Its title on her first shot: its five faces stacked in one box, one shown at a time (the others laid out, hidden,
-  // so the box measures them all once), their baselines on one line; rising from 0,4 of its capitals under its place,
-  // easing out until it lands; its small words above it, drifting up a little; it goes with the cut.
+  // so the box measures them all once), their baselines on one line; rising from under its place (its capitals are 0,72
+  // of its size), easing out until it lands; its small words above it, drifting up a little; it goes with the cut.
   const titleOn = Boolean(hook) && cur === 0 && frame < Math.min(hook.to, endAt, CUT);
   const p = within(frame / LAND, 0, 1);
-  const rise = 0.288 * Math.pow(1 - p, 3);
+  const rise = RISE * 0.72 * Math.pow(1 - p, 3);
   const drift = within(frame / Math.max(1, CUT), 0, 1);
   const cycle = (text, shown, size, key, color, wrap) => h("div", { key, style: { display: "grid", alignItems: "baseline", justifyItems: "center", fontSize: size } },
     FACES.map((f, i) => h("div", { key: "f" + i, style: { gridArea: "1 / 1", fontFamily: f.family, fontWeight: f.weight, fontSynthesis: "none", fontSize: Math.round(size * f.size), lineHeight: wrap ? 0.95 : 0.8, letterSpacing: "0.01em", color, whiteSpace: wrap ? "normal" : "nowrap", textWrap: wrap ? "balance" : undefined, textAlign: "center", visibility: i === shown ? "visible" : "hidden" } }, text)));

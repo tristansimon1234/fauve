@@ -181,13 +181,17 @@ test("« Nom aux cinq polices »: its name in five faces, one shown at a time, c
 test("« Nom aux cinq polices »: behind her roofs when her sky is read, its foot a fifth of its capitals under them, her skyline laid over its band", () => {
   const box = (tree: Drawn) => styleOf(title(tree)!) as unknown as Box;
   const front = (tree: Drawn) => flatten(tree).find((n) => n.props.key === "front") ?? null;
-  // Her roofs across its width at 300 px of its 16:9 box, two chimneys higher: its foot at the median, a fifth under it.
-  const roofs = (_f: number, span: { from: number; to: number }) => (span.from > 300 && span.from < 400 ? 220 : 300);
+  // Her roofs across its width at 300 px of its 16:9 box, as the original's flat roofline: its foot a fifth under them.
+  const roofs = () => 300;
   const tree = drawAt(30, { reads: { skyline: roofs, light: 0.8 } });
   const b = box(tree);
   // Its box's bottom: its foot and the little under its baseline; its capitals about 0,72 of its size once fitted.
   const caps = Math.round(0.72 * 210 * Math.min(1, 800 / (0.775 * 210 * 10)));
   assert.ok(Math.abs(b.top + b.height - (300 + 0.2 * caps + 0.07 * caps)) <= 2, JSON.stringify(b));
+  // A wide chimney higher in one of its eighths: it bites 45 % of a letter at most, never swallows one.
+  const chimney = (_f: number, span: { from: number; to: number }) => (span.from > 300 && span.from < 400 ? 220 : 300);
+  const lifted = box(drawAt(30, { reads: { skyline: chimney } }));
+  assert.ok(Math.abs(lifted.top + lifted.height - (220 + 0.45 * caps + 0.07 * caps)) <= 2, JSON.stringify(lifted));
   assert.ok(front(tree), "her skyline laid over it");
   assert.equal(flatten(front(tree)!).find((n) => n.type === "Skyline")!.props.shot, 0);
   // Laid after it, across its band only.
@@ -200,11 +204,11 @@ test("« Nom aux cinq polices »: behind her roofs when her sky is read, its foo
   assert.ok(Math.abs(box(bare).top + box(bare).height - (Math.round(608 * 0.475) + 0.07 * caps)) <= 2, JSON.stringify(box(bare)));
   const calm = drawAt(30, { reads: { clear: { x: 100, y: 40, w: 800, h: 200 } } });
   assert.ok(Math.abs(box(calm).top + box(calm).height - (240 + 0.07 * caps)) <= 2);
-  // Never deeper than half a capital under the second highest top across it: mountains on its left (two of its eighths
-  // at 200 px) bite half its letters there, the rest of it free above her roofs.
+  // Mountains behind her town on its left (two of its eighths at 200 px): they bite 45 % of its letters there, the rest
+  // of it free above her roofs.
   const mountains = (_f: number, span: { from: number; to: number }) => (span.from < 300 ? 200 : 300);
   const high = box(drawAt(30, { reads: { skyline: mountains } }));
-  assert.ok(Math.abs(high.top + high.height - (200 + 0.5 * caps + 0.07 * caps)) <= 2, JSON.stringify(high));
+  assert.ok(Math.abs(high.top + high.height - (200 + 0.45 * caps + 0.07 * caps)) <= 2, JSON.stringify(high));
   // Only a low horizon under it (a beach): behind it all the same, as low in her sky as it may go (two thirds of its box).
   const beach = drawAt(30, { reads: { skyline: () => 560 } });
   assert.ok(front(beach) && Math.abs(box(beach).top + box(beach).height - (Math.round(608 * 0.66) + 0.07 * caps)) <= 2, JSON.stringify(box(beach)));
@@ -257,13 +261,17 @@ test("« Nom aux cinq polices »: 16:9 on black when her files are horizontal, f
 });
 
 test("« Nom aux cinq polices »: it rises from under its place and lands on beat 4, its small words drifting up and its signature down", () => {
-  const rise = (f: number) => {
-    const t = title(drawAt(f, {}))!;
+  const rise = (f: number, reads: Reads = {}) => {
+    const t = title(drawAt(f, { reads }))!;
     const wrap = flatten(t).find((n) => (n.children as Drawn[]).some((c) => c && typeof c === "object" && c.props.key === "name"))!;
     return Number(/translateY\(([-\d.]+)em\)/.exec(String(styleOf(wrap).transform))![1]);
   };
   // 0,4 of its capitals (0,288 of its size) under its place at first, 70 % of the way in its first 0,6 s, landed on beat 4.
   assert.ok(Math.abs(rise(0) - 0.288) < 0.001);
+  // The same behind a flat roofline (a fifth of its letters hidden once landed, 60 % at first, as the original's) ;
+  // behind mountains that bite 45 % of a letter, it rises from closer, never more than 65 % of a letter hidden at first.
+  assert.ok(Math.abs(rise(0, { skyline: () => 300 }) - 0.288) < 0.001);
+  assert.ok(Math.abs(rise(0, { skyline: (_f, span) => (span.from < 300 ? 200 : 300) }) - 0.2 * 0.72) < 0.005);
   assert.ok(rise(18) < 0.288 * 0.35 && rise(18) > 0);
   assert.equal(rise(56), 0);
   assert.equal(rise(67), 0);
