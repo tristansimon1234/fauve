@@ -150,7 +150,7 @@ export const HOUSE_EFFECTS: Record<string, HouseEffect> = {
   },
   "nom-de-ville": {
     effet: "son nom géant dans le ciel de son plan large, derrière ses toits, dont la police change d'un coup à chaque temps (ronde, carrée, étroite, puis la sienne), à la même place et dans la même couleur",
-    il_faut: "un plan large et fixe de sa rue, de ses toits ou d'un paysage, avec du ciel dans le haut de l'image",
+    il_faut: "un plan large et fixe de sa rue, de ses toits ou d'un paysage, avec un ciel calme dans le haut de l'image",
   },
 };
 

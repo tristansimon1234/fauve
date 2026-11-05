@@ -1412,7 +1412,7 @@ export const HOUSE_MODELS: HouseModel[] = [
     // name giant in its sky behind its roofs, rising slowly while its typeface changes at once on four beats, then cuts
     // on the same pulse, a plunge down an alley as its music drops and breaks, the life of the place, a sunset cut dead.
     pitch: "Le nom de ton quartier ou de ton lieu en géant dans le ciel, derrière tes toits, qui change de police à chaque temps, puis tes plans sur le rythme jusqu'au coucher du soleil.",
-    needs: "un plan large et fixe de ta rue, de tes toits ou d'un paysage avec du ciel en haut, un plan qui avance dans une rue ou un passage, et 8 à 12 autres plans de la vie de ton lieu (des gens, des détails, un coucher de soleil)",
+    needs: "un plan large et fixe de ta rue, de tes toits ou d'un paysage avec un ciel calme en haut, un plan qui avance dans une rue ou un passage, et 8 à 12 autres plans de la vie de ton lieu (des gens, des détails, un coucher de soleil)",
     files: [4, 15],
     pair: "affiche",
     // Its skill's code is its reference.
