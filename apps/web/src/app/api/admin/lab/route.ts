@@ -8,6 +8,7 @@ import {
   editPlanSchema,
   effortSchema,
   GEMINI_MODEL_ID,
+  HOUSE_SOURCE,
   isKimiModel,
   imaginedBrief,
   intentionTitle,
@@ -962,9 +963,13 @@ async function result(key: string) {
     }
     return sums;
   };
-  // A Reel a montage skill played: its render kept as that skill version's bench, for Tristan's review on /admin.
+  // A Reel a montage skill played on its own model (model=, or the one Edith picked): its render kept as that skill
+  // version's bench, for Tristan's review on /admin. Never a Reel sent to copy that a model played (steal=): it is
+  // dressed like the copy, not like the model he validates.
   const played = plan.success ? plan.data.skill : undefined;
-  const benched = played ? renders.findLast((r) => r.edit_plan_id === kept?.id && r.status === "done" && r.storage_path) : undefined;
+  const model = played && post.data.inspiration_id ? (await db.from("inspirations").select("source, external_id").eq("id", post.data.inspiration_id as string).maybeSingle()).data : null;
+  const ownModel = Boolean(played && model?.source === HOUSE_SOURCE && model.external_id === played.key);
+  const benched = played && ownModel ? renders.findLast((r) => r.edit_plan_id === kept?.id && r.status === "done" && r.storage_path) : undefined;
   if (played && benched) {
     await keepBench(played, benched.storage_path as string, {
       seconds: benched.duration_ms ? Math.round((benched.duration_ms as number) / 10) / 100 : null,
