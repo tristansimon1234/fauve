@@ -2111,3 +2111,156 @@ test("« Plans fixes de cinéma » (v3): horizontal 4:3 on black as its original
   assert.equal(plan.layers![0]!.motion.texts!.format, "vertical");
   assert.deepEqual(plan.skill, { key: "plans-fixes", version: 3, settings: { format: "vertical" } });
 });
+
+// ——— « Mots aux quatre coins » v2, written again on its original's fiche (docs/fiches/quatre-coins.md) ——————————————
+
+test("« Mots aux quatre coins » (v2) cuts where its original does, on its own music (92 BPM), its words and its pause on its beats", async () => {
+  const { quatreCoins } = await import("./skills/quatre-coins.ts");
+  const { clearsDrawn, objectsDrawn } = await import("./subject.ts");
+  assert.equal(quatreCoins.version, 2);
+  assert.equal(quatreCoins.bpm, 92);
+  const line = quatreCoins.timeline(12, { end: false });
+  const f = (s: number) => Math.round(s * 30);
+  // The original's twelve shots, cut on its images 165, 186, 205, 234, 259, 285, 315, 339, 361, 394 and 430 (measured
+  // image by image at 30 i/s): within two images each, on its own music's beats; its front held to its 21,8 s.
+  const original = [0, 165, 186, 205, 234, 259, 285, 315, 339, 361, 394, 430];
+  assert.equal(line.shots.length, original.length);
+  line.shots.forEach((s, i) => assert.ok(Math.abs(f(s.start) - original[i]!) <= 2, `shot ${i + 1}: image ${f(s.start)}, the original's ${original[i]}`));
+  assert.ok(Math.abs(line.duration - 21.8) < 0.1, `${line.duration} s`);
+  // Its six pieces land on its images 20, 30, 46, 61, 75 and 89 (within two): the top row's three, her name, her place, her address.
+  const lands = [f(line.texts.debut!.from), line.marks.w1!, line.marks.w2!, f(line.texts.nom!.from), f(line.texts.lieu!.from), f(line.texts.adresse!.from)];
+  [20, 30, 46, 61, 75, 89].forEach((at, i) => assert.ok(Math.abs(lands[i]! - at) <= 2, `piece ${i + 1}: image ${lands[i]}, the original's ${at}`));
+  // They all go with the first cut; her name stays hers to the end, alone on her front from the original's image 476.
+  for (const slot of ["debut", "lieu", "adresse"]) assert.equal(line.texts[slot]!.to, line.shots[1]!.start, slot);
+  assert.equal(line.texts.nom!.to, line.duration);
+  assert.equal(line.marks.cut, f(line.shots[1]!.start));
+  assert.ok(Math.abs(line.marks.name! - 476) <= 1, `${line.marks.name}`);
+  // Its music loses its bass and drums half a beat after its sentence is whole (the original's 3,15 s), all of it back
+  // at once on the first cut (opened slowly, its line hollowed); it plays on to the last image. No sound of its own.
+  const { readMusicShape } = await import("./music-shape.ts");
+  const thin = readMusicShape(line.music, line.duration)!.filters![0]!;
+  assert.equal(line.music!.filters!.length, 1);
+  assert.equal(thin.kind, "thin");
+  assert.ok(Math.abs(thin.from - 3.15) < 0.05 && thin.from > f(line.texts.adresse!.from) / 30, `${thin.from} s`);
+  assert.equal(thin.to, line.shots[1]!.start);
+  assert.equal(thin.open, 0.02);
+  assert.deepEqual(line.music!.end, { at: line.duration, fade: 0.02 });
+  assert.equal(line.sounds, undefined);
+  // The life of the place: never two close shots in a row, its two last ones the longest of the ten.
+  const life = line.shots.slice(1, -1).map((s) => f(s.end) - f(s.start));
+  assert.ok(life.at(-1)! >= Math.max(...life.slice(0, -2)) && life.at(-2)! >= Math.max(...life.slice(0, -2)), JSON.stringify(life));
+  assert.ok(line.shots.slice(1, -1).every((s, i, all) => !(/de près/.test(s.want) && /de près/.test(all[i + 1]?.want ?? ""))));
+  // With an ending card, its front held half beats longer (the card's 1,6 s), its cuts the same; her name gives way to it.
+  const ended = quatreCoins.timeline(12, { end: true });
+  assert.deepEqual(ended.shots.slice(0, -1).map((s) => s.start), line.shots.map((s) => s.start).slice(0, -1));
+  assert.ok(ended.duration - line.duration >= 1.6 && Math.abs(((ended.duration - line.duration) * 92) / 60 - 2.5) < 0.05, `${ended.duration} s`);
+  assert.ok(Math.abs(ended.texts.nom!.to - (ended.duration - 1.6)) < 0.01);
+  // Fewer moments (six at least): its opening, its first life shots and its front as the original's; more: two beats each.
+  assert.deepEqual(quatreCoins.shots, [8, 12]);
+  const eight = quatreCoins.timeline(8, { end: false });
+  assert.deepEqual(eight.shots.slice(0, 4).map((s) => s.start), line.shots.slice(0, 4).map((s) => s.start));
+  assert.ok(Math.abs(eight.shots.at(-1)!.end - eight.shots.at(-1)!.start - (line.shots.at(-1)!.end - line.shots.at(-1)!.start)) <= 1 / 30 + 0.01);
+  const more = quatreCoins.timeline(14, { end: false });
+  assert.ok(Math.abs(more.duration - line.duration - 2 * 2 * (60 / 92)) < 0.05, `${more.duration} s`);
+  // At its slowest tempo and its most shots, never past 45 s; its words never cut its cuts.
+  assert.ok(quatreCoins.timeline(19, { end: false, bpm: 64 }).duration <= 45);
+  // Nothing is followed nor read in her shots: its words keep the original's places; its camera never moves.
+  assert.deepEqual(clearsDrawn(quatreCoins.code), []);
+  assert.deepEqual(objectsDrawn(quatreCoins.code), []);
+  assert.doesNotMatch(quatreCoins.code, /transform|scale\(/);
+  // The original's cream, with no shadow nor edge: only a wide dark halo, unseen on a dark wall, for a light one (its
+  // fallback on a very bright edge); its finish without the vignette its original does not have.
+  assert.match(quatreCoins.code, /#E7E2CC/);
+  assert.deepEqual(quatreCoins.code.match(/textShadow: "[^"]*"/g), ['textShadow: "0 0 0.5em rgba(0,0,0,0.3)"']);
+  assert.doesNotMatch(quatreCoins.code, /TextStroke|WebkitTextStroke/);
+  assert.deepEqual(quatreCoins.finish, { vignette: 0 });
+});
+
+test("« Mots aux quatre coins » (v2): horizontal 16:9 on black as its original when her files are, full frame otherwise or on her word; its words on the edges", async () => {
+  const { quatreCoins } = await import("./skills/quatre-coins.ts");
+  const { skillPlan, skillFillInput, skillSettings } = await import("./skills.ts");
+  const line = quatreCoins.timeline(12, { end: false });
+  const f = (s: number) => Math.round(s * 30);
+  const shotsOf = (aspects: number[]) => line.shots.map((s, i) => ({ src: `/v${i}.mp4`, aspect: aspects[i]!, from: f(s.start), durationInFrames: f(s.end) - f(s.start), kind: "video", segment: i }));
+  const at = (slot: string) => ({ from: f(line.texts[slot]!.from), to: f(line.texts[slot]!.to), emphasis: [] });
+  const reelTexts = [
+    { text: "une journée au", role: "caption", ...at("debut") },
+    { text: "Brighton Pier", role: "hook", ...at("nom") },
+    { text: "Brighton", role: "band", ...at("lieu") },
+    { text: "Madeira Dr, Brighton BN2 1TW", role: "caption", ...at("adresse") },
+  ];
+  const marks = Object.fromEntries(Object.entries(line.marks).map(([k, v]) => [k, String(v)]));
+  const draw = (aspects: number[], frame: number, extra: Record<string, unknown> = {}) =>
+    drawScene(quatreCoins.code, frame, { width: 1080, height: 1920, durationInFrames: f(line.duration), brand: { name: "Brighton Pier", displayFont: "Inter Tight", bodyFont: "Inter Tight" }, shots: shotsOf(aspects), reelTexts, end: null, texts: marks, ...extra });
+  const frameOf = (tree: Drawn) => {
+    const box = drawnNodes(tree).find((n) => n.type === "div" && styleOf(n).overflow === "hidden")!;
+    return { top: styleOf(box).top, height: styleOf(box).height };
+  };
+  const boxes = (tree: Drawn) => drawnNodes(tree).filter((n) => n.type === "FitText").map((n) => ({ ...(n.props.style as { left: number; top: number; width: number; height: number }), text: heldText(n).trim() }));
+  const wide = Array(12).fill(16 / 9);
+  const tall = Array(12).fill(9 / 16);
+  // Her files mostly horizontal: a 16:9 picture (1080 × 608) at the middle of the frame, on black; mostly vertical (half and half too): full frame.
+  assert.deepEqual(frameOf(draw(wide, 100)), { top: 656, height: 608 });
+  assert.equal(frameOf(draw([...Array(7).fill(16 / 9), ...Array(5).fill(9 / 16)], 100)).height, 608);
+  assert.deepEqual(frameOf(draw(tall, 100)), { top: 0, height: 1920 });
+  assert.equal(frameOf(draw([...Array(6).fill(16 / 9), ...Array(6).fill(9 / 16)], 100)).height, 1920);
+  // On her word, the other format.
+  assert.equal(frameOf(draw(wide, 100, { texts: { ...marks, format: "vertical" } })).height, 1920);
+  assert.equal(frameOf(draw(tall, 100, { texts: { ...marks, format: "horizontal" } })).top, 656);
+  for (const aspects of [wide, tall]) {
+    const { top, height } = frameOf(draw(aspects, 100));
+    // Each piece set at once on the image it lands on (its first word with its capital, her name and place in lower case,
+    // her address as written, its postcode kept on one line).
+    const shown = new Map<string, number>();
+    for (let frame = 0; frame < line.marks.cut!; frame++) {
+      for (const n of drawnNodes(draw(aspects, frame))) if (n.type === "span" && styleOf(n).opacity === 1 && !shown.has(drawnText(n))) shown.set(drawnText(n), frame);
+    }
+    assert.deepEqual(
+      ["Une", "journée", "au", "brighton pier", "brighton", "Madeira Dr, Brighton BN2\u00a01TW"].map((w) => shown.get(w)),
+      [f(line.texts.debut!.from), line.marks.w1, line.marks.w2, f(line.texts.nom!.from), f(line.texts.lieu!.from), f(line.texts.adresse!.from)],
+    );
+    // Three rows on the edges of its picture, at one size: its top row near its top, the address near its bottom, the
+    // middle row a little under its middle; 40 px from the sides, left of the apps' buttons below the middle of the
+    // screen, above the apps' caption.
+    const rows = boxes(draw(aspects, 100));
+    assert.equal(rows.length, 3);
+    const [upper, middle, lower] = rows as [(typeof rows)[number], (typeof rows)[number], (typeof rows)[number]];
+    assert.ok(upper.top + upper.height < middle.top && middle.top + middle.height < lower.top, JSON.stringify(rows));
+    assert.ok(upper.top - Number(top) < 0.1 * Number(height) && upper.top >= 80, JSON.stringify(upper));
+    assert.ok(lower.top + lower.height <= Math.min(Number(top) + Number(height), 1440), JSON.stringify(lower));
+    for (const b of rows) {
+      assert.equal(b.left, 40);
+      assert.ok(b.left + b.width <= (b.top + b.height > 948 ? 940 : 1040), JSON.stringify(b));
+    }
+    assert.equal(upper.left + upper.width, 1040);
+    // Nothing on her life of the place, then her name alone at the middle of her picture from its image, held to the end.
+    assert.equal(boxes(draw(aspects, line.marks.cut! + 30)).length, 0);
+    assert.equal(boxes(draw(aspects, line.marks.name! - 1)).length, 0);
+    const alone = boxes(draw(aspects, line.marks.name!));
+    assert.equal(alone.length, 1);
+    assert.equal(alone[0]!.text, "brighton pier");
+    assert.ok(Math.abs(alone[0]!.left + alone[0]!.width / 2 - 540) <= 1 && Math.abs(alone[0]!.top + alone[0]!.height / 2 - (Number(top) + Number(height) / 2)) <= 12, JSON.stringify(alone));
+    assert.equal(boxes(draw(aspects, f(line.duration) - 1)).length, 1);
+  }
+  // Its ending card in its own words: her title where her name was, her line on the bottom row a step later, no veil.
+  const endAt = f(line.duration) - 48;
+  const card = boxes(draw(wide, endAt + 20, { end: { title: "Ouvert tous les jours", subtitle: "dès 10 h", from: endAt } }));
+  assert.deepEqual(card.map((b) => b.text), ["Ouvert tous les jours", "dès 10 h"]);
+  assert.equal(drawnNodes(draw(wide, endAt + 20, { end: { title: "Ouvert", subtitle: null, from: endAt } })).filter((n) => /rgba/.test(String(styleOf(n).backgroundColor ?? ""))).length, 0);
+  // The setting: the filler sees it (the original's first, the default), the plan keeps a choice her words asked for;
+  // its music shape and its marks are on the plan.
+  assert.deepEqual(quatreCoins.settings?.map((s) => [s.name, s.choices.map((c) => c.value)]), [["format", ["auto", "horizontal", "vertical"]]]);
+  assert.deepEqual(skillSettings(quatreCoins, [{ name: "format", value: "auto" }]), {});
+  const files = Array.from({ length: 12 }, (_, i) => ({ id: `v${i}`, photo: false, seconds: 9 }));
+  const input = skillFillInput({ skill: quatreCoins, name: "Mots aux quatre coins", n: 12, files, business: {}, request: "en vertical" });
+  assert.equal(input.reglages?.[0]?.nom, "format");
+  assert.equal(input.cases.length, 12);
+  const fill = { shots: files.map((x) => ({ file: x.id, at: 0.5 })), texts: { debut: "un matin chez", nom: "Farine", lieu: "Belleville", adresse: "12 rue Ramponeau" }, end: null, settings: { format: "vertical" } };
+  const plan = skillPlan({ skill: quatreCoins, name: "Mots aux quatre coins", files, fill });
+  assert.ok(editPlanSchema.safeParse(plan).success);
+  assert.equal(plan.layers![0]!.motion.texts!.format, "vertical");
+  assert.deepEqual(plan.skill, { key: "quatre-coins", version: 2, settings: { format: "vertical" } });
+  const { readMusicShape } = await import("./music-shape.ts");
+  assert.deepEqual(plan.music_shape, readMusicShape(line.music, line.duration));
+  assert.equal(plan.sounds, undefined);
+});
