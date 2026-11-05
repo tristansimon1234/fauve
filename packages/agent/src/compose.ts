@@ -110,7 +110,8 @@ export type CompositionTexts = { texts: ComposeText[]; end: ComposeEnd | null; s
 export function compositionTexts(plan: EditPlan): CompositionTexts {
   const frames = (s: number) => Math.round(s * REEL_FPS);
   const px = (share: number) => Math.round(share * 1920);
-  const y = plan.subtitle_y ?? SUBTITLE_ROW.y;
+  // Where the render sets them: the row a composition chose (a skill timed on her voice sets its own), else the plan's.
+  const y = plan.layers?.find((l) => l.compose)?.motion.subtitle_y ?? plan.subtitle_y ?? SUBTITLE_ROW.y;
   // The engine's screens (a title card) are the composition's to draw too, at their moment (buildReelProps does the same).
   const timeline = planTimeline(plan).segments;
   const screens = plan.segments.flatMap((s, i) => {
@@ -127,6 +128,8 @@ export function compositionTexts(plan: EditPlan): CompositionTexts {
         to: frames(t.to),
         emphasis: t.emphasis ?? [],
         ...(t.items?.length ? { items: t.items } : {}),
+        // A font its filler picked for what its words evoke: the check lays it out in it, as the render does.
+        ...(t.font ? { font: t.font } : {}),
       })),
       ...screens,
     ].sort((a, b) => a.from - b.from),

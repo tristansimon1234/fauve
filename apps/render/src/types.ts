@@ -77,7 +77,16 @@ export type ShotCamera = {
   straighten?: number;
 };
 /** A text of the Reel that a collage's composition draws itself (frames from its start): its words, its role, the words to stress, a message's lines. */
-export type ComposeText = { text: string; role: "hook" | "band" | "caption"; from: number; to: number; emphasis: string[]; items?: { title: string; detail?: string }[] };
+export type ComposeText = {
+  text: string;
+  role: "hook" | "band" | "caption";
+  from: number;
+  to: number;
+  emphasis: string[];
+  items?: { title: string; detail?: string }[];
+  /** A font of its own, picked for what its words evoke (a skill's filler): a Google Fonts family, loaded with the Reel. */
+  font?: string;
+};
 /** The Reel's end that a composition draws itself: its title and line, from its frame. */
 export type ComposeEnd = { title: string; subtitle: string | null; from: number };
 export type RegionKind = "face" | "plate" | "screen" | "document" | "other";
@@ -228,6 +237,8 @@ export type ReelProps = {
     bullet?: { kind: "check" | "box" | "dot" | "dash" | "number" | "arrow"; color: string };
     /** In a Reel, a text with items is a message: its own words are its title (on a photo, a list's text is only its name). */
     message?: boolean;
+    /** A font of its own for its words (a skill's filler picked it for what they evoke): its composition draws it, loaded here. */
+    font?: string;
   }[];
   words: { w: string; from: number; to: number }[];
   /** What is said written like a creator: each phrase around the person (kinetic), or on labels (stickers); absent, the apps' own captions. */
@@ -302,6 +313,8 @@ export type ReelProps = {
     end?: ComposeEnd | null;
     /** The words said under it (frames from its start), when its code writes them (`spoken`): the engine's captions step aside. */
     spoken?: { w: string; from: number; to: number }[];
+    /** Its code only times its own words on them (a montage skill timed on her voice): the engine's captions stay under it. */
+    captionsStay?: true;
   }[];
   /** What she added on her Reel (a text, one of her photos or its cut-out), drawn over everything, in frames. */
   overlays?: {

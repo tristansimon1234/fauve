@@ -68,6 +68,8 @@ export function Reel(props: ReelProps) {
     props.brand.displayFont,
     props.brand.bodyFont,
     ...props.texts.flatMap((t) => [t.look, t.detail_look].flatMap((l) => (l ? [l.font, ...(l.emphasis?.font ? [l.emphasis.font] : [])] : []))),
+    // A font its words evoke, picked for one text by a skill's filler (its composition draws it).
+    ...props.texts.flatMap((t) => (t.font ? [t.font] : [])),
     ...(props.layer?.fonts ?? []),
     ...(props.elements ?? []).flatMap((e) => e.fonts),
     // The fonts an animation brings for itself (a universe she names, the Reel she copies).
@@ -95,8 +97,9 @@ export function Reel(props: ReelProps) {
   // engine draws the card. Drawn by no one, her calendar Reel's end card never showed.
   const engineEnd = Boolean(props.endCard) && (!whole || compose?.drawsEnd === false);
   const composeLength = compose && whole && engineEnd && props.endCard ? Math.max(1, Math.min(compose.durationInFrames, props.endCard.from - compose.from)) : compose?.durationInFrames;
-  // What is said, as the engine writes it: an animation that writes it itself (its `spoken`) has its own words.
-  const writing = (props.layers ?? []).filter((l) => l.spoken?.length);
+  // What is said, as the engine writes it: an animation that writes it itself (its `spoken`) has its own words; one that
+  // only times its own words on them (a skill timed on her voice) leaves the subtitles under it.
+  const writing = (props.layers ?? []).filter((l) => l.spoken?.length && !l.captionsStay);
   const captionWords = writing.length ? props.words.filter((w) => !writing.some((l) => w.from >= l.from && w.from < l.from + l.durationInFrames)) : props.words;
   const captionLook: CaptionLook = {
     fonts: { display: props.brand.displayFont, body: MONOSPACE.test(props.brand.bodyFont) ? props.brand.displayFont : props.brand.bodyFont, serif: COLLAGE_SERIF },

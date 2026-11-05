@@ -29,19 +29,40 @@
 // once per file (named after its path, size and date: another file at the same place in the list is normalized anew),
 // as the render workshop does. The browser is Playwright's Chromium (CHROME, default /opt/pw-browsers/…), whose fonts
 // load through the machine's own certificates.
+//
+// A skill timed on her voice (its `voice`): her talking video is the first clip, its words given as Scribe times them
+// (--talk: a JSON file or text, { "words": [{ "w", "start", "end" }], "pauses": [{ "start", "end" }], "fillers": [...] },
+// seconds of that clip), and what its filler chose in them as the filler writes it (--said: { "hook": { from, to, text },
+// "ideas": [{ from, to, key, text, font, items: [{ word, text, font }] }] }, word numbers). Her other clips are her other
+// angles of the same take: --takes '{"f1": 1.25}' gives each one's offset (s: its time = the first's + offset), or
+// --takes sync measures them on their sound as the sandbox does (ffmpeg decodes them, takeOffset correlates them). Her
+// sound is kept in the render, and the engine's subtitles of what she says are drawn.
 
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { basename, extname, resolve } from "node:path";
 import { parseArgs } from "node:util";
-import { buildReelProps } from "../packages/agent/src/motion.ts";
+import { buildReelProps, readsSpoken } from "../packages/agent/src/motion.ts";
 import { HOUSE_MODELS, houseStyle } from "../packages/agent/src/house-models.ts";
 import { MONTAGE_SKILLS } from "../packages/agent/src/skill-library.ts";
 import { isClipSegment } from "../packages/agent/src/schemas.ts";
 import { followedFrom, signatureOf } from "../packages/agent/src/steal.ts";
 import { clearPassages, layerObjects, objectKey, objectPassages, subjectShots, type ClearMap } from "../packages/agent/src/subject.ts";
-import { dressSkillPlan, skillLongest, skillPlan, skillShotCount, type MontageSkill, type SkillFile, type SkillFill } from "../packages/agent/src/skills.ts";
+import {
+  dressSkillPlan,
+  readSaid,
+  skillLongest,
+  skillPlan,
+  skillShotCount,
+  skillTalk,
+  type MontageSkill,
+  type SkillFile,
+  type SkillFill,
+  type SkillFillAnswer,
+  type SkillTalk,
+} from "../packages/agent/src/skills.ts";
+import { pcmSamples, sameTake, TAKE_MAX_SECONDS, TAKE_RATE, takeOffset, wordsOffset } from "../packages/agent/src/takes.ts";
 
 const { values } = parseArgs({
   options: {
@@ -62,8 +83,13 @@ const { values } = parseArgs({
     "no-render": { type: "boolean", default: false },
     dressed: { type: "boolean", default: false },
     "no-finish": { type: "boolean", default: false },
+    talk: { type: "string" },
+    said: { type: "string" },
+    takes: { type: "string" },
   },
 });
+/** A JSON option given as text or as the path of a file. */
+const json = <T,>(value: string | undefined): T | undefined => (value === undefined ? undefined : (JSON.parse(existsSync(value) ? readFileSync(value, "utf8") : value) as T));
 // A skill of the library, or one being written (its module exports it, under any name).
 const loaded = values.module ? (Object.values(await import(resolve(values.module))) as MontageSkill[]).find((x) => x && typeof x === "object" && "timeline" in x) : undefined;
 const skill = loaded ?? MONTAGE_SKILLS[values.skill ?? ""];
@@ -92,11 +118,18 @@ const files: (SkillFile & { src: string; aspect: number; path: string })[] = (va
   const id = `f${i}`;
   const { size, mtimeMs } = statSync(source);
   const stamp = createHash("sha1").update(`${source}:${size}:${mtimeMs}`).digest("hex").slice(0, 10);
-  const target = `${media}/${id}-${stamp}${photo ? extname(source) : ".mp4"}`;
+  // On her voice, her sound is kept (the Reel is what she says).
+  const sound = Boolean(skill.voice) && !photo;
+  const target = `${media}/${id}-${stamp}${sound ? "-a" : ""}${photo ? extname(source) : ".mp4"}`;
   if (!existsSync(target)) {
     if (photo) execFileSync("cp", [source, target]);
     else
-      execFileSync("ffmpeg", ["-v", "error", "-y", "-i", source, "-an", "-vf", "scale='if(gt(iw,ih),min(iw,2560),-2)':'if(gt(iw,ih),-2,min(ih,2560))',fps=30,tpad=stop_mode=clone:stop_duration=2,format=yuv420p", "-c:v", "libx264", "-preset", "veryfast", "-crf", "18", "-movflags", "+faststart", target]);
+      execFileSync("ffmpeg", [
+        "-v", "error", "-y", "-i", source,
+        ...(sound ? ["-map", "0:v:0", "-map", "0:a:0?", "-c:a", "aac", "-b:a", "160k"] : ["-an"]),
+        "-vf", "scale='if(gt(iw,ih),min(iw,2560),-2)':'if(gt(iw,ih),-2,min(ih,2560))',fps=30,tpad=stop_mode=clone:stop_duration=2,format=yuv420p",
+        "-c:v", "libx264", "-preset", "veryfast", "-crf", "18", "-movflags", "+faststart", target,
+      ]);
   }
   const p = probe(source);
   return { id, photo, seconds: photo ? 0 : Math.max(0, p.seconds), shows: basename(source), src: `/public/jobs/${job}/${basename(target)}`, aspect: p.width / Math.max(1, p.height), path: source };
@@ -121,9 +154,47 @@ const fill: SkillFill = {
   ...(values.named ? { objects: JSON.parse(values.named) as Record<string, string> } : {}),
 };
 const bpm = values.bpm ? Math.round(Math.min(140, Math.max(60, Number(values.bpm)))) : undefined;
+// On her voice: her talk cut as the engine cuts it, her other angles synced on their sound, the filler's choice read.
+type Timed = { w: string; start: number; end: number };
+const spoken: Record<string, Timed[]> = {};
+let talk: SkillTalk | undefined;
+if (skill.voice) {
+  const given = json<{ words: Timed[]; pauses?: { start: number; end: number }[]; fillers?: Timed[] }>(values.talk);
+  if (!given?.words?.length) throw new Error("--talk: her words in her first clip, as Scribe times them (a skill timed on her voice)");
+  const main = files[0]!;
+  spoken[main.id] = given.words;
+  // Her sound as the sandbox decodes it for a sync (s16le, mono, 8 kHz): her other clips measured against the first.
+  const pcm = (path: string) => pcmSamples(execFileSync("ffmpeg", ["-v", "error", "-i", path, "-vn", "-map", "0:a:0", "-ac", "1", "-ar", String(TAKE_RATE), "-t", String(TAKE_MAX_SECONDS), "-f", "s16le", "-"], { maxBuffer: 64 << 20 }));
+  const offsets: Record<string, number> =
+    values.takes === "sync"
+      ? Object.fromEntries(
+          files.slice(1).flatMap((f) => {
+            if (f.photo) return [];
+            const found = takeOffset(pcm(main.path), pcm(f.path), TAKE_RATE);
+            console.log(`take ${f.id} (${basename(f.path)}): ${found ? `${found.offset} s, score ${found.score}${sameTake(found) ? "" : " (not the same take)"}` : "no sound"}`);
+            return found && sameTake(found) ? [[f.id, found.offset]] : [];
+          }),
+        )
+      : (json<Record<string, number>>(values.takes) ?? {});
+  const takes = Object.entries(offsets).flatMap(([id, offset]) => {
+    const f = files.find((x) => x.id === id);
+    if (!f) return [];
+    // Its words: hers, on its own clock (for its subtitles).
+    spoken[id] = given.words.map((w) => ({ ...w, start: w.start + offset, end: w.end + offset }));
+    return [{ clip: id, offset, seconds: f.seconds }];
+  });
+  talk = skillTalk({ clip: main.id, seconds: main.seconds, words: given.words, speech: { source: "scribe", cleaned: false, floor: null, fillers: given.fillers ?? [], pauses: given.pauses ?? [] } }, { takes }) ?? undefined;
+  if (!talk) throw new Error("--talk: fewer than three words in her first clip");
+  const said = readSaid(skill.voice, talk, json<SkillFillAnswer["voice"]>(values.said));
+  if (!said) throw new Error("--said: no idea read in what she says (word numbers in her words, after her « euh » are cut)");
+  fill.shots = [];
+  fill.said = said;
+  if (values.takes && values.takes !== "sync") for (const [id] of Object.entries(offsets)) console.log(`take ${id}: ${offsets[id]} s (given)`);
+  console.log(`her talk: ${talk.pieces.length} pieces, ${talk.duration} s, ${talk.words.length} words; words of her other angles roughly ${files.slice(1).map((f) => `${f.id} ${wordsOffset(given.words, spoken[f.id] ?? [])?.offset ?? "—"} s`).join(", ") || "none"}`);
+}
 // The model followed as production follows it (her inspiration row's style: houseStyle), chosen by her, or by Edith (--dressed).
 const followed = model && !values["no-finish"] ? followedFrom("local", houseStyle(model), false, values.dressed) : undefined;
-const plan = dressSkillPlan(skillPlan({ skill, name: model?.name ?? skill.key, files, fill, ...(bpm ? { bpm } : {}) }), skill, followed);
+const plan = dressSkillPlan(skillPlan({ skill, name: model?.name ?? skill.key, files, fill, ...(bpm ? { bpm } : {}), ...(talk ? { talk } : {}) }), skill, followed);
 const fonts = (values.fonts || "").split(",").map((f) => f.trim()).filter(Boolean);
 console.log(
   followed
@@ -186,11 +257,13 @@ const props = buildReelProps(plan, {
   // Its light on each shot (the model's grade, over her charter's), as the render's theme takes it in production.
   brand: { name: values.name ?? "", ...(fonts.length ? { fonts } : {}), ...(followed ? { signature: signatureOf({ followed }) } : {}) },
   ...(Object.keys(subjects).length ? { subjects } : {}),
+  // Her words in each clip (on her voice): her subtitles, and what its code reads of what she says (`spoken`).
+  ...(Object.keys(spoken).length ? { words: spoken } : {}),
 });
 const out = resolve(values.out ?? `${ROOT}/${skill.key}.mp4`);
 writeFileSync(`${out}.plan.json`, JSON.stringify(plan, null, 1));
 writeFileSync(`${out}.props.json`, JSON.stringify(props));
-console.log(`${skill.key} v${skill.version}: ${n} shots, ${plan.duration} s at ${plan.tempo ?? skill.bpm} BPM, texts ${plan.texts.map((t) => `« ${t.text} » ${t.from}–${t.to} s`).join(", ")}`);
+console.log(`${skill.key} v${skill.version}: ${plan.segments.length} shots, ${plan.duration} s at ${plan.tempo ?? skill.bpm} BPM, texts ${plan.texts.map((t) => `« ${t.text} » ${t.from}–${t.to} s${t.font ? ` (${t.font})` : ""}`).join(", ")}`);
 
 // The scene check, as the engine runs it on a composition (its marks as its slot texts).
 const layer = props.layers?.find((l) => l.compose);
@@ -209,6 +282,8 @@ writeFileSync(
       ...(layer.fonts?.length ? { fonts: layer.fonts } : {}),
       ...(layer.reelTexts?.length ? { reelTexts: layer.reelTexts } : {}),
       ...(layer.end ? { end: layer.end } : {}),
+      // Its code reads what is said: checked with words said under it, as the engine checks it.
+      ...(readsSpoken(layer.js) ? { probeSpoken: true } : {}),
     },
   ]),
 );

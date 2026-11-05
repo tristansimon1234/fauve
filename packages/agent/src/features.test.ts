@@ -5293,3 +5293,532 @@ test("« Titre gaufré » (v2): her front built on the black from what it is mad
   assert.equal(letterSpans(ending).filter((n) => /^url\(#\w+\)$/.test(String(styleOf(n).filter))).map((n) => n.children[0]).join(""), "OuvertdimancheRUEDESMARTYRS");
   assert.ok(letterSpans(ending).filter((n) => /drop-shadow/.test(String(styleOf(n).filter))).length >= 20);
 });
+
+// ---------------------------------------------------------------------------
+// The tools of « Mot clé en grand », « Face caméra et références » and « Fenêtres et étiquettes »: a skill timed on her
+// voice, her two takes synced on their sound, a font per word, her address as coordinates.
+// ---------------------------------------------------------------------------
+
+/** « Alors aujourd'hui (euh) je vais vous montrer trois soins pour l'hiver. … Le gommage, le masque, et l'huile. … Voilà, à bientôt. » (10 s). */
+const talkFacts = {
+  clip: "talk",
+  seconds: 10,
+  words: [
+    word("Alors", 0.5, 0.8),
+    word("aujourd'hui", 0.85, 1.3),
+    word("je", 1.75, 1.85),
+    word("vais", 1.88, 2.05),
+    word("vous", 2.08, 2.25),
+    word("montrer", 2.28, 2.65),
+    word("trois", 2.7, 2.95),
+    word("soins", 3.0, 3.4),
+    word("pour", 3.45, 3.6),
+    word("l'hiver.", 3.62, 4.1),
+    word("Le", 5.2, 5.3),
+    word("gommage,", 5.35, 5.9),
+    word("le", 6.0, 6.1),
+    word("masque,", 6.15, 6.7),
+    word("et", 6.8, 6.9),
+    word("l'huile.", 6.95, 7.5),
+    word("Voilà,", 7.95, 8.3),
+    word("à", 8.35, 8.45),
+    word("bientôt.", 8.5, 9.0),
+  ],
+  speech: {
+    source: "scribe" as const,
+    cleaned: false,
+    floor: -55,
+    fillers: [word("euh", 1.35, 1.7)],
+    pauses: [
+      { start: 0, end: 0.48 },
+      { start: 4.12, end: 5.18 },
+      { start: 7.52, end: 7.93 },
+      { start: 9.02, end: 10 },
+    ],
+  },
+};
+
+/** The filler's choice in it: her two first words, three ideas, a list of three names each in a font it evokes. */
+const talkAnswer = {
+  hook: { from: 0, to: 1, text: "Alors aujourd'hui" },
+  ideas: [
+    { from: 0, to: 9, key: 7, text: "soins", font: "", items: [] },
+    {
+      from: 10,
+      to: 15,
+      key: 11,
+      text: "gommage",
+      font: "",
+      items: [
+        { word: 11, text: "gommage", font: "Great Vibes" },
+        { word: 13, text: "masque", font: "fraunces" },
+        { word: 15, text: "l'huile", font: "Comic Sans" },
+      ],
+    },
+    { from: 16, to: 18, key: 16, text: "Voilà", font: "", items: [] },
+  ],
+};
+
+test("a skill timed on her voice: her talk cut as a creator cuts it, her words moved with it, 45 s at most", async () => {
+  const { skillTalk, saidLines, TALK_MAX_SECONDS } = await import("./skills.ts");
+  const { MAX_REEL_SECONDS } = await import("./editor.ts");
+  assert.equal(TALK_MAX_SECONDS, MAX_REEL_SECONDS);
+  const talk = skillTalk(talkFacts)!;
+  // From just before her first word to just after her last; her « euh » and her two long pauses out, a breath kept.
+  assert.deepEqual(
+    talk.pieces.map((p) => [p.in, p.out]),
+    [
+      [0.15, 1.32],
+      [1.73, 4.24],
+      [5.06, 7.64],
+      [7.81, 9.5],
+    ],
+  );
+  // One after the other on the Reel's clock, her words with them.
+  assert.deepEqual(talk.pieces.map((p) => p.start), [0, 1.17, 3.68, 6.26]);
+  assert.equal(talk.duration, 7.95);
+  assert.equal(talk.words.length, 19);
+  assert.deepEqual(talk.words.find((w) => w.w === "soins"), { w: "soins", start: 2.44, end: 2.84 });
+  assert.deepEqual(talk.words.find((w) => w.w === "Le"), { w: "Le", start: 3.82, end: 3.92 });
+  assert.equal(talk.words.at(-1)!.end, 7.45);
+  // Numbered, phrase by phrase, for the filler.
+  assert.deepEqual(saidLines(talk.words).slice(0, 2), ["[0] Alors [1] aujourd'hui [2] je [3] vais [4] vous [5] montrer [6] trois [7] soins [8] pour [9] l'hiver.", "[10] Le [11] gommage, [12] le [13] masque, [14] et [15] l'huile."]);
+  // Never past 45 s: cut after the last word that fits.
+  const long = Array.from({ length: 160 }, (_, i) => word(`mot${i}`, 0.5 + i * 0.4, 0.8 + i * 0.4));
+  const capped = skillTalk({ clip: "long", seconds: 70, words: long, speech: { source: "scribe", cleaned: false, floor: -60, fillers: [], pauses: [] } })!;
+  assert.ok(capped.duration <= 45 && capped.duration > 44, `${capped.duration} s`);
+  assert.ok(capped.words.every((w) => w.end <= capped.duration));
+  // Fewer than three words: no talk.
+  assert.equal(skillTalk({ ...talkFacts, words: talkFacts.words.slice(0, 2) }), null);
+});
+
+test("a skill timed on her voice: what the filler chose in what she says is read against her words", async () => {
+  const { skillTalk, readSaid } = await import("./skills.ts");
+  const talk = skillTalk(talkFacts)!;
+  const voice = { hook: "ses deux premiers mots", key: "le mot de l'idée", ideas: [1, 3] as [number, number], items: "une liste", max: { hook: 20, key: 12, item: 10 }, fonts: ["item" as const] };
+  const picks = readSaid(voice, talk, talkAnswer)!;
+  assert.deepEqual(picks.hook, { from: 0, to: 1, text: "Alors aujourd'hui" });
+  assert.deepEqual(picks.ideas.map((i) => [i.from, i.to, i.key, i.text]), [
+    [0, 9, 7, "soins"],
+    [10, 15, 11, "gommage"],
+    [16, 18, 16, "Voilà"],
+  ]);
+  // Fonts only where the skill asks for them, and only of the library (« Comic Sans » is not one: her fonts).
+  assert.deepEqual(picks.ideas[1]!.items, [
+    { word: 11, text: "gommage", font: "Great Vibes" },
+    { word: 13, text: "masque", font: "Fraunces" },
+    { word: 15, text: "l'huile" },
+  ]);
+  assert.equal(picks.ideas[0]!.font, undefined);
+  // Numbers out of her words brought back, ideas that overlap made to follow each other, a keyword outside its idea its first word.
+  const loose = readSaid(voice, talk, {
+    hook: { from: 4, to: 5, text: "vous montrer" },
+    ideas: [
+      { from: 12, to: 99, key: 3, text: "", font: "", items: [{ word: 2, text: "je", font: "" }] },
+      { from: 0, to: 13, key: 7, text: "SOINS d'hiver pour toutes", font: "", items: [] },
+    ],
+  })!;
+  assert.equal(loose.hook, null);
+  // (Its keyword cut at the last word that fits its 12 characters.)
+  assert.deepEqual(loose.ideas.map((i) => [i.from, i.to, i.key, i.text, i.items.length]), [
+    [0, 13, 7, "SOINS", 0],
+    [14, 18, 14, "et", 0],
+  ]);
+  // As many ideas as the skill takes at most; none at all: the editor makes the Reel.
+  assert.equal(readSaid({ ...voice, ideas: [1, 2] }, talk, talkAnswer)!.ideas.length, 2);
+  assert.equal(readSaid(voice, talk, { hook: null, ideas: [] }), null);
+  assert.equal(readSaid(voice, talk, undefined), null);
+});
+
+/** A skill timed on her voice, as « Mot clé en grand » will be: her keywords big at their instant, the names of her lists each in its font. */
+const voicedSkill = async () => {
+  const { nominalSaid } = await import("./skills.ts");
+  const skill: import("./skills.ts").MontageSkill = {
+    key: "mot-cle",
+    version: 1,
+    bpm: 108,
+    shots: [1, 12],
+    files: [1, 2],
+    how: "Elle face caméra ; ses premiers mots en grand dès la première image, puis le mot clé de chaque idée au moment où elle le dit.",
+    texts: [],
+    end: false,
+    voice: { hook: "ses deux premiers mots", key: "le mot qui porte l'idée", ideas: [1, 4], items: "une liste qu'elle dit", max: { hook: 20, key: 14, item: 16 }, fonts: ["item"], row: 0.75 },
+    timeline(n, options) {
+      const said = options.said ?? nominalSaid(n, {});
+      return {
+        duration: said.duration,
+        shots: said.shots.map((s) => ({ ...s, want: "elle, face caméra" })),
+        texts: {},
+        marks: { beat: (30 * 60) / 108 },
+        // A low whoosh under each keyword as it slides in.
+        sounds: said.ideas.map((i) => ({ at: i.at, sound: "low whoosh", seconds: 0.5 })),
+      };
+    },
+    code: "function Scene({ spoken, reelTexts, texts }) { const h = React.createElement; return h(AbsoluteFill, null, reelTexts.map((t, i) => h('div', { key: i, style: { fontFamily: t.font || 'Inter' } }, t.text)), spoken.length); }",
+  };
+  return skill;
+};
+
+test("a skill timed on her voice: its shots on her talk, a new frame between two ideas, her words big at the instant she says them", async () => {
+  const { skillTalk, readSkillFill, skillPlan, skillSaid, skillLengths } = await import("./skills.ts");
+  const skill = await voicedSkill();
+  const talk = skillTalk(talkFacts)!;
+  const files = [{ id: "talk", photo: false, seconds: 10 }];
+  const answer = { fits: true, missing: "", shots: [], texts: [], end: null, why: "", voice: talkAnswer };
+  // Without her talk there is nothing to play.
+  assert.equal(readSkillFill(skill, files, 4, answer), null);
+  const fill = readSkillFill(skill, files, 4, answer, { talk })!;
+  assert.deepEqual(fill.shots, []);
+  const said = skillSaid(talk, fill.said!, skill.voice!);
+  // Each idea where it is said; its pieces of talk, the second idea framed tighter (one take: a frame held, never a zoom).
+  assert.deepEqual(said.ideas.map((i) => [i.from, i.at, i.to]), [
+    [0.35, 2.44, 3.54],
+    [3.82, 3.97, 6.12],
+    [6.4, 6.4, 7.45],
+  ]);
+  assert.deepEqual(said.shots.map((s) => [s.start, s.end, s.idea, s.punch]), [
+    [0, 1.17, 0, false],
+    [1.17, 3.68, 0, false],
+    [3.68, 6.26, 1, true],
+    [6.26, 7.95, 2, false],
+  ]);
+  // Its hook from the first image until she says the word after it; each keyword from its word to its idea's end.
+  assert.deepEqual(said.texts.accroche, { from: 0, to: 1.19 });
+  assert.deepEqual(said.texts.idee1, { from: 2.44, to: 3.64 });
+  assert.deepEqual(said.texts.idee2_2, { from: 4.77, to: 6.22 });
+  assert.deepEqual(said.texts.idee3, { from: 6.4, to: 7.55 });
+  // An idea that ends in the middle of a piece cuts it there (between its last word and the next idea's first).
+  const joined = { ...talk, pieces: [{ in: 0.15, out: 9.5, start: 0, end: 9.35 }], words: talkFacts.words.map((w) => ({ ...w, start: w.start - 0.15, end: w.end - 0.15 })), duration: 9.35 };
+  const split = skillSaid(joined, fill.said!, skill.voice!);
+  assert.deepEqual(split.shots.map((s) => [s.start, s.end, s.idea]), [
+    [0, 4.5, 0],
+    [4.5, 7.57, 1],
+    [7.57, 9.35, 2],
+  ]);
+
+  const plan = skillPlan({ skill, name: "Mot clé en grand", files, fill, talk });
+  const parsed = editPlanSchema.safeParse(plan);
+  assert.ok(parsed.success, parsed.success ? "" : parsed.error.message.slice(0, 300));
+  assert.deepEqual(plan.segments.map((s) => ("clip_id" in s ? [s.clip_id, s.in, s.out, s.move ?? "none"] : [])), [
+    ["talk", 0.15, 1.32, "none"],
+    ["talk", 1.73, 4.24, "none"],
+    ["talk", 5.06, 7.64, "punch"],
+    ["talk", 7.81, 9.5, "none"],
+  ]);
+  assert.equal(plan.duration, 7.95);
+  // Her words in the order they show: the hook, each keyword (band), the names of the list (caption), each in its font.
+  assert.deepEqual(plan.texts.map((t) => [t.style, t.text, t.from, t.to, t.font ?? ""]), [
+    ["hook", "Alors aujourd'hui", 0, 1.19, ""],
+    ["band", "soins", 2.44, 3.64, ""],
+    ["band", "gommage", 3.97, 6.22, ""],
+    ["caption", "gommage", 3.97, 6.22, "Great Vibes"],
+    ["caption", "masque", 4.77, 6.22, "Fraunces"],
+    ["caption", "l'huile", 5.57, 6.22, ""],
+    ["band", "Voilà", 6.4, 7.55, ""],
+  ]);
+  // What she says subtitled by the engine under it, its code given her words (times_spoken), its row on her chest.
+  assert.equal(plan.subtitles, true);
+  const motion = plan.layers![0]!.motion;
+  assert.equal(motion.times_spoken, true);
+  assert.equal(motion.writes_spoken, false);
+  assert.equal(motion.subtitle_y, 0.75);
+  // Its marks: its own, and where each idea is said (frames).
+  assert.equal(motion.texts!.said_ideas, "3");
+  assert.equal(motion.texts!.said_idea2_key, String(Math.round(3.97 * 30)));
+  assert.equal(motion.texts!.said_hook_to, String(Math.round(1.19 * 30)));
+  assert.ok(Number(motion.texts!.beat) > 16);
+  // Its sounds on her keywords, as its timeline times them.
+  assert.deepEqual(plan.sounds?.map((s) => s.at), [2.44, 3.97, 6.4]);
+  // Its lengths are hers.
+  assert.deepEqual(skillLengths(skill), { min: 3, max: 45 });
+  // Its subtitles its own: the engine's step aside.
+  const own = skillPlan({ skill: { ...skill, voice: { ...skill.voice!, subtitles: "own" } }, name: "Mot clé", files, fill, talk });
+  assert.equal(own.layers![0]!.motion.writes_spoken, true);
+});
+
+test("a skill timed on her voice: its code gets her words said, each at its frame, and the engine's subtitles stay under it", async () => {
+  const { skillTalk, readSkillFill, skillPlan } = await import("./skills.ts");
+  const { compositionTexts } = await import("./compose.ts");
+  const skill = await voicedSkill();
+  const talk = skillTalk(talkFacts)!;
+  const files = [{ id: "talk", photo: false, seconds: 10 }];
+  const fill = readSkillFill(skill, files, 4, { fits: true, missing: "", shots: [], texts: [], end: null, why: "", voice: talkAnswer }, { talk })!;
+  const plan = editPlanSchema.parse(skillPlan({ skill, name: "Mot clé en grand", files, fill, talk }));
+  const inputs = { template: "libre" as const, clipUrls: { talk: "https://x/talk.mp4" }, brand: { name: "Studio" }, words: { talk: talkFacts.words } };
+  const props = buildReelProps(plan, inputs);
+  const layer = props.layers![0]!;
+  // Every word she says kept (her « euh » was never a word), at its frame on the Reel.
+  assert.equal(layer.spoken?.length, 19);
+  assert.deepEqual(layer.spoken?.find((w) => w.w === "soins"), { w: "soins", from: Math.round(2.44 * 30), to: Math.round(2.84 * 30) });
+  assert.equal(layer.captionsStay, true);
+  // The engine still writes them as subtitles (the Reel's own words), in the skill's row.
+  assert.equal(props.words.length, 19);
+  assert.equal(props.subtitleY, 0.75);
+  // Its texts reach its code with their fonts, in the check as in the render.
+  assert.equal(layer.reelTexts?.find((t) => t.text === "masque")?.font, "Fraunces");
+  assert.equal(compositionTexts(plan).texts.find((t) => t.text === "masque")?.font, "Fraunces");
+  assert.ok((compositionTexts(plan).subtitles?.y_top ?? 0) > 1300);
+  // Its subtitles its own: its code writes them, the engine's step aside.
+  const own = editPlanSchema.parse(skillPlan({ skill: { ...skill, voice: { ...skill.voice!, subtitles: "own" } }, name: "Mot clé", files, fill, talk }));
+  const ownLayer = buildReelProps(own, inputs).layers![0]!;
+  assert.equal(ownLayer.spoken?.length, 19);
+  assert.equal(ownLayer.captionsStay, undefined);
+});
+
+test("a skill timed on her voice: the filler reads her words numbered, what to choose in them, the fonts, and a correction keeps its choices", async () => {
+  const { skillTalk, skillFillInput, saidCurrent, skillPlan, readSkillFill, skillFillSchema, SKILL_FILL_PROMPT } = await import("./skills.ts");
+  const skill = await voicedSkill();
+  const talk = skillTalk(talkFacts)!;
+  const files = [{ id: "talk", photo: false, seconds: 10 }];
+  const input = skillFillInput({ skill, name: "Mot clé en grand", n: talk.pieces.length, files, business: {}, request: "", talk }) as Record<string, unknown> & {
+    voix: { idees: string; liste: string };
+    ce_qu_elle_dit: string[];
+    cases: unknown[];
+    polices?: string[];
+    modele: { longueurs: string };
+  };
+  assert.deepEqual(input.cases, []);
+  assert.match(input.voix.idees, /^de 1 à 4 ; chacune : le mot qui porte l'idée \(14 caractères au plus\)$/);
+  assert.match(input.voix.liste, /police : oui, une différente par nom/);
+  assert.equal(input.ce_qu_elle_dit[0]!.slice(0, 22), "[0] Alors [1] aujourd'");
+  assert.ok((input.polices?.length ?? 0) >= 40);
+  assert.match(input.modele.longueurs, /ce Reel : 7\.95 s/);
+  assert.match(SKILL_FILL_PROMPT, /A model timed on her voice/);
+  assert.ok(skillFillSchema.shape.voice);
+  // A correction: what it chose shown back, its hook, its keywords and its list.
+  const fill = readSkillFill(skill, files, 4, { fits: true, missing: "", shots: [], texts: [], end: null, why: "", voice: talkAnswer }, { talk })!;
+  const plan = skillPlan({ skill, name: "Mot clé", files, fill, talk });
+  assert.deepEqual(saidCurrent(plan.texts), ["accroche : Alors aujourd'hui", "idée 1 : soins", "idée 2 : gommage ; sa liste : gommage, masque, l'huile", "idée 3 : Voilà"]);
+  const again = skillFillInput({ skill, name: "Mot clé", n: 4, files, business: {}, request: "change le mot clé", talk, currentSaid: saidCurrent(plan.texts) }) as { voix_actuelle?: string[] };
+  assert.equal(again.voix_actuelle?.length, 4);
+  // A skill without voice keeps its slots to cast.
+  const { decode } = await import("./skills/decode.ts");
+  assert.ok((skillFillInput({ skill: decode, name: "Décode", n: 12, files, business: {}, request: "" }).cases as unknown[]).length === 12);
+});
+
+test("two videos of one take: their offset found on their sound to a sample, two different talks told apart", async () => {
+  const { takeOffset, wordsOffset, pcmSamples, sameTake, TAKE_RATE, TAKE_MATCH } = await import("./takes.ts");
+  const rng = (seed: number) => () => {
+    seed = (seed + 0x6d2b79f5) | 0;
+    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+  /** A voice: syllables (a pitch with its harmonics, or a noisy consonant) in phrases, pauses between them. */
+  const speech = (seconds: number, seed: number) => {
+    const r = rng(seed);
+    const out = new Float32Array(Math.round(seconds * TAKE_RATE));
+    let t = Math.round(0.4 * TAKE_RATE);
+    while (t < out.length) {
+      for (let s = 0, n = 3 + Math.floor(r() * 8); s < n && t < out.length; s++) {
+        const len = Math.round((0.08 + r() * 0.18) * TAKE_RATE);
+        const f0 = 110 + r() * 140;
+        const voiced = r() > 0.25;
+        for (let i = 0; i < len && t + i < out.length; i++) {
+          let v = 0;
+          if (voiced) for (let h = 1; h <= 6; h++) v += Math.sin((2 * Math.PI * f0 * h * i) / TAKE_RATE) / h;
+          else v = (r() * 2 - 1) * 0.6;
+          out[t + i] = 0.3 * Math.sin((Math.PI * i) / len) * v;
+        }
+        t += len + Math.round(r() * 0.05 * TAKE_RATE);
+      }
+      t += Math.round((0.15 + r() * 0.6) * TAKE_RATE);
+    }
+    return out;
+  };
+  /** The same voice heard by a second phone: its own clock (b(t + offset) = a(t)), duller, the room's echo, its own noise. */
+  const otherPhone = (a: Float32Array, offset: number, seed: number, noise = 0.01) => {
+    const r = rng(seed);
+    const out = new Float32Array(a.length);
+    let low = 0;
+    for (let n = 0; n < out.length; n++) {
+      const src = n - offset * TAKE_RATE;
+      const i = Math.floor(src);
+      const x = i >= 0 && i + 1 < a.length ? a[i]! * (1 - (src - i)) + a[i + 1]! * (src - i) : 0;
+      const e = Math.floor(src - 0.031 * TAKE_RATE);
+      low += 0.35 * (x + (e >= 0 && e < a.length ? 0.35 * a[e]! : 0) - low);
+      out[n] = 0.45 * low + (r() * 2 - 1) * noise;
+    }
+    return out;
+  };
+  const voice = speech(20, 7);
+  for (const offset of [0.8137, -2.4562, 0, 6.03]) {
+    const found = takeOffset(voice, otherPhone(voice, offset, 3), TAKE_RATE)!;
+    assert.ok(Math.abs(found.offset - offset) < 0.001, `${offset} s found ${found.offset} s`);
+    assert.ok(sameTake(found) && found.score >= TAKE_MATCH, `${offset}: ${found.score}`);
+  }
+  // A loud room (each phone its own noise), searched near the gap between their words.
+  const noisy = takeOffset(voice.map((v, i) => v + (rng(i)() * 2 - 1) * 0.08), otherPhone(voice, 3.3333, 4, 0.08), TAKE_RATE, { around: 3.3 })!;
+  assert.ok(Math.abs(noisy.offset - 3.3333) < 0.001 && sameTake(noisy), JSON.stringify(noisy));
+  // Another voice, or the same words said again in another take: not one take.
+  assert.equal(sameTake(takeOffset(voice, speech(20, 99), TAKE_RATE)), false);
+  assert.equal(sameTake(takeOffset(voice, otherPhone(speech(20, 8), 1, 3), TAKE_RATE)), false);
+  // Too short or silent: nothing.
+  assert.equal(takeOffset(new Float32Array(TAKE_RATE), voice, TAKE_RATE), null);
+  // Their words: the same speech, the gap between the same words (its median); too few, or other words, none.
+  const said = (shift: number, words = "alors aujourd hui je vais vous montrer trois soins pour l hiver le gommage") => words.split(" ").map((w, i) => word(w, i * 0.4 + shift, i * 0.4 + shift + 0.3));
+  assert.deepEqual(wordsOffset(said(0), said(1.25)), { offset: 1.25, matched: 14, share: 1 });
+  assert.equal(wordsOffset(said(0), said(0).slice(0, 4)), null);
+  assert.equal(wordsOffset(said(0), said(0, "bonjour à tous bienvenue chez nous on va parler de la coupe du jour")), null);
+  // Her sound as the sandbox decodes it (s16le).
+  assert.deepEqual([...pcmSamples(new Uint8Array([0x00, 0x40, 0x00, 0xc0, 0xff, 0x7f]))].map((v) => Math.round(v * 1000) / 1000), [0.5, -0.5, 1]);
+});
+
+test("two videos of one take: a skill timed on her voice plays every other idea from her other angle, at the same moment of what she says", async () => {
+  const { skillTalk, readSkillFill, skillPlan } = await import("./skills.ts");
+  const skill = await voicedSkill();
+  const files = [{ id: "talk", photo: false, seconds: 10 }, { id: "side", photo: false, seconds: 11 }];
+  const answer = { fits: true, missing: "", shots: [], texts: [], end: null, why: "", voice: talkAnswer };
+  // Her side angle started 1,25 s before the front one: the same moment is 1,25 s later on it.
+  const talk = skillTalk(talkFacts, { takes: [{ clip: "side", offset: 1.25, seconds: 11 }] })!;
+  const plan = skillPlan({ skill, name: "Mot clé", files, fill: readSkillFill(skill, files, 4, answer, { talk })!, talk });
+  assert.deepEqual(plan.segments.map((s) => ("clip_id" in s ? [s.clip_id, s.in, s.out, s.move ?? "none"] : [])), [
+    ["talk", 0.15, 1.32, "none"],
+    ["talk", 1.73, 4.24, "none"],
+    ["side", 6.31, 8.89, "none"],
+    ["talk", 7.81, 9.5, "none"],
+  ]);
+  assert.equal(plan.duration, 7.95);
+  // An angle that does not have that moment (it started 6 s later): her main video, framed tighter.
+  const late = skillTalk(talkFacts, { takes: [{ clip: "side", offset: -6, seconds: 11 }] })!;
+  const fallback = skillPlan({ skill, name: "Mot clé", files, fill: readSkillFill(skill, files, 4, answer, { talk: late })!, talk: late });
+  assert.deepEqual(fallback.segments.map((s) => ("clip_id" in s ? [s.clip_id, s.move ?? "none"] : [])), [
+    ["talk", "none"],
+    ["talk", "none"],
+    ["talk", "punch"],
+    ["talk", "none"],
+  ]);
+  // One frame all along when the skill says so.
+  const still = skillPlan({ skill: { ...skill, voice: { ...skill.voice!, angles: false } }, name: "Mot clé", files, fill: readSkillFill(skill, files, 4, answer, { talk })!, talk });
+  assert.ok(still.segments.every((s) => "clip_id" in s && s.clip_id === "talk" && !s.move));
+  // Her video runs on after her last word when its timeline lasts longer (an ending), as far as it goes.
+  const longer = { ...skill, timeline: (n: number, o: Parameters<typeof skill.timeline>[1]) => ({ ...skill.timeline(n, o), duration: o.said!.duration + 1.6 }) };
+  const ending = skillPlan({ skill: longer, name: "Mot clé", files, fill: readSkillFill(skill, files, 4, answer, { talk: late })!, talk: late });
+  assert.equal(ending.duration, 8.45);
+  assert.deepEqual(ending.segments.at(-1), { clip_id: "talk", in: 7.81, out: 10, zoom: "none" });
+});
+
+test("a font per word: a library of Google Fonts families by what they evoke, one picked by the filler for a word, loaded with the Reel", async () => {
+  const { WORD_FONTS, wordFont, wordFontsBrief, FONT_PAIRS } = await import("./font-pairs.ts");
+  const { readSkillFill, skillPlan, skillFillInput } = await import("./skills.ts");
+  const { LOOK_FONT } = await import("./text-look.ts");
+  assert.ok(WORD_FONTS.length >= 40);
+  assert.equal(new Set(WORD_FONTS.map((f) => f.family)).size, WORD_FONTS.length);
+  for (const f of WORD_FONTS) {
+    assert.match(f.family, LOOK_FONT);
+    assert.ok(f.evokes.length >= 3 && f.looks.length > 5 && f.weight >= 100 && f.weight <= 900, f.family);
+  }
+  // Every theme Tristan named has its families.
+  for (const theme of ["boulangerie", "vin", "sport", "fleurs", "beauté", "café", "vintage", "tech"]) assert.ok(WORD_FONTS.some((f) => f.evokes.includes(theme)), theme);
+  assert.equal(wordFont("great  vibes")?.family, "Great Vibes");
+  assert.equal(wordFont("Comic Sans"), undefined);
+  assert.equal(wordFont(""), undefined);
+  assert.match(wordFontsBrief().find((l) => l.startsWith("Anton"))!, /^Anton : condensée très grasse, en capitales ; évoque sport, force/);
+  // The pairs stay as they were.
+  assert.equal(FONT_PAIRS.length, 15);
+  // A slot that asks for one: the filler's family when it is one of the library; none otherwise, nor on a slot that does not ask.
+  const skill = {
+    key: "test",
+    version: 1,
+    bpm: 100,
+    shots: [1, 1] as [number, number],
+    files: [1, 1] as [number, number],
+    how: "",
+    end: false,
+    texts: [
+      { slot: "mot", role: "hook" as const, want: "un mot", max: 20, required: true, font: true },
+      { slot: "ligne", role: "caption" as const, want: "une ligne", max: 40, required: false },
+    ],
+    timeline: () => ({ duration: 4, shots: [{ start: 0, end: 4, want: "" }], texts: { mot: { from: 0, to: 4 }, ligne: { from: 1, to: 4 } }, marks: {} }),
+    code: "function Scene() { return null; }",
+  };
+  const files = [{ id: "a", photo: true, seconds: 0 }];
+  const read = (fonts: [string, string]) =>
+    readSkillFill(skill, files, 1, { fits: true, missing: "", shots: [{ file: "a", at: 0 }], texts: [{ slot: "mot", text: "Croissant", font: fonts[0] }, { slot: "ligne", text: "tous les matins", font: fonts[1] }], end: null, why: "" })!;
+  assert.deepEqual(read(["fraunces", "Pacifico"]).fonts, { mot: "Fraunces" });
+  assert.equal(read(["Arial", ""]).fonts, undefined);
+  const plan = skillPlan({ skill, name: "Test", files, fill: read(["Fraunces", ""]) });
+  assert.ok(editPlanSchema.safeParse(plan).success);
+  assert.deepEqual(plan.texts.map((t) => t.font ?? null), ["Fraunces", null]);
+  // The render loads it (its texts' fonts) and the composition finds it on its text.
+  const props = buildReelProps(plan, { template: "libre", clipUrls: { a: "https://x/a.jpg" }, photoIds: ["a"], brand: { name: "Farine" } });
+  assert.equal(props.texts[0]!.font, "Fraunces");
+  assert.equal(props.layers![0]!.reelTexts?.[0]?.font, "Fraunces");
+  // The filler sees which slot asks for one, and the library.
+  const input = skillFillInput({ skill, name: "Test", n: 1, files, business: {}, request: "" }) as { textes: { police?: string }[]; polices?: string[] };
+  assert.deepEqual(input.textes.map((t) => t.police ?? null), ["oui", null]);
+  assert.equal(input.polices?.length, WORD_FONTS.length);
+  // A font that is not a family name is refused on a plan.
+  assert.equal(editPlanSchema.safeParse({ ...plan, texts: [{ ...plan.texts[0]!, font: "x;}" }] }).success, false);
+});
+
+test("her address as coordinates: found in her facts or her site, Nominatim's answer kept only when it is her door, four decimals", async () => {
+  const { addressIn, siteAddressLines, nominatimUrl, readNominatim, coordinatesText, placeCoordinates, studioPlaceSchema, GEO_USER_AGENT } = await import("./geo.ts");
+  const line = (facts: string[]) => addressIn(facts)?.line ?? null;
+  assert.equal(line(["Ouvert du mardi au samedi", "Adresse : 12 rue des Martyrs, 75009 Paris"]), "12 rue des Martyrs, 75009 Paris");
+  assert.equal(line(["Le studio est au 3 bis, avenue Jean Jaurès 69007 Lyon."]), "3 bis avenue Jean Jaurès, 69007 Lyon");
+  assert.equal(line(["Salon au 8 place du Marché à Saint-Ouen, ouvert du mardi au samedi"]), "8 place du Marché, Saint-Ouen");
+  assert.equal(line(["Studio Pilates : 14B quai de la Charente, 75019 Paris. Tél 01 23 45 67 89"]), "14B quai de la Charente, 75019 Paris");
+  assert.equal(line(["Notre adresse : 5, allée des Tilleuls - 1050 Bruxelles"]), "5 allée des Tilleuls, 1050 Bruxelles");
+  // Never a street without its number, a town alone, or a sentence that only looks like one.
+  assert.equal(line(["Rue des Martyrs, Paris", "Paris 11e", "12 cours de yoga par semaine, Paris", "3 cours sur 4 sont complets, Nous ouvrons bientôt"]), null);
+  assert.equal(line(["14 route de Lyon"]), null);
+  assert.equal(line(["14 route de Lyon 69300 Caluire"]), "14 route de Lyon, 69300 Caluire");
+  // Her site's structured data.
+  const html = `<script type="application/ld+json">{"@type":"Bakery","address":{"@type":"PostalAddress","streetAddress":"27 rue Ramponeau","postalCode":"75020","addressLocality":"Paris"}}</script>`;
+  assert.deepEqual(siteAddressLines(html), ["27 rue Ramponeau, 75020 Paris"]);
+  assert.equal(line(siteAddressLines(html)), "27 rue Ramponeau, 75020 Paris");
+  // One request, as its usage policy asks: one result with its details, an app's name, never an email.
+  const address = addressIn(["12 rue des Martyrs, 75009 Paris"])!;
+  const url = new URL(nominatimUrl(address));
+  assert.equal(url.origin + url.pathname, "https://nominatim.openstreetmap.org/search");
+  assert.deepEqual([url.searchParams.get("q"), url.searchParams.get("format"), url.searchParams.get("limit"), url.searchParams.get("addressdetails")], ["12 rue des Martyrs, 75009 Paris", "jsonv2", "1", "1"]);
+  assert.doesNotMatch(GEO_USER_AGENT, /@/);
+  assert.match(GEO_USER_AGENT, /^Edith\//);
+  // Its real answer (asked once, 5 November 2026): her door, four decimals.
+  const answer = [{ lat: "48.8772264", lon: "2.3394407", category: "place", type: "house", place_rank: 30, address: { house_number: "12", road: "Rue des Martyrs", city: "Paris", postcode: "75009", country_code: "fr" } }];
+  const found = readNominatim(answer, address)!;
+  assert.equal(coordinatesText(found), "48.8772° N, 2.3394° E");
+  assert.equal(coordinatesText({ lat: -33.86789, lon: -151.20732 }), "33.8679° S, 151.2073° O");
+  // Its street or its town instead of her door, another number or another postcode: no coordinates, never made up.
+  assert.equal(readNominatim([{ ...answer[0], address: { road: "Rue des Martyrs", postcode: "75009" } }], address), null);
+  assert.equal(readNominatim([{ ...answer[0], address: { ...answer[0]!.address, house_number: "21" } }], address), null);
+  assert.equal(readNominatim([{ ...answer[0], address: { ...answer[0]!.address, postcode: "75018" } }], address), null);
+  assert.equal(readNominatim([], address), null);
+  assert.equal(readNominatim({ error: "Unable to geocode" }, address), null);
+  // As cached on the studio: found, or not found (asked once all the same).
+  assert.deepEqual(placeCoordinates(studioPlaceSchema.parse({ address: address.line, lat: 48.8772264, lon: 2.3394407, at: "2026-11-05T08:00:00Z" })), { lat: 48.8772264, lon: 2.3394407 });
+  assert.equal(placeCoordinates(studioPlaceSchema.parse({ address: address.line, none: true, at: "2026-11-05T08:00:00Z" })), null);
+});
+
+test("her address as coordinates: a skill's label written by the engine when they are known, by the filler as its fallback when not", async () => {
+  const { readSkillFill, skillFillInput, skillPlan } = await import("./skills.ts");
+  const skill = {
+    key: "test",
+    version: 1,
+    bpm: 93,
+    shots: [1, 1] as [number, number],
+    files: [1, 1] as [number, number],
+    how: "",
+    end: false,
+    texts: [
+      { slot: "gauche", role: "hook" as const, want: "son quartier", max: 20, required: true },
+      { slot: "droite", role: "caption" as const, want: "ses coordonnées, sinon sa ville", max: 24, required: true, fact: "coordinates" as const },
+    ],
+    timeline: () => ({ duration: 4, shots: [{ start: 0, end: 4, want: "" }], texts: { gauche: { from: 0, to: 4 }, droite: { from: 0, to: 4 } }, marks: {} }),
+    code: "function Scene() { return null; }",
+  };
+  const files = [{ id: "a", photo: true, seconds: 0 }];
+  const answer = { fits: true, missing: "", shots: [{ file: "a", at: 0 }], texts: [{ slot: "gauche", text: "Pigalle" }, { slot: "droite", text: "48.8800° N, 2.3400° E" }], end: null, why: "" };
+  const facts = { coordinates: "48.8772° N, 2.3394° E" };
+  // Known: the engine's words, whatever the filler wrote; shown to the filler as written, never to be written again.
+  assert.equal(readSkillFill(skill, files, 1, answer, { facts })!.texts.droite, "48.8772° N, 2.3394° E");
+  const input = skillFillInput({ skill, name: "Fenêtres", n: 1, files, business: {}, request: "", facts }) as { textes: Record<string, unknown>[] };
+  assert.deepEqual(input.textes[1], { slot: "droite", ecrit_par_le_moteur: "48.8772° N, 2.3394° E", obligatoire: false });
+  assert.equal(skillPlan({ skill, name: "Fenêtres", files, fill: readSkillFill(skill, files, 1, answer, { facts })! }).texts[1]!.text, "48.8772° N, 2.3394° E");
+  // Unknown: the filler writes its fallback (here what it wrote).
+  assert.equal(readSkillFill(skill, files, 1, { ...answer, texts: [{ slot: "gauche", text: "Pigalle" }, { slot: "droite", text: "Paris 9e" }] })!.texts.droite, "Paris 9e");
+  assert.equal((skillFillInput({ skill, name: "Fenêtres", n: 1, files, business: {}, request: "" }) as { textes: Record<string, unknown>[] }).textes[1]!.dit, "ses coordonnées, sinon sa ville");
+  // Longer than its place: not written by the engine (never cut in the middle of a number).
+  assert.equal(readSkillFill({ ...skill, texts: [skill.texts[0]!, { ...skill.texts[1]!, max: 12 }] }, files, 1, { ...answer, texts: [{ slot: "gauche", text: "Pigalle" }, { slot: "droite", text: "Paris 9e" }] }, { facts })!.texts.droite, "Paris 9e");
+});

@@ -30,6 +30,8 @@ import {
   speechCleanFilter,
   speechGain,
   speechLevelsFilter,
+  TAKE_MAX_SECONDS,
+  TAKE_RATE,
   usdToEur,
   type ComposeEnd,
   type ComposeShot,
@@ -1273,6 +1275,33 @@ export async function cleanSpeechInSandbox(
     ]);
     if (!wav?.length || (denoised && !media?.length)) throw new Error("speech cleaning produced no file");
     return { media: media ?? null, wav, level, floor, pauses: parseSilences(await run.stdout(), duration ?? Infinity), duration, seconds: (Date.now() - started) / 1000, isolated };
+  } finally {
+    await bash(sandbox, 'rm -rf "$1"', [dir]).catch(() => {});
+  }
+}
+
+/**
+ * The sound of her videos for the sync of two takes (takes.ts in @fauve/agent): each one's first TAKE_MAX_SECONDS, mono
+ * at TAKE_RATE, as signed 16-bit samples (s16le), its sound as recorded (never the cleaned copy: the isolator's or the
+ * denoiser's work would differ from one to the other); null for a video without sound. ffmpeg only, a few seconds.
+ */
+export async function takeAudioInSandbox(id: string, urls: string[]): Promise<{ pcm: (Buffer | null)[]; seconds: number }> {
+  const started = Date.now();
+  const sandbox = await jobSandbox();
+  const dir = `${ROOT}/jobs/${id}-takes`;
+  const ff = `timeout 120 ${ROOT}/ffmpeg`;
+  try {
+    await bash(sandbox, 'rm -rf "$1" && mkdir -p "$1"', [dir]);
+    const pcm = await Promise.all(
+      urls.map(async (url, k) => {
+        await bash(sandbox, `cd "$1" && ${FETCH.replace('"$1"', `in${k}.src`)}`, [dir, url]);
+        // No sound: an empty file, read as none.
+        await bash(sandbox, `cd "$1" && { ${ff} -v error -y -i in${k}.src -vn -map 0:a:0 -ac 1 -ar ${TAKE_RATE} -t ${TAKE_MAX_SECONDS} -f s16le take${k}.pcm || : > take${k}.pcm; } && rm -f in${k}.src`, [dir]);
+        const bytes = await sandbox.readFileToBuffer({ path: `${dir}/take${k}.pcm` });
+        return bytes && bytes.length >= TAKE_RATE * 2 ? bytes : null;
+      }),
+    );
+    return { pcm, seconds: (Date.now() - started) / 1000 };
   } finally {
     await bash(sandbox, 'rm -rf "$1"', [dir]).catch(() => {});
   }

@@ -261,6 +261,12 @@ export const editPlanMotionSegmentSchema = z.object({
      * (set by the engine; false: it only times its own words on them, and the engine's subtitles stay). It follows its code.
      */
     writes_spoken: z.boolean().optional(),
+    /**
+     * Its code times its own drawing on what is said (a montage skill timed on her voice, skills.ts): it always gets the
+     * words said under it (`spoken`), and the engine's subtitles stay under it unless it writes them (writes_spoken).
+     * Set by the engine; it follows its code, never the browser.
+     */
+    times_spoken: z.boolean().optional(),
     /** Its sound effects, from its own start (the motion designer's answer): they follow its code, never the browser. */
     sounds: z.array(sfxCueSchema).max(16).optional(),
     /**
@@ -302,6 +308,11 @@ export const editPlanTextSchema = z.object({
   backdrop: z.boolean().optional(),
   /** A look of its own (copied from an example, or one of brand.text_looks), instead of the template's style. */
   look: textLookSchema.optional(),
+  /**
+   * A font of its own for its words, picked by a montage skill's filler for what they evoke (WORD_FONTS of font-pairs.ts,
+   * a Google Fonts family): the skill's composition draws it in it (reelTexts[i].font), the render loads it.
+   */
+  font: z.string().regex(LOOK_FONT).optional(),
   ...listFields,
 });
 
@@ -717,6 +728,14 @@ export const clipSpeechSchema = z.object({
   path: z.string().max(300).optional(),
   /** That copy keeps only the voice (the music and noise behind removed by ElevenLabs' voice isolator), not just denoised. */
   isolated: z.boolean().optional(),
+  /**
+   * Her other videos measured against this one for one take filmed by two phones (takes.ts): each one's offset (s: its
+   * time = this one's + offset), how sure (its onsets' correlation) and whether it is the same take. Measured once.
+   */
+  takes: z
+    .array(z.object({ media_id: z.string().min(1).max(80), offset: z.number().min(-600).max(600), score: z.number().min(-1).max(1), same: z.boolean() }))
+    .max(8)
+    .optional(),
 });
 export type ClipSpeech = z.infer<typeof clipSpeechSchema>;
 

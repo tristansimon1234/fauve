@@ -654,7 +654,8 @@ export function SceneCheck({ js, texts, durationInFrames, brand, photos = [], cu
   const width = 1080;
   const height = 1920;
   const [track] = useState(() => footageTrack(pieces, themeFor(look?.template ?? "libre", look?.signature, look?.tempo), { width, height }, { shots }));
-  loadFonts([brand.displayFont, brand.bodyFont, ...fonts]);
+  // The fonts its Reel's texts bring for their own words (a skill's filler picked them) laid out too, as the Reel draws them.
+  loadFonts([brand.displayFont, brand.bodyFont, ...fonts, ...reelTexts.flatMap((t) => (t.font ? [t.font] : []))]);
   const [handle] = useState(() => delayRender("scene check", { timeoutInMilliseconds: 60000 }));
   const [Scene] = useState(() => compileScene(js, checkScope(width, height, durationInFrames)));
   // Words said under it, when its code reads them: written by it or not, they are what it is given.

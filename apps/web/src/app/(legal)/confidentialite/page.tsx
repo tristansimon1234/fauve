@@ -58,6 +58,10 @@ export default function PrivacyPage() {
         <li>TypeSafe : choix de la réaction d’Edith aux messages écrits dans l’application.</li>
         <li>Treg : récupération de la vidéo d’un Reel Instagram que tu envoies en exemple, par son lien.</li>
         <li>Modal : détourage des personnes dans tes vidéos, sur une carte graphique louée le temps du travail ; rien n’y est gardé, la machine est supprimée juste après.</li>
+        <li>
+          OpenStreetMap (service Nominatim de la Fondation OpenStreetMap) : les coordonnées de l’adresse de ton commerce, quand un modèle les affiche ; seule cette adresse
+          est envoyée, une fois (données © les contributeurs d’OpenStreetMap, licence ODbL).
+        </li>
         <li>Meta Platforms (Instagram) et TikTok : publication sur tes comptes et lecture de leurs statistiques, à ta demande.</li>
         <li>Stripe : paiement de l’abonnement.</li>
       </ul>

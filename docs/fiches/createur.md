@@ -78,7 +78,7 @@
 ### 9. Un autre cadre pour une autre idée
 - **Mesuré** : le studio a deux cadres. Bas, la tête au milieu, de 0 à 12,07 s, pour laisser la place aux images ; puis en plan américain, la tête en haut (vers 11 %), de 12,07 à 14,97 s, quand il présente l'outil. Le salon aussi : large (18,30 · 23,00 · 27,70 s), puis un gros plan de côté, de 30,03 à 30,80 s (« Mon petit préféré »), puis de nouveau large. Le gros plan vient sans doute d'une seconde caméra : la phrase continue d'un plan à l'autre (pas clair). Pas de jump cut dans sa parole : voir « Le montage » plus haut.
 - **Sur quoi** : une seconde vidéo d'elle (de côté, ou plus serrée), ou une seconde prise.
-- **Outil** : existant : les coupes du monteur sur ses phrases (`speechCuts`, `jumpCut`). **Manquant** : caler sur leur son deux vidéos d'une même prise (deux téléphones), pour passer de l'une à l'autre au milieu de ce qu'elle dit.
+- **Outil** : existant : les coupes du monteur sur ses phrases (`speechCuts`, `jumpCut`). Existant depuis le 5 novembre : deux vidéos d'une même prise (deux téléphones) calées sur leur son (`docs/son.md`, « Deux prises calées sur leur son »), un skill calé sur sa voix passant de l'une à l'autre entre deux idées, au milieu de ce qu'elle dit (`docs/modeles.md`, « Skills calés sur sa voix »).
 - **Si rien ne s'y prête** : un cadre resserré dans sa propre vidéo (le plan resserré des coupes de parole), seulement sur une phrase forte.
 
 ### 10. Les sous-titres : l'accroche en bandeaux mot à mot, puis petits au milieu

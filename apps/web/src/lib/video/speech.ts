@@ -92,8 +92,8 @@ export async function polishSpeech(asset: { id: string; studio_id: string }, ana
   }
 }
 
-/** Updates the latest analysis of a clip (its speech read since). */
-async function keepAnalysis(studioId: string, mediaId: string, analysis: ClipAnalysis): Promise<void> {
+/** Updates the latest analysis of a clip (its speech read since, its takes measured). */
+export async function keepAnalysis(studioId: string, mediaId: string, analysis: ClipAnalysis): Promise<void> {
   const db = supabaseAdmin();
   const { data: latest } = await db.from("clip_analyses").select("id").eq("media_id", mediaId).eq("studio_id", studioId).order("created_at", { ascending: false }).limit(1).maybeSingle();
   if (latest?.id) await db.from("clip_analyses").update({ analysis }).eq("id", latest.id);
