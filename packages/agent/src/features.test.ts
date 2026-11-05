@@ -7316,3 +7316,397 @@ test("kit: the hand-made pieces are in the scope and told to the motion designer
   // A pictogram goes with its word, never an icon floating on its own (what looks cheap).
   assert.match(MOTION_DESIGNER_PROMPT, /never an icon floating on its own/);
 });
+
+// ——— « Mots mêlés » v2 and « Interrupteur » v2, written again on their originals' fiches (docs/fiches/mots-meles.md, interrupteur.md) ———
+
+/** What the kit's stand-ins read: her shot's light (LightUnder), her cut-out's outline (SubjectOutline) and her tracks, by frame. */
+type KitReads = { light?: { mean: number; high: number } | null; outline?: (frame: number) => string | null; track?: (frame: number, box: { left: number; top: number; width: number; height: number }) => unknown };
+/**
+ * A skill's Scene drawn at a frame as drawCutOuts draws it, with the scope its code also needs: its hooks (useMemo run at
+ * once), Remotion's seeded random, Scribble with its hand's pace (Scribble.frames: the length of the kit's own ring,
+ * capsuleRing or cellsRing of handmade.ts, over its speed), LightUnder, SubjectOutline and track as given.
+ */
+async function kitScene(code: string, read: KitReads = {}) {
+  const { capsuleRing, cellsRing } = await import("../../../apps/render/src/handmade.ts");
+  type Pt = { x: number; y: number };
+  type Ring = { kind?: string; box?: { x: number; y: number; w: number; h: number }; rows?: { x: number; y: number; w: number; h: number }[]; speed: number };
+  const length = (pts: Pt[]) => pts.slice(1).reduce((s, q, i) => s + Math.hypot(q.x - pts[i]!.x, q.y - pts[i]!.y), 0);
+  const ring = (p: Ring) => (p.kind === "cells" ? cellsRing(p.rows ?? [], "top-left", "ccw") : capsuleRing(p.box!, "top-left", "ccw"));
+  const Scribble = Object.assign(() => null, { frames: (p: Ring) => Math.ceil(length(ring(p)) / p.speed) });
+  let current = 0;
+  const React = { createElement: (type: unknown, p: Record<string, unknown> | null, ...children: unknown[]): Drawn => ({ type, props: p ?? {}, children }), Fragment: "Fragment", useMemo: <T,>(make: () => T) => make() };
+  const scope: Record<string, unknown> = {
+    AbsoluteFill: "AbsoluteFill",
+    FitText: "FitText",
+    Footage: "Footage",
+    Subject: "Subject",
+    Img: "Img",
+    Scribble,
+    useCurrentFrame: () => current,
+    interpolate: (x: number, [a, b]: [number, number], [y0, y1]: [number, number]) => y0 + (y1 - y0) * Math.min(1, Math.max(0, (x - a) / (b - a || 1))),
+    random: chance,
+    LightUnder: () => read.light ?? null,
+    SubjectOutline: (_shot: unknown, f: number) => read.outline?.(f) ?? null,
+  };
+  const make = new Function("React", ...Object.keys(scope), `"use strict";\n${code}\nreturn Scene;`) as (...args: unknown[]) => (p: Record<string, unknown>) => Drawn;
+  const Scene = make(React, ...Object.values(scope));
+  const draw = (frame: number, props: Record<string, unknown>) => {
+    current = frame;
+    return Scene({ ...(read.track ? { track: read.track } : {}), ...props });
+  };
+  return { draw, Scribble, frames: (p: Ring) => Scribble.frames(p) };
+}
+
+/** The original's sentence and its words of the same world, as its fiche read them (« SATURDAY AFTERNOON CALL FOR GREEK YOGURT »). */
+const MM_WORDS = [
+  { text: "Saturday afternoon call for greek yogurt", role: "band", from: 0, to: 563, emphasis: [] },
+  { text: "blackberry cinnamon honey dill", role: "caption", from: 0, to: 563, emphasis: [] },
+];
+/** Each letter a word-search Scene lays (a cell of its grid): its letter, its size, its box, and whether it is decor. */
+function gridLetters(tree: unknown) {
+  const out: { ch: string; size: number; decor: boolean; left: number; top: number; width: number; height: number }[] = [];
+  const walk = (node: unknown, decor: boolean): void => {
+    if (!node || typeof node !== "object") return;
+    if (Array.isArray(node)) {
+      node.forEach((n) => walk(n, decor));
+      return;
+    }
+    if (!("children" in node)) return;
+    const n = node as Drawn;
+    const isDecor = decor || "data-fauve-decor" in n.props;
+    const s = styleOf(n);
+    if (n.type === "div" && s.display === "flex" && typeof s.fontSize === "number" && typeof n.children[0] === "string") {
+      out.push({ ch: n.children[0] as string, size: s.fontSize, decor: isDecor, left: Number(s.left), top: Number(s.top), width: Number(s.width), height: Number(s.height) });
+    }
+    n.children.forEach((c) => walk(c, isDecor));
+  };
+  walk(tree, false);
+  return out;
+}
+
+test("« Mots mêlés » (v2): one calm shot of 25 beats at 80 BPM as its 18,67 s original, no cut, its sentence held, its card after the hold", async () => {
+  const { motsMeles } = await import("./skills/mots-meles.ts");
+  const { skillPlan } = await import("./skills.ts");
+  assert.equal(motsMeles.version, 2);
+  assert.equal(motsMeles.bpm, 80);
+  const line = motsMeles.timeline(1, { end: false });
+  // One shot, no cut (the original has none, measured image by image): 25 of its beats, the original's 560 images and three.
+  assert.equal(line.shots.length, 1);
+  assert.equal(line.shots[0]!.start, 0);
+  assert.equal(Math.round(line.duration * 30), 563);
+  // Its first loop on the original's image 4, its sentence held 4 beats at least (3 s), its grid all along.
+  assert.deepEqual(line.marks, { first: 4, hold: 90 });
+  assert.deepEqual(line.texts, { mots: { from: 0, to: line.duration }, autres: { from: 0, to: line.duration } });
+  // An ending card after the hold, never in its place: the grid stays its 25 beats at least, the card its 1,6 s.
+  const ended = motsMeles.timeline(1, { end: true });
+  assert.ok(ended.texts.mots!.to >= line.duration - 0.02 && Math.abs(ended.duration - ended.texts.mots!.to - 1.6) < 0.02, JSON.stringify(ended.texts));
+  // Its music calm (70 to 90 BPM): its length follows it, its loops a hand.
+  assert.deepEqual(motsMeles.tempo, [70, 90]);
+  assert.ok(Math.abs(motsMeles.timeline(1, { end: false, bpm: 70 }).duration - (25 * 60) / 70) < 0.02);
+  // No sound of its own (the original has none) and no shape of its music; a format setting, its default as her video.
+  const files = [{ id: "v", photo: false, seconds: 25 }];
+  const plan = skillPlan({ skill: motsMeles, name: "Mots mêlés", files, fill: { shots: [{ file: "v", at: 2 }], texts: { mots: "Samedi matin café croissant" }, end: null } });
+  assert.equal(plan.sounds, undefined);
+  assert.equal(plan.music_shape, undefined);
+  assert.deepEqual(motsMeles.settings?.map((s) => [s.name, s.choices.map((c) => c.value)]), [["format", ["auto", "horizontal", "vertical"]]]);
+  assert.deepEqual(plan.skill, { key: "mots-meles", version: 2 });
+});
+
+test("« Mots mêlés » (v2): its loops at the original's hand, chained 3 to 6 images apart, from just above each first letter, the letters never changing", async () => {
+  const { motsMeles } = await import("./skills/mots-meles.ts");
+  const line = motsMeles.timeline(1, { end: false });
+  const marks = Object.fromEntries(Object.entries(line.marks).map(([k, v]) => [k, String(v)]));
+  const { draw, Scribble, frames } = await kitScene(motsMeles.code);
+  const props = { width: 1080, height: 1920, durationInFrames: 563, brand: { name: "Le Studio", displayFont: "Inter Tight", bodyFont: "Inter Tight" }, shots: rallumeShots(line), reelTexts: MM_WORDS, end: null, texts: marks };
+  type Loop = { at: number; speed: number; kind: string; angle?: number; start: string; direction: string; width: number; color: string; box?: { x: number; y: number; w: number; h: number }; rows?: { x: number; y: number; w: number; h: number }[] };
+  const loops = (f: number, p: Record<string, unknown> = props) => drawnNodes(draw(f, p)).filter((n) => n.type === Scribble).map((n) => n.props as Loop);
+  const all = loops(562);
+  // Six loops, one a word, « AFTERNOON » in one stroke round two rows, « GREEK » up a diagonal (41,7° in the original).
+  assert.equal(all.length, 6);
+  assert.deepEqual(all.map((l) => l.kind), ["capsule", "cells", "capsule", "capsule", "capsule", "capsule"]);
+  assert.equal(all[1]!.rows!.length, 2);
+  assert.ok(all[4]!.angle! < -40 && all[4]!.angle! > -43, `${all[4]!.angle}`);
+  assert.ok(all.every((l) => l.start === "top-left" && l.direction === "ccw" && l.color === "#ffffff"));
+  // Their starts and lengths: the original's images 4, 88, 168, 227, 274 and 339, its 78, 74, 55, 42, 62 and 60 images
+  // of stroke, within a few images (a word's time is the hand's, 18,6 images plus 3,2 a row of stroke).
+  const starts = [4, 88, 168, 227, 274, 339];
+  const lengths = [78, 74, 55, 42, 62, 60];
+  all.forEach((l, i) => {
+    assert.ok(Math.abs(l.at - starts[i]!) <= 10, `loop ${i + 1} starts on image ${l.at}, the original's ${starts[i]}`);
+    assert.ok(Math.abs(frames(l) - lengths[i]!) <= 7, `loop ${i + 1} takes ${frames(l)} images, the original's ${lengths[i]}`);
+  });
+  // The next one 3 to 6 images after the one before closes (the pen lifted), the sentence held 5 s and more at the end.
+  for (let i = 1; i < all.length; i++) {
+    const lift = all[i]!.at - (all[i - 1]!.at + frames(all[i - 1]!));
+    assert.ok(lift >= 2 && lift <= 7, `lift ${i}: ${lift}`);
+  }
+  const closed = all.at(-1)!.at + frames(all.at(-1)!);
+  assert.ok(563 - closed >= 150, `held from image ${closed}`);
+  // Each one drawn from its start only: none before image 4, two by image 100.
+  assert.equal(loops(3).length, 0);
+  assert.equal(loops(100).length, 2);
+  // A stroke 3,8 % of a row, its capsule 0,9 of a row tall.
+  const row = 608 / 10.46;
+  assert.ok(Math.abs(all[0]!.width - 0.038 * row) < 0.15 && Math.abs(all[0]!.box!.h - 0.9 * row) < 1);
+  // A long sentence goes a little faster rather than eat its hold.
+  const fast = loops(562, { ...props, reelTexts: [{ ...MM_WORDS[0]!, text: "Samedi après-midi grand café crème croissant tartine confiture" }] });
+  const last = fast.at(-1)!;
+  assert.ok(fast.length === 8 && last.at + frames(last) <= 563 - 90 + 1, `the last closes on image ${last.at + frames(last)}`);
+  // The letters never change: the same letters, the same white, before and after their loop.
+  const letters = (f: number) => gridLetters(draw(f, props)).map((l) => `${l.left},${l.top}:${l.ch}`).sort().join("|");
+  assert.equal(letters(10), letters(500));
+  assert.ok(gridLetters(draw(500, props)).every((l) => l.size === 17));
+});
+
+test("« Mots mêlés » (v2): 16 × 10 on her horizontal video in a 16:9 band as the original, 9 × 16 full frame otherwise; her words in order, her other words hidden", async () => {
+  const { motsMeles } = await import("./skills/mots-meles.ts");
+  const line = motsMeles.timeline(1, { end: false });
+  const marks = Object.fromEntries(Object.entries(line.marks).map(([k, v]) => [k, String(v)]));
+  const brand = { name: "Le Studio", displayFont: "Inter Tight", bodyFont: "Inter Tight" };
+  const props = (aspect: number, extra: Record<string, string> = {}) => ({ width: 1080, height: 1920, durationInFrames: 563, brand, shots: rallumeShots(line, aspect), reelTexts: MM_WORDS, end: null, texts: { ...marks, ...extra } });
+  const { draw } = await kitScene(motsMeles.code);
+  const band = (tree: Drawn) => {
+    const b = drawnNodes(tree).find((n) => n.type === "div" && styleOf(n).overflow === "hidden")!;
+    return { top: styleOf(b).top, height: styleOf(b).height };
+  };
+  // Her video in width: the original's frame, 1080 × 608 in the middle, its 160 letters on it, the first 0,73 of a step in.
+  const wide = draw(300, props(16 / 9));
+  assert.deepEqual(band(wide), { top: 656, height: 608 });
+  const cells = new Map(gridLetters(wide).map((l) => [`${l.left},${l.top}`, l]));
+  assert.equal(cells.size, 160);
+  const step = 1080 / 16.46;
+  const row = 608 / 10.46;
+  const first = [...cells.values()].sort((a, b) => a.top - b.top || a.left - b.left)[0]!;
+  assert.ok(Math.abs(first.left + first.width / 2 - 0.73 * step) < 1.5 && Math.abs(first.top + first.height / 2 - (656 + 0.73 * row)) < 1.5, JSON.stringify(first));
+  // There all its letters are decor, at the original's size (2 % of its height); upright, her words are read at 48 px.
+  assert.ok(gridLetters(wide).every((l) => l.decor && l.size === 17));
+  const tall = draw(300, props(9 / 16));
+  assert.deepEqual(band(tall), { top: 0, height: 1920 });
+  const upright = gridLetters(tall);
+  assert.equal(new Set(upright.map((l) => `${l.left},${l.top}`)).size, 144);
+  const read = upright.filter((l) => !l.decor);
+  assert.equal(read.map((l) => l.ch).join(""), "SATURDAYAFTERNOONCALLFORGREEKYOGURT");
+  for (const l of read) {
+    const x = l.left + l.width / 2;
+    const y = l.top + l.height / 2;
+    assert.ok(l.size === 48 && x - 22 >= 28 && y - 26 >= 80 && y + 26 <= 1440 && x + 22 <= (y + 26 > 960 ? 952 : 1052), `${l.ch} at ${x},${y}`);
+  }
+  // Her setting both ways.
+  assert.equal(band(draw(300, props(9 / 16, { format: "horizontal" }))).top, 656);
+  assert.equal(band(draw(300, props(16 / 9, { format: "vertical" }))).height, 1920);
+  // Her words in the order of her sentence, top to bottom: AFTER over NOON from the same column, GREEK rising one row a
+  // letter from its first; her other words hidden in the grid, never ringed; her shortest word once more, as a trap.
+  const cellOf = (l: { left: number; top: number; width: number; height: number }) => ({ c: Math.round((l.left + l.width / 2) / step - 0.73), r: Math.round((l.top + l.height / 2 - 656) / row - 0.73) });
+  const words = drawnNodes(wide).find((n) => n.type === "div" && "data-fauve-decor" in n.props && gridLetters(n).length === 35)!;
+  const mine = gridLetters(words).map((l) => ({ ch: l.ch, ...cellOf(l) }));
+  const word = (from: number, to: number) => mine.slice(from, to);
+  const firstRows = [word(0, 8), word(8, 13), word(17, 21), word(21, 24), word(24, 29), word(29, 35)].map((w) => w[0]!.r);
+  for (let i = 1; i < firstRows.length; i++) assert.ok(firstRows[i]! > firstRows[i - 1]!, `rows ${firstRows}`);
+  const a = word(8, 9)[0]!;
+  assert.ok(word(8, 13).every((l, k) => l.r === a.r && l.c === a.c + k), "AFTER on one row");
+  assert.ok(word(13, 17).every((l, k) => l.r === a.r + 1 && l.c === a.c + k), "NOON under AFTER");
+  const g = word(24, 25)[0]!;
+  assert.ok(word(24, 29).every((l, k) => l.c === g.c + k && l.r === g.r - k), "GREEK up a diagonal");
+  const grid = new Map(gridLetters(wide).map((l) => [`${cellOf(l).c},${cellOf(l).r}`, l.ch]));
+  const lines = (w: string) => {
+    let found = 0;
+    for (let c = 0; c < 16; c++) for (let r = 0; r < 10; r++) for (const [dc, dr] of [[1, 0], [0, 1], [1, -1]] as const) if ([...w].every((ch, k) => grid.get(`${c + dc * k},${r + dr * k}`) === ch)) found++;
+    return found;
+  };
+  for (const hidden of ["BLACKBERRY", "CINNAMON", "HONEY", "DILL"]) assert.equal(lines(hidden), 1, hidden);
+  assert.equal(lines("FOR"), 2);
+  // The other letters drawn from the whole alphabet alike, Z, Q, J and X too.
+  assert.ok(["Z", "Q", "J", "X", "W", "K"].filter((ch) => [...grid.values()].includes(ch)).length >= 4);
+});
+
+test("« Mots mêlés » (v2): its picture darkened to its own light, as filmed, nothing cut out or followed: light to render", async () => {
+  const { motsMeles } = await import("./skills/mots-meles.ts");
+  const { subjectsDrawn, objectsDrawn, clearsDrawn, readsDrawn, depthsDrawn } = await import("./subject.ts");
+  const { checkMotionCode } = await import("./motion-scene.ts");
+  const line = motsMeles.timeline(1, { end: false });
+  const marks = Object.fromEntries(Object.entries(line.marks).map(([k, v]) => [k, String(v)]));
+  const props = { width: 1080, height: 1920, durationInFrames: 563, brand: { name: "Le Studio", displayFont: "Inter Tight", bodyFont: "Inter Tight" }, shots: rallumeShots(line), reelTexts: MM_WORDS, end: null, texts: marks };
+  const veil = async (light: { mean: number; high: number } | null) => {
+    const { draw } = await kitScene(motsMeles.code, { light });
+    const box = drawnNodes(draw(200, props)).find((n) => n.type === "div" && styleOf(n).overflow === "hidden")!;
+    const v = drawnNodes(box).find((n) => n.type === "div" && styleOf(n).backgroundColor === "#000000");
+    return v ? Number(styleOf(v).opacity) : 0;
+  };
+  // Its bright tenth brought under 60 % of white: a white room in daylight takes far more than a dark kitchen; unread, a fixed dose.
+  assert.equal(await veil({ mean: 0.7, high: 0.9 }), 0.333);
+  assert.equal(await veil({ mean: 0.3, high: 0.5 }), 0);
+  assert.equal(await veil({ mean: 0.9, high: 1 }), 0.4);
+  assert.equal(await veil(null), 0.25);
+  // Its light read on its one shot, nothing else: nobody cut out, no object, no clear area, no depth; no zoom, no push.
+  assert.deepEqual(checkMotionCode(motsMeles.code), []);
+  assert.deepEqual(readsDrawn(motsMeles.code), [{ shot: 0, kinds: ["light"] }]);
+  assert.deepEqual([subjectsDrawn(motsMeles.code), objectsDrawn(motsMeles.code), clearsDrawn(motsMeles.code), depthsDrawn(motsMeles.code)], [[], [], [], []]);
+  assert.doesNotMatch(motsMeles.code, /transform|scale\(|filter:/);
+  // Its finish leaves the darkening to its code, without grain or dark corners (the original has none).
+  assert.deepEqual(motsMeles.finish, { exposure: 0, grain: 0, vignette: 0 });
+});
+
+test("« Interrupteur » (v2): one shot of 9,1 s on its original's grid (143,7 BPM, one beat in two), its music stopped dead and back as she lands, its beep", async () => {
+  const { interrupteur } = await import("./skills/interrupteur.ts");
+  const { skillPlan } = await import("./skills.ts");
+  assert.equal(interrupteur.version, 2);
+  assert.equal(interrupteur.bpm, 71.85);
+  const line = interrupteur.timeline(1, { end: false });
+  // One fixed shot, no cut (the original has none): its 275 images less its last two, a rest of its edit.
+  assert.equal(line.shots.length, 1);
+  assert.equal(Math.round(line.duration * 30), 273);
+  // Its switch flips on its image 123 (beat 9¼) when nothing read on her shot says when; her hand looked for around it.
+  assert.equal(line.marks.flip, 123);
+  assert.ok(line.marks.look_from! <= 60 && line.marks.look_to! >= 190);
+  // Its music: its first beat at 0,24 s, stopped dead at 2,29 s (just before beat 5), back on beat 10 (4,41 s, as she
+  // lands) with its bass, cut on beat 21 (9,0 s); each within an image of the original's.
+  const music = line.music!;
+  assert.ok(Math.abs(music.downbeat! - 0.24) < 0.005);
+  assert.equal(music.pauses!.length, 1);
+  assert.ok(Math.abs(music.pauses![0]!.from - 2.29) <= 1 / 30 && Math.abs(music.pauses![0]!.to - 4.41) <= 1 / 30, JSON.stringify(music.pauses));
+  assert.deepEqual(music.filters, [{ kind: "thin", from: 0, to: music.pauses![0]!.from }]);
+  assert.ok(Math.abs(music.end!.at - 9.0) <= 2 / 30 && music.end!.fade! < 0.02);
+  // Its one sound: the short high beep alone in the silence, on beat 6¾ (3,06 s, its image 92), as loud as the music.
+  assert.equal(line.sounds!.length, 1);
+  assert.ok(Math.abs(line.sounds![0]!.at - 3.06) <= 1 / 30 && line.sounds![0]!.gain === 6 && /beep/.test(line.sounds![0]!.sound));
+  // Her poster's words from the flip to the end; she is cut out on her one shot.
+  assert.deepEqual(Object.keys(line.texts), ["nom", "ligne", "detail"]);
+  assert.ok(Object.values(line.texts).every((t) => Math.abs(t.from - 4.1) < 0.01 && t.to === line.duration));
+  assert.deepEqual(line.cutouts, [0]);
+  // An ending card after it (1,6 s at least, on its grid), the music ending as much later; at another tempo, all of it follows.
+  const ended = interrupteur.timeline(1, { end: true });
+  assert.ok(ended.duration - line.duration >= 1.6 && Math.abs(ended.music!.end!.at - music.end!.at - (ended.duration - line.duration)) < 0.02);
+  const slower = interrupteur.timeline(1, { end: false, bpm: 64 });
+  assert.ok(Math.abs(slower.marks.flip! / line.marks.flip! - 71.85 / 64) < 0.01 && Math.abs(slower.music!.pauses![0]!.to / music.pauses![0]!.to - 71.85 / 64) < 0.01);
+  // On the plan: its sound, its music's shape, her cut-out on that passage only.
+  const files = [{ id: "v", photo: false, seconds: 14 }];
+  const plan = skillPlan({ skill: interrupteur, name: "Interrupteur", files, fill: { shots: [{ file: "v", at: 0.5 }], texts: { nom: "Atelier Rose", ligne: "nouvelle collection" }, end: null } });
+  assert.equal(plan.sounds?.length, 1);
+  assert.deepEqual(plan.music_shape?.pauses, [{ from: 2.29, to: 4.415 }]);
+  assert.deepEqual(plan.layers![0]!.motion.drawn, { shots: 1, subjects: [0] });
+  assert.deepEqual(interrupteur.reads, ["gestures"]);
+});
+
+test("« Interrupteur » (v2): its switch where her hand goes highest, flipped in one image as it gets there, her poster at once, she in front", async () => {
+  const { interrupteur } = await import("./skills/interrupteur.ts");
+  const line = interrupteur.timeline(1, { end: false });
+  const marks = Object.fromEntries(Object.entries(line.marks).map(([k, v]) => [k, String(v)]));
+  const brand = { name: "Atelier Rose", displayFont: "Inter Tight", bodyFont: "Inter Tight", accent: "#7a2e3b", palette: { secondary: "#2c4a3e", light: "#f4efe9", dark: "#1d1d1b" } };
+  const reelTexts = [
+    { text: "Atelier Rose", role: "hook", from: 123, to: 273, emphasis: [] },
+    { text: "nouvelle collection", role: "caption", from: 123, to: 273, emphasis: [] },
+    { text: "dès samedi", role: "caption", from: 123, to: 273, emphasis: [] },
+  ];
+  const props = (extra: Record<string, unknown> = {}) => ({ width: 1080, height: 1920, durationInFrames: 273, brand, shots: rallumeShots(line, 9 / 16), reelTexts, end: null, texts: marks, ...extra });
+  // Her index finger rises from her chest to the top of her jump on image 110, then down again.
+  const tip = (f: number) => ({ x: 600 + (f - 60) * 0.5, y: f < 110 ? 1100 - (f - 60) * 14 : 400 + (f - 110) * 14 });
+  const track = (f: number) => ({
+    hands: f >= 60 && f <= 160 ? [{ points: { index_tip: tip(f), wrist: { x: tip(f).x, y: tip(f).y + 120 } } }] : [],
+    bodies: f >= 40 ? [{ points: { left_shoulder: { x: 560, y: 900, visible: true }, right_shoulder: { x: 700, y: 900, visible: true } } }] : [],
+  });
+  const { draw } = await kitScene(interrupteur.code, { track });
+  type Box = { left: number; top: number; width: number; height: number };
+  const switchOf = (tree: Drawn) => {
+    const s = drawnNodes(tree).find((n) => n.props.key === "switch")!;
+    return { ...(styleOf(s) as Box & { backgroundColor: string }), knob: styleOf(drawnNodes(s)[1]!) as Box };
+  };
+  // Its proportions: 0,2875 of the width, 0,46 of that tall, a capsule knob 1,28 times as wide as tall, 10,5 % in.
+  const off = switchOf(draw(100, props()));
+  assert.deepEqual([off.width, off.height], [311, 143]);
+  assert.ok(Math.abs(off.knob.width / off.knob.height - 1.28) < 0.02 && off.knob.top === 15 && off.knob.left === 15, JSON.stringify(off.knob));
+  // Where her fingertip goes highest, right of its middle at its mid-height; off and grey until then.
+  assert.ok(Math.abs(off.left + off.width / 2 - (tip(110).x - 0.03 * 311)) <= 1 && Math.abs(off.top + off.height / 2 - 400) <= 1, JSON.stringify(off));
+  assert.equal(off.backgroundColor, "#605e5a");
+  // It flips in one image as her hand gets within a hair of the top: no image between; her colour, the knob on the right.
+  const flips = [107, 108, 109, 110].map((f) => switchOf(draw(f, props())).backgroundColor);
+  const at = flips.indexOf("#7a2e3b") + 107;
+  assert.ok(at >= 108 && at <= 110, flips.join(" "));
+  const on = switchOf(draw(at, props()));
+  assert.equal(on.knob.left, 311 - 15 - on.knob.width);
+  assert.equal(switchOf(draw(at - 1, props())).knob.left, 15);
+  // Her poster there at once with it, never before; flat (nothing grows or fades in); under the switch, centred.
+  const poster = (f: number) => drawnNodes(draw(f, props())).find((n) => n.props.key === "poster");
+  assert.equal(poster(at - 1), undefined);
+  const lit = poster(at)!;
+  assert.doesNotMatch(JSON.stringify(lit), /opacity|scale|blur/);
+  const texts = drawnNodes(lit).filter((n) => n.type === "FitText");
+  assert.deepEqual(texts.map((n) => heldText(n).replace(/\s+/g, " ").trim()), ["Atelier Rose", "nouvelle collection", "dès samedi"]);
+  assert.ok(texts.every((n) => (n.props.style as Box).top > on.top + on.height));
+  // Each of its words inside the safe zone, left of the apps' buttons below the middle of the frame.
+  for (const n of texts) {
+    const b = n.props.style as Box;
+    assert.ok(b.left >= 40 && b.top >= 80 && b.top + b.height <= 1440 && b.left + b.width <= (b.top + b.height > 960 ? 940 : 1040), `${heldText(n)}: ${JSON.stringify(b)}`);
+  }
+  // Her name in her second colour, her line in spaced capitals between two rules in the first, small labels beside it.
+  assert.equal((texts[0]!.props.innerStyle as { color: string }).color, "#2c4a3e");
+  assert.equal((texts[1]!.props.innerStyle as { color: string }).color, "#7a2e3b");
+  assert.ok(drawnNodes(texts[1]!).some((n) => "data-fauve-accent" in n.props) && drawnNodes(texts[1]!).filter((n) => n.props.key === "a" || n.props.key === "b").length === 2);
+  assert.ok(drawnNodes(lit).some((n) => n.type === "svg"), "its sparkle");
+  // She passes in front of both: her cut-out laid after them, only from just before the flip.
+  const order = (f: number) => drawnNodes(draw(f, props())).filter((n) => n.props.key === "switch" || n.props.key === "poster" || n.type === "Subject").map((n) => (n.type === "Subject" ? "her" : String(n.props.key)));
+  assert.deepEqual(order(at), ["switch", "poster", "her"]);
+  assert.deepEqual(order(at - 25), ["switch"]);
+  // Nothing read (no hand, no outline): at the original's place, on its image 123.
+  const { draw: bare } = await kitScene(interrupteur.code);
+  const still = switchOf(bare(122, props()));
+  assert.ok(Math.abs(still.left + still.width / 2 - 539) <= 1 && Math.abs(still.top + still.height / 2 - 394) <= 1, JSON.stringify(still));
+  assert.equal(still.backgroundColor, "#605e5a");
+  assert.equal(switchOf(bare(123, props())).backgroundColor, "#7a2e3b");
+  // Her cut-out's outline when her hands were not tracked: the top of her raised arm.
+  const outline = (f: number) => (f >= 90 && f <= 130 ? `M 640 ${f === 112 ? 500 : 760} L 700 900 L 560 1500 Z` : "M 640 1000 L 700 1100 L 560 1500 Z");
+  const { draw: cut } = await kitScene(interrupteur.code, { outline });
+  const fromOutline = switchOf(cut(80, props()));
+  assert.ok(Math.abs(fromOutline.top + fromOutline.height / 2 - 500) <= 1, JSON.stringify(fromOutline));
+  // No colour of hers dark enough: a phone's green, an ink; a logo that says her name is never written under again.
+  const pale = { ...brand, accent: "#f5e6d8", palette: { light: "#ffffff" } };
+  assert.equal(switchOf(bare(130, props({ brand: pale }))).backgroundColor, "#34c759");
+  const withLogo = drawnNodes(bare(130, props({ brand: { ...brand, logoUrl: "/logo.png" } }))).find((n) => n.props.key === "poster")!;
+  assert.ok(drawnNodes(withLogo).some((n) => n.type === "Img"));
+  assert.ok(!drawnNodes(withLogo).some((n) => n.type === "FitText" && heldText(n).includes("Atelier Rose")));
+  // Its ending card takes the place of her name and her line on the poster.
+  const card = drawnNodes(bare(240, props({ end: { title: "Ouvert dimanche", subtitle: "de 10 h à 18 h", from: 225 } }))).find((n) => n.props.key === "poster")!;
+  assert.deepEqual(drawnNodes(card).filter((n) => n.type === "FitText").map((n) => heldText(n).replace(/\s+/g, " ").trim()), ["Ouvert dimanche", "de 10 h à 18 h"]);
+});
+
+test("« Interrupteur » (v2): upright as her video, a horizontal one cropped on her reach when her gesture fits, else whole in a band; light to render", async () => {
+  const { interrupteur } = await import("./skills/interrupteur.ts");
+  const { subjectsDrawn, objectsDrawn, clearsDrawn, readsDrawn } = await import("./subject.ts");
+  const { checkMotionCode } = await import("./motion-scene.ts");
+  const line = interrupteur.timeline(1, { end: false });
+  const marks = Object.fromEntries(Object.entries(line.marks).map(([k, v]) => [k, String(v)]));
+  const brand = { name: "Atelier Rose", displayFont: "Inter Tight", bodyFont: "Inter Tight" };
+  const reelTexts = [{ text: "Atelier Rose", role: "hook", from: 123, to: 273, emphasis: [] }];
+  const props = (aspect: number, extra: Record<string, string> = {}) => ({ width: 1080, height: 1920, durationInFrames: 273, brand, shots: rallumeShots(line, aspect), reelTexts, end: null, texts: { ...marks, ...extra } });
+  type Box = { left: number; top: number; width: number; height: number };
+  // Her hand at the top of her reach a little right of the middle of her picture (its own box, as laid), her body under it.
+  const track = (f: number, box: Box) => {
+    const x = box.left + box.width * 0.55;
+    const y = box.top + box.height * (f === 120 ? 0.25 : 0.45);
+    return { hands: [{ points: { index_tip: { x, y } } }], bodies: [{ points: { left_shoulder: { x: x - 80, y: box.top + box.height * 0.5, visible: true }, right_shoulder: { x: x + 80, y: box.top + box.height * 0.5, visible: true } } }] };
+  };
+  const wall = (tree: Drawn) => styleOf(drawnNodes(tree).find((n) => n.type === "Footage")!) as Box;
+  const { draw } = await kitScene(interrupteur.code, { track });
+  const { draw: bare } = await kitScene(interrupteur.code);
+  // Upright: full frame. Horizontal with her whole gesture in a window: cropped on her reach, the window fixed (her video
+  // laid at its own shape, her reach in the middle of the frame). Horizontal without anything read: whole in a band.
+  assert.deepEqual(wall(draw(130, props(9 / 16))), { left: 0, top: 0, width: 1080, height: 1920 });
+  const cropped = wall(draw(130, props(16 / 9)));
+  assert.equal(cropped.width, 3413);
+  assert.ok(Math.abs(cropped.left + cropped.width * 0.55 - 540) <= 1 && cropped.height === 1920, JSON.stringify(cropped));
+  assert.deepEqual(wall(draw(10, props(16 / 9))), cropped);
+  assert.deepEqual(wall(bare(130, props(16 / 9))), { left: 0, top: 656, width: 1080, height: 608 });
+  // Her words: whole in the band, or full frame as asked.
+  assert.deepEqual(wall(draw(130, props(16 / 9, { format: "horizontal" }))), { left: 0, top: 656, width: 1080, height: 608 });
+  assert.deepEqual(wall(bare(130, props(16 / 9, { format: "vertical" }))), { left: 0, top: 0, width: 1080, height: 1920 });
+  assert.deepEqual(interrupteur.settings?.map((s) => [s.name, s.choices.map((c) => c.value)]), [["format", ["auto", "vertical", "horizontal"]]]);
+  // In the band, its switch at the band's scale (the original's 16,2 % of its height wide).
+  assert.equal(styleOf(drawnNodes(bare(130, props(16 / 9))).find((n) => n.props.key === "switch")!).width, 98);
+  // Light to render: her cut-out on her one shot only, nothing followed, no clear area, no reading; no zoom, no push;
+  // her cut-out laid only from just before the flip.
+  assert.deepEqual(checkMotionCode(interrupteur.code), []);
+  assert.deepEqual(subjectsDrawn(interrupteur.code), [0]);
+  assert.deepEqual([objectsDrawn(interrupteur.code), clearsDrawn(interrupteur.code), readsDrawn(interrupteur.code)], [[], [], []]);
+  assert.doesNotMatch(interrupteur.code, /transform|scale\(/);
+  assert.equal(drawnNodes(bare(100, props(9 / 16))).filter((n) => n.type === "Subject").length, 0);
+  assert.equal(drawnNodes(bare(103, props(9 / 16))).filter((n) => n.type === "Subject").length, 1);
+});
