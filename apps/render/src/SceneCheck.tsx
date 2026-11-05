@@ -643,17 +643,28 @@ function spokenWritten(words: { w: string; from: number; to: number }[], frames:
   return asked ? written / asked : 1;
 }
 
+/** A copy's words without its decoration (data-fauve-decor): what reads, each text node once, in order. */
+function wordsOf(copy: HTMLElement): string {
+  let out = "";
+  const walker = document.createTreeWalker(copy, NodeFilter.SHOW_TEXT);
+  for (let node = walker.nextNode(); node; node = walker.nextNode()) if (!inDecor(node)) out += node.textContent ?? "";
+  return out;
+}
+
 /**
  * The Reel's texts a composition does not write: each one is looked for, whole, in the copies of
- * the frames it holds (its words may come one by one, so the fullest copy counts).
+ * the frames it holds (its words may come one by one, so the fullest copy counts). Each copy is read
+ * whole, its decoration included (a label set in it), and without its decoration: a hand that never
+ * repeats (Handwriting) lays each line's letters as decor before its unseen copy, so a text written
+ * over three lines or more reads whole only from its copies (« Carte au feutre »).
  */
 function missingTexts(reelTexts: NonNullable<SceneCheckProps["reelTexts"]>, frames: number[]): string[] {
-  const copies = new Map<number, string>();
-  document.querySelectorAll<HTMLElement>("[data-check-frame]").forEach((copy) => copies.set(Number(copy.dataset.checkFrame), plain(copy.textContent ?? "")));
+  const copies = new Map<number, string[]>();
+  document.querySelectorAll<HTMLElement>("[data-check-frame]").forEach((copy) => copies.set(Number(copy.dataset.checkFrame), [plain(copy.textContent ?? ""), plain(wordsOf(copy))]));
   return reelTexts.flatMap((t) => {
     const held = frames.filter((f) => f >= t.from && f < t.to);
     const words = [t.text, ...(t.items ?? []).map((item) => item.title)].map(plain);
-    const found = held.some((f) => words.every((w) => copies.get(f)?.includes(w)));
+    const found = held.some((f) => words.every((w) => copies.get(f)?.some((c) => c.includes(w))));
     return held.length && !found ? [`« ${t.text.slice(0, 50)} » (images ${t.from} à ${t.to})`] : [];
   });
 }
