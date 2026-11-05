@@ -1,5 +1,6 @@
 import type { EffectPiece } from "./pieces.ts";
 import { cadre } from "./pieces/cadre.ts";
+import { fenetres } from "./pieces/fenetres.ts";
 import { monTravail } from "./pieces/mon-travail.ts";
 
 // The bank of ready-to-play effects (pieces.ts: the form of an effect, its filler, how its layer is built), by the key of
@@ -8,7 +9,7 @@ import { monTravail } from "./pieces/mon-travail.ts";
 // (scripts/skill-render.mts --piece); a new model of Edith's brings its own (docs/reprise.md, « Passage de relais »).
 
 /** The bank, in the order the editor is offered them on a tie (pieces.ts, piecesOffered). */
-export const EFFECT_PIECES: Record<string, EffectPiece> = { cadre, "mon-travail": monTravail };
+export const EFFECT_PIECES: Record<string, EffectPiece> = { cadre, "mon-travail": monTravail, fenetres };
 
 /** The piece of the bank a model's key names, if it has one. */
 export const pieceFor = (key: string | null | undefined): EffectPiece | undefined => (key ? EFFECT_PIECES[key] : undefined);
