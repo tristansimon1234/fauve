@@ -2,6 +2,7 @@ import type { EffectPiece } from "./pieces.ts";
 import { cadre } from "./pieces/cadre.ts";
 import { plansFixes } from "./pieces/plans-fixes.ts";
 import { coulisses } from "./pieces/coulisses.ts";
+import { ecranPartage } from "./pieces/ecran-partage.ts";
 
 // The bank of ready-to-play effects (pieces.ts: the form of an effect, its filler, how its layer is built), by the key of
 // the model each one comes from. Server side only (@fauve/agent/pieces), like the montage skills: their code stays out of
@@ -9,7 +10,7 @@ import { coulisses } from "./pieces/coulisses.ts";
 // (scripts/skill-render.mts --piece); a new model of Edith's brings its own (docs/reprise.md, « Passage de relais »).
 
 /** The bank, in the order the editor is offered them on a tie (pieces.ts, piecesOffered). */
-export const EFFECT_PIECES: Record<string, EffectPiece> = { cadre, "plans-fixes": plansFixes, coulisses };
+export const EFFECT_PIECES: Record<string, EffectPiece> = { cadre, "plans-fixes": plansFixes, coulisses, "ecran-partage": ecranPartage };
 
 /** The piece of the bank a model's key names, if it has one. */
 export const pieceFor = (key: string | null | undefined): EffectPiece | undefined => (key ? EFFECT_PIECES[key] : undefined);
