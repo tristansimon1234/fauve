@@ -181,6 +181,16 @@ export const FONT_PAIRS: FontPair[] = [
     how: "un titre de film en grandes capitales serif sur deux lignes serrées, un petit mot en capitales très espacées au-dessus, une signature en petit italique dessous, dans la même famille",
     fits: "un court métrage, une journée racontée comme un film, un générique d'ouverture",
   },
+  {
+    // « Titre de film signé » (docs/fiches/titre-cinema.md, effect 1): its title in very heavy square capitals with slits
+    // for counters (Sarpanch 900 at its own width: 15,9 capitals for the original's 15,5), its signature in a roman serif.
+    key: "generique-signe",
+    name: "Générique signé",
+    display: { family: "Sarpanch", weight: 900, case: "upper", tracking: "normal" },
+    body: { family: "Tinos", weight: 400, case: "normal", tracking: "normal" },
+    how: "un mot en capitales carrées très grasses au milieu de l'image, une signature en serif romain sous sa fin (« par Léa »)",
+    fits: "un titre de film signé, un lieu raconté comme un court film, une ambiance du soir",
+  },
 ];
 
 const BY_KEY = new Map(FONT_PAIRS.map((p) => [p.key, p]));

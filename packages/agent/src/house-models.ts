@@ -1456,6 +1456,51 @@ export const HOUSE_MODELS: HouseModel[] = [
       why: "On ouvre un film plutôt qu'une vidéo : la fente qui s'ouvre, le titre et la brûlure promettent une histoire, la pellicule qui saute relance au milieu, et la lumière dorée donne envie d'y être.",
     },
   }),
+  model({
+    key: "titre-cinema",
+    name: "Titre de film signé",
+    // Written on its original's fiche (v1 of its skill, docs/fiches/titre-cinema.md): a film's opening title, a word in
+    // very heavy square white capitals dead centre over a still shot at dusk, signed under its end in a roman serif, the
+    // person passing in front of the signature; its intro without its bass, the beat dropping on the cut; then still
+    // shots of someone alone from behind, a bar or two each; its 10:9 window on black; no grain nor dark corners.
+    pitch: "Le titre de ton film en grandes capitales blanches au-dessus de toi dans ton premier plan, signé de ton nom en petit (« par Léa »), toi qui passes devant ta signature, puis tes plans de cinéma coupés sur la musique qui démarre.",
+    needs: "un plan large et fixe au crépuscule (ton lieu, ta rue ou un paysage, du ciel en haut) où tu marches ou te tiens, puis 3 à 7 plans fixes : quelqu'un seul de dos face à quelque chose de beau, des gens ensemble, quelqu'un qui s'en va au soleil couchant",
+    files: [3, 8],
+    pair: "generique-signe",
+    // Its skill's code is its reference (no composition was written before it).
+    example: null,
+    // Measured on its original (docs/fiches/titre-cinema.md): a bar every 1,932 s, eight snares on the grid within 12 ms.
+    tempo: 124.2,
+    finish: { name: "Ciné du soir", hint: "ombres sarcelle, hautes lumières crème, couleurs riches, sans grain ni coins sombres", contrast: 0.1, saturation: 0.06, warmth: 0.04, shadows: "#071216", highlights: "#E8D9AE", split: 0.3 },
+    look: {
+      name: "titre de film signé",
+      format: "pov",
+      hook: { kind: "mystère", what: "un plan large et fixe au crépuscule, un mot en très grandes capitales blanches au milieu, signé dessous en petit serif, et quelqu'un qui avance et passe devant la signature" },
+      text: {
+        amount: "une ligne",
+        composition: "un mot en capitales carrées très grasses, blanc, au milieu du premier plan sur 62 % de la largeur ; sous sa fin, une signature en serif romain (« par » et un prénom), derrière la personne",
+        case: "upper",
+        weight: "black",
+        tracking: "normal",
+        shadow: "none",
+      },
+      layout: "une fenêtre presque carrée (10:9) sur du noir quand ses vidéos sont horizontales, sinon plein cadre ; le titre sur le premier plan seulement",
+      moments: [
+        { at: 0, what: "un plan large et fixe au crépuscule, quelqu'un petit au milieu en bas qui avance lentement en levant les yeux ; le titre et sa signature là dès la première image, immobiles, la musique sans basse" },
+        { at: 0.4, what: "sa tête passe devant la signature, de plus en plus, jamais devant le titre" },
+        { at: 6.1, what: "la coupe emporte le titre et la basse tombe : un plan fixe de quelqu'un seul de dos devant ce qui brille (un manège illuminé), une mesure" },
+        { at: 8.1, what: "quelqu'un de dos face à la mer au crépuscule, une mesure, puis de dos devant un aquarium immense, la main tendue, deux mesures" },
+        { at: 13.83, what: "des gens ensemble (des passagers d'un bateau au soleil), puis une silhouette qui marche au soleil couchant, coupée net" },
+      ],
+      camera: "fixe",
+      transitions: "coupes nettes",
+      grade: "natural",
+      motion: "epure",
+      music: "dreamy indie pop, swaying triplet feel, half-time drums, warm bass",
+      ending: "une silhouette qui marche au soleil couchant, coupée net avec la musique ; ni carte, ni logo",
+      why: "Le titre signé fait générique de film dès la première image, la personne qui passe devant sa signature lui donne de la profondeur, et la basse qui tombe sur la coupe lance des plans contemplatifs qu'on regarde jusqu'au bout.",
+    },
+  }),
 ];
 
 const BY_KEY = new Map(HOUSE_MODELS.map((m) => [m.key, m]));
@@ -1528,6 +1573,7 @@ export const HOUSE_WHEN: Record<string, { pour: string; pas_pour: string }> = {
   silhouette: { pour: "se présenter (elle ou quelqu'un de son équipe), présenter son métier et ce qu'elle fait, un lancement, un ton de studio graphique", pas_pour: "des produits seuls, un lieu sans personne, une offre à lire" },
   vision: { pour: "son lieu fréquenté filmé de haut, quelqu'un d'immobile au milieu et des gens qui passent autour ; un ton tech ou graphique", pas_pour: "un lieu vide, un plan qui bouge, des produits en gros plan, un message à lire" },
   "court-metrage": { pour: "raconter sa journée, son quartier ou une sortie comme un petit film, une ouverture, une saison, de belles lumières (le matin, l'heure dorée)", pas_pour: "une offre à lire, quelqu'un qui parle, des vidéos sombres ou toutes en gros plan" },
+  "titre-cinema": { pour: "son lieu ou une sortie racontés comme un court film signé de son nom : son métier en un mot, un lieu au soir, une escapade, une ambiance", pas_pour: "sans plan large et fixe où quelqu'un se tient avec du ciel au-dessus, une offre à lire, quelqu'un qui parle" },
 };
 
 /** The models for Edith: their key, name, what they do, what they want, and what only she can film for one. */

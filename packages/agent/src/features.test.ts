@@ -1275,7 +1275,7 @@ test("each of Edith's models shows its original's frames as a Reel she sends: sh
   assert.equal(houseOriginalPath("facade"), "house/originals/facade.mp4");
   // A 31 s original: twelve sheets of 2.583 s; a 9.4 s one: five of 2 s; as many as the workshop made for each model.
   assert.equal(sheetSpan(31), 2.583);
-  const made: Record<string, number> = { decode: 12, "quatre-coins": 11, mosaique: 3, "carte-feutre": 5, pile: 5, "photo-dump": 6, table: 5, "ecran-partage": 7, cadre: 4, fenetres: 7, facade: 5, gaufre: 7, "mot-cle": 12, frappe: 7, "titre-derriere": 6, journee: 8, "plans-fixes": 7, "coups-de-fouet": 12, tourne: 7, nike: 6, eventail: 10, coulisses: 6, interrupteur: 5, interface: 7, pixel: 8, "mots-meles": 10, aplat: 5, detourages: 9, createur: 12, silhouette: 6, vision: 5, "mon-travail": 5, rallume: 0, "court-metrage": 12 };
+  const made: Record<string, number> = { decode: 12, "quatre-coins": 11, mosaique: 3, "carte-feutre": 5, pile: 5, "photo-dump": 6, table: 5, "ecran-partage": 7, cadre: 4, fenetres: 7, facade: 5, gaufre: 7, "mot-cle": 12, frappe: 7, "titre-derriere": 6, journee: 8, "plans-fixes": 7, "coups-de-fouet": 12, tourne: 7, nike: 6, eventail: 10, coulisses: 6, interrupteur: 5, interface: 7, pixel: 8, "mots-meles": 10, aplat: 5, detourages: 9, createur: 12, silhouette: 6, vision: 5, "mon-travail": 5, rallume: 0, "court-metrage": 12, "titre-cinema": 11 };
   for (const m of HOUSE_MODELS) assert.equal(houseSheets(m.key).length, made[m.key], m.key);
   assert.deepEqual(houseSheets("facade").at(-1), { from: 8, to: 9.4, path: "house/sheets/facade/04.jpg" });
   assert.deepEqual(houseSheets("inconnu"), []);
@@ -5794,8 +5794,8 @@ test("a font per word: a library of Google Fonts families by what they evoke, on
   assert.equal(wordFont(""), undefined);
   assert.match(wordFontsBrief().find((l) => l.startsWith("Anton"))!, /^Anton : condensée très grasse, en capitales ; évoque sport, force/);
   // The pairs (three added on November 5: « Mot clé en grand »'s, « Face caméra et références »' and « Ton nom qui clignote »';
-  // then « Court métrage »'s film title card).
-  assert.equal(FONT_PAIRS.length, 19);
+  // then « Court métrage »'s film title card and « Titre de film signé »'s).
+  assert.equal(FONT_PAIRS.length, 20);
   // A slot that asks for one: the filler's family when it is one of the library; none otherwise, nor on a slot that does not ask.
   const skill = {
     key: "test",
@@ -10396,8 +10396,9 @@ test("the models' signature effects: one short line each for the editor, named b
     // Never the marker the editor writes, nor an original's own words.
     assert.doesNotMatch(line, /\[borrow|LOS ANGELES|HOLLYWOOD|In-N-Out/i);
   });
-  // Short: the whole catalogue in about 2 500 tokens of the editor's input.
-  assert.ok(lines.join("\n").length < 10_000, String(lines.join("\n").length));
+  // Short: the whole catalogue in about 4 200 tokens of the editor's input (a Reel she copies only), for the 55 models
+  // Tristan's wave of November 5 brings (about 290 characters a line).
+  assert.ok(lines.join("\n").length < 17_000, String(lines.join("\n").length));
   // The task's own example: her name behind the scenery, on a fixed shot with sky.
   assert.match(houseEffectLine("titre-derriere")!, /^titre-derriere — Titre derrière le décor : son nom géant .*derrière ses toits.* Il faut : un plan large et fixe .*du ciel en haut/);
   assert.equal(houseEffectLine("inconnu"), undefined);

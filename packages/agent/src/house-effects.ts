@@ -152,6 +152,10 @@ export const HOUSE_EFFECTS: Record<string, HouseEffect> = {
     effet: "ses plans projetés comme une vieille pellicule aux coins arrondis : l'image qui s'ouvre depuis une fente, son titre de film en jaune, une brûlure sur la coupe, la pellicule qui saute",
     il_faut: "des vidéos dans une belle lumière (le matin, l'heure dorée), à l'horizontale de préférence, la première calme",
   },
+  "titre-cinema": {
+    effet: "le titre de son film en très grandes capitales blanches au milieu de son premier plan, signé dessous en petit serif (« par Léa »), la personne passant devant sa signature, parti avec la coupe où la basse tombe",
+    il_faut: "un plan large et fixe où quelqu'un se tient ou marche, du ciel au-dessus de sa tête",
+  },
 };
 
 /** The most of Edith's models one Reel borrows from: one charter, one music, never a patchwork. */
