@@ -21,7 +21,7 @@ Tristan va envoyer de nouveaux modèles (des liens de Reels) dans une nouvelle c
 
 **Règles en plus de CLAUDE.md** : les appels d'admin passent par la base (`net.http_post`, secrets du Vault `fauve_app_url` et `fauve_cron_secret`, réponse dans `net._http_response`, une quinzaine d'appels au plus par requête) ; jamais les outils Vercel (ils demandent une autorisation à Tristan) ; Tristan : « avance sans me demander trop de trucs », « fais-en le plus possible en même temps », « tu peux arrêter de me demander des autorisations ? » ; « c'est un effet que l'on veut pouvoir faire, pas exactement reproduire l'image » ; réponses en français, courtes (il n'a pas compris un message en anglais).
 
-**Encore ouvert** : la version horizontale à publier en « Publication » (piste dans `docs/monteur.md`, pas maintenant) ; « Photos posées sur la table » n'a pas eu de vrai plan de table au banc ; le schéma « legacy » du monteur, son repli quand l'API refuse le schéma courant, a 36 paramètres facultatifs et ne peut plus passer (à alléger ou à retirer) ; les modèles repérés (chantier 3 : candidats sur /admin, `model_candidates`, un brouillon écrit par un agent après le clic de Tristan).
+**Encore ouvert** : la version horizontale à publier en « Publication » (piste dans `docs/monteur.md`, pas maintenant) ; « Photos posées sur la table » n'a pas eu de vrai plan de table au banc ; le schéma « legacy » du monteur, son repli quand l'API refuse le schéma courant, a 37 paramètres facultatifs et ne peut plus passer (à alléger ou à retirer) ; les modèles repérés (chantier 3 : candidats sur /admin, `model_candidates`, un brouillon écrit par un agent après le clic de Tristan).
 
 ## Fait (3 et 4 novembre, en ligne sur edith-ai.app)
 
