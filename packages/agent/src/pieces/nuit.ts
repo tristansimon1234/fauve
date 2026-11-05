@@ -30,10 +30,11 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, shots,
   const len = (i) => Math.max(1, list[i] ? list[i].durationInFrames : 1);
   // One image of one of her shots at this frame (k: its image in her passage), held: a photo stays still.
   const pic = (i, k, style, key) => (list[i] ? h(Footage, { key: key || "p" + i, shot: i, style: { ...box, ...style }, at: frame - Math.max(0, Math.min(len(i) - 1, Math.round(k))) }) : null);
-  // Its moments (frames from its start): the drop on a beat, the black before it, the flash before the black.
-  const BACK = Math.round(mark("back", DUR - 5));
-  const FLASH = Math.round(mark("flash", BACK - 8));
-  const BLACK = FLASH + 2;
+  // Its moments (frames from its start): its burn on its last four images, the black on the eight before, the flash on
+  // the two before that (the music, cut in the black, comes back on a beat near the burn: its timeline's).
+  const BURN = Math.max(3, Math.round(mark("burn", DUR - 4)));
+  const BLACK = Math.max(2, Math.round(mark("black", BURN - 8)));
+  const FLASH = Math.max(1, BLACK - 2);
 
   // 1. Her object at one place and one size in every shot: its box read once in each, where the engine found it by its
   // name; each shot enlarged a little (1,15 times, room to move it) and more until her object is as big as where it is
@@ -115,23 +116,25 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, shots,
     // Its last image burnt white, then the whole picture in negative.
     const { a, k } = angleAt(FLASH - 1);
     node = aligned(a, pic(mine[a], k + 1, { filter: frame === FLASH ? "brightness(4) saturate(0.5)" : "invert(1) contrast(1.15)" }, "flash"));
-  } else if (frame <= BACK) node = fill("#000000", "black");
-  else node = fill(MOTTLE + BURNS[Math.min(2, frame - BACK - 1)], "burn", { backgroundColor: "#000000" });
+  } else if (frame < BURN) node = fill("#000000", "black");
+  else node = fill(MOTTLE + BURNS[Math.min(2, frame - BURN)], "burn", { backgroundColor: "#000000" });
   return h(AbsoluteFill, { style: { backgroundColor: "#000000" } }, node);
 }`;
 
 const round3 = (n: number) => Math.round(n * 1000) / 1000;
 
 /**
- * Its moments for a span (frames from its start) and a tempo: the drop on the last whole beat that leaves its burn its
- * four images, the black seven images before it with the flash two before that; a span too short for its stutter keeps
- * it to its end, its flash on its last two images, without black nor silence.
+ * Its moments for a span (frames from its start) and a tempo, as the original's (its black of 8 images, its burn of 4,
+ * the next shot): its burn on its last four images, the black on the eight before, the flash on the two before that;
+ * the music cut a frame into the black and back on the whole beat of the Reel nearest the burn's first image, when one
+ * falls from the middle of the black to the next shot (`back`, else null: the music plays on).
  */
-export function nuitMoments(frames: number, bpm: number): { back: number; flash: number; quiet: boolean } {
+export function nuitMoments(frames: number, bpm: number): { flash: number; black: number; burn: number; back: number | null } {
   const beat = (60 / bpm) * 30;
-  const back = Math.round(Math.floor((frames - 4) / beat) * beat);
-  if (back - 8 >= 18) return { back, flash: back - 8, quiet: true };
-  return { back: frames + 1, flash: Math.max(1, frames - 2), quiet: false };
+  const burn = frames - 4;
+  const black = burn - 8;
+  const near = Math.round(Math.round((burn - 1) / beat) * beat);
+  return { flash: black - 2, black, burn, back: near >= black + 4 && near <= frames ? near : null };
 }
 
 export const nuit: EffectPiece = {
@@ -147,18 +150,18 @@ export const nuit: EffectPiece = {
   texts: [],
   objects: Array.from({ length: 6 }, (_, k) => ({ slot: `objet${k + 1}`, shot: k, want: "l'objet qui revient dans chaque plan : son enseigne, son néon, son logo, sa porte, sa tireuse (le même nom dans chaque plan)" })),
   timeline(input: PieceTimelineInput) {
-    const { back, flash, quiet } = nuitMoments(input.frames, input.bpm);
+    const { flash, black, burn, back } = nuitMoments(input.frames, input.bpm);
     const cuts = [4, 9, 13, 15, 19, 23, 28, 30, 33, 35, 38, 40, 43, 45].map((f) => Math.round((f * flash) / 46));
     const s = (f: number) => round3(f / 30);
     return {
-      marks: { back, flash },
+      marks: { black, burn },
       sounds: [
         // A tick on each of its cuts, louder as they speed up; a shutter on its flash.
         { at: s(cuts[0]!), sound: "short tight hi-hat tick", seconds: 0.5, gain: -4, burst: { times: cuts.map((f) => s(f - cuts[0]!)), gains: cuts.map((_, k) => Math.round(-10 + (8 * k) / (cuts.length - 1))) } },
         { at: s(flash), sound: "camera shutter click", seconds: 0.5, gain: 2 },
       ],
-      // The music cut dead a moment into the black, back on the beat its burn comes on.
-      ...(quiet ? { music: { pauses: [{ from: s(back - 5), to: s(back) }] } } : {}),
+      // The music cut dead a frame into the black, back on the beat nearest its burn.
+      ...(back !== null ? { music: { pauses: [{ from: s(black + 1), to: s(back) }] } } : {}),
     };
   },
   code: CODE,
