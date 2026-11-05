@@ -40,6 +40,7 @@ import { nuit } from "./skills/nuit.ts";
 import { bientot } from "./skills/bientot.ts";
 import { nomDeVille } from "./skills/nom-de-ville.ts";
 import { carnet } from "./skills/carnet.ts";
+import { petitesLumieres } from "./skills/petites-lumieres.ts";
 
 // The montage skills written so far, by the key of the house model each one plays (skills.ts). Server side only
 // (@fauve/agent/skills): their code stays out of the pages. Each one is written by hand on its model's original,
@@ -87,6 +88,7 @@ export const MONTAGE_SKILLS: Record<string, MontageSkill> = {
   bientot,
   "nom-de-ville": nomDeVille,
   carnet,
+  "petites-lumieres": petitesLumieres,
 };
 
 /** The skill of a house model, when it has one. */

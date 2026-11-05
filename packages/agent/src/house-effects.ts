@@ -180,6 +180,10 @@ export const HOUSE_EFFECTS: Record<string, HouseEffect> = {
     effet: "son visage dans un hublot, un rond de lumière sur du noir, pendant qu'elle dit ce qu'elle aime, qui se rapproche d'un coup sur sa dernière phrase",
     il_faut: "une vidéo d'elle qui parle face caméra, le visage bien éclairé",
   },
+  "petites-lumieres": {
+    effet: "ses lumières qui s'allument sur des images immobiles de son lieu, sur les coups de la musique : sa lampe ou son enseigne qui clignote puis tient, ses fenêtres qui se remplissent de rouge par vagues",
+    il_faut: "des images fixes de son lieu le soir : une lampe, une enseigne ou un néon de près, une façade avec des fenêtres",
+  },
 };
 
 /** The most of Edith's models one Reel borrows from: one charter, one music, never a patchwork. */

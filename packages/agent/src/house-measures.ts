@@ -62,4 +62,5 @@ export const HOUSE_MEASURES: Record<string, ReelMeasures> = {
   // Its fiche's cuts (docs/fiches/carnet.md, image by image: its 43 hard cuts and its window's jump at 14,1 s); its music's
   // pulse is weak (89,8 BPM) and leads none of its cuts: its catalogue's tempo decides.
   "carnet": { duration: 37.36, cuts: [1.37, 1.83, 2.03, 2.27, 2.5, 2.77, 3.03, 3.5, 4.1, 4.6, 5.13, 5.53, 6.33, 6.63, 7.27, 7.6, 8.67, 8.93, 9.17, 9.33, 9.63, 9.77, 9.93, 10.33, 10.67, 14.1, 15.5, 17.47, 20.43, 21.6, 22.87, 23.13, 24.53, 25.33, 26.2, 28.33, 28.87, 29.83, 30.1, 30.23, 30.5, 30.67, 33.17, 36.67], bpm: null, lufs: -18 },
+  "petites-lumieres": { duration: 9.83, cuts: [4.13, 6.67], bpm: 83, lufs: -14.2 },
 };
