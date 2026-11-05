@@ -13,8 +13,8 @@ import { LOOK_FONT } from "./text-look.ts";
 
 export const MAX_CAROUSEL_SLIDES = 10;
 
-/** What the designer's code may use (apps/render/src/Carousel.tsx): a scene's scope without Footage, with her photos in boxes. */
-export const CAROUSEL_SCOPE = [...new Set([...MOTION_SCOPE.filter((name) => name !== "Footage" && name !== "Depth"), "Photo", "Subject", "SubjectBox", "SubjectOutline", "Outline", "Strip"])];
+/** What the designer's code may use (apps/render/src/Carousel.tsx): a scene's scope without Footage (nor Depth, nor Look: no shots, no ready looks), with her photos in boxes. */
+export const CAROUSEL_SCOPE = [...new Set([...MOTION_SCOPE.filter((name) => name !== "Footage" && name !== "Depth" && name !== "Look"), "Photo", "Subject", "SubjectBox", "SubjectOutline", "Outline", "Strip"])];
 
 /** A text of the carousel: its slot, the slide it is on (from 1; 0: on every slide), what it holds. */
 export const carouselSlotSchema = z.object({

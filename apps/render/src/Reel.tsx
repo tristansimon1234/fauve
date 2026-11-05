@@ -105,10 +105,13 @@ export function Reel(props: ReelProps) {
     onFootage: legible(props.brand.accent, "footage"),
     row: props.subtitleY ?? SUBTITLE_Y,
   };
+  // A shot laid beside another on the same moment (a split screen's other half) is a composition's to draw: the plain
+  // montage, and the prints of a collage, play the main line.
+  const aside = (segment: ReelProps["segments"][number]) => (segment.type === "clip" || segment.type === "image") && Boolean(segment.beside);
   // A phrase said over one of her shots cut out at every image (no animation over it, no accent on its cut): its strong word goes behind her.
   const behindHer = (card: CaptionCard) => {
     if (props.frame === "letterbox" || compose) return null;
-    const segment = props.segments.find((s) => card.from >= s.startAt && card.to <= s.startAt + s.durationInFrames);
+    const segment = props.segments.find((s) => !aside(s) && card.from >= s.startAt && card.to <= s.startAt + s.durationInFrames);
     if (!segment || segment.type !== "clip" || !segment.subject || segment.subject.top === undefined || segment.accent) return null;
     if ((props.layers ?? []).some((l) => l.from < card.to && l.from + l.durationInFrames > card.from)) return null;
     return {
@@ -130,7 +133,7 @@ export function Reel(props: ReelProps) {
   const composedScreen = (segment: ReelProps["segments"][number]) => segment.type === "scene" && Boolean(segment.composed);
   // A collage's print of a shot: a card that stays a little under the next one sliding over it.
   const print = (segment: ReelProps["segments"][number], i: number, from = 0) =>
-    segment.type === "clip" || segment.type === "image" ? (
+    (segment.type === "clip" || segment.type === "image") && !aside(segment) ? (
       <Sequence key={i} from={segment.startAt - from} durationInFrames={Math.min(segment.durationInFrames + COLLAGE_OVERLAP, props.durationInFrames - segment.startAt)} layout="none">
         {/* Over the opening shot, its sticker is drawn above the texts (the hook behind the subject), back in its card for the overlap. */}
         <CollageCard index={i} props={props} sticker={stickerOf(segment, theme)} layer={hookBehind(props, i) ? "print" : "all"} stickerFrom={segment.durationInFrames}>
@@ -253,9 +256,9 @@ export function Reel(props: ReelProps) {
           spoken={compose.spoken}
           fallbackNode={
             !collage ? (
-              // The plain montage: her shots full frame, the engine's screens it covered, the Reel's texts and end card.
+              // The plain montage: her shots full frame (its main line), the engine's screens it covered, the Reel's texts and end card.
               <>
-                {props.segments.map((segment, i) => (isShot(segment) || composedScreen(segment) ? montaged(segment, i) : null))}
+                {props.segments.map((segment, i) => ((isShot(segment) && !aside(segment)) || composedScreen(segment) ? montaged(segment, i) : null))}
                 {engineTexts}
                 {endCard}
               </>
@@ -292,8 +295,8 @@ export function Reel(props: ReelProps) {
         </>
       ) : null}
       {props.segments.map((segment, i) =>
-        // A composed Reel's shots are laid by its composition; a collage's, else each one a print.
-        (isShot(segment) && laidByComposition(segment)) || (whole && composedScreen(segment)) ? null : collage && isShot(segment) ? print(segment, i) : montaged(segment, i),
+        // A composed Reel's shots are laid by its composition; a collage's, else each one a print (never one laid beside another).
+        (isShot(segment) && laidByComposition(segment)) || (whole && composedScreen(segment)) || aside(segment) ? null : collage && isShot(segment) ? print(segment, i) : montaged(segment, i),
       )}
       {/* Animations over several shots (a character on every shot, a counter that runs…), above the montage, under its texts. */}
       {(props.layers ?? []).map((layer, i) =>

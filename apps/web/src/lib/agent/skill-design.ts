@@ -5,15 +5,13 @@ import {
   compositionShots,
   compositionTexts,
   contractLines,
+  dressSkillPlan,
   fewFiles,
   finishPlan,
-  followedFilter,
-  followedLook,
   houseModel,
   isClipSegment,
   memoryLines,
   motionTemplateSchema,
-  planLook,
   planTimeline,
   readSkillFill,
   resolveReelBrand,
@@ -174,13 +172,9 @@ export async function designSkill(params: {
     // A correction keeps the settings it had but what her request changes (a new Reel: only those she asks).
     const settings = mergeSkillSettings(skill, previousSettings, answer.settings);
     const fill = { ...read, settings };
-    const plan = leadPlan(skillPlan({ skill, name, files, fill, ...(bpm ? { bpm } : {}) }), lead);
-    // The model's lettering when she chose it (her charter's when Edith picked it), and its finish (its grade, its grain).
-    Object.assign(plan, followedLook(plan, params.followed));
-    Object.assign(plan, followedFilter(plan, params.followed));
-    // What its code does itself comes out of that finish (its own black and white, with its red over it).
-    if (skill.finish && plan.look) plan.look = { ...plan.look, ...skill.finish };
-    if (!planLook(plan) && params.profile.look) plan.look = params.profile.look;
+    // The model's lettering when she chose it (her charter's when Edith picked it), and its finish (its grade, its grain)
+    // without what its code does itself (its own black and white, with its red over it); else her own look.
+    const plan = dressSkillPlan(leadPlan(skillPlan({ skill, name, files, fill, ...(bpm ? { bpm } : {}) }), lead), skill, params.followed, params.profile.look);
     // Each shot framed on its subject and its light corrected, as any montage.
     const durations = Object.fromEntries(files.map((f) => [f.id, f.photo ? plan.duration : f.seconds]));
     Object.assign(plan, finishPlan(plan, facts, durations));

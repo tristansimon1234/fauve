@@ -3917,13 +3917,13 @@ test("« Quart de tour, deux tons » (v2): every shot in width turned a quarter 
   assert.deepEqual(plan.skill, { key: "tourne", version: 2, settings: { format: "droit" } });
 });
 
-// ——— « Écran partagé titré » v2, written again on its original's fiche (docs/fiches/ecran-partage.md) ———————————————
+// ——— « Écran partagé titré » v3, written again on its original's fiche (docs/fiches/ecran-partage.md), its halves on the same moment ———
 
-test("« Écran partagé titré » (v2) cuts where its original does, both halves together, on its grid of half a second", async () => {
+test("« Écran partagé titré » (v3) cuts where its original does, its two halves laid on the same moment, on its grid of half a second", async () => {
   const { ecranPartage } = await import("./skills/ecran-partage.ts");
   const { skillFit } = await import("./skills.ts");
-  const { clearsDrawn, objectsDrawn } = await import("./subject.ts");
-  assert.equal(ecranPartage.version, 2);
+  const { clearsDrawn, objectsDrawn, subjectsDrawn } = await import("./subject.ts");
+  assert.equal(ecranPartage.version, 3);
   assert.equal(ecranPartage.bpm, 120);
   const line = ecranPartage.timeline(10, { end: false });
   // Its five pairs, two shots each (the person at work, what it gives), cutting together where the original's do, on its
@@ -3935,12 +3935,12 @@ test("« Écran partagé titré » (v2) cuts where its original does, both halve
     assert.ok(Math.abs(at - f) <= 2, `pair ${k + 1}: image ${at}, the original's ${f}`);
   });
   assert.ok(Math.abs(line.duration - 12.77) < 0.05, `${line.duration} s`);
-  // Each pair's two halves share its time (each its own passage), so nothing cuts on screen between its cuts.
-  const frames = (s: { start: number; end: number }) => Math.round(s.end * 30) - Math.round(s.start * 30);
+  // Each pair's two halves on the same moment, the whole pair each (the second laid beside the first, its time counted
+  // once): its main line, the first halves, one after the other from 0.
   for (let k = 0; k < 5; k++) {
     const [a, b] = [line.shots[2 * k]!, line.shots[2 * k + 1]!];
-    assert.equal(a.end, b.start);
-    assert.ok(Math.abs(frames(a) - frames(b)) <= 1, `pair ${k + 1}: ${frames(a)} and ${frames(b)} images`);
+    assert.deepEqual([b.start, b.end, Boolean(b.beside), Boolean(a.beside)], [a.start, a.end, true, false], `pair ${k + 1}`);
+    if (k) assert.equal(a.start, line.shots[2 * k - 2]!.end);
   }
   assert.equal(line.marks.solo, -1);
   // Its two titles from the first image to the last; no sound of its own (its original has none); its music without its
@@ -3948,11 +3948,13 @@ test("« Écran partagé titré » (v2) cuts where its original does, both halve
   assert.deepEqual(line.texts, { personne: { from: 0, to: line.duration }, resultat: { from: 0, to: line.duration } });
   assert.equal(line.sounds, undefined);
   assert.deepEqual(line.music, { filters: [{ kind: "thin", from: 0, to: 4 }], end: { at: line.duration } });
-  // An odd count takes a second passage of one of her videos: a short pair more in the middle, one shot for both halves,
-  // never a shot alone full frame; the even counts keep their own lengths (12,8 s asked: the original's five pairs).
+  // An odd count takes a short pair more in the middle, one shot alone in both halves (laid beside nothing), never a
+  // shot alone full frame; the even counts keep their own lengths (12,8 s asked: the original's five pairs).
   const odd = ecranPartage.timeline(9, { end: false });
   assert.equal(odd.shots.length, 9);
   assert.equal(odd.marks.solo, 4);
+  assert.equal(odd.shots[4]!.beside, undefined);
+  assert.equal(odd.shots[4]!.start, odd.shots[3]!.end);
   assert.ok(odd.duration > ecranPartage.timeline(8, { end: false }).duration && odd.duration < line.duration, `${odd.duration} s`);
   assert.deepEqual(skillFit(ecranPartage, 12.8), { n: 10, bpm: 120 });
   // With an ending card (the original has none: only when she wants one), its last pair held whole beats longer.
@@ -3960,15 +3962,17 @@ test("« Écran partagé titré » (v2) cuts where its original does, both halve
   assert.deepEqual(ended.shots.slice(0, 8), line.shots.slice(0, 8));
   assert.ok(ended.duration - line.duration >= 1.6 && Math.abs((ended.duration - line.duration) * 2 - 4) < 0.05, `${ended.duration} s`);
   assert.ok(Math.abs(ended.texts.personne!.to - (ended.duration - 1.6)) < 0.01);
-  // Cuts only: no zoom, push nor slide; nothing read in her shots (its titles stay where the original's are).
+  // Cuts only: no zoom, push nor slide; nothing read in her shots (its titles stay where the original's are) and nothing
+  // cut out.
   assert.doesNotMatch(ecranPartage.code, /transform|scale\(|interpolate/);
   assert.deepEqual(clearsDrawn(ecranPartage.code), []);
   assert.deepEqual(objectsDrawn(ecranPartage.code), []);
+  assert.deepEqual(subjectsDrawn(ecranPartage.code), []);
   // Its finish leaves out the catalogue's vignette and grain: its original has neither.
   assert.deepEqual(ecranPartage.finish, { grain: 0, vignette: 0 });
 });
 
-test("« Écran partagé titré » (v2): the original's card for vertical files, one half above the other for horizontal ones, its halves at half speed", async () => {
+test("« Écran partagé titré » (v3): the original's card for vertical files, one half above the other for horizontal ones, each half at its own speed", async () => {
   const { ecranPartage } = await import("./skills/ecran-partage.ts");
   const line = ecranPartage.timeline(10, { end: false });
   const shotsOf = (aspects: number[], kinds: string[] = []) =>
@@ -4004,34 +4008,37 @@ test("« Écran partagé titré » (v2): the original's card for vertical files,
   assert.deepEqual(cardOf(draw(wide, 30, { texts: { solo: "-1", format: "carte" } })).card, [10, 570, 1060, 783]);
   assert.deepEqual(cardOf(draw(tall, 30, { texts: { solo: "-1", format: "plein-ecran" } })).halves, [[0, 0, 530, 1856], [530, 0, 530, 1856]]);
   assert.deepEqual(cardOf(draw(tall, 30, { texts: { solo: "-1", format: "empile" } })).halves, [[0, 0, 1060, 928], [0, 928, 1060, 928]]);
-  // Both halves of a pair play from its first image, each its own passage at half its speed (the second pair: its shots
-  // 3 and 4, images 68 to 173), the next image laid over it as it comes; the two always cut together.
+  // Both halves of a pair laid on the same moment (the second pair: its shots 3 and 4, both from image 68 to 173), each
+  // its own passage at its own speed, as the original's: laid once, played from its own first image (no `at`, no blend
+  // of two images); the two always cut together.
   const shots = shotsOf(tall);
+  assert.deepEqual([shots[2]!.from, shots[3]!.from, shots[2]!.durationInFrames, shots[3]!.durationInFrames], [68, 68, 105, 105]);
   for (const f of [68, 88, 120, 172]) {
     const { footage } = cardOf(draw(tall, f));
-    assert.deepEqual(footage.map((list) => list.map((p) => p.shot)), [[2, 2], [3, 3]], `image ${f}`);
-    footage.forEach((list, side) => {
-      const local = f - Number(list[0]!.at);
-      const length = shots[2 + side]!.durationInFrames;
-      assert.ok(Math.abs(local - ((f - 68) * length) / 105) < 1, `image ${f}, half ${side + 1}: its image ${local}`);
-      assert.equal(Number(list[1]!.at), Number(list[0]!.at) - 1);
-    });
+    assert.deepEqual(footage.map((list) => list.map((p) => [p.shot, p.at])), [[[2, undefined]], [[3, undefined]]], `image ${f}`);
   }
-  assert.deepEqual(cardOf(draw(tall, 173)).footage.map((list) => list.map((p) => [p.shot, p.at])), [[[4, 173], [4, 172]], [[5, 173], [5, 172]]]);
+  assert.deepEqual(cardOf(draw(tall, 173)).footage.map((list) => list.map((p) => p.shot)), [[4], [5]]);
   // A photo stays still: laid once, never played.
   const photo = cardOf(draw(tall, 88, {}, ["video", "video", "photo", "video"]));
   assert.deepEqual(photo.footage[0]!.map((p) => [p.shot, p.at]), [[2, undefined]]);
-  // An odd count: a video alone in its pair plays its start in one half, the rest of it in the other; a photo alone is
-  // laid across the card, never twice.
+  // An odd count: a video alone in its pair plays its gesture in one half while the other holds its last image (what it
+  // gives: its Footage laid as if just over); a photo alone is laid across the card, never twice.
   const nine = ecranPartage.timeline(9, { end: false });
   const oddShots = nine.shots.map((s, i) => ({ src: `/v${i}.mp4`, aspect: 9 / 16, from: Math.round(s.start * 30), durationInFrames: Math.round((s.end - s.start) * 30), kind: "video", segment: i }));
   const solo = oddShots[4]!;
   const oddDraw = (list: typeof oddShots) => drawScene(ecranPartage.code, solo.from + 10, { width: 1080, height: 1920, durationInFrames: 341, brand, shots: list, reelTexts, end: null, texts: { solo: "4" } });
   const alone = cardOf(oddDraw(oddShots));
-  assert.deepEqual(alone.footage.map((list) => list.map((p) => p.shot)), [[4, 4], [4, 4]]);
-  const [early, late] = alone.footage.map((list) => solo.from + 10 - Number(list[0]!.at));
-  assert.ok(early! < Math.floor(solo.durationInFrames / 2) && late! >= Math.floor(solo.durationInFrames / 2), `${early}, ${late}`);
+  assert.deepEqual(alone.footage.map((list) => list.map((p) => p.shot)), [[4], [4]]);
+  assert.equal(alone.footage[0]![0]!.at, undefined);
+  assert.equal(solo.from + 10 - Number(alone.footage[1]![0]!.at), solo.durationInFrames);
   assert.deepEqual(cardOf(oddDraw(oddShots.map((s, i) => (i === 4 ? { ...s, kind: "photo" } : s)))).halves, [[0, 0, 1060, 783]]);
+  // A pair before and after it keeps its two shots side by side.
+  assert.deepEqual(cardOf(drawScene(ecranPartage.code, oddShots[5]!.from + 3, { width: 1080, height: 1920, durationInFrames: 341, brand, shots: oddShots, reelTexts, end: null, texts: {} })).footage.map((list) => list.map((p) => p.shot)), [[5], [6]]);
+  // Shots that all follow one another (a plan of the editor's, after a request out of the model: it lays none beside
+  // another) are paired two by two, each half over its pair at half its speed, an image between two blended, as v2 did.
+  const row = [0, 1, 2, 3].map((i) => ({ src: `/v${i}.mp4`, aspect: 9 / 16, from: 34 * i, durationInFrames: 34, kind: "video", segment: i }));
+  const sequential = cardOf(drawScene(ecranPartage.code, 34, { width: 1080, height: 1920, durationInFrames: 136, brand, shots: row, reelTexts, end: null, texts: {} }));
+  assert.deepEqual(sequential.footage.map((list) => list.map((p) => [p.shot, p.at])), [[[0, 17], [0, 16]], [[1, 17], [1, 16]]]);
   // Its two small titles, on the card and still: a book serif in title case, white, 50 px; side by side just under the
   // middle of the card (54 % of its height), at 43 % and 51 % of their halves, the right one left of the apps' buttons;
   // one above the other, centred, as far above the line between the halves as below it, clear of the apps' caption.
@@ -4063,7 +4070,7 @@ test("« Écran partagé titré » (v2): the original's card for vertical files,
   assert.equal(drawnNodes(draw(tall, 370)).filter((n) => n.type === "div" && styleOf(n).background === "#000000").length, 0);
 });
 
-test("« Écran partagé titré » (v2): its layout as a setting her words ask, and the filler sees which of her files is wide", async () => {
+test("« Écran partagé titré » (v3): its layout as a setting her words ask, and the filler sees which of her files is wide", async () => {
   const { ecranPartage } = await import("./skills/ecran-partage.ts");
   const { skillPlan, skillFillInput, skillSettings, fileFormat } = await import("./skills.ts");
   // The setting: the filler sees it (its default first: as her files), the plan keeps a choice her words asked for.
@@ -4089,9 +4096,361 @@ test("« Écran partagé titré » (v2): its layout as a setting her words ask, 
   assert.ok(editPlanSchema.safeParse(plan).success);
   assert.equal(plan.layers![0]!.motion.texts!.format, "empile");
   assert.equal(plan.layers![0]!.motion.texts!.solo, "-1");
-  assert.deepEqual(plan.skill, { key: "ecran-partage", version: 2, settings: { format: "empile" } });
+  assert.deepEqual(plan.skill, { key: "ecran-partage", version: 3, settings: { format: "empile" } });
   // Its music shaped on the plan: without its bass to the third bar, cut dead at the end.
   assert.deepEqual(plan.music_shape, { filters: [{ kind: "thin", from: 0, to: 4, open: 0.02 }], end: { at: plan.duration, fade: 0.012 } });
+  // Each second half is laid beside its first on the plan (its moment kept), and the filler is told which slot it plays
+  // with: the Reel lasts its five pairs, not ten shots in a row.
+  const segments = plan.segments as { beside?: { at: number } }[];
+  assert.deepEqual(segments.map((s) => s.beside?.at ?? null), [null, 0, null, 2.27, null, 5.77, null, 7.77, null, 10.67]);
+  assert.ok(Math.abs(plan.duration - 12.77) < 0.05, `${plan.duration} s`);
+  assert.deepEqual(input.cases.map((c) => ("en_meme_temps_que" in c ? c.en_meme_temps_que : null)), [null, 1, null, 3, null, 5, null, 7, null, 9]);
+});
+
+// ——— The engine's tools the fiches found missing (5 November): simultaneous shots, objects counted from the end or
+// placed by the timeline, cut-outs only on the shots drawn, eight objects a Reel, a ready look on one passage, a skill
+// rendered locally with its model's finish ———————————————————————————————————————————————————————————————————————————
+
+/** A plan of her shots (a, b, c, d of 2 s each), the second and fourth laid beside the first and the third. */
+const besidePlan = (over: Partial<EditPlan> = {}): EditPlan =>
+  editPlanSchema.parse({
+    format: "9:16",
+    duration: 4,
+    template: "libre",
+    segments: [
+      { clip_id: "a", in: 0, out: 2 },
+      { clip_id: "b", in: 1, out: 3, beside: { at: 0 } },
+      { clip_id: "c", in: 0, out: 2 },
+      { clip_id: "d", in: 2, out: 4, beside: { at: 2 } },
+    ],
+    texts: [],
+    images: [],
+    transitions: "cut",
+    subtitles: false,
+    music: null,
+    ...over,
+  });
+
+test("simultaneous shots: a shot laid beside another starts on its own moment, its time counted once, only a composition draws it", async () => {
+  const { planTimeline } = await import("./motion.ts");
+  const { renderDuration } = await import("./render.ts");
+  const { segmentSpans, withoutScenes, isBeside } = await import("./schemas.ts");
+  const { timeline } = await import("./plan-edit.ts");
+  const { leadPlan } = await import("./sound-follow.ts");
+  const { editorOutputSchemaLegacy } = await import("./editor.ts");
+  const plan = besidePlan();
+  // Its shots two by two on the same moment: 4 s, not 8.
+  assert.deepEqual(planTimeline(plan), { segments: [{ start: 0, length: 2 }, { start: 0, length: 2 }, { start: 2, length: 2 }, { start: 2, length: 2 }], duration: 4 });
+  assert.deepEqual(segmentSpans(plan.segments).end, 4);
+  assert.deepEqual(timeline(plan), [{ start: 0, end: 2 }, { start: 0, end: 2 }, { start: 2, end: 4 }, { start: 2, end: 4 }]);
+  assert.deepEqual(plan.segments.map(isBeside), [false, true, false, true]);
+  // The ffmpeg engine plays the main line (a, c), 4 s.
+  assert.deepEqual(withoutScenes(plan).segments.map((s) => ("clip_id" in s ? s.clip_id : "")), ["a", "c"]);
+  assert.equal(renderDuration(plan), 4);
+  // A plan without any is unchanged: one shot after the other.
+  const plain = besidePlan({ segments: plan.segments.map((s) => ({ ...s, beside: undefined })) as EditPlan["segments"] });
+  assert.equal(planTimeline(plain).duration, 8);
+  assert.equal(renderDuration(plain), 8);
+  // The render: both start on the same frame, the second marked (the plain montage skips it), never heard, its words
+  // not the Reel's subtitles; a composition gets both shots on that frame, and one cut where both change.
+  const props = buildReelProps(
+    {
+      ...plan,
+      subtitles: true,
+      finish: { video_sound: "all" },
+      layers: [{ from: 0, to: 4, compose: true, motion: { brief: "b", js: "function Scene(){ return null }", draws_texts: true } }],
+    },
+    {
+      template: "libre",
+      clipUrls: { a: "/a.mp4", b: "/b.mp4", c: "/c.mp4", d: "/d.mp4" },
+      words: { b: [{ w: "bonjour", start: 1.2, end: 1.6 }] },
+      brand: { name: "Atelier" },
+    },
+  );
+  assert.equal(props.durationInFrames, 120);
+  assert.deepEqual(props.segments.map((s) => [s.startAt, s.durationInFrames, "beside" in s ? Boolean(s.beside) : false]), [[0, 60, false], [0, 60, true], [60, 60, false], [60, 60, true]]);
+  assert.deepEqual(props.segments.map((s) => (s.type === "clip" ? Boolean(s.speech) : null)), [true, false, true, false]);
+  assert.deepEqual(props.words, []);
+  assert.deepEqual(props.layers![0]!.shots!.map((s) => [s.segment, s.from]), [[0, 0], [1, 0], [2, 60], [3, 60]]);
+  assert.deepEqual(props.layers![0]!.cuts, [60]);
+  // A sound she follows holds the first image longer: the shots laid beside start that much later too.
+  const led = leadPlan(plan, 0.4);
+  assert.deepEqual(led.segments.map((s) => ("beside" in s ? (s.beside?.at ?? null) : null)), [null, 0.4, null, 2.4]);
+  assert.equal(planTimeline(led).duration, 4.4);
+  // Kept on the plan (its schema), never written by the editor (its answer has no such field).
+  assert.equal("beside" in editorOutputSchemaLegacy.shape.plan.shape.segments.element.options[0].shape, false);
+  // The tempo's snap leaves them where the skill set them, on its beats.
+  assert.deepEqual(snapToTempo({ ...plan, tempo: 100 }, { a: 10, b: 10, c: 10, d: 10 }).segments, plan.segments);
+});
+
+test("simultaneous shots in a skill: a half that cuts alone while the other plays on, cast by the filler like any slot", async () => {
+  const { skillPlan, skillFillInput, besideOf } = await import("./skills.ts");
+  const { planTimeline } = await import("./motion.ts");
+  // « Photos posées sur la table »: its split screen's left half holds one shot while its right half cuts twice.
+  const skill = {
+    key: "toy",
+    version: 1,
+    bpm: 120,
+    shots: [3, 3],
+    files: [3, 3],
+    how: "",
+    texts: [],
+    end: false,
+    timeline: () => ({
+      duration: 4,
+      shots: [
+        { start: 0, end: 4, want: "à gauche, le lieu" },
+        { start: 0, end: 2, want: "à droite, le geste", beside: true },
+        { start: 2, end: 4, want: "à droite, le même geste de plus près", beside: true },
+      ],
+      texts: {},
+      marks: {},
+    }),
+    code: "function Scene(){ return null }",
+  } satisfies MontageSkillShape;
+  const line = skill.timeline();
+  assert.deepEqual(besideOf(line), [null, 0, 0]);
+  const files = ["v0", "v1", "v2"].map((id) => ({ id, photo: false, seconds: 10 }));
+  const input = skillFillInput({ skill, name: "Table", n: 3, files, business: {}, request: "" });
+  assert.deepEqual(input.cases.map((c) => ("en_meme_temps_que" in c ? c.en_meme_temps_que : null)), [null, 1, 1]);
+  const plan = skillPlan({ skill, name: "Table", files, fill: { shots: files.map((f) => ({ file: f.id, at: 1 })), texts: {}, end: null } });
+  assert.deepEqual(plan.segments.map((s) => ("beside" in s ? (s.beside?.at ?? null) : null)), [null, 0, 2]);
+  assert.ok(editPlanSchema.safeParse(plan).success);
+  assert.deepEqual(planTimeline(plan), { segments: [{ start: 0, length: 4 }, { start: 0, length: 2 }, { start: 2, length: 2 }], duration: 4 });
+  assert.equal(plan.duration, 4);
+});
+
+/** What a test skill needs (its timeline taking no arguments). */
+type MontageSkillShape = Omit<import("./skills.ts").MontageSkill, "timeline"> & { timeline: (...args: never[]) => import("./skills.ts").SkillTimeline };
+
+test("objects of a skill: on a slot counted from the end, or placed by its timeline, followed only there", async () => {
+  const { skillObjectShot, skillFillInput, skillPlan, skillDrawn } = await import("./skills.ts");
+  const { objectPassages, layerObjects } = await import("./subject.ts");
+  // « Mots aux quatre coins »: her front is always the last shot, whatever the count; another slot placed by the timeline.
+  const objects = [
+    { slot: "enseigne", shot: -1, want: "son enseigne" },
+    { slot: "fenetres", shot: 0, want: "ses fenêtres" },
+  ];
+  const line = (n: number) => ({ shots: Array.from({ length: n }, (_, i) => ({ start: i, end: i + 1, want: "" })), objects: { fenetres: n - 3 } });
+  assert.equal(skillObjectShot(objects[0]!, line(5)), 4);
+  assert.equal(skillObjectShot(objects[0]!, line(9)), 8);
+  assert.equal(skillObjectShot(objects[1]!, line(9)), 6);
+  assert.equal(skillObjectShot({ slot: "x", shot: 12 }, line(5)), null);
+  assert.equal(skillObjectShot({ slot: "x", shot: -6 }, line(5)), null);
+  const skill = {
+    key: "toy",
+    version: 1,
+    bpm: 120,
+    shots: [4, 9],
+    files: [2, 9],
+    how: "",
+    texts: [],
+    end: false,
+    objects,
+    timeline: (n: number) => ({ duration: n, ...line(n), texts: {}, marks: {} }),
+    // Its code names the shots by a variable (its front: the last one).
+    code: `function Scene({ shots }) { const front = shots.length - 1; return [SubjectParts(shots[front], 0, null, "@enseigne", 8), SubjectBox(shots[shots.length - 3], 0, null, "@fenetres")]; }`,
+  } satisfies MontageSkillShape;
+  const files = Array.from({ length: 7 }, (_, i) => ({ id: `v${i}`, photo: false, seconds: 10 }));
+  // The filler is told the slot each object is on for this count.
+  assert.deepEqual(skillFillInput({ skill, name: "Toy", n: 7, files, business: {}, request: "" }).objets, [
+    { slot: "enseigne", case: 7, cherche: "son enseigne" },
+    { slot: "fenetres", case: 5, cherche: "ses fenêtres" },
+  ]);
+  const plan = skillPlan({ skill, name: "Toy", files, fill: { shots: files.map((f) => ({ file: f.id, at: 0 })), texts: {}, end: null, objects: { enseigne: "shop sign", fenetres: "every window" } } });
+  assert.deepEqual(plan.layers![0]!.motion.drawn, { shots: 7, objects: [{ shot: 6, name: "shop sign" }, { shot: 4, name: "every window" }] });
+  assert.ok(editPlanSchema.safeParse(plan).success);
+  // Only those passages are followed, though its code writes their shots as variables.
+  assert.deepEqual(layerObjects(plan, plan.layers![0]!), [{ shot: 6, name: "shop sign" }, { shot: 4, name: "every window" }]);
+  assert.deepEqual(objectPassages(plan, () => true).map((p) => [p.clip_id, p.name]), [["v6", "shop sign"], ["v4", "every window"]]);
+  // Its code kept over other shots (the editor's correction): the count no longer fits, its code is read again (every
+  // shot under it: its seven seconds, seven shots, for each of its two objects).
+  const kept = { ...plan, segments: [...plan.segments, ...plan.segments.slice(0, 2)] };
+  assert.equal(layerObjects(kept, kept.layers![0]!).length, 14);
+  // A slot left unnamed (nothing in her shot fits) is no object; a timeline that says nothing, nothing declared.
+  assert.equal(skillDrawn(skill, line(7), { enseigne: "none" }), undefined);
+  assert.equal(skillDrawn({}, { shots: line(7).shots }, {}), undefined);
+});
+
+/** Every shot a composition draws her cut out on over the frames given (Subject without an object, SubjectBox, SubjectOutline or SubjectParts without a name), each one found so every branch that needs her is taken. */
+async function cutoutsDrawn(code: string, props: Record<string, unknown>, frames: number[]): Promise<Set<number>> {
+  const { MOTION_SCOPE } = await import("./motion-scene.ts");
+  const seen = new Set<number>();
+  let current = 0;
+  const React = {
+    createElement: (type: unknown, p: Record<string, unknown> | null, ...children: unknown[]) => {
+      if (type === "Subject" && p && !p.object && typeof p.shot === "number") seen.add(p.shot);
+      // A FitText's content may be a function of its scale: run it, so what it holds is drawn too.
+      for (const c of children) if (typeof c === "function") (c as (s: number) => unknown)(1);
+      return { type, props: p ?? {}, children };
+    },
+    Fragment: "Fragment",
+  };
+  const her = (shot: { segment?: number } | undefined, name?: unknown) => {
+    if (shot && typeof name !== "string" && typeof shot.segment === "number") seen.add(shot.segment);
+    return { x: 400, y: 120, w: 260, h: 480 };
+  };
+  const scope: Record<string, unknown> = Object.fromEntries(MOTION_SCOPE.filter((n) => n !== "React").map((n) => [n, n]));
+  Object.assign(scope, {
+    useCurrentFrame: () => current,
+    useVideoConfig: () => ({ width: 1080, height: 1920, fps: 30, durationInFrames: props.durationInFrames }),
+    interpolate: (x: number, [a, b]: [number, number], [y0, y1]: [number, number]) => y0 + (y1 - y0) * Math.min(1, Math.max(0, (x - a) / (b - a || 1))),
+    interpolateColors: () => "#000000",
+    spring: () => 1,
+    random: (seed: string) => [...seed].reduce((x, c) => Math.imul(x ^ c.charCodeAt(0), 16777619) >>> 0, 2166136261) / 4294967296,
+    SubjectBox: (shot: { segment?: number }, _f: number, _laid: unknown, name?: string) => her(shot, name),
+    SubjectOutline: (shot: { segment?: number }, _f: number, _laid: unknown, name?: string) => (her(shot, name), null),
+    SubjectParts: (shot: { segment?: number }, _f: number, _laid: unknown, name?: string) => (her(shot, name), []),
+    ClearBox: (_s: unknown, _f: number, _l: unknown, options?: { fallback?: unknown }) => options?.fallback ?? null,
+  });
+  const make = new Function("React", ...Object.keys(scope), `"use strict";\n${code}\nreturn Scene;`) as (...args: unknown[]) => (p: Record<string, unknown>) => unknown;
+  const Scene = make(React, ...Object.values(scope));
+  for (const f of frames) {
+    current = f;
+    Scene(props);
+  }
+  return seen;
+}
+
+test("cut-outs: only on the shots a composition draws her on, as its code names them or its skill's timeline says them", async () => {
+  const { subjectsDrawn, subjectPassages, subjectShots, ANY_SHOT } = await import("./subject.ts");
+  const { decode } = await import("./skills/decode.ts");
+  const { skillPlan } = await import("./skills.ts");
+  // Read in its code: a shot as a number or shots[n], an object never, a variable every shot.
+  assert.deepEqual(subjectsDrawn(`h(Subject, { shot: 3, style }); SubjectBox(shots[5], f, laid); h(Subject, { shot: 1, object: "cup" })`), [3, 5]);
+  assert.deepEqual(subjectsDrawn(`<Outline shot={shots[2]} box={laid} />`), [2]);
+  assert.deepEqual(subjectsDrawn(`h(Subject, { shot: 5 + j, style })`), [ANY_SHOT]);
+  assert.deepEqual(subjectsDrawn(`SubjectBox(shots[i], f, laid)`), [ANY_SHOT]);
+  assert.deepEqual(subjectsDrawn(`const S = Subject; h(S, {})`), [ANY_SHOT]);
+  assert.deepEqual(subjectsDrawn(`SubjectBox(shots[1], f, laid, "cup")`), []);
+  // A composition over six shots that draws her on her shot 2: only that passage is cut out, not the 12 s of the six.
+  const segments = Array.from({ length: 6 }, (_, i) => ({ clip_id: `v${i}`, in: 0, out: 2 }));
+  const layers = (js: string, drawn?: unknown) => [{ from: 0, to: 12, compose: true, motion: { brief: "b", js, ...(drawn ? { drawn } : {}) } }];
+  assert.deepEqual(subjectPassages({ segments, layers: layers("h(Subject, { shot: 2 })") } as never, () => true).map((p) => p.clip_id), ["v2"]);
+  assert.equal(subjectPassages({ segments, layers: layers("h(Subject, { shot: k })") } as never, () => true).length, 6);
+  // Declared by its skill for this count: those, and its code's numbers; for another count (its code kept over other shots), read again.
+  assert.deepEqual(subjectPassages({ segments, layers: layers("h(Subject, { shot: k })", { shots: 6, subjects: [1, 4] }) } as never, () => true).map((p) => p.clip_id), ["v1", "v4"]);
+  assert.equal(subjectPassages({ segments, layers: layers("h(Subject, { shot: k })", { shots: 5, subjects: [1, 4] }) } as never, () => true).length, 6);
+  assert.deepEqual([...subjectShots({ segments, layers: layers("h(Subject, { shot: k })", { shots: 6, subjects: [] }) } as never)], []);
+  // A composition still to be written (her cut-outs made while it is written), and what is said written around her: as before, every passage.
+  assert.equal(subjectPassages({ segments, layers: [{ from: 0, to: 12, compose: true, motion: { brief: "b" } }] } as never, () => true, true).length, 6);
+  // « Titre qui se décode »: its code names its ending's three by their place from the end; its timeline says them, and
+  // they are exactly the shots its code draws her on, at every image, for every count it plays (with an ending card too).
+  for (const [n, end] of [[9, false], [12, false], [16, false], [16, true], [23, false]] as const) {
+    const line = decode.timeline(n, { end });
+    const shots = line.shots.map((s, i) => ({ src: `/v${i % 5}.mp4`, aspect: 16 / 9, from: Math.round(s.start * 30), durationInFrames: Math.round((s.end - s.start) * 30), kind: "video", segment: i }));
+    const durationInFrames = Math.round(line.duration * 30);
+    const props = {
+      width: 1080,
+      height: 1920,
+      durationInFrames,
+      brand: { name: "Atelier", displayFont: "Open Sans", bodyFont: "Open Sans" },
+      shots,
+      reelTexts: [
+        { text: "Paris", role: "hook", from: 0, to: 300, emphasis: [] },
+        { text: "un samedi à", role: "caption", from: 0, to: 300, emphasis: [] },
+      ],
+      end: end ? { title: "Ouvert dimanche", subtitle: null, from: durationInFrames - 48 } : null,
+      texts: Object.fromEntries(Object.entries(line.marks).map(([k, v]) => [k, String(v)])),
+    };
+    const drawn = await cutoutsDrawn(decode.code, props, Array.from({ length: durationInFrames }, (_, f) => f));
+    assert.deepEqual([...drawn].sort((a, b) => a - b), line.cutouts, `${n} shots${end ? ", an ending card" : ""}`);
+  }
+  // On its plan: declared, so only those three passages are cut out (2 s of the ending's 6 s, not the Reel's 22 s).
+  const files = Array.from({ length: 16 }, (_, i) => ({ id: `v${i}`, photo: false, seconds: 20 }));
+  const plan = skillPlan({ skill: decode, name: "Titre qui se décode", files, fill: { shots: files.map((f) => ({ file: f.id, at: 1 })), texts: { surtitre: "un samedi à", titre: "Paris" }, end: null } });
+  assert.deepEqual(plan.layers![0]!.motion.drawn, { shots: 16, subjects: [12, 14, 15] });
+  assert.deepEqual(subjectPassages(plan, () => true).map((p) => p.clip_id), ["v12", "v14", "v15"]);
+});
+
+test("objects: up to eight a Reel, their seconds of video and the card's cost held to their budgets", async () => {
+  const { OBJECT_MAX, OBJECT_MAX_SECONDS, OBJECT_MAX_EUR, OBJECT_CARD, objectPassages, objectsWithinBudget } = await import("./subject.ts");
+  const { modalCostUsd } = await import("./pricing.ts");
+  assert.equal(OBJECT_MAX, 8);
+  // « Titre derrière le décor » named five on five of her shots: all five are followed now.
+  const segments = Array.from({ length: 10 }, (_, i) => ({ clip_id: `v${i}`, in: 0, out: 1.5 }));
+  const names = ["skyline", "every window", "shop sign", "every frame", "ferris wheel hub"];
+  const js = names.map((name, i) => `h(Subject, { shot: ${2 * i}, object: "${name}" })`).join("; ");
+  const plan = { segments, layers: [{ from: 0, to: 15, compose: true, motion: { brief: "b", js } }] } as never;
+  assert.deepEqual(objectPassages(plan, () => true).map((p) => p.name), names);
+  // Eleven on long passages: within the 20 s of video (each read on its whole passage), whatever their number.
+  const long = { segments: Array.from({ length: 11 }, (_, i) => ({ clip_id: `v${i}`, in: 0, out: 4 })), layers: [{ from: 0, to: 44, compose: true, motion: { brief: "b", js: Array.from({ length: 11 }, (_, i) => `h(Subject, { shot: ${i}, object: "cup" })`).join(";") } }] } as never;
+  const kept = objectPassages(long, () => true);
+  assert.ok(kept.length <= OBJECT_MAX && kept.reduce((n, p) => n + p.to - p.from, 0) <= OBJECT_MAX_SECONDS, `${kept.length} passages`);
+  // The card's cost: 20 s of video on an A10G stays under the budget; at a dearer price the last ones named are left out.
+  const a10g = modalCostUsd(1, 2, 8, "A10G") * 0.92;
+  const twenty = Array.from({ length: 5 }, (_, i) => ({ from: 0, to: 4, key: `p${i}` }));
+  assert.ok((OBJECT_CARD.load + 20 * OBJECT_CARD.perSecond) * a10g < OBJECT_MAX_EUR, `${(OBJECT_CARD.load + 240) * a10g} €`);
+  assert.deepEqual(objectsWithinBudget(twenty, a10g).length, 5);
+  const dear = objectsWithinBudget(twenty, a10g * 2);
+  assert.deepEqual(dear.map((p) => p.key), twenty.slice(0, dear.length).map((p) => p.key));
+  assert.ok(dear.length < 5 && dear.length > 0, `${dear.length}`);
+  // A photo is one image read: a few seconds of the card.
+  assert.equal(objectsWithinBudget([{ from: 0, to: 0, photo: true as const }], a10g).length, 1);
+  assert.deepEqual(objectsWithinBudget([], a10g), []);
+});
+
+test("a ready look on one passage: the composition's Look lays a preset over what it wraps, while its shot plays or within its span", async () => {
+  const { passageLooks, usesPassageLooks } = await import("./motion.ts");
+  const { MOTION_SCOPE, MOTION_DESIGNER_PROMPT } = await import("./motion-scene.ts");
+  const { CAROUSEL_SCOPE } = await import("./carousel.ts");
+  const { passageLook, passageLookOn } = await import("../../../apps/render/src/look-passage.ts");
+  // Given to the render only when an animation's code lays one: each ready look, its grade as one matrix, its camera's date.
+  const code = `function Scene({ shots }) { return h(Look, { preset: "vhs", shot: shots[2] }, h(Footage, { shot: 2 })); }`;
+  const plan = besidePlan({ layers: [{ from: 0, to: 4, compose: true, motion: { brief: "b", js: code, draws_texts: true } }] });
+  assert.equal(usesPassageLooks(plan), true);
+  assert.equal(usesPassageLooks(besidePlan()), false);
+  assert.equal(usesPassageLooks(besidePlan({ layers: [{ from: 0, to: 4, compose: true, motion: { brief: "b", js: "function Scene(){ return h(LookBack) }" } }] })), false);
+  const props = buildReelProps(plan, { template: "libre", clipUrls: { a: "/a", b: "/b", c: "/c", d: "/d" }, brand: { name: "Atelier" }, today: "2026-11-05" });
+  assert.deepEqual(Object.keys(props.looks ?? {}).sort(), [...Object.keys(LOOK_PRESETS)].sort());
+  assert.deepEqual(props.looks!.vhs!.look.matrix, lookMatrix(LOOK_PRESETS.vhs));
+  assert.equal(props.looks!.vhs!.stamp, "5 NOV. 2026");
+  assert.equal(props.looks!.bw!.stamp, undefined);
+  assert.equal(props.look, undefined);
+  assert.equal(buildReelProps(besidePlan(), { template: "libre", clipUrls: { a: "/a", b: "/b", c: "/c", d: "/d" }, brand: { name: "Atelier" } }).looks, undefined);
+  // Named by its key or its name; another word is none (the passage plays plain).
+  const looks = passageLooks();
+  assert.equal(passageLook(looks, "vhs")?.look.name, "Cassette VHS");
+  assert.equal(passageLook(looks, "Noir et blanc"), passageLook(looks, "bw"));
+  assert.equal(passageLook(looks, "aquarelle"), null);
+  assert.equal(passageLook(null, "vhs"), null);
+  // On while its shot plays, or within its span (its end excluded), all along with neither.
+  const shot = { from: 60, durationInFrames: 30 };
+  assert.deepEqual([59, 60, 89, 90].map((f) => passageLookOn(f, { shot })), [false, true, true, false]);
+  assert.deepEqual([9, 10, 13, 14].map((f) => passageLookOn(f, { from: 10, to: 14 })), [false, true, true, false]);
+  assert.deepEqual([65, 70, 75].map((f) => passageLookOn(f, { shot, from: 70 })), [false, true, true]);
+  assert.equal(passageLookOn(0, {}), true);
+  // In the motion designer's scope and kit, not a carousel's (no ready looks are given to it).
+  assert.ok((MOTION_SCOPE as readonly string[]).includes("Look"));
+  assert.ok(!CAROUSEL_SCOPE.includes("Look"));
+  assert.match(MOTION_DESIGNER_PROMPT, /<Look preset="vhs"/);
+});
+
+test("a skill rendered locally is dressed as production dresses it: its model's finish without what its code does, its lettering", async () => {
+  const { dressSkillPlan, skillPlan } = await import("./skills.ts");
+  const { houseStyle, houseFinish } = await import("./house-models.ts");
+  const { ecranPartage } = await import("./skills/ecran-partage.ts");
+  const { readFileSync } = await import("node:fs");
+  const model = houseModel("ecran-partage")!;
+  const files = Array.from({ length: 10 }, (_, i) => ({ id: `v${i}`, photo: false, seconds: 12 }));
+  const bare = skillPlan({ skill: ecranPartage, name: model.name, files, fill: { shots: files.map((f) => ({ file: f.id, at: 0 })), texts: { personne: "les artistes", resultat: "l'art" }, end: null } });
+  assert.equal(bare.look, undefined);
+  // Chosen by her: the model's finish over the whole Reel, its grain and vignette taken out (its code has neither), its pairing.
+  const chosen = dressSkillPlan(bare, ecranPartage, followedFrom("local", houseStyle(model)));
+  assert.deepEqual(chosen.look, { ...houseFinish(model), grain: 0, vignette: 0 });
+  assert.ok(chosen.fonts?.display, JSON.stringify(chosen.fonts));
+  // Picked by Edith: dressed in her charter (no lettering of the model's), the same finish.
+  const picked = dressSkillPlan(bare, ecranPartage, followedFrom("local", houseStyle(model), false, true));
+  assert.equal(picked.fonts, undefined);
+  assert.deepEqual(picked.look, chosen.look);
+  // Without a model followed, her own look for all her Reels, else none; the plan given is left as it was.
+  assert.equal(dressSkillPlan(bare, ecranPartage, undefined, LOOK_PRESETS.bw).look, LOOK_PRESETS.bw);
+  assert.equal(dressSkillPlan(bare, ecranPartage, undefined).look, undefined);
+  assert.equal(bare.look, undefined);
+  // The local render and production dress it the same way.
+  const read = (path: string) => readFileSync(new URL(path, import.meta.url), "utf8");
+  assert.match(read("../../../scripts/skill-render.mts"), /dressSkillPlan\(skillPlan\(/);
+  assert.match(read("../../../apps/web/src/lib/agent/skill-design.ts"), /dressSkillPlan\(leadPlan\(skillPlan\(/);
 });
 
 // ——— « Façade qui se construit » v2, written again on its original's fiche (docs/fiches/facade.md) —————————————————

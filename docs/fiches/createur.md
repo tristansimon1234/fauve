@@ -54,7 +54,7 @@
 ### 5. La blague en carton de vieille cassette
 - **Mesuré** : d'abord 4 images de neige de cassette (449 à 452 : du noir et des traits blancs horizontaux). Puis un carton plein cadre bleu acier (#1F5A8B), au texte pâle en capitales (#A6B7BA, 11 à 86 % × 37 à 67 %) : « ATTENTION CE FLIM N'EST PAS UN FLIM SUR LE CYCLIMSE / MERCI DE VOTRE COMPRÉHENSION ». C'est l'ouverture de *La Classe américaine*, un jeu sur le nom de l'outil. L'image saute comme une bande qui décroche (456 à 460). Le carton garde son propre son et dure 3,2 s.
 - **Sur quoi** : un jeu de mots sur son nom ou son métier, quand elle en fait un. Jamais l'extrait d'un film (ses droits) : un carton fait par le moteur, avec ses mots à elle.
-- **Outil** : `Glitch` (existant, permis quand le Reel suivi en a un) pour la neige sur la coupe ; le carton lui-même (fond uni, capitales pâles, image qui saute) en code du modèle. **Manquant** : le look « cassette VHS » sur un seul passage (les looks, `LOOK_PRESETS`, valent pour tout le Reel).
+- **Outil** : `Glitch` (existant, permis quand le Reel suivi en a un) pour la neige sur la coupe ; le carton lui-même (fond uni, capitales pâles, image qui saute) en code du modèle. **Manquant** : le look « cassette VHS » sur un seul passage (les looks, `LOOK_PRESETS`, valent pour tout le Reel). Existant depuis le 5 novembre : `<Look preset="vhs" from to>` autour du carton (`docs/outils-video.md`, « Un look sur un passage »).
 - **Si rien ne s'y prête** : pas de carton.
 
 ### 6. Le mot écrit à la main qui continue tapé à l'écran
