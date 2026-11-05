@@ -252,7 +252,10 @@ test("« Rituel du matin » ends on three black images, or on her ending card ty
   const card = nodes(draw(at + 10, ended.p));
   assert.equal(card.filter((x) => x.type === "Footage").length, 0);
   assert.equal(card.find((x) => x.type === "TypeOn")!.props.text, "Ouvert\ndès 7 h");
-  assert.equal(nodes(draw(at + 40, ended.p)).filter((x) => String(x.props.key).startsWith("sub-")).length, 1);
+  // Typed quicker than her title (a card has 1,6 s), its line a second on screen from its 16th image.
+  assert.ok(Number(card.find((x) => x.type === "TypeOn")!.props.speed) > 30);
+  const sub = (f: number) => nodes(draw(f, ended.p)).filter((x) => String(x.props.key).startsWith("sub-")).length;
+  assert.deepEqual([sub(at + 15), sub(at + 16), sub(at + 47)], [0, 1, 1]);
   // Her videos in width: whole in a 16:9 band on black, its title on the band; full frame as she asks.
   const wide = props(16, { aspect: 16 / 9 });
   assert.deepEqual(styleOf(nodes(draw(100, wide.p)).find((x) => x.type === "Footage")!), { position: "absolute", left: 0, top: 656, width: 1080, height: 608 });

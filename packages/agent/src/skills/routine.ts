@@ -216,11 +216,11 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const line = small && shown(small, Math.max(small.from, LINE_AT), Math.min(small.to, TRAILER, endAt)) ? fine(small.text, "line-" + keep(small.text)) : null;
 
   // 3. Its end: three black images, the sound cut with the last; her ending card (an option) typed like her title on the
-  // black, her line under it.
-  const CARD_LINE = endAt + 34;
+  // black, quicker (the engine gives a card 1,6 s), her line under it from its 16th image, a second on screen.
+  const CARD_LINE = endAt + 16;
   const card = end && frame >= endAt
     ? h(React.Fragment, null,
-        typed(lines(end.title), endAt + 2, CARD_LINE, "card-" + keep(end.title)),
+        typed(lines(end.title), endAt + 1, CARD_LINE, "card-" + keep(end.title)),
         end.subtitle && frame >= CARD_LINE ? fine(end.subtitle, "sub-" + keep(end.subtitle)) : null)
     : null;
 
