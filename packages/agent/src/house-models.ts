@@ -17,8 +17,8 @@ import type { z } from "zod";
 
 /** The source of the inspiration row a house model is kept on, per studio (one per model, made when first used). */
 export const HOUSE_SOURCE = "house";
-/** The catalogue's version: a studio's row written by an older one is rewritten when the model is used again (3: its original's sheets; 4: no brand in a model's name; 5: Mots aux quatre coins as its original; 6: Plans fixes at 65 BPM; 7: four renamed; 8: Lieu tapé without its original's orange; 9: Plans fixes on its fiche; 10: Une journée chez toi on its fiche; 11: ten models on their fiches; 12: Façade qui se construit and Coulisses façon fiche on their fiches; 13: Recette cosy on its fiche). */
-export const HOUSE_VERSION = 13;
+/** The catalogue's version: a studio's row written by an older one is rewritten when the model is used again (3: its original's sheets; 4: no brand in a model's name; 5: Mots aux quatre coins as its original; 6: Plans fixes at 65 BPM; 7: four renamed; 8: Lieu tapé without its original's orange; 9: Plans fixes on its fiche; 10: Une journée chez toi on its fiche; 11: ten models on their fiches; 12: Façade qui se construit and Coulisses façon fiche on their fiches; 13: Recette cosy on its fiche; 14: Titre gaufré on its fiche). */
+export const HOUSE_VERSION = 14;
 
 export type HouseModel = {
   key: string;
@@ -482,34 +482,39 @@ export const HOUSE_MODELS: HouseModel[] = [
   model({
     key: "gaufre",
     name: "Titre gaufré",
-    pitch: "Tes plans, puis ton nom pressé dans un papier de couleur et encré lettre à lettre, comme un faire-part.",
-    needs: "2 à 6 vidéos ou photos de ton lieu ou de ton travail",
-    files: [1, 6],
+    // 14: written again on its original's fiche (v2 of its skill): her front built piece by piece on black, then her name
+    // pressed into a peach paper and inked letter by letter, its line under it; 113,2 BPM so that its reprise, its cut
+    // and its end fall on whole beats of a music that starts on its first beat (its original: 120).
+    pitch: "Ta devanture se construit morceau par morceau sur le noir, puis ton nom pressé dans un papier pêche s'encre lettre à lettre.",
+    needs: "une vidéo fixe de ta devanture, de face, avec de la vie devant et ton nom visible",
+    files: [1, 1],
     pair: "gaufre",
     example: "I-gaufre",
-    tempo: 84,
-    finish: { name: "Doux", hint: "lumière douce et chaude", contrast: 0.04, warmth: 0.1 },
+    tempo: 113.2,
+    finish: { name: "Jour doux", hint: "lumière du jour douce, couleurs naturelles", contrast: 0.03, saturation: -0.05 },
     look: {
-      name: "titre gaufré sur papier",
-      format: "message",
-      hook: { kind: "geste", what: "un plan calme, puis un papier de couleur où un mot apparaît en relief" },
+      name: "devanture puis titre gaufré",
+      format: "collage",
+      hook: { kind: "mystère", what: "un écran noir où son nom apparaît d'un coup, puis sa devanture qui se construit morceau par morceau" },
       text: {
         amount: "une ligne",
-        composition: "un seul mot serif très gras au centre du papier, pressé en relief puis encré, et dessous une ligne en petites capitales très espacées",
+        composition: "son nom en serif très gras au centre d'un papier pêche, pressé en relief puis encré lettre à lettre, et dessous une ligne en petites capitales très espacées",
         weight: "black",
         tracking: "tight",
       },
-      colors: ["#8a2c12", "#f2c9a8"],
-      layout: "des plans en plein cadre, puis un papier de couleur uni plein cadre où un titre est gaufré",
+      colors: ["#b43c01", "#f5cca4"],
+      layout: "sa devanture qui se construit sur du noir, puis un papier pêche plein cadre où son nom est gaufré ; en bande 16:9 si sa vidéo est horizontale",
       moments: [
-        { at: 0, what: "un ou deux plans calmes en plein cadre" },
-        { at: 1, what: "un papier de couleur pêche plein cadre, grain du papier visible ; le titre y apparaît pressé en relief, sans encre" },
-        { at: 1.3, what: "l'encre rouille entre dans les lettres une à une, puis la petite ligne dessous s'encre à son tour" },
+        { at: 0.03, what: "son nom, puis trois morceaux de sa devanture loin l'un de l'autre, lentement, sur le noir" },
+        { at: 2.67, what: "une rafale de morceaux, puis les murs entre les rangées, de bas en haut" },
+        { at: 5.27, what: "la rue, le haut et tout le reste sur la reprise : sa devanture entière, caméra fixe" },
+        { at: 9, what: "le papier pêche : son nom pressé en relief, encré lettre à lettre, puis sa petite ligne" },
       ],
+      camera: "fixe",
       motion: "fait_main",
-      music: "soft ambient piano, warm and intimate",
-      ending: "le titre encré sur le papier, tenu deux secondes",
-      why: "La matière du papier fait artisanal et premium : on a envie de toucher l'écran.",
+      music: "warm acoustic bossa indie pop, nylon guitar, soft kick on every beat",
+      ending: "son nom encré sur le papier, la musique coupée net",
+      why: "On voit le lieu naître, puis la matière du papier fait artisanal et premium : on a envie de toucher l'écran.",
     },
   }),
   model({

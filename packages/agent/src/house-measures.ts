@@ -17,7 +17,7 @@ export const HOUSE_MEASURES: Record<string, ReelMeasures> = {
   "nike": { duration: 12, cuts: [0.17, 0.67, 1.43, 1.67, 3.23, 4.6, 5.4, 6.47, 7.33, 7.8, 8.07, 9, 9.73, 10.37], bpm: null, lufs: -14.4 },
   "titre-derriere": { duration: 12.07, cuts: [3.37, 4.43, 4.63, 4.8, 5, 5.8, 6.23, 6.8, 7.37, 9.17, 10.2, 10.33, 10.43, 10.57, 10.67, 10.8, 10.93, 11.03, 11.17, 11.27, 11.4, 11.53], bpm: 82.9, lufs: -14.2 },
   "facade": { duration: 9.4, cuts: [5.27, 9], bpm: null, lufs: -14.5 },
-  "gaufre": { duration: 12.76, cuts: [5.27, 9], bpm: null, lufs: -14.5 },
+  "gaufre": { duration: 12.76, cuts: [5.27, 5.83, 6.33, 9], bpm: 120, lufs: -14.5 },
   "cadre": { duration: 6.41, cuts: [0.33, 0.67, 1, 1.33, 1.7, 2.03, 2.37, 2.7, 3.03, 3.37, 3.7, 4.03, 4.37, 4.7, 5.03, 5.37, 5.7], bpm: 90, lufs: -14.4 },
   "mot-cle": { duration: 23.45, cuts: [], bpm: 108, lufs: -14.1 },
   "eventail": { duration: 19.97, cuts: [3.63, 4.63, 5.63, 6.63, 7.67, 8.7, 9.7, 10.67, 11.67, 12.63, 13.67, 14.67, 15.63], bpm: 119.8, lufs: -14.2 },
