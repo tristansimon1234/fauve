@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { captionStyle, isClipSegment, segmentSeconds, type EditPlan } from "./schemas.ts";
+import { captionStyle, isClipSegment, segmentSpans, type EditPlan, type MotionDrawn, type PlanLayer } from "./schemas.ts";
 
 // Her subject cut out at every image of a passage of her video (apps/render/matte.py, in the cut-out sandbox), so
 // a composition lays a text behind her as she walks, a title behind a hill, or her alone on a colour or on paper
@@ -96,6 +96,8 @@ function subjectCalls(js: string): { shot: string; name?: string }[] {
 }
 const OBJECT_PROP = /\bobject\s*[:=]\s*\{?\s*["'`]([^"'`]+)["'`]/;
 const SHOT_PROP = /\bshot\s*[:=]\s*\{?\s*((?:shots\s*\[\s*)?\d+)/;
+/** A shot prop written as a number or shots[n], and nothing after it (`shot: 5 + j` is a variable). */
+const SHOT_NUMBER = /\bshot\s*[:=]\s*\{?\s*((?:shots\s*\[\s*)?\d+\s*\]?)\s*(?=[,})]|$)/;
 
 /**
  * A composition's code that draws her subject (the person, or what stands in front: what its cut-out keeps): any use
@@ -107,6 +109,63 @@ export function drawsSubject(js: string | undefined): boolean {
   const mentions = js.match(/\b(?:Subject|SubjectBox|SubjectOutline|SubjectParts|Outline)\b/g)?.length ?? 0;
   const forObjects = toolProps(js).filter((props) => OBJECT_PROP.test(props)).length + subjectCalls(js).filter((c) => c.name).length;
   return mentions > forObjects;
+}
+
+/**
+ * The shots a composition's code draws her cut out on (her subject, not an object): Subject or Outline without
+ * `object`, by their `shot` written as a number or shots[n], and SubjectBox, SubjectOutline or SubjectParts called
+ * without a name on shots[n] (or n). A shot written as a variable (`shot: i`, `shots[cur]`, `5 + j`) is ANY_SHOT,
+ * every shot under the animation; so is a use read no other way (aliased, in a list) when it is the only one.
+ */
+export function subjectsDrawn(js: string | undefined): number[] {
+  if (!js || !drawsSubject(js)) return [];
+  const shots = new Set<number>();
+  const add = (shot: string | undefined) => {
+    const n = /^(?:shots\s*\[\s*)?(\d+)\s*\]?$/.exec((shot ?? "").trim());
+    shots.add(n ? Number(n[1]) : ANY_SHOT);
+  };
+  for (const props of toolProps(js)) if (!OBJECT_PROP.test(props)) add(SHOT_NUMBER.exec(props)?.[1]);
+  for (const c of subjectCalls(js)) if (!c.name) add(c.shot);
+  if (!shots.size) shots.add(ANY_SHOT);
+  return [...shots].sort((a, b) => a - b);
+}
+
+/**
+ * What a layer's code draws of her shots as its montage skill declared it (motion.drawn), when it still fits the plan:
+ * made for as many shots as the plan has (its code kept over other shots no longer says which: it is read again).
+ */
+export function declaredDrawn(plan: Pick<EditPlan, "segments">, layer: Pick<PlanLayer, "motion"> | undefined): MotionDrawn | null {
+  const drawn = layer?.motion?.drawn;
+  return drawn && drawn.shots === plan.segments.filter(isClipSegment).length ? drawn : null;
+}
+
+/** When each of her shots is on screen (seconds, as the composition's shots list them: videos and photos), a shot laid beside the others at its own moment. */
+function shotSpans(plan: Pick<EditPlan, "segments">): { from: number; to: number }[] {
+  const { spans } = segmentSpans(plan.segments);
+  return plan.segments.flatMap((s, i) => (isClipSegment(s) ? [{ from: spans[i]!.start, to: spans[i]!.start + spans[i]!.length }] : []));
+}
+
+/** Her shots on screen under an animation (their index among her shots), by when they play (a fade's few tenths aside). */
+function shotsUnder(spans: { from: number; to: number }[], layer: Pick<PlanLayer, "from" | "to">): number[] {
+  return spans.flatMap((s, i) => (s.to > layer.from + 0.05 && s.from < layer.to - 0.05 ? [i] : []));
+}
+
+/**
+ * The shots of a plan its animations draw her cut out on (their index among her shots): each layer's that draws her,
+ * as its montage skill declared them (motion.drawn.subjects, with any shot its code writes as a number), else read in
+ * its code (subjectsDrawn: a shot written as a variable, every shot under it).
+ */
+export function subjectShots(plan: Pick<EditPlan, "segments" | "layers">): Set<number> {
+  const spans = shotSpans(plan);
+  const out = new Set<number>();
+  for (const layer of plan.layers ?? []) {
+    const read = subjectsDrawn(layer.motion?.js);
+    const declared = declaredDrawn(plan, layer)?.subjects;
+    if (!read.length && !declared?.length) continue;
+    const shots = declared ? [...declared, ...read.filter((k) => k !== ANY_SHOT)] : read.flatMap((k) => (k === ANY_SHOT ? shotsUnder(spans, layer) : [k]));
+    for (const k of shots) if (k >= 0 && k < spans.length) out.add(k);
+  }
+  return out;
 }
 
 /** An object's name as kept: lower case, its spaces single (« The coffee cup » and « the coffee cup » are one). */
@@ -185,9 +244,11 @@ export const AROUND_WORDS = /autour d|derri[eè]re (l[ae']|les|son|sa|ses|un|une
 export type SubjectPassage = { clip_id: string; from: number; to: number; key: string };
 
 /**
- * The passages a Reel needs cut out: the video shots of a plan whose composition draws Subject, played at their own
- * pace (a speed or a ramp changes which images show), the first ones up to SUBJECT_MAX_SECONDS in all. Photos are
- * left out: their subject is the photo's own cut-out, made once (subjectPhotoIds), which Subject draws on them too.
+ * The passages a Reel needs cut out: the video shots an animation draws her on (subjectShots: as its montage skill
+ * declares them, else read in its code, a shot written as a variable being every shot under it), played at their own
+ * pace (a speed or a ramp changes which images show), up to SUBJECT_MAX_SECONDS in all; every shot for a composition
+ * about to be written (anticipate), the opening ones for what is said written around her. Photos are left out: their
+ * subject is the photo's own cut-out, made once (subjectPhotoIds), which Subject draws on them too.
  */
 export function subjectPassages(
   plan: Pick<EditPlan, "segments" | "layers"> & { subtitles?: boolean; captions?: EditPlan["captions"]; finish?: EditPlan["finish"] },
@@ -198,11 +259,18 @@ export function subjectPassages(
   // Only the opening passages for the captions alone; an animation that draws her (or a composition that will: anticipate), as many as the budget holds.
   const composed = (plan.layers ?? []).some((l) => (l.compose && anticipate) || drawsSubject(l.motion?.js));
   const budget = composed ? SUBJECT_MAX_SECONDS : CAPTION_SUBJECT_SECONDS;
+  // The shots her cut-out is drawn on (decode's three of its ending, not its 16 passages): unknown before its code is
+  // written, and every one when what is said goes behind her too (its phrases fall on any shot).
+  const captions = Boolean(plan.subtitles && captionStyle(plan) === "kinetic");
+  const drawn = composed && !anticipate && !captions ? subjectShots(plan) : null;
   const out: SubjectPassage[] = [];
   let seconds = 0;
+  let shot = -1;
   for (const s of plan.segments) {
+    if (isClipSegment(s)) shot++;
     if (!composed && seconds >= budget) break;
-    if (!isClipSegment(s) || !isVideo(s.clip_id) || s.ramp || (s.speed && Math.abs(s.speed - 1) > 0.01)) continue;
+    if (!isClipSegment(s) || (drawn && !drawn.has(shot))) continue;
+    if (!isVideo(s.clip_id) || s.ramp || (s.speed && Math.abs(s.speed - 1) > 0.01)) continue;
     const length = Math.max(0, s.out - s.in);
     if (!length || seconds + length > budget) continue;
     const key = subjectKey(s.clip_id, s.in, s.out);
@@ -231,9 +299,40 @@ export function photosDrawnOver(plan: Pick<EditPlan, "segments" | "layers">): st
   return [...new Set([...subjectPhotoIds(plan), ...objectPassages(plan, () => false).flatMap((p) => (p.photo ? [p.clip_id] : []))])];
 }
 
-/** The most objects followed for one Reel, and the most seconds of video they take (each one is read on its whole passage). */
-export const OBJECT_MAX = 4;
+/**
+ * The most objects followed for one Reel (a skill lights five things up on five of her shots: « Titre derrière le
+ * décor »), and the most seconds of video they take in all: each one is read on its whole passage, about 12 s of the
+ * card a second, so the card's time stays under four minutes and its cost under 0,15 € whatever their number
+ * (lib/render/subjects.ts holds the cost to that, OBJECT_MAX_EUR, in the order the code names them).
+ */
+export const OBJECT_MAX = 8;
 export const OBJECT_MAX_SECONDS = 20;
+
+/**
+ * What objects take on the rented card (track_objects.py, seconds): its models loaded and its clips fetched, then each
+ * second of a passage (found on one image, followed both ways by SAM 2, its edge made), or one photo (one image read).
+ */
+export const OBJECT_CARD = { load: 60, perSecond: 12, photo: 8 } as const;
+
+/**
+ * The most a Reel's objects may cost on the card, its load and their work at its price: eight objects at most, their
+ * 20 s of video stay around 0,12 € on an A10G; past it (a dearer card, longer passages) the last ones are left out.
+ */
+export const OBJECT_MAX_EUR = 0.15;
+
+/**
+ * The object passages the card's budget holds (OBJECT_MAX_EUR), in the order the code names them: its estimate, the
+ * load then each one's work, at `eurPerSecond` (the card's price); the composition does without those left out.
+ */
+export function objectsWithinBudget<P extends { from: number; to: number; photo?: true }>(passages: P[], eurPerSecond: number): P[] {
+  let seconds = passages.length ? OBJECT_CARD.load : 0;
+  return passages.filter((p) => {
+    const need = p.photo ? OBJECT_CARD.photo : Math.max(0, p.to - p.from) * OBJECT_CARD.perSecond;
+    if ((seconds + need) * eurPerSecond > OBJECT_MAX_EUR + 1e-9) return false;
+    seconds += need;
+    return true;
+  });
+}
 
 /** A plan whose animations follow an object (Subject, SubjectBox, SubjectOutline or Outline given its name): a composition, or one laid over the montage. */
 export const wantsObjects = (plan: Pick<EditPlan, "layers">) => (plan.layers ?? []).some((l) => objectsDrawn(l.motion?.js).length > 0);
@@ -248,25 +347,35 @@ export const PHOTO_OBJECT_MAX = 6;
 export const photoKey = (mediaId: string) => subjectKey(mediaId, 0, 0);
 
 /**
+ * The objects an animation's code follows, by shot: as read in its code (objectsDrawn), a shot it writes as a variable
+ * placed where its montage skill declared that object (motion.drawn.objects: her sign on her last shot), else on every
+ * shot under it.
+ */
+export function layerObjects(plan: Pick<EditPlan, "segments" | "layers">, layer: PlanLayer, spans = shotSpans(plan)): { shot: number; name: string }[] {
+  const declared = declaredDrawn(plan, layer)?.objects ?? [];
+  const out = new Map<string, { shot: number; name: string }>();
+  for (const o of objectsDrawn(layer.motion?.js)) {
+    const placed = o.shot === ANY_SHOT ? declared.filter((d) => objectName(d.name) === o.name).map((d) => d.shot) : [o.shot];
+    const shots = o.shot === ANY_SHOT && !placed.length ? shotsUnder(spans, layer) : placed;
+    for (const shot of shots) out.set(`${shot}#${o.name}`, { shot, name: o.name });
+  }
+  return [...out.values()];
+}
+
+/**
  * The objects a Reel's compositions follow, each through the passage of the shot its code names: her shot n is the
- * plan's n-th shot (video or photo, as the composition's shots list them), a video at its own pace only (a speed or a
- * ramp changes which images show); OBJECT_MAX at most, OBJECT_MAX_SECONDS in all.
+ * plan's n-th shot (video or photo, as the composition's shots list them; one its montage skill placed, layerObjects),
+ * a video at its own pace only (a speed or a ramp changes which images show); OBJECT_MAX at most, OBJECT_MAX_SECONDS in all.
  */
 export function objectPassages(plan: Pick<EditPlan, "segments" | "layers">, isVideo: (clipId: string) => boolean): ObjectPassage[] {
   const shots = plan.segments.filter(isClipSegment);
   // When each shot is on screen (seconds; a fade's overlap, a few tenths, left aside): a shot written as a variable is any shot under the animation.
-  let at = 0;
-  const spans = plan.segments.flatMap((s) => {
-    const from = at;
-    at += segmentSeconds(s);
-    return isClipSegment(s) ? [{ from, to: at }] : [];
-  });
+  const spans = shotSpans(plan);
   const out: ObjectPassage[] = [];
   let seconds = 0;
   let photos = 0;
   for (const layer of plan.layers ?? []) {
-    const under = shots.flatMap((_, i) => (spans[i]!.to > layer.from + 0.05 && spans[i]!.from < layer.to - 0.05 ? [i] : []));
-    for (const { shot, name } of objectsDrawn(layer.motion?.js).flatMap((o) => (o.shot === ANY_SHOT ? under.map((i) => ({ shot: i, name: o.name })) : [o]))) {
+    for (const { shot, name } of layerObjects(plan, layer, spans)) {
       const s = shots[shot];
       // A photo: the object found once on it (a glass on a table, the cup she holds), whatever its move.
       if (s?.photo) {
@@ -369,12 +478,7 @@ export type ClearPassage = SubjectPassage & { photo?: true };
  */
 export function clearPassages(plan: Pick<EditPlan, "segments" | "layers">, isVideo: (clipId: string) => boolean): ClearPassage[] {
   const shots = plan.segments.filter(isClipSegment);
-  let at = 0;
-  const spans = plan.segments.flatMap((s) => {
-    const from = at;
-    at += segmentSeconds(s);
-    return isClipSegment(s) ? [{ from, to: at }] : [];
-  });
+  const spans = shotSpans(plan);
   const out: ClearPassage[] = [];
   let seconds = 0;
   for (const layer of plan.layers ?? []) {
@@ -459,17 +563,12 @@ export type ReadPassage = SubjectPassage & { kinds: ShotReadKind[]; photo?: true
  */
 export function readPassages(plan: Pick<EditPlan, "segments" | "layers">, isVideo: (clipId: string) => boolean): ReadPassage[] {
   const shots = plan.segments.filter(isClipSegment);
-  let at = 0;
-  const spans = plan.segments.flatMap((s) => {
-    const from = at;
-    at += segmentSeconds(s);
-    return isClipSegment(s) ? [{ from, to: at }] : [];
-  });
+  const spans = shotSpans(plan);
   const out: ReadPassage[] = [];
   let grounds = 0;
   let seconds = 0;
   for (const layer of plan.layers ?? []) {
-    const under = shots.flatMap((_, i) => (spans[i]!.to > layer.from + 0.05 && spans[i]!.from < layer.to - 0.05 ? [i] : []));
+    const under = shotsUnder(spans, layer);
     for (const { shot, kinds } of readsDrawn(layer.motion?.js).flatMap((r) => (r.shot === ANY_SHOT ? under.map((i) => ({ ...r, shot: i })) : [r]))) {
       const s = shots[shot];
       if (!s) continue;

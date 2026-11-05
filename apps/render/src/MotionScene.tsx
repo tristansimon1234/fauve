@@ -21,6 +21,7 @@ import { objectName } from "./outline";
 import { Marker } from "./Marker";
 import { Captions } from "./Captions";
 import { PaperCutout, type RimSpec } from "./PaperCutout";
+import { makeLooks, PassageLooksContext } from "./PassageLook";
 import { SceneView } from "./Scene";
 import type { Theme } from "./theme";
 import { footageTrack, type TrackFn, type TrackPiece } from "./track";
@@ -339,6 +340,8 @@ const type = makeType({ useCurrentFrame, useVideoConfig });
 const graphic = makeGraphic({ useCurrentFrame, useVideoConfig });
 // Letterbox, ColorPop, MaskReveal, Glitch, Callout, Brackets, Outline: the effects kit (Effects.tsx, lot 7).
 const effects = makeEffects({ useCurrentFrame, useVideoConfig });
+// Look: a ready look on one passage (PassageLook.tsx), from the looks the Reel gives (props.looks).
+const looks = makeLooks({ useCurrentFrame, useVideoConfig });
 export const SCOPE = {
   AbsoluteFill,
   Sequence,
@@ -407,6 +410,7 @@ export const SCOPE = {
   VanishingPoint,
   LightUnder,
   HeadMoves,
+  Look: looks.Look,
 };
 
 export type SceneComponent = (props: {
@@ -518,10 +522,12 @@ export function MotionScene(p: {
       spoken={p.spoken ?? []}
     />
   );
+  // The ready looks its Look lays on a passage, when the Reel gives them.
+  const looked = p.props.looks ? <PassageLooksContext.Provider value={p.props.looks}>{scene}</PassageLooksContext.Provider> : scene;
   return (
     <Fallback fallback={fixed}>
       <AbsoluteFill style={p.shift ? { transform: `translateY(${Math.round(p.shift * p.props.height)}px)` } : undefined}>
-        {p.footage ? <FootageContext.Provider value={p.footage}>{scene}</FootageContext.Provider> : scene}
+        {p.footage ? <FootageContext.Provider value={p.footage}>{looked}</FootageContext.Provider> : looked}
       </AbsoluteFill>
     </Fallback>
   );

@@ -1,4 +1,4 @@
-import { isClipSegment, MAX_OVERLAYS, segmentSeconds, type EditPlan, type PlanOverlay } from "./schemas.ts";
+import { isClipSegment, MAX_OVERLAYS, segmentSpans, type EditPlan, type PlanOverlay } from "./schemas.ts";
 
 // Manual edits of a montage (the scene editor): every change keeps the plan
 // valid and the overlay texts attached to the scene they were on, since texts
@@ -11,14 +11,9 @@ export function segmentKind(segment: Segment): SegmentKind {
   return isClipSegment(segment) ? "clip" : "scene" in segment ? "scene" : "motion";
 }
 
-/** Start and end of each segment, in seconds from the start of the video. */
+/** Start and end of each segment, in seconds from the start of the video (a shot laid beside the others at its own moment). */
 export function timeline(plan: Pick<EditPlan, "segments">): { start: number; end: number }[] {
-  let t = 0;
-  return plan.segments.map((s) => {
-    const start = t;
-    t += Math.max(0, segmentSeconds(s));
-    return { start, end: t };
-  });
+  return segmentSpans(plan.segments).spans.map(({ start, length }) => ({ start, end: start + length }));
 }
 
 /**
@@ -56,9 +51,10 @@ function withSegments(plan: EditPlan, segments: Segment[], origin: (number | nul
     return end - start >= 0.3 ? [{ ...text, from: start, to: end }] : [];
   });
   // What she added on a scene moves with it, like a text (one over the whole Reel keeps its span, clipped to the new end).
-  const duration = round(after.at(-1)?.end ?? 0);
+  // Where the video ends (its last image, a shot laid beside the others included).
+  const duration = round(segmentSpans(segments).end);
   const overlays = plan.overlays?.flatMap((o): PlanOverlay[] => {
-    const whole = o.from <= 0.05 && o.to >= (before.at(-1)?.end ?? 0) - 0.05;
+    const whole = o.from <= 0.05 && o.to >= segmentSpans(plan.segments).end - 0.05;
     if (whole) return [{ ...o, to: round(Math.max(o.from + 0.3, duration)) }];
     const from = segmentAt(plan, o.from);
     const at = origin.indexOf(from);

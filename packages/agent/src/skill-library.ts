@@ -9,6 +9,7 @@ import { facade } from "./skills/facade.ts";
 import { frappe } from "./skills/frappe.ts";
 import { gaufre } from "./skills/gaufre.ts";
 import { journee } from "./skills/journee.ts";
+import { monTravail } from "./skills/mon-travail.ts";
 import { mosaique } from "./skills/mosaique.ts";
 import { nike } from "./skills/nike.ts";
 import { photoDump } from "./skills/photo-dump.ts";
@@ -16,6 +17,7 @@ import { pile } from "./skills/pile.ts";
 import { pixel } from "./skills/pixel.ts";
 import { plansFixes } from "./skills/plans-fixes.ts";
 import { quatreCoins } from "./skills/quatre-coins.ts";
+import { rallume } from "./skills/rallume.ts";
 import { titreDerriere } from "./skills/titre-derriere.ts";
 import { tourne } from "./skills/tourne.ts";
 
@@ -34,6 +36,7 @@ export const MONTAGE_SKILLS: Record<string, MontageSkill> = {
   frappe,
   gaufre,
   journee,
+  "mon-travail": monTravail,
   mosaique,
   nike,
   "photo-dump": photoDump,
@@ -41,6 +44,7 @@ export const MONTAGE_SKILLS: Record<string, MontageSkill> = {
   pixel,
   "plans-fixes": plansFixes,
   "quatre-coins": quatreCoins,
+  rallume,
   "titre-derriere": titreDerriere,
   tourne,
 };

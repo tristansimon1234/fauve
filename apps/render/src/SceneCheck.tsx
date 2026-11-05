@@ -9,6 +9,7 @@ import { makeGraphic } from "./Graphic";
 import { makeEffects } from "./Effects";
 import { makeCaptions } from "./Captions";
 import { compileScene, SCOPE, type SceneComponent } from "./MotionScene";
+import { makeLooks } from "./PassageLook";
 import { themeFor } from "./theme";
 import { inBox, inShape, onlyProbe, probeSpoken as probeWords, silhouette, type Box as PersonBox, type Shape } from "./silhouette";
 import { footageTrack, NOTHING_SEEN, type Seen, type TrackFn, type TrackPiece } from "./track";
@@ -143,6 +144,8 @@ function checkScope(width: number, height: number, durationInFrames: number): ty
     ...makeEffects({ useCurrentFrame, useVideoConfig }),
     // What is said, on this copy's clock too (its words are measured: does the scene write them?).
     Captions: makeCaptions({ useCurrentFrame, useVideoConfig }),
+    // A look on one passage: none given here, what it wraps drawn plain in its box (its words are measured).
+    ...makeLooks({ useCurrentFrame, useVideoConfig }),
     Sequence: Sequence as unknown as typeof SCOPE.Sequence,
     Cutout: Cutout as typeof SCOPE.Cutout,
     Footage: Footage as typeof SCOPE.Footage,
@@ -656,7 +659,8 @@ export function SceneCheck({ js, texts, durationInFrames, brand, photos = [], cu
   const width = 1080;
   const height = 1920;
   const [track] = useState(() => footageTrack(pieces, themeFor(look?.template ?? "libre", look?.signature, look?.tempo), { width, height }, { shots }));
-  loadFonts([brand.displayFont, brand.bodyFont, ...fonts]);
+  // The fonts its Reel's texts bring for their own words (a skill's filler picked them) laid out too, as the Reel draws them.
+  loadFonts([brand.displayFont, brand.bodyFont, ...fonts, ...reelTexts.flatMap((t) => (t.font ? [t.font] : []))]);
   const [handle] = useState(() => delayRender("scene check", { timeoutInMilliseconds: 60000 }));
   const [Scene] = useState(() => compileScene(js, checkScope(width, height, durationInFrames)));
   // Words said under it, when its code reads them: written by it or not, they are what it is given.

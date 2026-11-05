@@ -32,7 +32,7 @@
 ### 1. Deux étiquettes techniques fixes
 - **Mesuré** : « 14,800 FEET » (l'altitude) à gauche, de 10,3 à 20,7 % de la largeur, et « 32.9585° N, 77.2486° E » (les coordonnées) à droite, de 69,9 à 89,9 % : à la même distance des bords, à mi-hauteur (de 47,8 à 52,5 % de la hauteur). Capitales blanches (≈ #F1F2F4) très étroites (11 caractères sur 74 px pour 18 px de haut), traits fins (2 px), sans ombre ni contour : sur les nuages, elles se lisent à peine (150-155). Hauteur des capitales : 4,4 % de l'image. Là dès la première image, jamais animées, au même pixel jusqu'à la dernière, au-dessus de tout (sur les silhouettes blanches, elles disparaissent : 132-135).
 - **Sur quoi** : deux repères vrais de son commerce, au ton d'un relevé : les coordonnées de son adresse, son adresse (« 12 RUE DES MARTYRS »), son quartier, l'heure ou l'année d'ouverture, une mesure de son métier (« 250 °C » pour un four à pizza).
-- **Outil** : du texte dans le code du modèle (`FitText`), comme le brouillon. Pour les coordonnées, outil manquant : le géocodage de son adresse (ses coordonnées à quatre décimales, rien d'inventé).
+- **Outil** : du texte dans le code du modèle (`FitText`), comme le brouillon. Pour les coordonnées, existant depuis le 5 novembre : un texte `fact: "coordinates"` écrit par le moteur, son adresse géocodée une fois par OpenStreetMap (`docs/modeles.md`, « Son adresse en coordonnées »), à quatre décimales, rien d'inventé ; sans elles, le repli de son texte.
 - **Si rien ne s'y prête** : son quartier ou sa ville, et ce qu'elle fait en un ou deux mots (le brouillon).
 
 ### 2. Le plan suivant entre case par case
@@ -57,7 +57,7 @@
 ### 5. La silhouette blanche de ce qui arrive
 - **Mesuré** : 2 à 4 images avant le plan suivant, son sujet découpé, plein d'une seule couleur, à sa place dans ce plan, posé sur le plan en cours : blanc #FCF9FD ou crème #FBF2DB, sans bord ni ombre. Huit fois : deux hommes (22-23, crème, d'un plan qu'on ne retrouve pas), la bande du 4x4 (40-41), le randonneur (97-100, 4 images), l'homme qui remet ses lunettes (132-135, 4 images, sur le temps 6, la caisse claire), la rivière (184-185, crème), le danseur (192-193, crème, sur le temps 9), le rétroviseur (263-264), l'homme devant la brume (329-330, crème).
 - **Sur quoi** : le sujet de son plan suivant : elle, un client, un plat, une bouteille, un vélo, sa devanture.
-- **Outil** : `Subject shot={suivant} at={…} fill="#FCF9FD"` (existant : sa silhouette d'une couleur, jouée en avance) ; un objet par `object="…"` (4 par Reel au plus). Outil manquant : ne détourer que les 2 à 4 images dessinées ; aujourd'hui, dès qu'un code dessine `Subject`, tout le passage de chaque plan est détouré (`subjectPassages`).
+- **Outil** : `Subject shot={suivant} at={…} fill="#FCF9FD"` (existant : sa silhouette d'une couleur, jouée en avance) ; un objet par `object="…"` (4 par Reel au plus). Outil manquant : ne détourer que les 2 à 4 images dessinées ; aujourd'hui, dès qu'un code dessine `Subject`, tout le passage de chaque plan est détouré (`subjectPassages`). Fait en partie le 5 novembre : seuls les plans où le code la dessine sont détourés (`SkillTimeline.cutouts`, ou le plan écrit en nombre ; `docs/detourage.md`), toujours le passage entier de chacun.
 - **Si rien ne s'y prête** : pas de silhouette sur cette coupe (un ciel, un paysage sans sujet) ; l'original en fait 8 pour une vingtaine de coupes.
 
 ### 6. Le sujet arrive avant son décor

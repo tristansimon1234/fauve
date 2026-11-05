@@ -9,8 +9,10 @@ import {
   mediaSubjectsSchema,
   mediaTracksSchema,
   nearPassages,
+  OBJECT_CARD,
   objectKey,
   objectPassages,
+  objectsWithinBudget,
   PHOTO_OBJECT_MAX,
   photoKey,
   readPassages,
@@ -370,10 +372,10 @@ export async function subjectInputs(studioId: string, plan: Plan): Promise<Recor
 // ——— Objects she shows (a cup, a product): followed on the card ————————————————————————————————————————
 
 /** On the card: the object found on one image and followed both ways through its passage (SAM 2), then its edge made, a second of video. */
-const OBJECT_LOAD_MS = 60_000;
-const OBJECT_WORK_PER_SECOND = 12;
+const OBJECT_LOAD_MS = OBJECT_CARD.load * 1000;
+const OBJECT_WORK_PER_SECOND = OBJECT_CARD.perSecond;
 /** An object found on a photo: one image read, its edge made at full size (a few seconds with its fetch and its send). */
-const PHOTO_OBJECT_MS = 8_000;
+const PHOTO_OBJECT_MS = OBJECT_CARD.photo * 1000;
 
 /**
  * Follows the objects a Reel's compositions name (Subject, SubjectBox, SubjectOutline or Outline given its name)
@@ -432,7 +434,10 @@ const CLEAR_WORK_PER_SECOND = 1;
  * The objects of these passages followed (or found on her photos) on the card, and the clear areas of `clears` read in
  * the same machine (without a card when there is no object), kept on their media, the machine's time billed.
  */
-async function followObjects(studioId: string, postId: string, missing: ObjectPassage[], rows: Map<string, Row>, clears: ClearPassage[] = []): Promise<void> {
+async function followObjects(studioId: string, postId: string, asked: ObjectPassage[], rows: Map<string, Row>, clears: ClearPassage[] = []): Promise<void> {
+  // The card's cost held to its budget (OBJECT_MAX_EUR, at its price a second): the objects its code names first are followed first.
+  const missing = objectsWithinBudget(asked, gpuCostEur(1));
+  if (missing.length < asked.length) console.warn("objects left out, over the card's budget", postId, asked.filter((p) => !missing.includes(p)).map((p) => p.key));
   if (!missing.length && !clears.length) return;
   const db = supabaseAdmin();
   const left = timeLeft();

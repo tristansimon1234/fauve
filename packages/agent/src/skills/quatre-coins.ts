@@ -1,10 +1,11 @@
 import { beatSpans, toFrame, type MontageSkill } from "../skills.ts";
 
-// « Mots aux quatre coins », version 2, written again on its original's fiche (docs/fiches/quatre-coins.md: measured
+// « Mots aux quatre coins », version 3, written again on its original's fiche (docs/fiches/quatre-coins.md: measured
 // image by image at 30 i/s, its music measured band by band, the video watched and heard by Gemini; Tristan: « c'est un
 // effet que l'on veut pouvoir faire, pas exactement reproduire l'image »). Its music is a downtempo groove at 92 BPM (its
 // first image is its beat −0,3; Gemini heard 78), and every length below is in its beats from the Reel's start, so its
-// cuts fall where the original's do (within an image):
+// cuts fall where the original's do (within an image), the music's first strong beat set half a beat in so they fall on
+// its beats:
 //   0 – 5,53   the first shot of the place, fixed and lively: from its beat 0,75 a sentence lands a piece at a time on
 //              the frame's edges, cut in, every three quarters of a beat (the first two half a beat apart): its first
 //              words along the top (left, a third in, right), her name and her place on the middle row (left, right),
@@ -25,6 +26,12 @@ const BPM = 92;
 const OPENING = 8.5;
 /** Where the original's first beat falls in the Reel (its first image is its beat −0,3): its words and its pause are counted from it. */
 const LEAD = 0.3;
+/**
+ * Where its music's first strong beat lands (beats from the Reel's start): half a beat in, so its first cut (8,5) is the
+ * first beat of the music's third bar, its next two on its beats and its fourth on an off-beat, as the original's after
+ * its reprise (its beats 8, 9, 10, 11,5: composed from 0, the music had its beats half a beat off, its cuts on its off-beats).
+ */
+const DOWNBEAT = 0.5;
 /** Its six pieces land on these beats of the original (images 20, 30, 46, 61, 75 and 89): every three quarters of a beat, the first two closer. */
 const WORDS = [0.75, 1.25, 2, 2.75, 3.5, 4.25];
 /** Its bass and drums drop out on its beat 4,5 (3,15 s), half a beat after its sentence is whole, until its first cut (here its bass and kick). */
@@ -178,7 +185,8 @@ export const quatreCoins: MontageSkill = {
   // its cuts, its words on its beats from its first image's lead, cream at one size with no shadow (a halo for a light
   // area), its address on one line, its music losing its bass on the whole sentence and back on the first cut, its front
   // held 7,5 s with her name alone in the middle, no vignette.
-  version: 2,
+  // 3: its music's first strong beat half a beat in (`downbeat`): its reprise and its first cuts on the music's beats.
+  version: 3,
   bpm: BPM,
   shots: SHOTS,
   long: LONGEST,
@@ -242,6 +250,8 @@ export const quatreCoins: MontageSkill = {
     return {
       duration,
       music: {
+        // Its first strong beat half a beat in (a pickup of the music before it), its cuts on its beats.
+        downbeat: at(DOWNBEAT),
         // Its bass and kick drop out half a beat after its sentence is whole (the original's 3,15 s; its snare and hats
         // stay): only what is over 240 Hz plays, and the whole groove is back at once on the first cut (its 20 ms: opened
         // slowly, from its pickup at 4,6 s, the dry music and its filtered copy, out of phase around 300 Hz, hollowed its

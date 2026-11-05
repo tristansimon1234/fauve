@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "typecheck": "next typegen && tsc --noEmit",
-    "test": "node --test src/lib/dates.test.ts \"src/app/(app)/style/style-profile.test.ts\""
+    "test": "node --test src/lib/dates.test.ts src/lib/render/render-tries.test.ts src/lib/render/sandbox-life.test.ts \"src/app/(app)/style/style-profile.test.ts\""
   },
   "dependencies": {
     "@fauve/agent": "*",

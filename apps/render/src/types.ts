@@ -80,7 +80,16 @@ export type ShotCamera = {
   straighten?: number;
 };
 /** A text of the Reel that a collage's composition draws itself (frames from its start): its words, its role, the words to stress, a message's lines. */
-export type ComposeText = { text: string; role: "hook" | "band" | "caption"; from: number; to: number; emphasis: string[]; items?: { title: string; detail?: string }[] };
+export type ComposeText = {
+  text: string;
+  role: "hook" | "band" | "caption";
+  from: number;
+  to: number;
+  emphasis: string[];
+  items?: { title: string; detail?: string }[];
+  /** A font of its own, picked for what its words evoke (a skill's filler): a Google Fonts family, loaded with the Reel. */
+  font?: string;
+};
 /** The Reel's end that a composition draws itself: its title and line, from its frame. */
 export type ComposeEnd = { title: string; subtitle: string | null; from: number };
 export type RegionKind = "face" | "plate" | "screen" | "document" | "other";
@@ -172,6 +181,8 @@ export type ReelProps = {
         ground?: { src: string; still?: boolean };
         /** Her shot with its depth as its transparency (near opaque), drawn like the shot by Near. */
         near?: { src: string };
+        /** Laid beside another shot on the same moment (a split screen's other half): only a composition draws it, the plain montage skips it. */
+        beside?: true;
       }
     | {
         type: "image";
@@ -195,6 +206,8 @@ export type ReelProps = {
         relief?: { src: string; frames: number };
         /** The photo without its sky (an image framed like the photo), drawn exactly over it by Skyline. */
         ground?: { src: string; still?: boolean };
+        /** Laid beside another shot on the same moment: only a composition draws it, the plain montage skips it. */
+        beside?: true;
       }
     /** composed: an engine screen inside a composition that draws the whole picture, drawn only in its fallback. */
     | { type: "scene"; scene: Scene; startAt: number; durationInFrames: number; under?: ReelUnder; composed?: true }
@@ -233,6 +246,8 @@ export type ReelProps = {
     bullet?: { kind: "check" | "box" | "dot" | "dash" | "number" | "arrow"; color: string };
     /** In a Reel, a text with items is a message: its own words are its title (on a photo, a list's text is only its name). */
     message?: boolean;
+    /** A font of its own for its words (a skill's filler picked it for what they evoke): its composition draws it, loaded here. */
+    font?: string;
   }[];
   words: { w: string; from: number; to: number }[];
   /** What is said written like a creator: each phrase around the person (kinetic), or on labels (stickers); absent, the apps' own captions. */
@@ -260,8 +275,11 @@ export type ReelProps = {
    * pauses, its end): points (frame, 0–1) to draw straight lines between.
    */
   soundtrack?: { src: string; volume?: number; duck?: { volume: number; windows: [number, number][] }; envelope?: [number, number][] } | null;
-  /** Its sound effects in the live preview (the render strips them and mixes them afterwards): from its frame, its gain in dB, the part of its file played (s). */
-  sfx?: { src: string; key: string; from: number; at: number; gain: number; onset: number; end: number }[];
+  /**
+   * Its sound effects in the live preview (the render strips them and mixes them afterwards): from its frame, its gain in
+   * dB, the part of its file played (s); a burst, laid again at each of its times (s after `at`), each at its own gain.
+   */
+  sfx?: { src: string; key: string; from: number; at: number; gain: number; onset: number; end: number; burst?: { times: number[]; gains: number[] } }[];
   /** Her videos kept whole and horizontal, on black above and below. */
   frame?: "letterbox";
   /** Her voice note over the Reel, from `from` (frames). */
@@ -270,6 +288,11 @@ export type ReelProps = {
   look?: ReelLookDraw | null;
   /** The date a look prints, in its camera's format (« '26 10 29 », « 29 OCT. 2026 »). */
   stamp?: string;
+  /**
+   * The ready looks (LOOK_PRESETS, by key: « vhs », « bw »…) an animation lays on one passage with Look (PassageLook.tsx),
+   * each drawn as a look over the whole Reel is, with the date its camera prints: given when an animation's code uses Look.
+   */
+  looks?: Record<string, { look: ReelLookDraw; stamp?: string }>;
   logo?: "top" | "bottom" | null;
   /** Where a voice's subtitles sit for the whole Reel (top, share of the height): off the faces, never moving. */
   subtitleY?: number;
@@ -302,6 +325,8 @@ export type ReelProps = {
     end?: ComposeEnd | null;
     /** The words said under it (frames from its start), when its code writes them (`spoken`): the engine's captions step aside. */
     spoken?: { w: string; from: number; to: number }[];
+    /** Its code only times its own words on them (a montage skill timed on her voice): the engine's captions stay under it. */
+    captionsStay?: true;
   }[];
   /** What she added on her Reel (a text, one of her photos or its cut-out), drawn over everything, in frames. */
   overlays?: {

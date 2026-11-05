@@ -116,6 +116,8 @@ const scope = {
   Outline: () => null,
   // What is said, written: the words themselves are what the check reads.
   Captions: ({ words = [] }) => React.createElement("div", null, (Array.isArray(words) ? words : []).map((w) => String(w?.w ?? "")).join(" ")),
+  // A ready look on one passage (laid by the render): what it wraps is drawn, at its box's size.
+  Look: ({ style, children }) => React.createElement("div", { style }, drawn(children, { width: style?.width ?? config.width, height: style?.height ?? config.height })),
 };
 
 const defaultBrand = {

@@ -230,9 +230,9 @@ function Strip({ children, style }: { children?: ReactNode; style?: CSSPropertie
 
 // Photo: her photo in a box. Subject: its subject (or an object found on it) cut out over it. Cutout: a subject as a
 // sticker. SubjectBox, SubjectOutline, Outline: where it is, its outline, a line round it. Strip: the slides side by
-// side. No Footage, Depth, Skyline nor Near: a carousel has no shots.
+// side. No Footage, Depth, Skyline nor Near: a carousel has no shots; nor Look: no ready looks are given to it.
 const CAROUSEL_SCOPE = {
-  ...Object.fromEntries(Object.entries(SCOPE).filter(([name]) => !["Footage", "Depth", "Skyline", "Near"].includes(name))),
+  ...Object.fromEntries(Object.entries(SCOPE).filter(([name]) => !["Footage", "Depth", "Skyline", "Near", "Look"].includes(name))),
   Cutout,
   Photo: BoxPhoto,
   Subject,

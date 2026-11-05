@@ -85,6 +85,7 @@ import {
   SPOKEN_WRITTEN,
   soundLead,
   soundTempo,
+  type MontageSkill,
 } from "@fauve/agent";
 import { outputFormat } from "@fauve/agent/answer";
 import { HOUSE_EXAMPLES } from "@fauve/agent/house-examples";
@@ -122,9 +123,9 @@ import { anthropic, CACHE_AN_HOUR, logClaudeCost } from "./run";
 const voiceIdOf = (post: { voice_media_id?: unknown }) => (typeof post.voice_media_id === "string" ? post.voice_media_id : null);
 
 /** Whether the post follows one of Edith's models that has its montage skill, one this studio plays (its inspiration's row, read once). */
-async function skillOfInspiration(studioId: string, inspirationId: string, gate: Awaited<ReturnType<typeof skillGate>>): Promise<boolean> {
+async function skillOfInspiration(studioId: string, inspirationId: string, gate: Awaited<ReturnType<typeof skillGate>>): Promise<MontageSkill | undefined> {
   const { data } = await supabaseAdmin().from("inspirations").select("source, external_id").eq("id", inspirationId).eq("studio_id", studioId).maybeSingle();
-  return data?.source === "house" && Boolean(gate(skillFor(data.external_id as string | null)));
+  return data?.source === "house" ? gate(skillFor(data.external_id as string | null)) : undefined;
 }
 
 /** The brief of the animation that draws a copied Reel's texts as its model does (constant: a correction keeps its code). */
@@ -372,9 +373,11 @@ export async function designEdit(params: {
   // only if the editor takes the Reel.
   // The skills this studio plays: those Tristan added to the library (the team's and the lab's play them all).
   const gate = await skillGate(params.studioId);
-  const skilled = Boolean(!voiceIdOf(post.data) && post.data.inspiration_id && (await skillOfInspiration(params.studioId, post.data.inspiration_id as string, gate)));
+  const skilledBy = !voiceIdOf(post.data) && post.data.inspiration_id ? await skillOfInspiration(params.studioId, post.data.inspiration_id as string, gate) : undefined;
+  const skilled = Boolean(skilledBy);
   const startTracks = () => (clips.length ? ensureTracks(params.studioId, clips.map((c) => c.media_id)).catch((e: unknown) => console.warn("tracks: not ready", e)) : null);
-  let earlyTracks = skilled ? null : startTracks();
+  // A skill timed on her voice sets its words over her head: where her face is, followed now (its render reads it).
+  let earlyTracks = skilled && !skilledBy?.voice ? null : startTracks();
   // Someone speaking in a video analysed before its speech was read: read now (its sound cleaned, its « euh » timed).
   const earlySpeech = clips.length
     ? ensureSpeech(params.studioId, clips).catch((e: unknown) => {
@@ -451,6 +454,11 @@ export async function designEdit(params: {
   const previousSkill = previousPlan.success && previousPlan.data.skill?.key === skill?.key ? previousPlan.data : null;
   // (Never in the director's look at a Reel it made: that step only looks at its own composition.)
   if (skill && followed && !params.director && (!correction || previousSkill)) {
+    // Timed on her voice: her speech read first (her words timed exactly, her « euh »), a minute and a half at most.
+    if (skill.voice && earlySpeech) {
+      const read = await Promise.race([earlySpeech, new Promise<null>((resolve) => setTimeout(() => resolve(null), SPEECH_WAIT_MS))]);
+      if (read) clips = read;
+    }
     const made = await designSkill({
       studioId: params.studioId,
       postId: params.postId,
