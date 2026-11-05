@@ -46,4 +46,5 @@ export const HOUSE_MEASURES: Record<string, ReelMeasures> = {
   // on its cuts' grid; its loudness by ffmpeg's ebur128.
   "court-metrage": { duration: 24.4, cuts: [0.13, 4, 6.83, 9.6, 12.4, 15.2, 18.03, 20.87], bpm: 85.5, lufs: -10.3 },
   "titre-cinema": { duration: 20.57, cuts: [6.1, 8.1, 10.07, 13.83, 16.9], bpm: 124.2, lufs: -22 },
+  "celui-la": { duration: 8.66, cuts: [2.3, 3.03, 3.63, 4.3, 4.87, 5.47, 6.07, 6.77], bpm: 96.5, lufs: -14.2 },
 };

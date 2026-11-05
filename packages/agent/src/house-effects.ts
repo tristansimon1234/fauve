@@ -156,6 +156,10 @@ export const HOUSE_EFFECTS: Record<string, HouseEffect> = {
     effet: "le titre de son film en très grandes capitales blanches au milieu de son premier plan, signé dessous en petit serif (« par Léa »), la personne passant devant sa signature, parti avec la coupe où la basse tombe",
     il_faut: "un plan large et fixe où quelqu'un se tient ou marche, du ciel au-dessus de sa tête",
   },
+  "celui-la": {
+    effet: "ses produits un par temps, sur chacun le même petit mot drôle (« Celui-là ») qui tombe d'un coup chaque fois ailleurs dans l'image, puis une hésitation tapée lettre à lettre et le dernier",
+    il_faut: "une photo ou une courte vidéo de chacun de ses produits (cinq au moins) et un plan de toute sa série réunie",
+  },
 };
 
 /** The most of Edith's models one Reel borrows from: one charter, one music, never a patchwork. */
