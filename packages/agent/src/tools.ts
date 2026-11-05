@@ -110,6 +110,11 @@ export const toolSpecs = {
       "Les inspirations de la gérante : des Reels qu'elle aime, partagés sur Instagram ou ajoutés dans l'app, avec ce qu'on peut en reprendre (accroche, rythme, textes). Avec elles, « modeles_edith » : les modèles d'Edith (des Reels de référence que le monteur sait refaire, chacun avec sa forme, sa typo et sa finition), à proposer quand elle veut un Reel stylé sans avoir de modèle, puis à passer à montage par modele_edith. Source « model » : un de ses Reels qu'elle a gardé comme modèle (« Garder comme modèle ») : quand elle veut un Reel « comme celui de … », passe son inspiration_id à montage. À regarder avant de proposer un nouveau Reel, pour lui demander s'il doit suivre l'une d'elles.",
     input: z.object({}),
   },
+  find_sound: {
+    description:
+      "Trouve un son sur lequel caler son Reel (« sur la musique de Bad Bunny », « un son tendance ») : sans mots, les sons du moment (Top 50 et Viral 50 de TikTok aux États-Unis, retrouvés sur Instagram) ; avec ses mots (un titre, un artiste), ceux d'Instagram. Chacun avec son_lien, un Reel qui l'utilise : propose-lui-en un à trois (titre, artiste, reply_with options), puis passe le son_lien choisi à montage. Le son n'entre jamais dans la vidéo : elle sort sans musique, coupée sur ses temps, et elle l'ajoute dans Instagram en la publiant.",
+    input: z.object({ mots: z.string().min(2).max(80).optional().describe("Un titre ou un artiste ; vide : les sons du moment") }),
+  },
   steal_style: {
     description:
       "Recopie la DA d'un Reel qu'elle aime pour UN Reel à elle, le prochain (« fais comme ça », « je veux ce style », un lien de Reel, de TikTok ou de Short, ou une vidéo qu'elle t'envoie comme exemple) : rend son inspiration_id tout de suite, puis après ta réponse Edith le regarde (une à deux minutes), en mesure le rythme, lit sa forme, ses textes, sa lumière, son mouvement et sa musique ; une fois lu, tu reçois un tour avec sa lecture pour écrire ton plan (ou demander ses fichiers). Le Reel qui le recopie : montage avec cet inspiration_id (le monteur attend la lecture) ; ses Reels suivants restent sur sa charte. Jamais ses images, ses mots ni sa musique : ses images restent les siennes, et ses couleurs et ses polices aussi, sauf quand celles du Reel recopié font son style. Un carrousel : demande une capture de la photo qui lui plaît, puis copy_text_style sur la publication.",
@@ -223,7 +228,7 @@ export const toolSpecs = {
         .string()
         .max(600)
         .optional()
-        .describe("Le lien d'un Reel Instagram qui utilise le son (une chanson, un son tendance) sur lequel elle veut caler ce Reel : la vidéo sort sans musique, coupée sur ses temps, et elle l'ajoute en publiant, avec « Utiliser l'audio » sur ce Reel"),
+        .describe("Le lien d'un Reel Instagram qui utilise le son (une chanson, un son tendance : son_lien de find_sound, ou le lien qu'elle t'a donné) sur lequel elle veut caler ce Reel : la vidéo sort sans musique, coupée sur ses temps, et elle l'ajoute en publiant, avec « Utiliser l'audio » sur ce Reel"),
       son: z
         .enum(["modele", "edith"])
         .optional()

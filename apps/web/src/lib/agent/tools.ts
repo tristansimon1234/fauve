@@ -83,6 +83,7 @@ import { fewSubjects } from "@/lib/agent/copy-design";
 import { skillTooShort, skillWantsMore } from "@/lib/agent/skill-design";
 import { keepModelSound, keepsModelSound } from "@/lib/model-sound";
 import { followSound } from "@/lib/sound-follow";
+import { searchSounds, soundExample, trendSounds } from "@/lib/trend-sounds";
 import { skillGate } from "@/lib/skill-reviews";
 import { MONTAGE_SKILLS } from "@fauve/agent/skills";
 import { queueRerender } from "@/lib/rerender";
@@ -1441,6 +1442,30 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
         }),
         note: `${items.length ? "Propose-en 2 au plus, par leur titre." : "Aucune inspiration à elle : elle peut envoyer le lien d'un Reel qu'elle aime."} Les modèles d'Edith : propose-en 2 ou 3 qui vont avec ses fichiers et son idée (par leur nom, en une phrase chacun), jamais toute la liste ; elle les voit en vidéo dans Créer › « Un modèle d'Edith ». Quand elle en choisit un qui a a_lui_dire (ce qu'elle seule peut filmer), dis-le-lui avec ses fichiers à envoyer, tel quel, avant de lancer. Un modèle qui a reglages se règle avec ses mots (« plus de cases », « plus lent », « avec ma couleur ») : mets-les dans brief, tu peux les lui proposer une fois quand ça sert son idée.`,
       });
+    },
+
+    async find_sound({ mots }) {
+      // Her words among Instagram's music, else this week's list; each with a Reel that uses it (its son_lien).
+      const list = mots ? await searchSounds(studioId, mots) : { ok: true as const, sounds: (await trendSounds()).sounds.slice(0, 8) };
+      if (!list.ok) return json({ error: list.error });
+      const found = await Promise.all(
+        list.sounds.slice(0, 5).map(async (sound) => {
+          const example = await soundExample(sound.audioId, studioId).catch(() => null);
+          if (!example) return null;
+          return {
+            titre: sound.title,
+            ...(sound.artist ? { artiste: sound.artist } : {}),
+            ...(sound.explicit ? { explicite: true } : {}),
+            ...(sound.chart ? { classement: `${sound.chart === "top" ? "Top 50" : "Viral 50"} n° ${sound.rank}` } : {}),
+            son_lien: example.link,
+          };
+        }),
+      );
+      const sons = found.filter(Boolean);
+      if (!sons.length) {
+        return json({ sons: [], note: mots ? "Rien trouvé sur Instagram pour ces mots : propose-lui ta musique dans ce genre (set_music, des mots de genre, jamais le nom de l'artiste), ou un autre titre." : "La liste de la semaine n'est pas encore prête : demande-lui un titre ou un artiste." });
+      }
+      return json({ sons, note: "Propose-lui-en un à trois (titre et artiste, jamais le lien), puis passe le son_lien choisi à montage. La page Tendances les fait écouter." });
     },
 
     async steal_style({ link, media_id, inspiration_id }) {

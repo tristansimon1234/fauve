@@ -20,6 +20,7 @@ import { localInstant, parseIsoDate } from "@/lib/dates";
 import { env } from "@/lib/env";
 import { montageStatus } from "@/lib/montage-status";
 import { modelState, type ModelState } from "@/lib/reel-models";
+import { modelSound } from "@/lib/model-sound";
 import { readPostMusic, soundLevel } from "@/lib/render/music";
 import { ensureSceneSprite } from "@/lib/render/scene-sprite";
 import { freeSlots } from "@/lib/slots";
@@ -85,6 +86,11 @@ export type ReviewData = {
   publishByHand: boolean;
   /** Edith's music (null: the music service is not set up), and how present its sound effects are. */
   music: { on: boolean; made: boolean; sfx: "light" | "more" | "off" } | null;
+  /**
+   * The sound she adds in Instagram when she posts it (a sound she picked or gave, or the one of the Reel she copies):
+   * the Reel to open for « Utiliser l'audio », its name when known; the page plays it under the video (soundPreview).
+   */
+  sound: { link: string; title: string | null; artist: string | null; followed: boolean } | null;
   /** The voice on the Reel: Edith's (which one) or her own voice note. */
   voice: { who: "simone" | "hers"; name: string | null; /** Edith's voice (or her clone) it was read with. */ id?: string | null } | null;
   /** Her own voice (a clone made in Style), to pick for this Reel. */
@@ -176,7 +182,11 @@ export async function loadReview(db: Db, studioId: string, post: ReviewPost, tim
   const previous = versions.filter((v) => v < (current.version as number)).at(-1);
   const next = versions.find((v) => v > (current.version as number));
   const music = readPostMusic(post.music);
-  const [handle, sfx] = await Promise.all([instagramHandle(studioId), soundLevel(studioId, post.id).catch(() => "light" as const)]);
+  const [handle, sfx, added] = await Promise.all([
+    instagramHandle(studioId),
+    soundLevel(studioId, post.id).catch(() => "light" as const),
+    music.mode === "model" ? modelSound(studioId, post.id).catch(() => null) : Promise.resolve(null),
+  ]);
 
   return {
     postId: post.id,
@@ -208,6 +218,7 @@ export async function loadReview(db: Db, studioId: string, post: ReviewPost, tim
     connect: socialConnect(),
     publishByHand: post.publish_by_hand,
     music: env("ELEVENLABS_API_KEY") ? { on: music.mode === "on", made: Boolean(music.track), sfx } : null,
+    sound: added ? { link: added.link, title: music.sound?.title ?? null, artist: music.sound?.artist ?? null, followed: Boolean(added.followed) } : null,
     voice,
     ownVoice: ownVoice ? { id: ownVoice.id, sampleUrl: ownSample?.data?.signedUrl ?? null } : null,
     slots,

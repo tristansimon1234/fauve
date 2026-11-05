@@ -7,7 +7,7 @@ import { updatePost } from "@/app/(app)/publications/[id]/actions";
 import { restoreVersion } from "@/app/(app)/publications/[id]/review-actions";
 import { ArrowLeftIcon, ArrowUpIcon, CalendarIcon, CaptionIcon, CheckIcon, DownloadIcon, PenIcon, ShareIcon, UndoIcon, VolumeIcon, VolumeOffIcon } from "@/components/icons";
 import { Mascot } from "@/components/mascot";
-import { PausedSign, useReelPlayback } from "@/components/review/reel-player";
+import { AddedSound, PausedSign, useReelPlayback, useSoundPreview } from "@/components/review/reel-player";
 import { whatsappLink } from "@/lib/public-env";
 import type { ReviewData } from "@/lib/review";
 import { needsInstagram, ReviewSheets, Sheet, type ReviewSheet } from "./review-sheets";
@@ -26,7 +26,8 @@ export function PhoneReview({ data }: { data: ReviewData }) {
   // It plays silently behind her buttons; a touch plays it from the start with its sound and
   // clears the screen, the next one pauses it and brings them back (Tristan: « quand je clique
   // sur play les actions disparaissent, pause elles réapparaissent »). Silent once its page is hidden.
-  const { playing, sound, toggle, toggleSound, seek } = useReelPlayback(video, data.videoUrl);
+  const preview = useSoundPreview(data.postId, data.sound);
+  const { playing, sound, toggle, toggleSound, seek } = useReelPlayback(video, data.videoUrl, preview);
   const [watching, setWatching] = useState(false);
   const [open, setOpen] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -213,6 +214,7 @@ export function PhoneReview({ data }: { data: ReviewData }) {
 
       {/* Bottom: the caption as the feed shows it, then what she does. */}
       <div className={`relative z-10 mt-auto flex flex-col gap-3 ${fade} bg-gradient-to-t from-black/85 via-black/60 to-transparent px-4 pt-16 pb-[calc(1rem+env(safe-area-inset-bottom))]`}>
+        {ready && !data.locked && <AddedSound sound={data.sound} heard={Boolean(preview)} dark />}
         {data.locked ? (
           data.captionShown && (
             <div className="flex flex-col gap-1.5">

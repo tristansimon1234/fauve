@@ -28,7 +28,9 @@ import { acceptQuote, createMontageQuote, pricedAsEffect } from "@/lib/credits";
 import { env } from "@/lib/env";
 import { queueWait } from "@/lib/montage-queue";
 import { startMontage } from "@/lib/montage-start";
+import { keepModelSound, keepsModelSound } from "@/lib/model-sound";
 import { isFirstReel } from "@/lib/onboarding";
+import { followSound } from "@/lib/sound-follow";
 import { pendingSteal } from "@/lib/steal";
 import { getStudioContext } from "@/lib/studio";
 import { supabaseAdmin } from "@/lib/supabase/admin";
@@ -61,6 +63,15 @@ const launchSchema = z.object({
   copy: z.union([z.uuid(), z.boolean()]).default(true),
   /** A carousel or a post she likes, as captures or a screen recording of it (Instagram does not open a carousel's link to us): its form is followed, never its words. */
   refs: z.array(uploadSchema).max(4).default([]),
+  /** A Reel cut on a sound she picked on Tendances: the link of a Reel that uses it (she adds it from there in Instagram), its name. */
+  sound: z
+    .object({
+      link: z.string().url().max(600),
+      title: z.string().max(200),
+      artist: z.string().max(200).optional(),
+      audioId: z.string().regex(/^\d{5,25}$/).optional(),
+    })
+    .optional(),
 });
 
 export type LaunchInput = z.input<typeof launchSchema>;
@@ -88,7 +99,10 @@ async function ownInspiration(studioId: string, id: string): Promise<{ id: strin
 export async function launchCreation(input: LaunchInput): Promise<LaunchResult> {
   const parsed = launchSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "Choisis au moins une photo ou une vidéo." };
-  const { kind, date, time, items, voice, platforms, copy } = parsed.data;
+  const { kind, date, time, items, platforms, copy } = parsed.data;
+  const sound = kind === "reel" ? parsed.data.sound : undefined;
+  // A sound added in Instagram plays over the Reel: no voice over with it.
+  const voice = sound ? "off" : parsed.data.voice;
   const refs = kind === "reel" ? [] : parsed.data.refs;
   const idea = parsed.data.idea.trim();
   const plan = parsed.data.plan;
@@ -110,7 +124,7 @@ export async function launchCreation(input: LaunchInput): Promise<LaunchResult> 
 
   // What she imagines, or a ref: the Reel to copy, the model of this Reel only (one shot). Edith asks before she makes anything.
   const copying = kind !== "reel" || copy === false ? null : typeof copy === "string" ? await ownInspiration(studioId, copy) : await pendingSteal(studioId).catch(() => null);
-  if (!idea && !plan && !copying && !refs.length) return { ok: false, error: kind === "reel" ? "Dis-moi ce que tu imagines pour ce Reel, ou montre-moi une ref." : "Dis-moi ce que tu imagines, ou montre-moi une ref." };
+  if (!idea && !plan && !copying && !refs.length && !sound) return { ok: false, error: kind === "reel" ? "Dis-moi ce que tu imagines pour ce Reel, ou montre-moi une ref." : "Dis-moi ce que tu imagines, ou montre-moi une ref." };
 
   // Her new files become her library's, read once in the background (ready for the montage).
   const db = supabaseAdmin();
@@ -165,6 +179,15 @@ export async function launchCreation(input: LaunchInput): Promise<LaunchResult> 
   }
   if (kind !== "reel") return { ok: true, postId: created.id, title: created.title, kind, mediaIds, refIds, montage: null };
 
+  // Its sound: the one she picked (cut on its beats), else the sound of the Instagram Reel she copies, kept without
+  // asking when nobody speaks on it (keepsModelSound). Silent then: she adds it in Instagram and posts it herself.
+  if (sound) {
+    const followed = await followSound(studioId, created.id, sound.link, { title: sound.title, artist: sound.artist, audioId: sound.audioId }).catch(() => null);
+    if (!followed?.ok) console.warn("create: sound not followed", followed?.why);
+  } else if (copying && (await keepsModelSound(studioId, created.id).catch(() => false))) {
+    await keepModelSound(studioId, created.id, true).catch((e: unknown) => console.warn("create: model sound not kept", e));
+  }
+
   // The level of care of the studio (Réglages); her first Reel gets its made-to-measure animations, as in the chat.
   const { data: studio } = await db.from("studios").select("montage_effort").eq("id", studioId).single();
   const effort = effortSchema.catch(DEFAULT_EFFORT).parse(studio?.montage_effort);
@@ -173,7 +196,10 @@ export async function launchCreation(input: LaunchInput): Promise<LaunchResult> 
     studioId,
     postId: created.id,
     mediaIds,
-    brief: [imaginedBrief(idea), plan ? validatedPlanBrief(plan) : undefined].filter(Boolean).join("\n\n") || undefined,
+    brief:
+      [imaginedBrief(idea), plan ? validatedPlanBrief(plan) : undefined, sound ? `Calé sur le son « ${sound.title} »${sound.artist ? ` de ${sound.artist}` : ""}, qu'elle ajoute dans Instagram en le publiant : chaque coupe sur un de ses temps.` : undefined]
+        .filter(Boolean)
+        .join("\n\n") || undefined,
     correction: false,
     maxNewScenes: scenes,
     effort,

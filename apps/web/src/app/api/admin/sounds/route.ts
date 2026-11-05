@@ -3,6 +3,7 @@ import { cronAuthorized } from "@/lib/cron-auth";
 import { env } from "@/lib/env";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { tregCall } from "@/lib/treg";
+import { refreshTrendSounds } from "@/lib/trend-sounds";
 
 // The bench of the trending sounds (Tristan: « une bibliothèque de sons tendances », as Mojo or Muse do: the video
 // comes out silent, the sound is added in Instagram). One run (CRON_SECRET, from the database by net.http_post):
@@ -60,7 +61,10 @@ function pick(value: Json, keys: string[], depth = 0): string | null {
 
 export async function POST(request: Request) {
   if (!cronAuthorized(request)) return new Response("unauthorized", { status: 401 });
-  if (new URL(request.url).searchParams.get("action") !== "bench") return Response.json({ error: "action=bench" }, { status: 400 });
+  const action = new URL(request.url).searchParams.get("action");
+  // This week's list made now (lib/trend-sounds.ts), as the Monday cron does: about $0.06 when its 30 sounds are new.
+  if (action === "refresh") return Response.json(await refreshTrendSounds({ force: true }));
+  if (action !== "bench") return Response.json({ error: "action=bench|refresh" }, { status: 400 });
   let costUsd = 0;
   let calls = 0;
   const call = async (id: string, query: Record<string, string | number>) => {

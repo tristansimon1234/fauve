@@ -59,6 +59,10 @@ export const postMusicSchema = z.object({
   sound: z
     .object({
       link: z.string().url().max(600),
+      /** Its name and its page in Instagram, when she picked it among the trending sounds (lib/trend-sounds.ts). */
+      title: z.string().max(200).optional(),
+      artist: z.string().max(200).optional(),
+      audio_id: z.string().regex(/^\d{5,25}$/).optional(),
       bpm: z.number().min(30).max(300).nullable().optional(),
       offset: z.number().min(0).max(4).nullable().optional(),
       miss: z.string().max(40).optional(),
@@ -66,6 +70,11 @@ export const postMusicSchema = z.object({
     .optional(),
   /** What she asked for the music of this Reel (her contract's, in English): the composer's brief, over every default. */
   wish: z.string().max(300).optional(),
+  /**
+   * The sound she adds in Instagram (mode model), heard on its page: the video link of the Reel it comes from, read
+   * from Instagram (nothing kept), valid until `until`; `of` is that Reel's link (another sound reads it again).
+   */
+  preview: z.object({ of: z.string().url().max(600), url: z.string().url().max(4000), until: z.string().max(40) }).optional(),
   /** How present this Reel's sound effects are (light, more, off); absent: her default, else light (sfx.ts). */
   sfx: sfxLevelSchema.optional(),
   /** The piece made for this post, and the cut it was made for. */
