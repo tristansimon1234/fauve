@@ -1,6 +1,7 @@
 // Mirror of ReelProps in packages/agent/src/motion.ts (the web app builds them).
 // This package is shipped alone to the render sandbox, so it cannot import it.
 import type { ClearMap } from "./clear";
+import type { ShotReading } from "./reading";
 import type { FaceZone, TrackPiece } from "./track";
 
 /** A passage of a shot at one speed (a speed ramp is several). Mirrors SpeedPiece in packages/agent/src/motion.ts. */
@@ -64,6 +65,8 @@ export type ComposeShot = ScenePhoto & {
   camera?: ShotCamera;
   /** Where a text can be set in it (its sky, an empty wall, any calm area) and how its camera moves, read before the render: ClearBox chooses its area on it. */
   clear?: ClearMap;
+  /** Its skyline, its vanishing point and its light, and how its camera moves, read before the render: SkylineAt, VanishingPoint and LightUnder read them. */
+  read?: ShotReading;
 };
 /** How the Reel moves a shot as it draws it, so what is read on its picture follows it (mirror of packages/agent/src/motion.ts). */
 export type ShotCamera = {
@@ -174,6 +177,10 @@ export type ReelProps = {
         objects?: Record<string, { src: string; still?: boolean }>;
         /** Its depth at every image of the passage (a grey video, near white), drawn like the shot by Depth. */
         depthMap?: { src: string };
+        /** Her shot without its sky at every image (a transparent video, or one image), drawn like the shot by Skyline. */
+        ground?: { src: string; still?: boolean };
+        /** Her shot with its depth as its transparency (near opaque), drawn like the shot by Near. */
+        near?: { src: string };
         /** Laid beside another shot on the same moment (a split screen's other half): only a composition draws it, the plain montage skips it. */
         beside?: true;
       }
@@ -197,6 +204,8 @@ export type ReelProps = {
         depth?: { src: string; box: Box };
         /** A moving photo whose depth the card read (relief.py): the video of every pixel moved by its depth, drawn in its place. */
         relief?: { src: string; frames: number };
+        /** The photo without its sky (an image framed like the photo), drawn exactly over it by Skyline. */
+        ground?: { src: string; still?: boolean };
         /** Laid beside another shot on the same moment: only a composition draws it, the plain montage skips it. */
         beside?: true;
       }

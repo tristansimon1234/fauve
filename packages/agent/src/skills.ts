@@ -307,6 +307,8 @@ export type MontageSkill = {
   settings?: SkillSetting[];
   /** What it lights up or cuts out in her shots (her sign, her windows), named by the filler from what each file shows. */
   objects?: SkillObject[];
+  /** What the filler needs measured on her files before it casts them (read once per file, then kept): its slots want a real whip, a covered lens, colour, a gesture. */
+  reads?: SkillReads;
   /**
    * The most shots it takes for a length she asks for, past `shots[1]` (the most it takes from her files alone): a model
    * whose middle can repeat (more full frames after a title, more of the place's life, more of the day) reaches 30 s at
@@ -349,7 +351,47 @@ export type SkillFile = {
    * the middle (« Écran partagé titré »: a 16:9 video keeps 38 % of its width in a 2:3 half).
    */
   aspect?: number;
+  /**
+   * What was measured on it (video_read.py, her tracks), when a model asks or it was read before: its camera's fast moves
+   * (« Ville en coups de fouet »: a whip slot gets her real whip), the moments something passes before its lens (« Une
+   * journée chez toi »: its cut hidden there), how colourful it is (« Quart de tour, deux tons »: its slots in colour), what
+   * the hands and heads in it do (« Silhouette »: her head lowered, raised); in seconds of the file, words in French.
+   */
+  measured?: {
+    moves?: { start: number; end: number; what: string }[];
+    covered?: { start: number; end: number; what: string }[];
+    gestures?: { start: number; end: number; what: string }[];
+    colour?: { score: number; words: string; best?: { start: number; end: number } };
+  };
 };
+
+/** What a model's filler wants measured on her files before it fills (her camera's fast moves, her lens covered, her colours, her gestures). */
+export type SkillReads = ("moves" | "covered" | "colour" | "gestures")[];
+
+/** A fast move of her camera in the filler's words (French). */
+export function moveWords(m: { kind: string; towards: string; speed: number; from: number; to: number }): string {
+  const way = { left: "vers la gauche", right: "vers la droite", up: "vers le haut", down: "vers le bas", in: "en avant", out: "en arrière" }[m.towards] ?? "";
+  const pace = `${Math.round(m.speed * 100)} % de l'image par image`;
+  const length = `${Math.round((m.to - m.from) * 10) / 10} s`.replace(".", ",");
+  switch (m.kind) {
+    case "whip":
+      return `un fouet de la caméra ${way}, flou (${length}, jusqu'à ${pace})`;
+    case "pan":
+      return `la caméra balaie vite ${way} (${length}, jusqu'à ${pace})`;
+    case "tilt":
+      return `la caméra bascule vite ${way} (${length}, jusqu'à ${pace})`;
+    case "rush":
+      return `la caméra fonce en avant (${length})`;
+    default:
+      return `la caméra recule vite (${length})`;
+  }
+}
+
+/** A moment her lens is covered, in the filler's words (French). */
+export function coveredWords(c: { peak: number; share: number; dark?: boolean; enters?: "left" | "right" }): string {
+  const side = c.enters ? `, entre par la ${c.enters === "left" ? "gauche" : "droite"}` : "";
+  return `quelque chose passe tout près de l'objectif et cache ${c.share >= 0.95 ? "toute" : "presque toute"} l'image${c.dark ? " (sombre)" : ""}${side}, le plus couvert à ${String(Math.round(c.peak * 100) / 100).replace(".", ",")} s : une coupe s'y cache`;
+}
 
 /** A file's shape in the filler's words. */
 export const fileFormat = (aspect: number | undefined): "verticale" | "horizontale" | "carrée" | undefined =>
@@ -1194,6 +1236,7 @@ Then cast her files on its slots (« cases », in order: each with its length an
 - never the same passage twice; a video may fill several slots only with moments that look different; her files all used before one comes back, never the same file on two slots in a row when another fits;
 - a file's format (« format »: verticale, horizontale, carrée) matters where the model lays a slot in a box of another shape (its « veut » or « deroule » says: a tall half, a wide band): there a file of that shape when one fits, else a passage whose subject is in the middle of its picture (only its middle shows);
 - a slot that plays at the same time as another (« en_meme_temps_que »: a split screen's other half) is seen beside it, each at its own speed: the two answer each other as its « veut » says (the gesture and what it gives), each from another file, never the same passage;
+- what was measured on a file is surer than what was seen: « mouvements_rapides » (her camera's whips, fast sweeps, rushes in, with their way), « objectif_couvert » (something passing right before the lens: a cut hides there), « gestes_mesures » (what her hands and head do), « couleur » (how colourful it is): a slot that wants one of them gets a passage that has it, timed on it (its « at » so the move or the cover falls where the slot wants it), and a slot left in colour gets one of her most colourful files;
 - a photo plays still (at 0).
 
 Then write its texts, in French (what her customers read), each in its slot (« textes »: what it says and its most characters):
@@ -1308,8 +1351,17 @@ export function skillFillInput(input: {
     ...(input.currentSettings && Object.keys(input.currentSettings).length ? { reglages_actuels: input.currentSettings } : {}),
     fichiers: input.files.map((f) => {
       const format = fileFormat(f.aspect);
+      const m = f.measured;
+      const span = (list: { start: number; end: number; what: string }[] | undefined, most: number) => list?.slice(0, most).map((x) => ({ de: round(x.start), a: round(x.end), quoi: x.what }));
+      // What was measured on it (its camera, its lens, its colours, its gestures), surer than what was seen.
+      const measured = {
+        ...(m?.moves?.length ? { mouvements_rapides: span(m.moves, 6) } : {}),
+        ...(m?.covered?.length ? { objectif_couvert: span(m.covered, 4) } : {}),
+        ...(m?.gestures?.length ? { gestes_mesures: span(m.gestures, 8) } : {}),
+        ...(m?.colour ? { couleur: `${m.colour.words} (${m.colour.score})${m.colour.best && !f.photo ? `, la plus colorée de ${round(m.colour.best.start)} à ${round(m.colour.best.end)} s` : ""}` } : {}),
+      };
       return f.photo
-        ? { id: f.id, type: "photo", ...(format ? { format } : {}), montre: f.shows }
+        ? { id: f.id, type: "photo", ...(format ? { format } : {}), montre: f.shows, ...measured }
         : {
             id: f.id,
             type: "vidéo",
@@ -1317,7 +1369,31 @@ export function skillFillInput(input: {
             duree: `${round(f.seconds)} s`,
             montre: f.shows,
             moments: f.moments?.slice(0, 6).map((m) => ({ de: round(m.start), a: round(m.end), ...(m.what ? { quoi: m.what } : {}) })),
+            ...measured,
           };
     }),
   };
+}
+
+/**
+ * Her files with what was measured on them (lib/render/readings.ts and her tracks): her camera's fast moves, the moments
+ * her lens is covered, how colourful each one is, what the hands and heads in it do; each file as it was when nothing was.
+ */
+export function measuredFiles(
+  files: SkillFile[],
+  readings: Record<string, { moves?: { from: number; to: number; kind: string; towards: string; speed: number }[]; covered?: { from: number; to: number; peak: number; share: number; dark?: boolean; enters?: "left" | "right" }[]; colour?: { score: number; words: string; best?: { from: number; to: number } } }>,
+  gestures: Record<string, { start: number; end: number; what: string }[]> = {},
+): SkillFile[] {
+  return files.map((f) => {
+    const r = readings[f.id];
+    const g = gestures[f.id];
+    if (!r && !g?.length) return f;
+    const measured: NonNullable<SkillFile["measured"]> = {
+      ...(r?.moves?.length ? { moves: r.moves.map((m) => ({ start: m.from, end: m.to, what: moveWords(m) })) } : {}),
+      ...(r?.covered?.length ? { covered: r.covered.map((c) => ({ start: c.from, end: c.to, what: coveredWords(c) })) } : {}),
+      ...(r?.colour ? { colour: { score: r.colour.score, words: r.colour.words, ...(r.colour.best ? { best: { start: r.colour.best.from, end: r.colour.best.to } } : {}) } } : {}),
+      ...(g?.length ? { gestures: g } : {}),
+    };
+    return Object.keys(measured).length ? { ...f, measured } : f;
+  });
 }

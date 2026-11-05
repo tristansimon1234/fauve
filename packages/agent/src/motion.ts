@@ -10,7 +10,7 @@ import { placeSounds, planCues, type SoundFacts, type SoundPlacement } from "./s
 import type { SfxLevel } from "./schemas.ts";
 import { faceZone, layerTrack, sceneTrack, shotTrack, type FaceZone, type ShotTrack, type TrackPiece, type TracksByClip } from "./tracking.ts";
 import { DEPTH_MOVES, reliefOf } from "./depth.ts";
-import { clearKey, depthKey, photoKey, subjectKey, type ClearMap } from "./subject.ts";
+import { clearKey, depthKey, groundKey, nearKey, photoKey, readKey, subjectKey, type ClearMap, type ShotReading } from "./subject.ts";
 import { LOOK_PRESETS, lookMatrix, lookStamp, planLook, type ReelLook } from "./looks.ts";
 
 // Edit plan → props of the Remotion "Reel" composition (apps/render). Everything
@@ -106,6 +106,10 @@ export type ReelSegment =
       objects?: Record<string, { src: string; still?: boolean }>;
       /** Its depth at every image of the passage (depth_video.py: a grey video, near white), drawn like the shot by a composition's Depth. */
       depthMap?: { src: string };
+      /** Her shot without its sky at every image (shot_read.py: a transparent video, or one image), drawn like the shot by Skyline. */
+      ground?: { src: string; still?: boolean };
+      /** Her shot with its depth as its transparency at every image (depth_video.py: near opaque), drawn like the shot by Near. */
+      near?: { src: string };
       /** Laid beside another shot on the same moment (a split screen's other half): only a composition draws it, the plain montage skips it. */
       beside?: true;
     }
@@ -132,6 +136,8 @@ export type ReelSegment =
       depth?: { src: string; box: { x: number; y: number; w: number; h: number } };
       /** A moving photo with its depth read on the card: the video of every pixel moved by its depth (relief.py), as long as the shot. */
       relief?: { src: string; frames: number };
+      /** The photo without its sky (shot_read.py, an image framed like the photo), drawn exactly over it by Skyline. */
+      ground?: { src: string; still?: boolean };
       /** Laid beside another shot on the same moment: only a composition draws it, the plain montage skips it. */
       beside?: true;
     }
@@ -192,6 +198,8 @@ export type ComposeShot = ScenePhoto & {
   camera?: ShotCamera;
   /** Where a text can be set in it (its sky, an empty wall, any calm area) and how its camera moves, read before the render: ClearBox chooses its area on it. */
   clear?: ClearMap;
+  /** Its sky's skyline, its vanishing point and its light, and how its camera moves, read before the render: SkylineAt, VanishingPoint and LightUnder read them. */
+  read?: ShotReading;
 };
 
 /** How the Reel moves a shot as it draws it, so what is read on its picture follows it: mirror of apps/render/src/types.ts. */
@@ -206,8 +214,8 @@ export type ShotCamera = {
   straighten?: number;
 };
 
-/** An animation's code that draws one of her shots or what is cut out of it (her, an object, its depth). */
-const DRAWS_SHOTS = /\b(?:Footage|Subject|SubjectBox|SubjectOutline|SubjectParts|Outline|Depth|ClearBox)\b/;
+/** An animation's code that draws one of her shots or what is cut out of it (her, an object, its depth, its ground), or reads it (its sky, its lines, its light, her head). */
+const DRAWS_SHOTS = /\b(?:Footage|Subject|SubjectBox|SubjectOutline|SubjectParts|Outline|Depth|ClearBox|Skyline|SkylineAt|Near|VanishingPoint|LightUnder|HeadMoves)\b/;
 
 /** An animation's code that lays a ready look on one of its passages (Look in the scope, PassageLook.tsx). */
 const LAYS_LOOK = /\bLook\b/;
@@ -553,8 +561,13 @@ export type ReelInputs = {
   depth?: Record<string, { src: string; box: { x: number; y: number; w: number; h: number } }>;
   /** The moving photos whose depth the card read for their shot (reliefJobs: `{media}#{key}`), signed, with their length in images. */
   reliefs?: Record<string, { src: string; frames: number }>;
-  /** The passages of her clips cut out at every image (subjectKey: clip, in, out), signed: what a composition's Subject draws; and their clear areas (clearKey), what ClearBox reads. */
-  subjects?: Record<string, { src: string; still?: boolean; top?: number; boxes?: (number[] | null)[]; contours?: (number[] | null)[]; parts?: number[]; clear?: ClearMap }>;
+  /**
+   * The passages of her clips cut out at every image (subjectKey: clip, in, out), signed: what a composition's Subject
+   * draws; their clear areas (clearKey), what ClearBox reads; their readings (readKey: their sky, vanishing point and
+   * light), what SkylineAt, VanishingPoint and LightUnder read; their ground (groundKey) and nearness (nearKey), what
+   * Skyline and Near draw.
+   */
+  subjects?: Record<string, { src: string; still?: boolean; top?: number; boxes?: (number[] | null)[]; contours?: (number[] | null)[]; parts?: number[]; clear?: ClearMap; reading?: ShotReading }>;
 };
 
 /** A clip's width / height as the Reel frames it, from its analysis (phones film 16:9 or 9:16). */
@@ -799,6 +812,8 @@ export function buildReelProps(plan: EditPlan, inputs: ReelInputs): ReelProps {
         ...(passageObjects(inputs.subjects, photoKey(s.clip_id)).length
           ? { objects: Object.fromEntries(passageObjects(inputs.subjects, photoKey(s.clip_id)).map(([name, o]) => [name, { src: o.src }])) }
           : {}),
+        // The photo without its sky, for Skyline: drawn exactly over it.
+        ...(inputs.subjects?.[groundKey(s.clip_id, 0, 0)]?.src ? { ground: { src: inputs.subjects[groundKey(s.clip_id, 0, 0)]!.src, still: true } } : {}),
       };
     }
     const ramp = rampFrames(s, lengths[i]!);
@@ -826,6 +841,11 @@ export function buildReelProps(plan: EditPlan, inputs: ReelInputs): ReelProps {
         : {}),
       // Its depth, image for image (as its cut-out): only at its own pace.
       ...(!ramp && !speed && inputs.subjects?.[depthKey(s.clip_id, s.in, s.out)] ? { depthMap: { src: inputs.subjects[depthKey(s.clip_id, s.in, s.out)]!.src } } : {}),
+      // Her shot without its sky, and with its depth as its transparency: image for image too.
+      ...(!ramp && !speed && inputs.subjects?.[groundKey(s.clip_id, s.in, s.out)]?.src
+        ? { ground: { src: inputs.subjects[groundKey(s.clip_id, s.in, s.out)]!.src, ...(inputs.subjects[groundKey(s.clip_id, s.in, s.out)]!.still ? { still: true } : {}) } }
+        : {}),
+      ...(!ramp && !speed && inputs.subjects?.[nearKey(s.clip_id, s.in, s.out)]?.src ? { near: { src: inputs.subjects[nearKey(s.clip_id, s.in, s.out)]!.src } } : {}),
     };
   });
   const durationInFrames = total;
@@ -952,6 +972,7 @@ export function buildReelProps(plan: EditPlan, inputs: ReelInputs): ReelProps {
               ? { objects: Object.fromEntries(found.map(([name, o]) => [name, objectReading(o)])) }
               : {}),
             ...(inputs.subjects?.[clearKey(s.clip_id, 0, 0)]?.clear ? { clear: inputs.subjects[clearKey(s.clip_id, 0, 0)]!.clear } : {}),
+            ...(inputs.subjects?.[readKey(s.clip_id, 0, 0)]?.reading ? { read: inputs.subjects[readKey(s.clip_id, 0, 0)]!.reading } : {}),
           },
         ];
       }
@@ -978,6 +999,8 @@ export function buildReelProps(plan: EditPlan, inputs: ReelInputs): ReelProps {
               }
             : {}),
           ...(inputs.subjects?.[clearKey(s.clip_id, s.in, s.out)]?.clear ? { clear: inputs.subjects[clearKey(s.clip_id, s.in, s.out)]!.clear } : {}),
+          // Its sky, vanishing point and light (shot_read.py), at its own pace only (a speed changes which images show).
+          ...(!s.ramp && !(s.speed && Math.abs(s.speed - 1) > 0.01) && inputs.subjects?.[readKey(s.clip_id, s.in, s.out)]?.reading ? { read: inputs.subjects[readKey(s.clip_id, s.in, s.out)]!.reading } : {}),
         },
       ];
     });

@@ -255,6 +255,8 @@ export const journee: MontageSkill = {
   // Up to 33 for a length she asks for: about 30 s at its own tempo (its day goes on in moments held three beats).
   long: 33,
   files: [6, 16],
+  // The moments something passes right before her lens (video_read.py): the filler casts them where its cut hides under a band.
+  reads: ["covered"],
   how: "Son lieu large et calme, puis une rafale de choses pareilles côte à côte dans son plan (ses bocaux, ses tasses, ses fenêtres), une par image à la même place, et une bande floue qui passe devant l'objectif et cache la coupe ; un plan du matin, une autre bande, et le haut de sa façade contre le ciel où son titre rouge apparaît derrière la bande qui repart, en didone capitales au milieu, de petits mots écrits à la main au-dessus, avec un déclic ; le titre reste sur un plan sombre (une porte, une arche) et part à la coupe ; puis sa journée en plans courts, avec des flashs d'appareil photo et des brûlures de pellicule sur les coupes, chacun avec son déclic ; des gens à contre-jour qui marchent en saccadé, le crépuscule, son lieu le soir puis le même de nuit au même endroit de l'image, la musique étouffée, et un dernier plan de nuit pendant qu'elle s'éteint. En horizontal comme l'original quand ses vidéos le sont.",
   end: true,
   texts: [

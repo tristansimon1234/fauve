@@ -533,13 +533,16 @@ async function localMedia(sandbox: Sandbox, id: string, props: ReelProps, option
         ...(segment.relief ? { relief: { ...segment.relief, src: local(segment.relief.src, false) } } : {}),
       };
     if (slowShots.has(index)) return segment;
-    // Its cut-out and its depth (an MP4 of grey images, depth_video.py), fetched as they are, image for image.
-    if (segment.type === "clip" && (segment.subject || segment.depthMap))
+    // Its cut-out and its depth (an MP4 of grey images, depth_video.py), its ground and its nearness (transparent WebMs,
+    // shot_read.py and depth_video.py), fetched as they are, image for image.
+    if (segment.type === "clip" && (segment.subject || segment.depthMap || segment.ground || segment.near))
       return {
         ...segment,
         src: local(segment.src, true),
         ...(segment.subject ? { subject: { ...segment.subject, src: local(segment.subject.src, false) } } : {}),
         ...(segment.depthMap ? { depthMap: { src: local(segment.depthMap.src, false) } } : {}),
+        ...(segment.ground ? { ground: { ...segment.ground, src: local(segment.ground.src, false) } } : {}),
+        ...(segment.near ? { near: { src: local(segment.near.src, false) } } : {}),
       };
     if (segment.type === "clip" || segment.type === "image") return { ...segment, src: local(segment.src, segment.type === "clip") };
     const moved = segment.under ? { ...segment, under: under(segment.under) } : segment;
@@ -1846,6 +1849,131 @@ export async function tracksInSandbox(id: string, videos: { id: string; url: str
       await bash(sandbox, 'rm -rf "$1"', [dir]).catch(() => {});
     }
   });
+}
+
+// ---------------------------------------------------------------------------
+// What else is read on her shots and her files, with no model: OpenCV and numpy in the tracker's
+// Python, on the cut-out sandbox's CPUs. For a composition, its sky as a matte and its skyline, its
+// vanishing point, its light (apps/render/shot_read.py, on the passages its code names); for the
+// filler, her camera's fast moves, the moments her lens is covered, her colours (video_read.py).
+// Two jobs at a time beside the cut-outs and the trackings (READ_SLOT).
+// ---------------------------------------------------------------------------
+
+const READ_SLOT = { kind: "read", slots: 1, perSlot: 2, leaseMs: 8 * 60_000, waitMs: 3 * 60_000 };
+const READ_SCRIPTS = ["shot_read.py", "video_read.py", "clear_area.py", "matte.py"];
+let readReady: Promise<Sandbox> | undefined;
+
+/**
+ * The cut-out sandbox with the tracker's Python and the reading scripts written as this deploy has them (once per
+ * instance: its snapshot keeps them while it is stopped).
+ */
+function readSandbox(): Promise<Sandbox> {
+  readReady ??= (async () => {
+    const sandbox = await withTimeLeft(await trackSandbox());
+    const files = READ_SCRIPTS.map((name) => ({ name, content: REMOTION_SOURCE_FILES[name] }));
+    const missing = files.find((f) => !f.content);
+    if (missing) throw new Error(`${missing.name} is missing from the render source`);
+    // A command first: it resumes a session stopped since the tracker was set up, the files then written into it.
+    await bash(sandbox, 'mkdir -p "$1"', [TRACK_ROOT]);
+    await sandbox.writeFiles(files.map((f) => ({ path: `${TRACK_ROOT}/${f.name}`, content: f.content! })));
+    return sandbox;
+  })().catch((error: unknown) => {
+    readReady = undefined;
+    throw error;
+  });
+  return readReady;
+}
+
+/** A passage read for a composition: its clip or photo (signed), its seconds, what to read (shot_read.py). */
+export type ShotReadJob = { key: string; url: string; from: number; to: number; read: ("ground" | "sky" | "vanish" | "light")[]; photo?: true };
+/** What was read: its readings (ShotReading), its images, and the file of its ground when one was made (a WebM, or a PNG for a photo). */
+export type ShotRead = { reading: Record<string, unknown>; frames: number; still: boolean; ground?: { file: Buffer; still: boolean } };
+
+/** Runs one reading script on its jobs in the cut-out sandbox, in a reading place; its readings by id (the script's last line). */
+async function readInSandbox(id: string, script: "shot_read.py" | "video_read.py", items: { id: string; url: string; [k: string]: unknown }[], wait: (sandbox: Sandbox, dir: string, readings: Record<string, Record<string, unknown>>) => Promise<void>) {
+  return withSlot(READ_SLOT, async () => {
+    // The time it worked, not the time it waited for its place.
+    const started = Date.now();
+    const sandbox = await withTimeLeft(await readSandbox());
+    const dir = `${TRACK_ROOT}/jobs/${id}`;
+    try {
+      await bash(sandbox, 'rm -rf "$1" && mkdir -p "$1"', [dir]);
+      await withTimeLeft(sandbox);
+      const urls = [...new Set(items.map((i) => i.url))];
+      await Promise.all(urls.map((url, i) => bash(sandbox, FETCH, [`${dir}/in${i}`, url])));
+      const jobs = items.map(({ url, ...rest }, i) => ({ ...rest, src: `${dir}/in${urls.indexOf(url)}`, out: `${dir}/out${i}` }));
+      await sandbox.writeFiles([{ path: `${dir}/jobs.json`, content: JSON.stringify(jobs) }]);
+      const run = await runIn(sandbox, {
+        cmd: "bash",
+        args: ["-c", `cd ${TRACK_ROOT} && FFMPEG=${CUTOUT_ROOT}/ffmpeg HDR_FILTER='${HDR_TO_SDR}' timeout 420 py/bin/python -I ${script} "$1/jobs.json"`, "bash", dir],
+      });
+      const lastLine = (await run.stdout()).trim().split("\n").at(-1) ?? "";
+      let readings: Record<string, Record<string, unknown>>;
+      try {
+        readings = JSON.parse(lastLine);
+      } catch {
+        const output = (await run.output("both").catch(() => "")).slice(-400);
+        throw new Error(`reading failed (${run.exitCode}): ${output}`);
+      }
+      await wait(sandbox, dir, readings);
+      return { readings, seconds: (Date.now() - started) / 1000 };
+    } finally {
+      await bash(sandbox, 'rm -rf "$1"', [dir]).catch(() => {});
+    }
+  });
+}
+
+/**
+ * Reads what compositions ask of these passages (their sky as a matte and their skyline, their vanishing point, their
+ * light: shot_read.py), in the cut-out sandbox: each one's readings, or why it has none. `seconds`: the work, billed.
+ */
+export async function shotReadsInSandbox(id: string, jobs: ShotReadJob[]): Promise<{ results: Record<string, ShotRead | Error>; seconds: number }> {
+  if (!jobs.length) return { results: {}, seconds: 0 };
+  const files: Record<string, Buffer | null> = {};
+  const { readings, seconds } = await readInSandbox(
+    id,
+    "shot_read.py",
+    jobs.map((j) => ({ id: j.key, url: j.url, from: j.from, to: j.to, read: j.read, ...(j.photo ? { photo: true } : {}) })),
+    async (sandbox, _dir, read) => {
+      // Its session given its time for the files read back (its last command just ended).
+      await withTimeLeft(sandbox);
+      for (const j of jobs) {
+        const file = read[j.key]?.file;
+        if (typeof file === "string") files[j.key] = await sandbox.readFileToBuffer({ path: file }).catch(() => null);
+      }
+    },
+  );
+  const results: Record<string, ShotRead | Error> = {};
+  for (const j of jobs) {
+    const r = readings[j.key];
+    if (!r || typeof r.error === "string") {
+      results[j.key] = new Error(typeof r?.error === "string" ? r.error : "nothing read");
+      continue;
+    }
+    // Its readings without what the script says of its own run (its file, its images, the ground's images).
+    const reading = Object.fromEntries(Object.entries(r).filter(([k]) => !["file", "ground_frames", "frames", "still"].includes(k)));
+    const { file, frames, still } = r;
+    const made = files[j.key];
+    results[j.key] = {
+      reading,
+      frames: Number(frames) || 0,
+      still: Boolean(still),
+      ...(typeof file === "string" && made?.length ? { ground: { file: made, still: file.endsWith(".png") } } : {}),
+    };
+  }
+  return { results, seconds };
+}
+
+/** Reads what the filler wants of these files (their camera's fast moves, the moments their lens is covered, their colours: video_read.py). */
+export async function fileReadsInSandbox(id: string, files: { id: string; url: string; photo?: boolean }[]): Promise<{ results: Record<string, Record<string, unknown> | Error>; seconds: number }> {
+  if (!files.length) return { results: {}, seconds: 0 };
+  const { readings, seconds } = await readInSandbox(id, "video_read.py", files.map((f) => ({ id: f.id, url: f.url, ...(f.photo ? { photo: true } : {}) })), async () => {});
+  const results: Record<string, Record<string, unknown> | Error> = {};
+  for (const f of files) {
+    const r = readings[f.id];
+    results[f.id] = !r || typeof r.error === "string" ? new Error(typeof r?.error === "string" ? r.error : "nothing read") : r;
+  }
+  return { results, seconds };
 }
 
 // ---------------------------------------------------------------------------

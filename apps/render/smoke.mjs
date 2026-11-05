@@ -106,6 +106,13 @@ const scope = {
   SubjectParts: () => [],
   // Where a text can be set in a shot (its clear areas, read before the render): its fallback here, where the scene puts it without them.
   ClearBox: (shot, frame, laid, options) => options?.fallback ?? null,
+  // Its sky, its skyline, its vanishing point, its light, its depth as a mask, her head's moves (read before the render): none here.
+  Skyline: () => null,
+  SkylineAt: () => null,
+  Near: () => null,
+  VanishingPoint: (shot, frame, laid, options) => options?.fallback ?? null,
+  LightUnder: () => null,
+  HeadMoves: () => [],
   Outline: () => null,
   // What is said, written: the words themselves are what the check reads.
   Captions: ({ words = [] }) => React.createElement("div", null, (Array.isArray(words) ? words : []).map((w) => String(w?.w ?? "")).join(" ")),

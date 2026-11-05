@@ -8,6 +8,9 @@ import {
   dressSkillPlan,
   fewFiles,
   finishPlan,
+  handMoves,
+  headMoves,
+  measuredFiles,
   houseModel,
   isClipSegment,
   memoryLines,
@@ -35,6 +38,8 @@ import {
   type BrandProfile,
   type ClipAnalysis,
   type EditPlan,
+  type FileReading,
+  type FileReadKind,
   type FollowedStyle,
   type MediaFacts,
   type MontageSkill,
@@ -48,6 +53,8 @@ import { outputFormat, readAnswer } from "@fauve/agent/answer";
 import { MONTAGE_SKILLS, skillFor } from "@fauve/agent/skills";
 import { insertPlanVersion } from "@/lib/edit-plans";
 import { usableFonts } from "@/lib/fonts";
+import { ensureFileReadings } from "@/lib/render/readings";
+import { ensureTracks, loadTracks } from "@/lib/render/tracks";
 import { studioPlace } from "@/lib/geo";
 import { skillGate } from "@/lib/skill-reviews";
 import { supabaseAdmin } from "@/lib/supabase/admin";
@@ -94,6 +101,44 @@ export function skillFiles(mediaIds: string[], clips: { media_id: string; analys
   });
 }
 
+/** How long a model that times its effects on her gestures waits for her videos to be followed before it fills without them. */
+const GESTURES_WAIT_MS = 120_000;
+
+/**
+ * What was measured on her files for the filler: her camera's fast moves, the moments her lens is covered, her colours
+ * (read now when the model asks and they were not yet: lib/render/readings.ts), and what the hands and heads in her
+ * videos do when they were followed (followed now when the model asks: its effects are timed on them). Never fails a fill.
+ */
+async function measuredOf(
+  studioId: string,
+  postId: string,
+  skill: MontageSkill,
+  mediaIds: string[],
+  clips: { media_id: string; analysis: ClipAnalysis }[],
+): Promise<[Record<string, FileReading>, Record<string, { start: number; end: number; what: string }[]>]> {
+  const reads = skill.reads ?? [];
+  const kinds = reads.filter((r): r is FileReadKind => r !== "gestures");
+  const videos = clips.map((c) => c.media_id);
+  const [readings] = await Promise.all([
+    ensureFileReadings(studioId, postId, mediaIds, kinds).catch((error: unknown) => {
+      console.warn("skill: her files not measured, the filler goes without", error instanceof Error ? error.message : error);
+      return {} as Record<string, FileReading>;
+    }),
+    reads.includes("gestures") && videos.length
+      ? Promise.race([ensureTracks(studioId, videos).catch(() => undefined), new Promise((resolve) => setTimeout(resolve, GESTURES_WAIT_MS))])
+      : null,
+  ]);
+  // Her tracks are files of their own (a few hundred kilobytes each): read only for a model that times its effects on them.
+  const tracks = reads.includes("gestures") && videos.length ? await loadTracks(studioId, videos).catch(() => ({}) as Awaited<ReturnType<typeof loadTracks>>) : {};
+  const gestures = Object.fromEntries(
+    Object.entries(tracks).map(([id, file]) => {
+      const t = { fps: file.fps, from: file.from, frames: file.frames, aspect: file.w / file.h };
+      return [id, [...handMoves(t), ...headMoves(t)].sort((a, b) => a.start - b.start)];
+    }),
+  );
+  return [readings, gestures];
+}
+
 /**
  * Her Reel on the skill, or null when her request needs more than the skill does (the editor then makes it from the
  * skill's code), when its words could not be written, or when its composition does not pass the check.
@@ -118,7 +163,7 @@ export async function designSkill(params: {
 }): Promise<SkillDesign | null> {
   const { skill } = params;
   const name = houseModel(skill.key)?.name ?? skill.key;
-  const files = skillFiles(params.mediaIds, params.clips, params.photos);
+  const files = measuredFiles(skillFiles(params.mediaIds, params.clips, params.photos), ...(await measuredOf(params.studioId, params.postId, skill, params.mediaIds, params.clips)));
   if (!files.length) return null;
   // Timed on her voice: her talking video cut as a creator cuts it, her other angles of the same take synced on their sound.
   const talk = skill.voice ? await talkOf(params.studioId, params.clips) : undefined;

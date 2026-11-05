@@ -253,6 +253,8 @@ export function Reel(props: ReelProps) {
             subject: (shot, size) => drawShot(props.segments[shot.segment], theme, size, shot.face, "subject"),
             object: (shot, name, size) => drawShot(props.segments[shot.segment], theme, size, shot.face, { object: name }),
             depth: (shot, size) => drawShot(props.segments[shot.segment], theme, size, shot.face, "depth"),
+            ground: (shot, size) => drawShot(props.segments[shot.segment], theme, size, shot.face, "ground"),
+            near: (shot, size) => drawShot(props.segments[shot.segment], theme, size, shot.face, "near"),
           }}
           reelTexts={compose.reelTexts}
           end={compose.end}
@@ -327,6 +329,8 @@ export function Reel(props: ReelProps) {
                       object: (shot: ComposeShot, name: string, size: { width: number; height: number }) =>
                         drawShot(props.segments[shot.segment], theme, size, shot.face, { object: name }, shot.segment),
                       depth: (shot: ComposeShot, size: { width: number; height: number }) => drawShot(props.segments[shot.segment], theme, size, shot.face, "depth", shot.segment),
+                      ground: (shot: ComposeShot, size: { width: number; height: number }) => drawShot(props.segments[shot.segment], theme, size, shot.face, "ground", shot.segment),
+                      near: (shot: ComposeShot, size: { width: number; height: number }) => drawShot(props.segments[shot.segment], theme, size, shot.face, "near", shot.segment),
                     },
                   }
                 : {})}
@@ -382,6 +386,9 @@ export function Reel(props: ReelProps) {
   );
 }
 
+/** What of a shot is drawn: the shot itself (none), her subject cut out, its depth, the shot without its sky, the shot by its depth, an object followed. */
+type Layer = "subject" | "depth" | "ground" | "near" | { object: string };
+
 /**
  * One of her shots in a box of that size, as the Reel draws it (its retouch, its camera move, its light), its faces
  * whole: for a composition; or what is cut out of it (her subject, an object found on it, its depth), drawn exactly the
@@ -394,12 +401,13 @@ function drawShot(
   theme: Theme,
   size: { width: number; height: number },
   face?: FaceZone,
-  layer?: "subject" | "depth" | { object: string },
+  layer?: Layer,
   montage?: number,
 ): ReactNode {
   if (segment?.type === "image") {
-    // A photo's subject is its own cut-out, an object the one found on it by name; a photo has no depth video.
-    const src = layer === "subject" ? segment.subject?.src : layer === "depth" ? undefined : layer ? segment.objects?.[layer.object]?.src : segment.src;
+    // A photo's subject is its own cut-out, an object the one found on it by name, its ground the photo without its sky; a photo has no depth video.
+    const src =
+      layer === "subject" ? segment.subject?.src : layer === "ground" ? segment.ground?.src : layer === "depth" || layer === "near" ? undefined : layer ? segment.objects?.[layer.object]?.src : segment.src;
     if (!src) return null;
     const photo = <Photo src={src} edit={segment.edit} grade={theme.grade} frame={size} />;
     if (montage === undefined) return photo;
@@ -414,7 +422,9 @@ function drawShot(
   if (segment?.type !== "clip") return null;
   if (layer === "subject" && !segment.subject) return null;
   if (layer === "depth" && !segment.depthMap) return null;
-  if (layer && layer !== "subject" && layer !== "depth" && !segment.objects?.[layer.object]) return null;
+  if (layer === "ground" && !segment.ground) return null;
+  if (layer === "near" && !segment.near) return null;
+  if (typeof layer === "object" && !segment.objects?.[layer.object]) return null;
   const shot = <Shot segment={segment} theme={theme} frame={size} face={face} {...(layer ? { layer } : {})} />;
   return montage !== undefined && segment.accent === "punch" ? (
     <Accent kind="punch" color="">
@@ -657,7 +667,7 @@ function Letterbox({ aspect, children }: { aspect: number | undefined; children:
  * A clip as the Reel frames it; with layer « subject », its subject cut out (matte.py) drawn the same way (the same
  * framing, straightening, camera move, light and blurred faces), so it falls exactly on the shot.
  */
-function Shot({ segment, theme, frame: box, face, layer }: { segment: ClipSegment; theme: Theme; frame?: { width: number; height: number }; face?: FaceZone; layer?: "subject" | "depth" | { object: string } }) {
+function Shot({ segment, theme, frame: box, face, layer }: { segment: ClipSegment; theme: Theme; frame?: { width: number; height: number }; face?: FaceZone; layer?: Layer }) {
   const frame = useCurrentFrame();
   const video = useVideoConfig();
   const { width, height } = box ?? video;
@@ -674,7 +684,9 @@ function Shot({ segment, theme, frame: box, face, layer }: { segment: ClipSegmen
   // Her subject's cut-out, or an object's (a cup she lifts), drawn exactly where the shot is; or its depth, grey and
   // without the shot's light (it is a machine's view of the room, not her picture).
   const depth = layer === "depth" ? segment.depthMap : undefined;
-  const subject = layer === "subject" ? segment.subject : layer && layer !== "depth" ? segment.objects?.[layer.object] : undefined;
+  // Her shot without its sky, or with its depth as its transparency: drawn as a cut-out is, with the shot's light.
+  const subject =
+    layer === "subject" ? segment.subject : layer === "ground" ? segment.ground : layer === "near" ? segment.near : typeof layer === "object" ? segment.objects?.[layer.object] : undefined;
   if (layer && !subject && !depth) return null;
   // A passage of the clip at one speed: the file may start later in the clip (a slow motion's own smooth file).
   const passage = (p: SpeedPiece) => (
@@ -683,7 +695,7 @@ function Shot({ segment, theme, frame: box, face, layer }: { segment: ClipSegmen
         // Its depth starts at the shot's first image of the clip, image for image.
         <OffthreadVideo src={depth.src} muted trimBefore={Math.max(0, p.startFrom - segment.startFrom)} playbackRate={p.speed} style={{ ...look, filter: undefined }} />
       ) : subject ? (
-        subject.still ? (
+        "still" in subject && subject.still ? (
           <Img src={subject.src} style={look} />
         ) : (
           // Its cut-out starts at the shot's first image of the clip, image for image.

@@ -502,6 +502,183 @@ export function clearPassages(plan: Pick<EditPlan, "segments" | "layers">, isVid
   return out;
 }
 
+// ——— What a composition reads on her shots besides its clear areas (shot_read.py, in the cut-out sandbox) ———————————
+
+/**
+ * What can be read on a passage, each for the tool of the scope that asks it: `ground` her shot without its sky at every
+ * image (Skyline: a transparent video, like her cut-out), `sky` its skyline only (SkylineAt), `vanish` its vanishing
+ * point (VanishingPoint), `light` the light of each cell of its picture (LightUnder).
+ */
+export type ShotReadKind = "ground" | "sky" | "vanish" | "light";
+
+/** The most passages read for one Reel; the most of them made into a ground, and the most seconds of video they take (each image is read and written). */
+export const READ_MAX = 8;
+export const GROUND_MAX = 4;
+export const GROUND_MAX_SECONDS = 20;
+
+/** The name of a passage's readings among a clip's cut-outs (a JSON file: ShotReading), and of its ground (a video without its sky): never an object's « # ». */
+export const readKey = (clipId: string, from: number, to: number) => `${subjectKey(clipId, from, to)}~read`;
+export const groundKey = (clipId: string, from: number, to: number) => `${subjectKey(clipId, from, to)}~ground`;
+
+/** The tools of the scope that read a shot, and what each one needs read. */
+const READ_TOOLS: [RegExp, ShotReadKind][] = [
+  [/\bSkylineAt\(\s*([^,()]*)/g, "sky"],
+  [/\bVanishingPoint\(\s*([^,()]*)/g, "vanish"],
+  [/\bLightUnder\(\s*([^,()]*)/g, "light"],
+];
+
+/**
+ * The shots a composition's code reads, and what it reads on each: `<Skyline shot={n} … />` (compiled or as JSX) its
+ * ground, SkylineAt(shots[n], …) its skyline, VanishingPoint(shots[n], …) its vanishing point, LightUnder(shots[n], …) its
+ * light; a shot written as a variable is ANY_SHOT (every shot under the animation).
+ */
+export function readsDrawn(js: string | undefined): { shot: number; kinds: ShotReadKind[] }[] {
+  if (!js) return [];
+  const found = new Map<number, Set<ShotReadKind>>();
+  const add = (shot: number, kind: ShotReadKind) => found.set(shot, (found.get(shot) ?? new Set()).add(kind));
+  for (const props of toolProps(js, "Skyline")) {
+    const n = /^(?:shots\s*\[\s*)?(\d+)/.exec(SHOT_PROP.exec(props)?.[1] ?? "");
+    add(n ? Number(n[1]) : ANY_SHOT, "ground");
+  }
+  for (const [pattern, kind] of READ_TOOLS) {
+    for (const m of js.matchAll(pattern)) {
+      const n = /^(?:shots\s*\[\s*)?(\d+)\s*\]?$/.exec((m[1] ?? "").trim());
+      add(n ? Number(n[1]) : ANY_SHOT, kind);
+    }
+  }
+  return [...found].map(([shot, kinds]) => ({ shot, kinds: [...kinds].sort() }));
+}
+
+/** A plan whose animations read one of her shots (its sky, its vanishing point, its light): a composition, or one laid over the montage. */
+export const wantsReads = (plan: Pick<EditPlan, "layers">) => (plan.layers ?? []).some((l) => readsDrawn(l.motion?.js).length > 0);
+
+/** A passage to read: its clip and seconds (a photo from 0 to 0), what to read there. */
+export type ReadPassage = SubjectPassage & { kinds: ShotReadKind[]; photo?: true };
+
+/**
+ * The passages a Reel reads, each with all its compositions ask of it (her shot n is the plan's n-th shot, video or
+ * photo, as its shots list them; a variable, every shot under it), a video at its own pace only (a speed or a ramp
+ * changes which images show: the tools then give their fallback); READ_MAX at most, and a ground for GROUND_MAX of
+ * them and GROUND_MAX_SECONDS of video at most (the others keep their skyline, read on their first image).
+ */
+export function readPassages(plan: Pick<EditPlan, "segments" | "layers">, isVideo: (clipId: string) => boolean): ReadPassage[] {
+  const shots = plan.segments.filter(isClipSegment);
+  const spans = shotSpans(plan);
+  const out: ReadPassage[] = [];
+  let grounds = 0;
+  let seconds = 0;
+  for (const layer of plan.layers ?? []) {
+    const under = shotsUnder(spans, layer);
+    for (const { shot, kinds } of readsDrawn(layer.motion?.js).flatMap((r) => (r.shot === ANY_SHOT ? under.map((i) => ({ ...r, shot: i })) : [r]))) {
+      const s = shots[shot];
+      if (!s) continue;
+      const photo = Boolean(s.photo);
+      if (!photo && (!isVideo(s.clip_id) || s.ramp || (s.speed && Math.abs(s.speed - 1) > 0.01))) continue;
+      const from = photo ? 0 : s.in;
+      const to = photo ? 0 : s.out;
+      const key = readKey(s.clip_id, from, to);
+      const known = out.find((p) => p.key === key);
+      if (!known && out.length >= READ_MAX) continue;
+      const passage = known ?? { clip_id: s.clip_id, from, to, key, kinds: [], ...(photo ? { photo: true as const } : {}) };
+      if (!known) out.push(passage);
+      for (const kind of kinds) {
+        if (passage.kinds.includes(kind)) continue;
+        if (kind === "ground") {
+          const length = Math.max(0, to - from);
+          // Past its budget, a ground is its skyline only (SkylineAt still reads it; Skyline draws nothing).
+          if (grounds >= GROUND_MAX || seconds + length > GROUND_MAX_SECONDS) {
+            if (!passage.kinds.includes("sky")) passage.kinds.push("sky");
+            continue;
+          }
+          grounds++;
+          seconds += length;
+        }
+        passage.kinds.push(kind);
+      }
+      passage.kinds.sort();
+    }
+  }
+  return out;
+}
+
+/** A shot's readings (shot_read.py), as their file keeps them and the render reads them. */
+export const shotReadingSchema = z.object({
+  /** The camera's move (s, dx, dy for each image, flat), when it moves: what is read on the first image follows it. */
+  motion: z.array(z.number()).optional(),
+  /** Its sky: its share of the picture, and where it ends in each of 64 columns of its first image (shares of the height from the top). */
+  sky: z.object({ share: z.number(), profile: z.array(z.number()) }).optional(),
+  /** Where its lines run to (shares of its first image, maybe a little outside it), how sure (0 to 1); null when they run nowhere. */
+  vanish: z.object({ x: z.number(), y: z.number(), strength: z.number() }).nullable().optional(),
+  /** The mean light of each cell of its picture over the passage (two hex digits a cell, rows from the top), its mean and its bright tenth (0 to 1). */
+  light: z
+    .object({ cols: z.number().int().min(2).max(256), rows: z.number().int().min(2).max(256), cells: z.string().regex(/^[0-9a-f]*$/), mean: z.number(), high: z.number() })
+    .refine((l) => l.cells.length === l.cols * l.rows * 2, "cells")
+    .optional(),
+});
+export type ShotReading = z.infer<typeof shotReadingSchema>;
+
+// ——— Her video's depth as a mask (Near in the scope: depth_video.py on the rented card) ——————————————————————————————
+
+/** The name of a passage's nearness among a clip's cut-outs (her shot with its depth as its transparency, a WebM). */
+export const nearKey = (clipId: string, from: number, to: number) => `${subjectKey(clipId, from, to)}~near`;
+
+/** The most seconds of video made into a nearness for one Reel (each image at the cut-out's size): its passages count in DEPTH_MAX too. */
+export const NEAR_MAX_SECONDS = 12;
+
+/** The shots a composition's code shows by their depth (`<Near shot={2} depth={…} />`, compiled or as JSX; a shot written as a variable is not read). */
+export function nearsDrawn(js: string | undefined): number[] {
+  if (!js) return [];
+  const shots = new Set<number>();
+  for (const props of toolProps(js, "Near")) {
+    const n = /^(?:shots\s*\[\s*)?(\d+)/.exec(SHOT_PROP.exec(props)?.[1] ?? "");
+    if (n) shots.add(Number(n[1]));
+  }
+  return [...shots];
+}
+
+/** A plan whose animations rebuild a shot by its depth (Near). */
+export const wantsNear = (plan: Pick<EditPlan, "layers">) => (plan.layers ?? []).some((l) => nearsDrawn(l.motion?.js).length > 0);
+
+/** The passages a Reel makes into a nearness: the shot each animation names with Near, a video at its own pace only; DEPTH_MAX at most, NEAR_MAX_SECONDS in all. */
+export function nearPassages(plan: Pick<EditPlan, "segments" | "layers">, isVideo: (clipId: string) => boolean): SubjectPassage[] {
+  const shots = plan.segments.filter(isClipSegment);
+  const out: SubjectPassage[] = [];
+  let seconds = 0;
+  for (const layer of plan.layers ?? []) {
+    for (const shot of nearsDrawn(layer.motion?.js)) {
+      const s = shots[shot];
+      if (!s || !isVideo(s.clip_id) || s.ramp || (s.speed && Math.abs(s.speed - 1) > 0.01)) continue;
+      const key = nearKey(s.clip_id, s.in, s.out);
+      const length = Math.max(0, s.out - s.in);
+      if (out.some((p) => p.key === key) || out.length >= DEPTH_MAX || !length || seconds + length > NEAR_MAX_SECONDS) continue;
+      out.push({ clip_id: s.clip_id, from: s.in, to: s.out, key });
+      seconds += length;
+    }
+  }
+  return out;
+}
+
+// ——— What the filler reads on her files (video_read.py, in the cut-out sandbox) ————————————————————————————————————
+
+/** What can be read on a whole file for the filler: its fast camera moves, the moments its lens is covered, its colourfulness. */
+export type FileReadKind = "moves" | "covered" | "colour";
+
+/** The name of a file's own readings among its cut-outs (kept inline: a few moments and a number). */
+export const fileKey = (mediaId: string) => `${mediaId}~file`;
+
+/** A file's readings (video_read.py): its fast camera moves, the moments its lens is covered, how colourful it is. */
+export const fileReadingSchema = z.object({
+  seconds: z.number().optional(),
+  moves: z
+    .array(z.object({ from: z.number(), to: z.number(), kind: z.enum(["whip", "pan", "tilt", "rush", "pull"]), towards: z.enum(["left", "right", "up", "down", "in", "out"]), speed: z.number() }))
+    .default([]),
+  covered: z
+    .array(z.object({ from: z.number(), to: z.number(), peak: z.number(), share: z.number(), colour: z.string().optional(), dark: z.boolean().optional(), enters: z.enum(["left", "right"]).optional() }))
+    .default([]),
+  colour: z.object({ score: z.number(), words: z.string(), best: z.object({ from: z.number(), to: z.number(), score: z.number() }).optional() }).optional(),
+});
+export type FileReading = z.infer<typeof fileReadingSchema>;
+
 /**
  * A passage's clear areas (clear_area.py), as its file keeps them and the render reads them: its grid (cols × rows
  * cells, rows from the top: « 2 » the sky, « 1 » calm, « 0 » busy or out of the picture at some image), in its first
@@ -545,8 +722,16 @@ export const mediaSubjectsSchema = z.record(
       depth: z.boolean().optional(),
       /** Its clear areas (a JSON file: ClearMap), not a cut-out: ClearBox reads them. */
       clear: z.boolean().optional(),
+      /** Its readings (a JSON file: ShotReading), not a cut-out: SkylineAt, VanishingPoint and LightUnder read them. */
+      read: z.boolean().optional(),
+      /** Her shot without its sky (a transparent video, or a PNG for a photo): Skyline draws it. */
+      ground: z.boolean().optional(),
+      /** Her shot with its depth as its transparency (near opaque, a WebM): Near draws it. */
+      near: z.boolean().optional(),
     }),
     z.object({ failed_at: z.string(), error: z.string() }),
+    /** A file's own readings, kept inline (no file): what the filler reads of it. */
+    z.object({ file: fileReadingSchema, at: z.string() }),
   ]),
 );
 export type MediaSubjects = z.infer<typeof mediaSubjectsSchema>;
