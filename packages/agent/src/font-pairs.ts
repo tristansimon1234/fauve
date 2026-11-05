@@ -42,7 +42,7 @@ export const FONT_PAIRS: FontPair[] = [
     display: { family: "Instrument Serif", weight: 400, case: "normal", tracking: "normal" },
     body: { family: "Inter Tight", weight: 500, case: "upper", tracking: "wide" },
     how: "un titre serif en casse normale, un mot en italique, des étiquettes minuscules en capitales espacées",
-    fits: "des plans fixes de cinéma, un écran partagé titré, une table, un restaurant",
+    fits: "des plans fixes de cinéma, une signature en petit serif sur le noir, une table, un restaurant",
   },
   {
     key: "serif-grasse",
@@ -51,6 +51,16 @@ export const FONT_PAIRS: FontPair[] = [
     body: { family: "Poppins", weight: 600, case: "normal", tracking: "wide" },
     how: "un ou deux mots en serif gras serrés sous trois petits mots sans serif très espacés, tout petit au centre",
     fits: "des plans fixes de cinéma, un titre court posé au milieu d'un plan calme",
+  },
+  {
+    // « Écran partagé titré » v2 (docs/fiches/ecran-partage.md): its two small titles are in a classic book serif, wider
+    // than Instrument Serif; the line of its ending card in spaced small capitals.
+    key: "labeur",
+    name: "Serif de labeur et petites capitales",
+    display: { family: "EB Garamond", weight: 400, case: "normal", tracking: "normal" },
+    body: { family: "Inter Tight", weight: 500, case: "upper", tracking: "wide" },
+    how: "deux petits titres en serif de labeur, romain, qui se répondent ; une ligne en petites capitales espacées sous un titre",
+    fits: "un écran partagé titré, le geste et son résultat, un atelier, une cuisine",
   },
   {
     key: "didone",
@@ -104,8 +114,9 @@ export const FONT_PAIRS: FontPair[] = [
     key: "decodage",
     name: "Sans humaniste",
     display: { family: "Open Sans", weight: 400, case: "upper", tracking: "normal" },
-    body: { family: "Inter", weight: 500, case: "upper", tracking: "wide" },
-    how: "un titre en capitales régulières qui se décode, trois petits mots espacés au-dessus",
+    // Its small words in the title's own face, regular, in lower case, a little spaced (docs/fiches/decode.md, effect 3).
+    body: { family: "Open Sans", weight: 400, case: "normal", tracking: "wide" },
+    how: "un titre en capitales régulières qui se décode, trois petits mots en minuscules un peu espacées au-dessus, dans la même police",
     fits: "un paysage, un voyage, un titre qui se décode",
   },
   {
