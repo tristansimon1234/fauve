@@ -6,6 +6,7 @@ import { decode } from "./skills/decode.ts";
 import { ecranPartage } from "./skills/ecran-partage.ts";
 import { eventail } from "./skills/eventail.ts";
 import { facade } from "./skills/facade.ts";
+import { fenetres } from "./skills/fenetres.ts";
 import { frappe } from "./skills/frappe.ts";
 import { gaufre } from "./skills/gaufre.ts";
 import { journee } from "./skills/journee.ts";
@@ -33,6 +34,7 @@ export const MONTAGE_SKILLS: Record<string, MontageSkill> = {
   "ecran-partage": ecranPartage,
   eventail,
   facade,
+  fenetres,
   frappe,
   gaufre,
   journee,
