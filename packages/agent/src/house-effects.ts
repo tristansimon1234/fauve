@@ -148,6 +148,10 @@ export const HOUSE_EFFECTS: Record<string, HouseEffect> = {
     effet: "son lieu vu par une machine, chaque passant dans un cadre bleu qui clignote, reliés par des fils, puis l'image redessinée en caractères",
     il_faut: "un plan fixe de son lieu fréquenté filmé de haut, quelqu'un d'immobile au milieu et des gens qui passent autour",
   },
+  "vlog-ville": {
+    effet: "sa phrase mot à mot en petits sous-titres sur un plan calme, la musique qui tombe sur son nom avec neuf gros plans éclair, puis son nom en capitales rouges entre guillemets sur quelqu'un de dos",
+    il_faut: "un plan large et calme, un détail plein de choses filmé de près, quelqu'un de dos immobile devant ce qui passe",
+  },
 };
 
 /** The most of Edith's models one Reel borrows from: one charter, one music, never a patchwork. */

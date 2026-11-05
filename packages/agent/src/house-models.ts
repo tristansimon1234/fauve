@@ -1405,6 +1405,57 @@ export const HOUSE_MODELS: HouseModel[] = [
       why: "Son lieu ordinaire vu comme par une machine : le stroboscope de regards intrigue, chaque passe montre autre chose, et la personne immobile au milieu tient l'œil.",
     },
   }),
+  model({
+    key: "vlog-ville",
+    name: "Ta ville racontée",
+    // Written on its original's fiche (docs/fiches/vlog-ville.md; its skill, skills/vlog-ville.ts, version 1): a city film
+    // of 41,8 s in 4:3, told in small subtitles (a voice tells the original), cut by ear on what is said.
+    pitch: "Ton quartier en court-métrage raconté : tes premiers mots un à un, la musique qui tombe sur ton nom avec une rafale de gros plans, ton nom en grandes capitales rouges entre guillemets sur toi de dos, puis ta ville qui bouge jusqu'au retour au plan du titre.",
+    needs: "15 à 30 vidéos de ton quartier et de toi : un plan large et calme avec toi au milieu, un détail plein de choses (ta carte, une étagère), toi de dos immobile pendant que tout passe, des passants, de la foule, des lumières le soir, toi qui marches",
+    files: [6, 16],
+    pair: "film-large",
+    // Its skill's code is its reference.
+    example: null,
+    // Measured on its original (docs/fiches/vlog-ville.md): its music's pulse at 76 (Gemini heard 75); its cuts follow
+    // what is said, not the beat, but for its drop on her name.
+    tempo: 76,
+    finish: { name: "Film doux", hint: "blancs retenus, noirs un peu levés, ombres bleu-vert et hautes lumières chaudes, rouges francs, sans grain ni coins sombres", contrast: 0.08, saturation: -0.1, fade: 0.05, shadows: "#1C2B2E", highlights: "#E6DCC0", split: 0.25 },
+    look: {
+      name: "court-métrage de ville raconté",
+      format: "raconte",
+      voice: "voix off",
+      hook: { kind: "pov", what: "un plan large et calme, quelqu'un d'immobile au milieu, une phrase qui arrive mot à mot en petits sous-titres, puis la musique qui tombe sur le nom du lieu avec une rafale de gros plans d'un détail" },
+      text: {
+        amount: "plusieurs",
+        composition: "de petits sous-titres blancs en minuscules en bas de l'image, une phrase à la fois ; au titre, le nom en grandes capitales rouges très larges entre guillemets au centre, une signature en petit au-dessus, une ligne minuscule dessous",
+        case: "upper",
+        weight: "black",
+        tracking: "tight",
+        subtitles: true,
+      },
+      colors: ["#d7261e"],
+      filter: "couleurs de cinéma retenues : les blancs jamais au-dessus de 215 sur 255, les noirs un peu levés, des ombres bleu-vert et des hautes lumières chaudes, des rouges francs (le titre, les lanternes, les rames), sans grain visible ni coins sombres",
+      layout: "des plans plein cadre, en 4:3 sur du noir quand ses vidéos sont horizontales, coupés à l'oreille sur ce qui est dit ; trois rafales de plans de deux à six images",
+      moments: [
+        { at: 0, what: "un plan large et calme, quelqu'un d'immobile au milieu, le son de la ville ; sa première phrase arrive mot à mot en petits sous-titres, puis la deuxième, qui finit sur le nom du lieu" },
+        { at: 2.63, what: "la musique tombe sur le nom : neuf gros plans d'une carte pleine de détails, deux et trois images chacun, puis le même plan filé" },
+        { at: 6.13, what: "quelqu'un de dos, immobile, devant une rame qui passe ; une demi-seconde plus tard le nom en grandes capitales rouges entre guillemets sur son dos, une signature au-dessus, une petite ligne dessous ; la musique étouffée, plus de sous-titre jusqu'à 7,93 s" },
+        { at: 8.57, what: "la ville qui bouge, une phrase de sous-titre par plan ou deux : quelqu'un sur un bateau, de l'eau, des escalators, la foule, des portiques, une verrière" },
+        { at: 17.3, what: "une rue sous des lanternes, puis une rafale de nuit : un feu piéton, un panneau, un néon, des phares, chacun de deux à six images" },
+        { at: 24.57, what: "une rafale qui rappelle les plans déjà vus, les gros plans de la carte dans leur ordre, sur une phrase qui dit le chaos et le mouvement" },
+        { at: 26.83, what: "le tournant : des plans calmes quand la phrase dit de ralentir ; quelqu'un qui lève les yeux, assis de dos, une contre-plongée qui tourne, une image brûlée de blanc" },
+        { at: 31.6, what: "le premier lieu à nouveau, des rappels, la nuit sur le fleuve, quelqu'un qui marche vers la caméra" },
+        { at: 39.9, what: "le plan du titre à nouveau, sans le titre, la rame plus lente, sur la dernière phrase qui reprend la première : la boucle" },
+      ],
+      camera: "mixte",
+      transitions: "coupes nettes",
+      grade: "film",
+      motion: "epure",
+      music: "cinematic downtempo hip-hop, deep 808 sub hits, soft piano, airy pads, 76 BPM",
+      ending: "le plan du titre à nouveau, sans le titre, le monde plus lent, sur la dernière phrase qui reprend la première : la boucle",
+      why: "Une voix raconte la ville comme un court-métrage : les sous-titres tiennent l'attention, les rafales tombent sur ce qui est dit, et le nom en rouge sur quelqu'un d'immobile pendant que tout passe dit où l'on est.",
+    },
+  }),
 ];
 
 const BY_KEY = new Map(HOUSE_MODELS.map((m) => [m.key, m]));
@@ -1476,6 +1527,7 @@ export const HOUSE_WHEN: Record<string, { pour: string; pas_pour: string }> = {
   createur: { pour: "quelqu'un qui explique en parlant face caméra et montre ce dont il parle (ses produits, ses réalisations, son lieu, son site)", pas_pour: "des images sans parole, quelqu'un qui parle sans rien à montrer" },
   silhouette: { pour: "se présenter (elle ou quelqu'un de son équipe), présenter son métier et ce qu'elle fait, un lancement, un ton de studio graphique", pas_pour: "des produits seuls, un lieu sans personne, une offre à lire" },
   vision: { pour: "son lieu fréquenté filmé de haut, quelqu'un d'immobile au milieu et des gens qui passent autour ; un ton tech ou graphique", pas_pour: "un lieu vide, un plan qui bouge, des produits en gros plan, un message à lire" },
+  "vlog-ville": { pour: "raconter son quartier, sa ville ou son lieu comme un court-métrage, avec des phrases (ou une voix) qui racontent tout du long et beaucoup de beaux plans", pas_pour: "une offre à lire en détail, un produit seul, peu de vidéos, un Reel court" },
 };
 
 /** The models for Edith: their key, name, what they do, what they want, and what only she can film for one. */

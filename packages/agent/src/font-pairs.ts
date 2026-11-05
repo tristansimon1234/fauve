@@ -171,6 +171,17 @@ export const FONT_PAIRS: FontPair[] = [
     how: "sa première phrase en grasse condensée sur des bandeaux noirs, puis de petits sous-titres sobres en grotesque demi-grasse",
     fits: "quelqu'un qui parle face caméra, une explication, des références",
   },
+  {
+    key: "film-large",
+    name: "Titre de film large",
+    // « Ta ville racontée » (docs/fiches/vlog-ville.md, effect 3): its title in extended black capitals between quotes
+    // (Unbounded 900 sets « LONDON » 389 px wide at the original's 52 px cap height, the original 410), its subtitles in
+    // a plain grotesque, regular, lowercase.
+    display: { family: "Unbounded", weight: 900, case: "upper", tracking: "tight" },
+    body: { family: "Inter", weight: 400, case: "normal", tracking: "normal" },
+    how: "un nom en capitales très larges et très grasses entre guillemets, une signature en petit au-dessus et une ligne minuscule dessous ; de petits sous-titres fins en minuscules",
+    fits: "un court-métrage de ville raconté, un titre de film posé sur quelqu'un de dos",
+  },
 ];
 
 const BY_KEY = new Map(FONT_PAIRS.map((p) => [p.key, p]));
