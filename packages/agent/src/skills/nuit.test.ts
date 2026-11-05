@@ -220,16 +220,16 @@ test("« La nuit sous tous les angles » (v1): its round things, the lens that f
 test("« La nuit sous tous les angles » (v1): its night comes in as the original's: white flash, panel, leak and white, overexposed, the photographer, the loop", () => {
   const at = (f: number, extra = {}) => drawAt(nuit.code, f, props(extra));
   // The white flash into the second shot of the night: its first three images burnt (96 – 98), then as filmed.
-  assert.deepEqual([96, 97, 98].map((f) => styleOf(keyed(at(f), "burnt")!).filter), ["brightness(4) saturate(0.6)", "brightness(4) saturate(0.6)", "brightness(4) saturate(0.6)"]);
+  assert.deepEqual([96, 97, 98].map((f) => styleOf(keyed(at(f), "burnt")!).filter), ["brightness(10) saturate(0.5)", "brightness(10) saturate(0.5)", "brightness(10) saturate(0.5)"]);
   assert.equal(keyed(at(99), "burnt"), null);
   // The warm panel of light on the right of its last images (123, 124), none on 125.
   assert.ok(keyed(at(123), "panel") && keyed(at(124), "panel") && !keyed(at(125), "panel"));
   // The orange leak on the last image before the neon (239), its first image burnt white, then two white images.
   assert.match(String(styleOf(keyed(at(239), "leak")!).background), /#893d23/);
-  assert.match(String(styleOf(keyed(at(240), "burnt")!).filter), /brightness\(6\)/);
+  assert.match(String(styleOf(keyed(at(240), "burnt")!).filter), /brightness\(14\)/);
   assert.deepEqual([241, 242].map((f) => styleOf(keyed(at(f), "white")!).background), ["#fcfcfc", "#fcfcfc"]);
   // Its counter coming in overexposed in colour (250, 251).
-  assert.deepEqual([250, 251].map((f) => String(styleOf(keyed(at(f), "burnt")!).filter)), ["brightness(2.6) saturate(1.7)", "brightness(2.6) saturate(1.7)"]);
+  assert.deepEqual([250, 251].map((f) => String(styleOf(keyed(at(f), "burnt")!).filter)), ["brightness(5) saturate(1.5)", "brightness(5) saturate(1.5)"]);
   // The one who takes a photo: their camera white (324), a grey veil (325, 326), their silhouette white (327).
   const camera = keyed(at(324), "camera")!;
   assert.deepEqual([camera.type, camera.props.object, camera.props.fill, camera.props.shot], ["Subject", "@appareil", "#ffffff", 27]);

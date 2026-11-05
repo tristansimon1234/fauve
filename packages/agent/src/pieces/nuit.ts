@@ -115,7 +115,7 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, shots,
   } else if (frame < BLACK) {
     // Its last image burnt white, then the whole picture in negative.
     const { a, k } = angleAt(FLASH - 1);
-    node = aligned(a, pic(mine[a], k + 1, { filter: frame === FLASH ? "brightness(4) saturate(0.5)" : "invert(1) contrast(1.15)" }, "flash"));
+    node = aligned(a, pic(mine[a], k + 1, { filter: frame === FLASH ? "brightness(10) saturate(0.5)" : "invert(1) contrast(1.15)" }, "flash"));
   } else if (frame < BURN) node = fill("#000000", "black");
   else node = fill(MOTTLE + BURNS[Math.min(2, frame - BURN)], "burn", { backgroundColor: "#000000" });
   return h(AbsoluteFill, { style: { backgroundColor: "#000000" } }, node);

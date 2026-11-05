@@ -241,10 +241,11 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
     const e = entry(cur);
     const next = entry(cur + 1);
     base = pic(cur, t);
+    // Burnt as the original's (its darkest parts still seen, the rest white): ten times its light burns a night shot through.
     if (cur === M0 && t < Math.max(4, P(4))) { base = null; over.push(burn(Math.floor(t / S), "drop")); }
-    else if (e === 3 && t < 3) { base = null; over.push(pic(cur, t, { filter: "brightness(4) saturate(0.6)" }, "burnt")); }
-    else if (e === 4 && t < 3) { base = null; over.push(t === 0 ? pic(cur, 0, { filter: "brightness(6) saturate(0.35)" }, "burnt") : fill("#fcfcfc", "white")); }
-    else if (e === 2 && t < 2) { base = null; over.push(pic(cur, t, { filter: "brightness(2.6) saturate(1.7)" }, "burnt")); }
+    else if (e === 3 && t < 3) { base = null; over.push(pic(cur, t, { filter: "brightness(10) saturate(0.5)" }, "burnt")); }
+    else if (e === 4 && t < 3) { base = null; over.push(t === 0 ? pic(cur, 0, { filter: "brightness(14) saturate(0.35)" }, "burnt") : fill("#fcfcfc", "white")); }
+    else if (e === 2 && t < 2) { base = null; over.push(pic(cur, t, { filter: "brightness(5) saturate(1.5)" }, "burnt")); }
     if (next === 4 && left === 1) over.push(fill(LEAK, "leak"));
     if (next === 1 && (left === 3 || left === 2))
       over.push(fill(left === 3
@@ -342,7 +343,7 @@ export const nuit: MontageSkill = {
     {
       slot: "titre",
       role: "hook",
-      want: "facultatif : son nom ou celui de son lieu (sa rue, son quartier), posé en capitales fines et espacées au milieu du premier plan de sa nuit, juste après la brûlure ; 1 à 3 mots",
+      want: "facultatif : son nom ou celui de son lieu (sa rue, son quartier), posé en capitales fines et espacées au milieu du premier plan de sa nuit, juste après la brûlure ; 1 ou 2 mots",
       max: 20,
       required: false,
     },
@@ -363,8 +364,6 @@ export const nuit: MontageSkill = {
     ...Array.from({ length: 6 }, (_, k) => ({ slot: `angle${k + 1}`, shot: k, want: "l'objet qui revient dans chaque angle : son enseigne, son néon, son logo, sa porte, sa tireuse, sa lampe (le même nom dans chaque angle)" })),
     { slot: "appareil", shot: -2, want: "l'appareil photo ou le téléphone que la personne lève pour prendre la photo" },
   ],
-  // Its film grade: its code lifts the blacks and holds the whites itself.
-  finish: { fade: 0 },
   timeline(n, options) {
     // At another tempo (a longer Reel, a music's own): every length counted in beats follows it.
     const bpm = options.bpm ?? BPM;
@@ -396,8 +395,8 @@ export const nuit: MontageSkill = {
     return {
       duration,
       shots: spans.map((span, i): SkillShot => ({ ...span, want: wants[i]! })),
-      // Her name from the first image of her night after the burn (78) until the panel of light (123).
-      texts: { titre: { from: s(78), to: s(123) } },
+      // Her name from the first image of her night after the burn (78) to the cut after the panel of light (126): 1,6 s.
+      texts: { titre: { from: s(78), to: s(126) } },
       marks: {
         scale: round3(scale),
         na: counts.angles,

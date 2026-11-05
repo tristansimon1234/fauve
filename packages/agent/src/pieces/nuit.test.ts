@@ -102,7 +102,7 @@ test("« Sous tous les angles » draws her angles in turn on its cuts, its last 
   const blur = (f: number) => flatten(drawAt(f)).find((n) => n.type === "feGaussianBlur")?.props.stdDeviation;
   assert.deepEqual([blur(41), blur(42), blur(57)], [undefined, "9.0 0", undefined]);
   // Its last image burnt white (58), the picture in negative (59), black (60 – 67), its burn on its last four images.
-  assert.equal(styleOf(footage(drawAt(58))[0]!).filter, "brightness(4) saturate(0.5)");
+  assert.equal(styleOf(footage(drawAt(58))[0]!).filter, "brightness(10) saturate(0.5)");
   assert.equal(styleOf(footage(drawAt(59))[0]!).filter, "invert(1) contrast(1.15)");
   assert.ok([60, 63, 67].every((f) => keyed(drawAt(f), "black")) && footage(drawAt(62)).length === 0);
   const burn = (f: number) => String(styleOf(keyed(drawAt(f), "burn")!).background);
@@ -126,6 +126,6 @@ test("« Sous tous les angles » draws her angles in turn on its cuts, its last 
   assert.equal(keyed(drawAt(4), "al1"), null);
   // A shorter one (1 s): the same end on its own last images, its stutter quicker.
   const short = (f: number) => drawAt(f, { durationInFrames: 30, black: 18, burn: 26 });
-  assert.equal(styleOf(footage(short(16))[0]!).filter, "brightness(4) saturate(0.5)");
+  assert.equal(styleOf(footage(short(16))[0]!).filter, "brightness(10) saturate(0.5)");
   assert.ok(keyed(short(20), "black") && keyed(short(27), "burn"));
 });

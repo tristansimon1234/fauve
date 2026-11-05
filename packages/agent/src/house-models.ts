@@ -1420,7 +1420,7 @@ export const HOUSE_MODELS: HouseModel[] = [
     example: null,
     // Measured on its original (docs/fiches/nuit.md): its hi-hats on every eighth from the drop, its snare every fourth beat.
     tempo: 136.8,
-    finish: { name: "Nuit", hint: "nuit de cinéma : noirs relevés, blancs retenus, couleurs éteintes sauf ses lumières, sans grain", contrast: 0.1, saturation: -0.35, warmth: -0.05, fade: 0.04, vignette: 0.15 },
+    finish: { name: "Nuit", hint: "nuit de cinéma : noirs relevés, blancs retenus, couleurs éteintes sauf ses lumières, sans grain", contrast: 0.08, saturation: -0.5, warmth: -0.05, fade: 0.05, vignette: 0.15 },
     look: {
       name: "nuit sous tous les angles",
       format: "pov",
