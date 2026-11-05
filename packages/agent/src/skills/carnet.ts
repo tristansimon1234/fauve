@@ -194,12 +194,31 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
         if (p >= prev + 6 && p <= b - 6) { points.push(p); prev = p; }
       }
     }
+    // Her first idea: its first picture under its name until the name goes, the others after it when there is room (the
+    // original's beauty shots after « notebook »), each 4 images at least (its quickest); else its first one alone.
+    const name = x.kind === 0 ? keyOf(x) : null;
+    if (name && m > 1 && name.to > a + 6) {
+      // The first one after it lies under the round of light, 9 images at least when there is room (the original's 14).
+      const room = b - name.to;
+      const rest = room < 4 ? 0 : Math.min(m - 1, room < 13 ? 1 : 1 + Math.floor((room - 9) / 4));
+      const lit = rest > 1 ? Math.max(9, Math.round(room / rest)) : room;
+      points.length = 0;
+      if (rest >= 1) points.push(Math.round(name.to));
+      for (let j = 1; j < rest; j++) points.push(Math.round(name.to + lit + ((room - lit) * (j - 1)) / (rest - 1)));
+    }
     const cuts = [a].concat(points, [b]);
     return cuts.slice(0, -1).map((q, j) => ({ r: group[Math.min(j, m - 1)], j, from: q, to: cuts[j + 1] }));
   };
-  const plan = idea ? turns(idea) : [];
-  const turn = plan.find((p) => frame >= p.from && frame < p.to) || null;
+  // Every idea's turns, on their pictures' own spans (an idea's pictures may start a few images before its first word, on
+  // a cut of her pauses).
+  const turnsAll = ideas.flatMap((x) => turns(x));
+  const turn = turnsAll.find((p) => frame >= p.from && frame < p.to) || null;
   const cited = refs.find((r) => r.item > 0 && frame >= r.from && frame < r.to) || null;
+  // Under a round of light (the original's spotlit notebook): the first picture after her first idea's name, of that
+  // idea or of the next when it is one of pictures, within a second of it.
+  const key1 = ideas.length ? keyOf(ideas[0]) : null;
+  const spot = key1 ? turnsAll.find((p) => p.from >= key1.to - 1 && p.r.idea <= 2 && ideas[p.r.idea - 1] && ideas[p.r.idea - 1].kind <= 1) || null : null;
+  const litTurn = spot && spot.from <= key1.to + 30 ? spot : null;
 
   // 4. The window: a round of light on black, an ellipse 49,4 % of the width and 1,36 times as tall (the original's spot
   // on the floor), its edge falling into the black; after its punch, the same picture 1,61 times closer.
@@ -240,7 +259,7 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   }, [track, win ? win.start : -1, win ? win.end : -1]);
   const herIn = (punched) => (b) => {
     const q = face || { x: W * 0.5, y: H * 0.38, w: W * 0.36 };
-    let s = Math.max(0.8, Math.min(2.4, (W * DW * 0.42) / Math.max(1, q.w))) * (punched ? PUNCH : 1);
+    let s = Math.max(0.5, Math.min(2.4, (W * DW * 0.42) / Math.max(1, q.w))) * (punched ? PUNCH : 1);
     s = Math.max(s, b.width / W, b.height / H);
     const left = Math.min(0, Math.max(b.width - W * s, b.width / 2 - q.x * s));
     const top = Math.min(0, Math.max(b.height - H * s, b.height / 2 - q.y * s));
@@ -265,8 +284,8 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   } else if (cited) {
     layers.push(h(Footage, { key: "c" + cited.i, shot: cited.i, at: cited.shot.from, style: box(PIC) }));
   } else if (turn) {
-    const spot = idea.k === 1 && turn.j === 1 && plan.length >= 3;
-    layers.push(spot ? disc(picIn(turn.r), false, "spot") : h(Footage, { key: "p" + turn.r.i, shot: turn.r.i, at: turn.r.shot.from, style: box(PIC) }));
+    const lit = litTurn && litTurn.r.i === turn.r.i && litTurn.from === turn.from;
+    layers.push(lit ? disc(picIn(turn.r), false, "spot") : h(Footage, { key: "p" + turn.r.i, shot: turn.r.i, at: turn.r.shot.from, style: box(PIC) }));
   } else {
     layers.push(h(Footage, { key: "t" + cur, shot: cur, style: box(PIC) }));
   }
@@ -293,8 +312,9 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
       }
       if (line.length && frame < key.to - 4) layers.push(h("div", { key: "small", style: { ...box({ left: 60, top: H * 0.414, width: W - 120, height: H * 0.046 }), display: "flex", justifyContent: "center", alignItems: "flex-end", gap: Math.round(H * 0.009) } },
         line.map((w, j) => h("span", { key: j, style: { fontFamily: display, fontWeight: 800, fontSynthesis: "none", fontSize: Math.round(H * 0.029), lineHeight: 1.1, letterSpacing: "-0.02em", color: "#ffffff", textShadow: EDGE, whiteSpace: "nowrap", opacity: frame >= w.from ? 1 : 0 } }, low(bare(w.w))))));
-      // Then the name of what she presents, very big right under them, on the instant she says it.
-      if (frame >= key.from) layers.push(big("name" + key.text, low(key.text), { left: W * 0.09, top: H * 0.462, width: W * 0.82, height: H * 0.086 }, H * 0.104));
+      // Then the name of what she presents, very big right under them, on the instant she says it: as wide as it goes in
+      // 82 % of the width (the original's « notebook », 8 letters, at 81 %), 15 % of the height at most, hugging the line.
+      if (frame >= key.from) layers.push(big("name" + key.text, low(key.text), { left: W * 0.09, top: H * 0.462, width: W * 0.82, height: H * 0.17 }, H * 0.17, { justifyContent: "flex-start", lineHeight: 0.92 }));
     }
   }
   if (idea && kind === 2 && !inBlack && !ending) {
@@ -305,7 +325,8 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
       const typed = 1 + Math.floor((frame - key.from) / 4.5);
       let n = 0;
       const parts = s.split("").map((ch, i) => { const shown = ch === " " || n < typed; if (ch !== " ") n++; return h("span", { key: i, style: shown ? {} : { color: "rgba(255,255,255,0)", textShadow: "none" } }, ch); });
-      layers.push(big("num" + s, parts, { left: W * 0.08, top: H * 0.395, width: W * 0.84, height: H * 0.2 }, H * 0.245, { letterSpacing: "-0.04em" }));
+      // (One span: FitText lays its children out in a column.)
+      layers.push(big("num" + s, h("span", null, parts), { left: W * 0.08, top: H * 0.395, width: W * 0.84, height: H * 0.2 }, H * 0.245, { letterSpacing: "-0.04em" }));
       const unit = captions.filter((t) => inIdea(t, idea) && frame >= t.from && frame < t.to).map((t) => t.text).join(" ");
       if (unit) layers.push(big("unit" + unit, low(unit), { left: 140, top: H * 0.612, width: W - 280, height: H * 0.04 }, H * 0.029, { fontWeight: 700, letterSpacing: "0em" }));
     } else if (key && frame >= key.to) {
@@ -343,16 +364,30 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   }
 
   // 7. What she says, small and bold, a short phrase at a time at the bottom of the safe zone (under her window), never
-  // while its big words show, nor in the black.
-  const chunks = [];
+  // while its big words show, nor in the black: her phrases (a pause, a sentence's end, a comma), a long one halved where
+  // its two halves are most even, never after a short word (« à », « le », « mon »), 26 characters at most.
+  const phrases = [];
   let c = [];
   said.forEach((w, i) => {
     const prev = said[i - 1];
-    const t = c.map((x) => x.w).concat([w.w]).join(" ");
-    if (prev && c.length && (w.from - prev.to >= 9 || /[.!?…;:]$/.test(prev.w) || (/,$/.test(prev.w) && c.length >= 2) || c.length >= 4 || t.length > 26)) { chunks.push(c); c = []; }
+    if (prev && c.length && (w.from - prev.to >= 9 || /[.!?…;:]$/.test(prev.w) || (/,$/.test(prev.w) && c.length >= 2))) { phrases.push(c); c = []; }
     c.push(w);
   });
-  if (c.length) chunks.push(c);
+  if (c.length) phrases.push(c);
+  const chunks = [];
+  const len = (ws) => ws.map((x) => x.w).join(" ").length;
+  const halve = (ws) => {
+    if (len(ws) <= 26 || ws.length < 2) { chunks.push(ws); return; }
+    let best = -1;
+    for (let k = 1; k < ws.length; k++) {
+      if (/^[^.,;:!?…]{1,3}$/.test(ws[k - 1].w)) continue;
+      if (best < 0 || Math.abs(len(ws.slice(0, k)) - len(ws.slice(k))) < Math.abs(len(ws.slice(0, best)) - len(ws.slice(best)))) best = k;
+    }
+    if (best < 0) best = Math.ceil(ws.length / 2);
+    halve(ws.slice(0, best));
+    halve(ws.slice(best));
+  };
+  phrases.forEach(halve);
   const sub = inBlack || ending || quiet(frame) ? null : chunks.find((x, i) => !quiet(x[0].from) && frame >= x[0].from && frame < Math.min(x[x.length - 1].to + 10, chunks[i + 1] ? chunks[i + 1][0].from : Infinity));
   if (sub) {
     const t = sub.map((w) => w.w).join(" ");

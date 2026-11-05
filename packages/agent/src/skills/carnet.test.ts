@@ -201,17 +201,31 @@ test("« Ton produit raconté » (v1) draws: her first words small one by one, i
   const big = fits(drawAt(name.from, layer));
   assert.deepEqual(big.map(textOf), ["notebook"]);
   assert.deepEqual([styleOf(big[0]!).left, styleOf(big[0]!).top, styleOf(big[0]!).width], [Math.round(1080 * 0.09), Math.round(1920 * 0.462), Math.round(1080 * 0.82)]);
-  assert.equal((big[0]!.props.innerStyle as Record<string, unknown>).fontWeight, 800);
+  const inner = big[0]!.props.innerStyle as Record<string, unknown>;
+  assert.deepEqual([inner.fontWeight, inner.fontSize, inner.justifyContent, inner.lineHeight], [800, Math.round(1920 * 0.17), "flex-start", 0.92]);
   assert.equal(line(drawAt(name.to - 2, layer)), null);
   assert.equal(fits(drawAt(name.to, layer)).length, 0);
-  // Its pictures in turn over its first idea, cut on his words; the second one under a round of light on black.
+  // Its first picture under its name until the name goes (his pause shortened by the engine, no room for his other two
+  // there); then the first picture after it under a round of light on black: his second idea's first.
   const pics = (tree: Drawn) => footage(tree).map((n) => Number(n.props.shot));
   const talkN = Number(layer.texts.said_shots);
-  const first = pics(drawAt(f(0.3), layer));
-  assert.deepEqual(first, [talkN]);
-  const spot = [...Array(f(1.3)).keys()].map((k) => drawAt(k, layer)).find((t) => keyed(t, "spot"));
-  assert.ok(spot, "its spot");
-  const disc = styleOf(keyed(spot!, "spot")!);
+  for (const k of [f(0.3), name.from, name.to - 1, name.to]) assert.deepEqual(pics(drawAt(k, layer)), [talkN], `image ${k}`);
+  assert.equal(keyed(drawAt(name.to - 1, layer), "spot"), null);
+  const second = Number(layer.texts.said_ref4_from);
+  const spot = drawAt(second, layer);
+  assert.ok(second - name.to <= 5);
+  assert.deepEqual(pics(spot), [talkN + 3]);
+  // With room after its name (her next idea 1,4 s later): her second picture of it under the round, the larger share,
+  // then her third, full frame.
+  const roomy = { said_ref1_to: "80", said_ref2_to: "80", said_ref3_to: "80", said_idea2_from: "80", said_ref4_from: "80", said_ref5_from: "80", said_ref6_from: "80", said_ref7_from: "80" };
+  const at = (k: number) => drawAt(k, layer, { texts: roomy });
+  assert.deepEqual([pics(at(name.to - 1)), pics(at(name.to)), pics(at(name.to + 20)), pics(at(name.to + 22))], [[talkN], [talkN + 1], [talkN + 1], [talkN + 2]]);
+  assert.ok(keyed(at(name.to), "spot") && !keyed(at(name.to + 22), "spot"));
+  // Its next pictures full frame again.
+  const next = drawAt(second + 45, layer);
+  assert.equal(keyed(next, "spot"), null);
+  assert.notDeepEqual(pics(next), [talkN + 3]);
+  const disc = styleOf(keyed(spot, "spot")!);
   assert.equal(disc.borderRadius, "50%");
   assert.ok(Math.abs(Number(disc.width) - 0.494 * 1080) <= 1 && Math.abs(Number(disc.height) / Number(disc.width) - 1.36) < 0.01);
 });
@@ -222,7 +236,9 @@ test("« Ton produit raconté » (v1): its number typed digit by digit, its unit
   // Typed at its final place: « 1 », « 16 », « 168 » (the original's every 4 to 5 images), its unit small under it.
   const digits = (k: number) => {
     const fit = fits(drawAt(num.from + k, layer)).find((n) => textOf(n) === "168")!;
-    return nodes(fit).filter((n) => n.type === "span").map((n) => (styleOf(n).color === "rgba(255,255,255,0)" ? "_" : textOf(n))).join("");
+    // Its digits in one span (FitText lays its children out in a column), each in its own.
+    assert.equal(fit.children.length, 1);
+    return nodes(fit).filter((n) => n.type === "span" && n.children.length === 1 && typeof n.children[0] === "string").map((n) => (styleOf(n).color === "rgba(255,255,255,0)" ? "_" : textOf(n))).join("");
   };
   assert.deepEqual([digits(0), digits(5), digits(9)], ["1__", "16_", "168"]);
   const unitAt = layer.reelTexts.find((t) => t.text === "pages")!.from;
@@ -296,8 +312,11 @@ test("« Ton produit raconté » (v1): its subtitles a short phrase at a time, n
   const { layer } = onOriginal();
   const subs = [...Array(layer.durationInFrames).keys()].map((k) => nodes(drawAt(k, layer)).find((n) => String(n.props.key).startsWith("sub")));
   const texts = [...new Set(subs.filter(Boolean).map((n) => textOf(n!)))];
-  // Four words and 26 characters at most, bold, white, at the bottom of the safe zone, left of the apps' buttons.
-  assert.ok(texts.length > 20 && texts.every((t) => t.split(" ").length <= 4 && t.length <= 26), JSON.stringify(texts));
+  // His phrases, a long one halved where its halves are most even (never after a short word): 26 characters at most,
+  // bold, white, at the bottom of the safe zone, left of the apps' buttons.
+  assert.ok(texts.length > 15 && texts.every((t) => t.length <= 26), JSON.stringify(texts));
+  assert.ok(texts.includes("It doesn't have to be") || texts.includes("It doesn't have") || texts.some((t) => /^It doesn't/.test(t)), JSON.stringify(texts));
+  assert.ok(!texts.some((t) => /\s(a|to|my|the|of|for|I)$/.test(t)), JSON.stringify(texts));
   const sub = subs.find(Boolean)!;
   assert.deepEqual([styleOf(sub).left, styleOf(sub).width], [140, 800]);
   assert.ok(Number(styleOf(sub).top) + Number(styleOf(sub).height) <= 1440);
@@ -305,6 +324,9 @@ test("« Ton produit raconté » (v1): its subtitles a short phrase at a time, n
   for (const t of layer.reelTexts) for (let k = t.from; k < t.to; k += 3) assert.ok(!subs[k], `a subtitle with « ${t.text} » at ${k}`);
   // His last word, then black to the end.
   const end = Number(layer.texts.said_end) + Number(layer.texts.black_after);
+  // One picture of his at every image but in its two blacks (before his window, after his last word): never a gap.
+  const [black, shown] = [Number(layer.texts.win_black), Number(layer.texts.win_from)];
+  for (let k = 0; k < layer.durationInFrames; k++) assert.equal(footage(drawAt(k, layer)).length, (k >= black && k < shown) || k >= end ? 0 : 1, `image ${k}`);
   assert.ok(layer.durationInFrames - end >= 8);
   const last = drawAt(layer.durationInFrames - 2, layer);
   assert.deepEqual([footage(last).length, fits(last).length], [0, 0]);
