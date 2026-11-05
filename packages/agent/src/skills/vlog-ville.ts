@@ -323,7 +323,7 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
     title, card ? null : subtitle);
 }`;
 
-const SUBTITLE = "une phrase de sous-titre en minuscules, comme dite par une voix calme qui raconte son quartier";
+const SUBTITLE = "une phrase de sous-titre en minuscules, courte (une ligne, deux au plus), comme dite par une voix calme qui raconte son quartier";
 
 export const vlogVille: MontageSkill = {
   key: "vlog-ville",
@@ -341,20 +341,20 @@ export const vlogVille: MontageSkill = {
     { slot: "nom", role: "band", want: "le titre du court-métrage, en grandes capitales rouges entre guillemets : le nom de son quartier, de sa ville ou de son lieu, comme un titre de film (une forme comme « Belleville », « Croix-Rousse ») ; 1 ou 2 mots, celui que la deuxième phrase dit", max: 14, required: true },
     { slot: "signature", role: "band", want: "sa signature en petit au-dessus du titre, comme celle d'un réalisateur : son nom ou son compte (une forme comme « par Maison Farine », « @cafedesarts ») ; jamais un nom inventé", max: 20, required: true },
     { slot: "genre", role: "band", want: "la petite ligne sous le titre, en minuscules avec un point : ce que c'est (« un court-métrage. », ou une forme comme « un film de quartier. »)", max: 22, required: true },
-    { slot: "l1", role: "caption", want: `${SUBTITLE} : ce qui le rend différent d'ailleurs ; 8 mots au plus`, max: 48, required: true },
+    { slot: "l1", role: "caption", want: `${SUBTITLE} : ce qui le rend différent d'ailleurs ; 8 mots au plus`, max: 40, required: true },
     { slot: "l2", role: "caption", want: `${SUBTITLE} : qu'il va à son propre rythme, juste avant le titre (1,1 s à l'écran) ; 4 mots au plus`, max: 26, required: true },
-    { slot: "l3", role: "caption", want: `${SUBTITLE} : ce que ça fait d'y être, ce qu'on y ressent ; 9 mots au plus`, max: 52, required: true },
-    { slot: "l4", role: "caption", want: `${SUBTITLE} : une sensation précise (une odeur, un bruit, l'air, la lumière) ; 8 mots au plus`, max: 48, required: true },
-    { slot: "l5", role: "caption", want: `${SUBTITLE} : les gens qui passent, le mouvement de la rue ; 9 mots au plus`, max: 52, required: true },
+    { slot: "l3", role: "caption", want: `${SUBTITLE} : ce que ça fait d'y être, ce qu'on y ressent ; 9 mots au plus`, max: 44, required: true },
+    { slot: "l4", role: "caption", want: `${SUBTITLE} : une sensation précise (une odeur, un bruit, l'air, la lumière) ; 8 mots au plus`, max: 40, required: true },
+    { slot: "l5", role: "caption", want: `${SUBTITLE} : les gens qui passent, le mouvement de la rue ; 9 mots au plus`, max: 44, required: true },
     { slot: "l6", role: "caption", want: `${SUBTITLE} : tout le monde ensemble (1,4 s à l'écran) ; 4 mots au plus`, max: 28, required: true },
-    { slot: "l7", role: "caption", want: `${SUBTITLE} : le quartier qui vit, ses lumières ; 6 mots au plus`, max: 40, required: true },
-    { slot: "l8", role: "caption", want: `${SUBTITLE} : ce qui respire et circule (les rues, les passants, ce qui arrive) ; 9 mots au plus`, max: 52, required: true },
-    { slot: "l9", role: "caption", want: `${SUBTITLE} : tant de mouvement qu'on se laisse emporter… (une rafale de plans passe dessous) ; 9 mots au plus`, max: 52, required: true },
-    { slot: "l10", role: "caption", want: `${SUBTITLE} : … ou qu'on ralentit pour en profiter (le tournant : les plans deviennent calmes) ; 7 mots au plus`, max: 44, required: true },
-    { slot: "l11", role: "caption", want: `${SUBTITLE} : tout se passe ici, chacun y a quelque chose à faire ; 9 mots au plus`, max: 52, required: true },
-    { slot: "l12", role: "caption", want: `${SUBTITLE} : ce qu'on comprend en regardant les autres ; 9 mots au plus`, max: 52, required: true },
-    { slot: "l13", role: "caption", want: `${SUBTITLE} : pourquoi on s'y sent chez soi ; 9 mots au plus`, max: 52, required: true },
-    { slot: "l14", role: "caption", want: `${SUBTITLE} : la dernière, qui reprend la première (son rythme, son quartier, son nom) et finit par un point ; 9 mots au plus`, max: 52, required: true },
+    { slot: "l7", role: "caption", want: `${SUBTITLE} : le quartier qui vit, ses lumières ; 6 mots au plus`, max: 36, required: true },
+    { slot: "l8", role: "caption", want: `${SUBTITLE} : ce qui respire et circule (les rues, les passants, ce qui arrive) ; 9 mots au plus`, max: 44, required: true },
+    { slot: "l9", role: "caption", want: `${SUBTITLE} : tant de mouvement qu'on se laisse emporter… (une rafale de plans passe dessous) ; 9 mots au plus`, max: 44, required: true },
+    { slot: "l10", role: "caption", want: `${SUBTITLE} : … ou qu'on ralentit pour en profiter (le tournant : les plans deviennent calmes) ; 7 mots au plus`, max: 40, required: true },
+    { slot: "l11", role: "caption", want: `${SUBTITLE} : tout se passe ici, chacun y a quelque chose à faire ; 9 mots au plus`, max: 44, required: true },
+    { slot: "l12", role: "caption", want: `${SUBTITLE} : ce qu'on comprend en regardant les autres ; 9 mots au plus`, max: 44, required: true },
+    { slot: "l13", role: "caption", want: `${SUBTITLE} : pourquoi on s'y sent chez soi ; 9 mots au plus`, max: 44, required: true },
+    { slot: "l14", role: "caption", want: `${SUBTITLE} : la dernière, qui reprend la première (son rythme, son quartier, son nom) et finit par un point ; 9 mots au plus`, max: 44, required: true },
   ],
   settings: [
     {

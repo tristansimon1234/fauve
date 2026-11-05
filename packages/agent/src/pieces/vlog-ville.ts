@@ -126,7 +126,7 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
 export const vlogVille: EffectPiece = {
   key: "vlog-ville",
   version: 1,
-  name: "Ouverture de court-métrage",
+  name: "Ouverture racontée",
   how: "sur son premier plan, large et calme, sa phrase arrive mot à mot en petits sous-titres sans musique, puis la deuxième qui finit sur son nom ; la musique tombe sur la coupe et son plan suivant éclate en neuf gros plans de deux et trois images, puis file ; sur son dernier plan, quelqu'un de dos, son nom en grandes capitales rouges entre guillemets, sa signature au-dessus et une petite ligne dessous, la musique étouffée ; puis le montage reprend.",
   needs: "un plan large et calme de son lieu ou de sa rue (quelqu'un d'immobile au milieu de préférence), un plan d'un détail plein de choses filmé de près (sa carte, une étagère, une vitrine), et quelqu'un de dos immobile devant ce qui passe.",
   lays: "au début du Reel ou d'une partie, sans voix dessous, sur deux à quatre plans : le premier calme de 2 à 3 s (ses mots y arrivent), le deuxième le détail (la rafale tombe sur sa coupe), le dernier quelqu'un de dos (le titre, 2 s au moins), 5 à 9 s en tout",
