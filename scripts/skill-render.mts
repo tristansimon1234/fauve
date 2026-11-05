@@ -142,6 +142,8 @@ const props = buildReelProps(plan, {
   clipUrls: Object.fromEntries(files.map((f) => [f.id, f.src])),
   photoIds: files.filter((f) => f.photo).map((f) => f.id),
   aspects: Object.fromEntries(files.map((f) => [f.id, f.aspect])),
+  // A photo's own shape, as the engine gives it (without it, every photo was laid as a 3:4 one).
+  photoAspects: Object.fromEntries(files.filter((f) => f.photo).map((f) => [f.id, f.aspect])),
   brand: { name: values.name ?? "", ...(fonts.length ? { fonts } : {}) },
   ...(Object.keys(subjects).length ? { subjects } : {}),
 });
