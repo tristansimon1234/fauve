@@ -45,4 +45,12 @@ export const HOUSE_MEASURES: Record<string, ReelMeasures> = {
   // Its fiche's cuts (the first image of each new picture: its title card's black, then under its burn and its roll),
   // on its cuts' grid; its loudness by ffmpeg's ebur128.
   "court-metrage": { duration: 24.4, cuts: [0.13, 4, 6.83, 9.6, 12.4, 15.2, 18.03, 20.87], bpm: 85.5, lufs: -10.3 },
+  // Its fiche's 49 cuts (measure.py's, each looked at: its gestures, its four tastings, its jumps in one frame); no beat
+  // to count (his voice alone, no music one hears: the catalogue's tempo is its music's under her voice).
+  "chef-face": {
+    duration: 59.87,
+    cuts: [0.93, 2.03, 2.73, 3.2, 3.87, 5.53, 6.07, 7.4, 8.23, 9.17, 10.2, 10.77, 11.47, 11.97, 12.57, 15.67, 17.47, 20.2, 23.73, 25.07, 26.13, 26.47, 27.87, 30.67, 31.97, 33.53, 34.73, 35.13, 35.67, 37.33, 37.63, 38.03, 39.83, 43.63, 44.47, 46.43, 47.13, 48.17, 49.27, 49.63, 50.47, 50.97, 51.57, 51.97, 57.2, 57.63, 58, 58.63, 59],
+    bpm: null,
+    lufs: -16.5,
+  },
 };

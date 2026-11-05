@@ -1456,6 +1456,55 @@ export const HOUSE_MODELS: HouseModel[] = [
       why: "On ouvre un film plutôt qu'une vidéo : la fente qui s'ouvre, le titre et la brûlure promettent une histoire, la pellicule qui saute relance au milieu, et la lumière dorée donne envie d'y être.",
     },
   }),
+  model({
+    key: "chef-face",
+    name: "Le plat, puis la dégustation",
+    // Written on its original's fiche (v1 of its skill, timed on her voice, docs/fiches/chef-face.md): her dish being
+    // finished first, close-up after close-up, then she tastes it face to face, her steps on the words that name them, all
+    // her words in small cream condensed capitals with her strong words big, her formula huge on two lines.
+    pitch: "Tu racontes ton plat face caméra : on le voit d'abord se finir en gros plans, puis toi qui le goûtes, chaque étape au mot où tu la dis, tes mots au milieu de l'écran et ta formule de fin en très grand.",
+    needs: "une vidéo de toi à table qui racontes ton plat face caméra, 3 à 8 vidéos de ton plat qui se finit en gros plans (la bouchée en dernier), une vidéo de toi qui goûtes, une par étape que tu nommes",
+    files: [3, 16],
+    // Its words in one very condensed bold family, small and big (Bebas Neue).
+    pair: "condensee-geometrique",
+    // Its skill's code is its reference.
+    example: null,
+    // Its original has no beat to count (his voice alone leads): the tempo of the music under her voice.
+    tempo: 96,
+    finish: { name: "Gourmand", hint: "chaud et contrasté, couleurs riches, sans grain ni coins sombres", warmth: 0.08, contrast: 0.08, saturation: 0.1 },
+    look: {
+      name: "le plat puis la dégustation",
+      format: "raconte",
+      voice: "quelqu'un parle",
+      hook: { kind: "geste", what: "le plat qui se finit en très gros plans, un geste entier par plan, sous sa voix qui pose une question, avant qu'on la voie" },
+      text: {
+        amount: "plusieurs",
+        composition: "tout ce qu'elle dit, deux à quatre mots à la fois, en petites capitales condensées crème au milieu de l'image ; les mots forts de chaque idée 1,75 fois plus grands à la même place ; sa formule de fin en très grand sur deux lignes",
+        case: "upper",
+        weight: "bold",
+        tracking: "tight",
+        subtitles: true,
+        shadow: "soft",
+      },
+      colors: ["#f2e9dc"],
+      layout: "plein cadre : ses gros plans du plat l'un après l'autre sur ce qu'elle dit, et elle à table face caméra, le plat devant elle, quand elle goûte et qu'elle parle",
+      moments: [
+        { at: 0, what: "le plat qui se finit, un geste entier par plan (verser, saupoudrer, poser), neuf gros plans de 0,5 à 1,7 s sous sa voix, ses mots deux à quatre à la fois au milieu, posés d'un coup" },
+        { at: 8.23, what: "la bouchée prise à la cuillère, deux très gros plans" },
+        { at: 10.2, what: "coupe sur elle à table, le plat au premier plan : quatre réactions rapides pendant qu'elle goûte, les yeux fermés, puis elle parle face caméra" },
+        { at: 20.2, what: "chaque étape de la recette en gros plan, coupée sur le mot qui la nomme et tenue jusqu'à la suivante" },
+        { at: 48.17, what: "elle regoûte face caméra, en sauts dans le même cadre" },
+        { at: 59.03, what: "sur une coupe, après un silence, sa formule de fin en très grand sur deux lignes, sur elle" },
+      ],
+      camera: "mixte",
+      transitions: "coupes nettes",
+      grade: "warm",
+      motion: "energique",
+      music: "warm lo-fi hip-hop groove, soft drums, muted keys, round bass, under a voice",
+      ending: "sa formule de fin en très grand sur deux lignes sur son visage, la musique coupée net dessous",
+      why: "Le résultat d'abord donne faim avant de dire comment : on voit le plat se finir, puis quelqu'un le goûter et dire pourquoi c'est bon ; chaque étape tombe sur son mot, et la formule de fin fait sourire.",
+    },
+  }),
 ];
 
 const BY_KEY = new Map(HOUSE_MODELS.map((m) => [m.key, m]));
@@ -1528,6 +1577,7 @@ export const HOUSE_WHEN: Record<string, { pour: string; pas_pour: string }> = {
   silhouette: { pour: "se présenter (elle ou quelqu'un de son équipe), présenter son métier et ce qu'elle fait, un lancement, un ton de studio graphique", pas_pour: "des produits seuls, un lieu sans personne, une offre à lire" },
   vision: { pour: "son lieu fréquenté filmé de haut, quelqu'un d'immobile au milieu et des gens qui passent autour ; un ton tech ou graphique", pas_pour: "un lieu vide, un plan qui bouge, des produits en gros plan, un message à lire" },
   "court-metrage": { pour: "raconter sa journée, son quartier ou une sortie comme un petit film, une ouverture, une saison, de belles lumières (le matin, l'heure dorée)", pas_pour: "une offre à lire, quelqu'un qui parle, des vidéos sombres ou toutes en gros plan" },
+  "chef-face": { pour: "un plat, une recette ou une spécialité racontée face caméra et goûtée (un restaurant, un traiteur, une pâtisserie, un café) : le résultat d'abord, puis la dégustation", pas_pour: "sans vidéo où elle parle, des images sans parole, un lieu ou une ambiance sans rien à goûter" },
 };
 
 /** The models for Edith: their key, name, what they do, what they want, and what only she can film for one. */
