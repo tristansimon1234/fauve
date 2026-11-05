@@ -57,4 +57,6 @@ export const HOUSE_MEASURES: Record<string, ReelMeasures> = {
     bpm: null,
     lufs: -14.2,
   },
+  // Its fiche's 14 cuts, read image by image; its first piece's tempo counted one beat in two (142,4 BPM; its second, 150,5, after its break).
+  "nom-de-ville": { duration: 14.73, cuts: [2.27, 2.73, 3.13, 3.53, 3.97, 6.33, 7.27, 8.33, 9.13, 9.8, 10.73, 11.47, 12.83, 13.8], bpm: 71.2, lufs: -19.9 },
 };

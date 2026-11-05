@@ -1690,6 +1690,53 @@ export const HOUSE_MODELS: HouseModel[] = [
       why: "Le compteur qui charge sans finir promet quelque chose sans le dire ; les éclairs de gestes à toute vitesse montrent le travail qui le prépare, et le noir, le logo et le boum font la révélation.",
     },
   }),
+  model({
+    key: "nom-de-ville",
+    name: "Nom aux cinq polices",
+    // Written on its original's fiche (v1 of its skill, docs/fiches/nom-de-ville.md): a 16:9 travel film of a city, its
+    // name giant in its sky behind its roofs, rising slowly while its typeface changes at once on four beats, then cuts
+    // on the same pulse, a plunge down an alley as its music drops and breaks, the life of the place, a sunset cut dead.
+    pitch: "Le nom de ton quartier ou de ton lieu en géant dans le ciel, derrière tes toits, qui change de police à chaque temps, puis tes plans sur le rythme jusqu'au coucher du soleil.",
+    needs: "un plan large et fixe de ta rue, de tes toits ou d'un paysage avec un ciel calme en haut, un plan qui avance dans une rue ou un passage, et 8 à 12 autres plans de la vie de ton lieu (des gens, des détails, un coucher de soleil)",
+    files: [4, 15],
+    pair: "affiche",
+    // Its skill's code is its reference.
+    example: null,
+    // Its first piece's grid, 142,4 BPM counted one beat in two (its four faces and its first five cuts on its beats
+    // within an image; its second piece, 150,5 BPM, is not kept: one music).
+    tempo: 71.2,
+    finish: { name: "Ocre", hint: "chaud et terreux, hautes lumières jaune crème, ombres presque noires, sans grain ni coins sombres", contrast: 0.12, saturation: -0.04, warmth: 0.14, shadows: "#16120C", highlights: "#EDCC74", split: 0.18 },
+    look: {
+      name: "nom aux cinq polices",
+      format: "pov",
+      hook: { kind: "pov", what: "un plan large et fixe de ses toits au soleil bas, son nom géant dans le ciel derrière eux, dont la police change d'un coup à chaque temps" },
+      text: {
+        amount: "une ligne",
+        composition: "un nom de lieu en capitales très grasses dans le ciel, le pied derrière les toits, sa police changée à chaque temps (ronde, carrée, étroite, carrée plus grande, la sienne) ; de petits mots blancs au-dessus, une signature en bas",
+        case: "upper",
+        weight: "black",
+        tracking: "tight",
+      },
+      colors: ["#fd4c4c"],
+      layout: "un nom géant posé dans le ciel du premier plan, derrière ses toits, en 16:9 sur du noir comme l'original quand ses vidéos sont horizontales, puis ses plans en plein cadre",
+      moments: [
+        { at: 0, what: "un plan large et fixe de ses toits au soleil bas ; son nom géant dans le ciel, le pied derrière les toits, qui monte lentement ; deux à quatre petits mots blancs au-dessus, une signature en petit en bas" },
+        { at: 0.6, what: "à chaque temps (0,42 s), la police du nom change d'un coup, en une image, à la même place et dans la même couleur : très grasse et ronde, carrée, étroite, carrée plus grande, puis la sienne, qui reste jusqu'à la coupe" },
+        { at: 2.27, what: "coupe sur le temps : quatre détails d'un temps chacun où quelque chose bouge (un toit, une ruelle vue d'en haut, le ciel entre deux murs, quelqu'un dans une cour)" },
+        { at: 3.97, what: "sur un gros coup de basse, un long plan qui avance au ras d'une ruelle, la caméra levée vers le ciel ; un temps plus tard la batterie s'arrête et le son résonne" },
+        { at: 6.33, what: "un deux-roues passe au ras de l'objectif, la caméra au sol ; la musique revient au milieu du plan" },
+        { at: 7.27, what: "la vie du lieu, un plan tous les deux ou trois temps : une place animée, un chat qui marche vers l'objectif, des gens qui passent, un rayon de lumière dans un passage couvert, le soleil qui perce un toit" },
+        { at: 13.8, what: "un coucher de soleil derrière une silhouette, coupé net avec la musique" },
+      ],
+      camera: "mixte",
+      transitions: "coupes nettes",
+      grade: "warm",
+      motion: "energique",
+      music: "warm lo-fi hip-hop beat, melodic sample, a deep bass drop then a break",
+      ending: "un coucher de soleil derrière une silhouette, coupé net avec la musique ; ni texte, ni logo",
+      why: "Le nom dans le ciel qui change de police à chaque temps accroche dès la première seconde et donne le tempo ; les coupes le reprennent, la ruelle fait respirer la musique, et la vie du lieu donne envie d'y aller.",
+    },
+  }),
 ];
 
 const BY_KEY = new Map(HOUSE_MODELS.map((m) => [m.key, m]));
@@ -1767,6 +1814,7 @@ export const HOUSE_WHEN: Record<string, { pour: string; pas_pour: string }> = {
   routine: { pour: "raconter son matin et son lieu (un café, une boulangerie, une boutique, un studio, un atelier) : sa préparation geste par geste, puis l'ouverture et sa journée", pas_pour: "une offre à lire, un produit seul, sans vidéo de sa préparation filmée téléphone posé" },
   nuit: { pour: "un lieu le soir ou la nuit (un bar, un restaurant, une boutique ouverte tard), son enseigne ou son néon, sa rue la nuit, une soirée", pas_pour: "sans plusieurs angles de son enseigne ou d'un objet qui la représente, un lieu calme de jour, un long message à lire" },
   bientot: { pour: "annoncer ce qui arrive (une ouverture, une nouvelle collection, une nouvelle carte, un événement) avec ses gestes de métier, un teaser élégant", pas_pour: "un message à lire en détail, quelqu'un qui parle, un lieu calme montré lentement, trop peu de vidéos" },
+  "nom-de-ville": { pour: "présenter son quartier, sa rue, sa ville ou son lieu avec du rythme, une sortie, un voyage, l'été, la lumière du soir", pas_pour: "sans plan large avec du ciel, un intérieur seul, des produits seuls, un message à lire" },
 };
 
 /** The models for Edith: their key, name, what they do, what they want, and what only she can film for one. */
