@@ -8288,6 +8288,52 @@ test("a skill timed on her voice: her images of what she names laid beside her t
   assert.equal(readSkillFill(own, files, 4, answer, { talk })!.said!.hook, null);
 });
 
+test("a skill timed on her voice: an idea's own images one after the other when it says so (turns), each its share at its own pace", async () => {
+  const { skillTalk, readSkillFill, skillPlan, TURN_LEAST } = await import("./skills.ts");
+  const base = await voicedSkill();
+  const talk = skillTalk(talkFacts)!;
+  const files = [
+    { id: "talk", photo: false, seconds: 10 },
+    { id: "verse", photo: false, seconds: 6, moments: [{ start: 1, end: 3 }] },
+    { id: "dresse", photo: false, seconds: 0.9 },
+    { id: "bouchee", photo: true, seconds: 0 },
+    { id: "goute", photo: false, seconds: 4 },
+    ...["a", "b", "c", "d", "e"].map((id) => ({ id, photo: true, seconds: 0 })),
+  ];
+  const [first, second, third] = talkAnswer.ideas;
+  const answer = voiceAnswer({ ...talkAnswer, ideas: [{ ...first, files: ["verse", "dresse", "bouchee"] }, { ...second, files: ["goute"], items: [] }, { ...third, files: ["a", "b", "c", "d", "e"] }] });
+  const planOf = (turns?: number) => {
+    const skill = { ...base, voice: { ...base.voice!, refs: "une vidéo de son plat", ...(turns ? { turns } : {}) } };
+    return skillPlan({ skill, name: "Le plat", files, fill: readSkillFill(skill, files, 4, answer, { talk })!, talk });
+  };
+  const images = (plan: ReturnType<typeof planOf>) => plan.segments.slice(4).map((s) => ("clip_id" in s ? [s.clip_id, s.in, s.out, s.speed ?? 1, s.beside?.at] : []));
+  // In turn: her first idea's three from its first image to the next idea (3,68 s), a share each (its rest of 0,08 s
+  // theirs: never a sliver of her), a video from its best moment at its own pace, a short one slowed only to its share;
+  // her next idea's one image 1,2 s at most, her talk after it; five in 1,69 s: the first four, 0,42 s each.
+  const turned = planOf(1.2);
+  assert.ok(editPlanSchema.safeParse(turned).success);
+  assert.deepEqual(images(turned), [
+    ["verse", 1, 2.23, 1, 0],
+    ["dresse", 0, 0.9, 0.74, 1.23],
+    ["bouchee", 0, 1.23, 1, 2.45],
+    ["goute", 0, 1.2, 1, 3.68],
+    ["a", 0, 0.42, 1, 6.26],
+    ["b", 0, 0.43, 1, 6.68],
+    ["c", 0, 0.42, 1, 7.11],
+    ["d", 0, 0.42, 1, 7.53],
+  ]);
+  assert.equal(TURN_LEAST, 0.4);
+  const marks = turned.layers![0]!.motion.texts!;
+  assert.deepEqual([marks.said_refs, marks.said_ref4_from, marks.said_ref4_to], ["8", "110", "146"]);
+  // Without it, each over the whole idea, as before (a short video slowed to half speed to fill it).
+  assert.deepEqual(images(planOf()).slice(0, 4), [
+    ["verse", 1, 4.68, 1, 0],
+    ["dresse", 0, 0.9, 0.5, 0],
+    ["bouchee", 0, 3.68, 1, 0],
+    ["goute", 0, 2.58, 1, 3.68],
+  ]);
+});
+
 test("a skill timed on her voice: the frame changes on the next idea's first word when it says so, on a cut of her pauses when one is near", async () => {
   const { skillTalk, readSaid, skillSaid } = await import("./skills.ts");
   const skill = await voicedSkill();
