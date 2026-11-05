@@ -284,6 +284,47 @@ export const HOUSE_MODELS: HouseModel[] = [
     },
   }),
   model({
+    key: "mon-travail",
+    name: "Voici mon travail",
+    // Written on its original's fiche (v1 of its skill, docs/fiches/mon-travail.md): the template and the sound of
+    // « Pile de photos » on one fixed shot of her standing; her works stack up behind her (cut out in front of them, the
+    // last ones over her legs) and leave one by one; her words in her colour, off her face (none of the original's lime nor
+    // its words: no colours here); its tempo (120, the grid of its landmarks: its music has none), no grade.
+    pitch: "Toi debout dans ton lieu, tes mots en très grand devant toi, et les photos de ton travail qui se posent en rafale derrière toi, puis repartent une à une.",
+    needs: "une photo (ou une vidéo d'au moins 6 s) de toi debout dans ton lieu, téléphone posé, et 15 à 40 photos de ton travail",
+    files: [16, 41],
+    pair: "grotesque",
+    example: null,
+    // Its landmarks on this grid (docs/fiches/mon-travail.md): its original's music has no beat, a clicking that slows down.
+    tempo: 120,
+    finish: { name: "Naturel" },
+    look: {
+      name: "voici mon travail",
+      format: "collage",
+      hook: { kind: "promesse", what: "elle debout dans son lieu, quelques mots en très grandes capitales devant elle, et ses travaux qui se posent en rafale derrière elle" },
+      text: {
+        amount: "un message tenu",
+        composition: "2 à 4 mots courts en grandes capitales grasses et larges, un par ligne, tous à la même taille, centrés, devant elle et ses travaux de la première image à la dernière",
+        case: "upper",
+        weight: "bold",
+        tracking: "normal",
+      },
+      layout: "un plan fixe d'elle debout dans son lieu, ses photos posées une à une derrière elle en collage du haut vers le bas, elle détourée devant, les dernières devant ses jambes",
+      moments: [
+        { at: 0, what: "elle debout dans son lieu et ses mots seuls, trois images" },
+        { at: 0.1, what: "ses photos se posent d'un coup derrière elle en rafale, une toutes les 2 ou 3 images, du haut vers le bas en zigzag, au carré, sans bord, sans ombre ni rotation ; elle reste détourée devant" },
+        { at: 2.53, what: "les neuf dernières de plus en plus lentement, en bas, les six dernières devant ses jambes, sur un cliquetis qui ralentit" },
+        { at: 4.1, what: "chaque photo repart d'un coup 4 s après s'être posée : le collage se vide par le haut pendant que les dernières se posent en bas, jamais plein et tenu" },
+        { at: 7.97, what: "le collage vide sur un coup sec, la dernière photo un instant, puis elle seule avec ses mots une seconde, la musique plus douce" },
+      ],
+      camera: "fixe",
+      motion: "energique",
+      music: "airy minimal electronica, held warm synth chord, dry ticking pulse, no drums",
+      ending: "le collage vide sur un coup sec, puis elle seule avec ses mots une seconde",
+      why: "La personne et son travail dans la même image : on voit tout son travail en neuf secondes sans la perdre de vue, la rafale qui ralentit tient l'œil, et ses mots disent ce qu'on regarde.",
+    },
+  }),
+  model({
     key: "photo-dump",
     name: "Photo dump",
     pitch: "Tes photos et vidéos une à une au centre d'un fond clair, chacune à sa taille, comme un carnet qu'on feuillette.",
@@ -1234,6 +1275,7 @@ export const HOUSE_WHEN: Record<string, { pour: string; pas_pour: string }> = {
   mosaique: { pour: "des plats, des produits ou des créations en série, une carte, une collection", pas_pour: "un message à lire, quelqu'un qui parle, un lieu en plan large" },
   "carte-feutre": { pour: "un message de quelques mots qui s'écrit sur ses images (une offre, une nouveauté, un horaire)", pas_pour: "un Reel sans message" },
   pile: { pour: "montrer son travail en série (réalisations, coupes, pièces) avec une phrase courte qui dit qui on est", pas_pour: "des vidéos qui racontent une histoire, une voix" },
+  "mon-travail": { pour: "se présenter avec son travail en série (bouquets, coupes, plats, pièces, céramiques), soi au milieu", pas_pour: "sans photo ou vidéo de soi debout, des vidéos qui racontent une histoire, une voix" },
   "photo-dump": { pour: "une semaine, un événement, l'envers du décor en vrac, beaucoup de photos", pas_pour: "un message précis, une offre" },
   table: { pour: "des plats ou des produits présentés comme des tirages posés sur sa table, un moment chaleureux", pas_pour: "un lieu, une rue" },
   "ecran-partage": { pour: "le geste et le résultat côte à côte (l'artisan et sa pièce, la coiffeuse et la coupe, le chef et l'assiette)", pas_pour: "un seul sujet, un lieu" },

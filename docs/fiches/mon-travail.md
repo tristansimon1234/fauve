@@ -1,0 +1,74 @@
+# « Voici mon travail » (`mon-travail`) : fiche de l'original
+
+> Fiche d'un original : ce qu'on y voit, mesuré image par image, et les effets qu'on veut savoir refaire sur les vidéos de n'importe quel commerce (la méthode : `docs/modeles.md`, « La chaîne des modèles »). Les temps sont en secondes de l'original et en images à 30 i/s ; pas de « temps » ici : sa musique n'a pas de tempo.
+
+**L'original** : un Reel envoyé par Tristan (« THIS / IS / MY / WORK »), à garder sous `house/originals/mon-travail.mp4` : 9,17 s (275 images), 720 × 1280, 30 i/s, **vertical 9:16** plein cadre, avec son. Aucune coupe : un seul plan fixe d'une jeune femme debout à un coin de rue au soleil, adossée à un poteau, les bras derrière la tête, et 37 de ses travaux (des visuels numériques colorés : posts, affiches, captures) qui se posent derrière elle puis repartent. **Son image ne bouge pas** : son visage, ses bras et la rue sont les mêmes d'une image à l'autre (0,3 niveau d'écart sur son visage de l'image 5 à 245 : une photo, ou une vidéo figée) ; deux légers sauts de toute l'image, travaux compris (images 150 et 250), sont un défaut d'export, pas un effet.
+**Le même gabarit que « Pile de photos »** (`docs/fiches/pile.md`) : son son est le même (corrélation 0,997 sans décalage, le même niveau à 0,25 s près), ses 37 poses tombent sur les mêmes images, chacune repart 120 images après sa pose comme là-bas, l'avant-dernière sur le même coup sec, et ses cases ont les mêmes centres (à 5 px près à 1 080 × 1 920). Ce qui change : le fond (elle, au lieu d'une page blanche), elle détourée devant ses travaux, ses mots (une grotesque grasse et large, des lignes régulières, au lieu de capitales étroites en paires) et la forme de ses travaux (presque tous carrés).
+**Sa musique** : celle de « Pile de photos ». Ni batterie ni tempo : un accord tenu et, par-dessus, un cliquetis sec qui ralentit sans cesse (40 tics par seconde à 0,3 s, 17 à 1,5 s, 10 à 2,3 s, 6 à 3,3 s, 4 à 4,3 s, 2 à 6,4 s, 1,5 à 7,6 s), jusqu'à un coup sec à 7,96 s ; après lui, 12 dB plus bas (de −12,7 à −24,9 dB) et plus clair jusqu'à la fin. La mesure disait 98,5 BPM : faux (pour « Pile de photos », 92) ; ses repères tombent sur une grille de 120 BPM (un temps toutes les 15 images). Niveau −14,1 LUFS.
+**Mesuré avec** : `scripts/fiche/measure.py` (le format, « aucune coupe » est juste ; ses 11 « clignotements » d'avant 2,5 s sont des travaux vus 2 à 9 images avant d'être recouverts), la différence de chaque image avec la précédente (chaque pose et sa boîte, le trou qu'elle y fait quand elle est devant), les pixels de chaque travail suivis jusqu'à son départ, des planches à 30 i/s et des gros plans (ses jambes, sa tête, les mots), la corrélation de son son avec celui de « Pile de photos », EBU R128. Pas de lecture par Gemini (aucun appel facturé pour cette fiche ; `house/breakdowns/mon-travail.json` reste à faire au banc).
+
+## Déroulé
+
+| De – à (s) | Images | Le son | Ce qu'on voit | Effets |
+|---|---|---|---|---|
+| 0 – 0,10 | 0 – 2 | Le cliquetis part, très vite | Elle debout au coin d'une rue au soleil, adossée à un poteau, et les quatre mots seuls | — |
+| 0,10 – 2,53 | 3 – 76 | 40 → 10 tics par seconde | 28 travaux se posent d'un coup derrière elle, un toutes les 2 ou 3 images (11 par seconde), en zigzag du haut vers le bas ; elle reste devant eux | **Elle détourée devant son travail** (1) ; **pose en rafale** (3) |
+| 2,53 – 4,33 | 76 – 130 | 8 → 5 par seconde | Les neuf derniers de plus en plus espacés (4, 5, 4, 6, 6, 6, 7, 9, 7 images), en bas ; les six derniers devant ses jambes | **La rafale ralentit** (3) ; **les derniers devant elle** (2) |
+| 4,10 – 7,97 | 123 – 239 | 4 → 1,5 par seconde ; coup sec à 7,96 | Le haut part pendant que les deux derniers se posent en bas ; le collage se vide par le haut | **Chaque travail repart 4 s après sa pose** (4) |
+| 7,97 – 8,13 | 239 – 244 | — | Le dernier (en bas, devant ses jambes) seul 5 images | — |
+| 8,13 – 9,17 | 244 – 275 | Plus doux et plus clair | Elle seule avec ses mots (1 s) | — |
+
+## Effets (ce qu'on veut savoir refaire)
+
+### 1. Elle, détourée devant son travail
+- **Mesuré** : elle occupe de 21 à 46 % de la largeur, de 40 % de la hauteur (le haut de sa tête) jusqu'en bas ; ses mains derrière la tête, son visage de 30 à 40 % de la largeur et de 40 à 47 % de la hauteur. Les 31 premiers travaux passent **derrière elle** à chaque image : sa tête, ses bras, son sac et son jean les coupent (le 15e, image 40, derrière sa tête ; le 23e, image 62, fait dans la différence un trou de sa forme ; le 31e, image 89, coupé par son jean). Elle ne bouge pas : son plan est une image fixe. Le poteau et les plaques de rue, eux, sont derrière les travaux (le décor).
+- **Sur quoi** : elle (ou quelqu'un de l'équipe) debout dans son lieu, face à l'objectif, téléphone posé, en entier ou jusqu'aux genoux : sa boutique, son atelier, son salon, sa cuisine. Une photo suffit (l'original est une image fixe) ; une vidéo où elle bouge peu joue.
+- **Outil** : existant. Son plan plein cadre (`Footage`), ses travaux posés par-dessus, puis son détourage (`Subject`, à chaque image d'une vidéo ou celui de sa photo) dessiné exactement sur elle, devant eux.
+- **Si rien ne s'y prête** : sans son détourage (pas fait à temps), aucun travail ne se pose sur son visage (le visage suivi dans son plan) : elle reste vue.
+
+### 2. Les derniers devant elle
+- **Mesuré** : du 32e au 37e (posés de 3,17 à 4,33 s, de 64 à 88 % de la hauteur), les travaux passent **devant** ses jambes : le 32e, image 95, couvre son jean sans trou, le 33e et le 37e aussi. Son buste et sa tête restent devant tout le collage d'au-dessus.
+- **Outil** : l'ordre de dessin du code du modèle (son détourage entre les deux) : les six derniers sur 37, la même part du collage pour un autre nombre.
+
+### 3. Pose en rafale qui ralentit, en zigzag
+- **Mesuré** : poses aux images 3, 5, 7, 10, 13, 15, 18, 21, 24, 26, 29, 32, 35, 37, 40, 42, 43, 48, 51, 54, 56, 59, 62, 65, 67, 70, 73, 76 (une toutes les 2 ou 3 images), puis 80, 85, 89, 95, 101, 107, 114, 123 et 130 : celles de « Pile de photos ». Chacun apparaît entier en une image : ni chute, ni zoom, ni glissé, ni rotation, ni bord, ni ombre ; toujours par-dessus les précédents (mais derrière elle). Leurs centres descendent en zigzag de 22 à 78 % de la hauteur, de 24 à 76 % de la largeur ; plein, le collage couvre de 8 à 92 % de la largeur et de 10 à 88 % de la hauteur. Leurs côtés vont de 26 à 45 % de la largeur (35 % au milieu), mêmes largeurs que les photos de « Pile de photos » à la même place. Presque tous **carrés** (tous ceux qu'on voit en entier), le 35e en portrait 4:5 (230 × 285 px). Certains sont animés (des vidéos : le 3e, le 37e, des danseurs dessinés, bouge de 6,4 à 7,5 s).
+- **Sur quoi** : ses photos de son travail en série (bouquets, coupes, plats, pièces, céramiques), d'autant mieux qu'elles changent de couleur et de cadrage ; une vidéo y entre comme une photo, sur son meilleur instant.
+- **Outil** : existant, la composition du modèle : `Footage` dans la boîte de chacun, cadré sur son sujet, posé à son image (`at`).
+- **Si rien ne s'y prête** : moins de photos, des cases plus grandes sur la même surface ; sous 15, Edith lui demande d'abord si elle en a d'autres.
+
+### 4. Chaque travail repart 4 s après sa pose
+- **Mesuré** : 28 des 37 repartent exactement 120 images (4,0 s) après leur pose, d'un coup, en une image ; le collage se vide par le haut au rythme où il s'est fait, et le haut part (image 123) pendant que les deux derniers se posent en bas : jamais plein et tenu. Comme « Pile de photos » : le 31e part après 55 images (image 144) sans raison visible ; le 32e et le 33e 4 images plus tôt (211 et 217) ; l'avant-dernier sur le coup sec (image 239), le dernier 5 images après (244) ; trois partent sans que ça se voie (déjà recouverts).
+- **Outil** : existant, la composition du modèle.
+
+### 5. Quatre mots fixes, devant tout
+- **Mesuré** : « THIS / IS / MY / WORK », un mot par ligne, centrés (49,9 % de la largeur) ; capitales d'une grotesque grasse et large, comme une Helvetica Bold (à hauteur égale, « WORK » fait 4,2 fois sa hauteur de capitales, « THIS » 3,05, « MY » 2,12) ; hauteur des capitales 7,3 % de l'image (92 à 95 px) ; une ligne toutes les 13,4 % (173, 162 et 180 px : posées à la main), le bloc de 26,6 à 74,3 % de la hauteur. Vert anis pâle #E7FA87, ni contour ni ombre, de la première image à la dernière, **devant tout**, elle comprise (« WORK » passe sur son jean). Son visage est à côté de « IS », un mot court, jamais dessous.
+- **À l'original, jamais recopié** : ses mots (« THIS IS MY WORK ») et son vert ; le modèle met ses mots à elle (« VOICI / MON / TRAVAIL » ou les siens) dans sa couleur.
+- **Sur quoi** : sa phrase de 2 à 4 mots courts.
+- **Outil** : existant : `FitText` dans la composition (un seul bloc, toutes les lignes à la même taille) ; la paire « grotesque » (Inter Tight) ; gardés hors de son visage (suivi par `track`, sinon lu en haut du contour de son détourage, `SubjectOutline`) : sous lui, sinon au-dessus, quand une ligne le croiserait (le code compte leur largeur lettre à lettre : son visage à côté d'un mot court reste comme dans l'original).
+
+### 6. Étalonnage
+Aucun sur l'ensemble : une rue au soleil telle quelle (ciel bleu saturé, ombres franches), chaque travail à ses couleurs. Ni grain, ni coins sombres.
+
+## Format
+L'original est vertical 9:16 : son plan à elle est toute l'image. Une vidéo horizontale d'elle est recadrée sur elle. Réglages : `format` (`carre` par défaut, comme l'original : ses travaux au carré, un en 4:5 ; `forme`, chacun à sa forme, de 3:4 à 4:3 ; `portrait`, tous en 4:5), `couleur` (`sienne` par défaut : sa couleur telle quelle, plus profonde si elle est très pâle ; `pale`, une teinte pâle et vive de la sienne, comme le vert anis de l'original sur sa rue au soleil, pour un lieu sombre ou très coloré ; `original`, le vert anis de l'original). Le Reel reste vertical.
+
+## Ce que le modèle v1 fait (5 novembre)
+Écrit sur cette fiche (`packages/agent/src/skills/mon-travail.ts`, version 1), rendu en local sur une céramiste dans son atelier (une séance de Yaroslav Shuraev sur Pexels : sa photo debout et 28 photos de ses pièces, `scripts/skill-render.mts`, aucun appel facturé) :
+- **Temps** : la grille de « Pile de photos », 120 BPM (un temps toutes les 15 images) : chaque travail reste 8 temps, le collage est vide au temps 16 (le coup sec), elle seule avec ses mots 2 temps à la fin. Sa musique est composée à 120 ; tout se compte en temps (un autre tempo, une autre durée).
+- **Rafale** : la première à l'image 3, puis une toutes les 0,18 temps (2 ou 3 images), puis les neuf dernières de plus en plus espacées : ses 37 poses à 2 images au plus de l'original. **Départs** : chacun 120 images après sa pose, l'avant-dernier sur le temps 16 (image 240, l'original 239), le dernier 5 images après (245 ; 244) ; ses 9,17 s comme l'original. Le 31e qui part tôt et les 4 images d'avance du 32e et du 33e ne sont pas refaits.
+- **Collage** : les 37 cases de l'original (les centres et côtés de « Pile de photos », ses 1er et 27e carrés comme ici), suivies le long du collage pour un autre nombre, plus grandes quand il y en a moins ; au carré sauf le 35e en 4:5 ; ni bord, ni ombre, ni rotation, ni zoom.
+- **Elle** : son plan en premier (une photo, ou une vidéo d'au moins 6 s), plein cadre tout le Reel : figé sur sa première image pendant la rafale, puis ses 6 dernières secondes jouées jusqu'à la fin (une case ne joue que sa longueur : voir « Ce qui manque ») ; son détourage dessiné devant les 31 premiers sur 37, les derniers devant lui.
+- **Ses travaux** : une image chacun (une photo est fixe, une vidéo figée sur son instant), le dernier le reste (deux secondes pour 37 travaux : une vidéo y joue).
+- **Mots** : sa phrase, un mot par ligne (quatre lignes au plus, aucune qui finit sur un mot qui va avec la suivante), devant tout de la première image à la dernière, capitales grasses d'un dixième de l'image (Inter Tight 700, 192 px : 140 px de capitales comme l'original), une ligne toutes les 13,4 %, dans une boîte de 20,5 à 74,5 % de la hauteur (un peu plus haut que l'original : son bas reste au-dessus de la légende des applis) ; descendue sous son visage, sinon montée au-dessus, quand une de ses lignes le croiserait (son visage suivi, sinon sa tête en haut du contour de son détourage, sinon le haut de sa boîte ; au premier rendu, sans le contour, « VOICI » était sur son menton) ; dans sa couleur telle quelle (plus profonde si elle est très pâle, sa teinte gardée), un léger halo clair qui la garde sur une image sombre : au banc, sa teinte pâle (le réglage `pale`, comme l'original) se perdait sur les murs blancs et le tablier de la céramiste ; ni les mots ni le vert de l'original.
+- **Son** : les tics qui ralentissent aux moments mesurés sur « Pile de photos » (le même son : 30, de 1,6 à 7,3 s, chacun à sa force), puis un coup sec sur le temps 16, le plus fort ; après lui, sa musique sans sa basse jusqu'à la fin, sans fondu.
+- **Lumière** : aucun étalonnage (`finish` à zéro).
+- **Fichiers** : elle et 15 à 40 travaux (sous 16 fichiers, Edith lui demande d'abord si elle en a d'autres), de 9 à 41 cases ; de 6,2 à 9,2 s selon le nombre, plus à un tempo plus lent ; une carte de fin en option, sur elle assombrie.
+
+## Ce qui manque
+- **Son plan sous tout le Reel** : une case d'un skill est un passage de sa longueur, et les cases se suivent ; son plan joue 6 s et reste sur une image avant (l'original est une image fixe : ça ne se voit pas sur une photo, ni sur une vidéo où elle bouge peu). Une vidéo d'elle de moins de 6 s serait ralentie, donc pas détourée (le détourage ne suit qu'un plan à sa vitesse) : le modèle demande 6 s au moins. Outil à ajouter une fois au moteur : une case de fond qui dure tout le Reel sous les autres.
+- **Ses vidéos de travaux qui jouent** : une image chacune (le dernier, ce qui reste : deux secondes pour 37), pour laisser le temps à son plan.
+- **Le détourage de ce qu'il faut seulement** : le moteur détoure toutes les vidéos du Reel et ses dix premières photos dès qu'une composition dessine `Subject`, alors qu'ici seul son plan le demande. Outil : ne détourer que les plans que son code nomme.
+- **Une musique qui ralentit jusqu'à s'arrêter**, comme pour « Pile de photos » : le compositeur ne fait que des boucles à tempo fixe ; ses tics d'avant 1,6 s ne se posent pas un à un.
+
+## Ce qu'il faut filmer
+Une photo (ou une vidéo d'au moins 6 s, où tu bouges peu) de toi debout dans ton lieu, face à l'objectif, téléphone posé, en entier ou jusqu'aux genoux, avec de la place au-dessus de toi ; 15 à 40 photos de ton travail, des gros plans qui changent de couleur et de cadrage, le sujet au centre (elles seront recadrées au carré et vues au tiers de la largeur) ; ta plus belle en dernier : c'est la dernière à partir.
