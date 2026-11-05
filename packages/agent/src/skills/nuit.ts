@@ -279,7 +279,8 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const display = "'" + brand.displayFont + "', 'Bodoni Moda', serif";
   const body = "'" + brand.bodyFont + "', 'Inter', sans-serif";
   const shade = "0 0 2px rgba(0,0,0,0.45), 0 2px 18px rgba(0,0,0,0.5)";
-  const mid = Math.round(by + bh / 2);
+  // The middle of its frame, in the frame's own place (its words are laid in it: in the band, its middle is the screen's).
+  const mid = Math.round(bh / 2);
   const line = (text, top, tall, size, family, weight, key, spaced) =>
     h(FitText, { key, style: { position: "absolute", left: 140, top, width: width - 280, height: tall }, innerStyle: { fontFamily: family, fontWeight: weight, fontSynthesis: "none", fontSize: size, lineHeight: 1.05, letterSpacing: spaced ? "0.14em" : "0.02em", textTransform: spaced ? "uppercase" : "none", color: "#ffffff", textAlign: "center", textWrap: "balance", textShadow: shade } }, keep(text));
   const endAt = end ? end.from : durationInFrames + 1;

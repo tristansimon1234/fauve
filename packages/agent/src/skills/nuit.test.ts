@@ -255,9 +255,13 @@ test("« La nuit sous tous les angles » (v1): her name after the burn, in the s
   const title = (f: number, extra = {}) => flatten(at(f, extra)).find((n) => String(n.props.key).startsWith("title-"));
   assert.equal(title(77), undefined);
   const t = title(78)!;
-  const b = styleOf(t) as { left: number; top: number; width: number; height: number };
-  // Between x 140 and 940 (it crosses the middle), above the bottom quarter, 48 px and more, white, its capitals spaced.
+  // Laid in its 16:9 frame (at 656 of the screen): where it is on the screen.
+  const inFrame = styleOf(t) as { left: number; top: number; width: number; height: number };
+  const frameTop = Number(styleOf(flatten(at(78)).find((n) => styleOf(n).overflow === "hidden")!).top);
+  const b = { ...inFrame, top: frameTop + inFrame.top };
+  // Between x 140 and 940 (it crosses the middle), above the bottom quarter, inside its frame, 48 px and more, white, its capitals spaced.
   assert.ok(b.left >= 140 && b.left + b.width <= 940 && b.top >= 80 && b.top + b.height <= 1440, JSON.stringify(b));
+  assert.ok(b.top >= 656 && b.top + b.height <= 656 + 608 && Math.abs(b.top + b.height / 2 - 960) <= 2, JSON.stringify(b));
   const inner = t.props.innerStyle as Record<string, string | number>;
   assert.ok(Number(inner.fontSize) >= 48 && inner.color === "#ffffff" && inner.textTransform === "uppercase");
   assert.equal(title(123), undefined);
