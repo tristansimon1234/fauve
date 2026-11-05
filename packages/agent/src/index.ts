@@ -93,6 +93,7 @@ export * from "./video-quality.ts";
 export * from "./sfx.ts";
 export * from "./font-pairs.ts";
 export * from "./house-models.ts";
+export * from "./house-effects.ts";
 export * from "./house-pick.ts";
 export * from "./model-scout.ts";
 export * from "./house-measures.ts";

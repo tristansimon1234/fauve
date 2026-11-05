@@ -142,6 +142,8 @@ const bodySchema = z.object({
   route: z.enum(["agent", "chain"]).optional(),
   /** Made freely, in none of Edith's models (the lab's creative test, free=1): the editor and the motion designer choose everything. */
   free: z.boolean().optional(),
+  /** False (the lab's effects=0): no effect of Edith's models lent to a Reel in none of them, the chain as before, to compare on the same videos. */
+  effects: z.boolean().optional(),
   /** The editor's reasoning effort, set on a montage queued by hand to compare two levels; else its level of care's. */
   editorEffort: z.enum(["medium", "high"]).optional(),
   /**
@@ -381,6 +383,8 @@ function designInput(job: Job) {
     fresh: !job.correction,
     // Its level of care: how many times its director looks at the composition before it goes out.
     looks: EFFORTS[job.effort ?? DEFAULT_EFFORT].looks,
+    // The lab's effects=0: no effect of Edith's models lent (every step of the job, its corrections and second take too).
+    ...(job.effects === false ? { effects: false } : {}),
   };
 }
 

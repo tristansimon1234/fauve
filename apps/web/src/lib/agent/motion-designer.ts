@@ -82,6 +82,12 @@ export type SceneRequest = {
    * `skill`, its whole Reel coded once (a montage skill, skills.ts), kept as it is but for what her request needs.
    */
   example?: { name: string; code: string; frames: number; shots: number; skill?: boolean };
+  /**
+   * The signature effects of Edith's models its brief borrows (a Reel in none of them, house-effects.ts; two at most):
+   * each model's key and name, its effect's line, and its code (its skill's, else its reference composition), the base
+   * the motion designer adapts to this moment, never pastes (part « borrow »).
+   */
+  borrowed?: { key: string; name: string; effect: string; code: string }[];
   /** The sound effects already made (the library's), reused by name when one fits. */
   readySounds?: string[];
   /** It draws the Reel's texts as the copied Reel does (its texts, frames from its start), over the montage. */
@@ -275,6 +281,7 @@ async function writeScene(
     look: Boolean(seen) && Boolean(request.look),
     example: Boolean(!fix && request.example && !request.example.skill),
     skill: Boolean(!fix && request.example?.skill),
+    borrow: Boolean(!fix && request.borrowed?.length),
   };
   const text = fix
     ? `This code failed: ${fix.error}\nFix it, keeping the same intention${kept.length ? ` and ${kept.join(" and ")}` : ""}.\n\nBrief: ${request.brief}\n\nCode:\n${fix.code}`
@@ -338,6 +345,8 @@ async function writeScene(
               },
             }
           : {}),
+        // The effects of Edith's models the editor borrowed for this animation: each one's code, its base.
+        ...(request.borrowed?.length ? { borrowed_effects: request.borrowed.map((b) => ({ model: b.name, key: b.key, effect: b.effect, code: b.code })) } : {}),
         ...(copied
           ? {
               model_frames:

@@ -109,6 +109,7 @@ import { skillGate } from "@/lib/skill-reviews";
 import { skillFor } from "@fauve/agent/skills";
 import { recordToolUses } from "@/lib/tool-maker";
 import { designMotionScenes, type SceneRequest, type SceneResult } from "./motion-designer";
+import { lendEffects, lendingFor } from "./borrowed-effects";
 import { askDirector, directorFirstTurn, directorLookTurn, type DirectorBlock, type DirectorParts, type SavedDirector } from "./director";
 import { reelStills, showReel } from "./reel-canvas";
 import { ensureInspirationRead } from "@/lib/inspirations";
@@ -314,6 +315,8 @@ export async function designEdit(params: {
   looks?: number;
   /** The director's look at the Reel it made (its own step): its first turn and answer, saved by the design. */
   director?: { look: SavedDirector };
+  /** False: no effect of Edith's models lent to this Reel (the lab's effects=0, the chain as before; borrowed-effects.ts). */
+  effects?: boolean;
 }): Promise<DesignedEdit> {
   const db = supabaseAdmin();
   const [post, studio, brand, previous, recent, report, inspirations, hooks, readyForEditor] = await Promise.all([
@@ -490,6 +493,9 @@ export async function designEdit(params: {
   const tracks: TracksByClip = clips.length ? await loadTracks(params.studioId, clips.map((c) => c.media_id)).catch(() => ({})) : {};
   // The version to correct as the editor wrote it: its ramps and its cuts of the « euh » undone (the engine makes them again).
   const asWritten = previousPlan.success ? undoSpeechCuts({ ...previousPlan.data, segments: previousPlan.data.segments.map(asAsked) }) : null;
+  // A Reel in none of Edith's models may borrow one or two of their signature effects (a test on the lab's studios and the
+  // team's, borrowed-effects.ts): the editor reads their lines, the motion designer gets the code of the ones it names.
+  const lending = lendingFor({ studio: studio.data, followed, gate, effects: params.effects, director: Boolean(params.director) });
   const input = {
     studio: {
       name: studio.data?.name,
@@ -530,6 +536,8 @@ export async function designEdit(params: {
     ...(contractLines(params.contract).length ? { contrat: contractLines(params.contract) } : {}),
     // The sound she follows, added by her in Instagram: its tempo is the Reel's, every cut on its beats (no music composed).
     ...(sound ? { son_suivi: `Ce Reel suit un son qu'elle a choisi, qu'elle ajoutera dans Instagram : son tempo est fixé (${soundTempo(sound.bpm, 100)} BPM) et tes coupes tombent sur ses temps ; aucune musique à composer.` } : {}),
+    // The signature effects of Edith's models this Reel may borrow, with their rule (its prompt stays under 17 000 characters).
+    ...(lending ? { effets_des_modeles: lending.input } : {}),
     post: {
       ...post.data,
       edit_plan_id: undefined,
@@ -620,7 +628,8 @@ export async function designEdit(params: {
   // On the bench and the team's studio only, until it beats the editor and the motion designer (first bench: more
   // faithful to the model on the café but emptier, worse on the Procope: a tiny vertical title, no hook).
   const directorTrial = Boolean(studio.data?.team) || String(studio.data?.website_url ?? "").startsWith("lab://");
-  const directing = Boolean(directorTrial && followed && sheets.length && !correction && !(voice && voiceId && spoken) && (params.director || timeLeft() >= DIRECTOR_NEEDS_MS));
+  // A copy that may borrow the models' effects is the chain's (the director writes its code alone, with no model's to start from).
+  const directing = Boolean(directorTrial && followed && sheets.length && !correction && !(voice && voiceId && spoken) && !lending && (params.director || timeLeft() >= DIRECTOR_NEEDS_MS));
   let directed: { first: DirectorBlock[]; parts: DirectorParts; answer: DirectorOutput } | null = null;
   // What the engine measured on the director's plan (a length missed, a floor not held): told at its look.
   const directorNotes: string[] = [];
@@ -1059,6 +1068,8 @@ export async function designEdit(params: {
   // One of Edith's models: its reference composition, timed on the model, a worked example for each animation that
   // remakes it (the composition over the whole Reel first of all), never pasted as it is.
   if (house && example) for (const request of requests) request.example = { name: house.name, ...example };
+  // A Reel in none of them: each animation whose brief borrows one of their effects starts from that model's code.
+  lendEffects(requests, plan, lending);
   // The director wrote the composition with its plan: checked like any animation, never written again.
   if (directed && directorWrites) {
     const target = requests.find((r) => r.compose);
