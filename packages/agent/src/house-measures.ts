@@ -35,7 +35,7 @@ export const HOUSE_MEASURES: Record<string, ReelMeasures> = {
   "interrupteur": { duration: 9.2, cuts: [], bpm: 142, lufs: -14.3 },
   "photo-dump": { duration: 11.33, cuts: [0.67, 1.1, 1.47, 1.83, 2.3, 2.63, 3.37, 3.7, 4.07, 4.37, 5.07, 5.47, 5.8, 6.17, 6.87, 7.3, 8.23, 8.53, 8.87, 9.9, 10.63], bpm: null, lufs: -14.1 },
   "interface": { duration: 12.77, cuts: [], bpm: null, lufs: -14.2 },
-  "pixel": { duration: 15.6, cuts: [1.33, 3.47, 5, 8.17, 9.07, 12.17, 14.13], bpm: null, lufs: -14.5 },
+  "pixel": { duration: 15.6, cuts: [1.33, 3.47, 5, 8.17, 9.07, 12.17, 14.13], bpm: 100, lufs: -14.5 },
   "createur": { duration: 31, cuts: [6.87, 7.8, 8.67, 9.67, 14.97, 18.3, 20.67, 21.7, 23, 24.73, 27.7, 30.03, 30.8], bpm: null, lufs: -14.3 },
   "silhouette": { duration: 11.15, cuts: [0.47, 1.07, 3.9, 5.37, 9.57], bpm: null, lufs: -14.1 },
   "vision": { duration: 8.55, cuts: [0.2, 0.7, 1.2, 1.5, 1.77, 2.1, 2.63, 3, 3.27, 3.63, 4.67, 5.13, 5.37, 5.67, 5.93, 6.53, 6.87, 7.13, 8.03], bpm: null, lufs: -14.1 },

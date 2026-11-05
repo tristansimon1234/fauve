@@ -17,8 +17,8 @@ import type { z } from "zod";
 
 /** The source of the inspiration row a house model is kept on, per studio (one per model, made when first used). */
 export const HOUSE_SOURCE = "house";
-/** The catalogue's version: a studio's row written by an older one is rewritten when the model is used again (3: its original's sheets; 4: no brand in a model's name; 5: Mots aux quatre coins as its original; 6: Plans fixes at 65 BPM; 7: four renamed; 8: Lieu tapé without its original's orange; 9: Plans fixes on its fiche; 10: Une journée chez toi on its fiche; 11: ten models on their fiches; 12: Façade qui se construit and Coulisses façon fiche on their fiches). */
-export const HOUSE_VERSION = 12;
+/** The catalogue's version: a studio's row written by an older one is rewritten when the model is used again (3: its original's sheets; 4: no brand in a model's name; 5: Mots aux quatre coins as its original; 6: Plans fixes at 65 BPM; 7: four renamed; 8: Lieu tapé without its original's orange; 9: Plans fixes on its fiche; 10: Une journée chez toi on its fiche; 11: ten models on their fiches; 12: Façade qui se construit and Coulisses façon fiche on their fiches; 13: Recette cosy on its fiche). */
+export const HOUSE_VERSION = 13;
 
 export type HouseModel = {
   key: string;
@@ -972,34 +972,38 @@ export const HOUSE_MODELS: HouseModel[] = [
   model({
     key: "pixel",
     name: "Recette cosy, typo pixel",
-    pitch: "Des gros plans chauds de ta cuisine ou de ton atelier, un titre en pixels doux et de toutes petites légendes.",
-    needs: "6 à 10 vidéos en gros plan de ce que tu prépares, à la lumière chaude",
+    // 13: written again on its original's fiche (v2 of its skill): 100 BPM, its steps gesture by gesture, its pixel title
+    // landing at once and trembling, its loop; no grain, no dark corners.
+    pitch: "Ta recette geste par geste, filmée téléphone posé, un titre en pixels qui tremble sur le plat fini, de petites légendes, et une boucle qui revient au début.",
+    needs: "8 à 14 courtes vidéos de ce que tu prépares, téléphone posé : le résultat fini vu d'en haut, chaque étape en quelques gestes",
     files: [4, 12],
     pair: "pixel",
     example: "AC-pixel",
-    tempo: 84,
-    finish: { name: "Cosy", hint: "lumière chaude, noirs doux, grain fin", contrast: 0.04, warmth: 0.25, fade: 0.08, grain: 0.25, grain_size: "fine", vignette: 0.25 },
+    // Counted on its original (docs/fiches/pixel.md): its 26 shots on a grid at 100.
+    tempo: 100,
+    finish: { name: "Cosy", hint: "lumière chaude, noirs profonds, sans grain", contrast: 0.08, warmth: 0.25 },
     look: {
       name: "recette cosy en pixels",
       format: "autre",
-      hook: { kind: "geste", what: "un gros plan chaud du plat fini, et un titre en pixels qui s'allume lettre par lettre" },
+      hook: { kind: "geste", what: "le plat fini vu d'en haut, et un titre en pixels qui arrive d'un coup et tremble" },
       text: {
         amount: "plusieurs",
-        composition: "un titre en police pixel blanche au tiers haut, avec deux points d'exclamation, puis de toutes petites légendes en machine à écrire sous les gestes",
+        composition: "un titre en pixels sur deux lignes au tiers haut, une petite tête avant et une étoile après, qui tremblent ; deux lignes en machine à écrire ; une petite légende par étape",
         weight: "regular",
       },
-      layout: "plein cadre, des gros plans l'un après l'autre, avec de petits textes posés par-dessus",
+      layout: "plein cadre, téléphone posé, ses étapes coupées geste par geste, de petits textes posés par-dessus ; en 16:9 sur du noir si ses vidéos sont en largeur",
       moments: [
-        { at: 0, what: "le plat fini en gros plan, le titre en pixels s'allume lettre par lettre en clignotant" },
-        { at: 0.9, what: "une toute petite légende en machine à écrire sous le titre" },
-        { at: 2, what: "les étapes en gros plans coupés toutes les 2 s, chacune avec sa petite légende" },
+        { at: 0, what: "le plat fini vu d'en haut, son titre en pixels arrive d'un coup à la 5e image et tremble" },
+        { at: 1.2, what: "ses étapes, chacune en plusieurs gestes courts du même plan, avec sa petite légende" },
+        { at: 4.2, what: "la musique se tait un temps, puis repart sans basse jusqu'à la cuisson" },
+        { at: 14, what: "la boucle : le dernier plan ramène au premier, la musique s'arrête net" },
       ],
-      camera: "à la main",
+      camera: "fixe",
       grade: "warm",
       motion: "chaleureux",
-      music: "cozy lo-fi hip-hop, soft vinyl crackle",
-      ending: "le plat fini, une petite légende, tenu deux secondes",
-      why: "Doux et intime : les gros plans donnent faim, la typo pixel fait sourire, on enregistre la recette.",
+      music: "soft solo piano, warm and intimate, a soft bass note on every beat, no drums",
+      ending: "la boucle : le dernier plan ramène au plat fini du début",
+      why: "Doux et intime : les gestes donnent faim, la typo pixel fait sourire, et la boucle fait revoir la recette.",
     },
   }),
   model({
@@ -1244,7 +1248,7 @@ export const HOUSE_WHEN: Record<string, { pour: string; pas_pour: string }> = {
   coulisses: { pour: "montrer son lieu et ses gestes comme un créateur montre ses coulisses : chaque bruitage nommé, la timeline du montage", pas_pour: "une offre à lire, quelqu'un qui parle, une ambiance calme" },
   interrupteur: { pour: "présenter sa marque, un lancement, son logo qui s'allume", pas_pour: "sans vidéo d'elle qui lève la main vers un mur" },
   interface: { pour: "faire suivre son compte, une app, un service en ligne", pas_pour: "montrer un lieu ou des produits" },
-  pixel: { pour: "une recette, une préparation en étapes, une ambiance chaleureuse", pas_pour: "un lieu, une rue" },
+  pixel: { pour: "une recette, une préparation en étapes, une ambiance chaleureuse", pas_pour: "un lieu, une rue, quelqu'un qui parle, des vidéos filmées à la main" },
   "mots-meles": { pour: "un jeu, une devinette, un message caché, un lieu calme", pas_pour: "un Reel rythmé" },
   aplat: { pour: "présenter une personne (la patronne, l'équipe), une marque qui ose la couleur", pas_pour: "sans vidéo d'elle qui marche" },
   detourages: { pour: "présenter un lieu, un paysage ou une sortie avec de l'élan, un nom à faire retenir", pas_pour: "sans plan large et fixe de son lieu ou de son paysage" },
