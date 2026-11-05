@@ -100,6 +100,8 @@ export type SceneRequest = {
   draft?: DraftScene;
   /** A draft played as it is (a montage skill): checked, never rewritten; its notes are only logged, a failure leaves it out. */
   keep?: boolean;
+  /** Its slot texts as the Reel plays them (an effect of the bank: its words, its marks, its settings): its check sees them. */
+  texts?: Record<string, string>;
 };
 
 /** A composition the director wrote with its plan. */
@@ -472,6 +474,8 @@ function smokeScenes(results: SceneResult[], requestOf: (id: string) => SceneReq
         id: r.id,
         js: r.js!,
         durationInFrames: request.durationInFrames,
+        // Its words and marks, when the Reel gives them (an effect of the bank): checked as they will play.
+        ...(request.texts && Object.keys(request.texts).length ? { texts: request.texts } : {}),
         ...(photos.length ? { photos } : {}),
         ...(r.fonts?.length ? { fonts: r.fonts } : {}),
         ...(request.cuts ? { cuts: request.cuts } : {}),

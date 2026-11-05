@@ -110,7 +110,7 @@ export type PieceShot = {
 
 const OUTDOORS = /ext[ée]rieur|\brue\b|trottoir|terrasse|fa[çc]ade|devanture|\bciel\b|\btoits?\b|plage|\bmer\b|\bparc\b|jardin|paysage|\bplace\b|quartier|\bville\b|jet[ée]e|plein air|montagne|colline|for[êe]t|\bchamps?\b|\bquai\b|\bport\b|\bpont\b|outdoor|street|\bsky\b/i;
 const INDOORS = /int[ée]rieur|\bsalle\b|boutique|cuisine|comptoir|atelier|\bstudio\b|\bbar\b|restaurant|salon|magasin|librairie|\brayons?\b|\bpi[èe]ce\b|\bchambre\b|indoor|\bshop\b|\broom\b/i;
-const PERSON = /personne|femme|homme|\bfille\b|gar[çc]on|client|cliente|[ée]quipe|serveu|barista|vendeu|coiffeu|fleuriste|\belle\b|\bil\b|passants?|people|woman|\bman\b|\bgens\b|\bcouple\b|enfant/i;
+const PERSON = /personne|femme|homme|\bfille\b|gar[çc]on|client|cliente|[ée]quipe|serveu|barista|vendeu|coiffeu|fleuriste|passants?|people|woman|\bman\b|\bgens\b|\bcouple\b|enfant|silhouette|visage|profil/i;
 
 /** Her shots as the bank weighs them: each shot of each video as Gemini read it (blurred or dark ones left out), each photo whole. */
 export function pieceShots(clips: { media_id: string; analysis: ClipAnalysis }[], photos: Record<string, PhotoFacts>): PieceShot[] {
@@ -118,7 +118,6 @@ export function pieceShots(clips: { media_id: string; analysis: ClipAnalysis }[]
     analysis.shots
       .filter((s) => !s.quality.blurry && !s.quality.dark)
       .map((s): PieceShot => {
-        const words = `${analysis.setting} ${s.description} ${s.subject} ${analysis.summary}`;
         return {
           id: media_id,
           photo: false,
@@ -126,7 +125,7 @@ export function pieceShots(clips: { media_id: string; analysis: ClipAnalysis }[]
           still: s.camera === "static" && !s.quality.shaky,
           outdoors: OUTDOORS.test(analysis.setting) || OUTDOORS.test(s.description),
           indoors: INDOORS.test(analysis.setting) && !OUTDOORS.test(analysis.setting),
-          person: s.faces_visible || PERSON.test(s.subject) || PERSON.test(s.description) || (PERSON.test(words) && /\b(qui|en train)\b/i.test(s.description)),
+          person: s.faces_visible || PERSON.test(s.subject) || PERSON.test(s.description),
           beauty: s.beauty ?? 3,
         };
       }),

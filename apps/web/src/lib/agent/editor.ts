@@ -52,6 +52,8 @@ import {
   resolveReelBrand,
   type EditPlan,
   openingCandidates,
+  pieceLayers,
+  pieceShots,
   planHook,
   lookMoments,
   planTimeline,
@@ -110,6 +112,7 @@ import { skillFor } from "@fauve/agent/skills";
 import { recordToolUses } from "@/lib/tool-maker";
 import { designMotionScenes, type SceneRequest, type SceneResult } from "./motion-designer";
 import { lendEffects, lendingFor } from "./borrowed-effects";
+import { playPieces } from "./pieces";
 import { askDirector, directorFirstTurn, directorLookTurn, type DirectorBlock, type DirectorParts, type SavedDirector } from "./director";
 import { reelStills, showReel } from "./reel-canvas";
 import { ensureInspirationRead } from "@/lib/inspirations";
@@ -513,7 +516,16 @@ export async function designEdit(params: {
   const asWritten = previousPlan.success ? undoSpeechCuts({ ...previousPlan.data, segments: previousPlan.data.segments.map(asAsked) }) : null;
   // A Reel in none of Edith's models may borrow one or two of their signature effects (a test on the lab's studios and the
   // team's, borrowed-effects.ts): the editor reads their lines, the motion designer gets the code of the ones it names.
-  const lending = lendingFor({ studio: studio.data, followed, gate, effects: params.effects, director: Boolean(params.director) });
+  // Made freely, the bank's ready effects her files can carry (pieces.ts): read on what was seen of her shots.
+  const lending = lendingFor({
+    studio: studio.data,
+    followed,
+    gate,
+    effects: params.effects,
+    director: Boolean(params.director),
+    shots: pieceShots(clips, Object.fromEntries(photoIds.flatMap((id, i) => (photoReads[i] ? [[id, photoReads[i]!] as const] : [])))),
+    files: new Set(mediaIds).size,
+  });
   const input = {
     studio: {
       name: studio.data?.name,
@@ -931,13 +943,17 @@ export async function designEdit(params: {
   // Free scenes and animations over several shots: reuse the code of unchanged briefs, have the motion designer write the others.
   const reusable = new Map(previousMotions.filter((m) => m.js).map((m) => [m.brief, m] as const));
   const layers = plan.layers ?? [];
+  // The effect of the bank a layer names (one per Reel): played as it is below, never written by the motion designer,
+  // never the code an earlier version kept for the same brief (its words are filled again on the new shots).
+  const pieceAt = lending?.pieces ? pieceLayers(plan, lending.pieces.keys()) : [];
+  const pieceBriefs = new Set(pieceAt.map((p) => layers[p.index]!.motion.brief));
   // The director wrote the composition with its plan: its code is the one checked and kept, never the earlier version's
   // with the same brief (its look at the Procope had rewritten the code, and the earlier one went out).
   const directorWrites = Boolean(directed?.answer.composition_code.trim());
-  const reusedLayer = (l: (typeof layers)[number]) => reusable.has(l.motion.brief) && !(l.compose && directorWrites);
+  const reusedLayer = (l: (typeof layers)[number]) => reusable.has(l.motion.brief) && !(l.compose && directorWrites) && !pieceBriefs.has(l.motion.brief);
   const toWrite = [
     ...plan.segments.flatMap((s, i) => (isMotionSegment(s) && !s.motion.js && !reusable.has(s.motion.brief) ? [{ id: `s${i}`, brief: s.motion.brief }] : [])),
-    ...layers.flatMap((l, i) => (!l.motion.js && !reusedLayer(l) ? [{ id: `l${i}`, brief: l.motion.brief }] : [])),
+    ...layers.flatMap((l, i) => (!l.motion.js && !reusedLayer(l) && !pieceAt.some((p) => p.index === i) ? [{ id: `l${i}`, brief: l.motion.brief }] : [])),
   ];
   // Her photos an animation may compose with: in a collage or another composition, every photo of the Reel; elsewhere,
   // those its brief names (by media_id). Each is cut out first (their own sandbox); one without a clean cut-out comes whole.
@@ -1108,7 +1124,7 @@ export async function designEdit(params: {
   }
   // Its motion kit: the business's latest scenes, whose language the new ones keep (a family from one Reel to the next);
   // their names, and those of the Reel's kept animations, say which ideas are already taken.
-  const latest = requests.length
+  const latest = requests.length || pieceAt.length
     ? ((
         await supabaseAdmin()
           .from("motion_templates")
@@ -1175,6 +1191,31 @@ export async function designEdit(params: {
         ...(signature ? { signature: resolveReelBrand(plan, template, { name: "", signature }).signature } : {}),
       },
     };
+  // The effect of the bank the editor laid, played as it is (no motion designer): its words written by a small call, its
+  // code checked with them. One that cannot play goes to the motion designer, its brief alone, the piece's code its base.
+  if (pieceAt.length && lending?.pieces) {
+    const outcome = await playPieces({
+      studioId: params.studioId,
+      postId: params.postId,
+      plan,
+      layers: pieceAt,
+      pieces: lending.pieces,
+      facts,
+      request: params.brief,
+      contract: params.contract,
+      studio: { name: studio.data?.name, business: studio.data?.business_type, memory: studio.data?.memory },
+      previous: correction && previousPlan.success ? previousPlan.data : null,
+      requestFor: (index) => requestFor({ id: `l${index}`, brief: layers[index]!.motion.brief }),
+      brand: sceneBrand,
+      context: sceneContext,
+    });
+    const left = outcome.unplayed.map((u) => requestFor({ id: `l${u.index}`, brief: layers[u.index]!.motion.brief }));
+    if (left.length) {
+      if (readyForEditor.length) for (const request of left) request.readySounds = readyForEditor;
+      lendEffects(left, plan, lending);
+      requests.push(...left);
+    }
+  }
   // Its first drafts see the Reel as it will come out without them (her shots, her texts, her subtitles), never blind:
   // with the animations a correction keeps (their brief unchanged), the ones being written drawn as nothing.
   const withKept = <M extends { brief: string; js?: string }>(motion: M): M => {
@@ -1193,7 +1234,9 @@ export async function designEdit(params: {
     (plan.layers ?? []).some((l) => l.compose && CUT_OUT_WORDS.test(l.motion.brief)) ||
     CUT_OUT_WORDS.test(params.brief ?? "") ||
     // A model of Edith's whose reference composition draws her cut out (a title behind her): the director looks at it with her cut-out.
-    Boolean(example && /\bSubject\b/.test(example.code));
+    Boolean(example && /\bSubject\b/.test(example.code)) ||
+    // An effect of the bank played that draws her cut out (her silhouette, a title behind her).
+    (plan.layers ?? []).some((l) => l.motion.piece && l.motion.js && /\bSubject\b/.test(l.motion.code ?? ""));
   const earlySubjects = cutOutAsked
     ? ensureSubjects(params.studioId, params.postId, plan, { anticipate: true }).catch((e: unknown) => console.warn("subjects: not ready", e))
     : null;

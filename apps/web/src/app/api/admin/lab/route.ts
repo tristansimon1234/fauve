@@ -1031,6 +1031,12 @@ async function result(key: string) {
           ),
         ]
       : [],
+    // The effects of the bank its layers played as they are (pieces.ts: no motion designer), with their words.
+    pieces: plan.success
+      ? (plan.data.layers ?? []).flatMap((l) =>
+          l.motion.piece ? [{ key: l.motion.piece.key, version: l.motion.piece.version, from: l.from, to: l.to, coded: Boolean(l.motion.js), texts: l.motion.texts ?? {}, drawn: l.motion.drawn ?? null }] : [],
+        )
+      : [],
     // The plan kept, readable: the scenes' code left out.
     plan: plan.success
       ? {
@@ -1040,7 +1046,7 @@ async function result(key: string) {
               ? { motion: { brief: s.motion.brief, template_id: s.motion.template_id, coded: Boolean(s.motion.js), photos: s.motion.photos, fonts: s.motion.fonts }, duration: s.duration, over: s.over }
               : s,
           ),
-          layers: plan.data.layers?.map((l) => ({ brief: l.motion.brief, from: l.from, to: l.to, coded: Boolean(l.motion.js), photos: l.motion.photos, fonts: l.motion.fonts })),
+          layers: plan.data.layers?.map((l) => ({ brief: l.motion.brief, from: l.from, to: l.to, coded: Boolean(l.motion.js), photos: l.motion.photos, fonts: l.motion.fonts, ...(l.motion.piece ? { piece: l.motion.piece.key } : {}) })),
         }
       : null,
   };
