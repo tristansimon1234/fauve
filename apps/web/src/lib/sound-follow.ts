@@ -19,6 +19,7 @@ export async function followSound(
   studioId: string,
   postId: string,
   link: string,
+  named: { title?: string; artist?: string; audioId?: string } = {},
 ): Promise<{ ok: true; link: string } | { ok: false; why: "not_instagram" | "voice" | "missing" }> {
   const found = reelLink(link);
   if (!found || found.platform !== "instagram") return { ok: false, why: "not_instagram" };
@@ -28,7 +29,19 @@ export async function followSound(
   // A song added in Instagram plays instead of the video's own sound: her voice would be lost.
   if (post.voice_media_id) return { ok: false, why: "voice" };
   const music = readPostMusic(post.music);
-  const sound = music.sound?.link === found.url ? music.sound : { link: found.url };
+  const kept = music.sound?.link === found.url ? music.sound : { link: found.url };
+  // A Reel of a trending sound (find_sound, Tendances): its name and its page, for the Reel's page.
+  let name = named;
+  if (!name.title) {
+    const { data: known } = await db.from("trend_sounds").select("audio_id, title, artist").contains("reels", [{ link: found.url }]).limit(1).maybeSingle();
+    if (known) name = { title: known.title as string, artist: (known.artist as string | null) ?? undefined, audioId: known.audio_id as string };
+  }
+  const sound = {
+    ...kept,
+    ...(name.title ? { title: name.title.slice(0, 200) } : {}),
+    ...(name.artist ? { artist: name.artist.slice(0, 200) } : {}),
+    ...(name.audioId && /^\d{5,25}$/.test(name.audioId) ? { audio_id: name.audioId } : {}),
+  };
   const next: PostMusic = { ...music, mode: "model", hand: !post.publish_by_hand || Boolean(music.hand), sound };
   const { error } = await db.from("posts").update({ music: next, publish_by_hand: true }).eq("id", postId).eq("studio_id", studioId).not("status", "in", "(published,measured)");
   if (error) throw new Error(error.message);

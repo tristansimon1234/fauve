@@ -5,7 +5,9 @@ import { NoStudio } from "@/components/empty-state";
 import { PageSuspense } from "@/components/page-suspense";
 import { getStudioContext } from "@/lib/studio";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { refreshTrendSounds, soundsStale, trendSounds } from "@/lib/trend-sounds";
 import { anyStale, lastSearched, monthIn, refreshTrends, trendCards } from "@/lib/trends";
+import { SoundsSection } from "./sounds";
 import { TrendQuery, TrendsGrid } from "./trends-grid";
 
 export const metadata: Metadata = { title: "Tendances" };
@@ -31,12 +33,17 @@ async function Trends() {
   const query = trendQueryOf(own, data?.business_type as string | null);
   const lang = trendLangOf(data?.trend_lang);
   const left = trendChangesLeft({ month: (data?.trend_query_month as string | null) ?? null, changes: Number(data?.trend_query_changes ?? 0) }, monthIn(member.studio.timezone));
+  // The trending sounds, the same for every trade: made again after the page is sent when last week's.
+  const sounds = await trendSounds();
+  if (soundsStale(sounds.chartedAt)) after(() => refreshTrendSounds().catch((e: unknown) => console.error("trends: sounds refresh failed", e)));
+  const soundsSection = <SoundsSection sounds={sounds.sounds} timezone={member.studio.timezone} />;
 
   if (!query) {
     return (
       <>
         <Header />
         <TrendQuery query={null} lang={lang} left={left} />
+        {soundsSection}
       </>
     );
   }
@@ -51,6 +58,7 @@ async function Trends() {
       <Header />
       <TrendQuery query={query} lang={lang} left={left} />
       <TrendsGrid lists={lists} searching={(stale || last.running) && !lists.trend.length && !lists.local.length} timezone={member.studio.timezone} />
+      {soundsSection}
     </>
   );
 }
@@ -59,7 +67,7 @@ function Header() {
   return (
     <div className="flex flex-col gap-1.5">
       <h1 className="text-[44px] leading-[0.95] font-semibold tracking-[-0.05em] sm:text-[60px]">Tendances</h1>
-      <p className="text-[15px] text-muted">Les vidéos les plus vues de ton métier ce mois-ci, dans ta langue et près de chez toi, sur TikTok et Instagram, avec leurs accroches. Mis à jour chaque semaine.</p>
+      <p className="text-[15px] text-muted">Les vidéos les plus vues de ton métier ce mois-ci, dans ta langue et près de chez toi, sur TikTok et Instagram, avec leurs accroches, et les sons du moment. Mis à jour chaque semaine.</p>
     </div>
   );
 }

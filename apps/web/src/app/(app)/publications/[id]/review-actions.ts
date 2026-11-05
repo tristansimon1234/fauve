@@ -7,6 +7,7 @@ import { z } from "zod";
 import { studioAccess } from "@/lib/billing/access";
 import { startEffectWords } from "@/lib/effect-words";
 import { loadEditorData } from "@/lib/montage-editor-data";
+import { soundPreviewUrl } from "@/lib/model-sound";
 import { overlayPhotoInputs } from "@/lib/render/cutout";
 import { postImages, type PostImages } from "@/lib/post-images";
 import { correctionQuote, startMontage } from "@/lib/montage-start";
@@ -256,4 +257,11 @@ export async function imagesToShare(postId: string): Promise<PostImages | null> 
   const { member } = await getStudioContext();
   if (!member) return null;
   return postImages(member.studio.id, postId);
+}
+
+/** The sound she adds in Instagram, to hear under her Reel on its page: a link of Instagram's, played from there. */
+export async function soundPreview(postId: string): Promise<string | null> {
+  const found = await reel(postId);
+  if (!found || found.post.kind !== "reel") return null;
+  return soundPreviewUrl(found.studioId, postId).catch(() => null);
 }

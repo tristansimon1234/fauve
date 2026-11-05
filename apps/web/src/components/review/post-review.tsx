@@ -9,7 +9,7 @@ import { useFauveDrawer } from "@/components/fauve-drawer";
 import { ArrowUpIcon, CalendarIcon, CheckIcon, DownloadIcon, PauseIcon, PenIcon, PlayIcon, ShareIcon, UndoIcon, VolumeIcon, VolumeOffIcon } from "@/components/icons";
 import { Mascot } from "@/components/mascot";
 import { CoverPicker } from "@/components/montage/cover-picker";
-import { PausedSign, Scrubber, useReelPlayback } from "@/components/review/reel-player";
+import { AddedSound, PausedSign, Scrubber, useReelPlayback, useSoundPreview } from "@/components/review/reel-player";
 import { whatsappLink } from "@/lib/public-env";
 import type { ReviewData } from "@/lib/review";
 import { OpeningEditor, type EditorParts } from "./editor-parts";
@@ -63,7 +63,8 @@ export function PostReview({
   const [editing, setEditing] = useState<EditStart | null>(null);
   const [editor, setEditor] = useState<EditorModule | null>(null);
   // The video is set aside while « Modifier » plays the montage in its frame: it follows the one shown again.
-  const player = useReelPlayback(video, editing ? null : data.videoUrl);
+  const preview = useSoundPreview(data.postId, data.sound);
+  const player = useReelPlayback(video, editing ? null : data.videoUrl, preview);
   const spans = useMemo(() => timeline(data.plan), [data.plan]);
   const [toast, setToast] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -303,6 +304,11 @@ export function PostReview({
                 </div>
               )}
             </div>
+            {!parts && data.sound && data.videoUrl && (
+              <div className="w-full max-w-[340px]">
+                <AddedSound sound={data.sound} heard={Boolean(preview)} />
+              </div>
+            )}
             {/* Its scenes: a tap opens that one alone; while it is open, they choose the scene to change. */}
             {parts?.strip ? (
               <div className="flex w-full max-w-[340px] flex-col items-center gap-1">{parts.strip}</div>

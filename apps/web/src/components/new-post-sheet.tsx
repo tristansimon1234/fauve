@@ -113,8 +113,11 @@ function defaultWhen(o: NewPostOptions | null, date?: string): When | null {
 
 const clock = (seconds: number) => `${Math.floor(seconds / 60)}:${String(Math.round(seconds % 60)).padStart(2, "0")}`;
 
-/** `copyLink`: a Reel to make one like (from the page Tendances), read as the Reel she copies. */
-export function NewPostSheet({ date, copyLink, onClose }: { date?: string; copyLink?: string; timezone: string; onClose: () => void }) {
+/** A sound she picked on the page Tendances: her Reel is cut on its beats, and she adds it in Instagram from this Reel (`link`). */
+export type PickedSound = { link: string; title: string; artist: string | null; audioId: string | null };
+
+/** `copyLink`: a Reel to make one like (from the page Tendances), read as the Reel she copies; `sound`: a sound to cut it on. */
+export function NewPostSheet({ date, copyLink, sound, onClose }: { date?: string; copyLink?: string; sound?: PickedSound; timezone: string; onClose: () => void }) {
   const titleId = useId();
   const [options, setOptions] = useState<NewPostOptions | null>(null);
   const [work, setWork] = useState<Work | null>(null);
@@ -148,7 +151,7 @@ export function NewPostSheet({ date, copyLink, onClose }: { date?: string; copyL
         {work ? (
           <Working work={work} titleId={titleId} onClose={onClose} />
         ) : (
-          <Create date={date} copyLink={copyLink} options={options} titleId={titleId} onClose={onClose} onStarted={setWork} />
+          <Create date={date} copyLink={copyLink} sound={sound} options={options} titleId={titleId} onClose={onClose} onStarted={setWork} />
         )}
       </div>
     </div>
@@ -158,6 +161,7 @@ export function NewPostSheet({ date, copyLink, onClose }: { date?: string; copyL
 function Create({
   date,
   copyLink,
+  sound,
   options,
   titleId,
   onClose,
@@ -165,6 +169,7 @@ function Create({
 }: {
   date?: string;
   copyLink?: string;
+  sound?: PickedSound;
   options: NewPostOptions | null;
   titleId: string;
   onClose: () => void;
@@ -182,7 +187,9 @@ function Create({
   /** Picked, in order: « m:<media id> » from her library, « u:<draft id> » from her phone. */
   const [order, setOrder] = useState<string[]>([]);
   const [idea, setIdea] = useState("");
-  const [format, setFormat] = useState<PostKind | null>(copyLink ? "reel" : null);
+  const [format, setFormat] = useState<PostKind | null>(copyLink || sound ? "reel" : null);
+  // The sound picked on Tendances: no voice over (a sound added in Instagram plays over it), and she can let it go.
+  const [soundOn, setSoundOn] = useState<PickedSound | null>(sound ?? null);
   const [when, setWhen] = useState<When | null>(null);
   const [other, setOther] = useState("");
   /** Her choices, else the studio's (voice) and the usual places (platforms). */
@@ -241,7 +248,7 @@ function Create({
   const chosenVoice = voice ?? defaultVoice(options);
   // With or without a voice over: always asked for a Reel (Tristan: « il faut demander si voix off ou pas »),
   // unless her Style already says always or never.
-  const voiceAsked = voice !== null || (options?.voice.use ?? "auto") !== "auto";
+  const voiceAsked = Boolean(soundOn) || voice !== null || (options?.voice.use ?? "auto") !== "auto";
   const [launchOnVoice, setLaunchOnVoice] = useState(false);
   const sent = options?.copy ?? null;
   const model = given ?? sent?.id ?? null;
@@ -441,7 +448,8 @@ function Create({
         idea: finalIdea,
         ...(plan ? { plan } : {}),
         items,
-        voice: kind === "reel" ? spoken : "auto",
+        voice: kind === "reel" ? (soundOn ? "off" : spoken) : "auto",
+        ...(kind === "reel" && soundOn ? { sound: { link: soundOn.link, title: soundOn.title, artist: soundOn.artist ?? undefined, audioId: soundOn.audioId ?? undefined } } : {}),
         platforms: where.filter((p): p is "instagram" | "tiktok" => p === "instagram" || p === "tiktok"),
         copy: copying ?? false,
         refs: refShots.map((f) => ({ path: f.path!, mime: f.file.type, size: f.file.size })),
@@ -560,7 +568,25 @@ function Create({
         </section>
         )}
 
-        {step === "what" && kind === "reel" && options && (
+        {step === "what" && kind === "reel" && soundOn && (
+          <section aria-labelledby={`${titleId}-sound`} className="flex flex-col gap-2 border border-line bg-white p-3.5">
+            <div className="flex items-baseline justify-between gap-3">
+              <h3 id={`${titleId}-sound`} className="mono-label text-muted">
+                Calé sur le son
+              </h3>
+              <button type="button" onClick={() => setSoundOn(null)} className="text-[13px] font-bold text-violet">
+                Retirer
+              </button>
+            </div>
+            <p className="text-[16px] font-extrabold leading-tight">
+              {soundOn.title}
+              {soundOn.artist && <span className="font-semibold text-muted"> · {soundOn.artist}</span>}
+            </p>
+            <p className="text-[13px] leading-snug text-muted">Ton Reel sort sans musique, coupé sur ses temps. Tu ajoutes le son dans Instagram en le publiant : je te dis comment à la livraison.</p>
+          </section>
+        )}
+
+        {step === "what" && kind === "reel" && options && !soundOn && (
           <section aria-labelledby={`${titleId}-voice`} className="flex flex-col gap-2.5">
             <h3 id={`${titleId}-voice`} className="text-[17px] font-extrabold tracking-[-0.01em]">
               Une voix off, ou juste la musique ?

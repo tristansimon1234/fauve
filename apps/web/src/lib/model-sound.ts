@@ -1,8 +1,12 @@
 import "server-only";
-import { stolenStyleSchema } from "@fauve/agent";
+import { linkExpiry, stolenStyleSchema, usdToEur } from "@fauve/agent";
+import { costMeta } from "@/lib/cost-scope";
+import { env } from "@/lib/env";
 import { readPostMusic } from "@/lib/render/music";
 import { SENT_TO_COPY } from "@/lib/steal";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { instagramVideo } from "@/lib/treg";
+import { soundExample } from "@/lib/trend-sounds";
 
 // Keeping the sound of the Reel she copies (Tristan: « il m'a pas demandé si je voulais garder le son d'origine ? »):
 // its music cannot be taken into the video (its rights are Instagram's), so the Reel comes out without music, on the
@@ -84,4 +88,46 @@ export function modelSoundLine(sound: { link: string; business: boolean | null; 
       ? "Ton compte est un compte Entreprise : Instagram n'y propose pas tous les sons. Si « Utiliser l'audio » n'apparaît pas, dis-moi « mets ta musique »."
       : "Si « Utiliser l'audio » n'apparaît pas (certains sons ne sont pas proposés aux comptes Entreprise), dis-moi « mets ta musique ».",
   ].join(" ");
+}
+
+/**
+ * The sound she adds in Instagram, heard on the Reel's page (Tristan: « TB une zone grise »): the video of the Reel it
+ * comes from, played from Instagram's CDN under her silent Reel (Instagram serves it to any page:
+ * access-control-allow-origin *), never kept. Its link lasts about a day and a half, kept on the post until then
+ * (posts.music.preview); a sound of the list may know it already (trend_sounds.reels), else Treg reads it (about a
+ * tenth of a cent). Null when this Reel adds no sound or the video could not be read.
+ */
+export async function soundPreviewUrl(studioId: string, postId: string): Promise<string | null> {
+  const sound = await modelSound(studioId, postId);
+  if (!sound) return null;
+  const db = supabaseAdmin();
+  const { data: post } = await db.from("posts").select("music").eq("id", postId).eq("studio_id", studioId).maybeSingle();
+  const music = readPostMusic(post?.music);
+  const cached = music.preview;
+  if (cached?.of === sound.link && Date.parse(cached.until) > Date.now() + 15 * 60_000) return cached.url;
+  let url: string | null = null;
+  const audioId = music.sound?.audio_id;
+  if (audioId) {
+    const example = await soundExample(audioId, studioId).catch(() => null);
+    if (example?.link === sound.link) url = example.video;
+  }
+  if (!url) {
+    const fetched = await instagramVideo(sound.link).catch(() => null);
+    if (fetched) {
+      await db
+        .from("cost_events")
+        .insert({ studio_id: studioId, kind: "steal", provider: "treg", units: 1, cost_eur: usdToEur(fetched.costUsd, env("USD_TO_EUR")), meta: costMeta({ purpose: "sound_preview", found: Boolean(fetched.video), cost_usd: fetched.costUsd }) });
+    }
+    url = fetched?.video ?? null;
+  }
+  if (!url) return null;
+  const until = (linkExpiry(url) ?? new Date(Date.now() + 6 * 3_600_000)).toISOString();
+  // Read again just before: the montage may have written its music meanwhile.
+  const { data: now } = await db.from("posts").select("music").eq("id", postId).eq("studio_id", studioId).maybeSingle();
+  await db
+    .from("posts")
+    .update({ music: { ...readPostMusic(now?.music), preview: { of: sound.link, url, until } } })
+    .eq("id", postId)
+    .eq("studio_id", studioId);
+  return url;
 }
