@@ -17,8 +17,8 @@ import type { z } from "zod";
 
 /** The source of the inspiration row a house model is kept on, per studio (one per model, made when first used). */
 export const HOUSE_SOURCE = "house";
-/** The catalogue's version: a studio's row written by an older one is rewritten when the model is used again (3: its original's sheets; 4: no brand in a model's name; 5: Mots aux quatre coins as its original; 6: Plans fixes at 65 BPM; 7: four renamed; 8: Lieu tapé without its original's orange; 9: Plans fixes on its fiche). */
-export const HOUSE_VERSION = 9;
+/** The catalogue's version: a studio's row written by an older one is rewritten when the model is used again (3: its original's sheets; 4: no brand in a model's name; 5: Mots aux quatre coins as its original; 6: Plans fixes at 65 BPM; 7: four renamed; 8: Lieu tapé without its original's orange; 9: Plans fixes on its fiche; 10: Une journée chez toi on its fiche). */
+export const HOUSE_VERSION = 10;
 
 export type HouseModel = {
   key: string;
@@ -573,37 +573,42 @@ export const HOUSE_MODELS: HouseModel[] = [
   model({
     key: "journee",
     name: "Une journée chez toi",
-    pitch: "Un grand titre rouge élégant derrière les passants, puis une journée en plans courts, comme un film.",
-    needs: "une vidéo large de ton lieu avec des gens qui passent, et 8 à 15 autres plans de ta journée",
+    // 10: written again on its original's fiche (v2 of its skill): horizontal 4:3 on black when her videos are, its tempo
+    // (136,8, Gemini heard 115), a burst of things alike, blurred passes over the cuts, the title fading in behind one,
+    // flashes and film burns with a click, her day into night; no grain nor dark corners its original does not have.
+    pitch: "Une rafale de choses pareilles, un titre rouge élégant qui apparaît derrière un passage flou, puis ta journée en plans courts, avec des flashs photo, jusqu'à la nuit.",
+    needs: "10 à 16 vidéos de ta journée, à l'horizontale de préférence : plusieurs fois la même chose côte à côte (tes tasses, tes fenêtres), ton lieu de jour puis de nuit, des gens et des gestes",
     files: [6, 16],
     pair: "didone",
     example: "S-journee",
-    tempo: 92,
-    finish: { name: "Film", hint: "contraste doux, couleurs de cinéma, grain, coins sombres", contrast: 0.12, saturation: -0.06, warmth: 0.1, vignette: 0.4, grain: 0.35, grain_size: "fine" },
+    // Measured on its original (docs/fiches/journee.md): a beat every 0,439 s; its cuts follow the music by ear.
+    tempo: 136.8,
+    finish: { name: "Journée", hint: "crème, bleu nuit, contraste doux, sans grain", contrast: 0.06, saturation: -0.08, warmth: 0.1, fade: 0.06, shadows: "#131C25", highlights: "#EAD2AD", split: 0.35 },
     look: {
-      name: "une journée, titre derrière",
+      name: "une journée, titre derrière un flou",
       format: "pov",
-      hook: { kind: "mystère", what: "des silhouettes qui passent devant un nom de lieu géant, rouge et élégant" },
+      hook: { kind: "mystère", what: "une rafale de choses pareilles, une par image, puis un titre rouge élégant qui apparaît derrière un passage flou" },
       text: {
         amount: "une ligne",
-        composition: "un nom de lieu géant en serif didone rouge, capitales, au centre, avec trois petits mots manuscrits rouges au-dessus",
+        composition: "un nom de lieu en serif didone rouge, capitales, au milieu de l'image, avec quelques petits mots écrits à la main au-dessus de sa première lettre",
         case: "upper",
         weight: "bold",
         tracking: "tight",
       },
-      colors: ["#e0251b"],
-      layout: "plein cadre, avec un titre rouge géant posé dans le décor, derrière les silhouettes détourées qui passent devant",
+      colors: ["#fa010c"],
+      layout: "4:3 horizontal sur du noir comme l'original, plein cadre si ses vidéos sont verticales",
       moments: [
-        { at: 0, what: "le titre rouge apparaît lettre par lettre en clignotant, derrière les gens qui passent devant" },
-        { at: 1.9, what: "une journée en plans courts, coupés toutes les 0,75 s : des détails, des gestes, des passants" },
-        { at: 12, what: "un plan du soir, lumières floues, tenu jusqu'à la fin" },
+        { at: 0, what: "une rafale de choses pareilles, une par image à la même place, puis une bande floue passe devant l'objectif et cache la coupe" },
+        { at: 1.47, what: "le titre rouge apparaît en fondu derrière la bande qui repart, avec un déclic, et reste sur un plan sombre" },
+        { at: 2.5, what: "sa journée en plans courts, des flashs d'appareil photo et des brûlures de pellicule sur les coupes, chacun avec son déclic" },
+        { at: 12.2, what: "son lieu de jour puis de nuit, au même endroit de l'image, la musique étouffée qui s'éteint" },
       ],
       camera: "mixte",
       grade: "film",
       motion: "chaleureux",
-      music: "dreamy cinematic pop, soft strings and light drums",
-      ending: "un plan du soir aux lumières floues",
-      why: "Un titre de film derrière de vraies gens : on entre dans une journée, pas dans une pub.",
+      music: "retro French instrumental, tremolo chords, soft bass on every beat, no drums",
+      ending: "son lieu de nuit, éclairé, pendant que la musique s'éteint ; ni noir, ni logo",
+      why: "Un petit film de sa journée : une rafale qui accroche, un titre de cinéma, des flashs comme des photos prises sur le vif, et la nuit qui tombe.",
     },
   }),
   model({
