@@ -22,23 +22,26 @@ import {
   type CandidateSource,
   type CandidateStatus,
   type CandidateVerdict,
+  type CopyNearest,
   type ScoutJudgement,
   type StolenStyle,
   type TokenUsage,
 } from "@fauve/agent";
 import { outputFormat } from "@fauve/agent/answer";
-import { anthropic } from "@/lib/agent/run";
+import { anthropic, logClaudeCost } from "@/lib/agent/run";
 import { withScoutCost } from "@/lib/cost-scope";
 import { env } from "@/lib/env";
 import { queueJob } from "@/lib/jobs";
 import { readReel, type StealMissReason } from "@/lib/steal";
+import { timeLeft } from "@/lib/step-clock";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
 // The Reels that may become one of Edith's models (packages/agent/src/model-scout.ts; docs/modeles.md, « Modèles
 // repérés »). A Reel a business sends to copy is judged on the reading made for her copy, after everything she sees
-// (the end of /api/jobs/steal): nothing changes for her, a failure is only logged. A link Tristan proposes on /admin is
+// (the end of /api/jobs/steal): nothing is told to her, a failure is only logged. A link Tristan proposes on /admin is
 // read the same way (readReel, the reading of stealStyle) in its own job (/api/jobs/scout), then judged the same. The
-// scout's costs are the team's, never a business's (cost_events.meta.scout = the Reel's key).
+// scout's costs are the team's, never a business's (cost_events.meta.scout = the Reel's key). Its judgement also says
+// which model plays the Reel she copies, when one does its form (copyNearest, packages/agent/src/copy-model.ts).
 
 /** The judgements of the Reels businesses send (capped each day, SCOUT_DAILY_EUR), and those of Tristan's links. */
 const STEAL_PURPOSE = "scout_steal";
@@ -80,8 +83,17 @@ async function logJudgement(key: string, usage: TokenUsage, purpose: string): Pr
   return eur;
 }
 
-/** Judges a Reel on its reading (SCOUT_JUDGE_PROMPT, Sonnet at low effort): its verdict and cost, or null (never thrown). */
-async function judge(key: string, reading: StolenStyle, platform: CandidatePlatform, from: CandidateSource): Promise<(ScoutJudgement & { costEur: number }) | null> {
+/**
+ * Judges a Reel on its reading (SCOUT_JUDGE_PROMPT, Sonnet at low effort): its verdict and cost, or null (never thrown).
+ * Its cost is the team's (logJudgement), or, through `log`, a montage's that needs its nearest model now (copyNearest).
+ */
+async function judge(
+  key: string,
+  reading: StolenStyle,
+  platform: CandidatePlatform,
+  from: CandidateSource,
+  log: (usage: TokenUsage) => Promise<number> = (usage) => logJudgement(key, usage, from === "steal" ? STEAL_PURPOSE : ADMIN_PURPOSE),
+): Promise<(ScoutJudgement & { costEur: number }) | null> {
   try {
     const response = await anthropic().beta.messages.parse(
       {
@@ -98,7 +110,7 @@ async function judge(key: string, reading: StolenStyle, platform: CandidatePlatf
       },
       { timeout: 90_000 },
     );
-    const costEur = await logJudgement(key, response.usage, from === "steal" ? STEAL_PURPOSE : ADMIN_PURPOSE);
+    const costEur = await log(response.usage);
     if (response.stop_reason === "refusal" || !response.parsed_output) return null;
     return { ...readScoutJudge(response.parsed_output), costEur };
   } catch (error) {
@@ -120,11 +132,14 @@ const judgedColumns = (j: ScoutJudgement) => ({
   why: j.why || null,
 });
 
-/** Whether a Reel is the original one of Edith's models was written from (house_originals). */
-async function isOriginal(key: string): Promise<boolean> {
-  const { data } = await supabaseAdmin().from("house_originals").select("link").not("link", "is", null);
-  return (data ?? []).some((o) => candidateKey(o.link as string) === key);
+/** The key of the model of Edith's a Reel is the original of, the one it was written from (house_originals); null for none. */
+async function originalOf(key: string): Promise<string | null> {
+  const { data } = await supabaseAdmin().from("house_originals").select("key, link").not("link", "is", null);
+  return ((data ?? []).find((o) => candidateKey(o.link as string) === key)?.key as string | undefined) ?? null;
 }
+
+/** Whether a Reel is the original one of Edith's models was written from. */
+const isOriginal = async (key: string): Promise<boolean> => (await originalOf(key)) !== null;
 
 /** One more request on a Reel already judged (count_model_candidate: two at once both count); false when none is kept. */
 async function countRequest(key: string): Promise<boolean> {
@@ -176,6 +191,70 @@ export async function scoutSteal(studioId: string, inspirationId: string): Promi
     console.info("scout: judged", key, judged.verdict, judged.score);
   } catch (error) {
     console.warn("scout: a Reel to copy not judged", inspirationId, error instanceof Error ? error.message.slice(0, 300) : error);
+  }
+}
+
+/** A Reel she sent judged for her montage alone (copyNearest): her studio's cost, counted for that montage. */
+const COPY_PURPOSE = "copy_model";
+/**
+ * A Reel is judged during its montage only with this much left in the step (its limit is 800 s): the judgement (90 s at
+ * most, twice at worst), then the skill, or the chain when its filler says no, as the step's other long calls.
+ */
+const COPY_JUDGE_NEEDS_MS = 420_000;
+
+/** The judgement a Reel's candidate keeps: its nearest model and how close; none while it is read, or unreadable. */
+async function judgedCandidate(key: string): Promise<CopyNearest | null> {
+  const { data } = await supabaseAdmin().from("model_candidates").select("verdict, nearest, closeness").eq("key", key).maybeSingle();
+  const nearest = houseModel(data?.nearest as string | null | undefined);
+  if (!data?.verdict || data.verdict === "unreadable" || !nearest || data.closeness === null) return null;
+  return { key: nearest.key, closeness: Number(data.closeness) };
+}
+
+/**
+ * The nearest of Edith's models for a Reel she sent by its link to copy, when its montage is designed (copy-model.ts;
+ * docs/recopie.md, « Un Reel recopié joué par un modèle d'Edith »): the model it is the original of (closeness 10, no
+ * call), else the scout's judgement kept on its candidate, else, for a real business's Reel not judged yet, the
+ * scout's judgement made now (scoutSteal: counted once, the team's cost, its candidate kept), else a judgement for this
+ * montage alone (the team's or the lab's studio, today's judgements spent, one being judged for another request): the
+ * same judge, its cost her studio's (counted for the montage, purpose copy_model), no candidate made nor counted. Judged
+ * only with the time for it in the step (COPY_JUDGE_NEEDS_MS). Null for anything else (a video she sent may be her own
+ * footage) or a failure: the montage goes on as before. Never thrown.
+ */
+export async function copyNearest(studioId: string, inspirationId: string): Promise<(CopyNearest & { by: "original" | "scout" | "montage" }) | null> {
+  try {
+    const { data: row } = await supabaseAdmin()
+      .from("inspirations")
+      .select("source, url, style, studios(team, website_url)")
+      .eq("id", inspirationId)
+      .eq("studio_id", studioId)
+      .maybeSingle();
+    if (!row || row.source !== "link" || typeof row.url !== "string") return null;
+    const style = stolenStyleSchema.safeParse(row.style);
+    const link = reelLink(row.url);
+    const key = candidateKey(row.url);
+    if (!style.success || !link || !key) return null;
+    const original = houseModel(await originalOf(key));
+    if (original) return { key: original.key, closeness: 10, by: "original" };
+    const kept = await judgedCandidate(key);
+    if (kept) return { ...kept, by: "scout" };
+    if (timeLeft() < COPY_JUDGE_NEEDS_MS) {
+      console.log("copy: no time left in the step to judge its nearest model, the chain makes it", inspirationId, Math.round(timeLeft() / 1000));
+      return null;
+    }
+    const studio = one(row.studios as { team?: boolean | null; website_url?: string | null } | null);
+    if (studio && !ourStudio(studio)) {
+      await scoutSteal(studioId, inspirationId);
+      const judged = await judgedCandidate(key);
+      if (judged) return { ...judged, by: "scout" };
+    }
+    const judged = await judge(key, style.data, link.platform, "steal", async (usage) => {
+      await logClaudeCost(studioId, usage, COPY_PURPOSE, SCOUT_MODEL, { reel: key });
+      return usdToEur(claudeCostUsd(SCOUT_MODEL, usage), env("USD_TO_EUR"));
+    });
+    return judged?.nearest && judged.closeness !== null ? { key: judged.nearest, closeness: judged.closeness, by: "montage" } : null;
+  } catch (error) {
+    console.warn("copy: nearest model not found", inspirationId, error instanceof Error ? error.message.slice(0, 300) : error);
+    return null;
   }
 }
 

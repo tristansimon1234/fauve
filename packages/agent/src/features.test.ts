@@ -10474,3 +10474,126 @@ test("the motion designer starts from a borrowed model's code and adapts its eff
   assert.doesNotMatch(motionDesignerPrompt({ composition: true, photos: true, moves: true, example: true }).parts, /Borrowed effects/);
 });
 
+// ---------------------------------------------------------------------------
+// A Reel she sends to copy that one of Edith's models already does is played by that model's skill (copy-model.ts;
+// Tristan: « il faut capitaliser sur ce qu'on sait faire au lieu de réinventer »).
+// ---------------------------------------------------------------------------
+
+/** A Reel she sent by its link, as its montage follows it: a reading built on a model's own look, with her measures. */
+async function sentReel(text: "aucun" | "une ligne" = "une ligne") {
+  const { HOUSE_MODELS } = await import("./house-models.ts");
+  const look = HOUSE_MODELS.find((m) => m.key === "mosaique")!.look;
+  return followedFrom("3f0c8a52-6d1e-4c1b-9a77-2b5d0f6e9c10", { look: { ...look, text: { ...look.text, amount: text } }, measures: { duration: 12, cuts: [1.5, 3, 4.5, 6], bpm: 118, lufs: -14 } });
+}
+
+test("a Reel sent to copy is played by its nearest model from a closeness of 8, the scout's « known »: never a new form for Tristan", async () => {
+  const { COPY_BY_MODEL_AT, copyByModel } = await import("./copy-model.ts");
+  const { readScoutJudge, SCOUT_KNOWN_AT } = await import("./model-scout.ts");
+  const { MONTAGE_SKILLS } = await import("./skill-library.ts");
+  assert.equal(COPY_BY_MODEL_AT, 8);
+  assert.ok(COPY_BY_MODEL_AT >= SCOUT_KNOWN_AT);
+  const every = (key: string) => MONTAGE_SKILLS[key];
+  const mosaique = MONTAGE_SKILLS.mosaique!;
+  // The judge's answer as the scout keeps it: its nearest named by key or by name, its closeness on 10.
+  const judged = (nearest: string, closeness: number) => {
+    const j = readScoutJudge({ form: true, nearest, closeness, what_is_new: "", name: "", trades: [], needs: "", score: 4, why: "" });
+    return j.nearest && j.closeness !== null ? { key: j.nearest, closeness: j.closeness, verdict: j.verdict } : null;
+  };
+  const close = judged("Mosaïque qui change", 9)!;
+  assert.deepEqual(close, { key: "mosaique", closeness: 9, verdict: "known" });
+  assert.equal(copyByModel(close, every, 6), mosaique);
+  assert.equal(copyByModel(judged("mosaique", 8), every, 6), mosaique);
+  assert.equal(copyByModel({ key: "mosaique", closeness: 10 }, every, 6), mosaique);
+  // Under 8 (a variant too far, an idea in common), unknown, or no judgement: the chain, as before.
+  assert.equal(copyByModel(judged("mosaique", 7), every, 6), undefined);
+  assert.equal(judged("not-a-model", 9), null);
+  assert.equal(copyByModel(null, every, 6), undefined);
+  assert.equal(copyByModel({ key: "mosaique", closeness: Number.NaN }, every, 6), undefined);
+  // A skill this studio does not play (a version Tristan has not added): none.
+  assert.equal(copyByModel(close, () => undefined, 6), undefined);
+  assert.equal(copyByModel({ key: "plans-fixes", closeness: 9 }, (key) => (key === "mosaique" ? mosaique : undefined), 6), undefined);
+  // Her files fill it, as when Edith picks a model while the Reel is made (she is never asked for more): 4 at least here.
+  assert.equal(mosaique.files[0], 4);
+  assert.equal(copyByModel(close, every, 3), undefined);
+  assert.equal(copyByModel(close, every, 4), mosaique);
+});
+
+test("only a Reel she sent is played by a model: never one of Edith's (its own skill), one of hers kept, a voice, her layout; a correction only of a skill's version", async () => {
+  const { mayCopyByModel, beyondSkills } = await import("./copy-model.ts");
+  const { HOUSE_MODELS, houseStyle } = await import("./house-models.ts");
+  const sent = await sentReel();
+  assert.equal(mayCopyByModel({ followed: sent, voice: false, correction: false }), true);
+  assert.equal(mayCopyByModel({ followed: undefined, voice: false, correction: false }), false);
+  // One of Edith's models plays its own skill; one of her Reels kept as a model is her own footage.
+  const house = followedFrom("3f0c8a52-6d1e-4c1b-9a77-2b5d0f6e9c11", houseStyle(HOUSE_MODELS.find((m) => m.key === "decode")!));
+  assert.equal(house.house, "decode");
+  assert.equal(mayCopyByModel({ followed: house, voice: false, correction: false }), false);
+  const own = followedFrom("3f0c8a52-6d1e-4c1b-9a77-2b5d0f6e9c12", { look: sent.look, measures: { duration: 12, cuts: [2, 4], bpm: null, lufs: null } }, true);
+  assert.equal(mayCopyByModel({ followed: own, voice: false, correction: false }), false);
+  // What no montage skill does: her voice over it, her layout, the words of a voice.
+  const none = { voice_text: null, voice_text_rest: null, layout: null };
+  assert.equal(beyondSkills(undefined, false), false);
+  assert.equal(beyondSkills(none, false), false);
+  assert.equal(mayCopyByModel({ followed: sent, voice: true, correction: false }), false);
+  assert.equal(mayCopyByModel({ followed: sent, contract: { ...none, layout: "écran partagé" }, voice: false, correction: false }), false);
+  assert.equal(mayCopyByModel({ followed: sent, contract: { ...none, voice_text: "Bienvenue chez nous" }, voice: false, correction: false }), false);
+  assert.equal(mayCopyByModel({ followed: sent, contract: { ...none, voice_text_rest: "puis tu présentes l'offre" }, voice: false, correction: false }), false);
+  // A correction stays on the skill its version was made on; one the chain made, the chain corrects.
+  assert.equal(mayCopyByModel({ followed: sent, voice: false, correction: true, previousSkill: "mosaique" }), true);
+  assert.equal(mayCopyByModel({ followed: sent, voice: false, correction: true, previousSkill: null }), false);
+  assert.equal(mayCopyByModel({ followed: sent, voice: false, correction: true }), false);
+});
+
+test("a Reel sent to copy that a model plays has its words when it has some, none when it has none, whatever dresses it", async () => {
+  const { skillWordsWanted } = await import("./copy-model.ts");
+  const { MONTAGE_SKILLS } = await import("./skill-library.ts");
+  const mosaique = MONTAGE_SKILLS.mosaique!;
+  // Its only title is optional; Titre qui se décode always writes both of its own.
+  assert.ok(mosaique.texts.length > 0 && mosaique.texts.every((t) => !t.required));
+  const decode = MONTAGE_SKILLS.decode!;
+  assert.ok(decode.texts.some((t) => t.required));
+  const worded = await sentReel("une ligne");
+  const wordless = await sentReel("aucun");
+  assert.equal(skillWordsWanted(mosaique, worded, true), true);
+  assert.equal(skillWordsWanted(mosaique, wordless, true), false);
+  // Her charter asked on the copy (« avec mes couleurs », dressed) changes its fonts and colours, never its words.
+  assert.equal(skillWordsWanted(mosaique, { ...wordless, dressed: true }, true), false);
+  // A model Edith picked gives the form, never the silence; one she picked herself stays as she leaves it.
+  assert.equal(skillWordsWanted(mosaique, { ...wordless, dressed: true }), true);
+  assert.equal(skillWordsWanted(mosaique, wordless), false);
+  // Required words are always written, whatever is wanted; a model without words wants none.
+  assert.equal(skillWordsWanted(decode, worded, true), false);
+  assert.equal(skillWordsWanted({ texts: [] }, worded, true), false);
+});
+
+test("a Reel sent to copy that a model plays: its filler knows, and Edith says it in one sentence on the post, nothing in the delivery", async () => {
+  const { copyByModelWords } = await import("./copy-model.ts");
+  const { deliveryWords } = await import("./editor.ts");
+  const { COPIED_REEL, SKILL_FILL_PROMPT, skillFillInput } = await import("./skills.ts");
+  const { MONTAGE_SKILLS } = await import("./skill-library.ts");
+  const said = copyByModelWords("Mosaïque qui change");
+  assert.equal(said, "Je l'ai refait avec mon modèle « Mosaïque qui change », qui fait la même chose.");
+  // The delivery keeps only what she must know after its first sentence: here, nothing more.
+  assert.equal(deliveryWords(said), "");
+  // Its filler is told the request may describe the Reel she sent, which the model does its own way.
+  const mosaique = MONTAGE_SKILLS.mosaique!;
+  const files = [1, 2, 3, 4, 5].map((i) => ({ id: `f${i}`, photo: true, seconds: 0, shows: "un plat", aspect: 9 / 16 }));
+  const input = (copied?: boolean) => skillFillInput({ skill: mosaique, name: "Mosaïque qui change", n: 6, files, business: {}, request: "Recopie ce Reel avec mes plats", ...(copied ? { copied } : {}) }) as { recopie?: string };
+  assert.equal(input(true).recopie, COPIED_REEL);
+  assert.equal("recopie" in input(), false);
+  assert.match(SKILL_FILL_PROMPT, /With « recopie », she sent a Reel to copy/);
+});
+
+test("a Reel sent to copy that a model plays, its sound kept for Instagram: the model plays at that Reel's tempo, else at its own", async () => {
+  const { keptSoundTempo } = await import("./copy-model.ts");
+  const sent = await sentReel();
+  assert.equal(sent.bpm, 118);
+  assert.deepEqual(keptSoundTempo({ mode: "model" }, sent.bpm), { bpm: 118, offset: 0 });
+  // Edith's music, a silent Reel for a sound of her choice, or a sound she follows (measured on its own link): its own tempo.
+  assert.equal(keptSoundTempo({ mode: "on" }, sent.bpm), undefined);
+  assert.equal(keptSoundTempo({ mode: "off" }, sent.bpm), undefined);
+  assert.equal(keptSoundTempo({ mode: "model", sound: { link: "https://www.instagram.com/reel/DfLqTq6CgLL/" } }, sent.bpm), undefined);
+  // No steady beat in the Reel she sent: nothing to land on.
+  assert.equal(keptSoundTempo({ mode: "model" }, null), undefined);
+});
+

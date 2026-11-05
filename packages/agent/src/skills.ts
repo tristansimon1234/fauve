@@ -1391,6 +1391,7 @@ export type SkillFillAnswer = z.infer<typeof skillFillSchema>;
 export const SKILL_FILL_PROMPT = `You fill one of Edith's montage models for a local business: a whole Reel coded once, like an Edits or CapCut template. Its shots are slots timed on its music, its texts have their place, its look, its signature moment and its ending are in its code. You only choose which of her files plays in each slot and from where, and write its words: the code plays everything else exactly as the model does.
 
 First decide "fits": true when the model, filled with her files and her words, gives her what she asked for. Her request may simply ask for this model, give her words, a mood, her files: that fits (the music and the caption are made elsewhere, never a reason for false). A length she asks for inside the model's lengths (« longueurs ») fits: the code has already set the number of slots and its tempo for it. When she asks for something the model does not do and that matters to her (a voice-over, subtitles of what she says, an animation of its own, another layout, a text the model has no slot for, a shot at a precise moment, another ending, a length outside its lengths), "fits" is false and "missing" says what in a few words: the editor then makes her Reel from this model. When in doubt about something she clearly wants, false.
+With « recopie », she sent a Reel to copy and this model does its form: what her request describes of that Reel (its opening, its texts, its rhythm, its ending) the model does its own way, never a reason for false; only what she asks beyond that Reel is.
 
 Then cast her files on its slots (« cases », in order: each with its length and what it wants), as a good editor would:
 - each slot gets the file and the passage that suits what it wants; the first slot opens the Reel: the strongest, most beautiful image;
@@ -1421,6 +1422,10 @@ A model timed on her voice (« voix »): her talking video is the Reel, cut by t
 "end": only when the model has an ending (« fin ») and she has something to end on (an offer, an opening, a date, in her request or what we know): its title (40 characters at most) and a subtitle or empty; otherwise null.
 "why": one sentence for her in French (tu), what you chose and why, in plain words.`;
 
+/** What the filler is told of a Reel she sent to copy that the model plays (« recopie »), in French like the rest of its input. */
+export const COPIED_REEL =
+  "Elle a envoyé un Reel à recopier, et ce modèle fait la même forme : sa demande peut décrire ce Reel (son ouverture, ses textes, son rythme, sa fin), que le modèle fait à sa façon.";
+
 /** What the filler reads: the business, her request, the model (how it goes, its slots, its texts), her files. */
 export function skillFillInput(input: {
   skill: MontageSkill;
@@ -1447,6 +1452,11 @@ export function skillFillInput(input: {
   currentSaid?: string[];
   /** What the engine knows and writes itself in a slot (her place's coordinates). */
   facts?: SkillFacts;
+  /**
+   * A Reel she sent to copy that this model plays (copy-model.ts: its form judged the same): her request may describe
+   * that Reel, which the model does its own way.
+   */
+  copied?: boolean;
 }) {
   const voice = input.skill.voice;
   // On her voice, no slot to cast: her talk is its shots.
@@ -1463,6 +1473,7 @@ export function skillFillInput(input: {
     },
     demande: input.request,
     ...(input.contract?.length ? { contrat: input.contract } : {}),
+    ...(input.copied ? { recopie: COPIED_REEL } : {}),
     modele: {
       nom: input.name,
       deroule: input.skill.how,

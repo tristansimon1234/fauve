@@ -1,10 +1,13 @@
 import "server-only";
 import {
+  beyondSkills,
   BRIEF_MAX,
   CHAT_MODEL,
   compositionShots,
   compositionTexts,
   contractLines,
+  copyByModel,
+  copyByModelWords,
   dressSkillPlan,
   fewFiles,
   finishPlan,
@@ -13,6 +16,8 @@ import {
   measuredFiles,
   houseModel,
   isClipSegment,
+  keptSoundTempo,
+  mayCopyByModel,
   memoryLines,
   motionTemplateSchema,
   planTimeline,
@@ -28,6 +33,7 @@ import {
   skillFitAt,
   skillLengths,
   skillWordsOf,
+  skillWordsWanted,
   mergeSkillSettings,
   leadPlan,
   soundLead,
@@ -56,6 +62,8 @@ import { usableFonts } from "@/lib/fonts";
 import { ensureFileReadings } from "@/lib/render/readings";
 import { ensureTracks, loadTracks } from "@/lib/render/tracks";
 import { studioPlace } from "@/lib/geo";
+import { copyNearest } from "@/lib/model-scout";
+import { readPostMusic } from "@/lib/render/music";
 import { skillGate } from "@/lib/skill-reviews";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { noteGap } from "@/lib/toolkit";
@@ -74,8 +82,43 @@ export type SkillDesign = { plan: EditPlan; editPlanId: string; version: number;
 /** The skill a Reel can be made on before anything is asked: one of Edith's models with a skill, without a voice nor a layout of hers. */
 export function skillCandidate(followed: FollowedStyle | undefined, contract: ReelContract | undefined, voice: boolean): MontageSkill | undefined {
   const skill = skillFor(followed?.house);
-  if (!skill || voice || contract?.layout || contract?.voice_text || contract?.voice_text_rest) return undefined;
+  if (!skill || beyondSkills(contract, voice)) return undefined;
   return skill;
+}
+
+/**
+ * The skill that plays a Reel she sent by its link to copy (copy-model.ts; docs/recopie.md, « Un Reel recopié joué par un
+ * modèle d'Edith »): its nearest of Edith's models (copyNearest: the scout's judgement, or one made now) when its form
+ * comes as close as COPY_BY_MODEL_AT, a skill this studio plays (skillGate) that her files fill, nothing she asks that no
+ * skill does; for a correction, only of a version made on a skill (the editor keeps it on that one). When she keeps the
+ * sound of the Reel she copies (added by her in Instagram, the Reel silent), the model plays at that Reel's measured
+ * tempo, its cuts on its beats as the chain's are; without a steady beat, at its own. Undefined: the chain, as before.
+ */
+export async function copySkill(input: {
+  studioId: string;
+  followed: FollowedStyle | undefined;
+  contract: ReelContract | undefined;
+  voice: boolean;
+  /** Her distinct files for this Reel. */
+  files: number;
+  gate: Awaited<ReturnType<typeof skillGate>>;
+  correction: boolean;
+  /** The skill the version a correction corrects was made on. */
+  previousSkill?: string | null;
+  /** The post's music (posts.music). */
+  music?: unknown;
+}): Promise<{ skill: MontageSkill; sound?: { bpm: number; offset: number } } | undefined> {
+  const { followed } = input;
+  if (!followed || !mayCopyByModel({ followed, contract: input.contract, voice: input.voice, correction: input.correction, previousSkill: input.previousSkill })) return undefined;
+  const nearest = await copyNearest(input.studioId, followed.inspiration_id);
+  const skill = copyByModel(nearest, (key) => input.gate(skillFor(key)), input.files);
+  if (!skill) {
+    if (nearest) console.log("copy: no model of Edith's plays it", followed.inspiration_id, nearest.key, nearest.closeness, nearest.by, `${input.files} files`);
+    return undefined;
+  }
+  console.log("copy: played by a model of Edith's", followed.inspiration_id, skill.key, nearest!.closeness, nearest!.by);
+  const kept = keptSoundTempo(readPostMusic(input.music), followed.bpm);
+  return { skill, ...(kept ? { sound: kept } : {}) };
 }
 
 /** Her files as a skill casts them: a video's length, what it shows and its moments worth showing (best first); a photo's reading; each one's shape. */
@@ -160,6 +203,11 @@ export async function designSkill(params: {
   profile: Partial<BrandProfile>;
   /** The sound she follows (its tempo and first beat): the skill plays at its tempo, its cuts on its beats. */
   sound?: { bpm: number; offset: number };
+  /**
+   * A Reel she sent to copy that this model plays (copySkill): `followed` is that Reel, which dresses it like her copy
+   * (its fonts and colours, or her charter when she asked for it); its words when it has some; said in one sentence.
+   */
+  copied?: boolean;
 }): Promise<SkillDesign | null> {
   const { skill } = params;
   const name = houseModel(skill.key)?.name ?? skill.key;
@@ -188,8 +236,9 @@ export async function designSkill(params: {
   const lead = params.sound && soundBpm ? soundLead(params.sound.offset, soundBpm) : 0;
   const n = fit.n;
   const bpm = fit.bpm !== skill.bpm ? fit.bpm : undefined;
-  // A model Edith picked gives the form, never the silence: its optional title is written (dressedFloorNote's floor).
-  const wordsWanted = Boolean(params.followed.dressed) && !skill.texts.some((t) => t.required) && skill.texts.length > 0;
+  // A model Edith picked gives the form, never the silence: its optional title is written (dressedFloorNote's floor). A Reel
+  // she copies has the words of the Reel she sent, or none.
+  const wordsWanted = skillWordsWanted(skill, params.followed, params.copied);
   // A correction keeps its words but what her request changes: the words of its texts, by slot.
   // A correction keeps the settings it had (« plus de cases » once asked) but what her request changes.
   const previousSettings = params.previous?.skill?.key === skill.key ? params.previous.skill.settings : undefined;
@@ -211,6 +260,7 @@ export async function designSkill(params: {
     ...(previousSettings && Object.keys(previousSettings).length ? { currentSettings: previousSettings } : {}),
     ...(talk ? { talk } : {}),
     ...(known ? { facts: known } : {}),
+    ...(params.copied ? { copied: true } : {}),
   });
   // One small call fills it; `again`: its answer and what the check said of it, for a second try.
   const fillIt = async (again?: { answer: SkillFillAnswer; note: string }): Promise<SkillFillAnswer | null> => {
@@ -291,7 +341,8 @@ export async function designSkill(params: {
     plan,
     editPlanId: row.id,
     version: row.version,
-    rationale: [`Je l'ai monté sur le modèle « ${name} ».`, answer.why.trim().slice(0, 300)].filter(Boolean).join(" "),
+    // A Reel she sent, played by one of Edith's models: one sentence on the post, nothing more (the delivery says none of it).
+    rationale: params.copied ? copyByModelWords(name) : [`Je l'ai monté sur le modèle « ${name} ».`, answer.why.trim().slice(0, 300)].filter(Boolean).join(" "),
   };
 }
 

@@ -103,7 +103,7 @@ import { photoRegions } from "@/lib/video/regions";
 import { latestReport } from "@/lib/performance";
 import { judgeHooks } from "./hook-judge";
 import { copyCandidate, designCopy } from "./copy-design";
-import { designSkill, skillCandidate } from "./skill-design";
+import { copySkill, designSkill, skillCandidate } from "./skill-design";
 import { followedSound } from "@/lib/sound-follow";
 import { skillGate } from "@/lib/skill-reviews";
 import { skillFor } from "@fauve/agent/skills";
@@ -453,19 +453,36 @@ export async function designEdit(params: {
   }
   // A model coded as a whole Reel (a montage skill, like an Edits or CapCut template): filled by one small call and played
   // as it is, no editor nor motion designer. Its correction too; a request it does not serve goes to the editor below,
-  // whose motion designer starts from its code.
-  const previousSkill = previousPlan.success && previousPlan.data.skill?.key === skill?.key ? previousPlan.data : null;
+  // whose motion designer starts from its code. A Reel she sent by its link that one of Edith's models does is played by
+  // that model's skill too, dressed like her copy (copySkill: its nearest model, judged once); else the editor, as before.
+  const copiedBy =
+    skill || params.director
+      ? undefined
+      : await copySkill({
+          studioId: params.studioId,
+          followed,
+          contract: params.contract,
+          voice: Boolean(voice),
+          files: new Set(mediaIds).size,
+          gate,
+          correction,
+          previousSkill: previousPlan.success ? previousPlan.data.skill?.key : null,
+          music: post.data.music,
+        });
+  const playing = skill ?? copiedBy?.skill;
+  const skillSound = sound ?? copiedBy?.sound;
+  const previousSkill = previousPlan.success && previousPlan.data.skill?.key === playing?.key ? previousPlan.data : null;
   // (Never in the director's look at a Reel it made: that step only looks at its own composition.)
-  if (skill && followed && !params.director && (!correction || previousSkill)) {
+  if (playing && followed && !params.director && (!correction || previousSkill)) {
     // Timed on her voice: her speech read first (her words timed exactly, her « euh »), a minute and a half at most.
-    if (skill.voice && earlySpeech) {
+    if (playing.voice && earlySpeech) {
       const read = await Promise.race([earlySpeech, new Promise<null>((resolve) => setTimeout(() => resolve(null), SPEECH_WAIT_MS))]);
       if (read) clips = read;
     }
     const made = await designSkill({
       studioId: params.studioId,
       postId: params.postId,
-      skill,
+      skill: playing,
       followed,
       mediaIds,
       clips,
@@ -475,7 +492,8 @@ export async function designEdit(params: {
       previous: correction ? previousSkill : null,
       studio: { name: studio.data?.name, business: studio.data?.business_type, memory: studio.data?.memory, booking: Boolean(studio.data?.booking_url) },
       profile,
-      ...(sound ? { sound } : {}),
+      ...(skillSound ? { sound: skillSound } : {}),
+      ...(copiedBy ? { copied: true } : {}),
     });
     if (made) return { editPlanId: made.editPlanId, version: made.version, plan: made.plan, rationale: made.rationale, newScenes: 0, reusedScenes: 0 };
   }
