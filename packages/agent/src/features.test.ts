@@ -4093,3 +4093,221 @@ test("« Écran partagé titré » (v2): its layout as a setting her words ask, 
   // Its music shaped on the plan: without its bass to the third bar, cut dead at the end.
   assert.deepEqual(plan.music_shape, { filters: [{ kind: "thin", from: 0, to: 4, open: 0.02 }], end: { at: plan.duration, fade: 0.012 } });
 });
+
+// ——— « Recette cosy, typo pixel » v2, written again on its original's fiche (docs/fiches/pixel.md) ———————————————————
+
+/** Its texts as its composition gets them on its original's 26 shots (frames), and what it draws at a frame. */
+const PIXEL_TEXTS = [
+  { text: "fraisier menthe!!", role: "hook", from: 5, to: 104, emphasis: [] },
+  { text: "fait maison, pour le goûter", role: "caption", from: 5, to: 104, emphasis: [] },
+  { text: "les œufs / farine tamisée, sucre et beurre / ça prend forme !", role: "band", from: 104, to: 424, emphasis: [] },
+  { text: "bonne dégustation", role: "caption", from: 424, to: 466, emphasis: [] },
+];
+async function pixelAt(frame: number, aspect = 9 / 16, extra: Record<string, unknown> = {}): Promise<Drawn> {
+  const { pixel } = await import("./skills/pixel.ts");
+  const line = pixel.timeline(26, { end: false });
+  const shots = line.shots.map((s, i) => ({ src: `/v${i}.mp4`, aspect, from: Math.round(s.start * 30), durationInFrames: Math.round((s.end - s.start) * 30), kind: "video", segment: i }));
+  const texts = Object.fromEntries(Object.entries(line.marks).map(([k, v]) => [k, String(v)]));
+  return drawScene(SEEDED + pixel.code, frame, { width: 1080, height: 1920, durationInFrames: 466, brand: { name: "Pâtisserie Lou", displayFont: "Pixelify Sans", bodyFont: "Space Mono" }, shots, reelTexts: PIXEL_TEXTS, end: null, texts, ...extra });
+}
+/** Every word under a node in the page's order, spaces left out (its letters are each in their own span). */
+const pixelWords = (node: unknown) => drawnNodes(node).map(drawnText).join("").replace(/\s+/g, "");
+/** A text's box (FitText) by the colour of its type, and each of its letters' pose (null: straight). */
+const pixelBoxes = (tree: Drawn, color: string) => drawnNodes(tree).filter((n) => n.type === "FitText" && (n.props.innerStyle as Record<string, unknown> | undefined)?.color === color);
+const pixelPoses = (node: Drawn) =>
+  drawnNodes(node)
+    .filter((n) => n.type === "span" && styleOf(n).display === "inline-block" && n.children.length === 1 && typeof n.children[0] === "string")
+    .map((n) => (styleOf(n).transform as string | undefined) ?? null);
+
+test("« Recette cosy, typo pixel » (v2) cuts where its original does, gesture by gesture, on its own music (100 BPM)", async () => {
+  const { pixel, pixelSections, pixelRest } = await import("./skills/pixel.ts");
+  const { skillPlan } = await import("./skills.ts");
+  assert.equal(pixel.version, 2);
+  assert.equal(pixel.bpm, 100);
+  const line = pixel.timeline(26, { end: false });
+  // The original's 26 pieces (images at 30 i/s, docs/fiches/pixel.md: 15 of its 25 cuts in the same frame, a gesture
+  // each), within two images each, on its own music's tempo.
+  const original = [0, 16, 40, 53, 70, 86, 104, 113, 127, 150, 175, 186, 202, 216, 230, 245, 257, 272, 284, 296, 323, 338, 351, 365, 386, 424];
+  assert.equal(line.shots.length, original.length);
+  line.shots.forEach((s, i) => assert.ok(Math.abs(Math.round(s.start * 30) - original[i]!) <= 2, `shot ${i + 1}: image ${Math.round(s.start * 30)}, the original's ${original[i]}`));
+  assert.ok(Math.abs(line.duration - 15.53) < 0.05, `${line.duration} s`);
+  // Its title and its tiny lines from its image 5 (before the first note) to the cut on its first step (image 104), its
+  // captions on its steps, its closing word on its loop; its sections given to its code.
+  assert.deepEqual([line.texts.titre!.from, line.texts.titre!.to].map((t) => Math.round(t * 30)), [5, 104]);
+  assert.deepEqual(line.texts.petit_mot, line.texts.titre);
+  assert.deepEqual([line.texts.etapes!.from, line.texts.etapes!.to].map((t) => Math.round(t * 30)), [104, 424]);
+  assert.deepEqual([line.texts.fin!.from, line.texts.fin!.to].map((t) => Math.round(t * 30)), [424, 466]);
+  assert.deepEqual(line.marks, { cut: 104, fill: 150, hand: 245, cook: 272, near: 365, loop: 424, boil: 5 });
+  // Its piano rests a beat in its first step and comes back on the downbeat at 4,8 s (the original's 4,25 – 4,75 s),
+  // without its bass until the cooking (9 s: its bass comes in at 8,98 s), stopped dead with the last image as it loops;
+  // no sound effect: its knife and its boiling water are its videos' own.
+  assert.deepEqual(line.music, { pauses: [{ from: 4.2, to: 4.8 }], filters: [{ kind: "thin", from: 0, to: 9 }], end: { at: line.duration } });
+  assert.equal(line.sounds, undefined);
+  // Its gestures: the next ones of a step want the same video, the loop the first one's video just before it.
+  assert.match(line.shots[1]!.want, /^la même vidéo que la case précédente/);
+  assert.match(line.shots.at(-1)!.want, /^la même vidéo que la case 1, juste avant elle/);
+  assert.ok(line.shots.filter((s) => /^la même vidéo que la case précédente/.test(s.want)).length === 15);
+  // Fewer shots: its gestures go first, every place keeps one, its steps with words enough of theirs to be read.
+  assert.deepEqual(pixel.shots, [15, 26]);
+  for (let n = 15; n <= 26; n++) {
+    const sections = pixelSections(n);
+    assert.equal(sections.flat().length, n);
+    assert.equal(sections.length, 11);
+    assert.ok(sections.every((g) => g.length >= 1));
+    const fewer = pixel.timeline(n, { end: false });
+    assert.equal(fewer.shots.length, n);
+    assert.ok(fewer.texts.titre!.to - fewer.texts.titre!.from >= 1.6, `${n} shots: its title`);
+    assert.ok((fewer.marks.hand! - fewer.marks.fill!) / 30 >= 1.7, `${n} shots: its list`);
+    const rest = fewer.music!.pauses![0]!;
+    assert.ok(rest.from >= fewer.marks.cut! / 30 - 1e-6 && rest.to <= fewer.marks.fill! / 30 + 1e-6, `${n} shots: ${JSON.stringify(rest)}`);
+  }
+  assert.ok(pixel.timeline(15, { end: false }).duration < pixel.timeline(20, { end: false }).duration);
+  // Its rest comes back on the latest downbeat of its first step, else its latest beat, none in a step under a beat.
+  assert.equal(pixelRest(5.78, 8.33), 8);
+  assert.equal(pixelRest(5.06, 7.11), 7);
+  assert.equal(pixelRest(5.2, 5.9), null);
+  // With an ending card (an option: the original loops), its loop held whole beats longer, the same cuts, the mix's fade.
+  const ended = pixel.timeline(26, { end: true });
+  assert.deepEqual(ended.shots.slice(0, -1), line.shots.slice(0, -1));
+  assert.ok(ended.duration - line.duration >= 1.6 && Math.abs(((ended.duration - line.duration) * 100) / 60 - 3) < 0.05, `${ended.duration} s`);
+  assert.equal(ended.music!.end, undefined);
+  assert.ok(Math.abs(ended.texts.fin!.to - (ended.duration - 1.6)) < 0.01);
+  // At another tempo, all of it follows its beats.
+  const slower = pixel.timeline(26, { end: false, bpm: 80 });
+  assert.ok(Math.abs(slower.duration / line.duration - 100 / 80) < 0.01);
+  assert.ok(Math.abs(slower.marks.cook! / line.marks.cook! - 100 / 80) < 0.01);
+  // On the plan: its tempo and its music's shape, no sound of its own.
+  const files = Array.from({ length: 12 }, (_, i) => ({ id: `v${i}`, photo: false, seconds: 20 }));
+  const words = { titre: "fraisier menthe!!", petit_mot: "fait maison, pour le goûter", etapes: "les œufs / farine, sucre et beurre / ça prend forme", fin: "bonne dégustation" };
+  const plan = skillPlan({ skill: pixel, name: "Recette cosy, typo pixel", files, fill: { shots: Array.from({ length: 26 }, (_, i) => ({ file: files[i % 12]!.id, at: Math.floor(i / 12) * 6 })), texts: words, end: null } });
+  assert.ok(editPlanSchema.safeParse(plan).success);
+  assert.equal(plan.tempo, 100);
+  assert.deepEqual(plan.music_shape, { pauses: [{ from: 4.2, to: 4.8 }], filters: [{ kind: "thin", from: 0, to: 9, open: 0.02 }], end: { at: plan.duration, fade: 0.012 } });
+  assert.equal(plan.sounds, undefined);
+});
+
+test("« Recette cosy, typo pixel » (v2): its title in pixels at once on image 5, every letter trembling every 5 images, its tiny lines, her name", async () => {
+  const { pixel } = await import("./skills/pixel.ts");
+  const { clearsDrawn, drawsSubject, objectsDrawn } = await import("./subject.ts");
+  // Nothing on its first 5 images: the finished result alone; then its title at once, nothing typed nor lit.
+  assert.equal(pixelBoxes(await pixelAt(4), "#d4f7e9").length, 0);
+  const title = pixelBoxes(await pixelAt(5), "#d4f7e9")[0]!;
+  assert.equal(pixelWords(title), "fraisiermenthe!!");
+  // Pale mint, its thin dark grey-green edge all round, no shadow; 89 px on two lines balanced by their letters, centred
+  // at the original's 34 % (ClearBox's fallback here: no clear area read), its face before it and its star after it.
+  const inner = title.props.innerStyle as Record<string, string | number>;
+  assert.equal(inner.fontSize, 89);
+  assert.match(String(inner.textShadow), /^2px 0px 0 #2c4741, -2px 0px 0 #2c4741/);
+  assert.doesNotMatch(String(inner.textShadow), /\d+px \d+px [1-9]/);
+  const lines = drawnNodes(title).filter((n) => n.type === "div" && styleOf(n).whiteSpace === "nowrap");
+  assert.deepEqual(lines.map(pixelWords), ["fraisier", "menthe!!"]);
+  assert.ok(lines.every((l) => drawnNodes(l).some((n) => "data-fauve-decor" in n.props && drawnNodes(n).some((d) => d.type === "svg"))));
+  const box = styleOf(title);
+  assert.ok(Math.abs(Number(box.left) + Number(box.width) / 2 - 540) <= 1 && Math.abs(Number(box.top) + Number(box.height) / 2 - 0.343 * 1920) <= 2, JSON.stringify(box));
+  // Its first pose straight (images 5 to 9); then every 5 images each letter its own small tilt (2 to 10°) and a shift
+  // of a pixel or two, held until the next.
+  const poses = async (f: number) => pixelPoses(pixelBoxes(await pixelAt(f), "#d4f7e9")[0]!);
+  assert.equal((await poses(5)).length, 16);
+  assert.ok((await poses(5)).every((t) => t === null) && (await poses(9)).every((t) => t === null));
+  const first = await poses(10);
+  assert.deepEqual(await poses(14), first);
+  assert.notDeepEqual(await poses(15), first);
+  for (const t of first) {
+    const m = /^translate\((-?[\d.]+)px, (-?[\d.]+)px\) rotate\((-?[\d.]+)deg\)$/.exec(String(t));
+    assert.ok(m && Math.abs(Number(m[3])) >= 2 && Math.abs(Number(m[3])) <= 10 && Math.abs(Number(m[1])) <= 2 && Math.abs(Number(m[2])) <= 2, String(t));
+  }
+  assert.ok(new Set(first).size === first.length);
+  // Its two tiny typewriter lines cut at their comma, the first on the left at mid-height, the second low on the right
+  // above the apps' caption (the original's 75 %, lifted), its comma kept in the page; her name very small at the top
+  // (never the original's own account), all trembling.
+  const tree = await pixelAt(60);
+  const tiny = pixelBoxes(tree, "#fff8e8");
+  assert.deepEqual(tiny.map(pixelWords), ["pâtisserielou", "faitmaison", "pourlegoûter"]);
+  assert.ok(pixelWords(tree).includes("faitmaison,pourlegoûter"));
+  const [name, left, right] = tiny.map(styleOf);
+  assert.ok(Number(name!.top) < 0.14 * 1920 && Math.abs(Number(name!.left) + Number(name!.width) / 2 - 540) <= 1);
+  assert.equal(Number(left!.left), Math.round(0.136 * 1080));
+  assert.ok(Number(right!.left) + Number(right!.width) <= 940 && Number(right!.top) + Number(right!.height) <= 0.75 * 1920, JSON.stringify(right));
+  assert.ok(tiny.every((n) => (n.props.innerStyle as Record<string, number>).fontSize! >= 20 && pixelPoses(n).some((t) => t !== null)));
+  assert.doesNotMatch(pixel.code + JSON.stringify(pixel.texts), /kometoneko|chayote|comfort food|cold days|smells so good|enjoy cooking/i);
+  // Gone with the cut on its first step.
+  assert.equal(pixelBoxes(await pixelAt(104), "#d4f7e9").length, 0);
+  // Set on the calmest part of the upper third of her result, read there only; nothing cut out nor followed, no zoom.
+  assert.deepEqual(clearsDrawn(pixel.code), [0]);
+  assert.equal(drawsSubject(pixel.code), false);
+  assert.deepEqual(objectsDrawn(pixel.code), []);
+  assert.doesNotMatch(pixel.code, /scale\(|\bSubject\b|Whip|ZoomThrough/);
+});
+
+test("« Recette cosy, typo pixel » (v2): its captions on their steps, its little faces and its stars, its loop, its format, its finish", async () => {
+  const { pixel } = await import("./skills/pixel.ts");
+  const { skillFillInput, skillPlan, skillSettings } = await import("./skills.ts");
+  /** The captions seen at a frame: the words of each one shown, in the page's order. */
+  const seen = async (f: number) => {
+    const tree = await pixelAt(f);
+    return { tree, words: drawnNodes(tree).filter((n) => n.type === "div" && styleOf(n).opacity === 1).map(pixelWords) };
+  };
+  // Each on its step, from its first cut to its last: its first one upper left, its second on two centred lines under
+  // what is prepared (above the apps' caption), its third once nearly ready; every one in the page all along.
+  const eggs = await seen(110);
+  assert.deepEqual(eggs.words, ["lesœufs"]);
+  assert.ok(pixelWords(eggs.tree).includes("lesœufs/farinetamisée,sucreetbeurre/çaprendforme!"));
+  const list = await seen(160);
+  assert.deepEqual(list.words, ["farinetamisée,sucreetbeurre"]);
+  const listLines = pixelBoxes(list.tree, "#ffffff").filter((n) => ["farinetamisée,", "sucreetbeurre"].includes(pixelWords(n)));
+  assert.equal(listLines.length, 2);
+  for (const n of listLines) assert.ok(Math.abs(Number(styleOf(n).left) + Number(styleOf(n).width) / 2 - 540) <= 1 && Number(styleOf(n).top) + Number(styleOf(n).height) <= 0.75 * 1920);
+  assert.deepEqual((await seen(370)).words, ["çaprendforme!"]);
+  // A gesture by hand: no words, its shy little face alone at the middle, trembling; the cooking: two pairs of stars in
+  // opposite corners, from its first place to its last, never blinking.
+  const hand = await seen(250);
+  assert.deepEqual(hand.words, []);
+  const decor = (tree: Drawn) => drawnNodes(tree).filter((n) => n.type === "div" && "data-fauve-decor" in n.props);
+  const face = decor(hand.tree);
+  assert.equal(face.length, 1);
+  assert.ok(Math.abs(Number(styleOf(face[0]!).left) - 0.454 * 1080) <= 1 && Math.abs(Number(styleOf(face[0]!).top) - 0.492 * 1920) <= 1);
+  assert.equal(decor((await seen(244)).tree).length, 0);
+  const cooking = decor((await seen(300)).tree);
+  assert.equal(cooking.length, 2);
+  assert.ok(Number(styleOf(cooking[0]!).top) < 0.25 * 1920 && Number(styleOf(cooking[1]!).top) > 0.7 * 1920 && Number(styleOf(cooking[1]!).left) > 0.75 * 1080);
+  assert.equal(decor((await seen(365)).tree).length, 0);
+  // Its loop: its closing word upper left, no card, no black.
+  const loop = await seen(440);
+  assert.ok(pixelBoxes(loop.tree, "#ffffff").some((n) => pixelWords(n) === "bonnedégustation"));
+  assert.equal(drawnNodes(loop.tree).filter((n) => /rgba\(20,12,6/.test(String(styleOf(n).background ?? ""))).length, 0);
+  // More words than its three: a fourth in place of the little face, a fifth in place of the stars.
+  const five = [{ ...PIXEL_TEXTS[2]!, text: "les œufs / farine et sucre / ça prend forme / on mélange / au frais" }, ...PIXEL_TEXTS.filter((t) => t.role !== "band")];
+  assert.deepEqual((await (async () => drawnNodes(await pixelAt(250, 9 / 16, { reelTexts: five })).filter((n) => n.type === "div" && styleOf(n).opacity === 1).map(pixelWords))()), ["onmélange"]);
+  assert.equal(drawnNodes(await pixelAt(300, 9 / 16, { reelTexts: five })).filter((n) => n.type === "div" && "data-fauve-decor" in n.props).length, 0);
+  // An ending card (an option): the last image softly darkened, its title in the title's pixels, a typewriter line to read.
+  const card = await pixelAt(480, 9 / 16, { durationInFrames: 520, end: { title: "commande pour samedi", subtitle: "au 06 12 34 56 78", from: 466 } });
+  assert.ok(drawnNodes(card).some((n) => /rgba\(20,12,6,0\.5/.test(String(styleOf(n).background ?? ""))));
+  assert.deepEqual(pixelBoxes(card, "#d4f7e9").map(pixelWords), ["commandepoursamedi"]);
+  assert.equal((pixelBoxes(card, "#fff8e8").find((n) => pixelWords(n) === "au0612345678")!.props.innerStyle as Record<string, number>).fontSize, 48);
+  // Its format: as her videos, the whole vertical frame as the original, 16:9 on black when most are in width; her word prevails.
+  const frameBox = async (aspect: number, format?: string) => {
+    const line = pixel.timeline(26, { end: false });
+    const texts = { ...Object.fromEntries(Object.entries(line.marks).map(([k, v]) => [k, String(v)])), ...(format ? { format } : {}) };
+    return styleOf((await pixelAt(60, aspect, { texts })).children[0] as Drawn);
+  };
+  assert.deepEqual([(await frameBox(9 / 16)).top, (await frameBox(9 / 16)).height], [0, 1920]);
+  assert.deepEqual([(await frameBox(16 / 9)).top, (await frameBox(16 / 9)).height], [656, 608]);
+  assert.equal((await frameBox(16 / 9, "vertical")).height, 1920);
+  assert.equal((await frameBox(9 / 16, "horizontal")).height, 608);
+  // In its 16:9 frame its title at 59 px (it reads), its tiny lines at 26 px and her name at 20, all inside it.
+  const wide = await pixelAt(60, 16 / 9);
+  assert.equal((pixelBoxes(wide, "#d4f7e9")[0]!.props.innerStyle as Record<string, number>).fontSize, 59);
+  assert.deepEqual(pixelBoxes(wide, "#fff8e8").map((n) => (n.props.innerStyle as Record<string, number>).fontSize), [20, 26, 26]);
+  assert.ok(pixelBoxes(wide, "#fff8e8").every((n) => Number(styleOf(n).top) + Number(styleOf(n).height) <= 608));
+  // The setting: the filler sees it (the default first: as her videos), the plan keeps a choice her words asked for.
+  assert.deepEqual(pixel.settings?.map((s) => [s.name, s.choices.map((c) => c.value)]), [["format", ["auto", "horizontal", "vertical"]]]);
+  assert.deepEqual(skillSettings(pixel, [{ name: "format", value: "auto" }]), {});
+  const files = Array.from({ length: 8 }, (_, i) => ({ id: `v${i}`, photo: false, seconds: 16 }));
+  assert.equal(skillFillInput({ skill: pixel, name: "Recette cosy", n: 26, files, business: {}, request: "en horizontal" }).reglages?.[0]?.nom, "format");
+  const plan = skillPlan({ skill: pixel, name: "Recette cosy", files, fill: { shots: Array.from({ length: 26 }, (_, i) => ({ file: files[i % 8]!.id, at: Math.floor(i / 8) * 4 })), texts: { titre: "fraisier menthe!!", petit_mot: "fait maison, pour le goûter", etapes: "les œufs / farine et sucre / ça sent bon", fin: "à demain" }, end: null, settings: { format: "horizontal" } } });
+  assert.equal(plan.layers![0]!.motion.texts!.format, "horizontal");
+  assert.deepEqual(plan.skill, { key: "pixel", version: 2, settings: { format: "horizontal" } });
+  assert.deepEqual(plan.layers![0]!.motion.fonts, ["Courier Prime", "Inter"]);
+  // Its finish: no grain, no dark corners, no lifted blacks (the catalogue's « Cosy » laid them over everything).
+  assert.deepEqual(pixel.finish, { contrast: 0.08, grain: 0, vignette: 0, fade: 0 });
+});
