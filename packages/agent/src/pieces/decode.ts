@@ -3,7 +3,7 @@ import type { EffectPiece } from "../pieces.ts";
 // « Titre qui se décode », the effect (docs/fiches/decode.md, effects 3, 4 and 5; its whole Reel is skills/decode.ts):
 // her shot cuts to black, an impact, and on the black her title in capitals shows at once, scrambled, holds, scrambles
 // anew every image or two, then lands through look-alikes (the original's 12, 19 and 8 images at its 122 BPM, counted
-// in beats so the Reel's tempo stretches them), her small words over it (in normal case, a little spaced, the first on
+// in the Reel's beats, half-beats on a slow one), her small words over it (in normal case, a little spaced, the first on
 // the title's left edge, the last on its right); on a beat after it lands, a band of video opens at once behind it,
 // 22,7 % of the frame high (where the original's fold had left its row), and grows at a constant speed to the full
 // frame by its last image: a mask, never a zoom. In it, a cut every 4 images like a machine (8 with her photos only):
@@ -34,9 +34,17 @@ const TICK = { sound: "digital glitch tick", seconds: 0.5, gain: -9 };
 const TICK_EVERY = 3;
 const MOST_TICKS = 14;
 
-/** Its moments in frames from its start for a span of `frames` at a tempo: the title shows, decodes, lands; the band opens on a beat after it and is full by the end. */
+/** Its original's beat, in frames (122 BPM). */
+const ORIGINAL_BEAT = 1800 / 122;
+
+/**
+ * Its moments in frames from its start for a span of `frames` at a tempo: the title shows, decodes, lands; the band
+ * opens on a beat after it (on a slow Reel, a half-beat: its decoding keeps about its original's pace) and is full by
+ * the end.
+ */
 export function decodeMoments(frames: number, bpm: number): { show: number; hold: number; scramble: number; resolve: number; lands: number; open: number; full: number } {
-  const beat = 1800 / bpm;
+  let beat = 1800 / Math.min(140, Math.max(60, bpm));
+  while (beat / ORIGINAL_BEAT > 1.42) beat /= 2;
   const total = DECODE_BEATS * beat;
   let open = Math.ceil((SHOW + total + AFTER_LANDING * beat) / beat) * beat;
   // Short: the band opens on the last beat that leaves it its share (else at the middle), the decoding shortened to land before it.

@@ -44,7 +44,8 @@ test("« Titre qui se décode »: its small words optional, a short span keeps i
   assert.ok(editPlanSchema.safeParse(alone).success);
   assert.equal(alone.layers![0]!.motion.texts!.surtitre, undefined);
   for (const bpm of [60, 90, 100, 122, 140]) {
-    const beat = 1800 / bpm;
+    // A beat, or a half-beat on a slow Reel (its decoding keeps about its original's pace).
+    const beat = (1800 / bpm) * (bpm < 86 ? 0.5 : 1);
     for (const seconds of [2.4, 3, 4, 5, 6, 8]) {
       const frames = Math.round(seconds * 30);
       const at = decodeMoments(frames, bpm);

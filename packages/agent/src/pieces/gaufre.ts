@@ -27,9 +27,10 @@ const SLOWEST = (1800 / 113.2) * 1.25;
 const HOLD_BEATS = 1.5;
 const HOLD_SHARE = 0.22;
 
-/** Its moments in frames from its start (the first letter's ink starts before it) for a span of `frames` at a tempo. */
+/** Its moments in frames from its start (the first letter's ink starts before it) for a span of `frames` at a tempo (its hold counted in half-beats on a slow Reel). */
 export function gaufreMoments(frames: number, bpm: number): Record<keyof typeof INK, number> & { hold: number } {
-  const beat = 1800 / bpm;
+  let beat = 1800 / Math.min(140, Math.max(60, bpm));
+  while (beat / (1800 / 113.2) > 1.42) beat /= 2;
   const hold = Math.min(HOLD_BEATS * beat, frames * HOLD_SHARE);
   const pace = Math.min(SLOWEST, (frames - hold) / ACT);
   const at = Object.fromEntries(Object.entries(INK).map(([k, v]) => [k, Math.round(v * pace)])) as Record<keyof typeof INK, number>;

@@ -46,8 +46,9 @@ test("« Titre gaufré »: short, its ink runs faster; long, never more than a q
       const frames = Math.round(seconds * 30);
       const at = gaufreMoments(frames, bpm);
       assert.ok(at.inked <= at.line_to && at.line_to < frames, `${bpm} BPM, ${seconds} s: inked by ${at.line_to} of ${frames}`);
-      // Held inked a beat and a half (a fifth of it at most when it is short), more when it is long.
-      assert.ok(at.hold >= Math.min((1800 / bpm) * 1.5, frames * 0.22) - 1, `${bpm} BPM, ${seconds} s: held ${at.hold}`);
+      // Held inked a beat and a half (half-beats on a slow Reel; a fifth of it at most when it is short), more when it is long.
+      const beat = (1800 / bpm) * (bpm < 80 ? 0.5 : 1);
+      assert.ok(at.hold >= Math.min(beat * 1.5, frames * 0.22) - 1, `${bpm} BPM, ${seconds} s: held ${at.hold}`);
       // Its pace: the first letter's ink lasts 6 of its original's beats, never more than a quarter slower than its own.
       assert.ok(at.first - at.ink <= 6 * ORIGINAL * 1.25 + 1);
     }
