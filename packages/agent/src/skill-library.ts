@@ -1,10 +1,12 @@
 import type { MontageSkill } from "./skills.ts";
+import { aplat } from "./skills/aplat.ts";
 import { cadre } from "./skills/cadre.ts";
 import { carteFeutre } from "./skills/carte-feutre.ts";
 import { coulisses } from "./skills/coulisses.ts";
 import { coupsDeFouet } from "./skills/coups-de-fouet.ts";
 import { createur } from "./skills/createur.ts";
 import { decode } from "./skills/decode.ts";
+import { detourages } from "./skills/detourages.ts";
 import { ecranPartage } from "./skills/ecran-partage.ts";
 import { eventail } from "./skills/eventail.ts";
 import { facade } from "./skills/facade.ts";
@@ -34,12 +36,14 @@ import { tourne } from "./skills/tourne.ts";
 // checked by the scene check and rendered locally before it joins (scripts/skill-render.mts).
 
 export const MONTAGE_SKILLS: Record<string, MontageSkill> = {
+  aplat,
   cadre,
   "carte-feutre": carteFeutre,
   coulisses,
   "coups-de-fouet": coupsDeFouet,
   createur,
   decode,
+  detourages,
   "ecran-partage": ecranPartage,
   eventail,
   facade,

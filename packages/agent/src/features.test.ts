@@ -3353,9 +3353,15 @@ type TdBox = { x: number; y: number; w: number; h: number };
 /**
  * What its Scene draws at a frame, as drawScene does, with what the engine reads before the render given: a cut-out's
  * box (SubjectBox), its outline (SubjectOutline, an SVG path) and its pieces (SubjectParts), by shot and object
- * (« 0#rooftops », « 9 » for her subject); Subject a named node.
+ * (« 0#rooftops », « 9 » for her subject); where its sky ends (SkylineAt, by shot and span) and its light (LightUnder);
+ * Subject and the other drawing tools named nodes.
  */
-function drawCutOuts(code: string, frame: number, props: Record<string, unknown>, read: { boxes?: Record<string, TdBox>; outlines?: Record<string, string>; parts?: Record<string, TdBox[]> } = {}): Drawn {
+function drawCutOuts(
+  code: string,
+  frame: number,
+  props: Record<string, unknown>,
+  read: { boxes?: Record<string, TdBox>; outlines?: Record<string, string>; parts?: Record<string, TdBox[]>; skyline?: (shot: number | undefined, span: { from?: number; to?: number }) => number | null; light?: { mean: number; high: number } } = {},
+): Drawn {
   const React = { createElement: (type: unknown, p: Record<string, unknown> | null, ...children: unknown[]): Drawn => ({ type, props: p ?? {}, children }), Fragment: "Fragment" };
   const interpolate = (x: number, [a, b]: [number, number], [y0, y1]: [number, number]) => y0 + (y1 - y0) * Math.min(1, Math.max(0, (x - a) / (b - a || 1)));
   const key = (shot: { segment?: number } | undefined, object?: string) => `${shot?.segment ?? "?"}${object ? `#${object}` : ""}`;
@@ -3364,12 +3370,21 @@ function drawCutOuts(code: string, frame: number, props: Record<string, unknown>
     FitText: "FitText",
     Footage: "Footage",
     Subject: "Subject",
+    Near: "Near",
+    Skyline: "Skyline",
+    CastShadow: "CastShadow",
+    Look: "Look",
+    Sketch: "Sketch",
+    Ascii: "Ascii",
+    Easing: { bezier: () => (t: number) => t },
     useCurrentFrame: () => frame,
     interpolate,
     ClearBox: (_shot: unknown, _frame: number, _laid: unknown, options?: { fallback?: unknown }) => options?.fallback ?? null,
     SubjectBox: (shot: { segment?: number } | undefined, _frame: number, _laid: unknown, object?: string) => read.boxes?.[key(shot, object)] ?? null,
     SubjectOutline: (shot: { segment?: number } | undefined, _frame: number, _laid: unknown, object?: string) => read.outlines?.[key(shot, object)] ?? null,
     SubjectParts: (shot: { segment?: number } | undefined, _frame: number, _laid: unknown, object?: string) => read.parts?.[key(shot, object)] ?? [],
+    SkylineAt: (shot: { segment?: number } | undefined, _frame: number, _laid: unknown, span: { from?: number; to?: number } = {}) => read.skyline?.(shot?.segment, span) ?? null,
+    LightUnder: () => read.light ?? null,
   };
   const make = new Function("React", ...Object.keys(scope), `"use strict";\n${code}\nreturn Scene;`) as (...args: unknown[]) => (p: Record<string, unknown>) => Drawn;
   return make(React, ...Object.values(scope))(props);
@@ -4360,6 +4375,12 @@ async function cutoutsDrawn(code: string, props: Record<string, unknown>, frames
     SubjectOutline: (shot: { segment?: number }, _f: number, _laid: unknown, name?: string) => (her(shot, name), null),
     SubjectParts: (shot: { segment?: number }, _f: number, _laid: unknown, name?: string) => (her(shot, name), []),
     ClearBox: (_s: unknown, _f: number, _l: unknown, options?: { fallback?: unknown }) => options?.fallback ?? null,
+    Easing: { bezier: () => (t: number) => t, out: (f: unknown) => f, inOut: (f: unknown) => f, cubic: (t: number) => t },
+    // Nothing else read on her shots (as in the scene check): no sky, no light, no lines.
+    SkylineAt: () => null,
+    LightUnder: () => null,
+    VanishingPoint: (_s: unknown, _f: number, _l: unknown, options?: { fallback?: unknown }) => options?.fallback ?? null,
+    HeadMoves: () => [],
   });
   const make = new Function("React", ...Object.keys(scope), `"use strict";\n${code}\nreturn Scene;`) as (...args: unknown[]) => (p: Record<string, unknown>) => unknown;
   const Scene = make(React, ...Object.values(scope));
@@ -9200,4 +9221,547 @@ test("« Mots mêlés » (v4): each letter's halo stronger where the picture sta
   assert.deepEqual(dark, { alpha: 0.55, blur: 6 });
   const bright = await halo({ mean: 0.85, high: 1 });
   assert.ok(bright.alpha > 0.7 && bright.blur >= 10, JSON.stringify(bright));
+});
+
+// ——— « Toi sur un aplat de couleur » v2, written on its original's fiche (docs/fiches/aplat.md) ——————————————————————
+
+/** Its music's first beat: the original's image 1,95 (0,065 s). Its model starts on it. */
+const AP_FIRST_BEAT = 1.95;
+/** The original's cuts (images at 30 i/s): the next shot whole, the one in front of a background, the same later; the red; its end. */
+const AP_CUTS = [120, 178, 236];
+const AP_RED = 251;
+const AP_END = 264;
+/** What its code draws at a frame, as the render gets it: her walk and the next shot's pieces read (« 0 », « 1#every tote bag »), her sky. */
+const aplatDrawn = async (frame: number, options: { n?: number; aspect?: number; end?: boolean; read?: Parameters<typeof drawCutOuts>[3]; settings?: Record<string, string>; accent?: string; named?: boolean; texts?: unknown[] } = {}) => {
+  const { aplat } = await import("./skills/aplat.ts");
+  const { skillCode } = await import("./skills.ts");
+  const line = aplat.timeline(options.n ?? 4, { end: Boolean(options.end) });
+  const durationInFrames = Math.round(line.duration * 30);
+  const code = options.named === false ? aplat.code : skillCode(aplat, { choses: "every tote bag" });
+  const tree = drawCutOuts(
+    code,
+    frame,
+    {
+      width: 1080,
+      height: 1920,
+      durationInFrames,
+      brand: { name: "Brick Lane", displayFont: "Anton", bodyFont: "Inter Tight", accent: options.accent ?? "#e4572e" },
+      shots: pileShots(line, options.aspect ?? 9 / 16),
+      reelTexts: options.texts ?? [],
+      end: options.end ? { title: "Vide-dressing samedi", subtitle: "de 10 h à 18 h", from: durationInFrames - 48 } : null,
+      texts: { ...Object.fromEntries(Object.entries(line.marks).map(([k, v]) => [k, String(v)])), ...(options.settings ?? {}) },
+    },
+    options.read ?? AP_READ,
+  );
+  return { line, tree, nodes: drawnNodes(tree) };
+};
+/** Her walking and her box, the next shot's four tote bags and one far one, her sky (a straight skyline at 600 px). */
+const AP_READ = {
+  boxes: { "0": { x: 400, y: 900, w: 200, h: 600 }, "2": { x: 300, y: 600, w: 400, h: 1200 } },
+  parts: { "1#every tote bag": [{ x: 100, y: 1300, w: 200, h: 300 }, { x: 700, y: 1250, w: 220, h: 300 }, { x: 150, y: 800, w: 180, h: 250 }, { x: 800, y: 900, w: 160, h: 200 }, { x: 500, y: 300, w: 100, h: 100 }] },
+  skyline: (shot: number | undefined) => (shot === 0 ? 600 : null),
+};
+/** The kinds of what is drawn, in order: « Subject0 », « Subject1/2 white » (a piece, white), « Near0 », « Footage1 »… */
+const apKinds = (nodes: Drawn[]) =>
+  nodes
+    .filter((n) => ["Footage", "Subject", "Near", "Skyline", "CastShadow", "Look", "Sketch", "Ascii"].includes(n.type as string))
+    .map((n) => `${n.type as string}${n.props.shot ?? ""}${typeof n.props.part === "number" ? `/${n.props.part}` : ""}${n.props.fill ? " white" : ""}`);
+
+test("« Toi sur un aplat de couleur » (v2) cuts where its original does, on its own music (123 BPM), its dips, its end on the colour", async () => {
+  const { aplat } = await import("./skills/aplat.ts");
+  const { skillPlan } = await import("./skills.ts");
+  assert.equal(aplat.version, 2);
+  assert.equal(aplat.bpm, 123);
+  const line = aplat.timeline(4, { end: false });
+  // Its walk, the next shot, the one in front of a background, the same later: each cut within two images of the
+  // original's, counted from its music's first beat; the colour back on beat 17, the Reel 18 beats long.
+  assert.equal(line.shots.length, 4);
+  line.shots.slice(1).forEach((s, i) => assert.ok(Math.abs(Math.round(s.start * 30) - (AP_CUTS[i]! - AP_FIRST_BEAT)) <= 2, `shot ${i + 2}: image ${Math.round(s.start * 30)}, the original's ${AP_CUTS[i]}`));
+  assert.ok(Math.abs(line.marks.red! - (AP_RED - AP_FIRST_BEAT)) <= 1, `red ${line.marks.red}`);
+  assert.ok(Math.abs(Math.round(line.duration * 30) - (AP_END - AP_FIRST_BEAT)) <= 2, `${line.duration} s`);
+  assert.ok(Math.abs(line.duration - 18 * (60 / 123)) < 0.02);
+  // Its moments, within an image of the original's: her shot rebuilding from beat 1 (its image 16), her ground white
+  // (59) and back (62), her sky white (76) and her shot whole (79), the next shot's pieces in colour (87, 91, 98, 105,
+  // 112), its frame closing from 136 to 177, its six looks on its notes (192, 198, 207, 212, 219, 226).
+  const at = (image: number) => image - AP_FIRST_BEAT;
+  assert.ok(Math.abs(line.marks.near_0! - at(16)) <= 1);
+  assert.ok(Math.abs(line.marks.ground! - at(59)) <= 1 && Math.abs(line.marks.sky! - at(76)) <= 1);
+  [87, 91, 98, 105, 112].forEach((image, k) => assert.ok(Math.abs(line.marks[`land_${k}`]! - at(image)) <= 1, `piece ${k + 1}: ${line.marks[`land_${k}`]}`));
+  const second = Math.round(line.shots[1]!.start * 30);
+  assert.ok(Math.abs(second + line.marks.close_after! - at(136)) <= 2);
+  assert.equal(second + Math.round((line.shots[1]!.end - line.shots[1]!.start) * 30) - 1, Math.round(at(177)));
+  [192, 198, 207, 212, 219, 226].forEach((image, k) => assert.ok(Math.abs(line.marks[`style_${k}`]! - at(image)) <= 1, `look ${k + 1}: ${line.marks[`style_${k}`]}`));
+  // Its music: its held note's dip in the beat before beat 4 and before the frozen world (the original's 1,60 to 2,00 s
+  // and 5,43 to 5,92 s), faded out in a tenth of a second at its end; no sound effect (its original has none).
+  const beat = 60 / 123;
+  const r3 = (x: number) => Math.round(x * 1000) / 1000;
+  assert.deepEqual(line.music, {
+    filters: [
+      { kind: "soft", from: r3(3.15 * beat), to: r3(4 * beat), db: -6, open: 0.02 },
+      { kind: "soft", from: r3(line.shots[2]!.start - beat), to: line.shots[2]!.start, db: -6, open: 0.02 },
+    ],
+    end: { at: line.duration, fade: 0.1 },
+  });
+  assert.ok(Math.abs(line.music!.filters![0]!.from - (1.6 - 0.065)) < 0.05 && Math.abs(line.music!.filters![1]!.from - (5.43 - 0.065)) < 0.05);
+  assert.equal(line.sounds, undefined);
+  // More shots (her files, a length she asks for): framed shots of four beats in its middle, its walk, its frozen world
+  // and its end the same, up to about 28 s; at another tempo all of it follows; with an ending card, the colour lasts
+  // the card's 1,6 s, its cuts the same.
+  const longest = aplat.timeline(14, { end: false });
+  assert.equal(longest.shots.length, 14);
+  assert.ok(longest.duration > 27 && longest.duration < 29, `${longest.duration} s`);
+  assert.ok(longest.shots.slice(1, 12).every((s) => Math.abs(s.end - s.start - 4 * beat) < 0.04));
+  assert.ok(Math.abs(longest.music!.filters![1]!.to - longest.shots[12]!.start) < 0.005);
+  const ended = aplat.timeline(4, { end: true });
+  assert.deepEqual(ended.shots.slice(0, 3), line.shots.slice(0, 3));
+  assert.ok(ended.duration - ended.marks.red! / 30 >= 1.6, `${ended.duration} s`);
+  const slower = aplat.timeline(4, { end: false, bpm: 100 });
+  assert.ok(Math.abs(slower.duration / line.duration - 1.23) < 0.01 && Math.abs(slower.marks.red! / line.marks.red! - 1.23) < 0.02);
+  // On the plan: valid, its music's shape, its version.
+  const files = Array.from({ length: 4 }, (_, i) => ({ id: `v${i}`, photo: false, seconds: 12 }));
+  const plan = skillPlan({ skill: aplat, name: "Toi sur un aplat de couleur", files, fill: { shots: files.map((f) => ({ file: f.id, at: 1 })), texts: {}, end: null } });
+  assert.ok(editPlanSchema.safeParse(plan).success);
+  assert.equal(plan.music_shape?.filters?.length, 2);
+  assert.deepEqual(plan.skill, { key: "aplat", version: 2 });
+  assert.equal(plan.texts.length, 0);
+});
+
+test("« Toi sur un aplat de couleur » (v2): her silhouette white then on the colour, her shot rebuilt from the nearest, her ground, her sky, the next shot's still pieces", async () => {
+  // Her first three images: she and her shadow flat white in a white halo, on the flat colour (hers, vivid); then in
+  // her own colours, her shadow cast from her feet (drawn from her silhouette), under her.
+  const first = await aplatDrawn(0);
+  assert.deepEqual(apKinds(first.nodes), ["CastShadow", "Subject0", "Subject0 white"]);
+  assert.ok(first.nodes.some((n) => n.type === "div" && /drop-shadow\(0 0 \d+px #ffffff\)/.test(String(styleOf(n).filter ?? ""))));
+  assert.ok(first.nodes.some((n) => n.type === "div" && styleOf(n).backgroundColor === "#e4572e"));
+  assert.equal((first.nodes.find((n) => n.type === "CastShadow")!.props as { color: string }).color, "#ffffff");
+  const walking = await aplatDrawn(10);
+  assert.deepEqual(apKinds(walking.nodes), ["CastShadow", "Subject0", "Subject0"]);
+  assert.deepEqual(walking.nodes.find((n) => n.type === "CastShadow")!.props.box, AP_READ.boxes["0"]);
+  // From beat 1 her shot rebuilds itself from the nearest to the farthest: its depth as a mask growing (the ground under
+  // her in seven images, its path, then on at a constant speed), held, under her.
+  const line = (await aplatDrawn(0)).line;
+  const depth = async (f: number) => Number((await aplatDrawn(f)).nodes.find((n) => n.type === "Near")?.props.depth ?? -1);
+  assert.equal(await depth(line.marks.near_0! - 1), -1);
+  const ds: number[] = [];
+  for (let f = line.marks.near_0!; f < line.marks.ground!; f++) ds.push(await depth(f));
+  assert.ok(ds.every((d, i) => i === 0 || d >= ds[i - 1]!) && ds[0]! < 0.06 && ds.at(-1)! >= 0.55, ds.join(" "));
+  const steps = ds.slice(line.marks.near_3! - line.marks.near_0! + 1, line.marks.near_4! - line.marks.near_0!).map((d, i, all) => (i ? d - all[i - 1]! : null)).filter((d): d is number => d !== null);
+  assert.ok(Math.max(...steps) - Math.min(...steps) < 1e-9, "constant speed");
+  // Just before beat 4 the rest of her ground (her shot without its sky) flat white for three images, then in its
+  // colours, her sky still the colour; then her sky white for three images, then her shot whole.
+  const g = line.marks.ground!;
+  const sky = line.marks.sky!;
+  const whiteGround = async (f: number) => (await aplatDrawn(f)).nodes.some((n) => n.type === "div" && styleOf(n).filter === "brightness(0) invert(1)" && drawnNodes(n).some((c) => c.type === "Skyline"));
+  assert.deepEqual(await Promise.all([g - 1, g, g + 2, g + 3].map(whiteGround)), [false, true, true, false]);
+  assert.deepEqual(apKinds((await aplatDrawn(g + 3)).nodes), ["Skyline0"]);
+  const ground = async (f: number) => (await aplatDrawn(f)).nodes.find((n) => n.type === "div" && styleOf(n).width === 1080 && styleOf(n).height === 1920 && styleOf(n).backgroundColor && !drawnNodes(n).slice(1).length);
+  assert.equal(styleOf((await ground(g + 3))!).backgroundColor, "#e4572e");
+  assert.equal(styleOf((await ground(sky))!).backgroundColor, "#ffffff");
+  assert.deepEqual(apKinds((await aplatDrawn(sky + 3)).nodes), ["Footage0"]);
+  // No sky in her shot (an interior): her ground and her top come back as bands, each white three images first.
+  const noSky = { ...AP_READ, skyline: () => null };
+  const band = async (f: number) => (await aplatDrawn(f, { read: noSky })).nodes.filter((n) => n.type === "div" && styleOf(n).backgroundColor === "#ffffff" && styleOf(n).width === 1080 && Number(styleOf(n).height) < 1920).map((n) => styleOf(n).top);
+  assert.deepEqual(await band(g), [653]);
+  assert.ok(apKinds((await aplatDrawn(g + 3, { read: noSky })).nodes).includes("Footage0"));
+  assert.deepEqual(await band(sky), [0]);
+  // Without her cut-out: her shot in black and white multiplied by the colour.
+  const bare = await aplatDrawn(10, { read: { skyline: AP_READ.skyline } });
+  assert.ok(bare.nodes.some((n) => n.type === "Footage" && /^grayscale\(1\)/.test(String(styleOf(n).filter))) && bare.nodes.some((n) => styleOf(n).mixBlendMode === "multiply"));
+  // From beat 5¾ the next shot lands on her walk piece by piece, still: what it has several of (named by the filler),
+  // from the nearest to the farthest, alternating sides (bottom left, bottom right, middle left, middle right), each
+  // white an image, then an image without it, then itself; then its whole bottom, its white burnt.
+  const lands = [0, 1, 2, 3, 4].map((k) => line.marks[`land_${k}`]!);
+  const pieces = async (f: number) => apKinds((await aplatDrawn(f)).nodes).filter((k) => k.startsWith("Subject1") || k.startsWith("Footage1"));
+  assert.deepEqual(await pieces(lands[0]! - 3), []);
+  assert.deepEqual(await pieces(lands[0]! - 2), ["Subject1/0 white"]);
+  assert.deepEqual(await pieces(lands[0]! - 1), []);
+  assert.deepEqual(await pieces(lands[0]!), ["Subject1/0"]);
+  assert.deepEqual(await pieces(lands[1]!), ["Subject1/0", "Subject1/1"]);
+  assert.deepEqual(await pieces(lands[3]!), ["Subject1/0", "Subject1/1", "Subject1/2", "Subject1/3"]);
+  const burnt = (await aplatDrawn(lands[4]! - 2)).nodes.find((n) => n.type === "Footage" && n.props.shot === 1)!;
+  assert.deepEqual([styleOf(burnt).filter, styleOf(burnt).clipPath], ["brightness(3)", "inset(768px 0 0px 0)"]);
+  assert.deepEqual(await pieces(lands[4]!), ["Subject1/0", "Subject1/1", "Subject1/2", "Subject1/3", "Footage1"]);
+  // Nothing named in that shot: three bands of it from the bottom up, one an eighth.
+  const bands = async (f: number) => (await aplatDrawn(f, { named: false })).nodes.filter((n) => n.type === "Footage" && n.props.shot === 1).map((n) => styleOf(n).clipPath);
+  assert.deepEqual(await bands(lands[2]!), ["inset(1280px 0 0px 0)"]);
+  assert.deepEqual(await bands(lands[4]!), ["inset(1280px 0 0px 0)", "inset(640px 0 640px 0)", "inset(0px 0 1280px 0)"]);
+});
+
+test("« Toi sur un aplat de couleur » (v2): its next shot burnt as it lands, a frame of the colour at a constant speed, the frozen world in a new look on each note", async () => {
+  const { line } = await aplatDrawn(0);
+  const from = Math.round(line.shots[1]!.start * 30);
+  // The next shot whole, overexposed for two images as it lands, then as filmed.
+  const framed = async (f: number, options: Parameters<typeof aplatDrawn>[1] = {}) => (await aplatDrawn(f, options)).nodes.find((n) => n.type === "Footage" && n.props.shot === 1)!;
+  assert.deepEqual(await Promise.all([from, from + 1, from + 2].map(async (f) => styleOf(await framed(f)).filter ?? null)), ["brightness(2.8) saturate(1.15)", "brightness(2.8) saturate(1.15)", null]);
+  // A beat in, a frame of the colour closes in on it from its four sides at a constant speed to the cut, the picture
+  // never shrinking nor moving (its box the whole frame, clipped): 150 px a side full frame; in its 4:3 frame, the
+  // original's 14,7 % of the width on its sides and 17,8 % of the height above and below.
+  const close = from + line.marks.close_after!;
+  assert.equal(styleOf(await framed(close - 1)).clipPath, undefined);
+  const insets: number[] = [];
+  for (let f = close; f < from + Math.round((line.shots[1]!.end - line.shots[1]!.start) * 30); f++) {
+    const s = styleOf(await framed(f));
+    assert.deepEqual([s.left, s.top, s.width, s.height], [0, 0, 1080, 1920]);
+    insets.push(Number(/inset\((\d+)px/.exec(String(s.clipPath ?? "inset(0px"))![1]));
+  }
+  assert.equal(insets.at(-1), 150);
+  const gaps = insets.slice(1).map((v, i) => v - insets[i]!);
+  assert.ok(Math.max(...gaps) - Math.min(...gaps) <= 1, gaps.join(" "));
+  assert.equal(styleOf(await framed(from + 58, { aspect: 16 / 9 })).clipPath, "inset(144px 159px)");
+  // Someone in front of a background: as filmed for a beat, then the world behind them frozen on one image (its
+  // Footage held on the frame of the first note) in a new look on each note, they cut out in front, moving.
+  const photo = Math.round(line.shots[2]!.start * 30);
+  const looks = [0, 1, 2, 3, 4, 5].map((k) => line.marks[`style_${k}`]!);
+  const frozen = async (f: number) => {
+    const { nodes } = await aplatDrawn(f);
+    const footage = nodes.find((n) => n.type === "Footage" && n.props.shot === 2)!;
+    return { held: typeof footage.props.at === "number" ? f - (footage.props.at as number) : null, kinds: apKinds(nodes), filter: String(styleOf(footage).filter ?? ""), nodes };
+  };
+  assert.deepEqual((await frozen(looks[0]! - 1)).kinds, ["Footage2"]);
+  const seen = await Promise.all(looks.map((f) => frozen(f)));
+  assert.ok(seen.every((s) => s.held === looks[0]! - photo && s.kinds.at(-1) === "Subject2"), JSON.stringify(seen.map((s) => [s.held, s.kinds])));
+  assert.equal(seen[0]!.filter, "saturate(2.1) contrast(1.2) brightness(1.04)");
+  assert.match(seen[1]!.filter, /^url\(#ap/);
+  assert.ok(seen[2]!.kinds.includes("Sketch"));
+  assert.ok(seen[3]!.filter.startsWith("grayscale(1)") && seen[3]!.nodes.some((n) => styleOf(n).mixBlendMode === "screen" && styleOf(n).backgroundColor === "#e4572e"));
+  assert.deepEqual(seen[4]!.nodes.find((n) => n.type === "Look")!.props.preset, "bw");
+  assert.ok(seen[5]!.nodes.some((n) => n.type === "Ascii" && n.props.kind === "dots" && n.props.ink === "#e4572e"));
+  // Never a look the original's AI drew: no painting, no invented clouds; every look one of the engine's own filters.
+  assert.doesNotMatch((await import("./skills/aplat.ts")).aplat.code, /cloud|paint|cartoon/i);
+  // Without their cut-out: the whole shot frozen, a new look on each note.
+  const alone = await aplatDrawn(looks[2]!, { read: { ...AP_READ, boxes: { "0": AP_READ.boxes["0"] } } });
+  assert.deepEqual(apKinds(alone.nodes), ["Sketch", "Footage2"]);
+  // The same shot later, then the colour full frame on beat 17 to the end: the Reel loops onto its opening.
+  const red = line.marks.red!;
+  assert.deepEqual(apKinds((await aplatDrawn(red - 1)).nodes), ["Footage3"]);
+  assert.deepEqual(apKinds((await aplatDrawn(red)).nodes), []);
+  assert.ok((await aplatDrawn(red)).nodes.some((n) => n.type === "div" && styleOf(n).backgroundColor === "#e4572e" && styleOf(n).height === 1920));
+  // Its ending card on the colour, five images in: its title stacked in capitals of the colour's ink, its line under it.
+  const ended = (await import("./skills/aplat.ts")).aplat.timeline(4, { end: true });
+  const card = await aplatDrawn(Math.round(ended.duration * 30) - 48 + 5, { end: true });
+  assert.ok(heldText(card.tree).includes("Vide-dressing\nsamedi") && heldText(card.tree).includes("de 10 h à 18 h"), heldText(card.tree));
+  assert.ok(card.nodes.some((n) => n.type === "div" && styleOf(n).backgroundColor === "#e4572e" && styleOf(n).height === 1920));
+});
+
+test("« Toi sur un aplat de couleur » (v2): horizontal 4:3 on black as its original when her files are, full frame otherwise; her colour, the original's red; light to render", async () => {
+  const { aplat } = await import("./skills/aplat.ts");
+  const { skillCode, skillPlan, skillFillInput, skillSettings } = await import("./skills.ts");
+  const { ANY_SHOT, objectsDrawn, nearsDrawn, readsDrawn, subjectsDrawn } = await import("./subject.ts");
+  const { usesPassageLooks } = await import("./motion.ts");
+  const frameOf = (nodes: Drawn[]) => {
+    const box = nodes.find((n) => n.type === "div" && styleOf(n).overflow === "hidden" && styleOf(n).backgroundColor === "#000000")!;
+    return { top: styleOf(box).top, height: styleOf(box).height };
+  };
+  // Her files mostly horizontal: its 4:3 picture (1080 × 810) at the middle of the frame, on black; upright: the whole
+  // frame; her setting either way.
+  assert.deepEqual(frameOf((await aplatDrawn(120, { aspect: 16 / 9 })).nodes), { top: 555, height: 810 });
+  assert.deepEqual(frameOf((await aplatDrawn(120)).nodes), { top: 0, height: 1920 });
+  assert.equal(frameOf((await aplatDrawn(120, { aspect: 16 / 9, settings: { format: "vertical" } })).nodes).height, 1920);
+  assert.equal(frameOf((await aplatDrawn(120, { settings: { format: "horizontal" } })).nodes).top, 555);
+  assert.deepEqual(aplat.settings?.map((s) => [s.name, s.choices.map((c) => c.value)]), [["format", ["auto", "horizontal", "vertical"]], ["couleur", ["sienne", "rouge"]]]);
+  assert.deepEqual(skillSettings(aplat, [{ name: "format", value: "auto" }, { name: "couleur", value: "rouge" }]), { couleur: "rouge" });
+  // Its colour: hers when vivid, else the original's pure red (#FF0000 measured), on her word the red whatever hers.
+  const colourOf = async (accent: string, settings: Record<string, string> = {}) =>
+    styleOf((await aplatDrawn(10, { accent, settings })).nodes.find((n) => n.type === "div" && styleOf(n).height === 1920 && styleOf(n).backgroundColor && styleOf(n).backgroundColor !== "#000000")!).backgroundColor;
+  assert.equal(await colourOf("#e4572e"), "#e4572e");
+  assert.equal(await colourOf("#f3efe6"), "#ff0000");
+  assert.equal(await colourOf("#2f6b4f"), "#ff0000");
+  assert.equal(await colourOf("#e4572e", { couleur: "rouge" }), "#ff0000");
+  assert.doesNotMatch(aplat.code, /#e30613/);
+  // Her optional title on the colour of her opening, above her (she passes in front of it), until her ground comes back.
+  const texts = [{ text: "un samedi", role: "hook", from: 3, to: 57, emphasis: [] }];
+  const titled = await aplatDrawn(10, { texts });
+  const title = titled.nodes.find((n) => n.type === "FitText" && heldText(n).includes("un samedi"))!;
+  const box = title.props.style as { top: number; height: number; left: number; width: number };
+  assert.ok(box.top + box.height <= AP_READ.boxes["0"].y && box.left === 140 && box.width === 800, JSON.stringify(box));
+  assert.ok(titled.nodes.indexOf(title) < titled.nodes.map((n) => n.type === "Subject").lastIndexOf(true));
+  assert.equal((await aplatDrawn(57, { texts })).nodes.some((n) => n.type === "FitText"), false);
+  assert.deepEqual(aplat.texts.map((t) => [t.slot, t.role, t.required]), [["titre", "hook", false], ["ligne", "caption", false]]);
+  // What it cuts out: her walk and the one in front of a background, for every count it plays, exactly the shots its
+  // code draws them on (every image, every branch); its object on the next shot; her walk's depth and sky only.
+  for (const n of [4, 5, 9, 14]) {
+    for (const end of [false, true]) {
+      const line = aplat.timeline(n, { end });
+      const durationInFrames = Math.round(line.duration * 30);
+      const props = { width: 1080, height: 1920, durationInFrames, brand: { name: "Studio", displayFont: "Anton", bodyFont: "Inter Tight", accent: "#e4572e" }, shots: pileShots(line, 9 / 16), reelTexts: [{ text: "un samedi", role: "hook", from: 3, to: 57, emphasis: [] }], end: end ? { title: "Ouvert samedi", subtitle: null, from: durationInFrames - 48 } : null, texts: Object.fromEntries(Object.entries(line.marks).map(([k, v]) => [k, String(v)])) };
+      const drawn = await cutoutsDrawn(skillCode(aplat, { choses: "every table" }), props, Array.from({ length: durationInFrames }, (_, f) => f));
+      assert.deepEqual([...drawn].sort((a, b) => a - b), line.cutouts, `${n} shots${end ? ", an ending card" : ""}`);
+    }
+  }
+  const named = skillCode(aplat, { choses: "every tote bag" });
+  assert.deepEqual(objectsDrawn(named), [{ shot: 1, name: "every tote bag" }]);
+  assert.deepEqual(objectsDrawn(aplat.code), []);
+  assert.deepEqual(nearsDrawn(aplat.code), [0]);
+  assert.deepEqual(readsDrawn(aplat.code), [{ shot: 0, kinds: ["ground", "sky"] }]);
+  // (Its code names the one in front of a background by its place from the end: its timeline says which shots, the engine reads that.)
+  assert.deepEqual(subjectsDrawn(aplat.code), [ANY_SHOT, 0]);
+  // Light to render: each piece mounted only while it is seen (her shot's depth while it rebuilds, her ground and her
+  // sky while they come back, her cut-out and her shadow while the colour is around her, the next shot's pieces from
+  // the first to land), never more than six of her pictures at once; no grain nor dark corners on the colour.
+  const { line } = await aplatDrawn(0);
+  const total = Math.round(line.duration * 30);
+  let most = 0;
+  for (let f = 0; f < total; f++) {
+    const kinds = apKinds((await aplatDrawn(f)).nodes);
+    most = Math.max(most, kinds.length);
+    if (kinds.includes("Near0")) assert.ok(f >= line.marks.near_0! && f < line.marks.ground! + 3, `Near at ${f}`);
+    if (kinds.includes("Skyline0")) assert.ok(f >= line.marks.ground! && f < line.marks.sky! + 3, `Skyline at ${f}`);
+    if (kinds.includes("CastShadow")) assert.ok(f < line.marks.ground!, `shadow at ${f}`);
+    if (kinds.some((k) => k.startsWith("Subject0"))) assert.ok(f < line.marks.ground! + 3, `her at ${f}`);
+    if (kinds.some((k) => k.startsWith("Subject1"))) assert.ok(f >= line.marks.land_0! - 2 && f < Math.round(line.shots[1]!.start * 30), `a piece at ${f}`);
+    if (kinds.includes("Subject2")) assert.ok(f >= line.marks.style_0! && f < Math.round(line.shots[3]!.start * 30), `them at ${f}`);
+  }
+  assert.ok(most <= 6, `${most} pictures at once`);
+  assert.deepEqual(aplat.finish, { grain: 0, vignette: 0 });
+  assert.equal(usesPassageLooks({ segments: [], layers: [{ from: 0, to: 9, compose: true, motion: { brief: "b", js: aplat.code } }] }), true);
+  // The filler sees its object slot on its next shot, its slots, its four to six shots and its lengths.
+  const files = Array.from({ length: 5 }, (_, i) => ({ id: `v${i}`, photo: false, seconds: 12 }));
+  const input = skillFillInput({ skill: aplat, name: "Toi sur un aplat de couleur", n: 4, files, business: {}, request: "" });
+  assert.deepEqual(input.objets?.map((o) => [o.slot, o.case]), [["choses", 2]]);
+  assert.match(input.cases[0]!.veut, /marche/);
+  assert.match(input.cases[2]!.veut, /devant un fond/);
+  assert.deepEqual([aplat.shots, aplat.files, aplat.long], [[4, 6], [3, 10], 14]);
+  const plan = skillPlan({ skill: aplat, name: "Toi sur un aplat de couleur", files, fill: { shots: files.slice(0, 4).map((f) => ({ file: f.id, at: 1 })), texts: { titre: "un samedi" }, end: null, objects: { choses: "every table" } } });
+  assert.deepEqual(plan.layers![0]!.motion.drawn, { shots: 4, subjects: [0, 2], objects: [{ shot: 1, name: "every table" }] });
+});
+
+// ——— « Ton nom qui clignote » (`detourages`) v2, written on its original's fiche (docs/fiches/detourages.md) —————————————
+
+/** The original's cuts (images at 30 i/s): its opening, the drop, its burst (its sweeps the 10th and 18th of it), its last shot; its end. */
+const DT_CUTS = [0, 187, 198, 205, 216, 226, 239, 248, 258, 268, 290, 300, 308, 328, 341, 352, 365, 380, 394, 404, 413, 432, 445];
+const DT_END = 494;
+/** Its letters as the fiche measured ICELAND's (images): each one's flash, its dark and its light for good. */
+const DT_LETTERS: Record<string, [number, number, number]> = { D: [108, 112, 116], C: [116, 120, 124], L: [124, 126, 130], E: [128, 132, 134], I: [133, 136, 139], N: [137, 139, 142], A: [140, 143, 145] };
+/** What its code draws at a frame for her name, her shots of one shape, her sky (a dome, its top at 400 px of its window). */
+const detouragesDrawn = async (frame: number, options: { n?: number; aspect?: number; end?: boolean; read?: Parameters<typeof drawCutOuts>[3]; settings?: Record<string, string>; name?: string } = {}) => {
+  const { detourages } = await import("./skills/detourages.ts");
+  const name = options.name ?? "ICELAND";
+  const line = detourages.timeline(options.n ?? 23, { end: Boolean(options.end), words: { titre: name } });
+  const durationInFrames = Math.round(line.duration * 30);
+  const drop = Math.round(line.shots[1]!.start * 30);
+  const tree = drawCutOuts(
+    detourages.code,
+    frame,
+    {
+      width: 1080,
+      height: 1920,
+      durationInFrames,
+      brand: { name, displayFont: "Montserrat", bodyFont: "Montserrat" },
+      shots: pileShots(line, options.aspect ?? 16 / 9),
+      reelTexts: [{ text: name, role: "hook", from: line.marks.name, to: drop, emphasis: [] }],
+      end: options.end ? { title: "Ouvert dimanche", subtitle: "de 9 h à 18 h", from: durationInFrames - 48 } : null,
+      texts: { ...Object.fromEntries(Object.entries(line.marks).map(([k, v]) => [k, String(v)])), ...(options.settings ?? {}) },
+    },
+    options.read ?? DT_READ,
+  );
+  return { line, tree, nodes: drawnNodes(tree), drop };
+};
+const DT_READ = { skyline: (shot: number | undefined, span: { from?: number; to?: number }) => (shot === 0 ? 400 + Math.abs(((span.from ?? 0) + (span.to ?? 1080)) / 2 - 540) * 0.25 : null) };
+
+test("« Ton nom qui clignote » (v2) cuts where its original does, on its own music (140 BPM): its burst on the dotted rhythm, its sweeps, its intro and its bass", async () => {
+  const { detourages, burstCuts } = await import("./skills/detourages.ts");
+  const { skillPlan } = await import("./skills.ts");
+  assert.equal(detourages.version, 2);
+  assert.equal(detourages.bpm, 140);
+  const line = detourages.timeline(23, { end: false });
+  // Its 23 shots, each cut within two images of the original's (here within one: its cuts measured, just after the
+  // song's hits), its length the original's.
+  assert.equal(line.shots.length, DT_CUTS.length);
+  line.shots.forEach((s, i) => assert.ok(Math.abs(Math.round(s.start * 30) - DT_CUTS[i]!) <= 1, `shot ${i + 1}: image ${Math.round(s.start * 30)}, the original's ${DT_CUTS[i]}`));
+  assert.ok(Math.abs(Math.round(line.duration * 30) - DT_END) <= 1, `${line.duration} s`);
+  // Its burst on the dotted rhythm: twelve of about ¾ of a beat, six of about one, three of one and a half or more.
+  const beat = 60 / 140;
+  const lengths = line.shots.slice(1, 22).map((s) => (s.end - s.start) / beat);
+  assert.deepEqual([lengths.filter((b) => b < 0.95).length, lengths.filter((b) => b >= 0.95 && b < 1.4).length, lengths.filter((b) => b >= 1.4).length], [12, 6, 3]);
+  // Its two sweeps, its 10th and 18th shots of the burst (10 images each).
+  assert.deepEqual([line.marks.file_a, line.marks.file_b], [10, 18]);
+  for (const k of [10, 18]) assert.equal(Math.round((line.shots[k]!.end - line.shots[k]!.start) * 30), 10);
+  // Its window opens from its second image to its 125th, her name's first flash on image 108, gone with the drop.
+  assert.deepEqual([line.marks.slit_from, line.marks.slit_to, line.marks.name], [1, 125, 108]);
+  assert.deepEqual(line.texts.titre, { from: 3.6, to: line.shots[1]!.start });
+  // Its letters on the original's images (ICELAND: D, C, L, E, I, N, A), a soft high tick on each flash and when the
+  // whole name is lit (the original's little high hits under them, 3,6 to 4,8 s).
+  [..."ICELAND"].forEach((c, k) => assert.deepEqual([line.marks[`fl${k}`], line.marks[`dk${k}`], line.marks[`on${k}`]], DT_LETTERS[c], c));
+  assert.deepEqual(line.sounds, [{ at: 3.6, sound: "soft high glass tick", seconds: 0.5, gain: -4, burst: { times: [0, 0.267, 0.533, 0.667, 0.833, 0.967, 1.067, 1.233] } }]);
+  // Its music: the highs opening over its first 3 s, softer to the drop, where its first strong beat lands; the bass
+  // falling away under its last shot (the original's 15,0 s) and back on 16,1 s; cut dead at the end (the loop).
+  const r3 = (x: number) => Math.round(x * 1000) / 1000;
+  const last = line.shots[22]!.start;
+  assert.deepEqual(line.music, {
+    downbeat: line.shots[1]!.start,
+    filters: [
+      { kind: "muffled", from: 0, to: 3, open: 3 },
+      { kind: "soft", from: 3, to: line.shots[1]!.start, db: -5, open: 0.02 },
+      { kind: "thin", from: r3(last + 0.4 * beat), to: r3(last + 2.9 * beat), open: 0.02 },
+    ],
+    end: { at: line.duration },
+  });
+  assert.ok(Math.abs(line.music!.filters![2]!.from - 15.0) < 0.05 && Math.abs(line.music!.filters![2]!.to - 16.1) < 0.05);
+  // Fewer shots: whole bars of its burst left out from its middle (its drop and its last bar kept, with its last
+  // sweep), each cut still one of the original's (relative to its bar), its last shot the same; more: bars added.
+  for (const n of [11, 12, 15, 16, 18, 19, 20, 22]) {
+    const fewer = detourages.timeline(n, { end: false });
+    assert.equal(fewer.shots.length, n);
+    const bars = burstCuts(n - 2).cuts;
+    assert.deepEqual(bars.slice(0, 5).map((c) => c.at), [0, 0.9, 1.45, 2.3, 3.05]);
+    assert.deepEqual(bars.slice(-4).map((c) => c.of), [17, 18, 19, 20], `${n}`);
+    assert.ok(bars.slice(-4)[0]!.file && fewer.marks.file_a! > 0);
+    assert.ok(Math.abs(fewer.shots.at(-1)!.end - fewer.shots.at(-1)!.start - 3.8 * beat) < 0.04);
+  }
+  assert.ok(Math.abs(detourages.timeline(11, { end: false }).duration - 11.3) < 0.05);
+  const longest = detourages.timeline(31, { end: false });
+  assert.ok(longest.shots.length === 31 && longest.duration < 21, `${longest.duration} s`);
+  // With an ending card, its last shot two beats longer, its cuts the same; at another tempo every length follows it.
+  const ended = detourages.timeline(23, { end: true });
+  assert.deepEqual(ended.shots.slice(0, -1), line.shots.slice(0, -1));
+  assert.ok(Math.abs(ended.duration - line.duration - 2 * beat) < 0.04);
+  const slower = detourages.timeline(23, { end: false, bpm: 112, words: { titre: "ICELAND" } });
+  assert.ok(Math.abs(slower.duration / line.duration - 1.25) < 0.01 && Math.abs(slower.marks.on4! / line.marks.on4! - 1.25) < 0.02);
+  // On the plan: valid, its sounds and its music's shape, its version.
+  const files = Array.from({ length: 12 }, (_, i) => ({ id: `v${i}`, photo: false, seconds: 12 }));
+  const plan = skillPlan({ skill: detourages, name: "Ton nom qui clignote", files, fill: { shots: Array.from({ length: 23 }, (_, i) => ({ file: files[i % 12]!.id, at: i < 12 ? 1 : 6 })), texts: { titre: "Udvar" }, end: null } });
+  assert.ok(editPlanSchema.safeParse(plan).success);
+  assert.equal(plan.sounds?.length, 1);
+  assert.equal(plan.sounds![0]!.burst!.times.length, 6);
+  assert.equal(plan.music_shape?.downbeat, line.shots[1]!.start);
+  assert.deepEqual(plan.skill, { key: "detourages", version: 2 });
+});
+
+test("« Ton nom qui clignote » (v2): its window opens as a slit at a constant speed, her name lights letter by letter as the original's, behind her scenery", async () => {
+  // Black on its first image; then a slit at the middle, the whole height, widening at a constant speed to the whole
+  // width, its ends round while it is narrow, then the picture in its rounded rectangle (a 3 % radius, its fine edge).
+  const clipOf = async (f: number, options: Parameters<typeof detouragesDrawn>[1] = {}) => String(styleOf((await detouragesDrawn(f, options)).nodes.find((n) => n.type === "div" && styleOf(n).overflow === "hidden")!).clipPath);
+  assert.equal((await detouragesDrawn(0)).nodes.some((n) => n.type === "Footage"), false);
+  const sides = [];
+  for (let f = 1; f <= 124; f++) sides.push(Number(/inset\(0 (\d+)px/.exec(await clipOf(f))![1]));
+  const widths = sides.map((s) => 1080 - 2 * s);
+  assert.ok(widths[0]! <= 12 && widths.at(-1)! >= 1060, `${widths[0]} … ${widths.at(-1)}`);
+  const steps = widths.slice(1).map((w, i) => w - widths[i]!);
+  assert.ok(Math.max(...steps) - Math.min(...steps) <= 2, steps.join(" "));
+  const pill = /inset\(0 (\d+)px round (\d+)px\)/.exec(await clipOf(2))!;
+  assert.ok(Math.abs(Number(pill[2]) - (1080 - 2 * Number(pill[1])) / 2) <= 1, pill[0]);
+  assert.equal(await clipOf(200), "inset(0 3px round 32px)");
+  // Her name, from its first flash: each letter flashes at 60 %, goes dark (a ghost of 6 %), then lights for good, on
+  // the original's images, out of order (D, C, L, E, I, N, A of ICELAND); every letter in the page all along.
+  const states = async (f: number) => {
+    const { nodes } = await detouragesDrawn(f);
+    return Object.fromEntries(nodes.filter((n) => n.type === "span" && typeof styleOf(n).opacity === "number").map((n) => [drawnText(n), styleOf(n).opacity]));
+  };
+  for (const [c, [flash, dark, on]] of Object.entries(DT_LETTERS)) {
+    assert.deepEqual([(await states(flash - 1))[c] ?? 0, (await states(flash))[c], (await states(dark))[c], (await states(on - 1))[c], (await states(on))[c]], [0, 0.6, 0.06, 0.06, 1], c);
+  }
+  assert.deepEqual(Object.keys(await states(108)).sort(), [..."ACDEILN"]);
+  // Very bold wide capitals across 87,6 % of its window when its foot is above the Reel's middle, within the apps'
+  // margins below it; as tall as the original's (16,8 % of the window): its font in the name's display face, white.
+  const nameBox = async (options: Parameters<typeof detouragesDrawn>[1] = {}) => {
+    const { nodes } = await detouragesDrawn(150, options);
+    const fit = nodes.find((n) => n.type === "FitText")!;
+    return { box: fit.props.style as { left: number; top: number; width: number; height: number }, inner: fit.props.innerStyle as Record<string, unknown>, nodes };
+  };
+  const { box, inner, nodes } = await nameBox();
+  assert.equal(inner.fontWeight, 800);
+  assert.equal(inner.color, "#ffffff");
+  assert.equal(inner.fontSize, Math.round(Math.round(915 * 0.168) / 0.7));
+  // In her sky, behind everything else (Skyline laid over it), its foot so that about an eighth of the word is hidden.
+  assert.ok(nodes.findIndex((n) => n.type === "Skyline") > nodes.findIndex((n) => n.type === "FitText"));
+  const foot = box.top + box.height - Math.round(0.2 * 154);
+  const tops = Array.from({ length: 8 }, (_, k) => DT_READ.skyline(0, { from: 67 + (k * 946) / 8, to: 67 + ((k + 1) * 946) / 8 })!);
+  const hidden = tops.reduce((a, y) => a + Math.max(0, Math.min(154, foot - y)), 0) / (8 * 154);
+  assert.ok(hidden > 0.09 && hidden < 0.16, `${hidden}`);
+  assert.deepEqual([box.left, box.width], 503 + foot > 960 ? [140, 800] : [67, 946]);
+  // A high skyline (her buildings fill the frame), or a narrow sky (trees and a front up to the top of the frame on
+  // both sides: whole letters hidden): not behind her sky; behind her cut-out when she has one, else in front.
+  const high = await nameBox({ read: { skyline: (shot) => (shot === 0 ? 40 : null) } });
+  assert.equal(high.nodes.some((n) => n.type === "Skyline"), false);
+  const narrow = { skyline: (shot: number | undefined, span: { from?: number; to?: number }) => (shot !== 0 ? null : (span.from ?? 0) < 320 || (span.from ?? 0) > 700 ? 0 : 300) };
+  assert.equal((await nameBox({ read: narrow })).nodes.some((n) => n.type === "Skyline"), false);
+  const highHer = await nameBox({ read: { ...narrow, boxes: { "0": { x: 450, y: 300, w: 180, h: 500 } } } });
+  assert.ok(highHer.nodes.some((n) => n.type === "Subject" && n.props.shot === 0) && !highHer.nodes.some((n) => n.type === "Skyline"));
+  // Without a sky, behind what stands before her wall (her cut-out), its foot just under its top; else in front.
+  const her = await nameBox({ read: { boxes: { "0": { x: 450, y: 300, w: 180, h: 500 } } } });
+  assert.ok(her.nodes.some((n) => n.type === "Subject" && n.props.shot === 0) && !her.nodes.some((n) => n.type === "Skyline"));
+  assert.equal(her.box.top + her.box.height, Math.round(300 + 0.3 * 154 + 0.2 * 154));
+  assert.deepEqual([her.box.left, her.box.width], [67, 946]);
+  const plain = await nameBox({ read: {} });
+  assert.ok(!plain.nodes.some((n) => n.type === "Subject" || n.type === "Skyline"));
+  // A soft shade under it only on a bright sky.
+  assert.equal(inner.textShadow, "none");
+  assert.match(String((await nameBox({ read: { ...DT_READ, light: { mean: 0.8, high: 0.9 } } })).inner.textShadow), /rgba\(0,0,0,0\.32\)/);
+  // A longer name, its spaces kept: smaller in the same box, each letter on its own image.
+  const long = await detouragesDrawn(150, { name: "Párisi Udvar" });
+  assert.equal(long.nodes.filter((n) => n.type === "span" && typeof styleOf(n).opacity === "number").length, 11);
+  // Gone with the drop, as the original (no fade).
+  const { drop } = await detouragesDrawn(0);
+  assert.ok((await detouragesDrawn(drop - 1)).nodes.some((n) => n.type === "FitText"));
+  assert.equal((await detouragesDrawn(drop)).nodes.some((n) => n.type === "FitText" || n.type === "Skyline"), false);
+});
+
+test("« Ton nom qui clignote » (v2): its rounded window on black when her videos are horizontal, full frame otherwise or on her word; its sweeps; light to render", async () => {
+  const { detourages } = await import("./skills/detourages.ts");
+  const { skillPlan, skillFillInput, skillSettings } = await import("./skills.ts");
+  const { readsDrawn, subjectsDrawn } = await import("./subject.ts");
+  const frameOf = (nodes: Drawn[]) => {
+    const box = nodes.find((n) => n.type === "div" && styleOf(n).overflow === "hidden" && styleOf(n).backgroundColor === "#000000")!;
+    return { top: styleOf(box).top, height: styleOf(box).height };
+  };
+  // Her videos horizontal (or square): the original's window, 1,18:1, at the middle of the frame on black; upright: the
+  // whole frame, its corners rounded and its slit kept; her setting either way.
+  assert.deepEqual(frameOf((await detouragesDrawn(300)).nodes), { top: 503, height: 915 });
+  assert.deepEqual(frameOf((await detouragesDrawn(300, { aspect: 1 })).nodes), { top: 503, height: 915 });
+  assert.deepEqual(frameOf((await detouragesDrawn(300, { aspect: 9 / 16 })).nodes), { top: 0, height: 1920 });
+  assert.equal(frameOf((await detouragesDrawn(300, { settings: { format: "vertical" } })).nodes).height, 1920);
+  assert.equal(frameOf((await detouragesDrawn(300, { aspect: 9 / 16, settings: { format: "fenetre" } })).nodes).top, 503);
+  assert.match(String(styleOf((await detouragesDrawn(300, { aspect: 9 / 16 })).nodes.find((n) => n.type === "div" && styleOf(n).overflow === "hidden")!).clipPath), /^inset\(0 0px round 32px\)$/);
+  assert.deepEqual(detourages.settings?.map((s) => [s.name, s.choices.map((c) => c.value)]), [["format", ["auto", "fenetre", "vertical"]]]);
+  assert.deepEqual(skillSettings(detourages, [{ name: "format", value: "auto" }, { name: "format", value: "vertical" }]), { format: "vertical" });
+  // Its two sweeps streaked along their way and sliding (a vertical one, then a sideways one), its other shots as filmed.
+  const { line } = await detouragesDrawn(0);
+  const streak = async (f: number) => {
+    const blur = (await detouragesDrawn(f)).nodes.find((n) => n.type === "feGaussianBlur");
+    return blur ? String(blur.props.stdDeviation) : null;
+  };
+  const sweep = (k: number) => Math.round(line.shots[k]!.start * 30);
+  assert.deepEqual(await Promise.all([sweep(10) - 1, sweep(10), sweep(10) + 9, sweep(10) + 10].map(streak)), [null, "0 42", "0 42", null]);
+  assert.equal(await streak(sweep(18) + 3), "42 0");
+  // Light to render: one of her pictures at a time, and her sky's ground only while her name is on (never on the slit
+  // before it nor on the burst); her opening shot the only one it cuts out or reads, exactly what its code draws.
+  let most = 0;
+  for (let f = 0; f < Math.round(line.duration * 30); f++) {
+    const { nodes } = await detouragesDrawn(f);
+    const pictures = nodes.filter((n) => ["Footage", "Skyline", "Subject"].includes(n.type as string));
+    most = Math.max(most, pictures.length);
+    if (pictures.some((n) => n.type === "Skyline")) assert.ok(f >= line.marks.name! && f < sweep(1), `Skyline at ${f}`);
+  }
+  assert.ok(most <= 2, `${most} pictures at once`);
+  for (const n of [11, 16, 23, 31]) {
+    for (const end of [false, true]) {
+      const l = detourages.timeline(n, { end, words: { titre: "Udvar" } });
+      const durationInFrames = Math.round(l.duration * 30);
+      const props = { width: 1080, height: 1920, durationInFrames, brand: { name: "Udvar", displayFont: "Montserrat", bodyFont: "Montserrat" }, shots: pileShots(l, 16 / 9), reelTexts: [{ text: "Udvar", role: "hook", from: l.marks.name, to: Math.round(l.shots[1]!.start * 30), emphasis: [] }], end: end ? { title: "Ouvert dimanche", subtitle: null, from: durationInFrames - 48 } : null, texts: Object.fromEntries(Object.entries(l.marks).map(([k, v]) => [k, String(v)])) };
+      const drawn = await cutoutsDrawn(detourages.code, props, Array.from({ length: durationInFrames }, (_, f) => f));
+      assert.deepEqual([...drawn].sort((a, b) => a - b), l.cutouts, `${n} shots${end ? ", an ending card" : ""}`);
+    }
+  }
+  assert.deepEqual(subjectsDrawn(detourages.code), [0]);
+  assert.deepEqual(readsDrawn(detourages.code), [{ shot: 0, kinds: ["ground", "light", "sky"] }]);
+  // Its grade is its finish without what would grey the black around its window; her real whips read for its sweeps.
+  assert.deepEqual(detourages.finish, { fade: 0, grain: 0, vignette: 0 });
+  assert.deepEqual(detourages.reads, ["moves"]);
+  assert.deepEqual(detourages.fonts, ["Montserrat"]);
+  assert.doesNotMatch(detourages.code, /ICELAND|Permanent Marker|Cutout/);
+  // The filler sees its sweeps where they are kept, its name's slot; its ending card over its last shot.
+  const files = Array.from({ length: 8 }, (_, i) => ({ id: `v${i}`, photo: false, seconds: 12 }));
+  const input = skillFillInput({ skill: detourages, name: "Ton nom qui clignote", n: 23, files, business: {}, request: "" });
+  assert.match(input.cases[0]!.veut, /large et fixe/);
+  assert.match(input.cases[10]!.veut, /balayage très rapide/);
+  assert.match(input.cases[18]!.veut, /balayage très rapide de côté/);
+  assert.ok(input.cases.filter((c) => /balayage/.test(c.veut)).length === 2);
+  assert.match(input.cases[22]!.veut, /de dos/);
+  assert.deepEqual(input.textes.map((t) => [t.slot, "max_caracteres" in t ? t.max_caracteres : null, t.obligatoire]), [["titre", 12, true]]);
+  const fewer = skillFillInput({ skill: detourages, name: "Ton nom qui clignote", n: 16, files, business: {}, request: "" });
+  assert.ok(fewer.cases.filter((c) => /balayage/.test(c.veut)).length === 1);
+  const ended = await detouragesDrawn(Math.round(detourages.timeline(23, { end: true }).duration * 30) - 40, { end: true });
+  assert.ok(heldText(ended.tree).includes("Ouvert dimanche") && heldText(ended.tree).includes("de 9 h à 18 h"));
+  const plan = skillPlan({ skill: detourages, name: "Ton nom qui clignote", files, fill: { shots: Array.from({ length: 23 }, (_, i) => ({ file: files[i % 8]!.id, at: Math.floor(i / 8) * 4 })), texts: { titre: "Udvar" }, end: null } });
+  assert.deepEqual(plan.layers![0]!.motion.drawn, { shots: 23, subjects: [0] });
 });
