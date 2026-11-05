@@ -171,7 +171,10 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const name = reelTexts.find((t) => t.role === "hook");
   const others = reelTexts.filter((t) => t !== lead && t !== name);
   const pileW = wide ? 0.17 * bw : 0.245 * bw;
-  const baseY = Math.round(bh * (wide ? 0.49 : 0.445)) - LINE;
+  // Its letters (about 50 px below their slot's middle, measured by the scene check) end above the middle of the screen,
+  // where the apps' buttons begin on the right: in the 4:3 band, whose middle is the screen's, its line sits a little
+  // higher than the original's (its name is 2.5 times as big and reaches the right edge).
+  const baseY = Math.round(bh * (wide ? 0.44 : 0.445)) - LINE;
   const zones = { left: { x: 40, w: Math.round(bw / 2 - pileW - 52) }, right: { x: Math.round(bw / 2 + pileW + 12), w: Math.round(bw / 2 - pileW - 52) } };
   const rowsOf = (text, w) => {
     const words = String(text || "").replace(/\s+/g, " ").trim().split(" ").filter(Boolean);

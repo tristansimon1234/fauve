@@ -7386,7 +7386,7 @@ test("« Carte au feutre » (v2) writes its words where its original does, a pho
   lands.forEach((f, k) => assert.ok(Math.abs(f - CARTE_WORDS[k]!) <= 2 && f % 3 === 0, `word ${k + 1} at ${f}`));
   assert.deepEqual(shown(123), [19, 6]);
   assert.deepEqual(shown(147), [19, 9]);
-  assert.deepEqual(shown(269), [19, 9, 12]);
+  assert.deepEqual(shown(269), [19, 22]);
   const shotAt = (f: number) => drawnNodes(draw(f, props)).filter((n) => n.type === "Footage").map((n) => n.props.shot);
   for (let f = 0; f < 270; f++) assert.deepEqual(shotAt(f), [Math.floor(f / 3) % 23], `image ${f}`);
   assert.deepEqual(changesOf(270, shotAt), Array.from({ length: 89 }, (_, k) => 3 * (k + 1)));
@@ -7438,22 +7438,29 @@ test("« Carte au feutre » (v2): an open notebook laid over her pictures, a new
   assert.match(String(styleOf(paper).background), /#b7b6ad 49\.3%/);
   assert.ok(drawnNodes(paper).some((n) => /repeating-linear-gradient/.test(String(styleOf(n).background))));
   assert.doesNotMatch(carteFeutre.code, /boxShadow|perspective\(|rotateX\(/);
-  // Two lines a page, each across its width: its top page, its third line under the binding, then the name she announces,
-  // the biggest line (written apart, stretched further, filling the rest of the page, its letters tighter); in the
+  // Two lines a page, each across its width: its top page; under the binding, its third line and the name she announces,
+  // the biggest line (its slot a third taller, the page stretched as far as the name's width needs to fill it); in the
   // original's red, a hand that never repeats in Covered By Your Grace, a grease pencil's grain, stretched to their height.
   const hands = handsOf(draw(200, props));
-  assert.deepEqual(hands.map((n) => [n.props.text, n.props.color, n.props.grain, n.props.align]), [
-    ["PUT THAT\nPHONE DOWN", "#b20b21", 0.6, "left"],
-    ["& COME TO", "#b20b21", 0.6, "left"],
-    ["BURGER NIGHT", "#b20b21", 0.6, "left"],
+  assert.deepEqual(hands.map((n) => [n.props.text, n.props.last, n.props.color, n.props.grain, n.props.align]), [
+    ["PUT THAT\nPHONE DOWN", 1, "#b20b21", 0.6, "left"],
+    ["& COME TO\nBURGER NIGHT", 1.3, "#b20b21", 0.6, "left"],
   ]);
   assert.ok(hands.every((n) => /^'Covered By Your Grace'/.test(String((n.props.style as Record<string, string>).fontFamily)) && !n.props.bend));
-  const blocks = drawnNodes(notebook).filter((n) => n.type === "div" && /^scaleY\(/.test(String(styleOf(n).transform ?? ""))).map((n) => ({ top: Number(styleOf(n).top), height: Number(styleOf(n).height), stretch: Number(/scaleY\(([\d.]+)\)/.exec(String(styleOf(n).transform))![1]), slot: (drawnNodes(n).find((c) => c.type === "Handwriting")!.props.box as TdBox).h }));
+  const blocks = drawnNodes(notebook).filter((n) => n.type === "div" && /^scaleY\(/.test(String(styleOf(n).transform ?? ""))).map((n) => ({ top: Number(styleOf(n).top), stretch: Number(/scaleY\(([\d.]+)\)/.exec(String(styleOf(n).transform))![1]), slot: (drawnNodes(n).find((c) => c.type === "Handwriting")!.props.box as TdBox).h }));
   const visible = blocks.map((b) => b.slot * b.stretch);
-  assert.deepEqual(blocks.map((b) => b.stretch), [1.45, 1.45, blocks[2]!.stretch]);
-  assert.ok(blocks[2]!.stretch > 1.45 && visible[2]! > visible[1]! * 1.3 && visible[2]! > visible[0]! / 2, JSON.stringify(blocks));
-  assert.ok(blocks[0]!.top + visible[0]! < 0.495 * 787 && blocks[1]!.top > 0.495 * 787 && blocks[2]!.top >= blocks[1]!.top + visible[1]! && blocks[2]!.top + visible[2]! <= 787, JSON.stringify(blocks));
-  assert.equal((hands[2]!.props.style as Record<string, string>).letterSpacing, "-0.02em");
+  assert.equal(blocks.length, 2);
+  assert.equal(blocks[0]!.stretch, 1.45);
+  assert.ok(blocks[0]!.top + visible[0]! < 0.495 * 787 && blocks[1]!.top > 0.495 * 787 && blocks[1]!.top + visible[1]! <= 787, JSON.stringify(blocks));
+  // The name's capitals, as its hand sizes them (its slot's height or its width, about 0.38 em a letter, the font's
+  // capitals at 0.72 em, stretched): taller than the third line's and the top page's (the original's 10,5 % of the image).
+  const cap = (slot: number, stretch: number, letters: number) => Math.min((slot / stretch / 0.72) * 0.92, 692 / (letters * 0.38)) * 0.72 * stretch;
+  const bottom = blocks[1]!;
+  const name = cap((visible[1]! / 2.3) * 1.3, bottom.stretch, 12);
+  assert.ok(bottom.stretch > 1.45 && name > cap(visible[1]! / 2.3, bottom.stretch, 9) * 1.2 && name > cap(visible[0]! / 2, 1.45, 10) * 1.1, `${name} px`);
+  // A name alone on its page (a short message): its own stretch, its letters tighter.
+  const alone = handsOf(draw(200, { ...props, reelTexts: [{ ...CARTE_TEXTS[0]!, text: "viens goûter la" }, { ...CARTE_TEXTS[1]!, text: "pizza du jeudi" }] }))[1]!;
+  assert.equal((alone.props.style as Record<string, string>).letterSpacing, "-0.02em");
   assert.deepEqual(carteFeutre.fonts, ["Covered By Your Grace"]);
   // Nothing written while it is empty, the bottom page only once its words come.
   assert.equal(handsOf(draw(20, props)).length, 0);
@@ -7508,11 +7515,12 @@ test("« Carte au feutre » (v2): full frame as the original, two bands when her
   const plan = skillPlan({ skill: carteFeutre, name: "Carte au feutre", files, fill: { shots: files.map((f) => ({ file: f.id, at: 0 })), texts: { message: "ce jeudi on vous attend pour la", nom: "soirée jazz" }, end: null } });
   const dressed = dressSkillPlan(plan, carteFeutre, followedFrom("local", houseStyle(houseModel("carte-feutre")!)));
   assert.ok(dressed.look && dressed.look.flash === 0 && dressed.look.grain === 0 && dressed.look.warmth === 0 && dressed.look.contrast === 0, JSON.stringify(dressed.look));
-  // Light to render: one picture a frame (two in bands), three written blocks at most, each mounted once it has letters,
-  // nothing cut out, followed, read or in depth; no 3D transform, its hand without its costly bend.
+  // Light to render: one picture a frame (two in bands), two written blocks at most (each one's grain a filter pass a
+  // frame), each mounted once it has letters, nothing cut out, followed, read or in depth; no 3D transform, its hand
+  // without its costly bend.
   for (let f = 0; f < 270; f += 3) {
     const tree = draw(f, carteProps(line, wide));
-    assert.ok(drawnNodes(tree).filter((n) => n.type === "Footage").length <= 2 && handsOf(tree).length <= 3 && handsOf(tree).every((n) => Number(n.props.upTo) > 0), `image ${f}`);
+    assert.ok(drawnNodes(tree).filter((n) => n.type === "Footage").length <= 2 && handsOf(tree).length <= 2 && handsOf(tree).every((n) => Number(n.props.upTo) > 0), `image ${f}`);
   }
   assert.deepEqual([subjectsDrawn(carteFeutre.code), objectsDrawn(carteFeutre.code), clearsDrawn(carteFeutre.code), depthsDrawn(carteFeutre.code)], [[], [], [], []]);
   assert.deepEqual(checkMotionCode(carteFeutre.code), []);
@@ -7653,7 +7661,9 @@ test("« Photos posées sur la table » (v2): its prints at once at the centre a
   assert.ok(pair.every((w) => /^'Shadows Into Light'/.test(w.font)));
   const [left, right] = pair as [(typeof pair)[number], (typeof pair)[number]];
   assert.ok(left.box.x >= 40 && left.box.x + left.box.w <= 0.34 * 1080 && right.box.x >= 0.68 * 1080 && right.box.x + right.box.w <= 1040, JSON.stringify(pair.map((w) => w.box)));
-  assert.ok(555 + right.box.y + right.box.h <= 960, JSON.stringify(right.box));
+  // Its letters reach about 50 px below their slot's middle (Shadows Into Light at 57 px, measured by the scene check in
+  // Chrome): above the apps' buttons, which begin at the screen's middle on the right (less the check's 12 px).
+  assert.ok(555 + right.box.y + right.box.h / 2 + 50 <= 960 - 12, JSON.stringify(right.box));
   const opacity = (f: number) => Number(styleOf(drawnNodes(draw(f, props)).find((n) => n.type === "div" && n.children.flat(Infinity).some((c) => (c as Drawn)?.type === "Handwriting"))!).opacity);
   assert.deepEqual([9, 13, 17, 60].map(opacity), [0, 0.5, 1, 1]);
   assert.deepEqual([75, 76].map((f) => words(f).length), [2, 0]);

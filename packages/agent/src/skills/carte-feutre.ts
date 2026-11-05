@@ -154,24 +154,26 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const ink = setting("encre", "sienne") === "sienne" && dark ? String(brand.accent).toLowerCase() : "#b20b21";
 
   // Its lines written by a hand that never repeats, at the left, each across the page's width, its capitals stretched to
-  // the original's height (tall and narrow): two lines on the top page, the third under the binding, and the name she
-  // announces under it, the biggest line (the original's 10,5 % of the image, the others 6,9 to 8,3 %): written apart and
-  // stretched further, as far as its width lets it fill the rest of the page, its letters tighter.
+  // the original's height (tall and narrow): two lines on the top page; on the bottom one, the third and the name she
+  // announces, the biggest line (the original's 10,5 % of the image, the others 6,9 to 8,3 %): its slot a third taller
+  // and the page stretched as far as the name's width needs to fill it (the third line, held by its slot, keeps its
+  // height), its letters tighter. Two blocks at most: each one's grain is a filter pass a frame.
   const hand = "'Covered By Your Grace', '" + brand.displayFont + "', cursive";
   const STRETCH = 1.45;
-  const page = (rows, y, hh, upTo, seed, stretch, tight) => rows.length && upTo > 0
+  const page = (rows, y, hh, upTo, seed, stretch, last) => rows.length && upTo > 0
     ? h("div", { key: seed, style: { position: "absolute", left: 0, top: y, width: NW, height: hh, transformOrigin: "50% 0%", transform: "scaleY(" + stretch.toFixed(3) + ")" } },
-        h(Handwriting, { text: rows.join("\n"), box: { x: Math.round(NW * 0.018), y: 0, w: Math.round(NW * 0.964), h: Math.round(hh / stretch) }, upTo, color: ink, grain: 0.6, wobble: 1, last: 1, align: "left", style: { fontFamily: hand, fontWeight: 400, ...(tight ? { letterSpacing: "-0.02em" } : {}) }, seed }))
+        h(Handwriting, { text: rows.join("\n"), box: { x: Math.round(NW * 0.018), y: 0, w: Math.round(NW * 0.964), h: Math.round(hh / stretch) }, upTo, color: ink, grain: 0.6, wobble: 1, last, align: "left", style: { fontFamily: hand, fontWeight: 400, ...(rows.length === 1 && rows[0] === nm ? { letterSpacing: "-0.02em" } : {}) }, seed }))
     : null;
   const topH = Math.round(NH * 0.4);
+  const bottomH = Math.round(NH * 0.42);
   const third = lines[2] || null;
-  const nameTop = Math.round(NH * (third ? 0.713 : 0.535));
-  const nameH = Math.round(NH * 0.965) - nameTop;
-  const nameStretch = Math.max(STRETCH, Math.min(2.2, (0.9 * nameH) / (0.72 * ((NW * 0.964) / (Math.max(4, length(nm)) * 0.38)))));
+  const bottom = (third ? [third] : []).concat(nm ? [nm] : []);
+  const last = third && nm ? 1.3 : 1;
+  const nameSlot = third && nm ? (bottomH / 2.3) * 1.3 : bottomH;
+  const stretched = nm ? Math.max(STRETCH, Math.min(2, (0.92 * nameSlot) / (0.72 * ((NW * 0.964) / (Math.max(4, length(nm)) * 0.38))))) : STRETCH;
   let writing = [
-    page(topLines, Math.round(NH * 0.045), Math.round((topH * Math.max(1, topLines.length)) / 2), Math.min(shown, topLength), "carnet-haut", STRETCH),
-    third ? page([third], Math.round(NH * 0.535), Math.round(NH * 0.163), Math.min(length(third), Math.max(0, shown - topLength - 1)), "carnet-bas", STRETCH) : null,
-    nm ? page([nm], nameTop, nameH, named_ ? length(nm) : 0, "carnet-nom", nameStretch, true) : null,
+    page(topLines, Math.round(NH * 0.045), Math.round((topH * Math.max(1, topLines.length)) / 2), Math.min(shown, topLength), "carnet-haut", STRETCH, 1),
+    page(bottom, Math.round(NH * 0.535), bottomH, Math.max(0, shown - topLength - 1), "carnet-bas", stretched, last),
   ];
   // 4. Its ending card, when she has one (the original has none): the notebook straight, written anew at once, her title
   // on the top page, its line on the bottom one.
@@ -179,7 +181,7 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
     const rows = (s) => { const t = up(s); return split(t.split(" ").filter(Boolean), Math.max(1, Math.min(2, Math.round(length(t) / 11)))); };
     const title = rows(end.title);
     const sub = end.subtitle ? rows(end.subtitle) : [];
-    writing = [page(title, Math.round(NH * 0.045), topH, 999, "carte-titre", STRETCH), page(sub, Math.round(NH * 0.535), Math.round((NH * 0.42 * sub.length) / 2), 999, "carte-ligne", STRETCH)];
+    writing = [page(title, Math.round(NH * 0.045), topH, 999, "carte-titre", STRETCH, 1), page(sub, Math.round(NH * 0.535), Math.round((bottomH * sub.length) / 2), 999, "carte-ligne", STRETCH, 1)];
   }
   const notebook = h("div", { style: { position: "absolute", left: Math.round(width * pose[0] - NW / 2), top: Math.round(height * pose[1] - NH / 2), width: NW, height: NH, transformOrigin: "50% 50%", transform: "rotate(" + pose[2] + "deg) scale(" + sc + ")" } },
     h("div", { style: { position: "absolute", left: 0, top: 0, width: NW, height: NH, clipPath: shape, background: "linear-gradient(180deg, #dcdad0 0%, #dad8cf 36%, #d6d4ca 41.5%, #c4c3b9 46.5%, #b7b6ad 49.3%, #a6a59d 49.5%, #c6c5bc 50%, #d9d8cf 52%, #dbdad1 70%, #d8d7ce 100%)" } },
