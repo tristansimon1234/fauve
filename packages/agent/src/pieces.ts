@@ -483,7 +483,10 @@ export function pieceMotion(input: {
         ...(s.hand && shot !== undefined ? { hand: { shot, moment: s.hand.moment, ...within } } : {}),
       };
     });
-  const code = pieceCode(piece, fill.objects);
+  // Only the objects on a shot under it are named in its code: one named for a shot it does not have (its sign before its
+  // sky, with a single shot under it) would be looked for on every shot it draws, for nothing.
+  const placed = Object.fromEntries(Object.entries(fill.objects).filter(([slot]) => objects.some((o) => o.name === skillObjectName(fill.objects[slot])) && (piece.objects ?? []).some((p) => p.slot === slot && at(p.shot) !== undefined)));
+  const code = pieceCode(piece, placed);
   // What a fallback, a correction or an animation over it reads: its brief as the editor wrote it, nothing of its earlier code.
   const { code: _code, js: _js, texts: _texts, drawn: _drawn, sounds: _sounds, fonts: _fonts, piece: _piece, photos: _photos, times_spoken: _spoken, ...rest } = layer.motion;
   return {

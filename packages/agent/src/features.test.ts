@@ -10845,3 +10845,15 @@ test("the effects offered change from one Reel to the next: the one she names fi
   const { mosaique } = await import("./pieces/mosaique.ts");
   assert.equal(piecesOffered([cadre, mosaique], [shot, { ...shot, framing: "close" }], 5, 2, { request: "une mosaique de mes plats" })[0]!.key, "mosaique");
 });
+
+test("an effect names in its code only the objects on a shot under it: one for a shot it does not have is never looked for", async () => {
+  const { cadre } = await import("./pieces/cadre.ts");
+  const { pieceMotion } = await import("./pieces.ts");
+  const piece = { ...cadre, objects: [{ slot: "porte", shot: 0, want: "" }, { slot: "enseigne", shot: -2, want: "" }], code: cadre.code.replace('"@porte"', '"@porte" || "@enseigne"') };
+  const plan: Pick<EditPlan, "segments" | "tempo"> = { tempo: 100, segments: [{ clip_id: "wide", in: 0, out: 4, zoom: "none" }] };
+  const motion = pieceMotion({ piece, fill: { texts: {}, objects: { porte: "back door", enseigne: "shop sign" }, settings: {} }, plan, layer: { from: 0, to: 4, motion: { brief: "" } }, bpm: 100 });
+  // One shot under it: its sign (the shot before the last) is not there, its door is.
+  assert.ok(motion.code!.includes('"back door"'));
+  assert.ok(!motion.code!.includes('"shop sign"') && motion.code!.includes('"@enseigne"'));
+  assert.deepEqual(motion.drawn, { shots: 1, objects: [{ shot: 0, name: "back door" }] });
+});
