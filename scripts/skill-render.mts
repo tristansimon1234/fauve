@@ -8,11 +8,21 @@
 //     --words '{"surtitre":"un samedi dans","titre":"le marais"}' [--end '{"title":"…","subtitle":"…"}'] \
 //     [--shots 10] [--bpm 90] [--settings '{"cases":"6x8"}'] [--fonts "Open Sans,Inter"] [--name "Café des Arts"] [--out reel.mp4] [--no-render]
 //     [--named '{"lumieres":"shop sign"}'] [--objects '{"1":{"src":"sign.webm","result":"result.json","id":"sign"}}']
+//     [--cast '[[0,15.4],[0,16.6],[1,1]]']
+//     [--dressed] [--no-finish]
 //
+// Its model's finish is laid as production lays it (dressSkillPlan, as designSkill does): the model's look over the
+// whole Reel without what its code does itself (MontageSkill.finish), its lettering (its pairing, over --fonts), and its
+// light on each shot (the signature's grade); --dressed plays it as a model Edith picked, dressed in her charter (the
+// --fonts set it), --no-finish shows it bare.
 // --bpm plays it at another tempo than its own (a longer Reel, a music's tempo), as skillFit would.
+// --cast casts her files by hand as the filler would follow its slots (each shot: its file's place in --clips and where
+// it starts, s), for a skill whose shots want the same video in a row (« Recette cosy »: a step's next gesture); it
+// sets the number of shots.
 // --named names its objects as the filler would (its « @slot » in its code); --objects lays the cut-outs the card made of
-// them (apps/render/track_objects.py, run with OBJECTS_CPU=1), by shot: its file (webm) and its reading in that run's
-// printed result (its boxes, outline and pieces), on that shot's passage of the plan.
+// them (apps/render/track_objects.py, run with OBJECTS_CPU=1), by shot: its file (webm, or png for one read on a still, left out when its code only
+// reads where it is) and its reading in that run's printed result (its boxes, outline and pieces), on that shot's
+// passage of the plan; a list for several objects on one shot, each with its `name` (else the shot's objects in order).
 // The shots its code sets a text in the clear area of (ClearBox) are read here as the engine reads them
 // (apps/render/clear_area.py, by PYTHON: a Python with OpenCV and numpy, `python3` by default); without it, the fallback.
 // Clips are local files (videos or photos); they are normalized at 30 images a second into the bundle's public folder,
@@ -26,11 +36,12 @@ import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "no
 import { basename, extname, resolve } from "node:path";
 import { parseArgs } from "node:util";
 import { buildReelProps } from "../packages/agent/src/motion.ts";
-import { HOUSE_MODELS } from "../packages/agent/src/house-models.ts";
+import { HOUSE_MODELS, houseStyle } from "../packages/agent/src/house-models.ts";
 import { MONTAGE_SKILLS } from "../packages/agent/src/skill-library.ts";
 import { isClipSegment } from "../packages/agent/src/schemas.ts";
-import { clearPassages, objectKey, objectsDrawn, type ClearMap } from "../packages/agent/src/subject.ts";
-import { skillLongest, skillPlan, skillShotCount, type MontageSkill, type SkillFile, type SkillFill } from "../packages/agent/src/skills.ts";
+import { followedFrom, signatureOf } from "../packages/agent/src/steal.ts";
+import { clearPassages, layerObjects, objectKey, objectPassages, subjectShots, type ClearMap } from "../packages/agent/src/subject.ts";
+import { dressSkillPlan, skillLongest, skillPlan, skillShotCount, type MontageSkill, type SkillFile, type SkillFill } from "../packages/agent/src/skills.ts";
 
 const { values } = parseArgs({
   options: {
@@ -44,10 +55,13 @@ const { values } = parseArgs({
     settings: { type: "string" },
     named: { type: "string" },
     objects: { type: "string" },
+    cast: { type: "string" },
     fonts: { type: "string", default: "" },
     name: { type: "string", default: "Studio Test" },
     out: { type: "string" },
     "no-render": { type: "boolean", default: false },
+    dressed: { type: "boolean", default: false },
+    "no-finish": { type: "boolean", default: false },
   },
 });
 // A skill of the library, or one being written (its module exports it, under any name).
@@ -89,11 +103,13 @@ const files: (SkillFile & { src: string; aspect: number; path: string })[] = (va
 });
 if (!files.length) throw new Error("--clips: at least one file");
 
-// A fill made by hand, as the filler would: her files in turn, a video's later moments when it comes back.
-const n = values.shots ? Math.max(skill.shots[0], Math.min(skillLongest(skill), Number(values.shots))) : skillShotCount(skill, files);
+// A fill made by hand, as the filler would: her files in turn, a video's later moments when it comes back; or as cast.
+const cast = values.cast ? (JSON.parse(values.cast) as [number, number][]) : null;
+const n = cast ? cast.length : values.shots ? Math.max(skill.shots[0], Math.min(skillLongest(skill), Number(values.shots))) : skillShotCount(skill, files);
 const seen = new Map<string, number>();
 const fill: SkillFill = {
   shots: Array.from({ length: n }, (_, i) => {
+    if (cast) return { file: files[cast[i]![0]]!.id, at: Math.max(0, cast[i]![1]) };
     const f = files[i % files.length]!;
     const k = seen.get(f.id) ?? 0;
     seen.set(f.id, k + 1);
@@ -105,21 +121,43 @@ const fill: SkillFill = {
   ...(values.named ? { objects: JSON.parse(values.named) as Record<string, string> } : {}),
 };
 const bpm = values.bpm ? Math.round(Math.min(140, Math.max(60, Number(values.bpm)))) : undefined;
-const plan = skillPlan({ skill, name: model?.name ?? skill.key, files, fill, ...(bpm ? { bpm } : {}) });
+// The model followed as production follows it (her inspiration row's style: houseStyle), chosen by her, or by Edith (--dressed).
+const followed = model && !values["no-finish"] ? followedFrom("local", houseStyle(model), false, values.dressed) : undefined;
+const plan = dressSkillPlan(skillPlan({ skill, name: model?.name ?? skill.key, files, fill, ...(bpm ? { bpm } : {}) }), skill, followed);
 const fonts = (values.fonts || "").split(",").map((f) => f.trim()).filter(Boolean);
+console.log(
+  followed
+    ? `finish: « ${plan.look?.name ?? "none"} »${plan.look ? ` (grain ${plan.look.grain}, vignette ${plan.look.vignette}, contrast ${plan.look.contrast})` : ""}, light ${followed.look.grade}, lettering ${plan.fonts ? `${plan.fonts.display} / ${plan.fonts.body}` : "her charter's"}`
+    : "finish: none (--no-finish, or a model not in the catalogue)",
+);
+// What the engine would cut out and follow before the render (her cut-out by shot, each object on its passage).
+const cut = [...subjectShots(plan)];
+const followedObjects = objectPassages(plan, (id) => !files.find((f) => f.id === id)?.photo);
+if (cut.length || followedObjects.length) console.log(`cut out: shots ${cut.join(", ") || "none"}; objects: ${followedObjects.map((p) => `« ${p.name} » ${p.clip_id} ${p.from}–${p.to} s`).join(", ") || "none"}`);
 // The cut-outs of its objects, laid on their shots' passages as the render workshop gets them (by passage and name).
 const subjects: Record<string, { src: string; boxes?: (number[] | null)[]; contours?: (number[] | null)[]; parts?: number[]; clear?: ClearMap }> = {};
-for (const [shot, o] of Object.entries(JSON.parse(values.objects ?? "{}") as Record<string, { src: string; result: string; id: string }>)) {
+type ObjectRun = { src?: string; result: string; id: string; name?: string };
+for (const [shot, given] of Object.entries(JSON.parse(values.objects ?? "{}") as Record<string, ObjectRun | ObjectRun[]>)) {
   const segment = plan.segments.filter(isClipSegment)[Number(shot)];
-  // Named as the engine reads it: Subject or Outline given `object`, or SubjectBox, SubjectOutline, SubjectParts given a name.
-  const name = objectsDrawn(plan.layers?.[0]?.motion.js).find((o) => o.shot === Number(shot))?.name;
-  if (!segment || !name) throw new Error(`--objects: no named object on shot ${shot}`);
-  const reading = (JSON.parse(readFileSync(resolve(o.result), "utf8")) as Record<string, { boxes?: (number[] | null)[]; contours?: (number[] | null)[]; parts?: number[] }>)[o.id];
-  if (!reading) throw new Error(`--objects: no « ${o.id} » in ${o.result}`);
-  const target = `${media}/object-${shot}-${createHash("sha1").update(resolve(o.src)).digest("hex").slice(0, 8)}.webm`;
-  execFileSync("cp", [resolve(o.src), target]);
-  subjects[objectKey(segment.clip_id, segment.in, segment.out, name)] = { src: `/public/jobs/${job}/${basename(target)}`, ...(reading.boxes ? { boxes: reading.boxes } : {}), ...(reading.contours ? { contours: reading.contours } : {}), ...(reading.parts ? { parts: reading.parts } : {}) };
-  console.log(`object « ${name} » on shot ${shot}: ${reading.parts ? reading.parts.length / 4 : 0} pieces`);
+  // Several objects on one shot (a front's windows and its sign): a list, each its object's name, else the shot's k-th.
+  (Array.isArray(given) ? given : [given]).forEach((o, k) => {
+    // Named as the engine reads it: Subject or Outline given `object`, or SubjectBox, SubjectOutline, SubjectParts given a
+    // name, on the shot its code names or its timeline places it on.
+    const layer = plan.layers?.[0];
+    const name = o.name ?? (layer ? layerObjects(plan, layer).filter((x) => x.shot === Number(shot))[k]?.name : undefined);
+    if (!segment || !name) throw new Error(`--objects: no named object on shot ${shot}`);
+    const reading = (JSON.parse(readFileSync(resolve(o.result), "utf8")) as Record<string, { boxes?: (number[] | null)[]; contours?: (number[] | null)[]; parts?: number[] }>)[o.id];
+    if (!reading) throw new Error(`--objects: no « ${o.id} » in ${o.result}`);
+    // Its cut-out, when its code draws it (Subject object): a reading alone serves SubjectBox, SubjectOutline and SubjectParts.
+    let src = "";
+    if (o.src) {
+      const target = `${media}/object-${shot}-${createHash("sha1").update(`${resolve(o.src)}#${name}`).digest("hex").slice(0, 8)}${extname(o.src) || ".webm"}`;
+      execFileSync("cp", [resolve(o.src), target]);
+      src = `/public/jobs/${job}/${basename(target)}`;
+    }
+    subjects[objectKey(segment.clip_id, segment.in, segment.out, name)] = { src, ...(reading.boxes ? { boxes: reading.boxes } : {}), ...(reading.contours ? { contours: reading.contours } : {}), ...(reading.parts ? { parts: reading.parts } : {}) };
+    console.log(`object « ${name} » on shot ${shot}: ${reading.parts ? reading.parts.length / 4 : 0} pieces`);
+  });
 }
 // Where its texts are set in her shots (ClearBox): their clear areas read on her own files, as the engine reads them.
 const clears = clearPassages(plan, (id) => !files.find((f) => f.id === id)?.photo);
@@ -145,7 +183,8 @@ const props = buildReelProps(plan, {
   aspects: Object.fromEntries(files.map((f) => [f.id, f.aspect])),
   // A photo's shape, as the render gets it (without it, a composition takes every photo for an upright 3:4).
   photoAspects: Object.fromEntries(files.filter((f) => f.photo).map((f) => [f.id, f.aspect])),
-  brand: { name: values.name ?? "", ...(fonts.length ? { fonts } : {}) },
+  // Its light on each shot (the model's grade, over her charter's), as the render's theme takes it in production.
+  brand: { name: values.name ?? "", ...(fonts.length ? { fonts } : {}), ...(followed ? { signature: signatureOf({ followed }) } : {}) },
   ...(Object.keys(subjects).length ? { subjects } : {}),
 });
 const out = resolve(values.out ?? `${ROOT}/${skill.key}.mp4`);

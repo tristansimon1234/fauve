@@ -181,10 +181,15 @@ function DigitalDate({ text, x, y, h, color }: { text: string; x: number; y: num
   return <g style={{ filter: `drop-shadow(0 0 ${(h * 0.18).toFixed(1)}px ${color})` }}>{shapes}</g>;
 }
 
-/** The date a camera prints and what it writes beside it, in its corner, clear of the app's buttons on the right and at the bottom. */
-function Stamp({ stamp, text, k }: { stamp: NonNullable<ReelLookDraw["stamp"]>; text?: string; k: number }) {
+/**
+ * The date a camera prints and what it writes beside it, in its corner, clear of the app's buttons on the right and at
+ * the bottom; in `size`, the box a look on one passage covers (the whole frame by default).
+ */
+function Stamp({ stamp, text, k, size }: { stamp: NonNullable<ReelLookDraw["stamp"]>; text?: string; k: number; size?: { width: number; height: number } }) {
   const frame = useCurrentFrame();
-  const { width, height, fps } = useVideoConfig();
+  const video = useVideoConfig();
+  const { width, height } = size ?? video;
+  const { fps } = video;
   const right = stamp.corner.endsWith("right");
   const bottom = stamp.corner.startsWith("bottom");
   const side = right ? 150 * k : 72 * k;
@@ -219,10 +224,15 @@ function Stamp({ stamp, text, k }: { stamp: NonNullable<ReelLookDraw["stamp"]>; 
   );
 }
 
-/** A look's texture, over her footage and under the texts. `stamp`: the date its camera prints. */
-export function LookOverlay({ look, stamp, k }: { look: ReelLookDraw; stamp?: string; k: number }) {
+/**
+ * A look's texture, over her footage and under the texts. `stamp`: the date its camera prints; `size`: the box it
+ * covers when it is laid on one passage of a composition (Look), the whole frame by default.
+ */
+export function LookOverlay({ look, stamp, k, size }: { look: ReelLookDraw; stamp?: string; k: number; size?: { width: number; height: number } }) {
   const frame = useCurrentFrame();
-  const { height, fps } = useVideoConfig();
+  const video = useVideoConfig();
+  const height = size?.height ?? video.height;
+  const { fps } = video;
   const rand = seeded(Math.floor(frame / 2) * 4973 + 7);
   // A tape's tracking band, rolling down for a third of a second every 3.4 s.
   const cycle = Math.round(fps * 3.4);
@@ -262,7 +272,7 @@ export function LookOverlay({ look, stamp, k }: { look: ReelLookDraw; stamp?: st
       ) : look.frame === "border" ? (
         <AbsoluteFill style={{ boxShadow: `inset 0 0 0 ${26 * k}px #F6F3EC, inset 0 0 ${10 * k}px ${26 * k}px rgba(0,0,0,0.12)` }} />
       ) : null}
-      {look.stamp ? <Stamp stamp={look.stamp} text={stamp} k={k} /> : null}
+      {look.stamp ? <Stamp stamp={look.stamp} text={stamp} k={k} {...(size ? { size } : {})} /> : null}
     </AbsoluteFill>
   );
 }

@@ -11,7 +11,7 @@ import type { SfxLevel } from "./schemas.ts";
 import { faceZone, layerTrack, sceneTrack, shotTrack, type FaceZone, type ShotTrack, type TrackPiece, type TracksByClip } from "./tracking.ts";
 import { DEPTH_MOVES, reliefOf } from "./depth.ts";
 import { clearKey, depthKey, photoKey, subjectKey, type ClearMap } from "./subject.ts";
-import { lookMatrix, lookStamp, planLook, type ReelLook } from "./looks.ts";
+import { LOOK_PRESETS, lookMatrix, lookStamp, planLook, type ReelLook } from "./looks.ts";
 
 // Edit plan → props of the Remotion "Reel" composition (apps/render). Everything
 // is converted to frames on the output timeline here, so the templates only
@@ -106,6 +106,8 @@ export type ReelSegment =
       objects?: Record<string, { src: string; still?: boolean }>;
       /** Its depth at every image of the passage (depth_video.py: a grey video, near white), drawn like the shot by a composition's Depth. */
       depthMap?: { src: string };
+      /** Laid beside another shot on the same moment (a split screen's other half): only a composition draws it, the plain montage skips it. */
+      beside?: true;
     }
   /**
    * A photo: a carousel slide (with its retouch and blurred zones), or a photo in a Reel (zoom: a slow Ken Burns move).
@@ -130,6 +132,8 @@ export type ReelSegment =
       depth?: { src: string; box: { x: number; y: number; w: number; h: number } };
       /** A moving photo with its depth read on the card: the video of every pixel moved by its depth (relief.py), as long as the shot. */
       relief?: { src: string; frames: number };
+      /** Laid beside another shot on the same moment: only a composition draws it, the plain montage skips it. */
+      beside?: true;
     }
   /**
    * Animations play over her footage when there is some (`under`), else on the studio's colours. composed: an engine
@@ -204,6 +208,26 @@ export type ShotCamera = {
 
 /** An animation's code that draws one of her shots or what is cut out of it (her, an object, its depth). */
 const DRAWS_SHOTS = /\b(?:Footage|Subject|SubjectBox|SubjectOutline|SubjectParts|Outline|Depth|ClearBox)\b/;
+
+/** An animation's code that lays a ready look on one of its passages (Look in the scope, PassageLook.tsx). */
+const LAYS_LOOK = /\bLook\b/;
+
+/** A plan whose animations lay a ready look on a passage (a composition, one over the montage, a scene). */
+export const usesPassageLooks = (plan: Pick<EditPlan, "segments"> & { layers?: EditPlan["layers"] }) =>
+  (plan.layers ?? []).some((l) => LAYS_LOOK.test(l.motion.js ?? "")) || plan.segments.some((s) => isMotionSegment(s) && LAYS_LOOK.test(s.motion.js ?? ""));
+
+/**
+ * The ready looks (LOOK_PRESETS) as an animation's Look draws them on one passage, by key: each one's settings, its
+ * grade as one colour matrix, and the date its camera prints (`today`, as for a look over the whole Reel).
+ */
+export function passageLooks(today?: string): Record<string, { look: ReelLook & { matrix: number[] }; stamp?: string }> {
+  return Object.fromEntries(
+    (Object.entries(LOOK_PRESETS) as [string, ReelLook][]).map(([key, look]) => {
+      const stamp = lookStamp(look, today);
+      return [key, { look: { ...look, matrix: lookMatrix(look) }, ...(stamp ? { stamp } : {}) }];
+    }),
+  );
+}
 
 /** What a composition reads of an object followed through a shot: its box and its outline at every image, its pieces. */
 const objectReading = (o: NonNullable<ReelInputs["subjects"]>[string]) => ({
@@ -383,6 +407,11 @@ export type ReelProps = {
   look?: (ReelLook & { matrix: number[] }) | null;
   /** The date a look prints, in its camera's format (« '26 10 29 », « 29 OCT. 2026 »). */
   stamp?: string;
+  /**
+   * The ready looks (LOOK_PRESETS, by key) an animation lays on one passage with Look, drawn like a look over the whole
+   * Reel, with the date each camera prints: given only when an animation's code uses Look (passageLooks).
+   */
+  looks?: Record<string, { look: ReelLook & { matrix: number[] }; stamp?: string }>;
   /** The studio's logo over the whole video or still (carousel slides). */
   logo?: "top" | "bottom" | null;
   /** Where a voice's subtitles sit for the whole Reel (top, share of the height): off the faces, never moving. */
@@ -585,16 +614,33 @@ function frameLengths(plan: Pick<EditPlan, "segments" | "transitions">) {
   return { lengths, fadeFrames };
 }
 
-/** When each segment starts in the video and how long it lasts (seconds), fades included, and the video's length. */
-export function planTimeline(plan: Pick<EditPlan, "segments" | "transitions">): { segments: { start: number; length: number }[]; duration: number } {
+/**
+ * Each segment's first frame and the video's length in frames: the main line one after the other (overlapped by its
+ * fades), a shot laid beside the others (beside, a split screen's other half) on its own moment, its time counted once.
+ */
+function frameStarts(plan: Pick<EditPlan, "segments" | "transitions">): { starts: number[]; lengths: number[]; fadeFrames: number; total: number } {
   const { lengths, fadeFrames } = frameLengths(plan);
   let cursor = 0;
-  const segments = lengths.map((length) => {
+  let total = 0;
+  const starts = plan.segments.map((s, i) => {
+    const length = lengths[i]!;
+    if (isClipSegment(s) && s.beside) {
+      const start = toFrames(s.beside.at);
+      total = Math.max(total, start + length);
+      return start;
+    }
     const start = cursor;
     cursor += length - fadeFrames;
-    return { start: start / REEL_FPS, length: length / REEL_FPS };
+    total = Math.max(total, cursor + fadeFrames);
+    return start;
   });
-  return { segments, duration: (cursor + fadeFrames) / REEL_FPS };
+  return { starts, lengths, fadeFrames, total };
+}
+
+/** When each segment starts in the video and how long it lasts (seconds), fades included, and the video's length (a shot laid beside the others counted once). */
+export function planTimeline(plan: Pick<EditPlan, "segments" | "transitions">): { segments: { start: number; length: number }[]; duration: number } {
+  const { starts, lengths, total } = frameStarts(plan);
+  return { segments: starts.map((start, i) => ({ start: start / REEL_FPS, length: lengths[i]! / REEL_FPS })), duration: total / REEL_FPS };
 }
 
 /**
@@ -605,7 +651,7 @@ export function planTimeline(plan: Pick<EditPlan, "segments" | "transitions">): 
  */
 export function textsOnShots<P extends Pick<EditPlan, "segments" | "transitions" | "texts">>(plan: P): P {
   const { segments } = planTimeline(plan);
-  const later = plan.segments.flatMap((s, i) => (isClipSegment(s) && i > 0 && segments[i] ? [segments[i]!] : []));
+  const later = plan.segments.flatMap((s, i) => (isClipSegment(s) && !s.beside && i > 0 && segments[i] ? [segments[i]!] : []));
   const texts = plan.texts.flatMap((t, i) => (t.from > 0.05 ? [{ t, i }] : []));
   if (texts.length < 3 || !(texts.length === later.length || texts.length === later.length - 1)) return plan;
   if (texts.some(({ t }) => t.to - t.from > 3) || texts.some(({ t }, k) => k > 0 && t.from < texts[k - 1]!.t.from)) return plan;
@@ -656,7 +702,8 @@ const subtitleRow = (plan: EditPlan): number | undefined => plan.layers?.find((l
 export function buildReelProps(plan: EditPlan, inputs: ReelInputs): ReelProps {
   const fps = REEL_FPS;
   const brand = resolveReelBrand(plan, inputs.template, inputs.brand);
-  const { lengths, fadeFrames } = frameLengths(plan);
+  // Each segment's first frame: the main line one after the other, a shot laid beside the others on its own moment.
+  const { starts: firstFrames, lengths, fadeFrames, total } = frameStarts(plan);
   const look = planLook(plan);
 
   // The footage under an animation: the passage of her clip (or the photo) the plan names.
@@ -670,10 +717,8 @@ export function buildReelProps(plan: EditPlan, inputs: ReelInputs): ReelProps {
     return { type: "clip", src, startFrom: toFrames(over.in ?? 0), ...(retouch?.adjust ? { adjust: retouch.adjust } : {}), ...(aspect ? { aspect } : {}) };
   };
 
-  let cursor = 0;
   const segments: ReelSegment[] = plan.segments.map((s, i) => {
-    const startAt = cursor;
-    cursor += lengths[i]! - fadeFrames;
+    const startAt = firstFrames[i]!;
     if (isMotionSegment(s)) {
       const fallback = s.motion.fallback ?? { kind: "title" as const, title: inputs.brand.name || " ", background: "accent" as const };
       const under = underOf(s.over);
@@ -701,11 +746,15 @@ export function buildReelProps(plan: EditPlan, inputs: ReelInputs): ReelProps {
     // or she wants the sound of her videos all along (never slowed down), or none of it; or its model hears this shot
     // (a skill's `sound` shot: the metro under its title), at its own pace, unless she wants none of her videos' sound.
     const heard = plan.finish?.video_sound ?? "speech";
+    // A shot laid beside another (the other half of a split screen) is seen, never heard: the main line's sound plays.
     const speech =
-      heard === "all"
+      !s.beside &&
+      (heard === "all"
         ? !speed
         : (heard === "speech" && !plan.voice && !speed && (inputs.words?.[s.clip_id] ?? []).some((w) => w.start >= s.in && w.end <= s.out)) ||
-          (heard !== "none" && Boolean(s.sound) && !speed && !s.ramp);
+          (heard !== "none" && Boolean(s.sound) && !speed && !s.ramp));
+    // Only a composition draws a shot laid beside the others: the plain montage skips it.
+    const beside = s.beside ? { beside: true as const } : {};
     const zoom = s.zoom === "light" || plan.transitions === "light_zoom";
     const move: CameraMove = s.move ?? (zoom ? "in" : "none");
     // A photo in a Reel: the move the engine chose (photoMoves: most held still); a plan from before those moves keeps its slow zoom.
@@ -718,6 +767,7 @@ export function buildReelProps(plan: EditPlan, inputs: ReelInputs): ReelProps {
         src,
         startAt,
         durationInFrames: lengths[i]!,
+        ...beside,
         zoom: s.move === undefined,
         ...(s.move ? { move: s.move } : {}),
         ...(s.photo ? { edit: s.photo } : {}),
@@ -744,6 +794,7 @@ export function buildReelProps(plan: EditPlan, inputs: ReelInputs): ReelProps {
       startFrom: toFrames(s.in),
       startAt,
       durationInFrames: lengths[i]!,
+      ...beside,
       zoom,
       ...(move !== "none" ? { move } : {}),
       ...(speed ? { speed } : {}),
@@ -763,7 +814,7 @@ export function buildReelProps(plan: EditPlan, inputs: ReelInputs): ReelProps {
       ...(!ramp && !speed && inputs.subjects?.[depthKey(s.clip_id, s.in, s.out)] ? { depthMap: { src: inputs.subjects[depthKey(s.clip_id, s.in, s.out)]!.src } } : {}),
     };
   });
-  const durationInFrames = cursor + fadeFrames;
+  const durationInFrames = total;
   // What moves in the footage under each animation, cut to its passage: its code follows it with `track`.
   const tracks = inputs.tracks ?? {};
   if (Object.keys(tracks).length) {
@@ -808,7 +859,8 @@ export function buildReelProps(plan: EditPlan, inputs: ReelInputs): ReelProps {
     }
   } else if (plan.subtitles) {
     plan.segments.forEach((s, i) => {
-      if (!isClipSegment(s)) return;
+      // A shot laid beside another is never heard: its words are not the Reel's.
+      if (!isClipSegment(s) || s.beside) return;
       for (const word of inputs.words?.[s.clip_id] ?? []) {
         if (word.start < s.in || word.end > s.out) continue;
         const from = segments[i]!.startAt + toFrames(screenTime(s, word.start));
@@ -916,7 +968,8 @@ export function buildReelProps(plan: EditPlan, inputs: ReelInputs): ReelProps {
     });
 
   // Animations over several shots: their span in frames and the cuts under them (from their start).
-  const starts = segments.slice(1).map((s) => s.startAt);
+  // (Two shots laid side by side cut on the same frame: one cut, in order.)
+  const starts = [...new Set(segments.slice(1).map((s) => s.startAt))].sort((a, b) => a - b);
   const endCard = plan.end_card
     ? {
         title: frenchSpaces(keepName(plan.end_card.title, inputs.brand.name)),
@@ -1005,6 +1058,8 @@ export function buildReelProps(plan: EditPlan, inputs: ReelInputs): ReelProps {
     ...(voice ? { voice: { src: voice.src, from: voice.from } } : {}),
     ...(look ? { look: { ...look, matrix: lookMatrix(look) } } : {}),
     ...(lookStamp(look, inputs.today) ? { stamp: lookStamp(look, inputs.today)! } : {}),
+    // The ready looks an animation lays on one of its passages (Look), when its code names them.
+    ...(usesPassageLooks(plan) ? { looks: passageLooks(inputs.today) } : {}),
     ...(subtitleRow(plan) !== undefined ? { subtitleY: subtitleRow(plan) } : {}),
     // An animation that times its own words on what is said without writing it all (a big word per phrase behind her):
     // the engine writes the rest as the apps' plain subtitles, never a second set of big words over its own.

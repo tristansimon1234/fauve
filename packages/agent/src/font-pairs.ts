@@ -130,10 +130,11 @@ export const FONT_PAIRS: FontPair[] = [
   {
     key: "coulisses",
     name: "Coulisses",
-    display: { family: "Archivo Narrow", weight: 700, case: "upper", tracking: "tight" },
-    body: { family: "Inter Tight", weight: 600, case: "upper", tracking: "normal" },
-    how: "un titre condensé en deux niveaux (un petit mot au-dessus de chaque bout), des étiquettes en capitales",
-    fits: "les coulisses, un avant/après, une liste d'étapes",
+    // Its original's title is a bold grotesque set tight, not condensed (the word is 8,4 times its cap height).
+    display: { family: "Inter Tight", weight: 700, case: "upper", tracking: "tight" },
+    body: { family: "Inter Tight", weight: 700, case: "upper", tracking: "normal" },
+    how: "un grand titre gras en deux niveaux (un petit mot au-dessus de chaque bout), des étiquettes en capitales grasses",
+    fits: "les coulisses, un montage montré, une liste d'étapes",
   },
   {
     key: "cinema",

@@ -191,6 +191,8 @@ export function sceneTrack(plan: Pick<EditPlan, "segments">, segments: ReelSegme
 export function layerTrack(plan: Pick<EditPlan, "segments">, segments: ReelSegment[], from: number, length: number, tracks: TracksByClip): TrackPiece[] {
   return segments.flatMap((segment, i): TrackPiece[] => {
     if (segment.startAt >= from + length || segment.startAt + segment.durationInFrames <= from) return [];
+    // A shot laid beside another is not under the animation: the plain montage plays the main line.
+    if ((segment.type === "clip" || segment.type === "image") && segment.beside) return [];
     const s = plan.segments[i];
     if (segment.type === "clip" && s && isClipSegment(s)) {
       const file = tracks[s.clip_id];
