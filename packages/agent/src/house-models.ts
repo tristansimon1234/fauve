@@ -1410,7 +1410,7 @@ export const HOUSE_MODELS: HouseModel[] = [
     name: "Ta ville racontée",
     // Written on its original's fiche (docs/fiches/vlog-ville.md; its skill, skills/vlog-ville.ts, version 1): a city film
     // of 41,8 s in 4:3, told in small subtitles (a voice tells the original), cut by ear on what is said.
-    pitch: "Ton quartier en court-métrage raconté : tes premiers mots un à un, la musique qui tombe sur ton nom avec une rafale de gros plans, ton nom en grandes capitales rouges entre guillemets sur toi de dos, puis ta ville qui bouge jusqu'au retour au plan du titre.",
+    pitch: "Ton quartier en court-métrage raconté : tes premiers mots un à un, la musique qui tombe sur ton nom avec une rafale de gros plans, ton nom en grandes capitales rouges (ou à ta couleur) entre guillemets sur toi de dos, puis ta ville qui bouge jusqu'au retour au plan du titre.",
     needs: "15 à 30 vidéos de ton quartier et de toi : un plan large et calme avec toi au milieu, un détail plein de choses (ta carte, une étagère), toi de dos immobile pendant que tout passe, des passants, de la foule, des lumières le soir, toi qui marches",
     files: [6, 16],
     pair: "film-large",

@@ -297,10 +297,11 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
 
   // 5. Its title: half a second into her shot from behind, at once, to its cut: her name in big capitals between quotes
   // (the original's extended black face: her title font), her signature small above it, its line in small lowercase
-  // under it, all in one red (hers when it is vivid enough, else a film title's red), on her back in the middle.
+  // under it, all in one colour on her back in the middle: hers when it is vivid enough (« sienne », her charter), else
+  // the original's film-title red, which « rouge » keeps whatever her colour.
   const rgb = (c) => { const m = /^#?([0-9a-f]{6})$/i.exec(String(c || "").trim()); if (!m) return null; const v = parseInt(m[1], 16); return [(v >> 16) & 255, (v >> 8) & 255, v & 255]; };
   const vivid = (c) => { const p = rgb(c); if (!p) return false; const hi = Math.max(p[0], p[1], p[2]); const lo = Math.min(p[0], p[1], p[2]); const l = (0.2126 * p[0] + 0.7152 * p[1] + 0.0722 * p[2]) / 255; return hi > 0 && (hi - lo) / hi > 0.45 && l > 0.1 && l < 0.6; };
-  const RED = vivid(brand.accent) ? brand.accent : "#d7261e";
+  const RED = setting("couleur", "sienne") !== "rouge" && vivid(brand.accent) ? brand.accent : "#d7261e";
   const T = of(5);
   const tFrom = F(${TITLE[0]});
   const tTo = shots[T] ? shots[T].from + shots[T].durationInFrames : F(${TITLE[1]});
@@ -333,14 +334,14 @@ export const vlogVille: MontageSkill = {
   files: [6, 16],
   // Its length is its film's (41,8 s at 76 BPM): its tempo moves it, from 35 to 43 s, its card within 45.
   tempo: [74, 90],
-  how: "Un court-métrage de son quartier raconté en petits sous-titres : un plan large et calme où ses premiers mots arrivent un à un, la musique qui tombe sur le nom de son lieu avec une rafale de gros plans d'un détail, puis elle de dos, immobile, pendant que tout passe, et le nom en grandes capitales rouges entre guillemets, sa signature au-dessus et « un court-métrage. » dessous ; puis sa ville qui bouge (passants, foule, lumières, une rafale de nuit), une rafale qui rappelle les plans déjà vus, des plans calmes quand le texte dit de ralentir, et la fin qui revient au plan du titre. Ses phrases racontent tout du long, en bas de l'image ; en 4:3 sur du noir quand ses vidéos sont horizontales.",
+  how: "Un court-métrage de son quartier raconté en petits sous-titres : un plan large et calme où ses premiers mots arrivent un à un, la musique qui tombe sur le nom de son lieu avec une rafale de gros plans d'un détail, puis elle de dos, immobile, pendant que tout passe, et le nom en grandes capitales rouges (ou à sa couleur quand elle est vive) entre guillemets, sa signature au-dessus et « un court-métrage. » dessous ; puis sa ville qui bouge (passants, foule, lumières, une rafale de nuit), une rafale qui rappelle les plans déjà vus, des plans calmes quand le texte dit de ralentir, et la fin qui revient au plan du titre. Ses phrases racontent tout du long, en bas de l'image ; en 4:3 sur du noir quand ses vidéos sont horizontales.",
   end: true,
   texts: [
     { slot: "accroche", role: "hook", want: "sa première phrase, qui arrive mot à mot sur le premier plan, en minuscules comme un sous-titre : le rythme ou l'âme de son quartier, de sa ville ou de son lieu (une forme comme « Chaque quartier a son rythme », « Ici, le matin commence tôt ») ; 5 mots au plus", max: 32, required: true },
     { slot: "ici", role: "caption", want: "la deuxième phrase, mot à mot, qui finit sur le nom de son quartier, de sa ville ou de son lieu (une forme comme « voici Belleville. », « ici, c'est la Croix-Rousse. ») : la musique tombe sur son dernier mot ; 4 mots au plus", max: 30, required: true },
-    { slot: "nom", role: "band", want: "le titre du court-métrage, en grandes capitales rouges entre guillemets : le nom de son quartier, de sa ville ou de son lieu, comme un titre de film (une forme comme « Belleville », « Croix-Rousse ») ; 1 ou 2 mots, celui que la deuxième phrase dit", max: 14, required: true },
-    { slot: "signature", role: "band", want: "sa signature en petit au-dessus du titre, comme celle d'un réalisateur : son nom ou son compte (une forme comme « par Maison Farine », « @cafedesarts ») ; jamais un nom inventé", max: 20, required: true },
-    { slot: "genre", role: "band", want: "la petite ligne sous le titre, en minuscules avec un point : ce que c'est (« un court-métrage. », ou une forme comme « un film de quartier. »)", max: 22, required: true },
+    { slot: "nom", role: "band", want: "le titre du court-métrage, en grandes capitales entre guillemets : le nom de son quartier, de sa ville ou de son lieu, comme un titre de film (une forme comme « Belleville », « Croix-Rousse ») ; 1 ou 2 mots, celui que la deuxième phrase dit", max: 14, required: true },
+    { slot: "signature", role: "band", want: "sa signature en petit au-dessus du titre, comme celle d'un réalisateur : son nom ou son compte (une forme comme « par Maison Farine », « @cafedesarts ») ; jamais un nom inventé ; 4 mots au plus", max: 20, required: true },
+    { slot: "genre", role: "band", want: "la petite ligne sous le titre, en minuscules avec un point : ce que c'est (« un court-métrage. », ou une forme comme « un film de quartier. ») ; 4 mots au plus", max: 22, required: true },
     { slot: "l1", role: "caption", want: `${SUBTITLE} : ce qui le rend différent d'ailleurs ; 8 mots au plus`, max: 40, required: true },
     { slot: "l2", role: "caption", want: `${SUBTITLE} : qu'il va à son propre rythme, juste avant le titre (1,1 s à l'écran) ; 4 mots au plus`, max: 26, required: true },
     { slot: "l3", role: "caption", want: `${SUBTITLE} : ce que ça fait d'y être, ce qu'on y ressent ; 9 mots au plus`, max: 44, required: true },
@@ -364,6 +365,14 @@ export const vlogVille: MontageSkill = {
         { value: "auto", says: "comme ses vidéos : en 4:3 sur du noir quand la plupart sont horizontales, sinon plein écran" },
         { value: "horizontal", says: "en 4:3 sur du noir, comme l'original" },
         { value: "vertical", says: "vertical plein écran" },
+      ],
+    },
+    {
+      name: "couleur",
+      want: "la couleur du titre, de sa signature et de sa petite ligne",
+      choices: [
+        { value: "sienne", says: "sa couleur à elle quand elle est vive (celle de sa charte), sinon le rouge de titre de film de l'original" },
+        { value: "rouge", says: "le rouge de titre de film de l'original, quelle que soit sa couleur" },
       ],
     },
   ],

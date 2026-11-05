@@ -106,10 +106,11 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
     : null;
 
   // 3. Her title on her last shot, at once, to the end: her name in big capitals between quotes, her signature small
-  // above, its small line under, in one red (hers when vivid enough, else a film title's), in the middle.
+  // above, its small line under, in one colour in the middle: hers when vivid enough (« sienne », her charter), else
+  // the original's film-title red, which « rouge » keeps whatever her colour.
   const rgb = (c) => { const m = /^#?([0-9a-f]{6})$/i.exec(String(c || "").trim()); if (!m) return null; const v = parseInt(m[1], 16); return [(v >> 16) & 255, (v >> 8) & 255, v & 255]; };
   const vivid = (c) => { const p = rgb(c); if (!p) return false; const hi = Math.max(p[0], p[1], p[2]); const lo = Math.min(p[0], p[1], p[2]); const l = (0.2126 * p[0] + 0.7152 * p[1] + 0.0722 * p[2]) / 255; return hi > 0 && (hi - lo) / hi > 0.45 && l > 0.1 && l < 0.6; };
-  const RED = vivid(brand.accent) ? brand.accent : "#d7261e";
+  const RED = word("couleur") !== "rouge" && vivid(brand.accent) ? brand.accent : "#d7261e";
   const name = word("nom");
   const sign = word("signature");
   const line = word("genre");
@@ -130,7 +131,7 @@ export const vlogVille: EffectPiece = {
   key: "vlog-ville",
   version: 1,
   name: "Ouverture racontée",
-  how: "sur son premier plan, large et calme, sa phrase arrive mot à mot en petits sous-titres sans musique, puis la deuxième qui finit sur son nom ; la musique tombe sur la coupe et son plan suivant éclate en neuf gros plans de deux et trois images, puis file ; sur son dernier plan, quelqu'un de dos, son nom en grandes capitales rouges entre guillemets, sa signature au-dessus et une petite ligne dessous, la musique étouffée ; puis le montage reprend.",
+  how: "sur son premier plan, large et calme, sa phrase arrive mot à mot en petits sous-titres sans musique, puis la deuxième qui finit sur son nom ; la musique tombe sur la coupe et son plan suivant éclate en neuf gros plans de deux et trois images, puis file ; sur son dernier plan, quelqu'un de dos, son nom en grandes capitales rouges (ou à sa couleur quand elle est vive) entre guillemets, sa signature au-dessus et une petite ligne dessous, la musique étouffée ; puis le montage reprend.",
   needs: "un plan large et calme de son lieu ou de sa rue (quelqu'un d'immobile au milieu de préférence), un plan d'un détail plein de choses filmé de près (sa carte, une étagère, une vitrine), et quelqu'un de dos immobile devant ce qui passe.",
   lays: "au début du Reel ou d'une partie, sans voix dessous, sur deux à quatre plans : le premier calme de 2 à 3 s (ses mots y arrivent), le deuxième le détail (la rafale tombe sur sa coupe), le dernier quelqu'un de dos (le titre, 2 s au moins), 5 à 9 s en tout",
   shots: [2, 4],
@@ -139,9 +140,19 @@ export const vlogVille: EffectPiece = {
   texts: [
     { slot: "phrase", want: "sa première phrase, qui arrive mot à mot sur son premier plan, en minuscules comme un sous-titre : le rythme ou l'âme de son quartier ou de son lieu (une forme comme « Chaque quartier a son rythme ») ; 5 mots au plus", max: 32, required: true },
     { slot: "ici", want: "la deuxième phrase, mot à mot, qui finit sur le nom de son quartier ou de son lieu (une forme comme « voici Belleville. ») : la musique tombe sur son dernier mot ; 4 mots au plus", max: 30, required: true },
-    { slot: "nom", want: "le titre du court-métrage, en grandes capitales rouges entre guillemets : le nom que dit la deuxième phrase (son quartier, sa ville ou son lieu) ; 1 ou 2 mots", max: 14, required: true },
-    { slot: "signature", want: "facultatif : sa signature en petit au-dessus du titre, comme celle d'un réalisateur : son nom ou son compte (une forme comme « par Maison Farine »), jamais inventée", max: 20, required: false },
-    { slot: "genre", want: "facultatif : la petite ligne sous le titre, en minuscules avec un point (« un court-métrage. », ou une forme comme « un film de quartier. »)", max: 22, required: false },
+    { slot: "nom", want: "le titre du court-métrage, en grandes capitales entre guillemets : le nom que dit la deuxième phrase (son quartier, sa ville ou son lieu) ; 1 ou 2 mots", max: 14, required: true },
+    { slot: "signature", want: "facultatif : sa signature en petit au-dessus du titre, comme celle d'un réalisateur : son nom ou son compte (une forme comme « par Maison Farine »), jamais inventée ; 4 mots au plus", max: 20, required: false },
+    { slot: "genre", want: "facultatif : la petite ligne sous le titre, en minuscules avec un point (« un court-métrage. », ou une forme comme « un film de quartier. ») ; 4 mots au plus", max: 22, required: false },
+  ],
+  settings: [
+    {
+      name: "couleur",
+      want: "la couleur du titre, de sa signature et de sa petite ligne",
+      choices: [
+        { value: "sienne", says: "sa couleur à elle quand elle est vive (celle de sa charte), sinon le rouge de titre de film de l'original" },
+        { value: "rouge", says: "le rouge de titre de film de l'original, quelle que soit sa couleur" },
+      ],
+    },
   ],
   timeline(input: PieceTimelineInput): PieceTimeline {
     const m = vlogMoments(input);

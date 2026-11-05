@@ -149,7 +149,7 @@ export const HOUSE_EFFECTS: Record<string, HouseEffect> = {
     il_faut: "un plan fixe de son lieu fréquenté filmé de haut, quelqu'un d'immobile au milieu et des gens qui passent autour",
   },
   "vlog-ville": {
-    effet: "sa phrase mot à mot en petits sous-titres sur un plan calme, la musique qui tombe sur son nom avec neuf gros plans éclair, puis son nom en capitales rouges entre guillemets sur quelqu'un de dos",
+    effet: "sa phrase mot à mot en petits sous-titres sur un plan calme, la musique qui tombe sur son nom avec neuf gros plans éclair, puis son nom en capitales de couleur entre guillemets sur quelqu'un de dos",
     il_faut: "un plan large et calme, un détail plein de choses filmé de près, quelqu'un de dos immobile devant ce qui passe",
   },
 };

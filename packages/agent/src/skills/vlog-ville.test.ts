@@ -161,7 +161,7 @@ test("« Ta ville racontée » (v1): its plan, its words in its slots, its music
   assert.equal(plan.subtitles, false);
   assert.deepEqual(checkMotionCode(vlogVille.code), []);
   assert.ok(vlogVille.code.length < 24000, String(vlogVille.code.length));
-  assert.deepEqual(vlogVille.settings?.map((s) => [s.name, s.choices.map((c) => c.value)]), [["format", ["auto", "horizontal", "vertical"]]]);
+  assert.deepEqual(vlogVille.settings?.map((s) => [s.name, s.choices.map((c) => c.value)]), [["format", ["auto", "horizontal", "vertical"]], ["couleur", ["sienne", "rouge"]]]);
 });
 
 test("« Ta ville racontée » (v1): 4:3 on black as her horizontal videos, full frame as her vertical ones; its burst of nine close-ups on the drop", () => {
@@ -234,6 +234,9 @@ test("« Ta ville racontée » (v1): her name between quotes in big red capitals
   assert.ok([name, signature, genre].every((n) => (n!.props.innerStyle as Record<string, unknown>).color === "#1f6b4f"));
   const pale = propsFor(31, 16 / 9, { brand: { ...props.brand, accent: "#f2e9dc" } });
   assert.equal((nodes(draw(210, pale)).find((n) => n.type === "FitText")!.props.innerStyle as Record<string, unknown>).color, "#d7261e");
+  // « rouge »: the original's red, whatever her colour.
+  const red = propsFor(31, 16 / 9, { texts: { ...props.texts, couleur: "rouge" } });
+  assert.ok(nodes(draw(210, red)).filter((n) => n.type === "FitText").every((n) => (n.props.innerStyle as Record<string, unknown>).color === "#d7261e"));
   assert.ok(nodes(signature!).some((n) => "data-fauve-accent" in n.props) && nodes(genre!).some((n) => "data-fauve-accent" in n.props));
   // Above, then the name, then the line, centred on her back in the middle of the picture, within x 140–940.
   const top = (n: Drawn) => Number(styleOf(n).top);
