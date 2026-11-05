@@ -249,11 +249,14 @@ const wordsOf = (piece: Pick<EffectPiece, "texts">) =>
 export function pieceLine(piece: EffectPiece): string {
   const name = piece.name || houseModel(piece.key)?.name || piece.key;
   const span = `${String(piece.seconds[0]).replace(".", ",")} à ${String(piece.seconds[1]).replace(".", ",")} s`;
-  return `${piece.key} — ${name} : ${piece.how} Il faut : ${piece.needs} Se pose : ${piece.lays} (${span}). Ses mots : ${wordsOf(piece)}.`;
+  const settings = piece.settings?.length
+    ? ` Réglages : ${piece.settings.map((s) => `${s.name} (${s.choices.map((c) => c.value).join(", ")})`).join(" ; ")}.`
+    : "";
+  return `${piece.key} — ${name} : ${piece.how} Il faut : ${piece.needs} Se pose : ${piece.lays} (${span}). Ses mots : ${wordsOf(piece)}.${settings}`;
 }
 
 /** The editor's rule for the ready effects of the bank (its input's « effets_des_modeles », beside the font pairs: its prompt stays under 17 000 characters). */
-export const BORROW_PIECES = `Ready-to-play effects from Edith's models, one line each: its key, its name, what it does, what it needs in her videos (« Il faut »), where it lays (« Se pose ») and its words (« Ses mots »). Each one is coded and tested once, like a CapCut effect: the engine plays it exactly as it is over the shots you lay it on, her words written in it, in her charter, with no motion designer, so it never comes out average and costs next to nothing. When one serves this Reel and her videos really have what it needs, lay ONE, never more: an animation in « layers » (from, to: seconds of the Reel) over the shots its « Se pose » says, cut for it (its first shot where it says, its length within its own), its brief beginning with [borrow: <key>], then the message, the words on screen in « » for its « Ses mots », what the shots under it show, and the energy. It writes its own words: none of your texts during it. None rather than a forced one: the Reel is then yours as usual. It counts as one of your animations (« max_new_scenes »); for the moment it serves, prefer it to an animation of your own.`;
+export const BORROW_PIECES = `Ready-to-play effects from Edith's models, one line each: its key, its name, what it does, what it needs in her videos (« Il faut »), where it lays (« Se pose ») and its words (« Ses mots »). Each one is coded and tested once, like a CapCut effect: the engine plays it exactly as it is over the shots you lay it on, her words written in it, in her charter, with no motion designer, so it never comes out average and costs next to nothing. Its « Réglages », when it has some, are its variants (the original's first): write in its brief the one this Reel needs (« papier noir » for a night Reel), else none. When one serves this Reel and her videos really have what it needs, lay ONE, never more: an animation in « layers » (from, to: seconds of the Reel) over the shots its « Se pose » says, cut for it (its first shot where it says, its length within its own), its brief beginning with [borrow: <key>], then the message, the words on screen in « » for its « Ses mots », what the shots under it show, and the energy. It writes its own words: none of your texts during it. None rather than a forced one: the Reel is then yours as usual. It counts as one of your animations (« max_new_scenes »); for the moment it serves, prefer it to an animation of your own.`;
 
 /** What the editor gets for a Reel made in none of Edith's models: the rule and the line of each piece offered; nothing without one. */
 export function piecesForEditor(pieces: EffectPiece[]): { rule: string; effets: string[] } | undefined {
@@ -271,7 +274,7 @@ export const PIECE_FILL_PROMPT = `You fill one of Edith's ready-made effects (Ed
 - a creator's words, concrete, specific to this business, never an ad slogan; nothing invented (no price, hour, address, offer or review that is not given);
 - within its « max » characters (count them), in normal case (the code sets the capitals); a name longer than its place is never cut: the word that sets it apart (« Farine » for « Maison Farine »);
 - a required slot (« obligatoire » true) always written, an optional one only when the brief or her request wants those words, else an empty text;
-- « mots_actuels » (a correction): keep them, but what her request changes.
+- « mots_actuels » (a correction): keep them, but what her request changes; its settings too (« reglages_actuels »): kept unless her request changes one.
 "objects": one per slot of « effet.ses_objets »: what in the shot it names (« plan », among « plans_dessous ») carries it, named in plain English as the eye sees it, two to four words (« back door », « shop window », « shop sign », « every window », « string lights »), « every » first for several to take one after the other; « none » when nothing in that shot fits (the code does without).
 "settings": only a setting of « effet.reglages » her request or the brief asks for, with the value that does it; otherwise none.
 With « ce_qu_elle_dit » (an effect timed on her voice): its words are hers, written exactly as she says them (a word the transcript misheard set right), in the order she says them, each one a word or a name she really says under it.
@@ -304,6 +307,8 @@ export function pieceFillInput(input: {
   business: { name?: string | null; activity?: string | null; facts?: string[] };
   contract?: string[];
   current?: Record<string, string>;
+  /** The settings the version corrected had (a correction keeps them but what her request changes). */
+  currentSettings?: Record<string, string>;
   /** What she says under it (an effect timed on her voice). */
   said?: string;
   /** Her photos it may lay (an effect that lays some): each one's id and what it shows. */
@@ -337,6 +342,7 @@ export function pieceFillInput(input: {
     commerce: { nom: input.business.name ?? undefined, activite: input.business.activity ?? undefined, ...(input.business.facts?.length ? { ce_qu_on_sait: input.business.facts } : {}) },
     ...(input.contract?.length ? { contrat: input.contract } : {}),
     ...(input.current && Object.keys(input.current).length ? { mots_actuels: input.current } : {}),
+    ...(input.currentSettings && Object.keys(input.currentSettings).length ? { reglages_actuels: input.currentSettings } : {}),
     ...(piece.spoken && input.said?.trim() ? { ce_qu_elle_dit: input.said.trim().slice(0, 1500) } : {}),
     ...(piece.photos && input.photos?.length ? { ses_photos: input.photos.slice(0, 20).map((p) => ({ id: p.id, montre: p.shows.slice(0, 160) })) } : {}),
   };
@@ -423,6 +429,11 @@ export function pieceLayers(plan: Pick<EditPlan, "layers">, offered: Iterable<st
 /** Its words as a correction finds them on the version it corrects: its slots only (never its marks nor its settings). */
 export function pieceWordsOf(piece: Pick<EffectPiece, "texts">, motion: Pick<PlanLayer["motion"], "texts"> | undefined): Record<string, string> {
   return Object.fromEntries(piece.texts.flatMap((t) => (motion?.texts?.[t.slot] ? [[t.slot, motion.texts[t.slot]!] as const] : [])));
+}
+
+/** Its settings as a correction finds them on the version it corrects (its slot texts by their names, at one of their choices, never the default). */
+export function pieceSettingsOf(piece: Pick<EffectPiece, "settings">, motion: Pick<PlanLayer["motion"], "texts"> | undefined): Record<string, string> {
+  return skillSettings(piece, Object.fromEntries((piece.settings ?? []).flatMap((s) => (motion?.texts?.[s.name] ? [[s.name, motion.texts[s.name]!] as const] : []))));
 }
 
 const round3 = (n: number) => Math.round(n * 1000) / 1000;

@@ -6,10 +6,12 @@ import {
   isClipSegment,
   layerShots,
   memoryLines,
+  mergeSkillSettings,
   PIECE_FILL_PROMPT,
   pieceFillInput,
   pieceFillSchemaFor,
   pieceMotion,
+  pieceSettingsOf,
   saidUnder,
   pieceWordsOf,
   readPieceFill,
@@ -125,7 +127,7 @@ export async function playPieces(input: {
       request: input.request?.slice(0, BRIEF_MAX) || "Un Reel avec ses fichiers.",
       business: { name: input.studio.name, activity: input.studio.business, facts: memoryLines(input.studio.memory) },
       contract: contractLines(input.contract),
-      ...(earlier ? { current: pieceWordsOf(piece, earlier.motion) } : {}),
+      ...(earlier ? { current: pieceWordsOf(piece, earlier.motion), currentSettings: pieceSettingsOf(piece, earlier.motion) } : {}),
       // Timed on her voice: what she says under it; laying her photos: those of this Reel; what the engine writes itself.
       ...(piece.spoken ? { said: saidUnder(input.plan, input.facts.clips, laid) } : {}),
       ...(piece.photos && input.photos?.length ? { photos: input.photos } : {}),
@@ -153,8 +155,10 @@ export async function playPieces(input: {
     };
     // Its layer from an answer, then its check (its words and marks as they will play): its js, or what the check refused.
     const tried = async (answer: PieceFillAnswer): Promise<{ js: string; fonts: string[] } | { error: string } | null> => {
-      const read = readPieceFill(piece, answer, { photos: (input.photos ?? []).map((p) => p.id), ...(facts ? { facts } : {}) });
-      if (!read) return null;
+      const filled = readPieceFill(piece, answer, { photos: (input.photos ?? []).map((p) => p.id), ...(facts ? { facts } : {}) });
+      if (!filled) return null;
+      // A correction keeps the settings it had (« papier noir » once asked) but what her request changes now.
+      const read = earlier ? { ...filled, settings: mergeSkillSettings(piece, pieceSettingsOf(piece, earlier.motion), answer.settings) } : filled;
       layers[index] = { ...laid, motion: pieceMotion({ piece, fill: read, plan: input.plan, layer: laid, bpm: input.plan.tempo ?? 100 }) };
       const motion = layers[index]!.motion;
       // Her photos it lays, as its code gets them (links, cut-outs) in the check too.

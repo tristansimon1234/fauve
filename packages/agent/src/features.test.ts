@@ -10857,3 +10857,17 @@ test("an effect names in its code only the objects on a shot under it: one for a
   assert.ok(!motion.code!.includes('"shop sign"') && motion.code!.includes('"@enseigne"'));
   assert.deepEqual(motion.drawn, { shots: 1, objects: [{ shot: 0, name: "back door" }] });
 });
+
+test("an effect's settings: named in the editor's line, kept by a correction but what her request changes", async () => {
+  const { mosaique } = await import("./pieces/mosaique.ts");
+  const { pieceLine, pieceSettingsOf } = await import("./pieces.ts");
+  const { mergeSkillSettings } = await import("./skills.ts");
+  const papier = mosaique.settings!.find((s) => s.name === "papier")!;
+  const noir = papier.choices.find((c) => c.value !== papier.choices[0]!.value)!.value;
+  assert.match(pieceLine(mosaique), new RegExp(`Réglages : .*papier \\(${papier.choices.map((c) => c.value).join(", ")}\\)`));
+  // The version corrected had one asked: kept when her request changes nothing of it, its default asked again takes it off.
+  const earlier = { texts: { papier: noir, beat: "18", titre: "les rolls du midi" } };
+  assert.deepEqual(pieceSettingsOf(mosaique, earlier), { papier: noir });
+  assert.deepEqual(mergeSkillSettings(mosaique, pieceSettingsOf(mosaique, earlier), []), { papier: noir });
+  assert.deepEqual(mergeSkillSettings(mosaique, pieceSettingsOf(mosaique, earlier), [{ name: "papier", value: papier.choices[0]!.value }]), {});
+});
