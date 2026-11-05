@@ -2284,6 +2284,10 @@ test("« Titre qui se décode » (v3): its bands, its fold, its title, its band 
   const block = drawnNodes(title).find((n) => n.type === "FitText")!;
   assert.deepEqual([styleOf(block).left, styleOf(block).width], [140, 800]);
   assert.ok(Math.abs(Number(styleOf(block).top) + Number(styleOf(block).height) / 2 - 960) <= 1);
+  // Full frame, where the band opens at 436 px, the title takes more of its width (150 px at most), its words the same share.
+  const tall = drawnDeep(draw(130, {}, 9 / 16));
+  assert.ok(tall.some((n) => n.type === "div" && styleOf(n).fontSize === 150));
+  assert.ok(tall.filter((n) => "data-fauve-accent" in n.props).every((n) => styleOf(n).fontSize === 56));
   assert.equal(footage(title).length, 0);
   assert.equal(drawnDeep(draw(398)).filter((n) => n.type === "Decode").length, 0);
   // The band: opens at 22,7 % of its frame with the music, grows at a constant speed to the full frame.

@@ -131,10 +131,11 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const hook = reelTexts.find((t) => t.role === "hook");
   const kicker = reelTexts.find((t) => t.role === "caption");
   const others = reelTexts.filter((t) => t !== hook && t !== kicker);
-  // The title as wide as its place allows (its original's spans 85 % of its frame), at most 110 px, so the block of its
-  // capitals stays inside the band's first 22,7 %; its small words always 0,375 of it, as the original's.
-  const TITLE = 110;
-  const SMALL = 41;
+  // The title as wide as its place allows (its original's spans 85 % of its frame): at most 110 px in its 16:9 frame, so
+  // the block of its capitals stays inside the band's first 22,7 % (138 px), 150 px full frame (the band opens at 436);
+  // its small words always 0,375 of it, as the original's.
+  const TITLE = wide ? 110 : 150;
+  const SMALL = Math.round(TITLE * 0.375);
   const titleStyle = { fontFamily: display, fontWeight: 400, fontSize: TITLE, lineHeight: 1, letterSpacing: 0, color: "#ffffff", whiteSpace: "nowrap", textAlign: "center", textShadow: edge };
   const smallStyle = { fontFamily: display, fontWeight: 400, lineHeight: 1, letterSpacing: "0.15em", color: "#ffffff", whiteSpace: "nowrap", textShadow: edge };
 
