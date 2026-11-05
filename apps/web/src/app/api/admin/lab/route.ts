@@ -256,6 +256,49 @@ const CASES: Record<string, LabCase> = {
       "12-bouquet-fini.mp4",
     ],
   },
+  // A bookshop's front, fixed, from across its street, and its street (one shoot on Pexels): for « Façade qui se construit ».
+  librairie: {
+    name: "Brick Lane Bookshop",
+    business: "librairie indépendante",
+    facts: ["Librairie indépendante de Brick Lane, à Londres", "Romans, livres d'art et sacs en toile, de nouveaux titres chaque semaine"],
+    brand: { colors: ["#111111", "#F5F2EC", "#B5292F"], fonts: ["DM Serif Display", "Inter Tight"], tone: "curieux, chaleureux, tutoiement" },
+    title: "Brick Lane Bookshop",
+    idea: "Notre librairie dans sa rue : ça doit donner envie de passer la porte.",
+    own: [
+      "01-facade.mp4",
+      "02-facade-passants.mp4",
+      "03-vitrine-photographe.mp4",
+      "04-rue-pont.mp4",
+      "05-rue-panneaux.mp4",
+      "06-rue-passants.mp4",
+      "07-coin-graffiti.mp4",
+      "08-vintage-photographes.mp4",
+      "09-boutique-photographe.mp4",
+    ],
+  },
+  // A cake made gesture by gesture, phone on a tripod (one shoot on Pexels): for « Recette cosy, typo pixel ».
+  patisserie: {
+    name: "Pâtisserie Lila",
+    business: "pâtisserie",
+    facts: ["Pâtisserie de quartier : entremets, choux et gâteaux de saison faits maison", "Le gâteau du moment : fraise et menthe"],
+    brand: { colors: ["#7FC8A9", "#F5F2EC", "#E86A92"], fonts: ["Fraunces", "Inter Tight"], tone: "gourmand, doux, tutoiement" },
+    title: "Gâteau fraise-menthe",
+    idea: "Notre gâteau fraise-menthe, du début à la fin : ça doit donner envie de venir le goûter.",
+    own: [
+      "01-resultat-dessus.mp4",
+      "02-on-touche.mp4",
+      "03-oeufs.mp4",
+      "04-farine.mp4",
+      "05-fouet.mp4",
+      "06-creme-menthe.mp4",
+      "07-creme-genoise.mp4",
+      "08-poche.mp4",
+      "09-fraises.mp4",
+      "10-montage.mp4",
+      "11-glacage.mp4",
+      "12-finitions.mp4",
+    ],
+  },
   // The other Reels of the landing's wall, on their very clips (Tristan: « renvoie les mêmes photos et reproduis les
   // reels »): steal=https://edith-ai.app/landing/reels/<id>.mp4 copies the one made by hand, none lets Edith choose.
   meche: {
