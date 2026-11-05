@@ -291,7 +291,8 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   }
 
   // 6. Its big words: very bold lowercase, white, one place each (keyed by their words: a FitText measures once).
-  const big = (key, text, b, size, extra) => h(FitText, { key, style: box(b), innerStyle: Object.assign({ fontFamily: display, fontWeight: 800, fontSynthesis: "none", fontSize: Math.round(size), lineHeight: 1, letterSpacing: "-0.03em", color: "#ffffff", textShadow: EDGE, whiteSpace: "nowrap" }, extra || {}) }, text);
+  // (A tight line box, so a short word keeps its size; each one between x 140 and 940 when it reaches below the middle.)
+  const big = (key, text, b, size, extra) => h(FitText, { key, style: box(b), innerStyle: Object.assign({ fontFamily: display, fontWeight: 800, fontSynthesis: "none", fontSize: Math.round(size), lineHeight: 0.92, letterSpacing: "-0.03em", color: "#ffffff", textShadow: EDGE, whiteSpace: "nowrap" }, extra || {}) }, text);
   // While they show, no subtitles: from her first idea's start to its name's end, a number's or a question's whole idea.
   const quiet = (f) => {
     const x = ideas.find((y) => f >= y.start && f < y.end);
@@ -313,8 +314,8 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
       if (line.length && frame < key.to - 4) layers.push(h("div", { key: "small", style: { ...box({ left: 60, top: H * 0.414, width: W - 120, height: H * 0.046 }), display: "flex", justifyContent: "center", alignItems: "flex-end", gap: Math.round(H * 0.009) } },
         line.map((w, j) => h("span", { key: j, style: { fontFamily: display, fontWeight: 800, fontSynthesis: "none", fontSize: Math.round(H * 0.029), lineHeight: 1.1, letterSpacing: "-0.02em", color: "#ffffff", textShadow: EDGE, whiteSpace: "nowrap", opacity: frame >= w.from ? 1 : 0 } }, low(bare(w.w))))));
       // Then the name of what she presents, very big right under them, on the instant she says it: as wide as it goes in
-      // 82 % of the width (the original's « notebook », 8 letters, at 81 %), 15 % of the height at most, hugging the line.
-      if (frame >= key.from) layers.push(big("name" + key.text, low(key.text), { left: W * 0.09, top: H * 0.462, width: W * 0.82, height: H * 0.17 }, H * 0.17, { justifyContent: "flex-start", lineHeight: 0.92 }));
+      // 800 px (the original's « notebook », 8 letters, at 81 % of the width), 17 % of the height at most, hugging the line.
+      if (frame >= key.from) layers.push(big("name" + key.text, low(key.text), { left: 140, top: H * 0.462, width: W - 280, height: H * 0.17 }, H * 0.17, { justifyContent: "flex-start" }));
     }
   }
   if (idea && kind === 2 && !inBlack && !ending) {
@@ -326,9 +327,10 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
       let n = 0;
       const parts = s.split("").map((ch, i) => { const shown = ch === " " || n < typed; if (ch !== " ") n++; return h("span", { key: i, style: shown ? {} : { color: "rgba(255,255,255,0)", textShadow: "none" } }, ch); });
       // (One span: FitText lays its children out in a column.)
-      layers.push(big("num" + s, h("span", null, parts), { left: W * 0.08, top: H * 0.395, width: W * 0.84, height: H * 0.2 }, H * 0.245, { letterSpacing: "-0.04em" }));
+      // (Its digits 17,5 % of the height, the original's « 168 ».)
+      layers.push(big("num" + s, h("span", null, parts), { left: 140, top: H * 0.37, width: W - 280, height: H * 0.25 }, H * 0.245, { letterSpacing: "-0.04em" }));
       const unit = captions.filter((t) => inIdea(t, idea) && frame >= t.from && frame < t.to).map((t) => t.text).join(" ");
-      if (unit) layers.push(big("unit" + unit, low(unit), { left: 140, top: H * 0.612, width: W - 280, height: H * 0.04 }, H * 0.029, { fontWeight: 700, letterSpacing: "0em" }));
+      if (unit) layers.push(big("unit" + unit, low(unit), { left: 140, top: H * 0.635, width: W - 280, height: H * 0.04 }, H * 0.029, { fontWeight: 700, letterSpacing: "0em" }));
     } else if (key && frame >= key.to) {
       // Then the rest of her phrase one word at a time in the middle, each alone.
       const rest = said.filter((w) => w.from >= key.to - 2 && w.from < idea.end);
@@ -347,8 +349,8 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
       const groups = firsts.map((j, g) => ws.slice(j, g + 1 < firsts.length ? firsts[g + 1] : n).join(" "));
       const slots = n <= 1 ? [3] : n === 2 ? [0, 3] : n === 3 ? [0, 1, 3] : [0, 1, 2, 3];
       const BOXES = [
-        { left: W * 0.11, top: H * 0.118, width: W * 0.6, height: H * 0.15, size: H * 0.14 },
-        { left: W * 0.45, top: H * 0.262, width: W * 0.44, height: H * 0.094, size: H * 0.115 },
+        { left: W * 0.11, top: H * 0.118, width: W * 0.7, height: H * 0.15, size: H * 0.14 },
+        { left: W * 0.45, top: H * 0.262, width: W * 0.44, height: H * 0.1, size: H * 0.115 },
         { left: W * 0.13, top: H * 0.585, width: W * 0.22, height: H * 0.075, size: H * 0.095 },
         { left: 140, top: H * 0.652, width: W - 280, height: H * 0.092, size: H * 0.105 },
       ];

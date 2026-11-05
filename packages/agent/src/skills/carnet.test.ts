@@ -200,7 +200,8 @@ test("« Ton produit raconté » (v1) draws: her first words small one by one, i
   assert.equal(fits(drawAt(name.from - 1, layer)).length, 0);
   const big = fits(drawAt(name.from, layer));
   assert.deepEqual(big.map(textOf), ["notebook"]);
-  assert.deepEqual([styleOf(big[0]!).left, styleOf(big[0]!).top, styleOf(big[0]!).width], [Math.round(1080 * 0.09), Math.round(1920 * 0.462), Math.round(1080 * 0.82)]);
+  // (Between x 140 and 940: it reaches below the middle, beside the apps' buttons.)
+  assert.deepEqual([styleOf(big[0]!).left, styleOf(big[0]!).top, styleOf(big[0]!).width], [140, Math.round(1920 * 0.462), 800]);
   const inner = big[0]!.props.innerStyle as Record<string, unknown>;
   assert.deepEqual([inner.fontWeight, inner.fontSize, inner.justifyContent, inner.lineHeight], [800, Math.round(1920 * 0.17), "flex-start", 0.92]);
   assert.equal(line(drawAt(name.to - 2, layer)), null);
@@ -245,6 +246,9 @@ test("« Ton produit raconté » (v1): its number typed digit by digit, its unit
   const both = fits(drawAt(unitAt + 1, layer));
   assert.deepEqual(both.map(textOf), ["168", "pages"]);
   assert.ok(Number(styleOf(both[1]!).top) > Number(styleOf(both[0]!).top) + Number(styleOf(both[0]!).height) - 1);
+  // Both reach below the middle: between x 140 and 940, above the bottom quarter; its digits 17,5 % of the height at most.
+  for (const n of both) assert.ok(Number(styleOf(n).left) >= 140 && Number(styleOf(n).left) + Number(styleOf(n).width) <= 940 && Number(styleOf(n).top) + Number(styleOf(n).height) <= 1440, JSON.stringify(styleOf(n)));
+  assert.equal((both[0]!.props.innerStyle as Record<string, unknown>).fontSize, Math.round(1920 * 0.245));
   assert.ok(Number((both[1]!.props.innerStyle as Record<string, unknown>).fontSize) >= 48);
   // Then the rest of his phrase one word at a time in the middle, each alone: « of », « pure », « creative », « sparks ».
   const after = layer.spoken.filter((w) => w.from >= num.to - 2 && w.from < Number(layer.texts.win_black) && ["of", "pure", "creative", "sparks."].includes(w.w));
