@@ -55,11 +55,19 @@ export function lendingFor(input: {
   /** Her shots as the bank weighs them (pieceShots), and her distinct files: what the bank's effects need. */
   shots?: PieceShot[];
   files?: number;
+  /** Her request (an effect it names comes first), the effects her latest Reels played (last), this Reel (its ties). */
+  request?: string;
+  avoid?: string[];
+  seed?: string;
 }): Lending | null {
   const trial = Boolean(input.studio?.team) || String(input.studio?.website_url ?? "").startsWith("lab://");
   if (!trial || input.effects === false || input.director || input.followed?.house) return null;
   if (!input.followed) {
-    const offered = piecesOffered(Object.values(EFFECT_PIECES), input.shots ?? [], input.files ?? 0);
+    const offered = piecesOffered(Object.values(EFFECT_PIECES), input.shots ?? [], input.files ?? 0, undefined, {
+      ...(input.request ? { request: input.request } : {}),
+      ...(input.avoid?.length ? { avoid: input.avoid } : {}),
+      ...(input.seed ? { seed: input.seed } : {}),
+    });
     const given = piecesForEditor(offered);
     if (!given) return null;
     const lent = new Map(offered.map((p): [string, LentEffect] => [p.key, { key: p.key, name: p.name, effect: pieceLine(p), code: p.code }]));

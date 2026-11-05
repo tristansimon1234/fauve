@@ -112,7 +112,7 @@ import { skillFor } from "@fauve/agent/skills";
 import { recordToolUses } from "@/lib/tool-maker";
 import { designMotionScenes, type SceneRequest, type SceneResult } from "./motion-designer";
 import { lendEffects, lendingFor } from "./borrowed-effects";
-import { playPieces } from "./pieces";
+import { playPieces, recentPieces } from "./pieces";
 import { askDirector, directorFirstTurn, directorLookTurn, type DirectorBlock, type DirectorParts, type SavedDirector } from "./director";
 import { reelStills, showReel } from "./reel-canvas";
 import { ensureInspirationRead } from "@/lib/inspirations";
@@ -525,6 +525,10 @@ export async function designEdit(params: {
     director: Boolean(params.director),
     shots: pieceShots(clips, Object.fromEntries(photoIds.flatMap((id, i) => (photoReads[i] ? [[id, photoReads[i]!] as const] : [])))),
     files: new Set(mediaIds).size,
+    // Never the same few for every Reel: one her request names first, those her latest Reels played last, ties by this Reel.
+    ...(params.brief ? { request: params.brief } : {}),
+    avoid: followed ? [] : await recentPieces(params.studioId, params.postId).catch(() => []),
+    seed: params.postId,
   });
   const input = {
     studio: {

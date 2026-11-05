@@ -23,6 +23,7 @@ import {
   type ReelContract,
 } from "@fauve/agent";
 import { studioPlace } from "@/lib/geo";
+import { supabaseAdmin } from "@/lib/supabase/admin";
 import { outputFormat, readAnswer } from "@fauve/agent/answer";
 import { designMotionScenes, type OfferedPhoto, type SceneBrand, type SceneContext, type SceneRequest } from "./motion-designer";
 import { anthropic, logClaudeCost } from "./run";
@@ -203,4 +204,30 @@ export async function playPieces(input: {
     result.played.push({ index, key });
   }
   return result;
+}
+
+/** How many of her latest Reels the effects they played come last in the offer (pieces.ts, piecesOffered). */
+const RECENT_REELS = 3;
+
+/** The effects of the bank her latest Reels played (this post's aside): offered after the others, never the same ones each time. */
+export async function recentPieces(studioId: string, exceptPostId: string): Promise<string[]> {
+  const db = supabaseAdmin();
+  const { data: posts } = await db
+    .from("posts")
+    .select("edit_plan_id")
+    .eq("studio_id", studioId)
+    .neq("id", exceptPostId)
+    .not("edit_plan_id", "is", null)
+    .order("created_at", { ascending: false })
+    .limit(RECENT_REELS);
+  const ids = (posts ?? []).map((p) => p.edit_plan_id as string);
+  if (!ids.length) return [];
+  const { data: plans } = await db.from("edit_plans").select("plan").in("id", ids);
+  return [
+    ...new Set(
+      (plans ?? []).flatMap((p) =>
+        ((p.plan as { layers?: { motion?: { piece?: { key?: unknown } } }[] } | null)?.layers ?? []).flatMap((l) => (typeof l.motion?.piece?.key === "string" ? [l.motion.piece.key] : [])),
+      ),
+    ),
+  ];
 }

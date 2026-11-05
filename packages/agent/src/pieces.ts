@@ -186,20 +186,55 @@ function carries(need: NonNullable<PieceNeeds["shot"]>, shot: PieceShot): number
   return score;
 }
 
+/** Words as compared: lower case, no accents, letters and digits only. */
+const plainWords = (s: string) =>
+  s
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
+    .trim();
+
+/** A number from a text, the same each time (a tie between two pieces broken one way for one Reel, another way for the next). */
+function hashOf(text: string): number {
+  let h = 2166136261;
+  for (let i = 0; i < text.length; i++) h = Math.imul(h ^ text.charCodeAt(i), 16777619);
+  return h >>> 0;
+}
+
 /**
- * The pieces her files can carry, the best first (PIECES_OFFERED at most; in the bank's order on a tie): enough of her
- * files, and a shot of the kind it needs. What was read on her files is coarse (a sky is not measured yet): the editor
- * reads each one's « Il faut » and lays it only where her shots have it.
+ * The pieces her files can carry, the best first (PIECES_OFFERED at most): enough of her files, and a shot of the kind it
+ * needs. What was read on her files is coarse (a sky is not measured yet): the editor reads each one's « Il faut » and
+ * lays it only where her shots have it. Never the same few for every Reel (Tristan: « il va proposer la même chose à
+ * tout le monde »): one her request names comes first (« une mosaïque de mes plats »: its name, or its model's), the ones
+ * her latest Reels played come last (`avoid`), and a tie is broken by the Reel (`seed`, its post), not by the bank's order.
  */
-export function piecesOffered(pieces: EffectPiece[], shots: PieceShot[], files: number, most = PIECES_OFFERED): EffectPiece[] {
-  const scored = pieces.flatMap((piece, order) => {
+export function piecesOffered(
+  pieces: EffectPiece[],
+  shots: PieceShot[],
+  files: number,
+  most = PIECES_OFFERED,
+  options: { avoid?: Iterable<string>; request?: string; seed?: string } = {},
+): EffectPiece[] {
+  const avoid = new Set(options.avoid ?? []);
+  const asked = ` ${plainWords(options.request ?? "")} `;
+  // Named in her request: its model's key as words (« mosaique », « mots meles », « titre derriere »), or its whole name or
+  // its model's (« cadre dans le cadre »); a false match only moves it into the few offered, the editor still decides.
+  const named = (piece: EffectPiece) =>
+    [piece.key.replace(/-/g, " "), piece.name, houseModel(piece.key)?.name ?? ""].some((name) => {
+      const words = plainWords(name);
+      return words.length >= 4 && (asked.includes(` ${words} `) || asked.includes(` ${words}s `));
+    });
+  const scored = pieces.flatMap((piece) => {
     if ((piece.require.files ?? 1) > files) return [];
     const need = piece.require.shot;
     const best = need ? Math.max(-1, ...shots.map((s) => carries(need, s) ?? -1)) : 3;
-    return best < 0 ? [] : [{ piece, order, best }];
+    if (best < 0) return [];
+    const score = best + (named(piece) ? 10 : 0) - (avoid.has(piece.key) ? 4 : 0);
+    return [{ piece, score, tie: hashOf(`${options.seed ?? ""}:${piece.key}`) }];
   });
   return scored
-    .sort((a, b) => b.best - a.best || a.order - b.order)
+    .sort((a, b) => b.score - a.score || a.tie - b.tie)
     .slice(0, most)
     .map((s) => s.piece);
 }

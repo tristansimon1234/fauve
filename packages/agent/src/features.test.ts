@@ -10827,3 +10827,21 @@ test("a sound of an effect laid over the montage lands on her gesture, read on h
   // No tracks: its own moment, from the layer's start.
   assert.deepEqual(planCues(plan, [{ start: 0, length: 6 }]).map((c) => c.at), [2]);
 });
+
+test("the effects offered change from one Reel to the next: the one she names first, those of her latest Reels last", async () => {
+  const { cadre } = await import("./pieces/cadre.ts");
+  const { piecesOffered } = await import("./pieces.ts");
+  const shot = { id: "a", photo: false, framing: "wide" as const, still: true, outdoors: false, indoors: true, person: false, beauty: 3 };
+  const bank = ["un", "deux", "trois", "quatre", "cinq", "six", "sept", "huit"].map((k) => ({ ...cadre, key: k, name: `Effet ${k}` }));
+  const keys = (options: Parameters<typeof piecesOffered>[4]) => piecesOffered(bank, [shot], 5, 3, options).map((p) => p.key);
+  // A tie is broken by the Reel, never by the bank's order: two Reels see different effects.
+  const seen = new Set(["p1", "p2", "p3", "p4", "p5", "p6"].map((seed) => keys({ seed }).join(",")));
+  assert.ok(seen.size > 1, "the same three for every Reel");
+  // The one her request names comes first; those of her latest Reels come last.
+  assert.equal(keys({ seed: "p1", request: "Je voudrais l'effet quatre sur mes photos" })[0], "quatre");
+  const avoided = keys({ seed: "p1", avoid: ["un", "deux", "trois", "quatre", "cinq"] });
+  assert.ok(avoided.every((k) => ["six", "sept", "huit"].includes(k)), avoided.join(","));
+  // The real names: « mosaïque » asks for « Mosaïque qui change ».
+  const { mosaique } = await import("./pieces/mosaique.ts");
+  assert.equal(piecesOffered([cadre, mosaique], [shot, { ...shot, framing: "close" }], 5, 2, { request: "une mosaique de mes plats" })[0]!.key, "mosaique");
+});
