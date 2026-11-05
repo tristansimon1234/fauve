@@ -34,7 +34,7 @@ export const HOUSE_MEASURES: Record<string, ReelMeasures> = {
   "aplat": { duration: 8.87, cuts: [1.97, 2.53, 3.67, 4, 5.93, 8.37], bpm: null, lufs: -14.2 },
   "pile": { duration: 9.2, cuts: [], bpm: null, lufs: -14.2 },
   "mon-travail": { duration: 9.17, cuts: [], bpm: null, lufs: -14.1 },
-  "interrupteur": { duration: 9.2, cuts: [], bpm: 142, lufs: -14.3 },
+  "interrupteur": { duration: 9.2, cuts: [], bpm: 71.85, lufs: -14.3 },
   "photo-dump": { duration: 11.33, cuts: [0.67, 1.1, 1.47, 1.83, 2.3, 2.63, 3.37, 3.7, 4.07, 4.37, 5.07, 5.47, 5.8, 6.17, 6.87, 7.3, 8.23, 8.53, 8.87, 9.9, 10.63], bpm: null, lufs: -14.1 },
   "interface": { duration: 12.77, cuts: [], bpm: null, lufs: -14.2 },
   "pixel": { duration: 15.6, cuts: [1.33, 3.47, 5, 8.17, 9.07, 12.17, 14.13], bpm: 100, lufs: -14.5 },

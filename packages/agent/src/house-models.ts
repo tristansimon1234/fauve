@@ -17,8 +17,8 @@ import type { z } from "zod";
 
 /** The source of the inspiration row a house model is kept on, per studio (one per model, made when first used). */
 export const HOUSE_SOURCE = "house";
-/** The catalogue's version: a studio's row written by an older one is rewritten when the model is used again (3: its original's sheets; 4: no brand in a model's name; 5: Mots aux quatre coins as its original; 6: Plans fixes at 65 BPM; 7: four renamed; 8: Lieu tapé without its original's orange; 9: Plans fixes on its fiche; 10: Une journée chez toi on its fiche; 11: ten models on their fiches; 12: Façade qui se construit and Coulisses façon fiche on their fiches; 13: Recette cosy on its fiche; 14: Titre gaufré on its fiche). */
-export const HOUSE_VERSION = 14;
+/** The catalogue's version: a studio's row written by an older one is rewritten when the model is used again (3: its original's sheets; 4: no brand in a model's name; 5: Mots aux quatre coins as its original; 6: Plans fixes at 65 BPM; 7: four renamed; 8: Lieu tapé without its original's orange; 9: Plans fixes on its fiche; 10: Une journée chez toi on its fiche; 11: ten models on their fiches; 12: Façade qui se construit and Coulisses façon fiche on their fiches; 13: Recette cosy on its fiche; 14: Titre gaufré on its fiche; 15: Mots mêlés and Interrupteur on their fiches). */
+export const HOUSE_VERSION = 15;
 
 export type HouseModel = {
   key: string;
@@ -995,29 +995,40 @@ export const HOUSE_MODELS: HouseModel[] = [
   model({
     key: "interrupteur",
     name: "Interrupteur",
+    // 15: written again on its original's fiche (v2 of its skill): its music stopped dead and back as she lands, its
+    // beep, its switch flipped in one image, its poster at once, her in front, its format.
     pitch: "Tu actionnes un grand interrupteur dessiné sur ton mur, et ton logo s'allume.",
-    needs: "une vidéo de toi qui lèves la main vers un mur clair, filmée fixe, et ton logo",
+    needs: "une vidéo de toi qui sautes (ou tends le bras) pour toucher un point haut d'un mur clair, filmée fixe en vertical, et ton logo",
     files: [1, 2],
     pair: "grotesque",
-    example: "Z-interrupteur",
-    tempo: 120,
-    finish: { name: "Clair", hint: "lumière douce", contrast: 0.04, warmth: 0.04 },
+    // Its reference composition added a cursor that clicks and a tilted « C'EST OUVERT » the original does not have: its
+    // skill's code is its reference now.
+    example: null,
+    // Its first piece's grid, 143,7 BPM counted one beat in two (the engine wants 60 to 140; the fiche, effects 5 and 6).
+    tempo: 71.85,
+    finish: { name: "Clair", hint: "lumière douce, contraste doux, sans grain ni coins sombres", contrast: 0.04, warmth: 0.04 },
     look: {
-      name: "interrupteur et logo",
+      name: "interrupteur et affiche",
       format: "autre",
-      hook: { kind: "geste", what: "un grand interrupteur sur un mur clair, et une main qui se lève vers lui" },
-      text: { amount: "aucun", composition: "aucun texte : le logo seul" },
-      layout: "un seul plan fixe en plein cadre, la personne devant un mur, avec un interrupteur dessiné posé sur le mur puis le logo",
+      hook: { kind: "geste", what: "un grand interrupteur de téléphone dessiné à plat, éteint, en haut d'un mur clair, hors de portée, et quelqu'un qui lève la main vers lui" },
+      text: {
+        amount: "plusieurs",
+        composition: "une affiche qui s'allume d'un coup sur le mur sous l'interrupteur : son logo, son titre en grand souligné à la main, une petite ligne en capitales espacées entre deux traits, un détail minuscule, une étincelle",
+        weight: "bold",
+      },
+      layout: "un seul plan fixe en plein cadre vertical : un mur clair, l'interrupteur dessiné en haut, l'affiche dessous, la personne devant les deux",
       moments: [
-        { at: 0, what: "un grand interrupteur de téléphone, éteint, posé sur le mur" },
-        { at: 3.5, what: "la main touche l'interrupteur : il passe au vert et glisse" },
-        { at: 4, what: "le logo apparaît en grand sur le mur, en dessous" },
+        { at: 0, what: "le mur vide, l'interrupteur éteint en haut (piste grise, pastille blanche à gauche)" },
+        { at: 2.29, what: "elle lève la main sans l'atteindre : la musique s'arrête net, un bip court dans le silence à 3,06 s, elle s'accroupit et saute" },
+        { at: 4.1, what: "au sommet de son saut, ses doigts touchent l'interrupteur : il bascule d'un coup, en une image, et l'affiche est là sur le mur, elle devant" },
+        { at: 4.41, what: "elle retombe et la musique repart avec sa basse ; elle s'en va, le mur garde l'interrupteur allumé et l'affiche jusqu'à la fin" },
       ],
+      sounds: [{ at: 3.06, what: "un bip court et aigu, seul dans le silence" }],
       camera: "fixe",
-      motion: "chaleureux",
-      music: "bright playful pop, claps",
-      ending: "le logo sur le mur, la personne s'éloigne",
-      why: "Un geste simple allume la marque : c'est ludique, mémorable, et ça finit sur le logo.",
+      motion: "epure",
+      music: "choppy melodic hip-hop beat with a heavy 808 bass, about 72 BPM",
+      ending: "le mur avec l'interrupteur allumé et l'affiche, sans elle, jusqu'à la fin du son",
+      why: "Le gag tient en une seconde : elle n'y arrive pas, saute, et tout s'allume d'un coup avec la musique qui repart ; on finit sur l'affiche.",
     },
   }),
   model({
@@ -1095,36 +1106,41 @@ export const HOUSE_MODELS: HouseModel[] = [
   model({
     key: "mots-meles",
     name: "Mots mêlés",
+    // 15: written again on its original's fiche (v2 of its skill): its 16:9 frame and its grid's proportions, its loops
+    // at a hand's pace chained one after the other, its sentence held 5 s, its light dosed, no grain.
     pitch: "Un plan calme sous une grille de lettres, où des boucles tracées à la main entourent les mots cachés un à un.",
-    needs: "une vidéo calme et fixe de ton lieu ou de toi au travail, d'environ 15 secondes",
+    needs: "une vidéo calme et fixe de ton lieu ou de toi au travail, d'environ 20 secondes, à l'horizontale de préférence",
     files: [1, 2],
     pair: "grotesque",
     example: "A-mots-meles",
+    // Its original has no sound: a calm music under it, its loops on the hand, never on a beat.
     tempo: 80,
-    finish: { name: "Doux", hint: "image un peu assombrie, grain fin", exposure: -0.06, contrast: 0.04, saturation: -0.1, grain: 0.25, grain_size: "fine" },
+    // Its code darkens her shot to its own light: here only its faded colours and its barely lifted blacks.
+    finish: { name: "Doux", hint: "couleurs passées, noirs à peine levés, contraste doux, sans grain ni coins sombres", contrast: -0.03, saturation: -0.2, fade: 0.05 },
     look: {
       name: "mots mêlés",
       format: "message",
-      hook: { kind: "mystère", what: "une grille de lettres posée sur une scène calme : on cherche les mots" },
+      hook: { kind: "mystère", what: "une grille aérée de fines lettres blanches posée sur une scène calme, une boucle tracée à la main qui commence à entourer un mot" },
       text: {
         amount: "un message tenu",
-        composition: "une grille de lettres capitales fines et grises sur tout le cadre, les mots cachés entourés une à une d'un trait blanc fait main",
+        composition: "une grille de fines capitales blanches sur toute l'image (16 × 10 en 16:9), très aérée, les mots de la phrase cachés dans l'ordre et entourés un à un d'une boucle blanche fine tracée à la main",
         case: "upper",
         weight: "regular",
         tracking: "wide",
         stress: "marker",
         stroke: "thin",
       },
-      layout: "un seul plan fixe en plein cadre, avec une grille de lettres posée par-dessus sur tout le cadre (mots mêlés)",
+      layout: "un seul plan fixe en 16:9 sur du noir comme l'original (plein cadre en vertical), une grille de lettres posée sur toute l'image",
       moments: [
-        { at: 0, what: "la grille de lettres sur toute l'image, le plan calme dessous" },
-        { at: 2, what: "un trait blanc fait main entoure un premier mot en 0,6 s ; un nouveau mot toutes les 3 s environ, jusqu'à la phrase entière" },
+        { at: 0, what: "la grille de lettres sur toute l'image, le plan calme et un peu assombri dessous, téléphone posé" },
+        { at: 0.13, what: "une boucle blanche tracée à la main entoure le premier mot, au-dessus de sa première lettre, à l'allure d'une main (2,6 s), puis chaque mot de la phrase dès que la précédente se ferme ; un mot sur deux rangées en escalier, un en diagonale" },
+        { at: 13.3, what: "toute la phrase entourée, tenue plus de cinq secondes, rien d'autre ne bouge que la personne" },
       ],
       camera: "fixe",
-      grade: "moody",
+      grade: "natural",
       motion: "fait_main",
-      music: "soft lo-fi bedroom pop, slow and dreamy",
-      ending: "la grille avec tous les mots entourés, tenue deux secondes",
+      music: "calm warm acoustic guitar and soft keys, no marked drums, slow and airy",
+      ending: "la grille avec toute la phrase entourée, tenue plus de cinq secondes",
       why: "On joue avec le Reel : chercher les mots retient l'attention, et la phrase trouvée reste en tête.",
     },
   }),
@@ -1334,10 +1350,10 @@ export const HOUSE_WHEN: Record<string, { pour: string; pas_pour: string }> = {
   nike: { pour: "l'effort, le geste, l'énergie (sport, danse, un service en plein rush)", pas_pour: "un lieu calme, des produits" },
   eventail: { pour: "une ouverture graphique, un lieu, une marque qui ose", pas_pour: "un message à lire" },
   coulisses: { pour: "montrer son lieu et ses gestes comme un créateur montre ses coulisses : chaque bruitage nommé, la timeline du montage", pas_pour: "une offre à lire, quelqu'un qui parle, une ambiance calme" },
-  interrupteur: { pour: "présenter sa marque, un lancement, son logo qui s'allume", pas_pour: "sans vidéo d'elle qui lève la main vers un mur" },
+  interrupteur: { pour: "présenter sa marque, un lancement, une soirée, son logo qui s'allume", pas_pour: "sans vidéo d'elle qui saute ou tend le bras vers un point d'un mur clair, filmée fixe" },
   interface: { pour: "faire suivre son compte, une app, un service en ligne", pas_pour: "montrer un lieu ou des produits" },
   pixel: { pour: "une recette, une préparation en étapes, une ambiance chaleureuse", pas_pour: "un lieu, une rue, quelqu'un qui parle, des vidéos filmées à la main" },
-  "mots-meles": { pour: "un jeu, une devinette, un message caché, un lieu calme", pas_pour: "un Reel rythmé" },
+  "mots-meles": { pour: "un jeu, une devinette, un message caché, un lieu calme : quelqu'un qui fait une chose simple", pas_pour: "un Reel rythmé, plusieurs plans, une vidéo qui bouge" },
   aplat: { pour: "présenter une personne (la patronne, l'équipe), une marque qui ose la couleur", pas_pour: "sans vidéo d'elle qui marche" },
   detourages: { pour: "présenter un lieu, un paysage ou une sortie avec de l'élan, un nom à faire retenir", pas_pour: "sans plan large et fixe de son lieu ou de son paysage" },
   createur: { pour: "quelqu'un qui explique en parlant, avec des images de ce dont il parle", pas_pour: "des images sans parole" },
