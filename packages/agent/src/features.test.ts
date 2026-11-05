@@ -2111,3 +2111,180 @@ test("« Plans fixes de cinéma » (v3): horizontal 4:3 on black as its original
   assert.equal(plan.layers![0]!.motion.texts!.format, "vertical");
   assert.deepEqual(plan.skill, { key: "plans-fixes", version: 3, settings: { format: "vertical" } });
 });
+
+// ——— « Écran partagé titré » v2, written again on its original's fiche (docs/fiches/ecran-partage.md) ———————————————
+
+test("« Écran partagé titré » (v2) cuts where its original does, both halves together, on its grid of half a second", async () => {
+  const { ecranPartage } = await import("./skills/ecran-partage.ts");
+  const { skillFit } = await import("./skills.ts");
+  const { clearsDrawn, objectsDrawn } = await import("./subject.ts");
+  assert.equal(ecranPartage.version, 2);
+  assert.equal(ecranPartage.bpm, 120);
+  const line = ecranPartage.timeline(10, { end: false });
+  // Its five pairs, two shots each (the person at work, what it gives), cutting together where the original's do, on its
+  // images 67, 172, 232 and 320 (measured image by image at 30 i/s): within two images each; 12,77 s in all.
+  const original = [0, 67, 172, 232, 320];
+  assert.equal(line.shots.length, 10);
+  original.forEach((f, k) => {
+    const at = Math.round(line.shots[2 * k]!.start * 30);
+    assert.ok(Math.abs(at - f) <= 2, `pair ${k + 1}: image ${at}, the original's ${f}`);
+  });
+  assert.ok(Math.abs(line.duration - 12.77) < 0.05, `${line.duration} s`);
+  // Each pair's two halves share its time (each its own passage), so nothing cuts on screen between its cuts.
+  const frames = (s: { start: number; end: number }) => Math.round(s.end * 30) - Math.round(s.start * 30);
+  for (let k = 0; k < 5; k++) {
+    const [a, b] = [line.shots[2 * k]!, line.shots[2 * k + 1]!];
+    assert.equal(a.end, b.start);
+    assert.ok(Math.abs(frames(a) - frames(b)) <= 1, `pair ${k + 1}: ${frames(a)} and ${frames(b)} images`);
+  }
+  assert.equal(line.marks.solo, -1);
+  // Its two titles from the first image to the last; no sound of its own (its original has none); its music without its
+  // bass to the third bar (the original's held bass comes in at 4,55 s), cut dead with the last image.
+  assert.deepEqual(line.texts, { personne: { from: 0, to: line.duration }, resultat: { from: 0, to: line.duration } });
+  assert.equal(line.sounds, undefined);
+  assert.deepEqual(line.music, { filters: [{ kind: "thin", from: 0, to: 4 }], end: { at: line.duration } });
+  // An odd count takes a second passage of one of her videos: a short pair more in the middle, one shot for both halves,
+  // never a shot alone full frame; the even counts keep their own lengths (12,8 s asked: the original's five pairs).
+  const odd = ecranPartage.timeline(9, { end: false });
+  assert.equal(odd.shots.length, 9);
+  assert.equal(odd.marks.solo, 4);
+  assert.ok(odd.duration > ecranPartage.timeline(8, { end: false }).duration && odd.duration < line.duration, `${odd.duration} s`);
+  assert.deepEqual(skillFit(ecranPartage, 12.8), { n: 10, bpm: 120 });
+  // With an ending card (the original has none: only when she wants one), its last pair held whole beats longer.
+  const ended = ecranPartage.timeline(10, { end: true });
+  assert.deepEqual(ended.shots.slice(0, 8), line.shots.slice(0, 8));
+  assert.ok(ended.duration - line.duration >= 1.6 && Math.abs((ended.duration - line.duration) * 2 - 4) < 0.05, `${ended.duration} s`);
+  assert.ok(Math.abs(ended.texts.personne!.to - (ended.duration - 1.6)) < 0.01);
+  // Cuts only: no zoom, push nor slide; nothing read in her shots (its titles stay where the original's are).
+  assert.doesNotMatch(ecranPartage.code, /transform|scale\(|interpolate/);
+  assert.deepEqual(clearsDrawn(ecranPartage.code), []);
+  assert.deepEqual(objectsDrawn(ecranPartage.code), []);
+  // Its finish leaves out the catalogue's vignette and grain: its original has neither.
+  assert.deepEqual(ecranPartage.finish, { grain: 0, vignette: 0 });
+});
+
+test("« Écran partagé titré » (v2): the original's card for vertical files, one half above the other for horizontal ones, its halves at half speed", async () => {
+  const { ecranPartage } = await import("./skills/ecran-partage.ts");
+  const line = ecranPartage.timeline(10, { end: false });
+  const shotsOf = (aspects: number[], kinds: string[] = []) =>
+    line.shots.map((s, i) => ({ src: `/v${i}.mp4`, aspect: aspects[i % aspects.length], from: Math.round(s.start * 30), durationInFrames: Math.round((s.end - s.start) * 30), kind: kinds[i] ?? "video", segment: i }));
+  const brand = { name: "Atelier Rose", displayFont: "EB Garamond", bodyFont: "Inter Tight" };
+  const reelTexts = [
+    { text: "les fleuristes", role: "hook", from: 0, to: 383, emphasis: [] },
+    { text: "les fleurs", role: "caption", from: 0, to: 383, emphasis: [] },
+  ];
+  const draw = (aspects: number[], frame: number, extra: Record<string, unknown> = {}, kinds: string[] = []) =>
+    drawScene(ecranPartage.code, frame, { width: 1080, height: 1920, durationInFrames: 383, brand, shots: shotsOf(aspects, kinds), reelTexts, end: null, texts: { solo: "-1" }, ...extra });
+  /** The card (the box with its rounded corners) and its halves, each with the Footage laid in it. */
+  const cardOf = (tree: Drawn) => {
+    const card = drawnNodes(tree).find((n) => n.type === "div" && Number(styleOf(n).borderRadius) > 0)!;
+    const halves = (card.children.flat(Infinity) as unknown[]).filter((n): n is Drawn => Boolean(n) && typeof n === "object" && (n as Drawn).type === "div" && styleOf(n as Drawn).overflow === "hidden");
+    const box = (s: Record<string, number | string>) => [s.left, s.top, s.width, s.height];
+    return { card: box(styleOf(card)), radius: styleOf(card).borderRadius, halves: halves.map((n) => box(styleOf(n))), footage: halves.map((n) => drawnNodes(n).filter((x) => x.type === "Footage").map((x) => x.props)) };
+  };
+  const tall = [9 / 16];
+  const wide = [16 / 9];
+  // Her files mostly vertical: the original's 4:3 card at the middle of the screen (1080 × 810), on black, its margins
+  // and rounded corners as the original's, its two 2:3 halves side by side, touching.
+  const card = cardOf(draw(tall, 30));
+  assert.deepEqual(card.card, [10, 570, 1060, 783]);
+  assert.equal(card.radius, 30);
+  assert.deepEqual(card.halves, [[0, 0, 530, 783], [530, 0, 530, 783]]);
+  // Mostly horizontal: the card over the whole screen, one half above the other (9:8): a 16:9 video keeps most of its width.
+  const stacked = cardOf(draw(wide, 30));
+  assert.deepEqual(stacked.card, [10, 35, 1060, 1856]);
+  assert.deepEqual(stacked.halves, [[0, 0, 1060, 928], [0, 928, 1060, 928]]);
+  assert.equal(cardOf(draw([16 / 9, 9 / 16], 30)).card[1], 570);
+  // On her word, another layout: the card whatever her files, side by side over the whole screen, one above the other.
+  assert.deepEqual(cardOf(draw(wide, 30, { texts: { solo: "-1", format: "carte" } })).card, [10, 570, 1060, 783]);
+  assert.deepEqual(cardOf(draw(tall, 30, { texts: { solo: "-1", format: "plein-ecran" } })).halves, [[0, 0, 530, 1856], [530, 0, 530, 1856]]);
+  assert.deepEqual(cardOf(draw(tall, 30, { texts: { solo: "-1", format: "empile" } })).halves, [[0, 0, 1060, 928], [0, 928, 1060, 928]]);
+  // Both halves of a pair play from its first image, each its own passage at half its speed (the second pair: its shots
+  // 3 and 4, images 68 to 173), the next image laid over it as it comes; the two always cut together.
+  const shots = shotsOf(tall);
+  for (const f of [68, 88, 120, 172]) {
+    const { footage } = cardOf(draw(tall, f));
+    assert.deepEqual(footage.map((list) => list.map((p) => p.shot)), [[2, 2], [3, 3]], `image ${f}`);
+    footage.forEach((list, side) => {
+      const local = f - Number(list[0]!.at);
+      const length = shots[2 + side]!.durationInFrames;
+      assert.ok(Math.abs(local - ((f - 68) * length) / 105) < 1, `image ${f}, half ${side + 1}: its image ${local}`);
+      assert.equal(Number(list[1]!.at), Number(list[0]!.at) - 1);
+    });
+  }
+  assert.deepEqual(cardOf(draw(tall, 173)).footage.map((list) => list.map((p) => [p.shot, p.at])), [[[4, 173], [4, 172]], [[5, 173], [5, 172]]]);
+  // A photo stays still: laid once, never played.
+  const photo = cardOf(draw(tall, 88, {}, ["video", "video", "photo", "video"]));
+  assert.deepEqual(photo.footage[0]!.map((p) => [p.shot, p.at]), [[2, undefined]]);
+  // An odd count: a video alone in its pair plays its start in one half, the rest of it in the other; a photo alone is
+  // laid across the card, never twice.
+  const nine = ecranPartage.timeline(9, { end: false });
+  const oddShots = nine.shots.map((s, i) => ({ src: `/v${i}.mp4`, aspect: 9 / 16, from: Math.round(s.start * 30), durationInFrames: Math.round((s.end - s.start) * 30), kind: "video", segment: i }));
+  const solo = oddShots[4]!;
+  const oddDraw = (list: typeof oddShots) => drawScene(ecranPartage.code, solo.from + 10, { width: 1080, height: 1920, durationInFrames: 341, brand, shots: list, reelTexts, end: null, texts: { solo: "4" } });
+  const alone = cardOf(oddDraw(oddShots));
+  assert.deepEqual(alone.footage.map((list) => list.map((p) => p.shot)), [[4, 4], [4, 4]]);
+  const [early, late] = alone.footage.map((list) => solo.from + 10 - Number(list[0]!.at));
+  assert.ok(early! < Math.floor(solo.durationInFrames / 2) && late! >= Math.floor(solo.durationInFrames / 2), `${early}, ${late}`);
+  assert.deepEqual(cardOf(oddDraw(oddShots.map((s, i) => (i === 4 ? { ...s, kind: "photo" } : s)))).halves, [[0, 0, 1060, 783]]);
+  // Its two small titles, on the card and still: a book serif in title case, white, 50 px; side by side just under the
+  // middle of the card (54 % of its height), at 43 % and 51 % of their halves, the right one left of the apps' buttons;
+  // one above the other, centred, as far above the line between the halves as below it, clear of the apps' caption.
+  const titles = (tree: Drawn) =>
+    drawnNodes(tree)
+      .filter((n) => n.type === "FitText")
+      .map((n) => ({ box: n.props.style as { left: number; top: number; width: number; height: number }, size: (n.props.innerStyle as { fontSize: number }).fontSize, text: heldText(n).replace(/\s+/g, " ").trim() }));
+  const side = titles(draw(tall, 30));
+  assert.deepEqual(side.map((t) => [t.text, t.size]), [["Les fleuristes", 50], ["Les fleurs", 50]]);
+  for (const t of side) assert.ok(Math.abs(t.box.top + t.box.height / 2 - (570 + 0.54 * 783)) <= 1, JSON.stringify(t.box));
+  const [left, right] = side as [(typeof side)[number], (typeof side)[number]];
+  assert.ok(left.box.left >= 50 && left.box.left + left.box.width <= 520 && Math.abs(left.box.left + left.box.width / 2 - 238) <= 2, JSON.stringify(left.box));
+  // (The right one moved in when its box would reach the buttons' column.)
+  assert.ok(right.box.left >= 560 && right.box.left + right.box.width <= 930, JSON.stringify(right.box));
+  assert.ok(Math.abs(right.box.left + right.box.width / 2 - 810) <= 2 || right.box.left + right.box.width === 930, JSON.stringify(right.box));
+  assert.ok(Math.abs(right.box.left + right.box.width / 2 - 810) <= 10, JSON.stringify(right.box));
+  assert.deepEqual(titles(draw(tall, 360)).map((t) => t.box), side.map((t) => t.box));
+  const above = titles(draw(wide, 30));
+  assert.ok(above.every((t) => Math.abs(t.box.left + t.box.width / 2 - 540) <= 1), JSON.stringify(above));
+  const [upper, lower] = above.map((t) => t.box.top + t.box.height / 2) as [number, number];
+  assert.ok(Math.abs(963 - upper - (lower - 963)) <= 25 && upper > 480 && above[1]!.box.top + above[1]!.box.height <= 1440, `${upper}, ${lower}`);
+  // A long title goes on two lines rather than shrinking, never past the buttons.
+  const long = titles(draw(tall, 30, { reelTexts: [reelTexts[0], { text: "les bouquets du jour", role: "caption", from: 0, to: 383, emphasis: [] }] }))[1]!;
+  assert.ok(long.box.left + long.box.width <= 930 && long.box.height >= 2 * 50 * 1.15, JSON.stringify(long.box));
+  // Its ending card when she has one: the last pair darkened under its title, its small titles gone.
+  const ending = draw(tall, 370, { end: { title: "Ouvert dimanche", subtitle: "Atelier Rose", from: 335 } });
+  assert.ok(drawnNodes(ending).some((n) => n.type === "div" && styleOf(n).background === "#000000" && Number(styleOf(n).opacity) === 0.55));
+  assert.deepEqual(titles(ending).map((t) => t.text), ["Ouvert dimanche", "Atelier Rose"]);
+  assert.equal(drawnNodes(draw(tall, 370)).filter((n) => n.type === "div" && styleOf(n).background === "#000000").length, 0);
+});
+
+test("« Écran partagé titré » (v2): its layout as a setting her words ask, and the filler sees which of her files is wide", async () => {
+  const { ecranPartage } = await import("./skills/ecran-partage.ts");
+  const { skillPlan, skillFillInput, skillSettings, fileFormat } = await import("./skills.ts");
+  // The setting: the filler sees it (its default first: as her files), the plan keeps a choice her words asked for.
+  assert.deepEqual(ecranPartage.settings?.map((s) => [s.name, s.choices.map((c) => c.value)]), [["format", ["auto", "carte", "plein-ecran", "empile"]]]);
+  assert.deepEqual(skillSettings(ecranPartage, [{ name: "format", value: "auto" }]), {});
+  // Each file's shape, in the filler's words: a horizontal video in a tall half keeps only its middle.
+  assert.deepEqual([16 / 9, 9 / 16, 1, 4 / 3, 3 / 4, undefined, 0].map(fileFormat), ["horizontale", "verticale", "carrée", "horizontale", "verticale", undefined, undefined]);
+  const files = [
+    { id: "v0", photo: false, seconds: 12, aspect: 16 / 9 },
+    { id: "v1", photo: false, seconds: 12, aspect: 9 / 16 },
+    { id: "p0", photo: true, seconds: 0, aspect: 1 },
+    { id: "v2", photo: false, seconds: 12 },
+  ];
+  const input = skillFillInput({ skill: ecranPartage, name: "Écran partagé titré", n: 10, files, business: {}, request: "l'un au-dessus de l'autre" });
+  assert.deepEqual(input.fichiers.map((f) => ("format" in f ? f.format : undefined)), ["horizontale", "verticale", "carrée", undefined]);
+  assert.equal(input.reglages?.[0]?.nom, "format");
+  // Its slots say where each half is: as her files give it, or the layout she asked for.
+  assert.match(ecranPartage.timeline(10, { end: false }).shots[0]!.want, /^le plan qui ouvre, la moitié de gauche \(du haut quand ses fichiers sont horizontaux\)/);
+  const asked = ecranPartage.timeline(10, { end: false, settings: { format: "empile" } });
+  assert.match(asked.shots[0]!.want, /moitié du haut/);
+  assert.match(asked.shots[1]!.want, /moitié du bas/);
+  const plan = skillPlan({ skill: ecranPartage, name: "Écran partagé titré", files, fill: { shots: Array.from({ length: 10 }, (_, i) => ({ file: files[i % 4]!.id, at: 0 })), texts: { personne: "les fleuristes", resultat: "les fleurs" }, end: null, settings: { format: "empile" } } });
+  assert.ok(editPlanSchema.safeParse(plan).success);
+  assert.equal(plan.layers![0]!.motion.texts!.format, "empile");
+  assert.equal(plan.layers![0]!.motion.texts!.solo, "-1");
+  assert.deepEqual(plan.skill, { key: "ecran-partage", version: 2, settings: { format: "empile" } });
+  // Its music shaped on the plan: without its bass to the third bar, cut dead at the end.
+  assert.deepEqual(plan.music_shape, { filters: [{ kind: "thin", from: 0, to: 4, open: 0.02 }], end: { at: plan.duration, fade: 0.012 } });
+});
