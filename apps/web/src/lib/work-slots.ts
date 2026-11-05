@@ -41,9 +41,10 @@ const STEP_MARGIN_MS = 4 * 60_000;
 /**
  * Runs `work` once a place is free, with the index of its machine. If the places stay full beyond
  * `waitMs` (or what its step has left), it runs anyway on the least busy one: a slow job is better
- * than none. If the database cannot be asked, it runs as before (on machine 0).
+ * than none. If the database cannot be asked, it runs as before (on machine 0). `held` is false in
+ * both cases: the job shares its machine with as many as it takes, and can do its work more gently.
  */
-export async function withSlot<T>(spec: SlotSpec, work: (slot: number) => Promise<T>): Promise<T> {
+export async function withSlot<T>(spec: SlotSpec, work: (slot: number, held: boolean) => Promise<T>): Promise<T> {
   const db = supabaseAdmin();
   const holder = randomUUID();
   const until = Date.now() + Math.max(0, Math.min(spec.waitMs, timeLeft() - STEP_MARGIN_MS));
@@ -60,6 +61,7 @@ export async function withSlot<T>(spec: SlotSpec, work: (slot: number) => Promis
     return data as number | null;
   };
   let slot: number | null;
+  let held = true;
   const waitStarted = Date.now();
   try {
     slot = await take(false);
@@ -69,16 +71,17 @@ export async function withSlot<T>(spec: SlotSpec, work: (slot: number) => Promis
     }
     if (slot === null) {
       console.warn("work slot: all places busy, running anyway", spec.kind);
+      held = false;
       slot = await take(true);
     }
   } catch (error) {
     console.warn("work slot not taken, running without one", spec.kind, error instanceof Error ? error.message : error);
-    return work(0);
+    return work(0, false);
   }
   const box = waits.getStore();
   if (box) box.ms += Date.now() - waitStarted;
   try {
-    return await work(slot ?? 0);
+    return await work(slot ?? 0, held);
   } finally {
     await db.rpc("release_work_slot", { p_kind: spec.kind, p_holder: holder }).then(
       ({ error }) => error && console.warn("work slot not released", spec.kind, error.message),

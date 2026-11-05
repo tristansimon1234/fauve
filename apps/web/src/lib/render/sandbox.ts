@@ -42,7 +42,9 @@ import {
 } from "@fauve/agent";
 import type { SceneBackdrop } from "@render/contrast";
 import { env } from "@/lib/env";
+import { timeLeft } from "@/lib/step-clock";
 import { REMOTION_SOURCE_FILES, REMOTION_SOURCE_HASH } from "./remotion-source.generated";
+import { FIRST_TRY, PATIENT_TRY, RENDER_LEASE_MS, RENDERS_PER_SANDBOX, remotionFlags, renderBoundSeconds, secondTryFits, type RenderTry } from "./render-tries";
 import { withSlot } from "@/lib/work-slots";
 
 // The render worker: a persistent Vercel Sandbox (Firecracker microVM) holding a
@@ -54,11 +56,14 @@ import { withSlot } from "@/lib/work-slots";
 const NAME = "fauve-render-paris";
 /**
  * The render sandboxes Chrome runs in (renders, scene checks, stills, frames of a Reel, a site read):
- * the first one, then two more woken only when it is full. Two Chrome jobs at a time in each (each
- * render opens 4 tabs in its 8 GB): ten montages at once used to start forty tabs in one sandbox.
+ * the first one, then two more woken only when it is full. In each, one Reel's render at a time
+ * (withRender: its videos re-encoded twelve at once, four tabs, Remotion's 1.5 GB frame cache and its
+ * compositor; two of them in one 8 GB sandbox failed together on 4 November) and two light Chrome jobs
+ * (withRemotion): ten montages at once used to start forty tabs in one sandbox.
  * The ffmpeg jobs (music, mixing, frames of a video) stay in the first one, outside the queue.
  */
 const REMOTION_POOL = [NAME, `${NAME}-2`, `${NAME}-3`];
+/** Light Chrome jobs at a time in each render sandbox (scene checks, stills, frames of a Reel, a site read). */
 const CHROME_PER_SANDBOX = 2;
 /** vCPUs of the render sandbox (2 GB of memory each). */
 const VCPUS = 4;
@@ -364,7 +369,7 @@ export function remotionSandbox(name = NAME): Promise<Sandbox> {
 export const warmRemotionPool = () => Promise.all(REMOTION_POOL.map((name) => remotionSandbox(name)));
 
 /**
- * Runs a Chrome job in a render sandbox with a free place (two jobs each, the first sandbox filled
+ * Runs a light Chrome job in a render sandbox with a free place (two jobs each, the first sandbox filled
  * first); a job that waited `waitMs` runs anyway on the least busy one.
  */
 function withRemotion<T>(waitMs: number, work: (sandbox: Sandbox) => Promise<T>): Promise<T> {
@@ -376,6 +381,17 @@ function withRemotion<T>(waitMs: number, work: (sandbox: Sandbox) => Promise<T>)
 /** How long a render waits for a place: it is the step's main work. A quick check (scenes, frames) waits less. */
 const RENDER_WAIT_MS = 6 * 60_000;
 const CHECK_WAIT_MS = 2 * 60_000;
+
+/**
+ * Runs a Reel's render in a render sandbox of its own (its own places, one per sandbox, the first sandbox filled
+ * first). `held` is false when all were taken past its wait and it shares one anyway: it renders gently then.
+ */
+function withRender<T>(work: (sandbox: Sandbox, held: boolean) => Promise<T>): Promise<T> {
+  return withSlot(
+    { kind: "render", slots: REMOTION_POOL.length, perSlot: RENDERS_PER_SANDBOX, leaseMs: RENDER_LEASE_MS, waitMs: RENDER_WAIT_MS },
+    async (slot, held) => work(await withTimeLeft(await remotionSandbox(REMOTION_POOL[slot] ?? NAME)), held),
+  );
+}
 
 /**
  * Copies the Reel's clips and photos (and the footage under its animations) into the
@@ -481,36 +497,70 @@ async function localMedia(sandbox: Sandbox, id: string, props: ReelProps, option
   return { ...props, segments, ...(layers ? { layers } : {}) };
 }
 
-/** Renders the Reel composition with the given props and returns the MP4 bytes. */
 /**
- * A Reel rendered by Remotion. A frame of her video waits 60 s at most (the default 28 s gave up on a workshop busy
- * with another render, and the Reel fell back to the plain ffmpeg engine); `patient`, a second try: 2 minutes, two tabs.
+ * A Reel rendered by Remotion, in a render sandbox of its own (withRender). A frame of her video waits 60 s at most
+ * (the default 28 s gave up on a workshop busy with another render, and the Reel fell back to the plain ffmpeg engine).
+ * If it fails, `again` gives the props of a second, patient try (two tabs, two minutes: PATIENT_TRY), made in the same
+ * place on her files already copied and re-encoded, when its step still has the time for it (secondTryFits). Each try
+ * stops before its step ends (renderBoundSeconds): it fails there and gives its place back, instead of dying with its
+ * function (on 4 November, two second tries copied everything again and finished after their step's 800 s). Throws
+ * the last error.
  */
-export async function renderReelInSandbox(job: { id: string; props: ReelProps; patient?: boolean; slowmo?: SmoothFiles }): Promise<Buffer> {
-  return withRemotion(RENDER_WAIT_MS, async (sandbox) => {
+export async function renderReelInSandbox(job: {
+  id: string;
+  props: ReelProps;
+  slowmo?: SmoothFiles;
+  /** The second try's props, from the first try's (their files already in the sandbox) and its error. */
+  again?: (local: ReelProps, error: unknown) => ReelProps;
+}): Promise<Buffer> {
+  return withRender(async (sandbox, held) => {
     const dir = `${ROOT}/jobs/${job.id}`;
     const media = `${REMOTION}/build/public/jobs/${job.id}`;
-    try {
-      await bash(sandbox, 'rm -rf "$1" "$2" && mkdir -p "$1"', [dir, media]);
-      const props = await localMedia(sandbox, job.id, job.props, { smooth: true, made: job.slowmo });
+    // Files copied again after a copy that failed (some of its commands may still be writing): a folder of their own.
+    const recopy = `${job.id}-again`;
+    const render = async (props: ReelProps, how: RenderTry): Promise<Buffer> => {
       await sandbox.writeFiles([{ path: `${dir}/props.json`, content: JSON.stringify(props) }]);
+      const bound = renderBoundSeconds(timeLeft());
       await bash(
         sandbox,
-        `cd ${REMOTION} && npx remotion render build Reel "$1/out.mp4" --props="$1/props.json" --concurrency=${job.patient ? 2 : 4} --timeout=${job.patient ? 120000 : 60000} --offthreadvideo-cache-size-in-bytes=${job.patient ? 1000000000 : 1500000000} --codec=h264 --crf=18 --jpeg-quality=95 --pixel-format=yuv420p --enforce-audio-track --log=error`,
+        `cd ${REMOTION} && rm -f "$1/out.mp4" && ${bound ? `timeout -k 10 ${bound} ` : ""}npx remotion render build Reel "$1/out.mp4" --props="$1/props.json" ${remotionFlags(how)} --codec=h264 --crf=18 --jpeg-quality=95 --pixel-format=yuv420p --enforce-audio-track --log=error`,
         [dir],
-      );
+      ).catch((error: unknown) => {
+        // 124: stopped by its bound.
+        if (bound && error instanceof Error && error.message.startsWith("sandbox command failed (124)")) throw new Error(`render stopped after ${bound} s, before the end of its step`);
+        throw error;
+      });
       // Whole, or not sent: every frame decodes (a Reel was delivered cut at 11 s of 20, its file broken after).
       const check = await bash(sandbox, `${ROOT}/ffmpeg -hide_banner -v error -stats -i "$1/out.mp4" -map 0:v:0 -f null - 2>&1 | tr '\\r' '\\n' | grep -E "frame=|Invalid|rror" | tail -4 || true`, [dir]);
       const report = await check.stdout();
       const frames = Number(/frame=\s*(\d+)/.exec(report.split("\n").filter((l) => l.includes("frame=")).at(-1) ?? "")?.[1] ?? Number.NaN);
-      if (/Invalid|rror/.test(report) || (Number.isFinite(frames) && frames < job.props.durationInFrames - 2)) {
-        throw new Error(`render produced a broken file (${Number.isFinite(frames) ? `${frames} of ${job.props.durationInFrames} frames` : "unreadable"})`);
+      if (/Invalid|rror/.test(report) || (Number.isFinite(frames) && frames < props.durationInFrames - 2)) {
+        throw new Error(`render produced a broken file (${Number.isFinite(frames) ? `${frames} of ${props.durationInFrames} frames` : "unreadable"})`);
       }
       const mp4 = await sandbox.readFileToBuffer({ path: `${dir}/out.mp4` });
       if (!mp4?.length) throw new Error("render produced no file");
       return mp4;
+    };
+    let local: ReelProps | null = null;
+    try {
+      await bash(sandbox, 'rm -rf "$1" "$2" && mkdir -p "$1"', [dir, media]);
+      try {
+        local = await localMedia(sandbox, job.id, job.props, { smooth: true, made: job.slowmo });
+        // Sharing its sandbox (no place was free past its wait): gently, as a second try.
+        return await render(local, held ? FIRST_TRY : PATIENT_TRY);
+      } catch (error) {
+        if (!job.again) throw error;
+        if (!secondTryFits(timeLeft())) {
+          console.error("remotion render failed, no time left in its step for a second try", job.id, error);
+          throw error;
+        }
+        // The session given the time for it; her files copied and re-encoded once, for both tries.
+        await withTimeLeft(sandbox);
+        const props = job.again(local ?? (await localMedia(sandbox, recopy, job.props, { smooth: true, made: job.slowmo })), error);
+        return await render(props, PATIENT_TRY);
+      }
     } finally {
-      await bash(sandbox, 'rm -rf "$1" "$2"', [dir, media]).catch(() => {});
+      await bash(sandbox, 'rm -rf "$1" "$2" "$3"', [dir, media, `${REMOTION}/build/public/jobs/${recopy}`]).catch(() => {});
     }
   });
 }
