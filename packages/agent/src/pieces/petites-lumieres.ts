@@ -101,7 +101,8 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const WIN = hers ? "rgb(" + hers.join(",") + ")" : warm ? "#ffc56e" : "#b4201a";
   const GLOW = hers || (warm ? [255, 176, 92] : [255, 42, 36]);
   const TUBE = hers ? "rgb(" + hers.map((c) => Math.round(c + (255 - c) * 0.72)).join(",") + ")" : warm ? "#fff3df" : "#ffe1dc";
-  const layers = [];
+  // Her shot as the montage plays it, under its lights (so the layer always holds a picture, even with nothing to light).
+  const layers = [h(Footage, { key: "film", shot: cur, style: full })];
   const bloom = (k, a) => h("div", { key: "bloom", style: { ...full, mixBlendMode: "screen", opacity: a, filter: "brightness(1.15) contrast(2.4) blur(" + Math.max(6, Math.round(H * 0.012)) + "px)" } }, h(Footage, { shot: k, style: full }));
 
   // 1. Its first shot: her light dimmed off, lit on its spans (its first beat, three blinks, held). Lit: its own picture

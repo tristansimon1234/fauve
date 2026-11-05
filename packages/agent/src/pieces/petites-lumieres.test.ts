@@ -124,6 +124,10 @@ test("« Petites lumières » draws her light dimmed off and lit on its spans, t
   assert.ok(keyed(drawAt(60, { box: LAMP, light: 0.9 }), "shine") && !keyed(drawAt(60, { box: LAMP, light: 0.9 }), "fill"));
   // Nothing named: her highlights bloom on the same spans.
   assert.ok(keyed(drawAt(60, {}), "bloom") && !keyed(drawAt(20, {}), "bloom"));
+  // Her shot always under its lights, as the montage plays it: never an empty layer (the scene check refused one at its
+  // first image, nothing found to light).
+  assert.equal(keyed(drawAt(0, {}), "film")!.props.shot, 1);
+  assert.equal(keyed(drawAt(150, {}), "film")!.props.shot, 2);
   // Her windows: none before the first wave, the lowest row first, all twelve on its sixth; the original's red.
   const windows = (f: number, texts?: Record<string, string>) => keyed(drawAt(f, { parts: GRID, ...(texts ? { texts } : {}) }), "windows");
   assert.equal(windows(91), null);

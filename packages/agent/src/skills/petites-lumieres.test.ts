@@ -17,7 +17,9 @@ test("« Petites lumières » (v1): three still shots on its original's grid (83
   assert.equal(petitesLumieres.key, "petites-lumieres");
   assert.equal(petitesLumieres.version, 1);
   assert.equal(petitesLumieres.bpm, 83);
-  assert.deepEqual(petitesLumieres.shots, [3, 4]);
+  // Three shots as the original; a fourth, its verse, only for a longer Reel she asks for.
+  assert.deepEqual(petitesLumieres.shots, [3, 3]);
+  assert.equal(petitesLumieres.long, 4);
   const line = petitesLumieres.timeline(3, { end: false });
   assert.equal(line.shots.length, 3);
   // Its cuts on the original's images 124 and 200, its end on 295 (9,83 s).

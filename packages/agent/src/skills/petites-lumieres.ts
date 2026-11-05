@@ -19,8 +19,8 @@ import { beatSpans, toFrame, type MontageSkill, type SkillSound } from "../skill
 // sun in her sky, behind her roofs (her skyline read on her shot cuts it, her shot without its sky laid over it when the
 // engine has it); her last shot's column lit from the bottom, then everything off. Its words: none in the original; her
 // name, when the Reel wants words, lit like a neon in the calm part of her last shot and left on as the last light. A
-// fourth file adds a verse: one more bar, lit like the last shot and kept on to its cut, on the next stop's tick (its
-// second example has four shots). Her photos stay still, her videos play (the original's slow push and pull-back left
+// longer Reel she asks for adds a verse: one more bar, lit like the last shot and kept on to its cut, on the next stop's
+// tick (its second example has four shots). Her photos stay still, her videos play (the original's slow push and pull-back left
 // out: Tristan). Vertical full frame as the original when her files are upright; horizontal ones whole in a 16:9 band on
 // black, as its second example (Tristan: « format par défaut [comme ses vidéos], et changement à la demande du user »).
 
@@ -32,7 +32,7 @@ const FIRST = (FIRST_S * BPM) / 60;
 const CUT1 = 5.593;
 const CUT2 = 9.098;
 const END = 13.478;
-/** A verse (a fourth file): one more bar, cut on the tick of the next stop. */
+/** A verse (a fourth shot, for a longer Reel she asks for): one more bar, cut on the tick of the next stop. */
 const VERSE = 4;
 /** Its first shot's light, on from – to (beats): the opening hit, three blinks, then held. */
 const LAMP: [number, number][] = [
@@ -185,7 +185,7 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   }
 
   // 6. Its later shots: a column lit from the bottom in four steps after its cut; in the last one everything goes off at
-  // once, then the picture holds. A verse (a fourth file) keeps its column on to its cut.
+  // once, then the picture holds. A verse (a fourth shot, for a longer Reel) keeps its column on to its cut.
   if (cur >= 2 && n > 2) {
     const STEPS = [0, 1, 2, 3].map((k) => mark("step_" + k, NaN)).filter(Number.isFinite);
     const OFF = mark("off", 1e9);
@@ -241,7 +241,9 @@ export const petitesLumieres: MontageSkill = {
   key: "petites-lumieres",
   version: 1,
   bpm: BPM,
-  shots: [3, 4],
+  // Three shots, as the original (three videos giving several passages each still make three); a verse for a longer Reel she asks for.
+  shots: [3, 3],
+  long: 4,
   files: [3, 4],
   how: "Trois images immobiles de son lieu le soir où seules les lumières bougent, sur un beat qui s'arrête net trois fois : sa lampe (ou son enseigne, un néon) clignote sur la musique puis tient allumée et s'éteint ; ses fenêtres se remplissent de rouge par vagues du bas vers le haut, un soleil rouge derrière ses toits ; une colonne de fenêtres s'allume du bas vers le haut, puis tout s'éteint d'un coup ; son nom, quand il faut des mots, reste allumé comme un néon, la dernière lumière. En vertical plein écran ; ses images horizontales entières dans une bande 16:9 sur du noir.",
   end: true,
