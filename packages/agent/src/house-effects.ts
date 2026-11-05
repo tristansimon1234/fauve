@@ -160,6 +160,10 @@ export const HOUSE_EFFECTS: Record<string, HouseEffect> = {
     effet: "ses produits un par temps, sur chacun le même petit mot drôle (« Celui-là ») qui tombe d'un coup chaque fois ailleurs dans l'image, puis une hésitation tapée lettre à lettre et le dernier",
     il_faut: "une photo ou une courte vidéo de chacun de ses produits (cinq au moins) et un plan de toute sa série réunie",
   },
+  routine: {
+    effet: "la bande-annonce de sa journée en ouverture : un éclair de ses plans toutes les cinq images, sous son titre tapé lettre à lettre avec son curseur, une petite ligne fine dessous",
+    il_faut: "des plans variés de sa journée (sa préparation, son lieu, ses gens) et un titre de 2 à 4 mots",
+  },
 };
 
 /** The most of Edith's models one Reel borrows from: one charter, one music, never a patchwork. */

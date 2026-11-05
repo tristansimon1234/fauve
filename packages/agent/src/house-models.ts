@@ -1545,6 +1545,50 @@ export const HOUSE_MODELS: HouseModel[] = [
       why: "Le même mot répété sur chaque produit fait sourire et donne le rythme : chacun a son temps de gloire, et l'hésitation de la fin fait attendre le dernier, toute la série.",
     },
   }),
+  model({
+    key: "routine",
+    name: "Rituel du matin",
+    // Written on its original's fiche (v1 of its skill, docs/fiches/routine.md): a « day in my life » of 58,5 s kept
+    // within 45 s: its trailer of flashes under a title typed with its cursor, her ritual gesture by gesture at the
+    // counter, what she made from above, her place shot by shot, the rest of her day in its longest versions; its lo-fi
+    // beat at 90,73 BPM (Gemini heard 100 to 110 and a guitar), its soft natural light, no grain nor dark corners.
+    pitch: "La bande-annonce de ta journée sous un titre tapé lettre à lettre, puis ton rituel du matin geste par geste au comptoir, servi vu d'en haut, et ton lieu qui ouvre.",
+    needs: "ton rituel du matin filmé de face téléphone posé (une préparation geste par geste, en une ou plusieurs vidéos), ce que tu as préparé vu d'en haut, et 4 à 11 plans de ton lieu (ton enseigne, tes coins, ton équipe, toi au travail)",
+    files: [5, 22],
+    pair: "grotesque",
+    // No reference composition: its skill's code is its reference.
+    example: null,
+    // Its lo-fi beat, measured on its kicks (docs/fiches/routine.md: 35 of its 43 strongest low hits on its grid within 30 ms).
+    tempo: 90.73,
+    finish: { name: "Lumière du matin", hint: "lumière naturelle douce, blancs neutres, ombres chaudes, noirs un peu levés, sans grain ni coins sombres", contrast: -0.04, warmth: 0.04, fade: 0.04 },
+    look: {
+      name: "rituel du matin, titre tapé",
+      format: "pov",
+      hook: { kind: "pov", what: "treize éclairs de sa journée à venir, un tous les cinq images, sous un titre tapé lettre à lettre au milieu avec son curseur" },
+      text: {
+        amount: "une ligne",
+        composition: "un titre en minuscules italiques très serrées sur deux lignes au milieu de l'image, tapé lettre à lettre avec un curseur fin, crème et à plat, une petite ligne fine en italique dessous ; rien d'autre de tout le Reel",
+        case: "normal",
+        weight: "bold",
+        tracking: "tight",
+      },
+      colors: ["#f6e2c1"],
+      layout: "une bande-annonce de ses plans à venir en éclairs sous le titre, puis ses plans un à un, son rituel filmé de face téléphone posé ; en 16:9 sur du noir si ses vidéos sont en largeur",
+      moments: [
+        { at: 0, what: "la bande-annonce : 13 éclairs de 4 ou 5 images, chacun un moment d'un plan à venir dans l'ordre du Reel, sous le titre tapé lettre à lettre avec son curseur, puis sa petite ligne d'un coup ; tout part à la coupe" },
+        { at: 2.07, what: "son rituel au comptoir, filmé de face à hauteur de poitrine, téléphone posé : un geste par plan (0,4 à 1,6 s, coupes au même endroit), les ingrédients qui entrent un à un, chaque préparation finie présentée des deux mains" },
+        { at: 23, what: "ce qu'elle a préparé, posé et servi, vu d'en haut" },
+        { at: 24.4, what: "son lieu plan par plan : son enseigne, ses coins, ses gens, elle qui entre dans la salle, elle au travail, ses plans d'activité plus longs" },
+        { at: 42.2, what: "la suite de sa journée en plans courts, puis trois images noires, le son coupé net" },
+      ],
+      camera: "mixte",
+      grade: "natural",
+      motion: "epure",
+      music: "soft lo-fi hip-hop beat, mellow chords, swung kick, no vocals, 91 BPM",
+      ending: "le dernier plan de sa journée, puis trois images noires, le son coupé net",
+      why: "La bande-annonce promet la journée et le titre tapé accroche ; puis un rituel geste par geste, apaisant à regarder, et son lieu qui ouvre : intime et vrai, on a envie d'y aller.",
+    },
+  }),
 ];
 
 const BY_KEY = new Map(HOUSE_MODELS.map((m) => [m.key, m]));
@@ -1619,6 +1663,7 @@ export const HOUSE_WHEN: Record<string, { pour: string; pas_pour: string }> = {
   "court-metrage": { pour: "raconter sa journée, son quartier ou une sortie comme un petit film, une ouverture, une saison, de belles lumières (le matin, l'heure dorée)", pas_pour: "une offre à lire, quelqu'un qui parle, des vidéos sombres ou toutes en gros plan" },
   "titre-cinema": { pour: "son lieu ou une sortie racontés comme un court film signé de son nom : son métier en un mot, un lieu au soir, une escapade, une ambiance", pas_pour: "sans plan large et fixe où quelqu'un se tient avec du ciel au-dessus, une offre à lire, quelqu'un qui parle" },
   "celui-la": { pour: "montrer ses produits un par un avec humour et en rythme (une collection, des nouveautés, ses pièces, ses gâteaux, ses bouquets, ses réalisations)", pas_pour: "un lieu, quelqu'un qui parle, une offre à lire en détail, un seul produit" },
+  routine: { pour: "raconter son matin et son lieu (un café, une boulangerie, une boutique, un studio, un atelier) : sa préparation geste par geste, puis l'ouverture et sa journée", pas_pour: "une offre à lire, un produit seul, sans vidéo de sa préparation filmée téléphone posé" },
 };
 
 /** The models for Edith: their key, name, what they do, what they want, and what only she can film for one. */
