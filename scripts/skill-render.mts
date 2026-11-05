@@ -6,13 +6,17 @@
 //   node scripts/skill-render.mts --skill decode --clips a.mp4,b.mp4,c.mp4 \
 //     [--module packages/agent/src/skills/<key>.ts]   (a skill not in the library yet: its module, exporting it)
 //     --words '{"surtitre":"un samedi dans","titre":"le marais"}' [--end '{"title":"…","subtitle":"…"}'] \
-//     [--shots 10] [--bpm 90] [--settings '{"cases":"6x8"}'] [--fonts "Open Sans,Inter"] [--name "Café des Arts"] [--out reel.mp4] [--no-render]
+//     [--shots 10] [--bpm 90] [--settings '{"cases":"6x8"}'] [--fonts "Open Sans,Inter"] [--name "Café des Arts"] [--accent "#b5543a"] [--out reel.mp4] [--no-render]
 //     [--named '{"lumieres":"shop sign"}'] [--objects '{"1":{"src":"sign.webm","result":"result.json","id":"sign"}}']
+//     [--subjects '{"0":{"src":"her.png","result":"result.json","id":"her"}}']
 //
 // --bpm plays it at another tempo than its own (a longer Reel, a music's tempo), as skillFit would.
 // --named names its objects as the filler would (its « @slot » in its code); --objects lays the cut-outs the card made of
 // them (apps/render/track_objects.py, run with OBJECTS_CPU=1), by shot: its file (webm) and its reading in that run's
 // printed result (its boxes, outline and pieces), on that shot's passage of the plan.
+// --subjects lays her own cut-out on a shot, as the engine gets it for Subject and SubjectBox: on a photo, a PNG the
+// photo's size and its box (a photo's cut-out, sceneCutouts), on a video, a WebM of the passage and its boxes image by
+// image (media_assets.subjects); made locally by track_objects.py on her (« woman », with `photo` for a photo).
 // The shots its code sets a text in the clear area of (ClearBox) are read here as the engine reads them
 // (apps/render/clear_area.py, by PYTHON: a Python with OpenCV and numpy, `python3` by default); without it, the fallback.
 // Clips are local files (videos or photos); they are normalized at 30 images a second into the bundle's public folder,
@@ -29,7 +33,7 @@ import { buildReelProps } from "../packages/agent/src/motion.ts";
 import { HOUSE_MODELS } from "../packages/agent/src/house-models.ts";
 import { MONTAGE_SKILLS } from "../packages/agent/src/skill-library.ts";
 import { isClipSegment } from "../packages/agent/src/schemas.ts";
-import { clearPassages, objectKey, objectsDrawn, type ClearMap } from "../packages/agent/src/subject.ts";
+import { clearPassages, objectKey, objectsDrawn, subjectKey, type ClearMap } from "../packages/agent/src/subject.ts";
 import { skillLongest, skillPlan, skillShotCount, type MontageSkill, type SkillFile, type SkillFill } from "../packages/agent/src/skills.ts";
 
 const { values } = parseArgs({
@@ -44,8 +48,10 @@ const { values } = parseArgs({
     settings: { type: "string" },
     named: { type: "string" },
     objects: { type: "string" },
+    subjects: { type: "string" },
     fonts: { type: "string", default: "" },
     name: { type: "string", default: "Studio Test" },
+    accent: { type: "string" },
     out: { type: "string" },
     "no-render": { type: "boolean", default: false },
   },
@@ -121,6 +127,24 @@ for (const [shot, o] of Object.entries(JSON.parse(values.objects ?? "{}") as Rec
   subjects[objectKey(segment.clip_id, segment.in, segment.out, name)] = { src: `/public/jobs/${job}/${basename(target)}`, ...(reading.boxes ? { boxes: reading.boxes } : {}), ...(reading.contours ? { contours: reading.contours } : {}), ...(reading.parts ? { parts: reading.parts } : {}) };
   console.log(`object « ${name} » on shot ${shot}: ${reading.parts ? reading.parts.length / 4 : 0} pieces`);
 }
+// Her own cut-out on a shot (Subject without an object): a photo's, laid exactly over it, or a video passage's.
+const sceneCutouts: Record<string, { src: string; box: { x: number; y: number; w: number; h: number }; contour?: number[] }> = {};
+for (const [shot, o] of Object.entries(JSON.parse(values.subjects ?? "{}") as Record<string, { src: string; result: string; id: string }>)) {
+  const segment = plan.segments.filter(isClipSegment)[Number(shot)];
+  if (!segment) throw new Error(`--subjects: no shot ${shot}`);
+  const reading = (JSON.parse(readFileSync(resolve(o.result), "utf8")) as Record<string, { boxes?: (number[] | null)[]; contours?: (number[] | null)[] }>)[o.id];
+  if (!reading?.boxes?.length) throw new Error(`--subjects: no boxes for « ${o.id} » in ${o.result}`);
+  const target = `${media}/subject-${shot}-${createHash("sha1").update(resolve(o.src)).digest("hex").slice(0, 8)}${extname(o.src)}`;
+  execFileSync("cp", [resolve(o.src), target]);
+  const src = `/public/jobs/${job}/${basename(target)}`;
+  if (files.find((f) => f.id === segment.clip_id)?.photo) {
+    const [x, y, w, h] = reading.boxes.find(Boolean)!;
+    sceneCutouts[segment.clip_id] = { src, box: { x: x!, y: y!, w: w!, h: h! }, ...(reading.contours?.[0]?.length ? { contour: reading.contours[0] } : {}) };
+  } else {
+    subjects[subjectKey(segment.clip_id, segment.in, segment.out)] = { src, boxes: reading.boxes, ...(reading.contours ? { contours: reading.contours } : {}) };
+  }
+  console.log(`her cut-out on shot ${shot}: ${reading.boxes.length} box${reading.boxes.length > 1 ? "es" : ""}`);
+}
 // Where its texts are set in her shots (ClearBox): their clear areas read on her own files, as the engine reads them.
 const clears = clearPassages(plan, (id) => !files.find((f) => f.id === id)?.photo);
 if (clears.length) {
@@ -145,8 +169,9 @@ const props = buildReelProps(plan, {
   aspects: Object.fromEntries(files.map((f) => [f.id, f.aspect])),
   // A photo's shape, as the render gets it (without it, a composition takes every photo for an upright 3:4).
   photoAspects: Object.fromEntries(files.filter((f) => f.photo).map((f) => [f.id, f.aspect])),
-  brand: { name: values.name ?? "", ...(fonts.length ? { fonts } : {}) },
+  brand: { name: values.name ?? "", ...(fonts.length ? { fonts } : {}), ...(values.accent ? { accent: values.accent } : {}) },
   ...(Object.keys(subjects).length ? { subjects } : {}),
+  ...(Object.keys(sceneCutouts).length ? { sceneCutouts } : {}),
 });
 const out = resolve(values.out ?? `${ROOT}/${skill.key}.mp4`);
 writeFileSync(`${out}.plan.json`, JSON.stringify(plan, null, 1));
