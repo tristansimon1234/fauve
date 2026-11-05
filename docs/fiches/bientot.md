@@ -1,0 +1,84 @@
+# « Teaser qui se charge » (`bientot`) : fiche de l'original
+
+> Fiche d'un original : ce qu'on y voit, mesuré image par image, et les effets qu'on veut savoir refaire sur les vidéos de n'importe quel commerce (la méthode : `docs/modeles.md`, « La chaîne des modèles »). Les temps sont en secondes de l'original ; « temps » compte les temps de la grille de ses coupes (79 BPM) depuis sa première image.
+
+**L'original** : le Reel envoyé par Tristan (https://www.instagram.com/reel/DfSZOnLi2RN/), le teaser d'un atelier de couture, mesuré sur sa copie à 720 px (`house/originals/bientot.mp4` une fois gardé) : 6,63 s (199 images), 720 × 1280, 30 i/s, **vertical 9:16 plein cadre**, avec son (stéréo, 44,1 kHz, −14,2 LUFS, une plage de 0,3 LU : un son tassé, égal du début à la fin). **Noir et blanc** du début à la fin. Le modèle prend tout l'original.
+**Sa musique** : **pas de tempo régulier**. C'est un habillage sonore percussif : un lit serré de clics mécaniques (une machine à coudre, un obturateur), une ligne tonale vers 600 à 900 Hz, trois coups sourds de 808 (0,68 s, 4,32 s, puis le boum de 6,29 s), deux roulements de clics à 25 par seconde (5,36 – 5,48 s, puis **5,92 – 6,19 s, sous le logo, jusqu'au boum**), et, à 6,28 s, **un boum de 808 qui descend de 200 à 50 Hz** : les clics aigus s'arrêtent avec lui, il sonne jusqu'à la fin. Aucun silence. `measure.py` dit 136,75 BPM (sa pulsation ; un tiers des coupes seulement s'y accorde) ; la grille la plus saillante, essayée de 90 à 160 BPM sur chaque bande, ne dépasse pas 1,2 fois une grille au hasard ; et les coupes ne tombent pas sur ses attaques (18 ms de l'attaque la plus proche en médiane, comme des instants tirés au hasard). Le monteur a coupé sur une cadence d'images, pas sur le son. Pour le modèle, le tempo est donc **la grille de ses coupes : 79 BPM** (un temps toutes les 0,7595 s), chaque éclair un huitième de temps (un neuvième dans la course qui suit « Coming soon ») : ses 64 coupes y tombent toutes à une image près (0,32 image d'écart en moyenne), et ses trois coups sourds aussi (temps ⅞, 5⅔ et 8¼).
+**Mesuré avec** : `scripts/fiche/measure.py` (60 coupes, son tempo, ses « flashs » : des plans clairs), des planches à 30 i/s de toute la vidéo (4 planches de 60 images), la bande du compteur image par image, le minimum de chaque pixel sur les images de chaque texte (sa boîte exacte, ce qui reste blanc quand les plans changent dessous), la corrélation des 64 éclairs entre eux (huit reviennent tels quels), le son par bandes (sous 90 Hz, 90 – 250, 250 – 1 000, 1 – 4 kHz, au-dessus) et ses attaques à 2,5 ms près, et la lecture de Gemini (`house/breakdowns/bientot.json`).
+
+## Déroulé
+
+Temps : la grille de ses coupes (79 BPM, un huitième de temps = 2,85 images).
+
+| De – à (s) | Temps | Ce qu'on voit | Effets |
+|---|---|---|---|
+| 0 – 2,97 | 0 – 3,9 | 32 éclairs de 0,1 s (2 ou 3 images) de l'atelier, de près : le pied et l'aiguille d'une machine à coudre, des mains qui tiennent un tissu, un tissu coupé aux ciseaux cranteurs, une pelote d'épingles, un mètre ruban, un tissu à paillettes, du cuir. Au centre exact, un petit compteur blanc en serif monte de **1 % à 88 %**, 3 % toutes les 3 images | Effets 1, 2, 3 |
+| 1,80 – 1,90 | 2,4 | une vidéo horizontale entière dans une bande 16:9 sur du noir, le compteur par-dessus | Effet 5 |
+| 0,68 | ⅞ | premier coup sourd | Effet 7 |
+| 2,97 – 3,07 | 3,9 – 4 | deux images sans texte | — |
+| 3,07 – 4,53 | 4 – 6 | **« Coming soon » à la place du compteur**, même place, même lettre ; 18 éclairs plus rapides (0,083 s) : la machine, des mains, une image fixe vue deux fois ; à 4,33 s, sur le deuxième coup sourd, **sept éclairs du début reviennent** (dans le désordre, à reculons) | Effets 2, 4, 7 |
+| 4,53 – 5,90 | 6 – 7¾ | les quatre derniers de ces sept, puis **la mercerie** : des rangs de perles, une allée, des casiers de fils, des boîtes de boutons, un mur de boutons (deux panoramiques rapides) | Effet 2 |
+| 5,90 – 6,50 | 7¾ – 8½ | le noir, le badge rond de la marque en blanc, grand et centré (**à l'original, jamais recopié**) ; un roulement de clics monte | Effets 6, 7 |
+| 6,29 | 8¼ | le boum qui descend ; les clics s'arrêtent | Effet 7 |
+| 6,50 – 6,63 | 8½ – 8,7 | le nom de la marque en petites capitales fines espacées, sur le noir (**à l'original, jamais recopié**) ; 4 images : la vidéo s'arrête | Effet 6 |
+
+Caméra à la main, de très près, deux panoramiques rapides dans la mercerie (images 150 – 152, 168 – 170) ; ni zoom, ni poussée, ni fondu : des coupes franches, rien de ce que Tristan trouve cheap.
+
+## Effets (ce qu'on veut savoir refaire)
+
+### 1. Un compteur qui charge et s'arrête avant 100 %
+- **Mesuré** : au centre exact de l'image (49,9 % de la largeur, 49,8 % de la hauteur), en blanc pur, sans ombre ni contour ni fond. Ses chiffres font 41 px de haut sur 1 280 (3,2 % de la hauteur) ; « 45% » fait 12,1 % de la largeur. Un serif à fort contraste, étroit, droit (pas italique), le « % » collé au nombre. Il compte sur **sa propre horloge, pas sur les coupes** : 1 % sur les images 0 à 2, puis 3 % de plus toutes les 3 images (3 % à l'image 3, 6 % à l'image 6… 78 % à l'image 78), un seul saut de 4 (78 → 82 %), puis 85 et **88 %** (images 87 à 89) : 30 valeurs en 3 s. Les coupes tombent à côté (images 3, 5, 8, 11…, le compteur sur 3, 6, 9, 12…). Il ne va jamais à 100 % : c'est ce qui dit « bientôt ».
+- **Sur quoi** : n'importe quelles images ; il se lit sur toutes (blanc sur le noir et blanc dense). C'est l'idée qui sert : ce qui se prépare, une ouverture, une collection, une carte, un événement.
+- **Outil** : le code du modèle l'écrit, une valeur par image (`Count` existe, mais il compte en douceur, alors que celui-ci saute par paliers sur sa propre horloge). Une petite ombre serrée le garde lisible sur un plan blanc (l'original s'y perd une image ou deux), le contrôle des scènes la compte comme un contour.
+- **Réglage** : il s'arrête à 88 % (l'original) ou va jusqu'à 100 % (c'est prêt : une ouverture aujourd'hui).
+
+### 2. Des éclairs de 0,1 s : 64 en 6 s
+- **Mesuré** : 64 éclairs de l'image 0 à l'image 176, de 2 ou 3 images chacun : 32 pendant le compteur (2,84 images en moyenne), 18 plus rapides après « Coming soon » (2,5 images, de 3,03 à 4,53 s), puis 14 de 3 images (2,93) dans la mercerie. Sur la grille de 79 BPM : un huitième de temps, puis un neuvième, puis un huitième ; chaque coupe à une image près de l'original. Presque toutes sont des images différentes (un seul saut dans le même plan, images 124 – 129) ; quatre éclairs sont des images fixes (29 – 30, 99 – 100, 104 – 105, 145 – 146 : des photos, ou des images tenues). **Huit éclairs en rejouent un plus ancien, tels quels** (les mêmes images, dans le même sens) : l'image fixe de 99 revient à 104, puis de 130 à 146 sept éclairs du début reviennent d'affilée (ceux des images 96, 86, 52, 23, 20, 34 et 29 : presque à reculons), juste avant la mercerie, le deuxième coup sourd sur leur premier. D'abord les gestes et les matières (l'atelier), à la fin le lieu (la mercerie) : on voit d'abord ce qui se fabrique, puis d'où ça vient.
+- **Sur quoi** : les gros plans de son métier (des mains qui travaillent, une matière, un outil, une machine), puis son lieu et ce qui arrive (ses étagères, ses produits en rangées, sa vitrine, la salle). Chaque vidéo donne plusieurs éclairs, à des moments qui ne se ressemblent pas.
+- **Outil** : ses plans dans les cases du modèle (`Footage`), une case par éclair (56) ; les huit éclairs rejoués sont dessinés par son code (`Footage at`, la case rejouée depuis sa première image) : une case de moins pour chacun.
+- **Si rien ne s'y prête** (peu de fichiers) : chaque vidéo donne plus d'éclairs, à d'autres moments ; ses photos restent fixes.
+
+### 3. Un noir et blanc dense
+- **Mesuré** : gris pur (aucune couleur, à la valeur près), des noirs bouchés (17 % des pixels sous 16 ; le 1 % le plus sombre à 0,2), des blancs tenus sans brûler (95e centile à 215, 99e à 241), une médiane à 88 : contrasté et plutôt sombre. Pas de grain ajouté (une image fixe reste identique d'une image à l'autre), pas de vignettage (les coins vont de 0,46 à 0,89 fois le centre selon les plans : c'est leur sujet, pas un voile posé).
+- **Outil** : le code du modèle pose son noir et blanc sur ses plans (`grayscale`, un contraste plus fort, un peu plus sombre) ; la finition de son modèle n'y ajoute rien.
+- **Réglage** : ses vidéos dans leurs couleurs, quand elle le demande (une fleuriste, une pâtisserie).
+
+### 4. Son mot à la place du compteur
+- **Mesuré** : « Coming soon » arrive à l'image 92 (3,07 s), deux images après le dernier 88 %, à la même place (centre exact, 49,9 % × 50,0 %), dans la même lettre, un peu plus petite : ses capitales font 36 px de haut sur 1 280 (2,8 %), ses minuscules 26 (le rapport 0,72 de l'Instrument Serif, exactement), 38,8 % de la largeur. Blanc, sans ombre, tenu jusqu'au logo (5,90 s) pendant que les éclairs accélèrent. Sur un plan blanc, il se perd (images 112 – 113).
+- **Sur quoi** : ce qu'elle annonce, en deux à quatre mots : « Bientôt », « Ouverture samedi », « Nouvelle collection », « La carte d'hiver ». « Coming soon » est un mot de l'original, jamais repris : le sien.
+- **Outil** : `FitText` au centre, entre x 140 et 940 (le texte passe sous le milieu de l'image de quelques pixels).
+
+### 5. Une vidéo horizontale entière dans une bande sur du noir
+- **Mesuré** : un seul éclair (images 54 à 56) : une vidéo horizontale entière (1,77) dans une bande de 31,7 % de la hauteur, centrée, sur du noir ; le compteur continue par-dessus.
+- **Outil** : `Footage` dans une boîte à la forme de sa vidéo, sur le fond noir de la composition. Réglage « format » : comme ses vidéos (par défaut : les verticales en plein cadre, une horizontale entière dans sa bande, une carrée dans son carré), tout en plein cadre, ou tout dans une bande 16:9.
+
+### 6. Son logo, puis son nom, sur le noir
+- **Mesuré** : à 5,90 s, le noir pur, et un badge rond blanc de 75 % de la largeur (x 12 – 87 %, y 31 – 74 %, centré à 49,6 % × 52,4 %) : un cercle de points, « MAISON DE COUTURE » en arc, « LIFE », un papillon gravé. À 6,50 s, le nom « MAISON LIFE » seul en capitales fines très espacées, 50 % de la largeur, ses capitales à 3,3 % de la hauteur, au centre exact. Tout cela est **à l'original, jamais recopié** (son badge, son papillon, son nom).
+- **Sur quoi** : son logo (un PNG, en blanc s'il est sombre et d'une couleur), puis son nom.
+- **Outil** : `Img` pour son logo, `FitText` pour son nom (sa police de texte, capitales espacées).
+- **Si rien ne s'y prête** : sans logo, son nom seul dès le noir ; son nom tenu assez longtemps pour se lire (l'original le coupe après 4 images, la vidéo finit là).
+
+### 7. Le son : deux coups sourds, un roulement, un boum qui descend
+- **Mesuré** : voir « Sa musique » : les coups sourds de 0,68 s et 4,32 s (le second sur le retour des sept éclairs), le roulement de clics à 25 par seconde qui monte sous le logo (5,92 – 6,19 s), le boum de 6,29 s qui descend de 200 à 50 Hz, les clics arrêtés avec lui, son grave qui sonne jusqu'à la fin.
+- **Outil** : les bruitages d'un skill (`sounds` : deux coups sourds, une rafale de clics qui monte, le boum) et la forme de sa musique (`music` : étouffée à partir du boum, comme si ses clics s'arrêtaient, puis fondue à la fin). La musique d'Edith est composée à son tempo, une boucle : un lit de clics mécaniques ne se compose pas à coup sûr (sa consigne le demande).
+
+## Format
+L'original est vertical 9:16, en plein cadre, un seul plan horizontal dans une bande. Réglage « format » : `auto` (par défaut : chaque plan comme filmé), `vertical`, `horizontal` (voir effet 5).
+
+## Ce que Gemini a vu, et ce qu'il a raté
+**Vu** : le format, le noir et blanc contrasté, les plans très serrés de l'atelier puis la mercerie, le compteur « 1% à 88% » (de 0 à 3,00 s : il s'arrête à 2,97 s), « Coming soon » au centre (3,00 – 5,87 s au lieu de 3,07 – 5,90), le badge sur le noir (5,87 – 6,40 s au lieu de 5,90 – 6,50) puis le nom (6,40 – 6,56 au lieu de 6,50 – 6,63), des panoramiques rapides dans la mercerie, des coupes franches.
+
+**Raté** : le compteur monte **à chaque coupe** selon lui : il monte sur sa propre horloge, 3 % toutes les 3 images, à côté des coupes ; sa lettre « style Didot, Regular / Italic » est un serif étroit droit, et sa boîte (x 40 %, y 47 %) est au centre exact ; il voit **5 plans** quand il y a 64 éclairs (de 2 ou 3 images), et ni les huit éclairs rejoués, ni la vidéo horizontale dans sa bande ; sa musique « s'arrête net sur le carton logo final » : elle ne s'arrête jamais, un roulement monte sous le logo, puis un boum descend, seuls les clics s'arrêtent ; ses « claques à chaque cut » : les coupes ne tombent pas sur le son ; son **128 BPM** « confiance haute » n'est le tempo de rien (aucune grille ne ressort), même si ses trois coups sourds tombent à 8 puis 4 temps d'une grille à 128 ; sa « texture granuleuse » : il n'y a pas de grain. `measure.py`, lui, voyait 136,75 BPM (une pulsation de ses clics, à laquelle un tiers des coupes s'accorde), 60 coupes (il en manque quatre de 2 images) et treize « flashs » qui sont des plans clairs.
+
+## Ce qu'il faut filmer
+Des gros plans, à la main, sans trembler : une dizaine de vidéos de 5 à 15 s de ses gestes (ses mains qui travaillent, une machine, un outil, une matière de près, ce qui se prépare), puis trois ou quatre de son lieu et de ce qui arrive (ses étagères, ses produits alignés, sa vitrine, la salle), en vertical de préférence ; des photos aussi (elles restent fixes). Rien de ralenti. Son logo (un PNG), ce qui arrive en deux à quatre mots, et une date si elle veut la dire à la fin.
+
+## Le modèle v1 (5 novembre)
+`skills/bientot.ts`, version 1, dans la bibliothèque (à valider sur /admin). 79 BPM (de 64 à 95), 8,17 s à son tempo (de 6,8 à 10,1 s), 9,87 s avec une carte de fin.
+- **Ses éclairs** : 56 cases d'un éclair chacune (un huitième de temps sous le compteur, un neuvième après son mot, un huitième dans son lieu), les huit éclairs rejoués de l'original dessinés par son code depuis la première image de la case rejouée (le temps d'un éclair rejoué est à la case d'avant sur la ligne principale) : ses 64 coupes à une image près de l'original.
+- **Le compteur** : au centre exact, dans sa police de titre (l'Instrument Serif de la paire « Éditorial » quand elle a choisi le modèle), ses chiffres à 3,2 % de la hauteur, blanc avec une ombre serrée, 30 valeurs de 1 à 88 % (celles de l'original, son saut de 4 compris) sur sa propre horloge ; jusqu'à 100 % par le réglage « compteur ».
+- **Son mot** (case `bientot`, 24 signes) à la même place sur le temps 4, ses capitales à 2,8 % de la hauteur, jusqu'au logo.
+- **Sa fin** : le noir sur le temps 7¾, son logo (blanc s'il est sombre d'une couleur), puis son nom (case `nom`, 18 signes) en capitales espacées sur le temps 8½, tenu 1,7 s ; sans logo, son nom dès le noir ; sa carte de fin (en option) après son nom, sur le noir.
+- **Le son** : deux coups sourds (temps ⅞ et 5⅔), une rafale de clics à 25 par seconde qui monte du logo au boum, le boum qui descend (temps 8¼, 2,5 s), la musique étouffée à partir du boum puis fondue.
+- **Réglages** : `compteur` (88, 100), `couleur` (noir et blanc, couleur), `format` (auto, vertical, horizontal).
+- **Ce qui manque** : le lit de clics mécaniques de l'original, qu'une musique composée en boucle n'a pas à coup sûr (sa consigne au compositeur le demande, ses bruitages le portent aux moments forts).
