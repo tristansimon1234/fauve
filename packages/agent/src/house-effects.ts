@@ -168,6 +168,10 @@ export const HOUSE_EFFECTS: Record<string, HouseEffect> = {
     effet: "son enseigne sous quatre à six angles, au même endroit et à la même taille, coupée de plus en plus vite sur un roulement, puis un flash, le noir et une brûlure de pellicule",
     il_faut: "quatre à six plans du même objet (son enseigne, son néon, sa porte) pris de différents endroits",
   },
+  bientot: {
+    effet: "ses plans en éclairs de 0,1 s en noir et blanc pendant qu'un petit compteur en serif charge au centre jusqu'à 88 %, puis le mot de ce qui arrive à sa place",
+    il_faut: "plusieurs vidéos de gestes et de matières de près (des mains au travail, un outil, ce qui se prépare), et ce qui arrive en quelques mots",
+  },
 };
 
 /** The most of Edith's models one Reel borrows from: one charter, one music, never a patchwork. */
