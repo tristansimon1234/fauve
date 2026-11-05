@@ -2111,3 +2111,269 @@ test("« Plans fixes de cinéma » (v3): horizontal 4:3 on black as its original
   assert.equal(plan.layers![0]!.motion.texts!.format, "vertical");
   assert.deepEqual(plan.skill, { key: "plans-fixes", version: 3, settings: { format: "vertical" } });
 });
+
+// ——— « Titre derrière le décor » v2, written again on its original's fiche (docs/fiches/titre-derriere.md) ————————————
+
+type TdBox = { x: number; y: number; w: number; h: number };
+/**
+ * What its Scene draws at a frame, as drawScene does, with what the engine reads before the render given: a cut-out's
+ * box (SubjectBox), its outline (SubjectOutline, an SVG path) and its pieces (SubjectParts), by shot and object
+ * (« 0#rooftops », « 9 » for her subject); Subject a named node.
+ */
+function drawCutOuts(code: string, frame: number, props: Record<string, unknown>, read: { boxes?: Record<string, TdBox>; outlines?: Record<string, string>; parts?: Record<string, TdBox[]> } = {}): Drawn {
+  const React = { createElement: (type: unknown, p: Record<string, unknown> | null, ...children: unknown[]): Drawn => ({ type, props: p ?? {}, children }), Fragment: "Fragment" };
+  const interpolate = (x: number, [a, b]: [number, number], [y0, y1]: [number, number]) => y0 + (y1 - y0) * Math.min(1, Math.max(0, (x - a) / (b - a || 1)));
+  const key = (shot: { segment?: number } | undefined, object?: string) => `${shot?.segment ?? "?"}${object ? `#${object}` : ""}`;
+  const scope: Record<string, unknown> = {
+    AbsoluteFill: "AbsoluteFill",
+    FitText: "FitText",
+    Footage: "Footage",
+    Subject: "Subject",
+    useCurrentFrame: () => frame,
+    interpolate,
+    ClearBox: (_shot: unknown, _frame: number, _laid: unknown, options?: { fallback?: unknown }) => options?.fallback ?? null,
+    SubjectBox: (shot: { segment?: number } | undefined, _frame: number, _laid: unknown, object?: string) => read.boxes?.[key(shot, object)] ?? null,
+    SubjectOutline: (shot: { segment?: number } | undefined, _frame: number, _laid: unknown, object?: string) => read.outlines?.[key(shot, object)] ?? null,
+    SubjectParts: (shot: { segment?: number } | undefined, _frame: number, _laid: unknown, object?: string) => read.parts?.[key(shot, object)] ?? [],
+  };
+  const make = new Function("React", ...Object.keys(scope), `"use strict";\n${code}\nreturn Scene;`) as (...args: unknown[]) => (p: Record<string, unknown>) => Drawn;
+  return make(React, ...Object.values(scope))(props);
+}
+
+/** The original's cuts (its images, 30 i/s, measured image by image), and its last image: 23 shots in 12,03 s. */
+const TD_CUTS = [0, 101, 133, 139, 144, 150, 174, 187, 204, 221, 275, 306, 310, 313, 317, 320, 324, 328, 331, 335, 338, 342, 346];
+/** Its music's first beat: its image 2,1 (0,07 s). Its model starts on it, its composed music's first beat. */
+const TD_FIRST_BEAT = 2.1;
+
+test("« Titre derrière le décor » (v2) cuts where its original does, on its own music (82,9 BPM), stopped one beat a bar", async () => {
+  const { titreDerriere } = await import("./skills/titre-derriere.ts");
+  const { skillPlan } = await import("./skills.ts");
+  assert.equal(titreDerriere.version, 2);
+  assert.equal(titreDerriere.bpm, 82.9);
+  const line = titreDerriere.timeline(23, { end: false });
+  // Its 23 shots, each cut within two images of the original's, counted from their music's first beat (the original
+  // shows two images before it, the model none: its music's first beat is its first image).
+  assert.equal(line.shots.length, TD_CUTS.length);
+  line.shots.forEach((s, i) => {
+    const at = Math.round(s.start * 30);
+    if (i) assert.ok(Math.abs(at - (TD_CUTS[i]! - TD_FIRST_BEAT)) <= 2, `shot ${i + 1}: image ${at}, the original's ${TD_CUTS[i]} (its beat at ${TD_FIRST_BEAT})`);
+  });
+  assert.ok(Math.abs(line.duration - (12.03 - 0.07)) < 0.05, `${line.duration} s`);
+  // Its burst: eleven shots of 3 or 4 images from beat 14 (the original: 4 3 4 3 4 4 3 4 3 4 4).
+  const burst = line.shots.slice(11, 22).map((s) => Math.round((s.end - s.start) * 30));
+  assert.ok(burst.every((l) => l === 3 || l === 4) && burst.reduce((a, b) => a + b, 0) === 40, JSON.stringify(burst));
+  // Its title rises from two images before the hit (half a beat in), its small words from the hit; both go with the cut.
+  const hit = line.marks.hit!;
+  assert.ok(Math.abs(hit - (12 - TD_FIRST_BEAT)) <= 1.5, `hit ${hit}`);
+  assert.equal(Math.round(line.texts.titre!.from * 30), hit - 2);
+  assert.equal(Math.round(line.texts.surtitre!.from * 30), hit);
+  assert.equal(line.texts.titre!.to, line.shots[1]!.start);
+  // Its paper from the music's return (image 47), its wave (67), the wheel's pieces (162), the wall's flashes (253 and
+  // 256), its next shot's silhouette (263): within two images of the original's.
+  for (const [name, image] of [["chase", 47], ["wave", 67], ["pieces", 162], ["flash", 253], ["ghost", 263]] as const)
+    assert.ok(Math.abs(line.marks[name]! - (image - TD_FIRST_BEAT)) <= 2, `${name}: ${line.marks[name]}, the original's ${image}`);
+  // Its music: silent to beat 2 but for the whoosh into the hit, then stopped dead one beat in every bar (the original's
+  // 3,60–4,40 · 6,55–7,30 · 9,40–10,20 s, from its first beat), cut dead with the picture.
+  const beat = 60 / 82.9;
+  const r3 = (x: number) => Math.round(x * 1000) / 1000;
+  assert.deepEqual(line.music, {
+    pauses: [{ from: 0, to: r3(2 * beat) }, { from: r3(5 * beat), to: r3(6 * beat) }, { from: r3(9 * beat), to: r3(10 * beat) }, { from: r3(13 * beat), to: r3(14 * beat) }],
+    end: { at: line.duration },
+  });
+  const stops: [number, number][] = [[3.6, 4.4], [6.55, 7.3], [9.4, 10.2]];
+  line.music!.pauses!.slice(1).forEach((p, i) => assert.ok(Math.abs(p.from - (stops[i]![0] - 0.07)) < 0.1 && Math.abs(p.to - (stops[i]![1] - 0.07)) < 0.1, JSON.stringify(p)));
+  // Its cuts on the music's returns (beats 6, 10, 14) and the calm shots over its stops.
+  for (const b of [6, 10, 14]) assert.ok(line.shots.some((s) => Math.abs(s.start - b * beat) <= 1 / 30), `a cut on beat ${b}`);
+  // Its sounds: the low whoosh that rises into the hit, and one dry knock in the third stop (the original's 6,96 s).
+  assert.deepEqual(line.sounds?.map((s) => [s.at, s.sound]), [[r3(0.5 * beat), "low whoosh rising into a deep bass hit"], [r3(9.52 * beat), "single dry drum hit"]]);
+  assert.ok(Math.abs(line.sounds![1]!.at - (6.96 - 0.07)) < 0.02);
+  // Fewer shots: a shorter burst from beat 14, the same end, just after the snare; more (a length she asks): bars of a
+  // held shot and a calm one on the music's stop before it, its sections where they were.
+  const fewer = titreDerriere.timeline(14, { end: false });
+  assert.equal(fewer.shots.length, 14);
+  assert.deepEqual(fewer.shots.slice(0, 12).map((s) => s.start), line.shots.slice(0, 12).map((s) => s.start));
+  assert.equal(fewer.duration, line.duration);
+  const longer = titreDerriere.timeline(35, { end: false });
+  assert.equal(longer.shots.length, 35);
+  assert.deepEqual(longer.shots.slice(0, 11).map((s) => s.start), line.shots.slice(0, 11).map((s) => s.start));
+  assert.ok(Math.abs(longer.duration - 30) < 1, `${longer.duration} s`);
+  assert.equal(longer.music!.pauses!.length, 4 + 6);
+  // With an ending card, its last shot held whole bars of two beats longer (the card's 1,6 s), its cuts the same.
+  const ended = titreDerriere.timeline(23, { end: true });
+  assert.deepEqual(ended.shots.slice(0, -1), line.shots.slice(0, -1));
+  const held = (ended.duration - line.duration) / beat;
+  assert.ok(ended.duration - line.duration >= 1.6 && Math.abs(held - 2 * Math.round(held / 2)) < 0.05, `${ended.duration} s`);
+  // Its finish keeps the original's warmth and contrast, without the catalogue's grain nor dark corners.
+  assert.deepEqual(titreDerriere.finish, { contrast: 0.16, warmth: 0.12, grain: 0, vignette: 0 });
+  // On the plan: valid, its music's shape and its sounds kept.
+  const files = Array.from({ length: 12 }, (_, i) => ({ id: `v${i}`, photo: false, seconds: 12 }));
+  const plan = skillPlan({ skill: titreDerriere, name: "Titre derrière le décor", files, fill: { shots: Array.from({ length: 23 }, (_, i) => ({ file: files[i % 12]!.id, at: i < 12 ? 1 : 6 })), texts: { surtitre: "un samedi à", titre: "Brighton" }, end: null } });
+  assert.ok(editPlanSchema.safeParse(plan).success);
+  assert.equal(plan.music_shape?.pauses?.length, 4);
+  assert.deepEqual(plan.sounds?.map((s) => s.skill), [true, true]);
+});
+
+test("« Titre derrière le décor » (v2): its scenery named by the filler passes in front of its title, then turns to paper piece by piece", async () => {
+  const { titreDerriere } = await import("./skills/titre-derriere.ts");
+  const { skillCode } = await import("./skills.ts");
+  const { objectsDrawn, drawsSubject, OBJECT_MAX } = await import("./subject.ts");
+  // Unnamed (nothing in her shots fits), no object; named, the four it follows, each on its shot, within a Reel's four.
+  assert.deepEqual(objectsDrawn(titreDerriere.code), []);
+  const code = skillCode(titreDerriere, { decor: "rooftops", morceaux: "every lamp", enseigne: "shop sign", cadres: "every frame" });
+  assert.deepEqual(
+    objectsDrawn(code).sort((a, b) => a.shot - b.shot),
+    [{ shot: 0, name: "rooftops" }, { shot: 5, name: "every lamp" }, { shot: 7, name: "shop sign" }, { shot: 9, name: "every frame" }],
+  );
+  assert.ok(objectsDrawn(code).length <= OBJECT_MAX);
+  const { checkMotionCode } = await import("./motion-scene.ts");
+  assert.deepEqual(checkMotionCode(code), []);
+  // Her subject too: on her first shot, the wall's big thing in front, the next shot's silhouette.
+  assert.ok(drawsSubject(code));
+  assert.deepEqual(titreDerriere.objects?.map((o) => [o.slot, o.shot]), [["decor", 0], ["morceaux", 5], ["enseigne", 7], ["cadres", 9]]);
+  // Its own colours, measured on the original: never its old lighter red nor a light edge around the letters.
+  assert.match(code, /#640005/);
+  assert.doesNotMatch(code, /#7a1414|textShadow: "0 0 1px rgba\(251/);
+  const line = titreDerriere.timeline(23, { end: false });
+  const shots = line.shots.map((s, i) => ({ src: `/v${i}.mp4`, aspect: 16 / 9, from: Math.round(s.start * 30), durationInFrames: Math.round((s.end - s.start) * 30), kind: "video", segment: i }));
+  const cut = shots[1]!.from;
+  const reelTexts = [
+    { text: "un samedi à", role: "caption", from: line.marks.hit, to: cut, emphasis: [] },
+    { text: "Brighton", role: "hook", from: line.marks.hit! - 2, to: cut, emphasis: [] },
+  ];
+  const marks = Object.fromEntries(Object.entries(line.marks).map(([k, v]) => [k, String(v)]));
+  const props = { width: 1080, height: 1920, durationInFrames: Math.round(line.duration * 30), brand: { name: "Brighton Pier", displayFont: "Archivo Black", bodyFont: "Caveat" }, shots, reelTexts, end: null, texts: marks };
+  // The rooftops' top at 300 px of its 4:3 frame (1080 × 810): its foot half a capital under it.
+  const read = { boxes: { "0#rooftops": { x: 100, y: 250, w: 800, h: 400 } }, parts: { "0#rooftops": [500, 100, 300, 700, 900].map((x) => ({ x, y: 260, w: 90, h: 300 })) } };
+  const draw = (f: number, r: Parameters<typeof drawCutOuts>[3] = read) => drawCutOuts(code, f, props, r);
+  const frameBox = (tree: Drawn) => drawnNodes(tree).find((n) => n.type === "div" && styleOf(n).overflow === "hidden" && styleOf(n).top === 555)!;
+  // Its title's box: the only text box of its first shot (its letters one span each while the wave runs).
+  const titleBox = (tree: Drawn) => drawnNodes(tree).find((n) => n.type === "FitText" && heldText(n).replace(/\s/g, "").includes("BRIGHTON"));
+  // Its title rises from below onto the hit in three images, blurred, and lands: 0,65 · 0,29 · 0,09 · 0,015 of its capitals.
+  const lifts = [9, 10, 11, 12, 13, 14].map((f) => {
+    const div = drawnNodes(titleBox(draw(f))!).find((n) => n.type === "div" && /translateY/.test(String(styleOf(n).transform)) && drawnText(n).includes("BRIGHTON"))!;
+    return Number(/translateY\((-?[\d.]+)px\)/.exec(String(styleOf(div).transform))![1]);
+  });
+  assert.ok(lifts.every((l, i) => i === 0 || l < lifts[i - 1]! || l === 0) && lifts[0]! > 90 && lifts.at(-1) === 0, JSON.stringify(lifts));
+  assert.equal(titleBox(draw(8)), undefined);
+  // Its box's foot half a capital (about its width over its 8 letters) under the rooftops' top, its width 90,7 % of the frame's.
+  const fit = titleBox(draw(30))!.props.style as { left: number; top: number; width: number; height: number };
+  assert.ok(Math.abs(fit.top + fit.height - (250 + (0.5 * 980) / 8)) <= 1, JSON.stringify(fit));
+  assert.equal(fit.width, Math.round(1080 * 0.907));
+  // Its outline, when read: the second highest of its tops across the title's width (a pole rising past it in one sixth).
+  const footOf = (r: Parameters<typeof drawCutOuts>[3]) => {
+    const s = titleBox(draw(30, r))!.props.style as { top: number; height: number };
+    return s.top + s.height;
+  };
+  const skyline = "M 100 300 C 250 280 400 100 420 100 C 600 290 750 310 900 320 C 1000 330 1000 330 1000 330";
+  assert.ok(Math.abs(footOf({ ...read, outlines: { "0#rooftops": skyline } }) - (280 + (0.5 * 980) / 8)) <= 1);
+  // Without anything named in front: the bottom of its sky, else the original's place, its foot at 41,3 %.
+  const bare = titleBox(draw(30, {}))!.props.style as { top: number; height: number };
+  assert.equal(bare.top + bare.height, Math.round(810 * 0.413));
+  // What rises past its highest place is not laid over it: the title in front, at its sky's or the original's place.
+  const towering = { ...read, outlines: { "0#rooftops": "M 100 40 C 300 40 500 40 700 40 C 900 40 1000 40 1000 40" } };
+  assert.equal(footOf(towering), Math.round(810 * 0.413));
+  assert.ok(!drawnNodes(frameBox(draw(30, towering))).some((n) => n.type === "Subject" && n.props.object === "rooftops" && !n.props.fill));
+  // The rooftops cut out over it, then her when her head rises into it (never when she towers over it).
+  const order = (tree: Drawn) => frameBox(tree).children.flat(Infinity).filter((c): c is Drawn => Boolean(c && typeof c === "object" && "type" in c));
+  const kids = order(draw(30));
+  const at = (pred: (n: Drawn) => boolean) => kids.findIndex((n) => drawnNodes(n).some(pred));
+  assert.ok(at((n) => n.type === "FitText") < at((n) => n.type === "Subject" && n.props.object === "rooftops"));
+  const withHer = (y: number) => drawnNodes(frameBox(draw(30, { ...read, boxes: { ...read.boxes, "0": { x: 400, y, w: 200, h: 500 } } }))).some((n) => n.type === "Subject" && n.props.shot === 0 && !n.props.object && !n.props.fill);
+  assert.equal(withHer(240), true);
+  assert.equal(withHer(60), false);
+  // From the music's return: its pieces in paper white one at a time, left to right, three images each.
+  const lit = (f: number) => {
+    const clip = drawnNodes(frameBox(draw(f))).find((n) => n.type === "div" && /inset/.test(String(styleOf(n).clipPath)) && drawnNodes(n).some((m) => m.type === "Subject" && m.props.fill === "#EFEDE9"));
+    return clip ? Number(/inset\(\d+px \d+px \d+px (\d+)px\)/.exec(String(styleOf(clip).clipPath))![1]) : null;
+  };
+  const chase = line.marks.chase!;
+  assert.equal(lit(chase - 1), null);
+  const pad = Math.round(810 * 0.012);
+  assert.deepEqual([0, 3, 6, 9, 12].map((d) => lit(chase + d)), [100, 300, 500, 700, 900].map((x) => x - pad));
+  assert.equal(lit(chase + 15), null);
+  // Then the white wave: one letter at a time, never two, left to right, 2 or 3 images each.
+  const wave = line.marks.wave!;
+  const litLetters: number[] = [];
+  for (let f = wave - 2; f < cut; f++) {
+    const spans = drawnNodes(titleBox(draw(f))!).filter((n) => n.type === "span" && styleOf(n).color === "#FCF8F9");
+    assert.ok(spans.length <= 1, `image ${f}: ${spans.length} letters lit`);
+    if (spans.length) litLetters.push(f);
+  }
+  assert.equal(litLetters[0], wave);
+  assert.ok(litLetters.length >= 8 * 2 && litLetters.length <= 8 * 3, `${litLetters.length} images`);
+});
+
+test("« Titre derrière le décor » (v2): its sign blinks, the wall's big thing flashes twice, the next shot's silhouette, its zoom blur", async () => {
+  const { titreDerriere } = await import("./skills/titre-derriere.ts");
+  const { skillCode } = await import("./skills.ts");
+  const code = skillCode(titreDerriere, { enseigne: "neon sign", cadres: "every arch" });
+  const line = titreDerriere.timeline(23, { end: false });
+  const shots = line.shots.map((s, i) => ({ src: `/v${i}.mp4`, aspect: 16 / 9, from: Math.round(s.start * 30), durationInFrames: Math.round((s.end - s.start) * 30), kind: "video", segment: i }));
+  const marks = Object.fromEntries(Object.entries(line.marks).map(([k, v]) => [k, String(v)]));
+  const props = { width: 1080, height: 1920, durationInFrames: Math.round(line.duration * 30), brand: { name: "Studio", displayFont: "Archivo Black", bodyFont: "Caveat" }, shots, reelTexts: [], end: null, texts: marks };
+  const subjects = (f: number) => drawnNodes(drawCutOuts(code, f, props)).filter((n) => n.type === "Subject");
+  // Its sign in paper white over the last eight images of its shot, one in two, irregular: 1 0 1 0 1 1 0 1.
+  const signCut = shots[7]!.from + shots[7]!.durationInFrames;
+  const blinks = Array.from({ length: 10 }, (_, i) => subjects(signCut - 9 + i).filter((n) => n.props.object === "neon sign").length);
+  assert.deepEqual(blinks, [0, 1, 0, 1, 0, 1, 1, 0, 1, 0]);
+  // The wall's big thing (her subject there) in paper white for one image, twice, three images apart.
+  const flash = line.marks.flash!;
+  const white9 = (f: number) => subjects(f).some((n) => n.props.shot === 9 && !n.props.object && n.props.fill === "#EFEDE9");
+  assert.deepEqual([flash - 1, flash, flash + 1, flash + 2, flash + 3, flash + 4].map(white9), [false, true, false, false, true, false]);
+  // The next shot's subject, a still white silhouette at its place, from the beat to the cut that shows it.
+  const ghost = (f: number) => subjects(f).some((n) => n.props.shot === 10 && n.props.fill === "#EFEDE9");
+  assert.equal(ghost(line.marks.ghost! - 1), false);
+  assert.equal(ghost(line.marks.ghost!), true);
+  assert.equal(ghost(shots[10]!.from - 1), true);
+  assert.equal(ghost(shots[10]!.from), false);
+  // The shot towards her door opens on a zoom blur (copies of its picture, larger each), strong then less, then as filmed.
+  const copies = (f: number) => drawnNodes(drawCutOuts(code, f, props)).filter((n) => n.type === "Footage").length;
+  const door = shots[8]!.from;
+  assert.deepEqual([door - 1, door, door + 1, door + 2].map(copies), [1, 6, 6, 1]);
+  // Nothing in its frames named: the wall's subject turns white at once for 3 images from its cut.
+  const bare = skillCode(titreDerriere, {});
+  const plainWall = (f: number) => drawnNodes(drawCutOuts(bare, f, props)).some((n) => n.type === "Subject" && n.props.shot === 9 && n.props.fill === "#EFEDE9");
+  assert.deepEqual([0, 1, 2, 3].map((d) => plainWall(shots[9]!.from + d)), [true, true, true, false]);
+});
+
+test("« Titre derrière le décor » (v2): horizontal 4:3 on black as its original when her files are, full frame otherwise or on her word", async () => {
+  const { titreDerriere } = await import("./skills/titre-derriere.ts");
+  const { skillPlan, skillFillInput, skillSettings } = await import("./skills.ts");
+  const line = titreDerriere.timeline(23, { end: false });
+  const draw = (aspects: number[], frame: number, extra: Record<string, string> = {}) => {
+    const shots = line.shots.map((s, i) => ({ src: `/v${i}.mp4`, aspect: aspects[i % aspects.length]!, from: Math.round(s.start * 30), durationInFrames: Math.round((s.end - s.start) * 30), kind: "video", segment: i }));
+    const texts = { ...Object.fromEntries(Object.entries(line.marks).map(([k, v]) => [k, String(v)])), ...extra };
+    return drawCutOuts(titreDerriere.code, frame, { width: 1080, height: 1920, durationInFrames: 359, brand: { name: "Studio", displayFont: "Archivo Black", bodyFont: "Caveat" }, shots, reelTexts: [{ text: "Brighton", role: "hook", from: 9, to: 99, emphasis: [] }], end: null, texts });
+  };
+  const frameOf = (tree: Drawn) => {
+    const box = drawnNodes(tree).find((n) => n.type === "div" && styleOf(n).overflow === "hidden" && styleOf(n).backgroundColor === "#000000")!;
+    return { top: styleOf(box).top, height: styleOf(box).height };
+  };
+  const wide = [16 / 9];
+  const tall = [9 / 16];
+  // Her files mostly horizontal: the original's 4:3 picture (1080 × 810) at the middle of the frame, on black.
+  assert.deepEqual(frameOf(draw(wide, 120)), { top: 555, height: 810 });
+  assert.deepEqual(frameOf(draw([16 / 9, 16 / 9, 9 / 16], 120)), { top: 555, height: 810 });
+  // Mostly vertical: full frame; on her word, the other format.
+  assert.deepEqual(frameOf(draw(tall, 120)), { top: 0, height: 1920 });
+  assert.equal(frameOf(draw(wide, 120, { format: "vertical" })).height, 1920);
+  assert.equal(frameOf(draw(tall, 120, { format: "horizontal" })).top, 555);
+  // Its title across its width, in its upper half, its glyphs above the apps' buttons in both formats.
+  for (const aspects of [wide, tall]) {
+    const tree = draw(aspects, 40);
+    const { top } = frameOf(tree);
+    const fit = drawnNodes(tree).find((n) => n.type === "FitText")!.props.style as { left: number; top: number; width: number; height: number };
+    assert.ok(Math.abs(fit.left + fit.width / 2 - 540) <= 1 && fit.left >= 40, JSON.stringify(fit));
+    assert.ok(Number(top) + fit.top + fit.height < 940, JSON.stringify(fit));
+  }
+  // The setting: the filler sees it (the original's first, the default), the plan keeps a choice her words asked for.
+  assert.deepEqual(titreDerriere.settings?.map((s) => [s.name, s.choices.map((c) => c.value)]), [["format", ["auto", "horizontal", "vertical"]]]);
+  assert.deepEqual(skillSettings(titreDerriere, [{ name: "format", value: "auto" }]), {});
+  const files = Array.from({ length: 12 }, (_, i) => ({ id: `v${i}`, photo: false, seconds: 12 }));
+  const input = skillFillInput({ skill: titreDerriere, name: "Titre derrière le décor", n: 23, files, business: {}, request: "en vertical" });
+  assert.equal(input.reglages?.[0]?.nom, "format");
+  assert.deepEqual(input.objets?.map((o) => [o.slot, o.case]), [["decor", 1], ["morceaux", 6], ["enseigne", 8], ["cadres", 10]]);
+  const plan = skillPlan({ skill: titreDerriere, name: "Titre derrière le décor", files, fill: { shots: Array.from({ length: 23 }, (_, i) => ({ file: files[i % 12]!.id, at: 1 })), texts: { surtitre: "un samedi à", titre: "Brighton" }, end: null, settings: { format: "vertical" } } });
+  assert.equal(plan.layers![0]!.motion.texts!.format, "vertical");
+  assert.deepEqual(plan.skill, { key: "titre-derriere", version: 2, settings: { format: "vertical" } });
+});
