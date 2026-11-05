@@ -2,6 +2,7 @@ import "server-only";
 import {
   BAR_BEATS,
   BEAT_STEP,
+  cutsOnBeats,
   heardGaps,
   isClipSegment,
   isMotionSegment,
@@ -175,10 +176,10 @@ const underVoice = (sound: string) =>
  */
 function brief(plan: EditPlan, business: string | null, adjustments: string[], sound?: string, wish?: string): { description: string; tags: string[] } {
   if (wish) {
-    // Only what makes it hold on the video: one piece from the first second to the end.
+    // Only what makes it hold on the video: one piece from the first second to the end (a model's cuts stay on its beats under a voice too).
     const bpm = planBpm(plan);
     return {
-      description: `Music for an Instagram Reel of ${business ? `a ${business}` : "a neighbourhood business"}: ${wish}.${bpm && !plan.voice ? ` Around ${bpm} BPM.` : ""} One piece from the very first second to the end, without a silence.`.slice(0, 2000),
+      description: `Music for an Instagram Reel of ${business ? `a ${business}` : "a neighbourhood business"}: ${wish}.${bpm && cutsOnBeats(plan) ? ` Around ${bpm} BPM.` : ""} One piece from the very first second to the end, without a silence.`.slice(0, 2000),
       tags: [wish.slice(0, 40)],
     };
   }
@@ -189,9 +190,10 @@ function brief(plan: EditPlan, business: string | null, adjustments: string[], s
   const notes = adjustments.length ? ` Notes from the owner: ${adjustments.join("; ").slice(0, 300)}.` : "";
   // The cuts sit on this tempo's beats (snapToTempo), and the piece is set on them after (beatGrid):
   // it keeps the tempo exactly, its first beat at the start. Over a voice the cuts follow its
-  // phrases, the tempo only keeps the energy of the Reel.
+  // phrases, the tempo only keeps the energy of the Reel; but a model with a voice laid over it keeps
+  // its cuts on its beats.
   const bpm = planBpm(plan);
-  const tempo = !bpm ? "" : plan.voice ? ` Around ${bpm} BPM.` : ` ${bpm} BPM exactly, four beats to the bar, the first beat right at 0:00.`;
+  const tempo = !bpm ? "" : !cutsOnBeats(plan) ? ` Around ${bpm} BPM.` : ` ${bpm} BPM exactly, four beats to the bar, the first beat right at 0:00.`;
   return {
     description:
       // A voice never brings a sound of its own: the business's genre (else the energy's) stays under it.
@@ -296,14 +298,14 @@ export async function withMusic(params: {
   const sounds = music.mode === "model" ? [] : (params.sounds ?? []);
   if (!musicPlays(music, params.plan, params.fresh)) {
     // No music of hers, or a model that plays without any: the effects alone over its own sound (none on a Reel that
-    // takes the copied Reel's sound).
-    if (!sounds.length) return { mp4: params.mp4, music: "none" };
-    return { mp4: await muxAudioInSandbox(params.renderId, params.mp4, null, { sounds }), music: "none" };
+    // takes the copied Reel's sound), a voice laid over it at the level of a voice.
+    if (!sounds.length && !params.plan.voice) return { mp4: params.mp4, music: "none" };
+    return { mp4: await muxAudioInSandbox(params.renderId, params.mp4, null, { sounds, voiceOver: Boolean(params.plan.voice) }), music: "none" };
   }
 
   const signature = cutSignature(params.plan);
-  // The grid the cuts sit on (snapToTempo); none over a voice, whose phrases place the cuts.
-  const beat = params.plan.voice ? null : planBeat(params.plan);
+  // The grid the cuts sit on (snapToTempo); none over a voice, whose phrases place the cuts, but a model's under a voice laid over it.
+  const beat = cutsOnBeats(params.plan) ? planBeat(params.plan) : null;
   let mp3: Uint8Array | null = null;
   let made: "kept" | "new" = "kept";
   // Its beats on the Reel's clock once set on the cuts: its model's pauses come back on them.

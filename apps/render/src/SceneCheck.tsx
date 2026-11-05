@@ -1,6 +1,6 @@
 import { Component, createContext, useContext, useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import { AbsoluteFill, cancelRender, continueRender, delayRender } from "remotion";
-import { cellsUnder, decodeGrid, lostOn, outlined, parseColor, type Rgb, type SceneBackdrop } from "./contrast";
+import { cellsUnder, decodeGrid, lostOn, luminance, outlined, parseColor, type Rgb, type SceneBackdrop } from "./contrast";
 import { fitsPending } from "./Fit";
 import { fontsLoaded, loadFonts } from "./fonts";
 import { makeKit } from "./Kit";
@@ -97,6 +97,8 @@ export type SceneCheckProps = {
   backdrop?: SceneBackdrop;
   /** Its code reads what is said: it is given words said, and how many of them it writes is measured. */
   probeSpoken?: boolean;
+  /** A montage skill's composition: the pale grounds it paints are measured (FAUVE_GROUND), for a voice's subtitles laid over it. */
+  probeGround?: boolean;
 };
 
 const FrameContext = createContext(0);
@@ -496,20 +498,27 @@ const alpha = (color: string) => (color.startsWith("rgba") ? Number(color.slice(
 /**
  * What a copy of the scene draws, row by row: the share of the subtitles' width (the safe zone's)
  * covered by its texts, its pictures and its painted shapes. A backdrop over most of the frame does
- * not count: subtitles read on it, as on her footage.
+ * not count: subtitles read on it, as on her footage. `own`: the same without her pictures (her shots'
+ * cards, her photos, her cut-outs): what the scene writes and draws of its own, its texts and its marks,
+ * where a voice laid over a model must not set its subtitles (two texts one over the other do not read).
+ * `opacity`: each element's effective opacity, for groundRows.
  */
-function drawn(copy: HTMLElement, width: number, height: number): number[] {
+function drawn(copy: HTMLElement, width: number, height: number): { all: number[]; own: number[]; opacity: Map<Element, number> } {
   const origin = copy.getBoundingClientRect();
   const [left, right] = [SAFE_ZONE.side, width - SAFE_ZONE.side];
   const rows: [number, number][][] = Array.from({ length: COVER_ROWS }, () => []);
-  const add = (r: DOMRect) => {
+  const ownRows: [number, number][][] = Array.from({ length: COVER_ROWS }, () => []);
+  const add = (r: DOMRect, picture = false) => {
     if (r.width * r.height > width * height * 0.6) return;
     const x0 = Math.max(left, r.left - origin.left);
     const x1 = Math.min(right, r.right - origin.left);
     if (x1 <= x0) return;
     const from = Math.max(0, Math.floor(((r.top - origin.top) / height) * COVER_ROWS));
     const to = Math.min(COVER_ROWS, Math.ceil(((r.bottom - origin.top) / height) * COVER_ROWS));
-    for (let i = from; i < to; i++) rows[i]!.push([x0, x1]);
+    for (let i = from; i < to; i++) {
+      rows[i]!.push([x0, x1]);
+      if (!picture) ownRows[i]!.push([x0, x1]);
+    }
   };
   // Effective opacity, top down: a faded element and all it holds do not count.
   const opacity = new Map<Element, number>();
@@ -521,7 +530,10 @@ function drawn(copy: HTMLElement, width: number, height: number): number[] {
     if (seen < 0.15) return;
     opacity.set(el, seen);
     const border = ["Top", "Right", "Bottom", "Left"].some((side) => parseFloat(style.getPropertyValue(`border-${side.toLowerCase()}-width`)) > 0) && alpha(style.borderTopColor) > 0.15;
-    if (SHAPES.has(el.tagName.toLowerCase()) || alpha(style.backgroundColor) > 0.15 || style.backgroundImage !== "none" || border) add(el.getBoundingClientRect());
+    // Her pictures: a photo, a video, a cut-out, one of her shots as the check draws it (a grey card), her silhouette's box,
+    // and the frame or card that holds one (its painted ground is her picture's mount, not a mark of its own).
+    const picture = PICTURES.has(el.tagName.toLowerCase()) || el.hasAttribute("data-fauve-shot") || el.hasAttribute("data-fauve-subject") || el.querySelector(HOLDS_PICTURE) !== null;
+    if (SHAPES.has(el.tagName.toLowerCase()) || alpha(style.backgroundColor) > 0.15 || style.backgroundImage !== "none" || border) add(el.getBoundingClientRect(), picture);
     for (const child of Array.from(el.children)) visit(child, seen);
   };
   for (const child of Array.from(copy.children)) visit(child, 1);
@@ -532,17 +544,54 @@ function drawn(copy: HTMLElement, width: number, height: number): number[] {
     range.selectNodeContents(node);
     for (const r of Array.from(range.getClientRects())) if (r.width >= 1 && r.height >= 1) add(r);
   }
-  return rows.map((spans) => {
-    // The width the spans cover together, overlaps counted once.
-    let covered = 0;
-    let end = -Infinity;
-    for (const [a, b] of spans.sort((p, q) => p[0] - q[0])) {
-      if (b <= end) continue;
-      covered += b - Math.max(a, end);
-      end = b;
+  const shares = (all: [number, number][][]) =>
+    all.map((spans) => {
+      // The width the spans cover together, overlaps counted once.
+      let covered = 0;
+      let end = -Infinity;
+      for (const [a, b] of spans.sort((p, q) => p[0] - q[0])) {
+        if (b <= end) continue;
+        covered += b - Math.max(a, end);
+        end = b;
+      }
+      return covered / (right - left);
+    });
+  return { all: shares(rows), own: shares(ownRows), opacity };
+}
+
+/** What holds one of her pictures inside it (a frame, a card, a window round her shot). */
+const HOLDS_PICTURE = "[data-fauve-shot], [data-fauve-subject], img, video, canvas, image";
+
+/** SVG shapes, whose paint is their fill. */
+const SVG_FILLED = new Set(["path", "rect", "circle", "ellipse", "polygon", "polyline"]);
+/** The rows where subtitles may go (SUBTITLE_ROWS of retouch.ts and their band): only those are looked at. */
+const GROUND_ROWS: [number, number] = [0.2, 0.8];
+
+/**
+ * For each row of a copy (`opacity`: its elements' effective opacity, from drawn), whether what is on top in the
+ * middle of the frame there is a pale ground the scene paints itself ('1'), else '0' (a dark one, one of her pictures
+ * or her cut-out, a gradient: unknown here, nothing): white subtitles would not read on it, they are written dark
+ * there. Hit-tested by the browser, so a ground seen only through a window (an eye's almond, a clipped card) counts
+ * only where it shows; the other copies are hidden while it is measured.
+ */
+function groundRows(copy: HTMLElement, width: number, height: number, opacity: Map<Element, number>): string {
+  const origin = copy.getBoundingClientRect();
+  const x = origin.left + width / 2;
+  return Array.from({ length: COVER_ROWS }, (_, i) => {
+    const share = (i + 0.5) / COVER_ROWS;
+    if (share < GROUND_ROWS[0] || share > GROUND_ROWS[1]) return "0";
+    for (const el of document.elementsFromPoint(x, origin.top + share * height)) {
+      if (el === copy || !copy.contains(el)) continue;
+      if ((opacity.get(el) ?? 0) < 0.6) continue;
+      const tag = el.tagName.toLowerCase();
+      if (PICTURES.has(tag) || el.hasAttribute("data-fauve-shot") || el.hasAttribute("data-fauve-subject")) return "0";
+      const style = getComputedStyle(el);
+      if (style.backgroundImage !== "none") return "0";
+      const paint = parseColor(SVG_FILLED.has(tag) ? style.fill : style.backgroundColor);
+      if (paint && paint.alpha >= 0.6) return luminance(paint.rgb) >= 0.5 ? "1" : "0";
     }
-    return covered / (right - left);
-  });
+    return "0";
+  }).join("");
 }
 
 const waitFrame = () => new Promise((resolve) => requestAnimationFrame(() => resolve(null)));
@@ -669,7 +718,7 @@ function missingTexts(reelTexts: NonNullable<SceneCheckProps["reelTexts"]>, fram
   });
 }
 
-export function SceneCheck({ js, texts, durationInFrames, brand, photos = [], cuts = [], shots = [], track: pieces, look, fonts = [], reelTexts = [], end = null, backdrop, probeSpoken = false }: SceneCheckProps) {
+export function SceneCheck({ js, texts, durationInFrames, brand, photos = [], cuts = [], shots = [], track: pieces, look, fonts = [], reelTexts = [], end = null, backdrop, probeSpoken = false, probeGround = false }: SceneCheckProps) {
   const width = 1080;
   const height = 1920;
   const [track] = useState(() => footageTrack(pieces, themeFor(look?.template ?? "libre", look?.signature, look?.tempo), { width, height }, { shots }));
@@ -779,9 +828,27 @@ export function SceneCheck({ js, texts, durationInFrames, brand, photos = [], cu
           console.log(`FAUVE_INK ${JSON.stringify(message)}`);
         }
         // What it draws, row by row, over its length (each row: the share of the subtitles' width it covers, on average).
-        const copies = Array.from(document.querySelectorAll<HTMLElement>("[data-check-frame]")).map((copy) => drawn(copy, width, height));
-        const cover = Array.from({ length: COVER_ROWS }, (_, i) => Math.round((copies.reduce((sum, c) => sum + c[i]!, 0) / Math.max(1, copies.length)) * 100) / 100);
-        console.log(`FAUVE_COVER ${JSON.stringify(cover)}`);
+        const sampled = Array.from(document.querySelectorAll<HTMLElement>("[data-check-frame]"));
+        const copies = sampled.map((copy) => drawn(copy, width, height));
+        const average = (pick: (c: { all: number[]; own: number[] }) => number[]) =>
+          Array.from({ length: COVER_ROWS }, (_, i) => Math.round((copies.reduce((sum, c) => sum + pick(c)[i]!, 0) / Math.max(1, copies.length)) * 100) / 100);
+        console.log(`FAUVE_COVER ${JSON.stringify(average((c) => c.all))}`);
+        // Its own texts and marks, her pictures left out: where a voice laid over a model sets its subtitles.
+        console.log(`FAUVE_OWN ${JSON.stringify(average((c) => c.own))}`);
+        // A model's composition (probeGround): the pale grounds it paints, row by row at each image sampled, where a voice's
+        // subtitles laid over it are written dark. Every element hit-testable, one copy shown at a time.
+        if (probeGround) {
+          const hitAll = document.createElement("style");
+          hitAll.textContent = "[data-check-frame], [data-check-frame] * { pointer-events: auto !important; }";
+          document.head.appendChild(hitAll);
+          const pale = sampled.map((copy, i) => {
+            for (const other of sampled) other.style.visibility = other === copy ? "" : "hidden";
+            return groundRows(copy, width, height, copies[i]!.opacity);
+          });
+          for (const other of sampled) other.style.visibility = "";
+          hitAll.remove();
+          console.log(`FAUVE_GROUND ${JSON.stringify({ frames: sampled.map((copy) => Number(copy.dataset.checkFrame)), pale })}`);
+        }
         return continueRender(handle);
       }
       const detail = failures

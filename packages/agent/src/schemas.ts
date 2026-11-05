@@ -286,6 +286,11 @@ export const editPlanMotionSegmentSchema = z.object({
     /** A composition's choice of where the engine sets a voice's subtitles (share of the height): where none of its faces nor texts go. */
     subtitle_y: z.number().min(0.1).max(0.8).optional(),
     /**
+     * Where a voice's subtitles laid over a montage skill sit on a pale ground its composition paints (frames from its
+     * start, spans), measured by the scene check (paleSpans in skills.ts): written dark there, white elsewhere. Set by the engine.
+     */
+    subtitle_pale: z.array(z.tuple([z.number().int().min(0), z.number().int().min(0)])).max(60).optional(),
+    /**
      * Its code reads what is said (`spoken`): whether the scene check found it writing those words at their moment
      * (set by the engine; false: it only times its own words on them, and the engine's subtitles stay). It follows its code.
      */

@@ -59,6 +59,12 @@
 // An effect that lays her photos takes them by --photos f2,f3 (their ids, in --clips' order, f0 the first file); one timed
 // on what she says takes her words in its first clip by --talk (as Scribe times them, seconds of that clip): its code gets
 // them as `spoken`, and the engine's subtitles show under it.
+//
+// A voice laid over a skill (her voice note, Edith's voice: docs/voix.md, « Une voix sur un modèle »): --voice '{ "words":
+// [{ "w", "start", "end" }], "audio": "voice.mp3" }' (a JSON file or text: its words as Scribe or ElevenLabs time them,
+// seconds of the recording; the audio is optional, the Reel silent without it), laid as designSkill lays it: the Reel
+// fitted to its last word and a breath (skillVoiceFit; --follow as for her own note, the model fitted to its end), its
+// words subtitled by the engine on the row the scene check finds off the skill's own texts (skillSubtitleRow), printed.
 
 import { execFileSync, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -77,18 +83,24 @@ import { clearPassages, layerObjects, objectKey, objectPassages, readPassages, s
 import { tracksFileSchema, type TracksByClip } from "../packages/agent/src/tracking.ts";
 import {
   dressSkillPlan,
+  paleSpans,
   readSaid,
   skillLongest,
   skillPlan,
   skillShotCount,
+  skillSubtitleRow,
   skillTalk,
+  skillVoiceFit,
   type MontageSkill,
+  type SceneGround,
   type SkillFile,
   type SkillFill,
   type SkillFillAnswer,
   type SkillTalk,
 } from "../packages/agent/src/skills.ts";
 import { pcmSamples, sameTake, TAKE_MAX_SECONDS, TAKE_RATE, takeOffset, wordsOffset } from "../packages/agent/src/takes.ts";
+import { voiceAt, voiceEnd } from "../packages/agent/src/voice.ts";
+import { SKILL_VOICE_TAIL } from "../packages/agent/src/voice-over.ts";
 
 const { values } = parseArgs({
   options: {
@@ -119,6 +131,8 @@ const { values } = parseArgs({
     span: { type: "string" },
     each: { type: "string" },
     photos: { type: "string" },
+    voice: { type: "string" },
+    follow: { type: "boolean", default: false },
   },
 });
 /** A JSON option given as text or as the path of a file. */
@@ -188,7 +202,19 @@ if (!files.length) throw new Error("--clips: at least one file");
 
 // A fill made by hand, as the filler would: her files in turn, a video's later moments when it comes back; or as cast.
 const cast = values.cast ? (JSON.parse(values.cast) as [number, number][]) : null;
-const n = piece ? 0 : cast ? cast.length : values.shots ? Math.max(skill.shots[0], Math.min(skillLongest(skill), Number(values.shots))) : skillShotCount(skill, files);
+const asked = piece ? 0 : cast ? cast.length : values.shots ? Math.max(skill.shots[0], Math.min(skillLongest(skill), Number(values.shots))) : skillShotCount(skill, files);
+const askedBpm = values.bpm ? Math.round(Math.min(140, Math.max(60, Number(values.bpm)))) : undefined;
+// A voice laid over it (never over a skill timed on her filmed talk): heard from its first word at once, the Reel fitted
+// to its last word and a breath, as designSkill fits it (her own note with --follow).
+const laidVoice = !piece && !skill.voice ? json<{ words: { w: string; start: number; end: number }[]; audio?: string }>(values.voice) : undefined;
+const laidAt = laidVoice ? voiceAt(laidVoice) : 0;
+const reach = laidVoice
+  ? skillVoiceFit(skill, voiceEnd({ words: laidVoice.words, duration: 0 }, laidAt) + SKILL_VOICE_TAIL, { n: asked, bpm: askedBpm ?? skill.bpm }, { follow: values.follow })
+  : null;
+if (laidVoice && !reach) throw new Error("--voice: longer than this model plays (the chain would make the Reel)");
+const n = reach ? reach.n : asked;
+const bpm = reach ? (Math.abs(reach.bpm - skill.bpm) > 0.005 ? reach.bpm : undefined) : askedBpm;
+if (laidVoice) console.log(`voice laid from ${laidAt} s, its last word at ${voiceEnd({ words: laidVoice.words, duration: 0 }, laidAt)} s: ${n} shots${bpm ? ` at ${bpm} BPM` : ""}`);
 const seen = new Map<string, number>();
 const fill: SkillFill = {
   shots: Array.from({ length: n }, (_, i) => {
@@ -203,7 +229,6 @@ const fill: SkillFill = {
   ...(values.settings ? { settings: JSON.parse(values.settings) as Record<string, string> } : {}),
   ...(values.named ? { objects: JSON.parse(values.named) as Record<string, string> } : {}),
 };
-const bpm = values.bpm ? Math.round(Math.min(140, Math.max(60, Number(values.bpm)))) : undefined;
 // On her voice: her talk cut as the engine cuts it, her other angles synced on their sound, the filler's choice read.
 type Timed = { w: string; start: number; end: number };
 const spoken: Record<string, Timed[]> = {};
@@ -271,7 +296,7 @@ const piecePlan = piece
   : null;
 const plan = piecePlan
   ? { ...piecePlan, ...(piece?.spoken ? { subtitles: true } : {}) }
-  : dressSkillPlan(skillPlan({ skill, name: model?.name ?? skill.key, files, fill, ...(bpm ? { bpm } : {}), ...(talk ? { talk } : {}) }), skill, followed);
+  : dressSkillPlan(skillPlan({ skill, name: model?.name ?? skill.key, files, fill, ...(bpm ? { bpm } : {}), ...(talk ? { talk } : {}), ...(laidVoice ? { voice: { media_id: "voice", at: laidAt } } : {}) }), skill, followed);
 const fonts = (values.fonts || "").split(",").map((f) => f.trim()).filter(Boolean);
 console.log(
   followed
@@ -384,6 +409,15 @@ const props = buildReelProps(plan, {
   ...(Object.keys(tracks).length ? { tracks } : {}),
   // Her words in each clip (on her voice): her subtitles, and what its code reads of what she says (`spoken`).
   ...(Object.keys(spoken).length ? { words: spoken } : {}),
+  // A voice laid over it: its recording (copied into the bundle) and its words, subtitled by the engine.
+  ...(laidVoice
+    ? (() => {
+        if (!laidVoice.audio) return { voice: { src: "", words: laidVoice.words } };
+        const target = `${media}/voice-${createHash("sha1").update(resolve(laidVoice.audio)).digest("hex").slice(0, 8)}${extname(laidVoice.audio) || ".mp3"}`;
+        copyFileSync(resolve(laidVoice.audio), target);
+        return { voice: { src: `/public/jobs/${job}/${basename(target)}`, words: laidVoice.words } };
+      })()
+    : {}),
 });
 const out = resolve(values.out ?? `${ROOT}/${key}.mp4`);
 writeFileSync(`${out}.plan.json`, JSON.stringify(plan, null, 1));
@@ -413,6 +447,8 @@ writeFileSync(
       ...(layer.end ? { end: layer.end } : {}),
       // Its code reads what is said: checked with words said under it, as the engine checks it.
       ...(readsSpoken(layer.js) ? { probeSpoken: true } : {}),
+      // A voice laid over it: the pale grounds its composition paints, where its subtitles are written dark.
+      ...(laidVoice ? { probeGround: true } : {}),
     },
   ]),
 );
@@ -439,6 +475,31 @@ const refused = (() => {
 if (refused) {
   console.log("SCENE CHECK REFUSED: read its notes above");
   process.exitCode = 2;
+}
+// A voice laid over it: its subtitles on the skill's row, else off what its composition writes and draws of its own on
+// this Reel (the check's `own`, her pictures left out), as designSkill sets them.
+if (laidVoice) {
+  const measured = (() => {
+    try {
+      return JSON.parse(verdict) as { own?: Record<string, number[]>; ground?: Record<string, SceneGround> };
+    } catch {
+      return {};
+    }
+  })();
+  const own = measured.own?.skill;
+  const row = skillSubtitleRow(skill, own, plan.duration);
+  const composed = plan.layers?.find((l) => l.compose);
+  const pale = composed ? paleSpans(measured.ground?.skill, row, Math.round((composed.to - composed.from) * 30)) : [];
+  if (composed) {
+    composed.motion.subtitle_y = row;
+    if (pale.length) composed.motion.subtitle_pale = pale;
+  }
+  props.subtitleY = row;
+  if (pale.length) props.subtitlePale = pale.map(([a, b]) => [a + Math.round((composed?.from ?? 0) * 30), b + Math.round((composed?.from ?? 0) * 30)]);
+  writeFileSync(`${out}.plan.json`, JSON.stringify(plan, null, 1));
+  writeFileSync(`${out}.props.json`, JSON.stringify(props));
+  console.log(`the voice's subtitles at ${row} of the height${skill.voiceOver?.row !== undefined ? " (the skill's own row)" : own ? " (off its own texts and marks)" : " (the usual row: nothing measured)"}`);
+  console.log(`written dark on its pale grounds: ${pale.length ? pale.map(([a, b]) => `${(a / 30).toFixed(2)}–${(b / 30).toFixed(2)} s`).join(", ") : "none"}`);
 }
 
 if (!values["no-render"]) {

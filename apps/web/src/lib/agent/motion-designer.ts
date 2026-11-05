@@ -15,6 +15,7 @@ import {
   type MotionSlot,
   type SfxCue,
   type ReelProps,
+  type SceneGround,
   type ScenePhoto,
   type TrackPiece,
   readsSpoken,
@@ -130,6 +131,13 @@ export type SceneResult = {
   sounds?: SfxCue[];
   /** Its code reads what is said: the share of the words said the scene check found written at their moment. */
   spokenShare?: number;
+  /**
+   * A draft played as it is (a montage skill's composition): what it writes and draws of its own, row by row (the scene
+   * check's, her pictures left out), for the row of a voice's subtitles laid over it; and the pale grounds it paints at
+   * each image sampled, where they are written dark.
+   */
+  own?: number[];
+  ground?: SceneGround;
 };
 
 /** What already exists, so that a new scene takes another idea. */
@@ -490,6 +498,8 @@ function smokeScenes(results: SceneResult[], requestOf: (id: string) => SceneReq
         ...(request.backdrop ? { backdrop: request.backdrop } : {}),
         // Its code reads what is said: checked with words said under it, to see whether it writes them.
         ...(readsSpoken(r.js!) ? { probeSpoken: true } : {}),
+        // A montage skill's composition (played as it is) under subtitles: the pale grounds it paints, where they are written dark.
+        ...(request.keep && request.compose?.subtitles ? { probeGround: true } : {}),
       };
     });
 }
@@ -581,7 +591,16 @@ async function checkScenes(
       (e: unknown): SceneChecks => ({ errors: Object.fromEntries(results.map((r) => [r.id, `smoke indisponible : ${String(e)}`])), faces: {}, cover: {} }),
     );
     results = results.map((r) => {
-      if (!r.js || !checks.errors[r.id]) return checks.spoken?.[r.id] !== undefined && r.js ? { ...r, spokenShare: checks.spoken[r.id] } : r;
+      if (!r.js || !checks.errors[r.id]) {
+        if (!r.js) return r;
+        // A kept draft (a montage skill) gets what it draws of its own and the pale grounds it paints: a voice laid over it
+        // sets its subtitles off its texts, written dark on those grounds.
+        const kept = requestOf(r.id).keep;
+        const own = kept && checks.own?.[r.id]?.length ? { own: checks.own[r.id] } : {};
+        const ground = kept && checks.ground?.[r.id]?.frames?.length ? { ground: checks.ground[r.id] } : {};
+        const spoken = checks.spoken?.[r.id] !== undefined ? { spokenShare: checks.spoken[r.id] } : {};
+        return Object.keys(own).length || Object.keys(ground).length || Object.keys(spoken).length ? { ...r, ...spoken, ...own, ...ground } : r;
+      }
       return working.get(r.id) ?? { ...r, js: null, error: checks.errors[r.id]! };
     });
     if (round === 1) break;

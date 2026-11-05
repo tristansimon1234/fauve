@@ -35,11 +35,16 @@ import {
   VOICE_MAX_SECONDS,
   VOICE_FORMAT_PROMPT,
   VOICE_OVER_PROMPT,
+  VOICE_OVER_SLACK,
+  SKILL_VOICE_SLACK,
   voiceWordsFor,
+  voiceWordsForSkill,
   voiceOverDecisionSchema,
   voiceOverScriptSchema,
+  withoutVoice,
   type ReelContract,
   type ReelFormat,
+  type SkillFile,
   type VoiceOverDecision,
   type VoiceOverDraft,
   type VoiceOverScript,
@@ -48,6 +53,7 @@ import {
 import { outputFormat } from "@fauve/agent/answer";
 import { judgeHooks } from "@/lib/agent/hook-judge";
 import { anthropic, logClaudeCost } from "@/lib/agent/run";
+import { voiceSkill, type VoiceSkill } from "@/lib/agent/skill-design";
 import { env } from "@/lib/env";
 import { levelSpeechInSandbox } from "@/lib/render/sandbox";
 import { postStyle, STEAL_WAIT_MS } from "@/lib/steal";
@@ -144,6 +150,12 @@ type ScriptOptions = {
   decide?: boolean;
   /** What she fixed for this Reel: her text, her person, her ending… over every rule. */
   contract?: ReelContract;
+  /**
+   * One of Edith's models the voice is laid on (voiceSkill): played as it is, its length fixed (at her files or at the
+   * length she asked), the voice written to stop a breath before its end (Tristan: « et sur un modèle on peut ajouter
+   * une voix off ? »).
+   */
+  skill?: VoiceSkill;
 };
 
 /**
@@ -154,21 +166,28 @@ type ScriptOptions = {
 export async function writeVoiceScript(
   studioId: string,
   postId: string,
-  { wish, mediaIds, brief, whispered = false, decide = false, contract }: ScriptOptions = {},
+  { wish, mediaIds, brief, whispered = false, decide = false, contract, skill }: ScriptOptions = {},
 ): Promise<VoiceOverScript & Partial<Pick<VoiceOverDecision, "format" | "why">>> {
   const fixed = contractLines(contract);
   const read = await scriptInput(studioId, postId, mediaIds, brief);
-  // The length she asked for decides how much the voice says, so that it reaches the end of her Reel.
-  if (contract?.duration) {
+  // Laid on one of Edith's models: as long as the model plays (its length at her files, or at the length she asked),
+  // a short model a short voice. Else the length she asked for decides, so that it reaches the end of her Reel.
+  if (skill) {
+    const fits = voiceWordsForSkill(skill.seconds);
+    read.longueur = { mots_min: fits.min, mots_max: fits.max };
+  } else if (contract?.duration) {
     const asked = voiceWordsFor(0, contract.duration);
     read.longueur = { mots_min: asked.min, mots_max: asked.max };
   }
   const input = {
     ...read,
+    ...(skill ? { modele: { nom: skill.name, deroule: skill.how, duree: `${String(skill.seconds).replace(".", ",")} s` } } : {}),
     ...(wish ? { consigne_voix: wish } : {}),
     ...(whispered ? { voix: "chuchotée (ASMR)" } : {}),
     ...(fixed.length ? { contrat: fixed } : {}),
   };
+  // Over its ceiling by this many words, it is written again once (tighter on a model: its length does not move for it).
+  const slack = skill ? SKILL_VOICE_SLACK : VOICE_OVER_SLACK;
   // She wrote the words herself: read as written (or improved for the ear when she asked), never rewritten into another voice.
   if (contract?.voice_text) return ownTextScript(studioId, contract, fixed, input);
   type Draft = VoiceOverDraft & Partial<Pick<VoiceOverDecision, "format" | "why">>;
@@ -192,7 +211,7 @@ export async function writeVoiceScript(
   // a voice that filled it described the images (Tristan: « le scénariste des reels est un peu naze »).
   const { mots_min: min, mots_max: max } = input.longueur;
   const words = spokenWords(scriptFrom(draft.hooks[0] ?? "", draft.rest).script);
-  if (words > max + 4 || words < Math.round(min * 0.5)) {
+  if (words > max + slack || words < Math.round(min * 0.5)) {
     const again = await write({ longueur_precedente: `La version précédente faisait ${words} mots : ${max} au plus.` }).catch(() => draft);
     if (again.format !== "message" && again.hooks.length) draft = again;
   }
@@ -225,7 +244,7 @@ export async function writeVoiceScript(
       { version_precedente: { accroche: hook, reste: draft.rest }, accroche_gardee: hook, a_corriger: chosen.script.fixes },
       false,
     ).catch((error: unknown) => (console.warn("voice script kept as first written", error), null));
-    if (fixed?.rest.trim() && spokenWords(scriptFrom(hook, fixed.rest).script) <= max + 4) rest = fixed.rest;
+    if (fixed?.rest.trim() && spokenWords(scriptFrom(hook, fixed.rest).script) <= max + slack) rest = fixed.rest;
   }
   return { ...scriptFrom(hook, rest), format: draft.format, why: draft.why };
 }
@@ -416,7 +435,16 @@ export async function voiceOverIfWanted(params: {
   const { data: analyses } = videos.length
     ? await db.from("clip_analyses").select("media_id, analysis").in("media_id", videos.map((v) => v.id as string))
     : { data: [] as { media_id: string; analysis: unknown }[] };
-  const read = (analyses ?? []).map((a) => clipAnalysisSchema.safeParse(a.analysis)).flatMap((a) => (a.success ? [a.data] : []));
+  const parsed = (analyses ?? []).map((a) => ({ media_id: a.media_id as string, read: clipAnalysisSchema.safeParse(a.analysis) }));
+  const read = parsed.flatMap((a) => (a.read.success ? [a.read.data] : []));
+  // Her files as a model counts its shots (a photo one, a video one per distinct passage): a voice laid on it is written to its length.
+  const lengths = new Map(parsed.flatMap((a) => (a.read.success ? [[a.media_id, a.read.data.duration] as const] : [])));
+  const files: SkillFile[] = ids.flatMap((id): SkillFile[] => {
+    const m = (media ?? []).find((x) => x.id === id);
+    if (m?.kind === "image") return [{ id, photo: true, seconds: 0 }];
+    const seconds = lengths.get(id) ?? (Number(m?.duration) || 0);
+    return m?.kind === "video" && seconds > 0 ? [{ id, photo: false, seconds }] : [];
+  });
   // Someone speaking in a shot carries the Reel with their own words.
   const speechInClips = read.some((a) => (a.words?.length ?? 0) >= 6);
   const footageSeconds = videos.reduce((sum, v) => sum + (Number(v.duration) || 0), 0) || read.reduce((sum, a) => sum + a.duration, 0);
@@ -449,6 +477,13 @@ export async function voiceOverIfWanted(params: {
   // She chose a voice (for this Reel, or always) but someone speaks in her videos: their words stay, and the delivery says so.
   if (!wanted && speechInClips && !choices.onReel && !choices.correction && choice?.mode !== "off" && (choice?.mode === "on" || setting.use === "always")) return { spokenKept: true };
   if (!wanted) return null;
+  // Laid on one of Edith's models (the one Edith picked, or hers): the model plays as it is, the voice is written to its
+  // length (Tristan: « et sur un modèle on peut ajouter une voix off ? »); a Reel the chain makes, to her footage's.
+  const model = await voiceSkill({ studioId: params.studioId, postId: params.postId, files, contract: params.contract }).catch((error: unknown) => {
+    console.warn("voice: the model it is laid on not read, written for her footage", params.postId, error);
+    return null;
+  });
+  if (model) console.log("voice: laid on a model of Edith's", params.postId, model.key, `${model.seconds} s`);
   // A voice of the gallery, or her own (a clone made with her consent) kept as it is; anything else
   // (a voice deleted since, another studio's clone) is read with the default voice.
   const own = readOwnVoice((brand.data?.profile as { own_voice?: unknown } | null)?.own_voice);
@@ -459,11 +494,12 @@ export async function voiceOverIfWanted(params: {
     // Her setting leaves it to Edith: told by a voice, or one key message with the music (then nothing is read nor paid);
     // a Reel she copies told by a voice has its form already.
     const auto = choice?.mode !== "on" && !choice?.wish && setting.use === "auto" && !copied && !ownText;
+    const laid = model ? { skill: model } : {};
     const written = auto
-      ? await writeVoiceScript(params.studioId, params.postId, { mediaIds: ids, brief: params.brief, whispered: Boolean(findVoice(voiceId)?.asmr), decide: true, contract: params.contract })
+      ? await writeVoiceScript(params.studioId, params.postId, { mediaIds: ids, brief: params.brief, whispered: Boolean(findVoice(voiceId)?.asmr), decide: true, contract: params.contract, ...laid })
       : undefined;
     if (written?.format === "message") return { format: "message", why: (written.why ?? "").slice(0, 300) };
-    const made = await makeVoiceOver({ studioId: params.studioId, postId: params.postId, wish: choice?.wish, voiceId, mediaIds: ids, brief: params.brief, script: written, contract: params.contract });
+    const made = await makeVoiceOver({ studioId: params.studioId, postId: params.postId, wish: choice?.wish, voiceId, mediaIds: ids, brief: params.brief, script: written, contract: params.contract, ...laid });
     // Her wish and the remake were for this voice: used once.
     if (choice?.wish || choice?.remake) await db.from("posts").update({ voice_over: { mode: choice.mode, ...(choice.voice_id ? { voice_id: choice.voice_id } : {}) } }).eq("id", params.postId);
     return { mediaId: made.mediaId, voice: voiceName };
@@ -476,7 +512,8 @@ export async function voiceOverIfWanted(params: {
 /**
  * A Reel without a voice (hers or Edith's): the choice is kept on the post and,
  * when it is already montaged, its plan gets a new version without the voice (the
- * cut stays; the music is made again for a Reel without voice). True when the
+ * cut stays; the music is made again for a Reel without voice; a Reel made on one of
+ * Edith's models loses the subtitles it had for it: withoutVoice). True when the
  * video must be made again; "agent" when the voice is in a video the effects agent
  * drew (only a correction of the effect takes it out).
  */
@@ -493,10 +530,10 @@ export async function removeVoice(studioId: string, postId: string): Promise<boo
   const plan = editPlanSchema.safeParse(current.data?.plan);
   if (!plan.success || !plan.data.voice) return false;
   if (isBaked(plan.data)) return "agent";
-  // The same plan, its voice left out (undefined is dropped when stored).
+  // The same plan, its voice left out (and a model's subtitles for it).
   const row = await db
     .from("edit_plans")
-    .insert({ studio_id: studioId, post_id: postId, version: ((latest.data?.version as number | undefined) ?? 0) + 1, plan: { ...plan.data, voice: undefined } })
+    .insert({ studio_id: studioId, post_id: postId, version: ((latest.data?.version as number | undefined) ?? 0) + 1, plan: withoutVoice(plan.data) })
     .select("id")
     .single();
   if (row.error) throw new Error(row.error.message);
@@ -520,6 +557,8 @@ export async function makeVoiceOver(params: {
   script?: VoiceOverScript;
   /** What she fixed for this Reel (her text, her person, her pace). */
   contract?: ReelContract;
+  /** The model it is laid on (voiceSkill): written to its length. */
+  skill?: VoiceSkill;
 }): Promise<{ mediaId: string; script: string; seconds: number }> {
   const db = supabaseAdmin();
   const script =
@@ -530,6 +569,7 @@ export async function makeVoiceOver(params: {
       brief: params.brief,
       whispered: Boolean(findVoice(params.voiceId)?.asmr),
       contract: params.contract,
+      ...(params.skill ? { skill: params.skill } : {}),
     }));
   const started = Date.now();
   const speed = VOICE_SPEED[params.contract?.voice_pace ?? "normale"];

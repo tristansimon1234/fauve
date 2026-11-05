@@ -58,9 +58,12 @@ export function secondTryFits(timeLeftMs: number): boolean {
 /**
  * The second try's props: the first try's, its files already in the sandbox, without a composition that lays the
  * shots (a collage's that broke the render gives way to the printed collage) nor the animation that draws a copied
- * Reel's texts (the engine draws them again).
+ * Reel's texts (the engine draws them again), nor the pale grounds a model's composition painted under a voice's
+ * subtitles (white again over her footage).
  */
 export function withoutCompositions(props: ReelProps): ReelProps {
   const layers = props.layers?.filter((l) => !l.compose && !l.drawsTexts);
-  return { ...props, layers: layers?.length ? layers : undefined };
+  const rest = { ...props, layers: layers?.length ? layers : undefined };
+  delete rest.subtitlePale;
+  return rest;
 }

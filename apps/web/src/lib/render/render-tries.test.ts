@@ -58,4 +58,8 @@ test("the second try keeps the first try's local files and drops the composition
   assert.equal(again.layers?.[0], props.layers?.[0]);
   assert.equal(withoutCompositions({ ...props, layers: [layer({ compose: true })] }).layers, undefined);
   assert.equal(withoutCompositions({ ...props, layers: undefined }).layers, undefined);
+  // A voice laid over a model: the pale grounds its composition painted go with it, its subtitles white again over her footage.
+  const laid = withoutCompositions({ ...props, subtitleY: 0.48, subtitlePale: [[30, 90]] });
+  assert.equal("subtitlePale" in laid, false);
+  assert.equal(laid.subtitleY, 0.48);
 });

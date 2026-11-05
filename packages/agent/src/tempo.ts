@@ -29,6 +29,13 @@ export function planBeat(plan: Pick<EditPlan, "template" | "tempo">): number | n
   return bpm ? 60 / bpm : null;
 }
 
+/**
+ * Whether a Reel's cuts sit on its tempo's beats, so its music keeps that tempo exactly and its beats are set on its
+ * cuts (lib/render/music.ts): any Reel without a voice, and one of Edith's models with a voice laid over it (its cuts are
+ * its beats, the voice runs over them); a Reel the editor cut on a voice follows its phrases, its tempo only an energy.
+ */
+export const cutsOnBeats = (plan: Pick<EditPlan, "voice" | "skill">): boolean => !plan.voice || Boolean(plan.skill);
+
 const round = (n: number) => Math.round(n * 100) / 100;
 
 /** Shortest scene (the schema's minimum) and longest, by kind. */

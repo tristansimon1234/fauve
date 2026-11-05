@@ -160,10 +160,15 @@ export function soundChains(sounds: SoundInMix[], first: number): string {
 /**
  * The sound effects over a Reel without Edith's music: over its own sound as it is (`hasAudio`),
  * else over silence of its `duration`; the effects are the inputs 1…, out as [a], peaks under -1 dBFS.
+ * `speechGain` (dB): a voice laid over a model that plays without music (her voice note, levelled nowhere else) brought
+ * to the level of a voice (speechGain of its measured loudness), with or without effects over it.
  */
-export function soundsOnlyFilter(hasAudio: boolean, duration: number, sounds: SoundInMix[]): string {
-  const base = hasAudio ? `[0:a]${STEREO}[pre]` : `anullsrc=r=44100:cl=stereo,atrim=duration=${duration.toFixed(2)}[pre]`;
-  return `${base};${soundChains(sounds, 1)};[pre]${sounds.map((_, i) => `[x${i}]`).join("")}amix=inputs=${sounds.length + 1}:duration=first:normalize=0,alimiter=limit=${MIX_CEILING}:level=false[a]`;
+export function soundsOnlyFilter(hasAudio: boolean, duration: number, sounds: SoundInMix[], speechGain = 0): string {
+  const gain = hasAudio && speechGain ? `,volume=${speechGain}dB` : "";
+  const base = hasAudio ? `[0:a]${STEREO}${gain}[pre]` : `anullsrc=r=44100:cl=stereo,atrim=duration=${duration.toFixed(2)}[pre]`;
+  const limit = `alimiter=limit=${MIX_CEILING}:level=false[a]`;
+  if (!sounds.length) return `${base};[pre]${limit}`;
+  return `${base};${soundChains(sounds, 1)};[pre]${sounds.map((_, i) => `[x${i}]`).join("")}amix=inputs=${sounds.length + 1}:duration=first:normalize=0,${limit}`;
 }
 
 /** The ffmpeg filter that prints a voice's level (RMS, dB) every `step` seconds (its rumble left out). */
