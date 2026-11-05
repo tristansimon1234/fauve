@@ -69,7 +69,7 @@ type Drawn = { type: unknown; props: Record<string, unknown>; children: unknown[
 type Face = { x: number; y: number; width: number; height: number };
 
 /** What its Scene draws at a frame, run with a plain tree for React (no renderer): the kit's pieces as named nodes. */
-function drawAt(frame: number, props: { durationInFrames?: number; texts?: Record<string, string>; spoken?: { w: string; from: number; to: number }[]; face?: Face | null; light?: number }): Drawn {
+function drawAt(frame: number, props: { durationInFrames?: number; texts?: Record<string, string>; spoken?: { w: string; from: number; to: number }[]; face?: Face | null; light?: number; body?: Record<string, { x: number; y: number; visible: boolean }> }): Drawn {
   const React = { createElement: (type: unknown, p: Record<string, unknown> | null, ...children: unknown[]): Drawn => ({ type, props: p ?? {}, children }) };
   const light = props.light;
   const scope: Record<string, unknown> = {
@@ -81,7 +81,8 @@ function drawAt(frame: number, props: { durationInFrames?: number; texts?: Recor
   const make = new Function("React", ...Object.keys(scope), `"use strict";\n${motCle.code}\nreturn Scene;`) as (...args: unknown[]) => (p: Record<string, unknown>) => Drawn;
   const brand = { displayFont: "Bricolage Grotesque", bodyFont: "Inter Tight", accent: "#c0532b" };
   const face = props.face;
-  const track = face === undefined ? undefined : () => ({ hands: [], bodies: [], faces: face ? [face] : [] });
+  const body = props.body;
+  const track = face === undefined && !body ? undefined : () => ({ hands: [], bodies: body ? [{ points: body }] : [], faces: face ? [face] : [] });
   const durationInFrames = props.durationInFrames ?? 240;
   return make(React, ...Object.values(scope))({
     width: 1080,
@@ -204,6 +205,13 @@ test("« Mot clé en grand »: above her head when there is room, smaller when l
   const chest = keywordAt(drawAt(at, { texts, spoken: SPEECH, face: high }))!;
   assert.ok(chest.top >= high.y + high.height * 0.75, `${chest.top}`);
   assert.ok(chest.left >= 140 && chest.left + chest.width <= W - 140 && chest.top + chest.height <= 0.75 * 1920);
+  // Her face missed by the face model (her head turned): her head read on her body, its nose sized by her shoulders.
+  const body = { nose: { x: 540, y: 900, visible: true }, left_shoulder: { x: 680, y: 1100, visible: true }, right_shoulder: { x: 400, y: 1100, visible: true } };
+  const turned = keywordAt(drawAt(at, { texts, spoken: SPEECH, body }))!;
+  assert.ok(turned.top + turned.height <= 900 - 0.68 * 280, `${turned.top} + ${turned.height}`);
+  // A face found lower than her body says (a face model's mistake): the higher of the two keeps the words off her head.
+  const wrong = { x: 900, y: 1300, width: 120, height: 150 };
+  assert.deepEqual(keywordAt(drawAt(at, { texts, spoken: SPEECH, body, face: wrong })), turned);
   // The small words keep 48 px at the least, wherever the block goes.
   const spans = flatten(drawAt(SPEECH.find((w) => w.w === "montre")!.from, { texts, spoken: SPEECH, face: high })).filter((n) => n.type === "span");
   assert.ok(spans.length && spans.every((s) => Number(styleOf(s).fontSize) >= 48));

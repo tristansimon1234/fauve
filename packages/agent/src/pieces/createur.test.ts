@@ -76,16 +76,17 @@ test("« Face caméra et références » is offered on a video of someone and an
 type Drawn = { type: unknown; props: Record<string, unknown>; children: unknown[] };
 type Face = { x: number; y: number; width: number; height: number; points?: Record<string, { x: number; y: number }> };
 type Photo = { src: string; aspect: number; cutout?: string; subject?: { x: number; y: number; w: number; h: number } };
+type Body = { points: Record<string, { x: number; y: number; visible: boolean }> };
 
 /** What its Scene draws at a frame, run with a plain tree for React (no renderer): the kit's pieces as named nodes. */
-function drawAt(frame: number, props: { texts?: Record<string, string>; spoken?: { w: string; from: number; to: number }[]; face?: Face | null; photos?: Photo[] }): Drawn {
+function drawAt(frame: number, props: { texts?: Record<string, string>; spoken?: { w: string; from: number; to: number }[]; face?: Face | null; body?: Body; photos?: Photo[] }): Drawn {
   const React = { createElement: (type: unknown, p: Record<string, unknown> | null, ...children: unknown[]): Drawn => ({ type, props: p ?? {}, children }) };
   const scope: Record<string, unknown> = { AbsoluteFill: "AbsoluteFill", FitText: "FitText", Footage: "Footage", Img: "Img", Cutout: "Cutout", useCurrentFrame: () => frame };
   const make = new Function("React", ...Object.keys(scope), `"use strict";\n${createur.code}\nreturn Scene;`) as (...args: unknown[]) => (p: Record<string, unknown>) => Drawn;
   const brand = { displayFont: "Bricolage Grotesque", bodyFont: "Inter Tight", accent: "#c0532b" };
-  const face = props.face;
-  // Her face in the frame (as the montage draws her shot).
-  const track = face === undefined ? undefined : () => ({ hands: [], bodies: [], faces: face ? [face] : [] });
+  const { face, body } = props;
+  // Her face and her body in the frame (as the montage draws her shot).
+  const track = face === undefined && !body ? undefined : () => ({ hands: [], bodies: body ? [body] : [], faces: face ? [face] : [] });
   return make(React, ...Object.values(scope))({
     width: 1080,
     height: 1920,
@@ -175,6 +176,14 @@ test("« Face caméra et références »: over her own picture when her head is 
   const small = { x: 540, y: 700, width: 110, height: 130, points: { right_eye: { x: 520, y: 690 }, left_eye: { x: 560, y: 690 } } };
   const lifted = seenAt(drawAt(at("le") + 2, { texts: TEXTS, spoken: SPEECH, photos: PHOTOS, face: small }));
   assert.ok(lifted.sub && lifted.sub.top + lifted.sub.height <= 960, JSON.stringify(lifted.sub));
+  // Her head read on her body (her nose, sized by her shoulders) where the face model misses it, or where it gives a
+  // small face that is not hers: moved down until her hair is under the split all the same.
+  const shoulders = { left_shoulder: { x: 680, y: 900, visible: true }, right_shoulder: { x: 400, y: 900, visible: true } };
+  const body = { points: { nose: { x: 540, y: 700, visible: true }, ...shoulders } };
+  const turned = seenAt(drawAt(at("le") + 2, { texts: TEXTS, spoken: SPEECH, photos: PHOTOS, body }));
+  assert.deepEqual(turned.her, { top: Math.round(960 + 0.02 * 1920 - (700 - 0.68 * 280)), height: 1920, clip: [960, 960] });
+  const wrong = seenAt(drawAt(at("le") + 2, { texts: TEXTS, spoken: SPEECH, photos: PHOTOS, body, face: { x: 540, y: 880, width: 50, height: 60 } }));
+  assert.deepEqual(wrong.her, turned.her);
   // Full frame on her word.
   const full = seenAt(drawAt(at("le") + 2, { texts: { ...TEXTS, format: "plein" }, spoken: SPEECH, photos: PHOTOS, face: high }));
   assert.deepEqual(full.imgs.map((i) => [i.top, i.height]), [[0, 1920]]);

@@ -109,10 +109,27 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const headAt = (f) => {
     if (typeof track !== "function") return null;
     const seen = track(f) || {};
+    let head = null;
+    const grow = (top, bottom) => { head = head ? { top: Math.min(head.top, top), bottom: Math.max(head.bottom, bottom) } : { top, bottom }; };
     const faces = (seen.faces || []).filter((x) => x && x.width > 0 && x.height > 0);
-    if (!faces.length) return null;
-    const face = faces.reduce((a, b) => (b.width * b.height > a.width * a.height ? b : a));
-    return { top: face.y - face.height * 0.95, bottom: face.y + face.height * 0.75 };
+    if (faces.length) {
+      const face = faces.reduce((a, b) => (b.width * b.height > a.width * a.height ? b : a));
+      grow(face.y - face.height * 0.95, face.y + face.height * 0.75);
+    }
+    // Her head from her body too (its nose or its ears, sized by her shoulders), where the face model misses or
+    // misplaces it (her head turned, too far): her hair and her chin, as the scene check draws her silhouette.
+    (seen.bodies || []).forEach((b) => {
+      const p = (b && b.points) || {};
+      const at = (k) => (p[k] && p[k].visible ? p[k] : null);
+      const ls = at("left_shoulder");
+      const rs = at("right_shoulder");
+      const ears = at("left_ear") && at("right_ear") ? { y: (at("left_ear").y + at("right_ear").y) / 2 } : null;
+      const nose = at("nose") || ears;
+      if (!ls || !rs || !nose) return;
+      const sw = Math.hypot(ls.x - rs.x, ls.y - rs.y);
+      if (sw >= 8) grow(nose.y - 0.68 * sw, nose.y + 0.48 * sw);
+    });
+    return head;
   };
   const headOver = (from, to) => {
     let head = null;
