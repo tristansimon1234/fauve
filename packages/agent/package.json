@@ -8,11 +8,12 @@
     "./network": "./src/network.ts",
     "./answer": "./src/answer.ts",
     "./house-examples": "./src/house-examples.ts",
-    "./skills": "./src/skill-library.ts"
+    "./skills": "./src/skill-library.ts",
+    "./pieces": "./src/piece-library.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "test": "node --test src/agent.test.ts src/features.test.ts src/model-scout.test.ts"
+    "test": "node --test src/agent.test.ts src/features.test.ts src/model-scout.test.ts src/pieces/*.test.ts"
   },
   "devDependencies": {
     "@types/node": "^22.20.5",

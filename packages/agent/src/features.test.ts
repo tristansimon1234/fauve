@@ -10264,7 +10264,10 @@ test("the answers' schemas stay within the API's optional parameters: the editor
   const { reelContractSchema } = await import("./contract.ts");
   const { montageReviewSchema } = await import("./critic.ts");
   const { voiceOverDecisionSchema, voiceOverScriptSchema } = await import("./voice-over.ts");
+  const { pieceFillSchema } = await import("./pieces.ts");
   const optional = (schema: unknown) => optionalParameters((outputFormat(schema as never) as unknown as { schema: Record<string, unknown> }).schema);
+  // The filler of an effect of the bank leaves nothing optional (its answer is read whole).
+  assert.equal(optional(pieceFillSchema), 0);
   // The API counted 4 more than this for the editor's (25 for 21 here, 24 for 20 when it last passed, on 3 November):
   // 20 here at most for any of them, and the editor's under it, so one more field on a plan's texts never breaks it.
   const counts = { editorOutputSchema, directorOutputSchema, skillFillSchema, motionSceneOutputSchema, reelContractSchema, montageReviewSchema, voiceOverDecisionSchema, voiceOverScriptSchema };
@@ -10597,3 +10600,167 @@ test("a Reel sent to copy that a model plays, its sound kept for Instagram: the 
   assert.equal(keptSoundTempo({ mode: "model" }, null), undefined);
 });
 
+
+// ——— The bank of ready-to-play effects (pieces.ts, piece-library.ts; docs/modeles.md, « Banque d'effets prêts à jouer ») ———
+
+/** Her shots as the chain cuts them under an effect: n shots of a beat each at 100 BPM after a lead shot, the effect over them. */
+function pieceRun(n: number, options: { lead?: number; photo?: boolean } = {}) {
+  const lead = options.lead ?? 1.2;
+  return [
+    { file: "lead", at: 1, seconds: lead },
+    ...Array.from({ length: n }, (_, i) => ({ file: `f${i}`, at: 0.5, seconds: 0.6, ...(options.photo && i % 2 ? { photo: true } : {}) })),
+    { file: "after", at: 2, seconds: 1.8 },
+  ];
+}
+
+test("the bank of effects: each piece comes from a model, passes the code check, and holds over every count of shots and length it takes", async () => {
+  const { EFFECT_PIECES } = await import("./piece-library.ts");
+  const { pieceTestPlan, layerShots } = await import("./pieces.ts");
+  const { checkMotionCode } = await import("./motion-scene.ts");
+  const { houseModel } = await import("./house-models.ts");
+  const { HOUSE_EFFECTS } = await import("./house-effects.ts");
+  const { SLOT_NAME } = await import("./schemas.ts");
+  assert.ok(Object.keys(EFFECT_PIECES).length >= 1);
+  for (const [key, piece] of Object.entries(EFFECT_PIECES)) {
+    assert.equal(piece.key, key);
+    assert.ok(houseModel(key) && HOUSE_EFFECTS[key], `${key}: one of Edith's models, with its signature effect`);
+    assert.deepEqual(checkMotionCode(piece.code), [], `${key}: its code passes the code check`);
+    assert.ok(piece.code.length < 24000, `${key}: ${piece.code.length} characters`);
+    assert.match(piece.code, /function Scene\s*\(/);
+    assert.doesNotMatch(piece.code, /<[A-Za-z]/, `${key}: plain JS, no JSX`);
+    assert.ok(piece.shots[0] >= 1 && piece.shots[0] <= piece.shots[1], key);
+    assert.ok(piece.seconds[0] >= 1 && piece.seconds[0] <= piece.seconds[1] && piece.seconds[1] <= 12, key);
+    assert.ok(piece.name && piece.how && piece.needs && piece.lays, `${key}: its words for the editor`);
+    for (const t of piece.texts) {
+      assert.match(t.slot, SLOT_NAME, `${key}: slot ${t.slot}`);
+      assert.ok(t.max >= 1 && t.max <= 200);
+    }
+    // Every object it names is written « @slot » in its code (replaced by its filler's name), on one of its shots.
+    for (const o of piece.objects ?? []) assert.ok(piece.code.includes(`"@${o.slot}"`), `${key}: « @${o.slot} » in its code`);
+    for (let n = piece.shots[0]; n <= piece.shots[1]; n++) {
+      for (const full of [false, true]) {
+        const words = Object.fromEntries(piece.texts.filter((t) => full || t.required).map((t) => [t.slot, "abc ".repeat(t.max).slice(0, t.max).trim()]));
+        const shots = pieceRun(n, { photo: n % 2 === 0 });
+        const span: [number, number] = [1.2, 1.2 + n * 0.6];
+        const plan = pieceTestPlan({ piece, shots, span, fill: { texts: words, objects: {}, settings: {} }, bpm: 100 });
+        const parsed = editPlanSchema.safeParse(plan);
+        assert.ok(parsed.success, `${key} n=${n}: ${parsed.success ? "" : parsed.error.message.slice(0, 300)}`);
+        const layer = plan.layers![0]!;
+        assert.equal(layer.compose, undefined, `${key}: a layer over the montage, never the whole Reel`);
+        assert.deepEqual(layer.motion.piece, { key, version: piece.version });
+        assert.deepEqual(layerShots(plan, layer), Array.from({ length: n }, (_, i) => i + 1));
+        assert.equal(Number(layer.motion.texts!.beat), 18, `${key}: a beat at 100 BPM is 18 frames`);
+        for (const [slot, w] of Object.entries(words)) assert.equal(layer.motion.texts![slot], w);
+      }
+    }
+  }
+});
+
+test("an effect of the bank: its filler's words cut to their place, a required one missing or a shot that cannot carry it plays nothing", async () => {
+  const { cadre } = await import("./pieces/cadre.ts");
+  const { readPieceFill, pieceFillInput } = await import("./pieces.ts");
+  const answer = { fits: true, missing: "", texts: [{ slot: "gauche", text: "nouvelle carte du soir" }, { slot: "droite", text: "Café des Arts" }], objects: [{ slot: "porte", name: "The Back Door!" }], settings: [] };
+  const read = readPieceFill(cadre, answer)!;
+  // Cut at the last word that fits its 16 characters, never in the middle of one; its object named as the detector reads it.
+  assert.equal(read.texts.gauche, "nouvelle carte");
+  assert.equal(read.texts.droite, "Café des Arts");
+  assert.equal(read.objects.porte, "the back door");
+  // « none »: no object, its code does without.
+  assert.deepEqual(readPieceFill(cadre, { ...answer, objects: [{ slot: "porte", name: "none" }] })!.objects, {});
+  // The shots under it cannot carry it: nothing plays, the motion designer takes its brief.
+  assert.equal(readPieceFill(cadre, { ...answer, fits: false, missing: "aucun plan large" }), null);
+  // A required word missing plays nothing either.
+  const required = { ...cadre, texts: cadre.texts.map((t) => ({ ...t, required: true })) };
+  assert.equal(readPieceFill(required, { ...answer, texts: [{ slot: "gauche", text: "bientôt" }] }), null);
+  // Its filler sees its words and objects, the shots under it in order, the brief and her request.
+  const input = pieceFillInput({
+    piece: cadre,
+    under: [{ id: "a", photo: false, shows: "la salle de lecture vue de l'entrée, une fenêtre au fond", framing: "wide", camera: "static" }, { id: "b", photo: true, shows: "une pile de livres" }],
+    brief: "[borrow: cadre] Her reading room opening frame after frame, « nouveautés » and « Brick Lane ».",
+    request: "Les nouveautés de la semaine",
+    business: { name: "Brick Lane Bookshop", activity: "librairie", facts: ["Librairie de Brick Lane"] },
+    current: { gauche: "nouveautés" },
+  });
+  assert.equal(input.effet.ses_mots.length, 2);
+  assert.deepEqual(input.effet.ses_objets, [{ slot: "porte", plan: 1, cherche: cadre.objects![0]!.want }]);
+  assert.deepEqual(input.plans_dessous.map((p) => p.plan), [1, 2]);
+  assert.equal(input.mots_actuels?.gauche, "nouveautés");
+});
+
+test("an effect of the bank is offered only when her files can carry it, the best first, five at most", async () => {
+  const { cadre } = await import("./pieces/cadre.ts");
+  const { piecesOffered, pieceShots, PIECES_OFFERED } = await import("./pieces.ts");
+  const shot = (framing: "wide" | "medium" | "close" | "detail", beauty = 3) => ({
+    start: 0,
+    end: 3,
+    description: "la salle vue de l'entrée",
+    subject: "salle",
+    energy: 2,
+    hook_score: 3,
+    quality: { blurry: false, dark: false, shaky: false },
+    faces_visible: false,
+    framing,
+    camera: "static" as const,
+    subject_box: [0, 0, 1000, 1000],
+    beauty,
+  });
+  const clip = (framing: "wide" | "medium" | "close" | "detail") =>
+    ({ duration: 6, orientation: "landscape", summary: "une librairie", setting: "intérieur d'une librairie", lighting: "good", shots: [shot(framing)], best_moments: [], transcript: "" }) as never;
+  const wide = pieceShots([{ media_id: "a", analysis: clip("wide") }], {});
+  assert.deepEqual(wide.map((s) => [s.framing, s.still, s.indoors, s.outdoors]), [["wide", true, true, false]]);
+  // Three files at least, one of them wide.
+  assert.deepEqual(piecesOffered([cadre], wide, 3).map((p) => p.key), ["cadre"]);
+  assert.deepEqual(piecesOffered([cadre], wide, 2), []);
+  assert.deepEqual(piecesOffered([cadre], pieceShots([{ media_id: "a", analysis: clip("close") }], {}), 5), []);
+  // Blurred or dark shots never carry one.
+  const blurred = pieceShots([{ media_id: "a", analysis: { ...(clip("wide") as object), shots: [{ ...shot("wide"), quality: { blurry: true, dark: false, shaky: false } }] } as never }], {});
+  assert.deepEqual(blurred, []);
+  assert.equal(PIECES_OFFERED, 5);
+  const many = Array.from({ length: 8 }, (_, i) => ({ ...cadre, key: `k${i}` }));
+  assert.equal(piecesOffered(many, wide, 5).length, 5);
+});
+
+test("an effect of the bank: the editor names it in its layer's brief, one per Reel, and the engine builds its layer from it", async () => {
+  const { cadre } = await import("./pieces/cadre.ts");
+  const { pieceLayers, pieceMotion, pieceLine, piecesForEditor, pieceWordsOf, unplayedPiece, MAX_PIECES } = await import("./pieces.ts");
+  assert.equal(MAX_PIECES, 1);
+  const layers = [
+    { motion: { brief: "Her hook, « pov : ton samedi » over her widest shot" }, from: 0, to: 2 },
+    { motion: { brief: "[borrow: cadre] Her reading room opening frame after frame" }, from: 1.2, to: 4.8 },
+    { motion: { brief: "[borrow: cadre] again" }, from: 5, to: 6.5 },
+    { motion: { brief: "[borrow: cadre] the composition" }, from: 0, to: 7, compose: true },
+  ];
+  // The first layer naming one of the pieces offered, never a composition; one per Reel.
+  assert.deepEqual(pieceLayers({ layers }, ["cadre"]), [{ index: 1, key: "cadre" }]);
+  assert.deepEqual(pieceLayers({ layers }, ["titre-derriere"]), []);
+  assert.deepEqual(pieceLayers({ layers: [{ motion: { brief: "[borrow: cadres]" }, from: 0, to: 2 }] }, ["cadre"]), []);
+  // Its layer: its code with its object named, its words and marks, what it draws on her shots by their index among her shots.
+  const plan: Pick<EditPlan, "segments" | "tempo"> = {
+    tempo: 90,
+    segments: [
+      { clip_id: "lead", in: 0, out: 1.2, zoom: "none" },
+      { motion: { brief: "an animation" }, duration: 1 },
+      { clip_id: "wide", in: 2, out: 2.6, zoom: "none" },
+      { clip_id: "b", in: 0, out: 0.6, zoom: "none" },
+      { clip_id: "c", in: 0, out: 0.6, zoom: "none" },
+    ],
+  };
+  const motion = pieceMotion({ piece: cadre, fill: { texts: { gauche: "nouveautés" }, objects: { porte: "back door" }, settings: {} }, plan, layer: { from: 2.2, to: 4, motion: { brief: "[borrow: cadre] …", js: "old", code: "old" } }, bpm: 90 });
+  assert.ok(motion.code!.includes('"back door"') && !motion.code!.includes('"@porte"'));
+  assert.equal(motion.js, motion.code);
+  assert.equal(motion.texts!.gauche, "nouveautés");
+  assert.equal(motion.texts!.beat, "20");
+  // Its door on the first shot under it: the second of her shots (the animation in between is not one of her shots).
+  assert.deepEqual(motion.drawn, { shots: 4, objects: [{ shot: 1, name: "back door" }] });
+  assert.deepEqual(motion.piece, { key: "cadre", version: cadre.version });
+  assert.equal(motion.brief, "[borrow: cadre] …");
+  assert.deepEqual(pieceWordsOf(cadre, motion), { gauche: "nouveautés" });
+  // When it cannot play, the motion designer gets its brief alone (its code given as its base, elsewhere).
+  assert.deepEqual(unplayedPiece(motion), { brief: "[borrow: cadre] …" });
+  // The editor's line and rule: one at most, laid in « layers », named in its brief.
+  assert.match(pieceLine(cadre), /^cadre — Cadre dans le cadre : .* Il faut : .* Se pose : .*\(2 à 8 s\)\. Ses mots : .*16 signes au plus, facultatif/);
+  const offered = piecesForEditor([cadre])!;
+  assert.match(offered.rule, /lay ONE, never more/);
+  assert.match(offered.rule, /\[borrow: <key>\]/);
+  assert.equal(piecesForEditor([]), undefined);
+});

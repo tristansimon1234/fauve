@@ -303,6 +303,11 @@ export const editPlanMotionSegmentSchema = z.object({
      * the shots it cuts her out on and the objects it follows, read instead of its code. Set by the engine.
      */
     drawn: motionDrawnSchema.optional(),
+    /**
+     * A ready-to-play effect of the bank (pieces.ts): its key (its model's) and the version its code is, played as it is
+     * over the shots under it, its words written by its filler. Set by the engine; a correction fills it again.
+     */
+    piece: z.object({ key: z.string().min(1).max(40), version: z.number().int().min(1) }).optional(),
   }),
   duration: z.number().min(1).max(8),
   /**

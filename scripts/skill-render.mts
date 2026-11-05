@@ -50,6 +50,12 @@
 // as the render gets them for track(frame) and for framing her face.
 // What its code reads on her shots besides their clear areas (LightUnder, VanishingPoint, SkylineAt: shot_read.py, by
 // PYTHON) is read here too, on her own files, as the engine reads it (never a ground: Skyline draws nothing here).
+//
+// An effect of the bank (packages/agent/src/pieces.ts, piece-library.ts) is rendered the same way, laid over a span of a
+// plain montage of her clips, as the editor lays it: --piece <key> [--module packages/agent/src/pieces/<key>.ts]
+// --span 0,4.2 (seconds of the Reel) [--cast '[[0,1.5,2.4],[1,0,0.6]]' (each shot: its file's place in --clips, where it
+// starts, how long it lasts; else each clip a shot of --each seconds, 1.2 by default)] [--bpm 100] --words '{…}' (its
+// slots) --named '{…}' (its objects) [--settings '{…}']; its check is the layer's, as the engine runs it on an animation.
 
 import { execFileSync, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -60,6 +66,8 @@ import { buildReelProps, readsSpoken } from "../packages/agent/src/motion.ts";
 import { HOUSE_MODELS, houseStyle } from "../packages/agent/src/house-models.ts";
 import { HDR_MARKS, HDR_TAGS, HDR_TO_SDR, PREPARED_CODEC, preparedFilter } from "../packages/agent/src/prepare.ts";
 import { MONTAGE_SKILLS } from "../packages/agent/src/skill-library.ts";
+import { EFFECT_PIECES } from "../packages/agent/src/piece-library.ts";
+import { pieceTestPlan, type EffectPiece } from "../packages/agent/src/pieces.ts";
 import { isClipSegment } from "../packages/agent/src/schemas.ts";
 import { followedFrom, signatureOf } from "../packages/agent/src/steal.ts";
 import { clearPassages, layerObjects, objectKey, objectPassages, readPassages, shotReadingSchema, subjectKey, subjectShots, type ClearMap, type ShotReading } from "../packages/agent/src/subject.ts";
@@ -104,20 +112,27 @@ const { values } = parseArgs({
     said: { type: "string" },
     takes: { type: "string" },
     tracks: { type: "string" },
+    piece: { type: "string" },
+    span: { type: "string" },
+    each: { type: "string" },
   },
 });
 /** A JSON option given as text or as the path of a file. */
 const json = <T,>(value: string | undefined): T | undefined => (value === undefined ? undefined : (JSON.parse(existsSync(value) ? readFileSync(value, "utf8") : value) as T));
-// A skill of the library, or one being written (its module exports it, under any name).
-const loaded = values.module ? (Object.values(await import(resolve(values.module))) as MontageSkill[]).find((x) => x && typeof x === "object" && "timeline" in x) : undefined;
-const skill = loaded ?? MONTAGE_SKILLS[values.skill ?? ""];
-if (!skill) throw new Error(`--skill: one of ${Object.keys(MONTAGE_SKILLS).join(", ")}, or --module <its file>`);
-const model = HOUSE_MODELS.find((m) => m.key === skill.key);
+// A skill of the library, or one being written (its module exports it, under any name); or an effect of the bank (--piece).
+const exported = values.module ? (Object.values(await import(resolve(values.module))) as unknown[]).filter((x): x is Record<string, unknown> => Boolean(x) && typeof x === "object") : [];
+const piece = values.piece ? ((exported.find((x) => "lays" in x && "code" in x) as EffectPiece | undefined) ?? EFFECT_PIECES[values.piece]) : undefined;
+if (values.piece && !piece) throw new Error(`--piece: one of ${Object.keys(EFFECT_PIECES).join(", ")}, or --module <its file>`);
+const loaded = piece ? undefined : (exported.find((x) => "timeline" in x && "shots" in x && !("lays" in x)) as MontageSkill | undefined);
+const skill = piece ? (undefined as unknown as MontageSkill) : (loaded ?? MONTAGE_SKILLS[values.skill ?? ""]);
+if (!skill && !piece) throw new Error(`--skill: one of ${Object.keys(MONTAGE_SKILLS).join(", ")}, or --module <its file>`);
+const key = piece?.key ?? skill.key;
+const model = HOUSE_MODELS.find((m) => m.key === key);
 const ROOT = resolve(import.meta.dirname, "..");
 const RENDER = `${ROOT}/apps/render`;
 if (!existsSync(`${RENDER}/build`)) throw new Error("apps/render/build is missing: bundle it first (see the top of this file)");
 const CHROME = process.env.CHROME ?? "/opt/pw-browsers/chromium-1243/chrome-linux64/chrome";
-const job = `skill-${skill.key}`;
+const job = piece ? `piece-${key}` : `skill-${key}`;
 const media = `${RENDER}/build/public/jobs/${job}`;
 mkdirSync(media, { recursive: true });
 
@@ -169,7 +184,7 @@ if (!files.length) throw new Error("--clips: at least one file");
 
 // A fill made by hand, as the filler would: her files in turn, a video's later moments when it comes back; or as cast.
 const cast = values.cast ? (JSON.parse(values.cast) as [number, number][]) : null;
-const n = cast ? cast.length : values.shots ? Math.max(skill.shots[0], Math.min(skillLongest(skill), Number(values.shots))) : skillShotCount(skill, files);
+const n = piece ? 0 : cast ? cast.length : values.shots ? Math.max(skill.shots[0], Math.min(skillLongest(skill), Number(values.shots))) : skillShotCount(skill, files);
 const seen = new Map<string, number>();
 const fill: SkillFill = {
   shots: Array.from({ length: n }, (_, i) => {
@@ -189,7 +204,7 @@ const bpm = values.bpm ? Math.round(Math.min(140, Math.max(60, Number(values.bpm
 type Timed = { w: string; start: number; end: number };
 const spoken: Record<string, Timed[]> = {};
 let talk: SkillTalk | undefined;
-if (skill.voice) {
+if (!piece && skill.voice) {
   const given = json<{ words: Timed[]; pauses?: { start: number; end: number }[]; fillers?: Timed[] }>(values.talk);
   if (!given?.words?.length) throw new Error("--talk: her words in her first clip, as Scribe times them (a skill timed on her voice)");
   const main = files[0]!;
@@ -226,8 +241,24 @@ if (skill.voice) {
   console.log(`her talk: ${talk.pieces.length} pieces, ${talk.duration} s, ${talk.words.length} words; words of her other angles roughly ${files.slice(1).map((f) => `${f.id} ${wordsOffset(given.words, spoken[f.id] ?? [])?.offset ?? "—"} s`).join(", ") || "none"}`);
 }
 // The model followed as production follows it (her inspiration row's style: houseStyle), chosen by her, or by Edith (--dressed).
-const followed = model && !values["no-finish"] ? followedFrom("local", houseStyle(model), false, values.dressed) : undefined;
-const plan = dressSkillPlan(skillPlan({ skill, name: model?.name ?? skill.key, files, fill, ...(bpm ? { bpm } : {}), ...(talk ? { talk } : {}) }), skill, followed);
+const followed = model && !piece && !values["no-finish"] ? followedFrom("local", houseStyle(model), false, values.dressed) : undefined;
+// An effect of the bank: her clips as a plain montage (cast by hand: [file, start, length], else each one a shot of --each
+// seconds), the effect laid over --span as the editor lays it, filled as its filler would (--words, --named, --settings).
+const laidShots = piece
+  ? cast
+    ? (cast as unknown as [number, number, number][]).map(([k, at, seconds]) => ({ file: files[k]!.id, at, seconds, photo: files[k]!.photo }))
+    : files.map((f) => ({ file: f.id, at: f.photo ? 0 : Math.max(0, Math.min(f.seconds - Number(values.each ?? 1.2), f.seconds / 3)), seconds: Number(values.each ?? 1.2), photo: f.photo }))
+  : [];
+const span = (values.span ?? "").split(",").map(Number);
+const plan = piece
+  ? pieceTestPlan({
+      piece,
+      shots: laidShots,
+      span: [Number.isFinite(span[0]) ? span[0]! : 0, Number.isFinite(span[1]) ? span[1]! : laidShots.reduce((t, s) => t + s.seconds, 0)],
+      fill: { texts: fill.texts, objects: fill.objects ?? {}, settings: fill.settings ?? {} },
+      bpm: bpm ?? 100,
+    })
+  : dressSkillPlan(skillPlan({ skill, name: model?.name ?? skill.key, files, fill, ...(bpm ? { bpm } : {}), ...(talk ? { talk } : {}) }), skill, followed);
 const fonts = (values.fonts || "").split(",").map((f) => f.trim()).filter(Boolean);
 console.log(
   followed
@@ -341,19 +372,23 @@ const props = buildReelProps(plan, {
   // Her words in each clip (on her voice): her subtitles, and what its code reads of what she says (`spoken`).
   ...(Object.keys(spoken).length ? { words: spoken } : {}),
 });
-const out = resolve(values.out ?? `${ROOT}/${skill.key}.mp4`);
+const out = resolve(values.out ?? `${ROOT}/${key}.mp4`);
 writeFileSync(`${out}.plan.json`, JSON.stringify(plan, null, 1));
 writeFileSync(`${out}.props.json`, JSON.stringify(props));
-console.log(`${skill.key} v${skill.version}: ${plan.segments.length} shots, ${plan.duration} s at ${plan.tempo ?? skill.bpm} BPM, texts ${plan.texts.map((t) => `« ${t.text} » ${t.from}–${t.to} s${t.font ? ` (${t.font})` : ""}`).join(", ")}`);
+console.log(
+  piece
+    ? `effect ${key} v${piece.version}: over ${plan.layers?.[0]?.from}–${plan.layers?.[0]?.to} s of ${plan.segments.length} shots, ${plan.duration} s at ${plan.tempo} BPM, words ${JSON.stringify(fill.texts)}`
+    : `${skill.key} v${skill.version}: ${plan.segments.length} shots, ${plan.duration} s at ${plan.tempo ?? skill.bpm} BPM, texts ${plan.texts.map((t) => `« ${t.text} » ${t.from}–${t.to} s${t.font ? ` (${t.font})` : ""}`).join(", ")}`,
+);
 
-// The scene check, as the engine runs it on a composition (its marks as its slot texts).
-const layer = props.layers?.find((l) => l.compose);
-if (!layer) throw new Error("no composition in the props");
+// The scene check, as the engine runs it on a composition (its marks as its slot texts), or on an effect's layer.
+const layer = piece ? props.layers?.[0] : props.layers?.find((l) => l.compose);
+if (!layer) throw new Error(piece ? "no layer in the props (its span under a second, or its code not drawn)" : "no composition in the props");
 writeFileSync(
   `${out}.scenes.json`,
   JSON.stringify([
     {
-      id: "skill",
+      id: piece ? "piece" : "skill",
       js: layer.js,
       durationInFrames: layer.durationInFrames,
       texts: layer.texts,
