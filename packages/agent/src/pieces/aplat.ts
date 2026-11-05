@@ -208,7 +208,7 @@ export const aplat: EffectPiece = {
   name: "Toi sur un aplat de couleur",
   how: "sa silhouette détourée marche seule sur un grand aplat de couleur vive (sa couleur quand elle l'est, sinon un rouge pur), blanche et lumineuse trois images, puis à ses couleurs avec son ombre portée ; un temps après, son vrai plan revient autour d'elle du plus près au plus loin, le sol sous ses pieds d'abord, puis le reste du sol en un éclair blanc, puis son ciel en un éclair blanc ; son plan entier, et le montage reprend.",
   needs: "une vidéo de quelqu'un qui marche (elle ou quelqu'un de l'équipe), de dos ou de profil, en entier dans l'image, le sol bien visible et du ciel ou un plafond en haut, à contre-jour de préférence.",
-  lays: "sur un seul de ses plans, quelqu'un qui marche en pied, coupé de 5 à 6 temps ; le montage reprend sur ce même plan, entier",
+  lays: "sur un seul de ses plans, quelqu'un qui marche en pied, coupé de 5 à 7 temps (son plan revient entier à la fin de l'effet)",
   shots: [1, 1],
   seconds: [2, 5],
   require: { files: 1, shot: { framing: ["wide", "medium"], person: true, video: true } },
