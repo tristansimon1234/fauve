@@ -98,26 +98,29 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const up = (s) => String(s || "").toUpperCase().replace(/(\d)(\s?)H(?![A-ZÀ-ÖØ-Ý])/g, "$1$2h");
   const chunkText = (x) => x.map((w) => w.w).join(" ").replace(/[,;:]+$/, "").replace(/([^.])\.$/, "$1");
 
-  // 4. The line her words are set on, the original's at 59,3 % of the height; on her own shots off her face, read once a
-  // shot: under her chin when her face is on it, else above her head.
+  // 4. The line her words are set on, the original's at 59,3 % of the height; on her own shots off her face (read once a
+  // shot), as tall as each text is: under her chin when it fits there, else above her head.
   const LINE = Math.round(H * 0.593);
-  const lines = React.useMemo(() => Array.from({ length: talkN }, (_, k) => {
-    if (typeof track !== "function" || !list[k]) return LINE;
+  const faces = React.useMemo(() => Array.from({ length: talkN }, (_, k) => {
+    if (typeof track !== "function" || !list[k]) return null;
     const seen = track(Math.round(list[k].from + list[k].durationInFrames / 2), { shot: k, left: BOX.left, top: BOX.top, width: BOX.width, height: BOX.height }) || {};
-    const faces = (seen.faces || []).filter((x) => x && x.width > 0 && x.height > 0);
-    if (!faces.length) return LINE;
-    const face = faces.reduce((a, b) => (b.width * b.height > a.width * a.height ? b : a));
-    const top = face.y - face.height * 0.95;
-    const bottom = face.y + face.height * 0.75;
-    if (bottom < LINE - H * 0.05 || top > LINE + H * 0.05) return LINE;
-    if (bottom + H * 0.06 <= H * 0.7) return Math.round(bottom + H * 0.06);
-    return top - H * 0.06 >= H * 0.3 ? Math.round(top - H * 0.06) : LINE;
+    const found = (seen.faces || []).filter((x) => x && x.width > 0 && x.height > 0);
+    if (!found.length) return null;
+    const face = found.reduce((a, b) => (b.width * b.height > a.width * a.height ? b : a));
+    return { top: face.y - face.height * 0.95, bottom: face.y + face.height * 0.75 };
   }), [talkN, track]);
+  const place = (face, half) => {
+    if (!face || face.bottom < LINE - half - H * 0.01 || face.top > LINE + half + H * 0.01) return LINE;
+    const under = face.bottom + half + H * 0.02;
+    if (under + half <= H * 0.75) return Math.round(under);
+    const over = face.top - half - H * 0.02;
+    return over - half >= H * 0.06 ? Math.round(over) : LINE;
+  };
 
   // 5. What plays: her image of now, else her talk; from her formula on, her face alone.
   const now = frame >= hush ? null : refs.find((r) => frame >= r.from && frame < r.to) || null;
   const picture = now ? h(Footage, { key: "ref" + now.i, shot: now.i, at: now.from, style: laid }) : list.length ? h(Footage, { key: "her" + cur, shot: cur, style: laid }) : null;
-  const y = now ? LINE : lines[cur] || LINE;
+  const face = now ? null : faces[cur] || null;
 
   // 6. Her words in her title font in capitals, cream, a soft dark shadow, no box: small; her strong words 1,75 times as
   // big; her formula 3,3 times, on two lines, to the end. Each box centred, left of the apps' buttons, above the bottom
@@ -126,7 +129,7 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const B = Math.round(S * 1.75);
   const F = Math.round(S * 3.3);
   const type = (size) => ({ fontFamily: display, fontWeight: 700, fontSynthesis: "none", fontSize: size, lineHeight: 1, letterSpacing: "0.01em", color: "#f2e9dc", textShadow: "0 0 7px rgba(0,0,0,0.55), 0 2px 4px rgba(0,0,0,0.5)", textAlign: "center", whiteSpace: "nowrap" });
-  const at = (tall) => ({ position: "absolute", left: 140, width: W - 280, top: Math.round(Math.max(H * 0.06, Math.min(H * 0.75 - tall, y - tall / 2))), height: Math.round(tall) });
+  const at = (tall) => { const y = place(face, tall / 2); return { position: "absolute", left: 140, width: W - 280, top: Math.round(Math.max(H * 0.06, Math.min(H * 0.75 - tall, y - tall / 2))), height: Math.round(tall) }; };
   const strongNow = strong.find((t) => frame >= t.from && frame < t.to) || null;
   const chunkNow = !strongNow && frame < hush ? shown.find((s) => frame >= s.from && frame < s.to) || null : null;
   const said = formula && frame >= formula.from

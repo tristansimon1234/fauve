@@ -245,8 +245,8 @@ test("« Le plat, puis la dégustation »: every word in the safe zone, off her 
   const face = { x: 540, y: 900, width: 300, height: 260 };
   const moved = seen(drawAt(layer, onHer, { face }));
   assert.ok(Number(moved.at!.top) >= face.y + face.height * 0.75, JSON.stringify(moved.at));
-  // A bigger face down to the bottom of the frame: above her head.
-  const big = { x: 540, y: 1050, width: 300, height: 360 };
+  // A face down to the bottom quarter, no room under her chin: above her head.
+  const big = { x: 540, y: 1150, width: 300, height: 360 };
   const above = seen(drawAt(layer, onHer, { face: big }));
   assert.ok(Number(above.at!.top) + Number(above.at!.height) <= big.y - big.height * 0.95, JSON.stringify(above.at));
   // A face above the line leaves it where the original has it.
