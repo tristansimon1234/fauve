@@ -1,10 +1,12 @@
 import { after } from "next/server";
 import { z } from "zod";
 import {
+  borrowedEffects,
   CHAT_MODEL,
   CLAUDE_MODEL,
   DEFAULT_EFFORT,
   directorOutputSchema,
+  HOUSE_MODELS,
   editPlanSchema,
   effortSchema,
   GEMINI_MODEL_ID,
@@ -55,6 +57,10 @@ import { photoRegions } from "@/lib/video/regions";
 //                        to compare them on the same case (else decided as for her);
 //                        free=1 makes it in none of Edith's models (the creative test: the editor and the motion
 //                        designer free with every tool), effort=rapide|soigne|max at that care (else the default);
+//                        a Reel in none of Edith's models (free=1, or a Reel to copy that no model plays) borrows
+//                        one or two of their signature effects, its motion designer starting from their code
+//                        (lib/agent/borrowed-effects.ts); effects=0 lends none: the chain as before (the director
+//                        for a copy), to compare on the same videos;
 //                        idea=<her words> is what she writes in « Ce que tu imagines » (else the
 //                        case's idea), sent as the Créer screen sends it: the post's title, and
 //                        « Ce que la gérante imagine : … » for the editor and the voice;
@@ -75,7 +81,7 @@ import { photoRegions } from "@/lib/video/regions";
 //   ?case=…&step=upload&file=<name>.mp4|mov|jpg  a signed upload URL (2 h) for a file of hers into the
 //                        lab studio ({studio}/lab/<name>), for own= and steal=lab:.
 //   ?case=…&step=result  every version: its render (signed link, 24 h), the plan kept
-//                        (without the scenes' code), the delivered message, what this Reel cost
+//                        (without the scenes' code; borrowed: the models' effects its briefs borrow), the delivered message, what this Reel cost
 //                        (costs) and what the lab studio has spent over all its runs (studio_costs).
 //   ?case=…&step=music   the version kept rendered again with a newly composed piece, the
 //                        montage untouched: to hear a change to the music without a new montage.
@@ -137,6 +143,8 @@ type LabCase = {
   free?: boolean;
   /** Its level of care for this run (effort=rapide|soigne|max), else the default. */
   effort?: Effort;
+  /** False (effects=0): no effect of Edith's models lent to this Reel, the chain as before, to compare with the test. */
+  effects?: boolean;
 };
 
 const CASES: Record<string, LabCase> = {
@@ -797,7 +805,7 @@ async function startSite(url: string, kindName: string, withClips: boolean, rese
   await montage(siteKey(url), studioId, { title: kind.title, idea: idea ?? kind.idea, template }, videos, photos, voice, copy);
 }
 
-async function montage(name: string, studioId: string, c: Pick<LabCase, "title" | "idea" | "template" | "route" | "free" | "effort">, videos: string[], photos: string[], voice: LabVoice, copy: string | null = null) {
+async function montage(name: string, studioId: string, c: Pick<LabCase, "title" | "idea" | "template" | "route" | "free" | "effort" | "effects">, videos: string[], photos: string[], voice: LabVoice, copy: string | null = null) {
   const db = supabaseAdmin();
   // Everything read first, as when she sends them: Gemini watches each video, each photo is framed.
   const [analyses] = await Promise.all([
@@ -846,6 +854,7 @@ async function montage(name: string, studioId: string, c: Pick<LabCase, "title" 
     effort: c.effort ?? DEFAULT_EFFORT,
     ...(c.route ? { route: c.route } : {}),
     ...(c.free ? { free: true } : {}),
+    ...(c.effects === false ? { effects: false } : {}),
   });
   console.log("lab: montage started", name, post.data.id);
 }
@@ -1006,6 +1015,17 @@ async function result(key: string) {
     costs: byKind(post.data.created_at as string),
     studio_costs: byKind(),
     steal: await stolenStyles(studioId),
+    // The effects of Edith's models its animations borrowed (« [borrow: <key>] » in their briefs; lib/agent/borrowed-effects.ts).
+    borrowed: plan.success
+      ? [
+          ...new Set(
+            borrowedEffects(
+              [...plan.data.segments.flatMap((s) => (isMotionSegment(s) ? [s.motion.brief] : [])), ...(plan.data.layers ?? []).map((l) => l.motion.brief)],
+              HOUSE_MODELS.map((m) => m.key),
+            ).flat(),
+          ),
+        ]
+      : [],
     // The plan kept, readable: the scenes' code left out.
     plan: plan.success
       ? {
@@ -1201,6 +1221,8 @@ export async function POST(request: Request) {
     ...(route ? { route: route as "agent" | "chain" } : {}),
     ...(params.get("free") === "1" ? { free: true } : {}),
     ...(effort ? { effort: effort as Effort } : {}),
+    // effects=0: none of the models' effects lent, the chain as before (to compare with the test on the same videos).
+    ...(params.get("effects") === "0" ? { effects: false } : {}),
   };
   // « Steal »: a Reel's link, a video file's URL (https), or a video uploaded to the lab studio (lab:<file>).
   const steal = params.get("model") ? `house:${params.get("model")}` : params.get("steal");

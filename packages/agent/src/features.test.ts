@@ -10365,3 +10365,112 @@ test("a composition's titles in the font her signature gives titles; the other k
   assert.equal(titleFonts({ displayFont: "Anton", bodyFont: "IBM Plex Mono", signature: { titles: { font: "body" as const } } }).displayFont, "Anton");
 });
 
+// ---------------------------------------------------------------------------
+// The models' signature effects, lent to a Reel in none of them (house-effects.ts; Tristan on the creative test of
+// 5 November: « il faut capitaliser sur ce qu'on sait faire au lieu de réinventer »).
+// ---------------------------------------------------------------------------
+
+test("the models' signature effects: one short line each for the editor, named by the catalogue, each with code to lend", async () => {
+  const { HOUSE_EFFECTS, houseEffectLine, houseEffectLines } = await import("./house-effects.ts");
+  const { HOUSE_MODELS } = await import("./house-models.ts");
+  const { MONTAGE_SKILLS } = await import("./skill-library.ts");
+  const { HOUSE_EXAMPLES } = await import("./house-examples.ts");
+  // Every model has its effect, and only the models: a new model adds its line (« Passage de relais »), a model gone takes it away.
+  assert.deepEqual(Object.keys(HOUSE_EFFECTS).sort(), HOUSE_MODELS.map((m) => m.key).sort(), "each model of house-models.ts has its line in HOUSE_EFFECTS (house-effects.ts), from its fiche");
+  // Each one lends code to start from: its skill's (all 33 are coded), else its reference composition.
+  for (const m of HOUSE_MODELS) assert.ok((MONTAGE_SKILLS[m.key]?.code ?? (m.example ? HOUSE_EXAMPLES[m.example]?.code : ""))?.includes("function Scene"), m.key);
+  const lines = houseEffectLines();
+  assert.equal(lines.length, HOUSE_MODELS.length);
+  // In the catalogue's order, by its key and its name (a renamed model follows), what it does, then what it needs in her videos.
+  lines.forEach((line, i) => {
+    const m = HOUSE_MODELS[i]!;
+    assert.ok(line.startsWith(`${m.key} — ${m.name} : `), line);
+    assert.match(line, /[^.]\. Il faut : [^.].+\.$/, line);
+    assert.ok(line.length <= 360, `${m.key}: ${line.length} characters`);
+    const effect = HOUSE_EFFECTS[m.key]!;
+    assert.ok(effect.effet.length >= 60 && effect.il_faut.length >= 40, m.key);
+    // Never the marker the editor writes, nor an original's own words.
+    assert.doesNotMatch(line, /\[borrow|LOS ANGELES|HOLLYWOOD|In-N-Out/i);
+  });
+  // Short: the whole catalogue in about 2 500 tokens of the editor's input.
+  assert.ok(lines.join("\n").length < 10_000, String(lines.join("\n").length));
+  // The task's own example: her name behind the scenery, on a fixed shot with sky.
+  assert.match(houseEffectLine("titre-derriere")!, /^titre-derriere — Titre derrière le décor : son nom géant .*derrière ses toits.* Il faut : un plan large et fixe .*du ciel en haut/);
+  assert.equal(houseEffectLine("inconnu"), undefined);
+  // Only the models given, in the catalogue's order.
+  assert.deepEqual(houseEffectLines(["vision", "decode", "inconnu"]).map((l) => l.split(" ")[0]), ["decode", "vision"]);
+});
+
+test("the editor borrows one or two of the models' effects in its input, named in an animation's brief; a copy remakes only its own", async () => {
+  const { houseEffectsForEditor, MAX_BORROWED } = await import("./house-effects.ts");
+  const { EDITOR_SYSTEM_PROMPT } = await import("./editor.ts");
+  const free = houseEffectsForEditor(["titre-derriere", "decode", "inconnu"], { copy: false })!;
+  assert.deepEqual(free.effets.map((l) => l.split(" ")[0]), ["decode", "titre-derriere"]);
+  // In none of her models: one or two that her videos allow, as an animation over her montage or its composition.
+  assert.match(free.rule, /one or two of these effects, never more/);
+  assert.match(free.rule, /what her videos really have \(each one's « Il faut »\)/);
+  assert.match(free.rule, /over her montage.*or the whole Reel's composition \(« form » « composition »\)/);
+  assert.match(free.rule, /Begin its brief with \[borrow: <key>\] \(\[borrow: <key>, <key>\] for a composition that takes two\)/);
+  assert.match(free.rule, /motion designer starts from that model's code/);
+  assert.match(free.rule, /none rather than a forced one/);
+  assert.doesNotMatch(free.rule, /reel_a_recopier/);
+  // A Reel she copies: only an effect it has, remade from the model's code instead of invented again.
+  const copy = houseEffectsForEditor(["titre-derriere"], { copy: true })!;
+  assert.match(copy.rule, /This Reel copies the Reel she sent \(« reel_a_recopier »\)/);
+  assert.match(copy.rule, /remake it from the model's code instead of inventing it again/);
+  assert.match(copy.rule, /never an effect the Reel she copies does not have: none when none matches/);
+  // Nothing lent, nothing said.
+  assert.equal(houseEffectsForEditor([], { copy: false }), undefined);
+  assert.equal(houseEffectsForEditor(["inconnu"], { copy: true }), undefined);
+  assert.equal(MAX_BORROWED, 2);
+  // Its rule rides in its input with the lines, as the font pairs do: its prompt stays under 17 000 characters, and its
+  // answer has no new field (the brief names the model: the answer's optional parameters are tested below their limit).
+  assert.doesNotMatch(EDITOR_SYSTEM_PROMPT, /borrow|effets_des_modeles/);
+  assert.ok(EDITOR_SYSTEM_PROMPT.length < 17_000);
+});
+
+test("an animation's brief names the models it borrows, by key or by name: two distinct ones at most over the Reel", async () => {
+  const { borrowedEffects, briefBorrows } = await import("./house-effects.ts");
+  const { HOUSE_MODELS } = await import("./house-models.ts");
+  const all = HOUSE_MODELS.map((m) => m.key);
+  assert.deepEqual(briefBorrows("[borrow: titre-derriere] Her name « Brighton » rising behind the hotels of the front.", all), ["titre-derriere"]);
+  // As the editor may write it: spaces, capitals, two keys in the order it names them, a model's name, its punctuation.
+  assert.deepEqual(briefBorrows("[Borrow : Frappe, decode] The whole Reel: bands, then her name typed…", all), ["frappe", "decode"]);
+  assert.deepEqual(briefBorrows("[borrow: decode + frappe]", all), ["decode", "frappe"]);
+  assert.deepEqual(briefBorrows("[borrow: Titre derrière le décor] her name behind the roofs", all), ["titre-derriere"]);
+  assert.deepEqual(briefBorrows("[borrow: « Quart de tour, deux tons »]", all), ["tourne"]);
+  assert.deepEqual(briefBorrows("Opening: [borrow: mosaique]; ending: [borrow: interrupteur].", all), ["mosaique", "interrupteur"]);
+  // A key inside another word, a model not lent, a model named outside the mark: nothing.
+  assert.deepEqual(briefBorrows("[borrow: decoder]", all), []);
+  assert.deepEqual(briefBorrows("[borrow: titre-derriere]", ["decode"]), []);
+  assert.deepEqual(briefBorrows("Her name behind the roofs, as in titre-derriere.", all), []);
+  // Over the Reel, in its order: the first two models named; a third left out; one named again still its own.
+  assert.deepEqual(borrowedEffects(["[borrow: decode]", "[borrow: frappe, vision]", "Her offer, « -20 % »", "[borrow: decode] its ending"], all), [["decode"], ["frappe"], [], ["decode"]]);
+  assert.deepEqual(borrowedEffects(["[borrow: decode, frappe] the composition"], all), [["decode", "frappe"]]);
+  assert.deepEqual(borrowedEffects(["[borrow: decode, frappe]", "[borrow: vision]"], all, 1), [["decode"], []]);
+  // The mark is no word on screen: a brief's quoted words stay the only ones an animation is said to write.
+  const { animationWords } = await import("./editor.ts");
+  assert.equal(animationWords({ motion: { brief: "[borrow: titre-derriere] Her name « Brighton » behind the hotels." }, duration: 3 } as never), "Brighton");
+});
+
+test("the motion designer starts from a borrowed model's code and adapts its effect to her moment, never reinvents it", async () => {
+  const { motionDesignerPrompt, MOTION_DESIGNER_PROMPT } = await import("./motion-scene.ts");
+  const parts = motionDesignerPrompt({ borrow: true }).parts;
+  assert.match(parts, /^Borrowed effects \(borrowed_effects: one, or two for a composition\)/);
+  assert.match(parts, /Your animation is not that Reel: take the effect from its code and set it on your moment, adapted, never reinvented/);
+  // Its tools and its way of reading her shots kept; its objects named from her shots; the rest of its Reel left out.
+  assert.match(parts, /how it reads her shots \(Subject, SubjectParts, ClearBox, Skyline…\)/);
+  assert.match(parts, /where its code writes « @name », an object named in plain English/);
+  assert.match(parts, /Leave out the rest of its Reel/);
+  // Two skills' code can pass 40 000 characters: the scene check refuses one over 24 000 (checkMotionCode).
+  assert.match(parts, /your code stays under 24 000 characters/);
+  // A copy: the effect looks like the Reel she copies, the code is how it is built.
+  assert.match(parts, /When the Reel she copies is shown \(model_frames\), the effect looks like that Reel/);
+  assert.match(parts, /one Reel, never a patchwork/);
+  // Only for an animation that borrows: never for a model she chose (its skill or its example), nor any other.
+  for (const other of [motionDesignerPrompt({}), motionDesignerPrompt({ skill: true }), motionDesignerPrompt({ example: true, composition: true })]) assert.doesNotMatch(other.parts, /borrowed_effects/);
+  assert.ok(MOTION_DESIGNER_PROMPT.includes(parts));
+  // The director's kit never has it (it writes its code alone).
+  assert.doesNotMatch(motionDesignerPrompt({ composition: true, photos: true, moves: true, example: true }).parts, /Borrowed effects/);
+});
+
