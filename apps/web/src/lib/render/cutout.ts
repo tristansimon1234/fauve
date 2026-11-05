@@ -31,7 +31,16 @@ export async function ensureCutouts(studioId: string, mediaIds: string[]): Promi
   if (!mediaIds.length) return;
   const db = supabaseAdmin();
   const { data: assets } = await db.from("media_assets").select("id, storage_path, kind, cutout").eq("studio_id", studioId).in("id", mediaIds);
-  const missing = (assets ?? []).filter((a) => a.kind === "image" && !currentCutout(cutoutSchema.safeParse(a.cutout).data?.model)).slice(0, MAX_PHOTOS);
+  // Ten at most, in the order asked (the photos an animation draws her on first), never the database's: « Voici mon
+  // travail » had ten of its twenty works cut out at its first bench, and not the photo of her it draws.
+  const rank = new Map<string, number>();
+  mediaIds.forEach((id, i) => {
+    if (!rank.has(id)) rank.set(id, i);
+  });
+  const missing = (assets ?? [])
+    .filter((a) => a.kind === "image" && !currentCutout(cutoutSchema.safeParse(a.cutout).data?.model))
+    .sort((a, b) => (rank.get(a.id as string) ?? 0) - (rank.get(b.id as string) ?? 0))
+    .slice(0, MAX_PHOTOS);
   if (!missing.length) return;
   const signed = await db.storage.from("media").createSignedUrls(missing.map((a) => a.storage_path as string), 3600);
   let photos = missing.flatMap((a, i) => (signed.data?.[i]?.signedUrl ? [{ id: a.id as string, url: signed.data[i]!.signedUrl }] : []));

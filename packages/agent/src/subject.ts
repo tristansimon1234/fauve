@@ -291,7 +291,11 @@ export const SUBJECT_PHOTO_MAX = 10;
  */
 export function subjectPhotoIds(plan: Pick<EditPlan, "segments" | "layers">): string[] {
   if (!(plan.layers ?? []).some((l) => drawsSubject(l.motion?.js))) return [];
-  return [...new Set(plan.segments.flatMap((s) => (isClipSegment(s) && s.photo ? [s.clip_id] : [])))].slice(0, SUBJECT_PHOTO_MAX);
+  // The photos her subject is drawn on first, then the others: past ten, those it draws are never the ones left out
+  // (« Voici mon travail » at its first bench: ten of its twenty works cut out, not the photo of her it draws).
+  const drawn = subjectShots(plan);
+  const photos = plan.segments.filter(isClipSegment).flatMap((s, k) => (s.photo ? [{ id: s.clip_id, drawn: drawn.has(k) }] : []));
+  return [...new Set([...photos.filter((p) => p.drawn), ...photos.filter((p) => !p.drawn)].map((p) => p.id))].slice(0, SUBJECT_PHOTO_MAX);
 }
 
 /** The photos of a Reel its animations draw something of (her subject, an object), so the montage plays them flat (no relief): a cut-out laid over them falls exactly on them. */

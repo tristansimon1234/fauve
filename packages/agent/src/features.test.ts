@@ -1115,8 +1115,18 @@ test("text around something of her photos: her subject, an object found on a pho
   assert.deepEqual(objectPassages(plan, () => false), [{ clip_id: "p1", from: 0, to: 0, key: objectKey("p1", 0, 0, "wine glass"), name: "wine glass", photo: true }]);
   assert.equal(objectKey("p1", 0, 0, "wine glass"), `${photoKey("p1")}#wine glass`);
   assert.ok(PHOTO_OBJECT_MAX >= 4);
-  // Her subject drawn by an animation: every photo of the Reel has its own cut-out made (none when nothing draws her).
-  assert.deepEqual(subjectPhotoIds(plan), ["p1", "p2"]);
+  // Her subject drawn by an animation: every photo of the Reel has its own cut-out made (none when nothing draws her),
+  // the one it draws her on first (ten are cut out at a time: past ten, hers is never left out).
+  assert.deepEqual(subjectPhotoIds(plan), ["p2", "p1"]);
+  const many: EditPlan = {
+    ...plan,
+    segments: Array.from({ length: 20 }, (_, k) => ({ ...plan.segments[0]!, clip_id: `w${k}` })),
+    layers: [{ ...plan.layers![0]!, motion: { ...plan.layers![0]!.motion, js: `<Subject shot={0} style={{ position: "absolute", ...laid }} />` } }],
+  };
+  assert.equal(subjectPhotoIds(many)[0], "w0");
+  assert.equal(subjectPhotoIds(many).length, 10);
+  const last: EditPlan = { ...many, layers: [{ ...many.layers![0]!, motion: { ...many.layers![0]!.motion, js: `<Subject shot={19} style={laid} />` } }] };
+  assert.equal(subjectPhotoIds(last)[0], "w19");
   assert.deepEqual(subjectPhotoIds({ ...plan, layers: [{ ...plan.layers![0]!, motion: { ...plan.layers![0]!.motion, js: ring } }] }), []);
   // Photos drawn over move flat: a relief would move her subject away from its cut-out laid over it.
   assert.deepEqual(photosDrawnOver(plan).sort(), ["p1", "p2"]);

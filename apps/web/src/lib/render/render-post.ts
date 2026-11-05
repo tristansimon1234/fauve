@@ -364,6 +364,8 @@ export async function prepareRenderAssets(studioId: string, postId: string, plan
   // Photos have their subject cut out once (an open model in its own sandbox): a collage's, laid as stickers, a
   // composed Reel's, and those an animation composes with (the design step has usually made them already).
   const toCut = [
+    // Those an animation draws her on first (ensureCutouts takes ten at a time, in this order).
+    ...subjectPhotoIds(plan),
     ...(plan.template === "collage" || isComposed(plan) ? planMediaIds(plan) : [...new Set([...scenePhotoIds(plan), ...depthPhotoIds(plan), ...subjectPhotoIds(plan)])]),
     ...copyPhotos(plan),
     // The photos she added cut out (unless she wants them whole).
