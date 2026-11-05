@@ -84,6 +84,11 @@ test("« Montage sport noir et blanc » (effect v1): its layer over a run of sho
   // Its settings: her colour and a plain entry only when asked (the defaults are never written).
   const filled = readPieceFill(nike, { fits: true, missing: "", texts: [{ slot: "mots", text: WORDS }], objects: [], settings: [{ name: "couleur", value: "sienne" }, { name: "entree", value: "strobo" }] })!;
   assert.deepEqual(filled.settings, { couleur: "sienne" });
+  // Its words are required: without them it plays nothing (the motion designer takes its brief).
+  assert.equal(readPieceFill(nike, { fits: true, missing: "", texts: [{ slot: "mots", text: "" }], objects: [], settings: [] }), null);
+  // Its words cut to their place, at the last whole word.
+  const long = readPieceFill(nike, { fits: true, missing: "", texts: [{ slot: "mots", text: `${WORDS}, transpirer, gagner, perdre` }], objects: [], settings: [] })!;
+  assert.ok(long.texts.mots!.length <= 70 && !/,$/.test(long.texts.mots!), long.texts.mots);
   // No sound of its own: the original's sound is its music.
   assert.equal(motion.sounds, undefined);
 });
