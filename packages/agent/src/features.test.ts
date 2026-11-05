@@ -4093,3 +4093,234 @@ test("« Écran partagé titré » (v2): its layout as a setting her words ask, 
   // Its music shaped on the plan: without its bass to the third bar, cut dead at the end.
   assert.deepEqual(plan.music_shape, { filters: [{ kind: "thin", from: 0, to: 4, open: 0.02 }], end: { at: plan.duration, fade: 0.012 } });
 });
+
+// ——— « Voici mon travail » v1, written on its original's fiche (docs/fiches/mon-travail.md) ——————————————————————————
+
+/** The original's 37 works as its fiche measured them, image by image at 30 i/s: when each one lands (« Pile de photos »'s own). */
+const MT_LANDS = [3, 5, 7, 10, 13, 15, 18, 21, 24, 26, 29, 32, 35, 37, 40, 42, 43, 48, 51, 54, 56, 59, 62, 65, 67, 70, 73, 76, 80, 85, 89, 95, 101, 107, 114, 123, 130];
+/** And when each one leaves, where it is seen leaving (null: already covered); its 31st leaves after 55 images, as pile's. */
+const MT_LEAVES = [123, 125, 127, 130, 133, 135, 138, 141, 144, 146, 149, 152, 155, 157, 160, 162, null, 168, 171, 174, 176, 179, 182, 185, 187, null, 193, 196, 200, 205, 144, 211, 217, 227, 234, 239, 244];
+/** What its code lays at a frame: her shot, each work's shot, its box and where its Footage plays from, her cut-out, in drawing order. */
+const travailDrawn = (code: string, frame: number, props: Record<string, unknown>, read: { boxes?: Record<string, TdBox>; outlines?: Record<string, string> } = {}) => {
+  const tree = drawCutOuts(code, frame, { width: 1080, height: 1920, brand: { name: "Atelier Terre", displayFont: "Inter Tight", bodyFont: "Inter Tight", accent: "#b5543a" }, reelTexts: [], end: null, ...props }, read);
+  const nodes = drawnNodes(tree);
+  const works = nodes.flatMap((n) => {
+    const footage = n.type === "div" && styleOf(n).overflow === "hidden" ? drawnNodes(n).find((c) => c.type === "Footage") : undefined;
+    return footage ? [{ shot: footage.props.shot as number, at: footage.props.at as number, box: styleOf(n) as { left: number; top: number; width: number; height: number } }] : [];
+  });
+  const order = nodes.filter((n) => n.type === "Footage" || n.type === "Subject").map((n) => `${n.type === "Subject" ? "cut" : "shot"}${n.props.shot as number}`);
+  return { tree, nodes, works, order };
+};
+const travailMarks = (line: { marks: Record<string, number> }) => Object.fromEntries(Object.entries(line.marks).map(([k, v]) => [k, String(v)]));
+
+test("« Voici mon travail » (v1) lays her works where and when its original does, within two images, her shot under them all along", async () => {
+  const { monTravail, workLandings, frontFrom } = await import("./skills/mon-travail.ts");
+  assert.equal(monTravail.version, 1);
+  assert.equal(monTravail.bpm, 120);
+  const line = monTravail.timeline(38, { end: false });
+  // Her shot and the original's 37 works; 9,17 s (275 images), as the original.
+  assert.equal(line.shots.length, 38);
+  assert.ok(Math.abs(Math.round(line.duration * 30) - 275) <= 1, `${line.duration} s`);
+  // Each work lands where the original's does, within two images: its burst at 2 or 3 images, its nine last on the
+  // original's own slowing gaps.
+  const lands = Array.from({ length: 37 }, (_, k) => line.marks[`l${k}`]!);
+  assert.deepEqual(lands, workLandings(37).map((b) => Math.round(b * 15)));
+  lands.forEach((f, k) => assert.ok(Math.abs(f - MT_LANDS[k]!) <= 2, `work ${k + 1}: image ${f}, the original's ${MT_LANDS[k]}`));
+  const gaps = lands.slice(1).map((f, k) => f - lands[k]!);
+  assert.ok(gaps.slice(0, 27).every((g) => g === 2 || g === 3), gaps.join(" "));
+  assert.deepEqual(gaps.slice(27), [4, 5, 4, 6, 6, 6, 7, 9, 7]);
+  // Each one leaves 120 images after it landed (the original's 28 seen leaving so, its 32nd and 33rd 4 images earlier),
+  // the second-last on its hit (image 240, the original's 239), the last 5 images after; its 31st's early leaving not kept.
+  const leaves = Array.from({ length: 37 }, (_, k) => line.marks[`o${k}`]!);
+  leaves.forEach((f, k) => {
+    const seen = MT_LEAVES[k];
+    if (seen !== null && k !== 30) assert.ok(Math.abs(f - seen!) <= 3, `work ${k + 1} leaves at ${f}, the original's ${seen}`);
+  });
+  assert.equal(line.marks.hit, 240);
+  assert.equal(line.marks.last, 245);
+  assert.ok(leaves.slice(0, 35).every((f, k) => f <= lands[k]! + 120 && f < 240));
+  // Its code: each work on its image, at once, until it leaves (the top already leaving while the last two land: the
+  // full collage is never held); nothing but her and her words after the last; her shot under them at every image.
+  const shots = pileShots(line, 1, "photo");
+  const texts = travailMarks(line);
+  const seen = Array.from({ length: 276 }, (_, f) => travailDrawn(monTravail.code, f, { durationInFrames: 275, shots, texts }));
+  const on = seen.map((d) => new Set(d.works.map((w) => w.shot - 1)));
+  for (let k = 0; k < 37; k++) {
+    const from = on.findIndex((s) => s.has(k));
+    assert.equal(from, lands[k], `work ${k + 1} lands`);
+    assert.equal(on.findIndex((s, f) => f > from && !s.has(k)), leaves[k], `work ${k + 1} leaves`);
+  }
+  assert.equal(on.findIndex((s, f) => f > 3 && !s.has(0)), 123);
+  assert.ok(!on.some((s) => s.size === 37));
+  assert.ok(on.slice(245).every((s) => s.size === 0) && on[0]!.size === 0);
+  assert.ok(seen.every((d) => d.order[0] === "shot0" && d.order.includes("cut0")));
+  // Her shot first in the plan, its passage her last 6 s (held on its first image while her works burst in), a work's an
+  // image each (a photo still, a video held on its instant), the last one two seconds (it plays them).
+  assert.deepEqual([line.shots[0]!.start, line.shots[0]!.end], [0, 6]);
+  assert.equal(line.marks.hold, 95);
+  assert.ok(seen.every((d) => d.nodes.find((n) => n.type === "Footage" && n.props.shot === 0)!.props.at === 95));
+  for (let k = 1; k < 37; k++) assert.equal(Math.round((line.shots[k]!.end - line.shots[k]!.start) * 30), 1, `shot ${k + 1}`);
+  assert.equal(Math.round((line.shots[37]!.end - line.shots[37]!.start) * 30), 59);
+  for (const w of seen[130]!.works) assert.equal(w.at, lands[w.shot - 1]);
+  // The last six of 37 pass in front of her (her cut-out drawn before them), the others behind.
+  assert.equal(frontFrom(37), 31);
+  assert.equal(line.marks.front, 31);
+  const order = seen[130]!.order;
+  assert.ok(order.indexOf("cut0") > order.indexOf("shot31") && order.indexOf("cut0") < order.indexOf("shot32"), order.join(" "));
+  // With an ending card, its landings the same, longer for the engine's 1,6 s, its words up to the card.
+  const ended = monTravail.timeline(38, { end: true });
+  assert.deepEqual(Array.from({ length: 37 }, (_, k) => ended.marks[`l${k}`]), lands);
+  assert.ok(ended.duration - line.duration >= 1, `${ended.duration} s`);
+  assert.equal(ended.texts.mots!.to, Math.round((ended.duration - 1.6) * 100) / 100);
+  // At another tempo, every length in beats follows it; fewer works keep an image each and her shot the rest.
+  const slower = monTravail.timeline(38, { end: false, bpm: 100 });
+  assert.ok(Math.abs(slower.duration / line.duration - 1.2) < 0.01, `${slower.duration} s`);
+  const few = monTravail.timeline(9, { end: false });
+  assert.equal(few.shots.length, 9);
+  assert.ok(few.shots.slice(1).every((s) => Math.round((s.end - s.start) * 30) >= 1) && few.marks.hold! >= 8);
+});
+
+test("« Voici mon travail » (v1): the original's boxes, square but one, behind her but the last ones, never laid on her face uncut", async () => {
+  const { monTravail } = await import("./skills/mon-travail.ts");
+  const line = monTravail.timeline(38, { end: false });
+  const texts = travailMarks(line);
+  const shots = pileShots(line, 1, "photo");
+  const draw = (f: number, extra: Record<string, unknown> = {}, read: { boxes?: Record<string, TdBox> } = { boxes: { "0": { x: 300, y: 280, w: 480, h: 1560 } } }) =>
+    travailDrawn(monTravail.code, f, { durationInFrames: 275, shots, texts, ...extra }, read);
+  const box = (k: number) => draw(line.marks[`l${k}`]!).works.find((w) => w.shot === k + 1)!.box;
+  // In the original's boxes (measured at 720 × 1280 where nothing hides them, at 1080 × 1920 here): centre within 12 px,
+  // sides within 16; its 35th a 4:5, the others square; no turn, no border, no shadow.
+  const measured: Record<number, [number, number, number, number]> = { 0: [348, 510, 315, 312], 2: [570, 428, 477, 476], 4: [755, 528, 391, 390], 19: [765, 1056, 414, 414], 34: [823, 1477, 345, 428], 36: [584, 1503, 364, 363] };
+  for (const [k, [cx, cy, w, hh]] of Object.entries(measured)) {
+    const b = box(Number(k));
+    assert.ok(Math.abs(b.left + b.width / 2 - cx) <= 12 && Math.abs(b.top + b.height / 2 - cy) <= 12, `work ${Number(k) + 1}: ${JSON.stringify(b)}`);
+    assert.ok(Math.abs(b.width - w) <= 16 && Math.abs(b.height - hh) <= 16, `work ${Number(k) + 1}: ${JSON.stringify(b)}`);
+  }
+  const shapes = Array.from({ length: 37 }, (_, k) => Math.round((box(k).width / box(k).height) * 100) / 100);
+  assert.deepEqual(shapes.flatMap((a, k) => (a !== 1 ? [[k, a]] : [])), [[34, 0.8]]);
+  assert.doesNotMatch(monTravail.code, /boxShadow|border:|rotate\(/);
+  // On her word: each at its own shape, or all in portrait 4:5; the Reel stays vertical.
+  const wide = pileShots(line, 4 / 3, "photo");
+  const own = draw(130, { shots: wide, texts: { ...texts, format: "forme" } }).works.at(-1)!.box;
+  assert.ok(Math.abs(own.width / own.height - 4 / 3) < 0.01, JSON.stringify(own));
+  const tall = draw(130, { texts: { ...texts, format: "portrait" } }).works.at(-1)!.box;
+  assert.ok(Math.abs(tall.width / tall.height - 0.8) < 0.01, JSON.stringify(tall));
+  assert.deepEqual(monTravail.settings?.map((s) => [s.name, s.choices.map((c) => c.value)]), [["format", ["carre", "forme", "portrait"]], ["couleur", ["sienne", "pale", "original"]]]);
+  // Fewer works: bigger squares on the same surface.
+  const few = monTravail.timeline(16, { end: false });
+  const fewDrawn = travailDrawn(monTravail.code, few.marks.l3!, { durationInFrames: Math.round(few.duration * 30), shots: pileShots(few, 1, "photo"), texts: travailMarks(few) });
+  const third = fewDrawn.works.find((w) => w.shot === 4)!.box;
+  assert.ok(third.width >= 480 && third.width === third.height, JSON.stringify(third));
+  // Without her cut-out (none made in time), no work is laid over her face, as tracked: she stays seen.
+  const tracked = { track: () => ({ hands: [], faces: [{ id: 0, x: 470, y: 560, width: 150, height: 180, points: {} }], bodies: [] }) };
+  const bare = draw(60, tracked, {});
+  const face = { x: 470, y: 560, w: 150, h: 180 };
+  const covered = (b: { left: number; top: number; width: number; height: number }) =>
+    Math.max(0, Math.min(b.left + b.width, face.x + face.w) - Math.max(b.left, face.x)) * Math.max(0, Math.min(b.top + b.height, face.y + face.h) - Math.max(b.top, face.y));
+  assert.ok(bare.works.length > 0 && bare.works.every((w) => covered(w.box) <= 0.3 * face.w * face.h));
+  assert.ok(draw(60, tracked).works.some((w) => covered(w.box) > 0.3 * face.w * face.h));
+  // No grade: her shot and her works keep their colours; 15 works and her before Edith asks for more, 40 at most.
+  assert.deepEqual(monTravail.finish, { contrast: 0, saturation: 0, warmth: 0, grain: 0, vignette: 0, fade: 0 });
+  assert.deepEqual([monTravail.files, monTravail.shots], [[16, 41], [9, 41]]);
+});
+
+test("« Voici mon travail » (v1): her words in front, at the original's size, one a line, in her colour, off her face", async () => {
+  const { monTravail } = await import("./skills/mon-travail.ts");
+  const line = monTravail.timeline(38, { end: false });
+  const texts = travailMarks(line);
+  const reelTexts = [{ text: "Voici mon travail", role: "hook", from: 0, to: 275, emphasis: [] }];
+  const draw = (f: number, extra: Record<string, unknown> = {}, read: { boxes?: Record<string, TdBox>; outlines?: Record<string, string> } = {}) =>
+    travailDrawn(monTravail.code, f, { durationInFrames: 275, shots: pileShots(line, 1, "photo"), texts, reelTexts, ...extra }, read);
+  const words = (d: { nodes: Drawn[] }) => d.nodes.filter((n) => n.type === "div" && styleOf(n).height === 257);
+  const block = (d: { nodes: Drawn[] }) => d.nodes.find((n) => n.type === "FitText" && heldText(n).includes("TRAVAIL"))!;
+  // One word a line, from the first image to the last, drawn after her works and her cut-out (in front of everything).
+  for (const f of [0, 130, 274]) assert.deepEqual(words(draw(f)).map(drawnText), ["VOICI", "MON", "TRAVAIL"]);
+  const flat = draw(130).nodes;
+  assert.ok(flat.findIndex((n) => n.type === "FitText") > flat.findIndex((n) => n.type === "Subject"));
+  assert.ok(flat.findIndex((n) => n.type === "FitText") > flat.map((n) => n.type === "Footage" && Number(n.props.shot) > 31).lastIndexOf(true));
+  // Bold capitals as tall as the original's (7,3 % of the frame: a size of a tenth of it), a line every 13,4 %, centred in
+  // its box, kept clear of the apps' caption and their buttons.
+  const style = styleOf(words(draw(0))[0]!);
+  assert.equal(style.fontSize, 192);
+  assert.equal(style.fontWeight, 700);
+  assert.equal(style.lineHeight, "257px");
+  const b = styleOf(block(draw(0)));
+  assert.deepEqual([b.left, b.width, b.top, Number(b.top) + Number(b.height)], [140, 800, 394, 1430]);
+  // In her colour as it is (a soft light halo keeping it on a darker picture), a pale one deepened (its hue kept): on
+  // the white walls of a workshop, a pale tint did not read. On her word a pale tint of hers, vivid, with a thin dark
+  // edge, as the original's lime, or that lime itself; never its words.
+  const lumOf = (hex: string) => {
+    const c = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255).map((v) => (v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4));
+    return 0.2126 * c[0]! + 0.7152 * c[1]! + 0.0722 * c[2]!;
+  };
+  assert.equal(style.color, "#b5543a");
+  assert.match(String(style.textShadow), /rgba\(255,255,255,0\.5\)/);
+  const deepened = String(styleOf(words(draw(0, { brand: { name: "Atelier Terre", displayFont: "Inter Tight", bodyFont: "Inter Tight", accent: "#f6c8d2" } }))[0]!).color);
+  assert.ok(lumOf(deepened) <= 0.22 && parseInt(deepened.slice(1, 3), 16) > parseInt(deepened.slice(3, 5), 16), deepened);
+  const paleWords = styleOf(words(draw(0, { texts: { ...texts, couleur: "pale" } }))[0]!);
+  const pale = String(paleWords.color);
+  assert.ok(lumOf(pale) >= 0.6 && parseInt(pale.slice(1, 3), 16) > parseInt(pale.slice(5, 7), 16), `${pale}: her terracotta's hue, pale`);
+  assert.match(String(paleWords.textShadow), /rgba\(0,0,0,0\.55\)/);
+  assert.equal(styleOf(words(draw(0, { texts: { ...texts, couleur: "original" } }))[0]!).color, "#e7fa87");
+  assert.doesNotMatch(monTravail.code, /THIS|WORK/);
+  // Off her face: her face beside a short word, as the original's, leaves the block where it is; one under a line moves
+  // it below her face (else above it).
+  const beside = { track: () => ({ hands: [], faces: [{ id: 0, x: 160, y: 770, width: 110, height: 130, points: {} }], bodies: [] }) };
+  assert.equal(styleOf(block(draw(0, beside))).top, 394);
+  const under = { track: () => ({ hands: [], faces: [{ id: 0, x: 470, y: 420, width: 150, height: 190, points: {} }], bodies: [] }) };
+  const moved = styleOf(block(draw(0, under)));
+  assert.ok(Number(moved.top) >= 610 && Number(moved.top) + Number(moved.height) === 1430, JSON.stringify(moved));
+  // From her cut-out when she is not tracked: her head at the top of its outline (the ceramicist of its bench, arms out
+  // holding her apron's straps: her box as wide as the frame), else the top of its box.
+  const head = "M 610 397 L 687 403 L 733 459 L 742 536 L 714 605 L 1075 879 L 878 1918 L 336 1411 L 127 883 L 526 511 L 548 440 Z";
+  const outlined = styleOf(block(draw(0, {}, { boxes: { "0": { x: 119, y: 397, w: 960, h: 1523 } }, outlines: { "0": head } })));
+  assert.equal(outlined.top, 397 + Math.round(207 * 1.3) + 38);
+  const cut = styleOf(block(draw(0, {}, { boxes: { "0": { x: 330, y: 450, w: 420, h: 1400 } } })));
+  assert.ok(Number(cut.top) > 394 + 100, JSON.stringify(cut));
+  // More than four words: four lines at most, none ending on a word that belongs to the next.
+  const long = draw(0, { reelTexts: [{ text: "mes bouquets faits main à Lyon depuis dix ans", role: "hook", from: 0, to: 275, emphasis: [] }] });
+  const set = words(long).map(drawnText);
+  assert.ok(set.length <= 4 && !set.slice(0, -1).some((l) => /(^| )(À|MES)$/.test(l)), set.join(" / "));
+  // Its ending card over her: its title in the same capitals, a line under it, her words gone.
+  const ended = monTravail.timeline(38, { end: true });
+  const endFrom = Math.round(ended.duration * 30) - 48;
+  const card = travailDrawn(monTravail.code, endFrom + 5, { durationInFrames: Math.round(ended.duration * 30), shots: pileShots(ended, 1, "photo"), texts: travailMarks(ended), reelTexts, end: { title: "Atelier ouvert samedi", subtitle: "de 10 h à 18 h", from: endFrom } });
+  assert.deepEqual(words(card).map(drawnText), ["ATELIER", "OUVERT", "SAMEDI"]);
+  assert.ok(heldText(card.tree).includes("de 10 h à 18 h") && !heldText(card.tree).includes("TRAVAIL"));
+});
+
+test("« Voici mon travail » (v1): its clicks slowing down on their measured moments, a dry knock as the collage empties, its music lighter after", async () => {
+  const { monTravail } = await import("./skills/mon-travail.ts");
+  const { skillPlan, skillFillInput } = await import("./skills.ts");
+  const line = monTravail.timeline(38, { end: false });
+  // The original's clicks from 1,6 s (images, measured on its sound, the same as pile's) and its hit at 7,962 s: each
+  // within two images.
+  const original = [48, 50.1, 52.1, 54.2, 56.5, 58.9, 61, 63.7, 66.7, 69.6, 72.8, 75.6, 79.4, 83, 86.7, 90.9, 95.6, 100.4, 105.5, 111.1, 117.4, 124, 131.3, 139.7, 148.7, 159.1, 170.8, 184.1, 199.6, 218.2, 238.9];
+  const sounds = line.sounds!;
+  assert.equal(sounds.length, original.length);
+  sounds.forEach((s, i) => assert.ok(Math.abs(s.at * 30 - original[i]!) <= 2, `sound ${i + 1}: image ${s.at * 30}, the original's ${original[i]}`));
+  assert.deepEqual(sounds.at(-1), { at: line.marks.hit! / 30, sound: "dry knock", seconds: 0.5, gain: 6 });
+  assert.ok(!sounds.some((s) => /paper|whoosh|pop/.test(s.sound)));
+  assert.deepEqual(line.music, { filters: [{ kind: "thin", from: line.marks.hit! / 30, to: line.duration }], end: { at: line.duration, fade: 0.02 } });
+  // On her plan, valid: her video's passage her last 6 s at its own pace (so she is cut out at every image), each work's
+  // an image, its sounds and its music's shape; a work's video on its best instant.
+  const files = [{ id: "her", photo: false, seconds: 9, moments: [{ start: 1, end: 8 }] }, ...Array.from({ length: 36 }, (_, i) => ({ id: `p${i}`, photo: true, seconds: 0 })), { id: "v", photo: false, seconds: 5 }];
+  const fill = { shots: files.map((f) => ({ file: f.id, at: f.id === "her" ? 1 : f.id === "v" ? 2 : 0 })), texts: { mots: "Voici mon travail" }, end: null };
+  const plan = skillPlan({ skill: monTravail, name: "Voici mon travail", files, fill });
+  assert.ok(editPlanSchema.safeParse(plan).success);
+  const her = plan.segments[0] as ClipSegment;
+  assert.deepEqual([her.clip_id, her.in, her.out, her.speed], ["her", 1, 7, undefined]);
+  assert.ok(plan.segments.slice(1, -1).every((s) => Math.round(segmentSeconds(s) * 30) === 1));
+  const last = plan.segments.at(-1) as ClipSegment;
+  assert.deepEqual([last.clip_id, last.in, last.speed], ["v", 2, undefined]);
+  assert.equal(plan.sounds?.length, 31);
+  assert.deepEqual(plan.music_shape, { filters: [{ kind: "thin", from: 8, to: plan.duration, open: 0.02 }], end: { at: plan.duration, fade: 0.02 } });
+  assert.deepEqual(plan.skill, { key: "mon-travail", version: 1 });
+  assert.equal(plan.layers![0]!.motion.texts!.front, "31");
+  // The filler sees her shot first, then her works, and her words' slot.
+  const input = skillFillInput({ skill: monTravail, name: "Voici mon travail", n: 38, files, business: {}, request: "voici mon travail" });
+  assert.match(input.cases[0]!.veut, /debout dans son lieu/);
+  assert.match(input.cases[1]!.veut, /première photo de son travail/);
+  assert.match(input.cases[33]!.veut, /devant ses jambes/);
+  assert.deepEqual(input.textes.map((t) => [t.slot, t.max_caracteres]), [["mots", 26]]);
+});
