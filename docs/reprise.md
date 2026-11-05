@@ -76,12 +76,12 @@ Pour chacun (un agent par modèle en parallèle, chacun dans son arbre de travai
 
 ## Prochains chantiers (dans l'ordre)
 
-L'ordre dit à Tristan le 5 novembre au soir (« et dans l'ordre il va faire quoi ? ») :
+L'ordre décidé avec Tristan le 5 novembre au soir (« et dans l'ordre il va faire quoi ? », puis « 1, 3, 4, 5, 2 plus logique non ? » : construire le système avant de le remplir, ses modèles avant ce qui ne bloque rien) :
 
 1. **La banque d'effets prêts à jouer (A)**, d'abord, parce que les autres s'appuient dessus : la forme d'un effet (sur quel plan, à quel moment, quels mots) et les 5 à 8 plus utiles des 33.
-2. **Ses nouveaux modèles, au fil de l'eau, en même temps** : un agent par modèle ; pour chacun, sa fiche, son modèle (banque de modèles), les outils qui manquent (banque d'outils), son effet dans la banque d'effets dès qu'elle existe ; puis le banc et sa validation (« Passage de relais » plus haut).
-3. **Des ajouts sur n'importe quel modèle sans repasser par la chaîne (B)** : une voix off, une police, une scène en plus.
-4. **Quand un modèle, quand de la création** : les mêmes vidéos en modèle entier, en création avec un effet emprunté et par la chaîne libre ; Tristan choisit (le détail plus bas).
+2. **Des ajouts sur n'importe quel modèle sans repasser par la chaîne (B)** : une voix off, une police, une scène en plus.
+3. **Quand un modèle, quand de la création** : les mêmes vidéos en modèle entier, en création avec un effet emprunté et par la chaîne libre ; Tristan choisit (le détail plus bas).
+4. **Ses nouveaux modèles** : un agent par modèle ; pour chacun, sa fiche, son modèle (banque de modèles), les outils qui manquent (banque d'outils), son effet dans la banque d'effets dès qu'elle existe ; puis le banc et sa validation (« Passage de relais » plus haut). Chacun entre ainsi directement dans les trois banques et sait déjà recevoir une voix off, une police, une scène.
 5. **Ensuite** : les versions jamais passées au banc (Coups de fouet v3, Pile v3, Quatre coins v3) et Présente-toi sans personne de profil (sa silhouette faite d'un objet) ; les modèles repérés (chantier 3, déjà construit : candidats sur /admin, `model_candidates`, un brouillon écrit par un agent après son clic) ; 6 à 8 modèles « message » à inventer (avant/après, offre datée, avis client, portrait d'équipe, liste ou étapes, planning ou menu) ; la promesse de la landing (« pas de modèle tout fait », à revoir avec lui, jamais sans lui) ; la recopie fidèle des 9 Reels de la landing (les cas `cafe`, `bar` et `procope` du banc en refont trois).
 
 **En continu, de son côté : valider les modèles sur /admin**, section « Modèles » : sans sa validation de la version à jour, un commerce n'en joue aucun (« En bref »).
