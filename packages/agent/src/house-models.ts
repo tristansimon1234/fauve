@@ -1882,6 +1882,51 @@ export const HOUSE_MODELS: HouseModel[] = [
       why: "Une voix raconte la ville comme un court-métrage : les sous-titres tiennent l'attention, les rafales tombent sur ce qui est dit, et le nom en rouge sur quelqu'un d'immobile pendant que tout passe dit où l'on est.",
     },
   }),
+  model({
+    key: "assiettes",
+    name: "Défilé d'assiettes",
+    // Written on its original's fiche (v1 of its skill, docs/fiches/assiettes.md): her menu dish by dish, each plate seen
+    // from above in the middle of the frame, cut on what is heard, a title typed over the first ones, a vedette held
+    // while the music settles, a near silence, the drop and the rest of the menu at full speed, looping.
+    pitch: "Tes plats vus d'en haut qui défilent sur la musique, un titre qui se tape lettre à lettre sur les premiers, un plat vedette tenu pendant que la musique se pose, puis le reste de ta carte à toute vitesse sur le drop.",
+    needs: "12 à 30 courtes vidéos ou photos de tes plats (ou de tes produits) vues d'en haut, chacun tenu à la main au-dessus du même comptoir, l'assiette au milieu de l'image ; un plat plus beau que les autres pour la vedette",
+    files: [6, 20],
+    pair: "menu",
+    // Its skill's code is its reference.
+    example: null,
+    // Its drop's grid (docs/fiches/assiettes.md): its 30 cuts within an image at 91,6 (its intro's vocal has its own pace).
+    tempo: 91.6,
+    finish: { name: "Gourmand", hint: "chaud et franc, couleurs des plats vives, noirs profonds, sans grain ni coins sombres", warmth: 0.08, contrast: 0.06, saturation: 0.06 },
+    look: {
+      name: "défilé d'assiettes",
+      format: "pov",
+      hook: { kind: "promesse", what: "un plat coloré vu d'en haut, tenu à la main, et un titre qui se tape lettre à lettre au milieu, une ligne fine en serif tapée dessous derrière un curseur" },
+      text: {
+        amount: "une ligne",
+        composition: "un titre court en capitales condensées très grasses, blanc, tapé lettre à lettre au milieu ; juste dessous, une ligne fine en serif droite en minuscules, tapée en même temps derrière un curseur ; les deux partent d'un coup",
+        case: "upper",
+        weight: "black",
+        tracking: "normal",
+      },
+      layout: "un défilé de plats, un à la fois en plein cadre, chacun vu d'en haut au milieu de l'image et presque aussi large qu'elle, tenu à la main au-dessus du même comptoir, sous un titre tapé lettre à lettre",
+      moments: [
+        { at: 0, what: "un plat coloré vu d'en haut ; son titre se tape lettre à lettre au milieu en capitales condensées blanches, une ligne en serif fine tapée dessous en même temps derrière un curseur, entiers à 1,4 s" },
+        { at: 0.47, what: "un plat toutes les 0,33 à 0,6 s, chacun au même endroit de l'image, coupé sur les syllabes de la voix ; la musique sans basse" },
+        { at: 3.07, what: "le titre et sa ligne partent d'un coup ; les plats continuent" },
+        { at: 6.27, what: "un plat en éclair, trois images, sur un coup double de la musique" },
+        { at: 6.37, what: "le plat vedette, plus gros, tenu 2,9 s : la batterie se coupe, une nappe seule, la voix revient" },
+        { at: 9.95, what: "un presque-silence d'une demi-seconde sur un plat" },
+        { at: 10.43, what: "le drop, une grosse basse : le reste du menu à toute vitesse, six plats par mesure sur les coups du groove, jusqu'au dernier plat" },
+      ],
+      camera: "à la main",
+      transitions: "coupes nettes",
+      grade: "warm",
+      motion: "epure",
+      music: "afro trap: chopped vocal over light drums, then a heavy 808 drop, 92 BPM",
+      ending: "le dernier plat en plein cadre, la musique coupée net : le Reel boucle sur le premier et son titre",
+      why: "Une demi-seconde par plat, au même endroit de l'image : on reste pour voir le suivant ; le titre promet le menu, le plat vedette tenu pendant la pause fait saliver, et le drop relance jusqu'au dernier.",
+    },
+  }),
 ];
 
 const BY_KEY = new Map(HOUSE_MODELS.map((m) => [m.key, m]));
@@ -1963,6 +2008,7 @@ export const HOUSE_WHEN: Record<string, { pour: string; pas_pour: string }> = {
   carnet: { pour: "présenter en parlant un produit, une pièce ou un outil phare (ce qu'il a de spécial, un chiffre, pourquoi elle l'aime), avec des images de lui", pas_pour: "des images sans parole, quelqu'un qui parle sans images de ce dont il parle, un lieu sans chose à montrer" },
   "petites-lumieres": { pour: "son lieu le soir et ses lumières (sa devanture, son enseigne, ses fenêtres, ses lampes, sa terrasse), une ambiance de ville, l'hiver, une soirée", pas_pour: "un lieu en plein jour sans aucune lumière, quelqu'un qui parle, des produits en gros plan, un message à lire en détail" },
   "vlog-ville": { pour: "raconter son quartier, sa ville ou son lieu comme un court-métrage, avec des phrases (ou une voix) qui racontent tout du long et beaucoup de beaux plans", pas_pour: "une offre à lire en détail, un produit seul, peu de vidéos, un Reel court" },
+  assiettes: { pour: "montrer sa carte, ses plats du jour, des idées de recettes ou une sélection de produits, un par un, filmés d'en haut au même endroit (un restaurant, un traiteur, une cantine, une boulangerie, des box)", pas_pour: "un seul plat, les gestes d'une recette, quelqu'un qui parle, un lieu, moins de six plats" },
 };
 
 /** The models for Edith: their key, name, what they do, what they want, and what only she can film for one. */

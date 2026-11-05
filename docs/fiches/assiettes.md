@@ -1,0 +1,103 @@
+# « Défilé d'assiettes » (`assiettes`) : fiche de l'original
+
+> Fiche d'un original : ce qu'on y voit, mesuré image par image, et les effets qu'on veut savoir refaire sur les vidéos de n'importe quel commerce (la méthode : `docs/modeles.md`, « La chaîne des modèles »). Les temps sont en secondes de l'original ; « temps » compte les temps de la grille du modèle (91,6 BPM) depuis la première image, « double » ses doubles-croches (un quart de temps, 0,164 s).
+
+**L'original** : le lien de Tristan https://vm.tiktok.com/ZGdXrJew1/ (au labo, `lab/models/62fd734b-6956-4649-a478-364ac9228175.mp4` ; `house/originals/assiettes.mp4` une fois gardé), 16,90 s (507 images), 720 × 1280, 30 i/s, **vertical 9:16 plein cadre**, avec son (AAC stéréo, −20,1 LUFS). **31 plats en 16,9 s**, chacun vu d'en haut, tenu à la main au-dessus du même plan de travail en marbre blanc, coupés net : des bols de riz, de purée, de pâtes, de boulgour, des gratins, une baguette garnie, des salades, une soupe, un couscous, un bol de granola, une pizza à la burrata. Un seul texte, au début : un titre tapé lettre à lettre et sa ligne en serif. Tout l'original sert au modèle (pas de passage dans `HOUSE_PASSAGES`).
+**Sa musique** : **deux morceaux, comme « Interrupteur »**. D'abord une voix chantée, aiguë et hachée (un échantillon accéléré), sur une batterie légère sans basse (charleston, caisse claire, une petite grosse caisse), à son propre pas : environ 83 BPM (ses charlestons toutes les 0,18 s, l'autocorrélation à 0,726 s). À 6,92 s la batterie se coupe net : une nappe seule, 15 à 18 dB plus bas, la voix qui revient à 8,97 s ; de 9,95 à 10,47 s **presque le silence** (−41 à −45 dB) ; à **10,48 s le drop**, une basse 808 énorme (+20 dB sous 150 Hz), un groove chaloupé en doubles-croches (des coups sur les doubles 0, 3, 4, 5, 7, 9, 11, 12 et 14 de chaque mesure, le troisième en retard), une mesure qui revient toutes les 2,62 s : **91,6 BPM**. Sûr pour le drop (le même motif à 10,47, 13,07 et 15,71 s ; sa mesure de 2,594 puis 2,644 s), et il tombe pile sur le temps 16 d'une grille à 91,6 BPM partie de la première image (16 × 0,655 = 10,48 s). La musique est coupée net à 16,82 s, deux images avant la fin : le Reel boucle. Gemini disait 115 BPM, `measure.py` 124,25 : faux tous les deux. Pour le modèle, une seule grille suffit, celle du drop.
+**Mesuré avec** : `scripts/fiche/measure.py` (format, coupes, clignotements, tempo), des planches à 30 i/s de tout le Reel, les gros plans du titre image par image (sa frappe, sa sortie), des mesures au pixel (la boîte et la couleur de l'encre du titre et de sa ligne, l'ombre dessous, les noirs et les blancs, la saturation, les coins, le blanc du marbre), la place de l'assiette dans chacun des 31 plans (lue sur l'image du milieu de chaque plan), le son par bandes (graves, médiums, aigus) toutes les 20 ms, ses attaques par bande, son spectre, l'autocorrélation de chaque partie, une grille ajustée sur les attaques du drop et sur celles de l'intro, et la lecture de Gemini (`house/breakdowns/assiettes.json`).
+
+## Déroulé
+
+| De – à (s) | Temps | Ce qu'on voit | Effets |
+|---|---|---|---|
+| 0 – 0,47 | 0 – 0,7 | Un bol de riz au saumon, avocat, haricots verts et oignons rouges, tenu à la main ; un second bol en haut | La ligne commence à se taper à l'image 2, le titre à l'image 4 (effet 3) |
+| 0,47 – 3,07 | 0,7 – 4,7 | Sept plats, un toutes les 0,33 à 0,6 s (orzo et bavette, brochettes, purée et bœuf, cuisse de poulet, lasagne, pizza blanche), coupés sur les syllabes de la voix | **Le défilé** (effets 1 et 2) ; le titre entier à l'image 42 (1,40 s), sa ligne à l'image 39 |
+| 3,07 | 4,7 | Le titre et sa ligne partent d'un coup, au milieu d'un plat | Effet 3 |
+| 3,07 – 6,27 | 4,7 – 9,6 | Six plats de plus (gratin, attiéké, conchiglioni, kefta, bourguignon, pomme de terre farcie) | Effet 2 |
+| 6,27 – 6,37 | 9,6 – 9,7 | Un bol de chili trois images, sur un coup double de la musique (6,25 et 6,35 s) | **Le plat en éclair** (effet 4) |
+| 6,37 – 9,23 | 9,7 – 14,1 | La baguette garnie en gros plan, 2,87 s : la batterie se coupe à 6,92 s, la nappe seule, la voix revient à 8,97 s | **Le plat vedette** (effet 5), effet 7 |
+| 9,23 – 10,43 | 14,1 – 15,9 | Deux plats ; le second traverse le presque-silence (9,95 – 10,47 s) | Effet 7 |
+| 10,43 | 15,9 | La coupe, une image avant le drop (10,48 s) | **Le drop** (effet 7) |
+| 10,43 – 16,90 | 15,9 – 25,8 | Quatorze plats sur les coups du groove, un toutes les 0,27 à 0,87 s (poulet rôti, ailes, couscous, soupe, burrito bowl, tagliatelles, riz épicé, granola, nouilles, bolognaise, plateau, yassa, poke bowl, pizza burrata) | Effets 1 et 2 |
+| 16,82 – 16,90 | 25,7 – 25,8 | La musique coupée, deux images de pizza | La boucle (effet 8) |
+
+Une seule chose bouge : ses plats. Ni zoom, ni glissé, ni fondu, ni flash, ni bruitage : rien de ce que Tristan trouve cheap.
+
+## Effets (ce qu'on veut savoir refaire)
+
+### 1. Chaque plat vu d'en haut, au même endroit de l'image (le moment signature, tout le Reel)
+- **Mesuré** : les 31 plans sont filmés de haut (une plongée de 60 à 80° : le bord du plan de travail et la crédence grise se voient en haut dans la moitié des plans), au-dessus du même marbre blanc veiné. L'assiette principale est **au milieu** : son centre entre 45 et 55 % de la largeur dans chaque plan, entre 35 et 65 % de la hauteur, **presque aussi large que l'image** (80 à 105 % de sa largeur, son bord souvent coupé par les côtés). Une main (un poignet, un bracelet) la tient par en dessous, depuis le bas ou le bas à gauche, dans 22 plans sur 31. Dans deux plans sur trois, une **seconde portion du même plat** est posée derrière, plus petite, en haut de l'image (souvent coupée par le haut). La caméra bouge à peine (tenue à la main, quelques pixels), la baguette dérive un peu pendant ses 2,87 s. D'un plat au suivant, l'œil ne bouge pas : seul ce qu'il y a dans l'assiette change.
+- **Sur quoi** : n'importe quel commerce qui a beaucoup de choses à montrer une à une, vues d'en haut et posées au même endroit : ses plats (un restaurant, un traiteur, une cantine, des box), ses pâtisseries ou ses pains sur une planche, ses cafés vus d'en haut (le latte art), ses bouquets tenus au-dessus de son établi, ses bijoux dans sa main, ses bougies, ses livres tenus au-dessus du comptoir.
+- **Outil** : existant, le code du modèle (`Footage` plein cadre, le plan qui joue à son moment). La même place vient de ce qu'elle filme : le remplisseur la demande à chaque case (« au milieu de l'image, presque aussi large qu'elle »), et une vidéo horizontale est recadrée sur son sujet par `Footage`. Pas fait : recentrer chaque assiette sur la même place par le moteur (le suivi d'un objet ne tient que huit objets par Reel, il en faudrait trente ; la lecture de chaque plan ne donne que le centre de son sujet, pas sa taille).
+- **Si rien ne s'y prête** : ses plats filmés autrement (posés sur une table, de côté) défilent quand même : le rythme reste, la place de l'assiette change.
+
+### 2. Un plat toutes les deux à quatre doubles-croches, coupé sur ce qu'on entend
+- **Mesuré** : 30 coupes franches (aucun fondu, aucun glissé, aucun flash : une image remplace l'autre). Dans l'intro, un plat toutes les 0,33 à 0,7 s (0,45 s en moyenne), **sur les syllabes de la voix chantée** (11 coupes sur 13 à une image d'une attaque des médiums, les deux autres à 37 et 46 ms), pas sur une grille. Après le drop, un plat toutes les 0,27 à 0,87 s (0,46 s en moyenne), **sur les coups du groove** : aux doubles 0, 3, 7, 9, 11 et 14 de la première mesure, 16, 21, 23, 25, 27 et 30 de la deuxième, puis 32 et 36 (six plats par mesure). Sur la grille de 91,6 BPM, les 30 coupes du modèle tombent toutes à une image au plus de celles de l'original (11 pile dessus) ; 20 sont sur des doubles-croches, 9 sur des demi-doubles (dans l'intro et avant le drop, où la voix a son propre pas), et l'éclair trois images avant le plat vedette.
+- **Outil** : existant, la `timeline` du skill (ses coupes en doubles-croches de sa grille).
+- **Si rien ne s'y prête** : avec moins de plats, des phrases entières du défilé sautent (le milieu du drop, la suite de l'intro), puis certaines de ses coupes, les plats restants plus longs, toujours sur les coupes de l'original.
+
+### 3. Le titre tapé lettre à lettre, sa ligne en serif tapée derrière un curseur
+- **Mesuré** : deux lignes au milieu de l'image, sur les premiers plats, **sans ombre** (la même lumière juste sous les lettres que plus loin) ni fond :
+  - le **titre** (« IDÉES DE RECETTES ») en capitales d'une grotesque condensée très grasse (type Anton), d'un blanc chaud (252, 250, 245), ses capitales hautes de 32 px (2,5 % de la hauteur), larges de 36 % de l'image, centré à 50,0 % de la hauteur (le milieu exact) ;
+  - sa **ligne** (« simples, saines, rapides et gourmandes ») en minuscules d'un serif fin et droit (type Cormorant Garamond ; pas un italique), du même blanc, son œil haut de 11 px (environ 41 px de corps en 1080 × 1920), large de 58 % de l'image, centrée à 53,8 % de la hauteur.
+  
+  Les deux se tapent **ensemble et finissent ensemble** : la ligne dès l'image 2, une lettre par image environ, entière à l'image 39 ; le titre dès l'image 4, une lettre toutes les 2,4 images (un espace compte pour une lettre), entier à l'image 42 (1,40 s). Chaque ligne est déjà à sa place finale, centrée : ses lettres apparaissent de gauche à droite. Un **curseur** « | » suit la dernière lettre de la ligne pendant qu'elle se tape, et disparaît vers l'image 46 ; le titre n'en a pas. Puis les deux restent, immobiles, et **partent d'un coup à l'image 92** (3,07 s), au milieu d'un plat : 3,0 s après leur arrivée, la durée d'un texte par défaut dans CapCut, pas un moment de la musique. Aucun bruit de frappe.
+- **Sur quoi** : ce qu'elle annonce en quelques mots, au-dessus de ce qui défile : sa carte (« Notre carte d'hiver »), ses plats du jour, des idées (« 5 idées de brunch »), une sélection ; sa ligne, ce qu'ils ont en commun (« faits maison, de saison »).
+- **Outil** : existant, `TypeOn` du kit (chaque ligne à sa place, ses lettres révélées de gauche à droite, à un pas égal avec `jitter: 0`, son curseur `caret: "bar"`), sa vitesse calculée par le code pour que les deux lignes finissent ensemble ; `FitText` pour sa boîte, dans la zone sûre.
+- **Si rien ne s'y prête** : sans ligne, le titre seul. Le titre est obligatoire : c'est l'accroche.
+- **Ce que le modèle change** : le titre reste jusqu'à la coupe du neuvième plat (3,60 s, 0,53 s de plus que l'original), pour qu'on lise une ligne de quatre ou cinq mots ; une ligne de plus de quatre mots passe à 48 px (une petite ligne de quatre mots au plus reste à 42 px, une étiquette à côté du titre qui se lit).
+
+### 4. Un plat en éclair, trois images
+- **Mesuré** : à 6,27 s, un bol de chili trois images (6,27 – 6,37 s), sur le premier de deux coups rapprochés de la musique (6,25 et 6,35 s, ses plus forts de l'intro), juste avant le plat vedette, qui part sur le second.
+- **Outil** : existant, la `timeline` du skill (une case de trois images, quel que soit le tempo).
+- **Si rien ne s'y prête** : sous 21 plats, il saute.
+
+### 5. Le plat vedette, tenu pendant que la musique se pose
+- **Mesuré** : la baguette garnie, 2,87 s (4,4 temps) : six fois plus longue que les autres, en plus gros plan (sa seconde moitié remplit l'image), la seule qui dérive un peu (elle descend de quelques pixels). Elle couvre la coupure de la batterie (6,92 s) et le retour de la voix (8,97 s) : on regarde un plat pendant que la musique respire.
+- **Sur quoi** : son plat le plus beau, le plus généreux : un sandwich, un plat à partager, un gâteau entier, son best-seller.
+- **Outil** : existant, la `timeline` du skill.
+
+### 6. Le second plat derrière, la main qui tient
+- **Mesuré** : voir l'effet 1. Ce n'est pas un effet de montage : c'est sa façon de filmer (une portion devant, la même derrière, tenue à la main), qui donne envie et fait « vrai ».
+- **Outil** : rien à faire au montage : « Ce qu'il faut filmer » le demande.
+
+### 7. La musique qui se pose, se tait, puis le drop
+- **Mesuré** : la voix hachée et sa batterie légère sans basse jusqu'à 6,92 s ; la batterie coupée net (la nappe seule, 15 à 18 dB plus bas, les aigus disparus) de 6,92 à 8,97 s ; la voix et les aigus qui reviennent, toujours sans basse, jusqu'à 9,95 s ; le presque-silence de 9,95 à 10,47 s (la fin d'une note qui s'éteint en 0,15 s) ; **le drop à 10,48 s**, sur le temps 16, la basse 808 et tout le groove jusqu'à la fin. La coupe sur le drop tombe une image avant lui (10,43 s).
+- **Sur quoi** : n'importe quelle musique composée au tempo du modèle.
+- **Outil** : existant, la forme de la musique d'un modèle (`docs/son.md`) : `thin` (sans basse) jusqu'à trois doubles après le début du plat vedette, `muffled` (étouffée, comme la batterie partie) jusqu'au retour de la voix, `thin` de nouveau, une pause de trois doubles et quart qui s'éteint en 0,12 s, le retour pile sur le drop, coupée net à la fin. **Manquant** : deux morceaux (le moteur en compose un seul : sa basse qui arrive sur le drop tient lieu du second) ; la voix chantée de l'intro (le compositeur ne sait pas faire une voix).
+
+### 8. La boucle
+- **Mesuré** : la dernière image est un plat comme les autres (la pizza à la burrata, 0,57 s), la musique coupée net deux images avant la fin, aucune carte, aucun logo : Instagram et TikTok reprennent au début, où le titre se retape.
+- **Outil** : existant (la dernière case, la fin de la musique coupée net, `end`). La carte de fin, quand elle a une annonce, prend la place de la boucle : sur le dernier plat, tenue 1,6 s, tapée comme le titre.
+
+### 9. Étalonnage
+Chaud et franc : le marbre d'un blanc chaud (214, 203, 197 au milieu de ses zones claires), des noirs profonds (4 à 18 au 1er centile), des blancs tenus sous la brûlure (239 au 99e centile), des couleurs de plats saturées (0,36 en moyenne) ; aucun coin assombri (les coins, du marbre, sont plus clairs que le milieu), aucun grain. Une finition « Gourmand » : un peu chaude, un peu de contraste et de couleur, rien d'autre.
+
+## Ce qui appartient à l'original
+« IDÉES DE RECETTES » et « simples, saines, rapides et gourmandes » sont les mots de son autrice : **à l'original, jamais recopiés** ; le modèle écrit les siens. Ses plats, son marbre et sa main sont ce qu'elle filme : ils ne disent que ce qu'il faut filmer. Ni logo, ni marque, ni mascotte.
+
+## Format
+L'original est vertical 9:16, chaque plat plein cadre. Réglage « format » :
+- `auto` (par défaut) : vertical plein cadre quand la plupart de ses vidéos sont en hauteur (une vidéo horizontale recadrée sur son sujet) ; quand la plupart sont en largeur, chacune entière dans une bande 16:9 au milieu, sur du noir, le titre sur la bande ;
+- `vertical` : plein cadre quoi qu'elle envoie ;
+- `horizontal` : la bande 16:9 sur du noir.
+
+## Ce que Gemini a vu, et ce qu'il a raté
+**Vu** : le format vertical, les 31 plats et leurs coupes (à une ou deux images près), ce que montre chacun, l'assiette tenue à la main au-dessus d'un marbre blanc, le cadrage homogène, les coupes franches calées sur la musique, le plat en éclair (« image flash très rapide ») et le plat vedette tenu 2,9 s (« une pause visuelle avant de relancer le rythme »), le titre tapé « machine à écrire » et sa ligne « synchronisée avec le titre », leur place au milieu.
+
+**Raté** : le **tempo** (115 au lieu de 91,6, et une intro chantée à son propre pas) ; le **drop** à 10,48 s (pour lui, « un beat drop marquant l'apparition du sandwich » à 6,33 s, là où la batterie se tait), la batterie coupée sous le plat vedette, le presque-silence qui précède le drop ; la **police du titre** (« un serif élégant type Playfair ou Cinzel » : c'est une grotesque condensée très grasse) et celle de sa ligne (« serif italique » : elle est droite) ; leurs **ombres** (aucune) ; leur **durée** (« de 0,13 à 2,13 s, coupé à 2,13 » : ils restent jusqu'à 3,07 s, entiers dès 1,40 s) ; un **bruit de machine à écrire** sous la frappe (aucun : les attaques des aigus sont les charlestons, toutes les 0,18 s, pas un clic par lettre) ; une **vignette** sombre (aucune) et un contraste « élevé » (moyen). `measure.py`, lui, voyait 124,25 BPM (faux) mais ses 30 coupes sont justes ; ses 32 « clignotements » sont des reflets et la main qui bouge : rien ne s'allume.
+
+## Le modèle v1 (5 novembre)
+`packages/agent/src/skills/assiettes.ts`, version 1, rendu en local sur seize plats libres de Mixkit vus d'en haut (bols de fruits et de granola, burgers, pizza, salades, ramen, tacos, un petit-déjeuner ; quatorze horizontaux, recadrés en hauteur sur leur sujet, d'où des plats plus serrés que ceux de l'original ; `scripts/skill-render.mts`, aucun appel facturé), contrôle des scènes sans remarque. Une seule grille, 91,6 BPM depuis la première image ; ses coupes en doubles-croches (et demi-doubles là où l'original suit la voix) : ses 30 coupes à une image au plus de l'original (au rendu : l'éclair aux images 189 à 191, le plat vedette de 192 à 277, le drop à 314 ; l'original : 188, 191, 277, 313), 16,9 s pour ses 31 plans.
+- **Cases** : 12 à 31 plats de ses fichiers (61 pour une durée qu'elle demande : 30 s à son tempo, une mesure de six plats de plus à chaque fois). Dans l'ordre : l'intro (neuf plats, le titre s'y tape), sa suite (quatre), le plat en éclair (trois images), le plat vedette (17,5 doubles, 2,9 s), deux plats avant le drop, le drop (six plats par mesure, deux mesures), les deux derniers. Avec moins de plats, des phrases entières sautent (la seconde mesure du drop, la suite de l'intro, l'éclair), puis certaines coupes d'une phrase (ses plats plus longs). Deux mots : le titre (`titre`, obligatoire, 22 caractères) et sa ligne (`ligne`, facultative, 4 mots au plus de préférence).
+- **Images** : chaque plat plein cadre, comme filmé ; le titre tapé en capitales de sa police de titre (Anton dans la paire du modèle, « Titre condensé et serif fine »), blanc chaud, ses capitales hautes de 2,5 % de l'image, centré au milieu exact ; sa ligne dans sa police de texte (Cormorant Garamond), tapée en même temps derrière un curseur qui part sept images après sa dernière lettre ; une ombre à peine visible pour les plats clairs ; les deux partent d'un coup à la coupe du neuvième plat. Une carte de fin en option sur le dernier plat (tenu 2 s de plus), son titre et son sous-titre tapés de la même façon.
+- **Son** : la musique sans basse jusqu'au plat vedette, étouffée sous lui, sans basse au retour de la voix, une pause avant le drop, le drop sur sa coupe, coupée net à la fin (la boucle) ; aucun bruitage, comme l'original.
+- **Léger** : rien de détouré, rien de suivi, aucune lecture de ses plans.
+- **Ce qui manque** : deux morceaux et la voix chantée (effet 7) ; la même place de l'assiette faite par le moteur (effet 1).
+
+## Ce qu'il faut filmer
+Le téléphone tenu au-dessus du plat (ou sur un pied), en vertical, de haut, toujours au même endroit : le même plan de travail ou la même table, la même lumière (près d'une fenêtre, sans flash). Pour chaque plat, 2 à 3 s suffisent (on en garde une demi-seconde) :
+1. l'assiette tenue à la main au milieu de l'image, presque aussi large qu'elle ; une seconde portion du même plat posée derrière, en haut, si elle peut ;
+2. un plat différent à chaque fois : beaucoup de plats (douze au moins, trente c'est mieux), les plus colorés pour commencer (le titre se tape sur les trois premiers) ;
+3. un plat plus beau, plus généreux, filmé de plus près et un peu plus longtemps (4 s) : le plat vedette ;
+4. pour finir, un plat qui donne envie d'y revenir (la boucle repart sur le premier).

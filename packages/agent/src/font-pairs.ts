@@ -213,6 +213,16 @@ export const FONT_PAIRS: FontPair[] = [
     how: "un nom en capitales très larges et très grasses entre guillemets, une signature en petit au-dessus et une ligne minuscule dessous ; de petits sous-titres fins en minuscules",
     fits: "un court-métrage de ville raconté, un titre de film posé sur quelqu'un de dos",
   },
+  {
+    // « Défilé d'assiettes » (docs/fiches/assiettes.md, effect 3): its title typed in a very bold condensed grotesque in
+    // capitals, its line typed under it in a fine upright serif in lower case (not an italic), both white, no shadow.
+    key: "menu",
+    name: "Titre condensé et serif fine",
+    display: { family: "Anton", weight: 400, case: "upper", tracking: "normal" },
+    body: { family: "Cormorant Garamond", weight: 500, case: "normal", tracking: "normal" },
+    how: "un titre court en capitales condensées très grasses au milieu, une ligne fine en serif droite et en minuscules juste dessous, tapées ensemble lettre à lettre",
+    fits: "un menu, une carte, des idées de recettes, une sélection de produits qui défile",
+  },
 ];
 
 const BY_KEY = new Map(FONT_PAIRS.map((p) => [p.key, p]));
