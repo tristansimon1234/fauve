@@ -239,8 +239,8 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
     if (ev[2] === "dark") return sweep(again(ev[3], a, 0.5, DARK, "dk-a"), "dk", false, p);
     if (ev[2] === "again") return again(ev[3], a, ev[4], null, "ag");
     if (ev[2] === "spin") return sweep(shot(cur), "spin", true, p);
-    // One image burnt almost white, the picture still in it (a camera's flash, never a white card).
-    return [shot(cur), h(Flash, { key: "white", at: [a], frames: 1, before: 0, expose: true })];
+    // One image burnt almost white, the picture still in it (a camera's flash three times as strong, never a white card).
+    return [shot(cur), h(Flash, { key: "white", at: [a], frames: 1, before: 0, expose: 3 })];
   })();
 
   // 4. Its words: her sentences as small white subtitles at the bottom of its picture (the original's row, safe for the

@@ -190,7 +190,7 @@ test("« Ta ville racontée » (v1): 4:3 on black as her horizontal videos, full
   assert.ok(nodes(picture(draw(108, props))).some((n) => n.type === "feGaussianBlur" && n.props.stdDeviation === "34 0"));
   // One image burnt almost white in the shot looking up, as the original's image 930: a camera's flash over the picture.
   const flash = nodes(picture(draw(930, props))).find((n) => n.type === "Flash")!;
-  assert.deepEqual([flash.props.at, flash.props.frames, flash.props.expose], [[930], 1, true]);
+  assert.deepEqual([flash.props.at, flash.props.frames, flash.props.expose], [[930], 1, 3]);
   assert.ok(nodes(picture(draw(930, props))).some((n) => n.type === "Footage"));
   assert.equal(nodes(picture(draw(931, props))).filter((n) => n.type === "Flash").length, 0);
 });
