@@ -119,6 +119,13 @@ export const editPlanSegmentSchema = z.object({
    * (`finish.cuts` off, and what a correction shows the editor).
    */
   jump: z.object({ in: z.number().min(0), out: z.number().positive(), move: cameraMoveSchema.optional() }).optional(),
+  /**
+   * A shot laid beside the others, on the same moment (a split screen's other half: two passages at once, each at its
+   * own speed): it starts `at` seconds into the Reel, whatever the shots before it, and adds nothing to its length (its
+   * time is counted once). Only a composition draws it (Footage, Subject…); the plain montage and the ffmpeg engine play
+   * the main line without it. Set by the engine from a montage skill's timeline (SkillShot.beside), never by the editor.
+   */
+  beside: z.object({ at: z.number().min(0).max(90) }).optional(),
 });
 
 /**
@@ -198,6 +205,20 @@ export type SfxCue = z.infer<typeof sfxCueSchema>;
 export const sfxLevelSchema = z.enum(["light", "more", "off"]);
 export type SfxLevel = z.infer<typeof sfxLevelSchema>;
 
+/**
+ * What a composition's code draws of her shots, when its montage skill's timeline says it (skills.ts, skillDrawn):
+ * `subjects`, the shots it draws her cut out on (by their number in shots), and `objects`, each object it follows on
+ * its shot (the filler's name for her file). Only those passages are cut out and followed before the render, where
+ * its code, writing a shot as a variable, would have every shot under it read. Kept for `shots` shots: over another
+ * number (its code kept over the editor's new shots), it no longer says which, and its code is read again.
+ */
+export const motionDrawnSchema = z.object({
+  shots: z.number().int().min(1).max(200),
+  subjects: z.array(z.number().int().min(0).max(199)).max(200).optional(),
+  objects: z.array(z.object({ shot: z.number().int().min(0).max(199), name: z.string().min(1).max(60) })).max(24).optional(),
+});
+export type MotionDrawn = z.infer<typeof motionDrawnSchema>;
+
 /** Free motion-design scene: the editor writes the brief, the motion designer (Opus) writes the code. */
 export const editPlanMotionSegmentSchema = z.object({
   motion: z.object({
@@ -248,6 +269,11 @@ export const editPlanMotionSegmentSchema = z.object({
     times_spoken: z.boolean().optional(),
     /** Its sound effects, from its own start (the motion designer's answer): they follow its code, never the browser. */
     sounds: z.array(sfxCueSchema).max(16).optional(),
+    /**
+     * What its code draws of her shots, as its montage skill's timeline says it for that many shots (motionDrawnSchema):
+     * the shots it cuts her out on and the objects it follows, read instead of its code. Set by the engine.
+     */
+    drawn: motionDrawnSchema.optional(),
   }),
   duration: z.number().min(1).max(8),
   /**
@@ -585,6 +611,27 @@ export function speedPieces(s: Pick<ClipSegment, "in" | "out" | "speed" | "ramp"
 /** How long a segment lasts in the video (a shot at another speed lasts its clip time divided by the speed; a ramp, each passage at its own). */
 export const segmentSeconds = (s: PlanSegment) => (isClipSegment(s) ? speedPieces(s).reduce((sum, p) => sum + (p.to - p.from) / p.speed, 0) : s.duration);
 
+/** A shot laid beside the others on the same moment (ClipSegment.beside): its time is counted once, only a composition draws it. */
+export const isBeside = (s: PlanSegment): boolean => isClipSegment(s) && Boolean(s.beside);
+
+/**
+ * When each segment starts in the video and how long it plays (seconds, without the fades' overlap), and where the
+ * video ends: the main line one shot after the other, a shot laid beside the others (beside) at its own moment, adding
+ * nothing to the length. The plain sum of the segments for a plan without any (every plan made before).
+ */
+export function segmentSpans(segments: PlanSegment[]): { spans: { start: number; length: number }[]; end: number } {
+  let cursor = 0;
+  let end = 0;
+  const spans = segments.map((s) => {
+    const length = Math.max(0, segmentSeconds(s));
+    const start = isClipSegment(s) && s.beside ? s.beside.at : cursor;
+    if (!(isClipSegment(s) && s.beside)) cursor += length;
+    end = Math.max(end, start + length, cursor);
+    return { start, length };
+  });
+  return { spans, end };
+}
+
 /** When a moment of the clip (`clip`, seconds) shows in a shot, in seconds from the shot's start (its speed and its ramp counted). */
 export function screenTime(s: Pick<ClipSegment, "in" | "out" | "speed" | "ramp">, clip: number): number {
   let seconds = 0;
@@ -612,9 +659,9 @@ export function scenePhotoIds(plan: Pick<EditPlan, "segments"> & { layers?: Edit
   return [...new Set([...plan.segments.flatMap((s) => (isMotionSegment(s) ? (s.motion.photos ?? []) : [])), ...(plan.layers ?? []).flatMap((l) => l.motion.photos ?? [])])];
 }
 
-/** The plan with its motion-design scenes removed (what the ffmpeg engine can render). */
+/** The plan with its motion-design scenes removed (what the ffmpeg engine can render): its main line of shots, one after the other (a shot laid beside them is a composition's to draw). */
 export function withoutScenes(plan: EditPlan): EditPlan {
-  return { ...plan, segments: plan.segments.filter(isClipSegment) };
+  return { ...plan, segments: plan.segments.filter((s) => isClipSegment(s) && !s.beside) };
 }
 
 // ---------------------------------------------------------------------------

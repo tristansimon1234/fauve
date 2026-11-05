@@ -174,6 +174,8 @@ export type ReelProps = {
         objects?: Record<string, { src: string; still?: boolean }>;
         /** Its depth at every image of the passage (a grey video, near white), drawn like the shot by Depth. */
         depthMap?: { src: string };
+        /** Laid beside another shot on the same moment (a split screen's other half): only a composition draws it, the plain montage skips it. */
+        beside?: true;
       }
     | {
         type: "image";
@@ -195,6 +197,8 @@ export type ReelProps = {
         depth?: { src: string; box: Box };
         /** A moving photo whose depth the card read (relief.py): the video of every pixel moved by its depth, drawn in its place. */
         relief?: { src: string; frames: number };
+        /** Laid beside another shot on the same moment: only a composition draws it, the plain montage skips it. */
+        beside?: true;
       }
     /** composed: an engine screen inside a composition that draws the whole picture, drawn only in its fallback. */
     | { type: "scene"; scene: Scene; startAt: number; durationInFrames: number; under?: ReelUnder; composed?: true }
@@ -272,6 +276,11 @@ export type ReelProps = {
   look?: ReelLookDraw | null;
   /** The date a look prints, in its camera's format (« '26 10 29 », « 29 OCT. 2026 »). */
   stamp?: string;
+  /**
+   * The ready looks (LOOK_PRESETS, by key: « vhs », « bw »…) an animation lays on one passage with Look (PassageLook.tsx),
+   * each drawn as a look over the whole Reel is, with the date its camera prints: given when an animation's code uses Look.
+   */
+  looks?: Record<string, { look: ReelLookDraw; stamp?: string }>;
   logo?: "top" | "bottom" | null;
   /** Where a voice's subtitles sit for the whole Reel (top, share of the height): off the faces, never moving. */
   subtitleY?: number;

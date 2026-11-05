@@ -308,7 +308,7 @@ export const decode: MontageSkill = {
     // At another tempo (a longer Reel, a music's own): every length in beats follows it.
     const bpm = options.bpm ?? BPM;
     const beat = 60 / bpm;
-    const { montage, extra } = decodeParts(n);
+    const { count, montage, extra } = decodeParts(n);
     const pure = montage - DECOR.length;
     // With an ending card, the black after its ending lasts the card's time, on the beat grid.
     const black = end ? Math.ceil(((END_CARD + 0.05) / beat) * 4) / 4 : 0;
@@ -375,6 +375,9 @@ export const decode: MontageSkill = {
       },
       sounds,
       shots: spans.map((s, i) => ({ ...s, want: wants[i]! })),
+      // Her cut out only on its ending's three: the followed one, the next one and the person (its code names them by
+      // their place from the end); every other passage plays as filmed, never cut out.
+      cutouts: [count - 4, count - 2, count - 1],
       // Its words show on the black at once, scrambled, and go at once when the band is full.
       texts: {
         surtitre: { from: titleFrom, to: round(calm) },

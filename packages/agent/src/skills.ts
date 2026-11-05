@@ -1,12 +1,13 @@
 import { z } from "zod";
 import { wordFont, wordFontsBrief } from "./font-pairs.ts";
-import type { ReelLook } from "./looks.ts";
+import { planLook, type ReelLook } from "./looks.ts";
 import { REEL_FPS } from "./motion.ts";
 import { readMusicShape, type MusicShape } from "./music-shape.ts";
-import type { ClipSegment, ClipSpeech, EditPlan, PlanSegment, SfxCue } from "./schemas.ts";
+import type { ClipSegment, ClipSpeech, EditPlan, MotionDrawn, PlanSegment, SfxCue } from "./schemas.ts";
 import { soundSeconds } from "./sfx.ts";
 import { laterAudio } from "./sound-follow.ts";
 import { speechCuts } from "./speech.ts";
+import { followedFilter, followedLook, type FollowedStyle } from "./steal.ts";
 
 // Montage skills (Tristan: « edith pourrait choisir d'adapter ces modèles comme une librairie de "skills de montage" »,
 // « sur Edits d'Insta tu as des modèles où le texte est préposé et les photos et vidéos n'ont qu'à être changées »):
@@ -49,11 +50,18 @@ export type SkillText = {
 };
 
 /**
- * One of its shots for n shots: its span (seconds from the start) and what it wants (for the filler). A skill timed on
- * her voice may say which of her takes plays it (`take`: 0 her main video, 1 her other angle synced on its sound, as
- * SkillSaid.shots gives them by default) and whether it is framed tighter (`punch`).
+ * One of its shots for n shots: its span (seconds from the start) and what it wants (for the filler). Its shots follow
+ * one another from 0 (each starts where the one before it ends), except a shot `beside` another: two passages on the
+ * same moment, each at its own speed (a split screen's two halves, « Écran partagé titré »; a half that cuts alone while
+ * the other plays on, « Photos posées sur la table »). It plays from its own start, beside the shot on screen then, its
+ * time counted once (the Reel lasts no longer for it); the filler casts it like any slot, told which slot it plays with
+ * (`en_meme_temps_que`); its composition draws both (shots[i] keep the timeline's order: list it right after the shot it
+ * plays beside; both have the same `from` when they start together). The plain montage, which plays when the
+ * composition cannot, shows the main line alone. A skill timed on her voice may say which of her takes plays a shot
+ * (`take`: 0 her main video, 1 her other angle synced on its sound, as SkillSaid.shots gives them by default) and
+ * whether it is framed tighter (`punch`).
  */
-export type SkillShot = { start: number; end: number; want: string; take?: number; punch?: boolean };
+export type SkillShot = { start: number; end: number; want: string; beside?: boolean; take?: number; punch?: boolean };
 
 /** One of her words on the Reel's clock (s), her hesitations out: what a skill timed on her voice reads of what she says. */
 export type SkillWord = { w: string; start: number; end: number };
@@ -161,6 +169,22 @@ export type SkillTimeline = {
    * Applied by the mix to whatever music the Reel gets (plan.music_shape).
    */
   music?: MusicShape;
+  /**
+   * The shots its code draws her cut out on (Subject, SubjectBox, SubjectOutline or SubjectParts without an object), by
+   * their index in its shots, for this count: only those passages are cut out (on the rented card, or in the cut-out
+   * sandbox; its cost logged as any cut-out), so a code that names its shots by a variable (« Titre qui se décode »: its
+   * ending's three, n − 4, n − 2 and n − 1) no longer has every passage of the Reel cut out, up to 30 s. Leave it out
+   * and they are read in its code: a shot written as a number, or every shot when written as a variable. Give it whenever
+   * its code draws her: the plan keeps it (motion.drawn) and the engine reads it instead of guessing.
+   */
+  cutouts?: number[];
+  /**
+   * For this count, the shot each of its objects is on, by slot (a negative index counts from the end, −1 the last): its
+   * sign on its front, which is always its last shot (« Mots aux quatre coins »), the place of its ending, which moves
+   * with the count. Over its object's own `shot`. The filler names it from the file it casts on that shot, and only that
+   * passage is followed.
+   */
+  objects?: Record<string, number>;
 };
 
 /**
@@ -187,11 +211,36 @@ export type SkillSetting = {
  */
 export type SkillObject = {
   slot: string;
-  /** The shot it is in (its index in the timeline's shots): the filler names it from the file cast there. */
+  /**
+   * The shot it is in (its index in the timeline's shots; negative, counted from the end: −1 its last shot, whatever
+   * the count), unless its timeline places it for this count (SkillTimeline.objects): the filler names it from the file
+   * cast there, and the engine follows it on that passage only, even when its code writes the shot as a variable
+   * (`SubjectParts(shots[n - 1], …)`).
+   */
   shot: number;
   /** What to look for there, in French for the filler: what can carry the effect, by kind. */
   want: string;
 };
+
+/** The shot an object slot is on, for its timeline's count: the timeline's placing, else its own (negative from the end); null past its shots. */
+export function skillObjectShot(object: Pick<SkillObject, "slot" | "shot">, line: Pick<SkillTimeline, "shots" | "objects">): number | null {
+  const n = line.shots.length;
+  const at = line.objects?.[object.slot] ?? object.shot;
+  const k = at < 0 ? n + at : at;
+  return Number.isInteger(k) && k >= 0 && k < n ? k : null;
+}
+
+/**
+ * Where each shot of a timeline plays with another (SkillShot.beside): for each shot, the shot of the main line on
+ * screen when it starts (the one it plays beside), else null.
+ */
+export function besideOf(line: Pick<SkillTimeline, "shots">): (number | null)[] {
+  return line.shots.map((s) => {
+    if (!s.beside) return null;
+    const k = line.shots.findIndex((m) => !m.beside && m.start <= s.start + 0.005 && m.end > s.start + 0.005);
+    return k < 0 ? null : k;
+  });
+}
 
 export type MontageSkill = {
   /** The house model it plays (house-models.ts). */
@@ -210,13 +259,14 @@ export type MontageSkill = {
   /** Whether its code draws an ending card (an offer, an announcement) when the Reel has one. */
   end: boolean;
   /**
-   * For n shots: its length, each shot's span and want, its texts' moments and its code's marks, its sounds and its
-   * music's shape; `bpm`, at another tempo than its own (a longer or shorter Reel, a music's tempo): every length it
-   * counts in beats follows it; `words`, her words by slot when they are written (the plan's): what its sounds follow
-   * (a key click on each letter of her name as its code types it), never its lengths. A skill timed on her voice gets
-   * `said` (her talk cut, her words and what its filler chose in them, on the Reel's clock): its n shots are said.shots,
-   * its length said.duration (longer: her last shot runs on, as far as her video goes); without it (the lengths of the
-   * library, a check), a nominal timeline of n shots.
+   * For n shots: its length, each shot's span and want (two on the same moment: SkillShot.beside), its texts' moments
+   * and its code's marks, its sounds and its music's shape, the shots its code cuts her out on (`cutouts`) and the shot
+   * of each object (`objects`) for that count; `bpm`, at another tempo than its own (a longer or shorter Reel, a
+   * music's tempo): every length it counts in beats follows it; `words`, her words by slot when they are written (the
+   * plan's): what its sounds follow (a key click on each letter of her name as its code types it), never its lengths.
+   * A skill timed on her voice gets `said` (her talk cut, her words and what its filler chose in them, on the Reel's
+   * clock): its n shots are said.shots, its length said.duration (longer: her last shot runs on, as far as her video
+   * goes); without it (the lengths of the library, a check), a nominal timeline of n shots.
    */
   timeline(n: number, options: { end: boolean; bpm?: number; settings?: Record<string, string>; words?: Record<string, string>; said?: SkillSaid }): SkillTimeline;
   /**
@@ -237,7 +287,13 @@ export type MontageSkill = {
    * 10 secondes mais qu'elle veut un Reel de 30 ? »). Its timeline takes any count up to it.
    */
   long?: number;
-  /** Its composition over the whole Reel: plain JS defining function Scene (h = React.createElement, no JSX), the kit's scope. */
+  /**
+   * Its composition over the whole Reel: plain JS defining function Scene (h = React.createElement, no JSX), the kit's
+   * scope (motion-scene.ts): Footage for her shots (two shots laid beside each other share their `from`: lay both, each
+   * plays at its own speed), Subject and the reading tools for what is cut out of them, and `Look` for a ready look
+   * (LOOK_PRESETS: « vhs », « bw »…) on one shot or one span of it, over what it wraps, where a look on the whole Reel
+   * is its finish.
+   */
   code: string;
   /** Google Fonts families its code brings besides the Reel's two. */
   fonts?: string[];
@@ -306,6 +362,42 @@ export function skillCode(skill: Pick<MontageSkill, "code" | "objects">, objects
     if (name) code = code.split(`"@${o.slot}"`).join(JSON.stringify(name));
   }
   return code;
+}
+
+/**
+ * What a skill's code draws of her shots for its timeline's count, as the plan keeps it (motion.drawn): the shots it
+ * cuts her out on (its timeline's `cutouts`) and each object it named on its shot (its slot's shot for that count, the
+ * filler's name), so the engine cuts out and follows only those, even where its code writes the shot as a variable.
+ * Nothing when its timeline says neither.
+ */
+export function skillDrawn(
+  skill: Pick<MontageSkill, "objects">,
+  line: Pick<SkillTimeline, "shots" | "cutouts" | "objects">,
+  named: Record<string, string> | undefined,
+): MotionDrawn | undefined {
+  const count = line.shots.length;
+  const subjects = line.cutouts ? [...new Set(line.cutouts.filter((k) => Number.isInteger(k) && k >= 0 && k < count))].sort((a, b) => a - b) : undefined;
+  const objects = (skill.objects ?? []).flatMap((o) => {
+    const shot = skillObjectShot(o, line);
+    const name = skillObjectName(named?.[o.slot]);
+    return shot !== null && name ? [{ shot, name }] : [];
+  });
+  if (!subjects && !objects.length) return undefined;
+  return { shots: count, ...(subjects ? { subjects } : {}), ...(objects.length ? { objects } : {}) };
+}
+
+/**
+ * Her Reel on a skill dressed the way production dresses it (designSkill, and scripts/skill-render.mts to see it as it
+ * will come out): the model's lettering when she chose it (her charter's when Edith picked it: `followed.dressed`), its
+ * finish over the whole Reel (its grade, its grain, its corners) without what its code does itself (MontageSkill.finish),
+ * else her own look for all her Reels (`own`).
+ */
+export function dressSkillPlan(plan: EditPlan, skill: Pick<MontageSkill, "finish">, followed: FollowedStyle | undefined, own?: ReelLook | null): EditPlan {
+  const dressed: EditPlan = { ...plan, ...followedLook(plan, followed) };
+  Object.assign(dressed, followedFilter(dressed, followed));
+  if (skill.finish && dressed.look) dressed.look = { ...dressed.look, ...skill.finish };
+  if (!planLook(dressed) && own) dressed.look = own;
+  return dressed;
 }
 
 /**
@@ -534,6 +626,8 @@ export function skillPlan(input: { skill: MontageSkill; name: string; files: Ski
     ...(said ? { said } : {}),
   });
   const segments = said ? talkSegments(input.talk!, said, line) : castSegments(input.files, fill, line);
+  // What its code draws of her shots for this count (her cut-out, its objects): only those are made before the render.
+  const drawn = skillDrawn(skill, line, fill.objects);
   // Its length: its timeline's; on her voice, her shots' (her last one running on for an ending, as far as her video goes).
   const duration = said ? round(segments.reduce((sum, s) => sum + ("clip_id" in s ? s.out - s.in : 0), 0)) : round(line.duration);
   const texts = [
@@ -580,6 +674,8 @@ export function skillPlan(input: { skill: MontageSkill; name: string; files: Ski
           draws_texts: true,
           draws_end: Boolean(fill.end),
           ...(skill.fonts?.length ? { fonts: skill.fonts.slice(0, 3) } : {}),
+          // What its code draws of her shots for this count (her cut-out, its objects): only those are made before the render.
+          ...(drawn ? { drawn } : {}),
           // On her voice: its code gets her words said, each at its frame (`spoken`), whether or not it writes them all.
           ...(voice ? { times_spoken: true, writes_spoken: voice.subtitles === "own" } : {}),
           ...(voice?.row ? { subtitle_y: Math.min(0.8, Math.max(0.1, voice.row)) } : {}),
@@ -600,14 +696,16 @@ function castSegments(files: SkillFile[], fill: SkillFill, line: SkillTimeline):
     const length = round(span.end - span.start);
     const pick = fill.shots[i] ?? fill.shots[i % fill.shots.length]!;
     const file = byId.get(pick.file) ?? files[0]!;
-    if (file.photo) return { clip_id: file.id, in: 0, out: length, zoom: "none" };
+    // A shot beside another plays from its own start on the Reel's clock, its time counted once.
+    const beside = span.beside ? { beside: { at: round(span.start) } } : {};
+    if (file.photo) return { clip_id: file.id, in: 0, out: length, zoom: "none", ...beside };
     // A video shorter than its shot: all of it, slowed down (never under half speed).
     if (file.seconds < length + 0.05) {
       const speed = Math.max(0.5, Math.min(1, file.seconds / length));
-      return { clip_id: file.id, in: 0, out: round(Math.min(file.seconds, length * speed)), zoom: "none", speed: round(speed) };
+      return { clip_id: file.id, in: 0, out: round(Math.min(file.seconds, length * speed)), zoom: "none", speed: round(speed), ...beside };
     }
     const at = passage(file, length, pick.at, taken);
-    return { clip_id: file.id, in: at, out: round(at + length), zoom: "none" };
+    return { clip_id: file.id, in: at, out: round(at + length), zoom: "none", ...beside };
   });
 }
 
@@ -1055,6 +1153,7 @@ Then cast her files on its slots (« cases », in order: each with its length an
 - a video's passage starts at "at" (seconds) and lasts the slot's length: choose it inside one of its good moments (« moments »), never a blurry or dark one when another exists;
 - never the same passage twice; a video may fill several slots only with moments that look different; her files all used before one comes back, never the same file on two slots in a row when another fits;
 - a file's format (« format »: verticale, horizontale, carrée) matters where the model lays a slot in a box of another shape (its « veut » or « deroule » says: a tall half, a wide band): there a file of that shape when one fits, else a passage whose subject is in the middle of its picture (only its middle shows);
+- a slot that plays at the same time as another (« en_meme_temps_que »: a split screen's other half) is seen beside it, each at its own speed: the two answer each other as its « veut » says (the gesture and what it gives), each from another file, never the same passage;
 - a photo plays still (at 0).
 
 Then write its texts, in French (what her customers read), each in its slot (« textes »: what it says and its most characters):
@@ -1103,7 +1202,9 @@ export function skillFillInput(input: {
   facts?: SkillFacts;
 }) {
   const voice = input.skill.voice;
+  // On her voice, no slot to cast: her talk is its shots.
   const line = voice ? null : input.skill.timeline(input.n, { end: input.skill.end, ...(input.bpm ? { bpm: input.bpm } : {}) });
+  const besides = line ? besideOf(line) : [];
   const fonts = input.skill.texts.some((t) => t.font) || Boolean(voice?.fonts?.length);
   return {
     commerce: {
@@ -1125,7 +1226,13 @@ export function skillFillInput(input: {
         return `de ${round(l.min)} à ${round(l.max)} s selon le nombre de cases et son tempo (ce Reel : ${round(line!.duration)} s, ${input.n} cases)`;
       })(),
     },
-    cases: line ? line.shots.map((s, i) => ({ case: i + 1, duree: `${round(s.end - s.start)} s`, veut: s.want })) : [],
+    // A slot that plays at the same time as another (a split screen's other half) says which one.
+    cases: line
+      ? line.shots.map((s, i) => {
+          const beside = besides[i];
+          return { case: i + 1, duree: `${round(s.end - s.start)} s`, veut: s.want, ...(beside !== null && beside !== undefined ? { en_meme_temps_que: beside + 1 } : {}) };
+        })
+      : [],
     ...(voice && input.talk
       ? {
           voix: {
@@ -1148,7 +1255,15 @@ export function skillFillInput(input: {
     ...(input.skill.settings?.length
       ? { reglages: input.skill.settings.map((x) => ({ nom: x.name, change: x.want, choix: x.choices.map((c, i) => `${c.value} : ${c.says}${i === 0 ? " (celui de l'original, par défaut)" : ""}`) })) }
       : {}),
-    ...(input.skill.objects?.length ? { objets: input.skill.objects.map((o) => ({ slot: o.slot, case: o.shot + 1, cherche: o.want })) } : {}),
+    // Each object on the slot its timeline gives it for this count (counted from the end, or placed by the timeline); none past its slots.
+    ...(input.skill.objects?.length && line
+      ? {
+          objets: input.skill.objects.flatMap((o) => {
+            const shot = skillObjectShot(o, line);
+            return shot === null ? [] : [{ slot: o.slot, case: shot + 1, cherche: o.want }];
+          }),
+        }
+      : {}),
     ...(input.current ? { textes_actuels: input.current } : {}),
     ...(input.currentSettings && Object.keys(input.currentSettings).length ? { reglages_actuels: input.currentSettings } : {}),
     fichiers: input.files.map((f) => {
