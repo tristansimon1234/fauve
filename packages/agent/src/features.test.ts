@@ -7602,7 +7602,7 @@ test("« Mots mêlés » (v2): its picture darkened to its own light, as filmed,
 test("« Interrupteur » (v2): one shot of 9,1 s on its original's grid (143,7 BPM, one beat in two), its music stopped dead and back as she lands, its beep", async () => {
   const { interrupteur } = await import("./skills/interrupteur.ts");
   const { skillPlan } = await import("./skills.ts");
-  assert.equal(interrupteur.version, 8);
+  assert.equal(interrupteur.version, 9);
   assert.equal(interrupteur.bpm, 71.85);
   const line = interrupteur.timeline(1, { end: false });
   // One fixed shot, no cut (the original has none): its 275 images less its last two, a rest of its edit.
@@ -7667,8 +7667,10 @@ test("« Interrupteur » (v2): its switch where her hand goes highest, flipped i
   const off = switchOf(draw(100, props()));
   assert.deepEqual([off.width, off.height], [311, 143]);
   assert.ok(Math.abs(off.knob.width / off.knob.height - 1.28) < 0.02 && off.knob.top === 15 && off.knob.left === 15, JSON.stringify(off.knob));
-  // Where her fingertip goes highest, right of its middle at its mid-height; off and grey until then.
-  assert.ok(Math.abs(off.left + off.width / 2 - (tip(110).x - 0.03 * 311)) <= 1 && Math.abs(off.top + off.height / 2 - 400) <= 1, JSON.stringify(off));
+  // At the height where her fingertip goes highest, across in the original's middle (49,9 %) while her fingertip stays
+  // on it (v9, Tristan: « le bouton n'est pas au centre »); off and grey until then.
+  assert.ok(Math.abs(off.left + off.width / 2 - Math.round(1080 * 0.499)) <= 1 && Math.abs(off.top + off.height / 2 - 400) <= 1, JSON.stringify(off));
+  assert.ok(Math.abs(tip(110).x - (off.left + off.width / 2)) <= 0.42 * 311, "her fingertip on it");
   assert.equal(off.backgroundColor, "#605e5a");
   // It flips in one image as her hand gets within a hair of the top: no image between; her colour, the knob on the right.
   const flips = [107, 108, 109, 110].map((f) => switchOf(draw(f, props())).backgroundColor);
@@ -9175,7 +9177,7 @@ test("« Photos posées sur la table » (v2): horizontal 4:3 on black when her t
 
 test("« Interrupteur » (v4): once she has left, her wall held on that image to the end, nothing of hers coming back; never frozen when nothing says she was there", async () => {
   const { interrupteur } = await import("./skills/interrupteur.ts");
-  assert.equal(interrupteur.version, 8);
+  assert.equal(interrupteur.version, 9);
   const line = interrupteur.timeline(1, { end: false });
   const marks = Object.fromEntries(Object.entries(line.marks).map(([k, v]) => [k, String(v)]));
   const brand = { name: "Atelier Rose", displayFont: "Inter Tight", bodyFont: "Inter Tight", accent: "#7a2e3b", palette: { secondary: "#2c4a3e", light: "#f4efe9", dark: "#1d1d1b" } };
@@ -10295,5 +10297,28 @@ test("« Interrupteur » (v8): its poster's texts keyed by their words, so its e
   assert.ok(before.includes("s-Nouvelle saison") && before.includes("title-La Fripe Rétro"), before.join(" "));
   assert.ok(after.includes("s-Deux salles, de nouvelles pièces chaque semaine") && after.includes("title-La nouvelle saison est ouverte"), after.join(" "));
   assert.equal(after.some((k) => before.includes(k)), false);
+});
+
+test("« Interrupteur » (v9): its switch as near the middle as her fingertip stays on it, her poster centred under it", async () => {
+  const { interrupteur } = await import("./skills/interrupteur.ts");
+  const line = interrupteur.timeline(1, { end: false });
+  const marks = Object.fromEntries(Object.entries(line.marks).map(([k, v]) => [k, String(v)]));
+  const brand = { name: "Atelier Rose", displayFont: "Inter Tight", bodyFont: "Inter Tight", accent: "#7a2e3b", palette: { secondary: "#2c4a3e", light: "#f4efe9", dark: "#1d1d1b" } };
+  const props = { width: 1080, height: 1920, durationInFrames: 273, brand, shots: rallumeShots(line, 9 / 16), reelTexts: [{ text: "Atelier Rose", role: "hook", from: 123, to: 273, emphasis: [] }], end: null, texts: marks };
+  // Her hand reaching high far on the right (x 900): the switch goes no further from the middle than her fingertip allows.
+  const at = (x: number) => (f: number) => ({
+    hands: f >= 60 && f <= 160 ? [{ points: { index_tip: { x, y: f < 110 ? 1100 - (f - 60) * 14 : 400 + (f - 110) * 14 }, wrist: { x, y: 1300 } } }] : [],
+    bodies: f >= 40 ? [{ points: { left_shoulder: { x: x - 80, y: 900, visible: true }, right_shoulder: { x: x + 60, y: 900, visible: true } } }] : [],
+  });
+  const centre = async (x: number) => {
+    const { draw } = await kitScene(interrupteur.code, { track: at(x) });
+    const s = drawnNodes(draw(100, props)).find((n) => n.props.key === "switch")!;
+    const st = styleOf(s);
+    return Number(st.left) + Number(st.width) / 2;
+  };
+  const SW = Math.round(1080 * 0.2875);
+  assert.ok(Math.abs((await centre(900)) - (900 - SW * 0.42)) <= 1);
+  // Near the middle: in the middle.
+  assert.ok(Math.abs((await centre(600)) - Math.round(1080 * 0.499)) <= 1);
 });
 

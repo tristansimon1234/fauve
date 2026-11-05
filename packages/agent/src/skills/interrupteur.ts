@@ -156,12 +156,14 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
 
   // 3. The switch: a phone's, flat (no shadow, no outline), the original's proportions (its track 0,29 of the frame's
   // width, as tall as 0,46 of it; its knob a capsule 1,28 times as wide as tall, 10,5 % of the track from its edges),
-  // there from the first image, never pulsing; set where her hand goes highest, her fingertip right of its middle at
-  // its mid-height, else where the original sets it (49,9 % across, 20,5 % down). It flips in one image when her hand
-  // gets there: the knob on the right, the track in her colour; nothing else changes.
+  // there from the first image, never pulsing; set at the height where her hand goes highest, and across as near the
+  // original's middle (49,9 %) as her fingertip stays on it (Tristan, on its v7 bench: « le bouton n'est pas au
+  // centre »; her poster is centred under it); without her hand, where the original sets it (49,9 % across, 20,5 %
+  // down). It flips in one image when her hand gets there: the knob on the right, the track in her colour.
   const SW = Math.round(layout.band ? U * 0.162 : FW * 0.2875);
   const SH = Math.round(SW * 0.46);
-  const sx = Math.round(reach ? within(reach.x - SW * 0.03, box.left + SW / 2 + 20, box.left + box.width - SW / 2 - 20) : box.left + box.width * 0.499);
+  const mid = box.left + box.width * 0.499;
+  const sx = Math.round(reach ? within(within(mid, reach.x - SW * 0.42, reach.x + SW * 0.42), box.left + SW / 2 + 20, box.left + box.width - SW / 2 - 20) : mid);
   const sy = Math.round(reach ? within(reach.y, Math.max(box.top, 0) + SH / 2 + 30, box.top + box.height * 0.6) : box.top + box.height * 0.205);
   const ON = reach ? reach.at : FLIP;
   const lit = frame >= ON;
@@ -287,8 +289,9 @@ export const interrupteur: MontageSkill = {
   // passage ends on her wall alone, a second at least after she has left (Tristan on v6: « bizarre que la main reste »:
   // its filler had set her highest reach on the flip, and her video's 3 s of empty wall came after the Reel's end).
   // 8: gone under a five-hundredth (v7 froze her hand leaving at the edge, a hundredth of her); her title and lines keyed
-  // by their text (its ending card's long line kept the size of « Nouvelle saison » and ran off both sides).
-  version: 8,
+  // by their text (its ending card's long line kept the size of « Nouvelle saison » and ran off both sides). 9: its
+  // switch as near the middle as her fingertip stays on it (Tristan: « le bouton n'est pas au centre »).
+  version: 9,
   bpm: BPM,
   shots: [1, 1],
   files: [1, 2],
