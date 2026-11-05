@@ -4093,3 +4093,176 @@ test("« Écran partagé titré » (v2): its layout as a setting her words ask, 
   // Its music shaped on the plan: without its bass to the third bar, cut dead at the end.
   assert.deepEqual(plan.music_shape, { filters: [{ kind: "thin", from: 0, to: 4, open: 0.02 }], end: { at: plan.duration, fade: 0.012 } });
 });
+
+// ——— « Titre gaufré » v2, written again on its original's fiche (docs/fiches/gaufre.md) ——————————————————————————
+
+/** Where its original's pieces land (images at 30 i/s): one on each of its three chords, thirteen in its burst, the street on its reprise and the two largest on its next beats. */
+const GAUFRE_PIECES = [1, 25, 53, 80, 85, 90, 94, 97, 100, 104, 109, 114, 118, 124, 128, 132, 158, 175, 190];
+/** What its four objects are on the passage under its paper, as the engine reads them (px of the vertical frame): her sign, her two windows, three bags in her window, a bicycle. */
+const GAUFRE_READ = {
+  boxes: { "1#shop sign": { x: 200, y: 400, w: 580, h: 150 } },
+  parts: {
+    "1#every window": [{ x: 120, y: 0, w: 260, h: 210 }, { x: 700, y: 0, w: 260, h: 210 }],
+    "1#every tote bag": [{ x: 60, y: 600, w: 90, h: 170 }, { x: 300, y: 600, w: 90, h: 170 }, { x: 600, y: 600, w: 90, h: 170 }],
+    "1#every bicycle": [{ x: 860, y: 1000, w: 220, h: 400 }],
+  },
+};
+const GAUFRE_NAMED = { nom: "shop sign", fenetres: "every window", vitrine: "every tote bag", devant: "every bicycle" };
+
+test("« Titre gaufré » (v2) lands its front's pieces and cuts to its paper where its original does, on its own music (113,2 BPM)", async () => {
+  const { gaufre } = await import("./skills/gaufre.ts");
+  const { skillPlan, skillCode } = await import("./skills.ts");
+  const { objectsDrawn, objectPassages, drawsSubject, clearsDrawn } = await import("./subject.ts");
+  assert.equal(gaufre.version, 2);
+  assert.equal(gaufre.bpm, 113.2);
+  // Her one video of her front (its original has one), and the same video under the paper, where its things are read.
+  assert.deepEqual([gaufre.shots, gaufre.files], [[2, 2], [1, 1]]);
+  const line = gaufre.timeline(2, { end: false });
+  assert.equal(line.shots.length, 2);
+  assert.ok(Math.abs(line.shots[1]!.start * 30 - 270) <= 2, `the paper at ${line.shots[1]!.start} s, the original's 9,00 s`);
+  assert.ok(Math.abs(line.duration * 30 - 382) <= 2, `${line.duration} s`);
+  assert.equal(line.marks.paper, Math.round(line.shots[1]!.start * 30));
+  // Each of its 19 pieces within two images of the original's.
+  GAUFRE_PIECES.forEach((f, i) => assert.ok(Math.abs(line.marks[`piece_${i}`]! - f) <= 2, `piece ${i + 1}: image ${line.marks[`piece_${i}`]}, the original's ${f}`));
+  // Its reprise, the two largest pieces after it and its paper on whole beats of its music, its end too (10, 11, 12, 17, 24).
+  const beat = (60 / 113.2) * 30;
+  for (const [k, b] of [["piece_16", 10], ["piece_17", 11], ["piece_18", 12], ["paper", 17]] as const) assert.ok(Math.abs(line.marks[k]! - b * beat) <= 1.5, `${k}: image ${line.marks[k]}, beat ${b}`);
+  assert.ok(Math.abs(line.duration * 30 - 24 * beat) <= 1);
+  // Its ink as the original's: the first letter already in it at the cut and done at 323, the second from 317, the last
+  // from 355, a dot from 359, all of it by 374; its line from 325 to 378.
+  assert.ok(line.marks.ink! < line.marks.paper!);
+  for (const [k, f] of [["first", 323], ["second", 317], ["last", 355], ["dots", 359], ["inked", 374], ["line_from", 325], ["line_to", 378]] as const)
+    assert.ok(Math.abs(line.marks[k]! - f) <= 2, `${k}: image ${line.marks[k]}, the original's ${f}`);
+  assert.ok(line.marks.dry! >= 45 && line.marks.dry! <= 90, `dry ${line.marks.dry}`);
+  // Her name and her line pressed in the paper from its first image to the end.
+  assert.deepEqual(line.texts, { titre: { from: line.shots[1]!.start, to: line.duration }, ligne: { from: line.shots[1]!.start, to: line.duration } });
+  // Its music thin (without its bass) to its reprise, stopped before it while nothing lands, whole again on it, cut dead as
+  // its groove ends (the original's 11,95 s); no sound of its own.
+  const s = 60 / 113.2;
+  const r3 = (x: number) => Math.round(x * 1000) / 1000;
+  assert.deepEqual(line.music, { filters: [{ kind: "thin", from: 0, to: r3(10 * s) }], pauses: [{ from: r3(8.5 * s), to: r3(10 * s) }], end: { at: r3(22.5 * s) } });
+  assert.ok(line.marks.piece_15! < line.music!.pauses![0]!.from * 30 && line.marks.piece_16! <= line.music!.pauses![0]!.to * 30);
+  assert.ok(Math.abs(line.music!.end!.at - 11.95) <= 2 / 30);
+  assert.equal(line.sounds, undefined);
+  // At another tempo, all of it follows its beats.
+  const slower = gaufre.timeline(2, { end: false, bpm: 90 });
+  assert.ok(Math.abs(slower.marks.paper! / line.marks.paper! - 113.2 / 90) < 0.01 && Math.abs(slower.marks.piece_9! / line.marks.piece_9! - 113.2 / 90) < 0.02);
+  // With an ending card (an option: its original has none), the inked card held whole beats longer for its 1,6 s, its
+  // music playing on to the mix's own fade.
+  const ended = gaufre.timeline(2, { end: true });
+  assert.deepEqual(ended.shots[0], line.shots[0]);
+  const more = (ended.duration - line.duration) / s;
+  assert.ok(ended.duration - line.duration >= 1.6 && Math.abs(more - Math.round(more)) < 0.05, `${ended.duration} s`);
+  assert.equal(ended.music!.end, undefined);
+  assert.ok(Math.abs(ended.texts.titre!.to - (ended.duration - 1.6)) < 0.01);
+  // Its objects: what her front is made of, named by the filler and looked for on the passage under the paper; nobody
+  // cut out, no clear area read, no zoom nor move; no grain nor dark corners.
+  assert.deepEqual(objectsDrawn(gaufre.code), []);
+  const named = skillCode(gaufre, GAUFRE_NAMED);
+  assert.deepEqual(objectsDrawn(named), Object.values(GAUFRE_NAMED).map((name) => ({ shot: 1, name })));
+  assert.equal(drawsSubject(named), false);
+  assert.deepEqual(clearsDrawn(gaufre.code), []);
+  assert.doesNotMatch(gaufre.code, /scale\(|translate|rotate\(|ellipse/);
+  assert.deepEqual(gaufre.finish, { grain: 0, vignette: 0 });
+  // On the plan: valid, its two shots on her one video, its music's shape kept, its four objects within the engine's
+  // budget (the passage under the paper is short); with an ending card, the fourth is left out.
+  const files = [{ id: "v", photo: false, seconds: 15 }];
+  const fill = { shots: [{ file: "v", at: 1 }, { file: "v", at: 1 }], texts: { titre: "Brick Lane", ligne: "librairie · spitalfields" }, end: null, objects: GAUFRE_NAMED };
+  const plan = skillPlan({ skill: gaufre, name: "Titre gaufré", files, fill });
+  assert.ok(editPlanSchema.safeParse(plan).success);
+  assert.deepEqual(plan.segments.map((x) => (x as ClipSegment).clip_id), ["v", "v"]);
+  assert.deepEqual(plan.music_shape, { pauses: [{ from: r3(8.5 * s), to: r3(10 * s) }], filters: [{ kind: "thin", from: 0, to: r3(10 * s), open: 0.02 }], end: { at: r3(22.5 * s), fade: 0.012 } });
+  assert.deepEqual(objectPassages(plan, () => true).map((p) => [p.from, p.name]), Object.values(GAUFRE_NAMED).map((name) => [(plan.segments[1] as ClipSegment).in, name]));
+  const withCard = skillPlan({ skill: gaufre, name: "Titre gaufré", files, fill: { ...fill, end: { title: "Ouvert dimanche" } } });
+  assert.equal(objectPassages(withCard, () => true).length, 3);
+});
+
+test("« Titre gaufré » (v2): her front built on the black from what it is made of, her name first, as her video is; its paper, her name pressed then inked", async () => {
+  const { gaufre } = await import("./skills/gaufre.ts");
+  const { skillCode } = await import("./skills.ts");
+  const line = gaufre.timeline(2, { end: false });
+  const marks = Object.fromEntries(Object.entries(line.marks).map(([k, v]) => [k, String(v)]));
+  const shotsOf = (aspect: number, srcs = ["/v0.mp4", "/v0.mp4"]) => line.shots.map((x, i) => ({ src: srcs[i], aspect, from: Math.round(x.start * 30), durationInFrames: Math.round((x.end - x.start) * 30), kind: "video", segment: i }));
+  const reelTexts = [
+    { text: "Still", role: "hook", from: 270, to: 382 },
+    { text: "in the moment", role: "caption", from: 270, to: 382 },
+  ];
+  const named = skillCode(gaufre, GAUFRE_NAMED);
+  const draw = (frame: number, extra: Record<string, unknown> = {}, read: Parameters<typeof drawCutOuts>[3] = GAUFRE_READ) =>
+    drawCutOuts(named, frame, { width: 1080, height: 1920, durationInFrames: 382, brand: { displayFont: "DM Serif Display", bodyFont: "Cormorant Garamond" }, shots: shotsOf(9 / 16), reelTexts, end: null, texts: marks, ...extra }, read);
+  const frameBox = (tree: Drawn) => tree.children[0] as Drawn;
+  const film = (tree: Drawn) => frameBox(tree).children[0] as Drawn | null;
+  const rects = (tree: Drawn) => [...String(styleOf(film(tree)!).clipPath ?? "").matchAll(/M(-?\d+) (-?\d+)H(-?\d+)V(-?\d+)H/g)].map((m) => [Number(m[1]), Number(m[2]), Number(m[3]) - Number(m[1]), Number(m[4]) - Number(m[2])]);
+  // Black on its first image; her sign alone on its second, whole and at its place; then a thing far from it, then the
+  // highest, one more on each of the original's chords (images 25 and 53), each staying where it landed.
+  assert.equal(styleOf(film(draw(0))!).clipPath, "inset(50%)");
+  assert.deepEqual(rects(draw(1)), [[200, 400, 580, 150]]);
+  assert.deepEqual(rects(draw(24)), rects(draw(1)));
+  assert.deepEqual(rects(draw(25)), [[200, 400, 580, 150], [860, 1000, 220, 400]]);
+  assert.deepEqual(rects(draw(53))[2], [120, 0, 260, 210]);
+  // Then its burst: the widest thing across it first, its bicycle, its windows and bags from right to left, then the
+  // walls between its rows of things from the bottom up: sixteen by the original's image 132, none in its stop.
+  assert.equal(rects(draw(131)).length, 15);
+  assert.equal(rects(draw(132)).length, 16);
+  assert.deepEqual(rects(draw(157)), rects(draw(132)));
+  // The street on the reprise (all of it under its things), the top on its left, then the whole picture, no zoom nor move.
+  const street = rects(draw(158))[16]!;
+  assert.deepEqual([street[0], street[2], street[1]! + street[3]!], [0, 1080, 1920]);
+  assert.deepEqual(rects(draw(175))[17]!.slice(0, 3), [0, 0, 366]);
+  assert.equal(styleOf(film(draw(190))!).clipPath, undefined);
+  const footage = drawnNodes(film(draw(120))!).find((n) => n.type === "Footage")!;
+  assert.deepEqual([footage.props.shot, styleOf(footage).left, styleOf(footage).top, styleOf(footage).width, styleOf(footage).height], [0, 0, 0, 1080, 1920]);
+  // Another video cast under the paper, or nothing found in it: its middle in sixteen regular pieces, the same times.
+  const grid = rects(draw(132, {}, {}));
+  assert.equal(grid.length, 16);
+  assert.ok(grid.every(([x, y, w, h]) => x! >= 86 && x! + w! <= 995 && y! >= 288 && y! + h! <= 1384), JSON.stringify(grid));
+  assert.deepEqual(rects(draw(132, { shots: shotsOf(9 / 16, ["/v0.mp4", "/v1.mp4"]) })), grid);
+  // Its frame as her video: upright, the whole frame; in width, all of it in a 16:9 band in the middle of the black; her
+  // setting prevails both ways. The paper always full frame.
+  const boxAt = (aspect: number, format?: string) => styleOf(frameBox(draw(100, { shots: shotsOf(aspect), texts: { ...marks, ...(format ? { format } : {}) } })));
+  assert.deepEqual([boxAt(9 / 16).top, boxAt(9 / 16).height], [0, 1920]);
+  assert.deepEqual([boxAt(16 / 9).top, boxAt(16 / 9).width, boxAt(16 / 9).height], [656, 1080, 608]);
+  assert.deepEqual([boxAt(9 / 16, "horizontal").top, boxAt(9 / 16, "horizontal").height], [656, 608]);
+  assert.deepEqual([boxAt(16 / 9, "vertical").top, boxAt(16 / 9, "vertical").height], [0, 1920]);
+  assert.deepEqual(gaufre.settings?.map((x) => [x.name, x.choices.map((c) => c.value)]), [["format", ["auto", "horizontal", "vertical"]]]);
+  const banded = draw(270, { shots: shotsOf(16 / 9) });
+  assert.deepEqual([styleOf(banded.children[1] as Drawn).top, styleOf(banded.children[1] as Drawn).height], [0, 1920]);
+  // At the cut: no more of her video, the paper full frame in the original's peach, its fibres, no shade at its edges.
+  const card = draw(270);
+  assert.equal(film(card), null);
+  assert.equal(styleOf(card.children[1] as Drawn).backgroundColor, "#f5cca4");
+  // Her name the size of the original's (its five letters at most 800 px wide), centred half way down; its line under it
+  // in capitals spread over its width; every letter pressed in its cavity from the paper's first image, and in ink over it.
+  const fit = drawnNodes(card).find((n) => n.type === "FitText")!;
+  assert.ok(styleOf(fit).left === 140 && styleOf(fit).width === 800 && Math.abs(Number(styleOf(fit).top) - 756) <= 2, JSON.stringify(styleOf(fit)));
+  const letterSpans = (tree: Drawn) => drawnNodes(tree).filter((n) => n.type === "span" && typeof n.children[0] === "string" && /\S/.test(n.children[0] as string));
+  const pressed = letterSpans(card).filter((n) => /^url\(#\w+\)$/.test(String(styleOf(n).filter)));
+  assert.equal(pressed.map((n) => n.children[0]).join(""), "StillINTHEMOMENT");
+  assert.ok(drawnNodes(card).some((n) => n.type === "div" && styleOf(n).justifyContent === "space-between" && n.props["data-fauve-accent"] === ""));
+  // Its ink: the first letter already in it at the cut, from its upper left; the next ones rising from their foot, 0,4 s
+  // apart; the dot of the i last; all of it by the end, the line too; dark as it comes in, rust once dry.
+  const inkedAt = (f: number) => letterSpans(draw(f)).filter((n) => /drop-shadow/.test(String(styleOf(n).filter)));
+  const letter = (f: number, c: string) => inkedAt(f).find((n) => n.children[0] === c)!;
+  const front = (n: Drawn) => Number(/rgba\([\d,]+,1\) (-?[\d.]+)%, rgba\([\d,]+,0\)/.exec(String(styleOf(n).backgroundImage))?.[1]);
+  const colours = (n: Drawn) => [...String(styleOf(n).backgroundImage).matchAll(/rgba\((\d+),(\d+),(\d+),1\)/g)].map((m) => m.slice(1, 4).map(Number));
+  assert.deepEqual(inkedAt(270).map((n) => n.children[0]), ["S"]);
+  assert.match(String(styleOf(letter(300, "S")).backgroundImage), /^radial-gradient/);
+  assert.deepEqual(inkedAt(316).map((n) => n.children[0]), ["S"]);
+  assert.deepEqual(inkedAt(317).map((n) => n.children[0]), ["S", "t"]);
+  assert.match(String(styleOf(letter(325, "t")).backgroundImage), /^linear-gradient\(to top/);
+  assert.ok(front(letter(325, "t")) > 0 && front(letter(330, "t")) > front(letter(325, "t")));
+  // The i's stem inked and its dot held until 359, then inked last with the second l.
+  assert.equal(front(letter(352, "i")), front(letter(358, "i")));
+  assert.ok(front(letter(358, "i")) < 70 && front(letter(366, "i")) > front(letter(358, "i")) && front(letter(374, "i")) >= 100);
+  assert.equal(inkedAt(381).length, 5 + 11);
+  assert.match(String(styleOf(letter(381, "N")).backgroundImage), /^linear-gradient\(to right/);
+  assert.deepEqual(colours(letter(290, "S"))[1], [125, 33, 0]);
+  assert.deepEqual(colours(letter(381, "S"))[0], [180, 60, 1]);
+  // It lifts off the paper over 0,4 s: its soft shadow from nothing as its ink comes in.
+  assert.match(String(styleOf(letter(317, "t")).filter), /rgba\(72,26,4,0\.000\)/);
+  assert.match(String(styleOf(letter(330, "t")).filter), /rgba\(72,26,4,0\.500\)/);
+  // Its ending card when she has one (an option): the same paper, its title pressed, then inked quickly.
+  const ending = draw(440, { durationInFrames: 445, end: { title: "Ouvert dimanche", subtitle: "rue des Martyrs", from: 397 } });
+  assert.equal(letterSpans(ending).filter((n) => /^url\(#\w+\)$/.test(String(styleOf(n).filter))).map((n) => n.children[0]).join(""), "OuvertdimancheRUEDESMARTYRS");
+  assert.ok(letterSpans(ending).filter((n) => /drop-shadow/.test(String(styleOf(n).filter))).length >= 20);
+});
