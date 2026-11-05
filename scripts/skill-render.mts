@@ -29,7 +29,7 @@ import { buildReelProps } from "../packages/agent/src/motion.ts";
 import { HOUSE_MODELS } from "../packages/agent/src/house-models.ts";
 import { MONTAGE_SKILLS } from "../packages/agent/src/skill-library.ts";
 import { isClipSegment } from "../packages/agent/src/schemas.ts";
-import { clearPassages, objectKey, type ClearMap } from "../packages/agent/src/subject.ts";
+import { clearPassages, objectKey, objectsDrawn, type ClearMap } from "../packages/agent/src/subject.ts";
 import { skillLongest, skillPlan, skillShotCount, type MontageSkill, type SkillFile, type SkillFill } from "../packages/agent/src/skills.ts";
 
 const { values } = parseArgs({
@@ -111,7 +111,8 @@ const fonts = (values.fonts || "").split(",").map((f) => f.trim()).filter(Boolea
 const subjects: Record<string, { src: string; boxes?: (number[] | null)[]; contours?: (number[] | null)[]; parts?: number[]; clear?: ClearMap }> = {};
 for (const [shot, o] of Object.entries(JSON.parse(values.objects ?? "{}") as Record<string, { src: string; result: string; id: string }>)) {
   const segment = plan.segments.filter(isClipSegment)[Number(shot)];
-  const name = plan.layers?.[0]?.motion.js?.match(/object: "([^"@][^"]*)"/g)?.map((m) => m.slice(9, -1)).find((x) => plan.layers?.[0]?.motion.js?.includes(`shot: ${shot}, object: "${x}"`));
+  // Named as the engine reads it: Subject or Outline given `object`, or SubjectBox, SubjectOutline, SubjectParts given a name.
+  const name = objectsDrawn(plan.layers?.[0]?.motion.js).find((o) => o.shot === Number(shot))?.name;
   if (!segment || !name) throw new Error(`--objects: no named object on shot ${shot}`);
   const reading = (JSON.parse(readFileSync(resolve(o.result), "utf8")) as Record<string, { boxes?: (number[] | null)[]; contours?: (number[] | null)[]; parts?: number[] }>)[o.id];
   if (!reading) throw new Error(`--objects: no « ${o.id} » in ${o.result}`);
@@ -142,6 +143,8 @@ const props = buildReelProps(plan, {
   clipUrls: Object.fromEntries(files.map((f) => [f.id, f.src])),
   photoIds: files.filter((f) => f.photo).map((f) => f.id),
   aspects: Object.fromEntries(files.map((f) => [f.id, f.aspect])),
+  // A photo's shape, as the render gets it (without it, a composition takes every photo for an upright 3:4).
+  photoAspects: Object.fromEntries(files.filter((f) => f.photo).map((f) => [f.id, f.aspect])),
   brand: { name: values.name ?? "", ...(fonts.length ? { fonts } : {}) },
   ...(Object.keys(subjects).length ? { subjects } : {}),
 });
