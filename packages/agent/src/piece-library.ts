@@ -12,6 +12,7 @@ import { ecranPartage } from "./pieces/ecran-partage.ts";
 import { fenetres } from "./pieces/fenetres.ts";
 import { facade } from "./pieces/facade.ts";
 import { gaufre } from "./pieces/gaufre.ts";
+import { motCle } from "./pieces/mot-cle.ts";
 import { frappe } from "./pieces/frappe.ts";
 import { titreDerriere } from "./pieces/titre-derriere.ts";
 import { journee } from "./pieces/journee.ts";
@@ -22,11 +23,13 @@ import { tourne } from "./pieces/tourne.ts";
 import { nike } from "./pieces/nike.ts";
 import { eventail } from "./pieces/eventail.ts";
 import { coulisses } from "./pieces/coulisses.ts";
+import { interrupteur } from "./pieces/interrupteur.ts";
 import { interfaceEffect } from "./pieces/interface.ts";
 import { pixel } from "./pieces/pixel.ts";
 import { motsMeles } from "./pieces/mots-meles.ts";
 import { aplat } from "./pieces/aplat.ts";
 import { detourages } from "./pieces/detourages.ts";
+import { createur } from "./pieces/createur.ts";
 import { silhouette } from "./pieces/silhouette.ts";
 import { vision } from "./pieces/vision.ts";
 
@@ -36,7 +39,7 @@ import { vision } from "./pieces/vision.ts";
 // (scripts/skill-render.mts --piece); a new model of Edith's brings its own (docs/reprise.md, « Passage de relais »).
 
 /** The bank, in the catalogue's order (house-models.ts); the editor is offered them by what her files carry (pieces.ts, piecesOffered). */
-export const EFFECT_PIECES: Record<string, EffectPiece> = { cadre, decode, "quatre-coins": quatreCoins, mosaique, "carte-feutre": carteFeutre, pile, "mon-travail": monTravail, "photo-dump": photoDump, table, "ecran-partage": ecranPartage, fenetres, facade, gaufre, frappe, "titre-derriere": titreDerriere, journee, rallume, "plans-fixes": plansFixes, "coups-de-fouet": coupsDeFouet, tourne, nike, eventail, coulisses, interface: interfaceEffect, pixel, "mots-meles": motsMeles, aplat, detourages, silhouette, vision };
+export const EFFECT_PIECES: Record<string, EffectPiece> = { cadre, decode, "quatre-coins": quatreCoins, mosaique, "carte-feutre": carteFeutre, pile, "mon-travail": monTravail, "photo-dump": photoDump, table, "ecran-partage": ecranPartage, fenetres, facade, gaufre, "mot-cle": motCle, frappe, "titre-derriere": titreDerriere, journee, rallume, "plans-fixes": plansFixes, "coups-de-fouet": coupsDeFouet, tourne, nike, eventail, coulisses, interrupteur, interface: interfaceEffect, pixel, "mots-meles": motsMeles, aplat, detourages, createur, silhouette, vision };
 
 /** The piece of the bank a model's key names, if it has one. */
 export const pieceFor = (key: string | null | undefined): EffectPiece | undefined => (key ? EFFECT_PIECES[key] : undefined);
