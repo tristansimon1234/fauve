@@ -2111,3 +2111,167 @@ test("« Plans fixes de cinéma » (v3): horizontal 4:3 on black as its original
   assert.equal(plan.layers![0]!.motion.texts!.format, "vertical");
   assert.deepEqual(plan.skill, { key: "plans-fixes", version: 3, settings: { format: "vertical" } });
 });
+
+// ——— « Mosaïque qui change » v3, written again on its original's fiche (docs/fiches/mosaique.md) ——————————————————————
+
+/** A deterministic random(seed) for a composition drawn here (the render has Remotion's own). */
+const SEEDED = `function random(seed) { let x = 2166136261; for (const ch of String(seed)) x = Math.imul(x ^ ch.charCodeAt(0), 16777619) >>> 0; return x / 4294967296; }\n`;
+type MosaicPrint = { shot: number | null; at: number | undefined; lean: number | null };
+/**
+ * What each print of a mosaic shows at a frame, read from what its code draws (its block: where its pictures are laid):
+ * the shot it shows (null: blank paper), where that shot plays from, and its tilt while it lands (null: laid straight).
+ */
+function mosaicAt(code: string, frame: number, props: Record<string, unknown>, cols: number, rows: number): MosaicPrint[] {
+  const tree = drawScene(SEEDED + code, frame, props);
+  const out: MosaicPrint[] = Array.from({ length: cols * rows }, () => ({ shot: null, at: undefined, lean: null }));
+  const nodes = drawnNodes(tree);
+  const laid = nodes.find((n) => n.type === "Footage");
+  // Its block: where a picture is laid, less the few pixels it is laid past it.
+  const box = laid ? (styleOf(laid) as Record<string, number>) : { left: 7, top: 1, width: 1066, height: 1918 };
+  const block = { left: box.left! + 6, top: box.top! + 6, width: box.width! - 12, height: box.height! - 12 };
+  const cell = (x: number, y: number) =>
+    Math.min(cols - 1, Math.max(0, Math.floor(((x - block.left) / block.width) * cols))) + cols * Math.min(rows - 1, Math.max(0, Math.floor(((y - block.top) / block.height) * rows)));
+  for (const node of nodes) {
+    if (node.type !== "div") continue;
+    const style = styleOf(node);
+    const footage = drawnNodes(node).find((x) => x.type === "Footage");
+    const shown = { shot: footage ? Number(footage.props.shot) : null, at: footage?.props.at as number | undefined };
+    const clip = /^path\('(.*)'\)$/.exec(String(style.clipPath ?? ""));
+    for (const part of clip ? clip[1]!.split("Z").filter((p) => p.trim()) : []) {
+      const xy = part.replace(/[ML]/g, " ").trim().split(/\s+/).map(Number);
+      out[cell((xy[0]! + xy[2]! + xy[4]! + xy[6]!) / 4, (xy[1]! + xy[3]! + xy[5]! + xy[7]!) / 4)] = { ...shown, lean: null };
+    }
+    const lean = /rotate\((-?[\d.]+)deg\)/.exec(String(style.transform ?? ""));
+    if (lean) out[cell(Number(style.left) + Number(style.width) / 2, Number(style.top) + Number(style.height) / 2)] = { ...shown, lean: Number(lean[1]) };
+  }
+  return out;
+}
+/** Her pictures as a mosaic's composition gets them: n of that shape (width / height), a wave (36 images) each. */
+const mosaicShots = (aspects: number[], kind = "photo") => aspects.map((aspect, i) => ({ src: `/f${i}.jpg`, aspect, from: i * 36, durationInFrames: 36, kind, segment: i }));
+const MOSAIC_BRAND = { name: "La Fripe Rétro", displayFont: "Instrument Serif", bodyFont: "Inter Tight" };
+
+test("« Mosaïque qui change » (v3) changes its prints on its original's images, on its own music (130 BPM)", async () => {
+  const { mosaique } = await import("./skills/mosaique.ts");
+  assert.equal(mosaique.version, 3);
+  assert.equal(mosaique.bpm, 130);
+  // Its five pictures in 6 s, 13 beats of its music: a wave of 2,6 beats (36 images) each, as the original's.
+  const line = mosaique.timeline(5, { end: false });
+  assert.equal(line.duration, 6);
+  assert.deepEqual(line.shots.map((s) => Math.round(s.start * 30)), [0, 36, 72, 108, 144]);
+  assert.equal(line.marks.cycle, 36);
+  // Any count: the whole loop a whole number of beats, a print every 3 images within a fifth of an image.
+  for (let n = 4; n <= 10; n++) {
+    const other = mosaique.timeline(n, { end: false });
+    assert.ok(Math.abs(((other.duration * 130) / 60) % 1) < 0.05 || Math.abs(((other.duration * 130) / 60) % 1) > 0.95, `${n}: ${other.duration} s`);
+    assert.ok(Math.abs(other.marks.cycle! / 12 - 3) < 0.2, `${n}: ${other.marks.cycle}`);
+  }
+  // No text and no sound of its own; its music plays to its last image and stops dead as it loops (the original's
+  // never fades); a Reel that ends on a card does not loop, the mix fades it.
+  assert.equal(line.sounds, undefined);
+  assert.deepEqual(line.music, { end: { at: 6 } });
+  assert.equal(mosaique.timeline(5, { end: true }).music, undefined);
+  // Image by image: its 59 changes on the original's images (3 + 3 × the print's rank + 36 × the wave), within two
+  // images (here on them), in reading order, each print to the next picture; the first one comes back last.
+  const props = { width: 1080, height: 1920, durationInFrames: 180, brand: MOSAIC_BRAND, shots: mosaicShots(Array(5).fill(3 / 4)), reelTexts: [], end: null, texts: { cycle: "36" } };
+  const seen = Array.from({ length: 180 }, (_, f) => mosaicAt(mosaique.code, f, props, 3, 4));
+  const expected = Array.from({ length: 5 }, (_, w) => Array.from({ length: 12 }, (_, j) => ({ j, at: 3 + 3 * j + 36 * w, shot: (w + 1) % 5 }))).flat().filter((c) => c.at < 180);
+  const changes = seen.flatMap((prints, f) => (f ? prints.flatMap((p, j) => (p.shot !== seen[f - 1]![j]!.shot ? [{ j, at: f, shot: p.shot }] : [])) : []));
+  assert.equal(changes.length, 59);
+  for (const c of expected) assert.ok(changes.some((x) => x.j === c.j && x.shot === c.shot && Math.abs(x.at - c.at) <= 2), `print ${c.j + 1} to picture ${c.shot + 1} on image ${c.at}`);
+  // Its first image whole and straight; the next picture whole for 3 images (its last print still landing).
+  assert.ok(seen[0]!.every((p) => p.shot === 0 && p.lean === null));
+  for (const f of [36, 37, 38]) assert.ok(seen[f]!.every((p) => p.shot === 1), `image ${f}`);
+  assert.ok(seen[39]!.some((p) => p.shot === 2));
+  // Each print lands askew for 3 images, about 1° (0,3 to 2,1), the first one counterclockwise and the way alternating
+  // from one to the next, then lies straight as the next one lands.
+  for (const c of expected) {
+    const leans = [0, 1, 2].map((k) => seen[c.at + k]![c.j]!.lean);
+    assert.ok(leans.every((a) => a !== null && Math.abs(a) >= 0.3 && Math.abs(a) <= 2.1 && Math.sign(a) === (c.j % 2 ? 1 : -1)), `print ${c.j + 1} on image ${c.at}: ${leans}`);
+    if (c.at + 3 < 180) assert.equal(seen[c.at + 3]![c.j]!.lean, null);
+  }
+  assert.ok(seen.every((prints) => prints.filter((p) => p.lean !== null).length <= 1));
+  // Photos stay still, videos play: each picture a wave long, centred on the moment it is whole; the first one, brought
+  // back, holds the image the Reel starts on, its last print landing on the loop's first image.
+  assert.deepEqual([4, 40, 76, 112, 148].map((f) => [seen[f]![0]!.shot, seen[f]![0]!.at]), [[1, 18], [2, 54], [3, 90], [4, 126], [0, 180]]);
+  assert.ok(seen[179]!.slice(0, 11).every((p) => p.shot === 0 && p.at === 180) && seen[179]![11]!.shot === 4);
+  // On its original's flat warm light grey paper; its finish keeps its matte, warm print: lifted blacks, no grain nor
+  // dark corners.
+  assert.match(mosaique.code, /"#d5d0c6"/);
+  assert.deepEqual({ grain: mosaique.finish?.grain, vignette: mosaique.finish?.vignette }, { grain: 0, vignette: 0 });
+  assert.ok((mosaique.finish?.fade ?? 0) > 0);
+});
+
+test("« Mosaïque qui change » (v3): vertical full frame as its original, her horizontal pictures whole in a 16:9 block, a square on her word", async () => {
+  const { mosaique } = await import("./skills/mosaique.ts");
+  const { skillPlan, skillFillInput, skillSettings } = await import("./skills.ts");
+  const title = { text: "La Fripe Rétro", role: "hook", from: 0, to: 78, emphasis: [] };
+  const draw = (aspects: number[], frame: number, texts: Record<string, string> = {}, extra: Record<string, unknown> = {}) =>
+    drawScene(SEEDED + mosaique.code, frame, { width: 1080, height: 1920, durationInFrames: aspects.length * 36, brand: MOSAIC_BRAND, shots: mosaicShots(aspects, "video"), reelTexts: [title], end: null, texts: { cycle: "36", ...texts }, ...extra });
+  /** Its block (where its pictures are laid, less the 6 px they are laid past it), and its prints (each one's box, from its clip). */
+  const blockOf = (tree: Drawn) => {
+    const s = styleOf(drawnNodes(tree).find((n) => n.type === "Footage")!) as Record<string, number>;
+    return { left: s.left! + 6, top: s.top! + 6, width: s.width! - 12, height: s.height! - 12 };
+  };
+  const printsOf = (tree: Drawn) =>
+    drawnNodes(tree).flatMap((n) => {
+      const clip = /^path\('(.*)'\)$/.exec(String(styleOf(n).clipPath ?? ""));
+      return clip
+        ? clip[1]!.split("Z").filter((p) => p.trim()).map((part) => {
+            const xy = part.replace(/[ML]/g, " ").trim().split(/\s+/).map(Number);
+            const xs = [xy[0]!, xy[2]!, xy[4]!, xy[6]!];
+            const ys = [xy[1]!, xy[3]!, xy[5]!, xy[7]!];
+            return { x: Math.min(...xs), y: Math.min(...ys), w: Math.max(...xs) - Math.min(...xs), h: Math.max(...ys) - Math.min(...ys) };
+          })
+        : [];
+    });
+  const wide = Array(6).fill(1920 / 1012);
+  const tall = Array(6).fill(9 / 16);
+  // Her files mostly vertical (half and half too): the original's full frame, 3 × 4 standing prints of its 231 × 315 px
+  // at 720 (32,1 % × 24,6 %), its margin of 13 px on the sides and 7 at the top and the bottom, a gap of 4 px.
+  const full = { left: 13, top: 7, width: 1054, height: 1906 };
+  assert.deepEqual(blockOf(draw(tall, 0)), full);
+  assert.deepEqual(blockOf(draw([...Array(3).fill(16 / 9), ...Array(3).fill(9 / 16)], 0)), full);
+  const standing = printsOf(draw(tall, 0));
+  assert.equal(standing.length, 12);
+  assert.ok(standing.every((p) => Math.abs(p.w - 346.5) <= 6 && Math.abs(p.h - 472.5) <= 6 && p.x >= 6 && p.x + p.w <= 1074), JSON.stringify(standing));
+  // Mostly horizontal: her pictures whole in a 16:9 block in the middle of the paper, 4 × 3 lying prints.
+  const block = { left: 13, top: 664, width: 1054, height: 593 };
+  assert.deepEqual(blockOf(draw(wide, 0)), block);
+  const lying = printsOf(draw(wide, 0));
+  assert.equal(lying.length, 12);
+  assert.ok(lying.every((p) => p.w > p.h && p.y >= 660 && p.y + p.h <= 1261), JSON.stringify(lying[0]));
+  assert.equal(new Set(lying.map((p) => Math.round(p.x / 100))).size, 4);
+  // On her word, the other one, or a square block of 3 × 3 at the original's pace (a print every 3 images).
+  assert.deepEqual(blockOf(draw(wide, 0, { format: "vertical" })), full);
+  assert.deepEqual(blockOf(draw(tall, 0, { format: "horizontal" })), block);
+  const square = mosaique.timeline(6, { end: false, settings: { format: "carre" } });
+  assert.ok(Math.abs(square.marks.cycle! / 9 - 3) < 0.2, `${square.marks.cycle}`);
+  const squared = draw(tall, 0, { format: "carre", cycle: String(square.marks.cycle) });
+  assert.deepEqual(blockOf(squared), { left: 13, top: 433, width: 1054, height: 1054 });
+  assert.equal(printsOf(squared).length, 9);
+  // Her title: on a paper label at the top full frame; in a block, in the serif on the paper above it.
+  const titleBox = (tree: Drawn) => drawnNodes(tree).find((n) => n.type === "FitText" && heldText(n).includes("La Fripe Rétro"))!;
+  const onLabel = titleBox(draw(tall, 10));
+  assert.equal(styleOf(onLabel).top, 150);
+  assert.ok(drawnNodes(onLabel).some((n) => n.type === "span" && styleOf(n).background));
+  const above = titleBox(draw(wide, 10));
+  assert.ok(Number(styleOf(above).top) + Number(styleOf(above).height) <= 664 && Number(styleOf(above).top) >= 80, JSON.stringify(styleOf(above)));
+  assert.match(String((above.props.innerStyle as Record<string, unknown>).fontFamily), /Instrument Serif/);
+  // Its ending card on blank paper prints laid by its last wave, its words on them, in its block.
+  const card = draw(wide, 220, {}, { durationInFrames: 264, end: { title: "Ouvert dimanche", subtitle: "12 rue des Martyrs", from: 216 } });
+  assert.ok(printsOf(card).length === 12 && drawnNodes(card).filter((n) => n.type === "Footage").length === 0);
+  const words = drawnNodes(card).filter((n) => n.type === "FitText").map((n) => ({ text: heldText(n), box: styleOf(n) }));
+  assert.deepEqual(words.map((w) => w.text.trim()), ["Ouvert dimanche", "12 rue des Martyrs"]);
+  for (const w of words) assert.ok(Number(w.box.top) >= 664 && Number(w.box.top) + Number(w.box.height) <= 1257, JSON.stringify(w.box));
+  // Its settings: the original's first (the default); the filler sees them; the plan keeps the one her words asked for.
+  assert.deepEqual(mosaique.settings?.map((s) => s.name), ["cases", "vitesse", "ordre", "papier", "format"]);
+  assert.deepEqual(mosaique.settings?.at(-1)?.choices.map((c) => c.value), ["auto", "vertical", "horizontal", "carre"]);
+  assert.deepEqual(skillSettings(mosaique, [{ name: "format", value: "auto" }]), {});
+  const files = Array.from({ length: 6 }, (_, i) => ({ id: `v${i}`, photo: false, seconds: 12 }));
+  const input = skillFillInput({ skill: mosaique, name: "Mosaïque", n: 6, files, business: {}, request: "en horizontal" });
+  assert.equal(input.reglages?.at(-1)?.nom, "format");
+  const plan = skillPlan({ skill: mosaique, name: "Mosaïque", files, fill: { shots: files.map((f) => ({ file: f.id, at: 1 })), texts: {}, end: null, settings: { format: "horizontal" } } });
+  assert.equal(plan.layers![0]!.motion.texts!.format, "horizontal");
+  assert.deepEqual(plan.skill, { key: "mosaique", version: 3, settings: { format: "horizontal" } });
+  assert.deepEqual(plan.music_shape, { end: { at: plan.duration, fade: 0.012 } });
+});
