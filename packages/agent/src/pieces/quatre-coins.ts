@@ -8,11 +8,12 @@ import type { EffectPiece, PieceTimelineInput } from "../pieces.ts";
 // bottom line 0,76 of it, no shadow nor edge; the whole sentence held, and every word goes at once on the cut, the
 // effect's last image. Kept of its skill: its places as shares of her picture (the top row's capitals at 7 %, the middle
 // row's line at 56 %, the bottom one at 90 %, 40 px from the sides, the second word of the top a third in), its sizes,
-// its grotesque in its cream, its beats, its format (her shot in width whole in a 16:9 band on black as the original,
-// her upright shot full frame, the montage's own). Made for any Reel: its words tighter on its beats when its span is
-// short (half beats, then quarters), so the sentence is always read whole before the cut; its middle row moved to the
-// nearest share clear of a face seen there; its halo dosed by the light read under each row (none on a dark edge, as the
-// original's letters; a soft dark one on a bright edge, its fiche's fallback). Left to its Reel: its music holding its
+// its cream, its beats, its format (her shot in width whole in a 16:9 band on black as the original, her upright shot
+// full frame, the montage's own). Made for any Reel: its words in her text face (the original's small grotesque, not a
+// display face); tighter on its beats when its span is short (half beats, then quarters), so the sentence is always
+// read whole before the cut; its middle row moved to the nearest share clear of a face seen there; its halo dosed by
+// the light read under each word (none on a dark edge, as the original's letters; a soft dark one on a bright edge, its
+// fiche's fallback). Left to its Reel: its music holding its
 // breath (bass and kick out) from the whole sentence to the cut, which an effect cannot do (it plays on the Reel's
 // music as it is), its ten shots of the place's life, her front and her name alone at the end. Nothing of the original's
 // own (its café's name, its ®, its address).
