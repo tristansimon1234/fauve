@@ -32,6 +32,7 @@ import { detourages } from "./pieces/detourages.ts";
 import { createur } from "./pieces/createur.ts";
 import { silhouette } from "./pieces/silhouette.ts";
 import { vision } from "./pieces/vision.ts";
+import { nomDeVille } from "./pieces/nom-de-ville.ts";
 
 // The bank of ready-to-play effects (pieces.ts: the form of an effect, its filler, how its layer is built), by the key of
 // the model each one comes from. Server side only (@fauve/agent/pieces), like the montage skills: their code stays out of
@@ -39,7 +40,7 @@ import { vision } from "./pieces/vision.ts";
 // (scripts/skill-render.mts --piece); a new model of Edith's brings its own (docs/reprise.md, « Passage de relais »).
 
 /** The bank, in the catalogue's order (house-models.ts); the editor is offered them by what her files carry (pieces.ts, piecesOffered). */
-export const EFFECT_PIECES: Record<string, EffectPiece> = { cadre, decode, "quatre-coins": quatreCoins, mosaique, "carte-feutre": carteFeutre, pile, "mon-travail": monTravail, "photo-dump": photoDump, table, "ecran-partage": ecranPartage, fenetres, facade, gaufre, "mot-cle": motCle, frappe, "titre-derriere": titreDerriere, journee, rallume, "plans-fixes": plansFixes, "coups-de-fouet": coupsDeFouet, tourne, nike, eventail, coulisses, interrupteur, interface: interfaceEffect, pixel, "mots-meles": motsMeles, aplat, detourages, createur, silhouette, vision };
+export const EFFECT_PIECES: Record<string, EffectPiece> = { cadre, decode, "quatre-coins": quatreCoins, mosaique, "carte-feutre": carteFeutre, pile, "mon-travail": monTravail, "photo-dump": photoDump, table, "ecran-partage": ecranPartage, fenetres, facade, gaufre, "mot-cle": motCle, frappe, "titre-derriere": titreDerriere, journee, rallume, "plans-fixes": plansFixes, "coups-de-fouet": coupsDeFouet, tourne, nike, eventail, coulisses, interrupteur, interface: interfaceEffect, pixel, "mots-meles": motsMeles, aplat, detourages, createur, silhouette, vision, "nom-de-ville": nomDeVille };
 
 /** The piece of the bank a model's key names, if it has one. */
 export const pieceFor = (key: string | null | undefined): EffectPiece | undefined => (key ? EFFECT_PIECES[key] : undefined);
