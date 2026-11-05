@@ -177,7 +177,7 @@ export async function stealStyle(studioId: string, inspirationId: string): Promi
   const kept = stolenStyleSchema.safeParse(row.style);
   if (kept.success) return read(inspirationId, kept.data, true);
   const url = (row.url as string | null) ?? null;
-  let take: { link: string } | { file: string };
+  let take: ReelTake;
   if (row.storage_path) {
     const signed = await db.storage.from("media").createSignedUrl(row.storage_path as string, 900);
     if (!signed.data) return { ok: false, miss: "not_found" };
@@ -194,7 +194,33 @@ export async function stealStyle(studioId: string, inspirationId: string): Promi
     await db.from("inspirations").update({ style: { miss, ...outline } }).eq("id", inspirationId).eq("studio_id", studioId);
     return { ok: false, miss };
   };
+  const reading = await readReel(studioId, take, sheetsFolder(studioId, inspirationId), outline);
+  if ("miss" in reading) return missed(reading.miss);
+  const { style } = reading;
+  // Its three lines also stand as its reading (the inspirations list, the editor's chosen inspiration).
+  const analysis = stolenStyleLines(style).join(" ");
+  await db
+    .from("inspirations")
+    .update({ style, analysis, title: (row.title as string | null) || style.look.name, storage_path: null })
+    .eq("id", inspirationId)
+    .eq("studio_id", studioId);
+  // The file was only for this reading (someone else's content, or a copy of her own Reel's video).
+  if (row.storage_path) await db.storage.from("media").remove([row.storage_path as string]).catch(() => {});
+  return read(inspirationId, style, false);
+}
 
+/** A Reel to take: its link, or a file at a signed link. */
+export type ReelTake = { link: string } | { file: string };
+
+/**
+ * Takes, measures and reads a Reel, as every Reel to copy is read: the sandbox takes it (Treg fetches an Instagram video
+ * it cannot open) and measures its cuts, tempo and loudness, its words are counted, Gemini reads it, its font is checked
+ * against its title and its filter designed, and sheets of its frames are kept in `sheets` (that folder, emptied first;
+ * none kept without one). Every cost is logged for `studioId`. Read for an inspiration (stealStyle), and for a link
+ * Tristan proposes as one of Edith's models (lib/model-scout.ts): one reading, the same for both.
+ */
+export async function readReel(studioId: string, take: ReelTake, sheets: string | null, extra: { outline?: string } = {}): Promise<{ style: StolenStyle } | { miss: StealMissReason }> {
+  const db = supabaseAdmin();
   const started = Date.now();
   let reel = await stealReelInSandbox(`steal-${randomUUID()}`, take);
   // An Instagram link the sandbox could not open (Instagram often refuses a server): its video through Treg, read as a file.
@@ -215,7 +241,7 @@ export async function stealStyle(studioId: string, inspirationId: string): Promi
     .insert({ studio_id: studioId, kind: "steal", provider: "vercel_sandbox", units: Math.round(seconds), cost_eur: sandboxCostEur(seconds), meta: costMeta({ link: "link" in take, ...why }) });
   if ("miss" in reel) {
     console.warn("steal: not taken", reel.miss, reel.detail.slice(-500));
-    return missed(reel.miss);
+    return { miss: reel.miss };
   }
   const spoken = reel.lufs === null ? 0 : await spokenWords(studioId, reel.video, reel.duration).catch((error: unknown) => (console.warn("steal: words not counted", error), null));
   const measures = reelMeasuresSchema.parse({ duration: reel.duration, cuts: reel.cuts, bpm: tempoOf(reel.levels), lufs: reel.lufs, ...(spoken === null ? {} : { spoken }) });
@@ -223,7 +249,7 @@ export async function stealStyle(studioId: string, inspirationId: string): Promi
     console.warn("steal: reading failed", error instanceof Error ? error.message.slice(0, 300) : error);
     return null;
   });
-  if (!reading) return missed("unreadable");
+  if (!reading) return { miss: "unreadable" };
   // Its voice as measured: nobody speaks when its sound holds no words (an ambient piece was read as a voice over).
   const look = { ...reading.look, voice: measuredVoice(reading.look.voice, measures) };
   // A font that makes its style, checked against its title and by the name Google Fonts serves it under (the render
@@ -234,19 +260,13 @@ export async function stealStyle(studioId: string, inspirationId: string): Promi
   // Its filter as a look's settings, designed once from what Gemini saw (its Reel wears it, unless she asks for another).
   const filterLook = look.filter ? (await designLook(studioId, look.filter, { copied: true }))?.look : undefined;
   // Sheets of its frames, for the animations that remake it (never its video): deleted with the inspiration.
-  await dropSheets(studioId, inspirationId).catch(() => {});
-  const sheets = await keepSheets(studioId, inspirationId, reel.sheets);
-  const style: StolenStyle = { look: { ...look, text: { ...text, ...(font ? { font } : {}) } }, measures, reader: STEAL_READER, ...outline, ...(sheets.length ? { sheets } : {}), ...(filterLook ? { filter_look: filterLook } : {}) };
-  // Its three lines also stand as its reading (the inspirations list, the editor's chosen inspiration).
-  const analysis = stolenStyleLines(style).join(" ");
-  await db
-    .from("inspirations")
-    .update({ style, analysis, title: (row.title as string | null) || look.name, storage_path: null })
-    .eq("id", inspirationId)
-    .eq("studio_id", studioId);
-  // The file was only for this reading (someone else's content, or a copy of her own Reel's video).
-  if (row.storage_path) await db.storage.from("media").remove([row.storage_path as string]).catch(() => {});
-  return read(inspirationId, style, false);
+  let kept: NonNullable<StolenStyle["sheets"]> = [];
+  if (sheets) {
+    await dropFolder(sheets).catch(() => {});
+    kept = await keepSheets(sheets, reel.sheets);
+  }
+  const outline = extra.outline ? { outline: extra.outline } : {};
+  return { style: { look: { ...look, text: { ...text, ...(font ? { font } : {}) } }, measures, reader: STEAL_READER, ...outline, ...(kept.length ? { sheets: kept } : {}), ...(filterLook ? { filter_look: filterLook } : {}) } };
 }
 
 /**
@@ -273,11 +293,11 @@ async function spokenWords(studioId: string, mp4: Buffer, seconds: number): Prom
 /** Where a copied Reel's sheets are kept: with her inspirations, removed with it. */
 export const sheetsFolder = (studioId: string, inspirationId: string) => `${studioId}/inspirations/${inspirationId}/sheets`;
 
-async function keepSheets(studioId: string, inspirationId: string, sheets: { from: number; to: number; jpeg: Buffer }[]): Promise<NonNullable<StolenStyle["sheets"]>> {
+async function keepSheets(folder: string, sheets: { from: number; to: number; jpeg: Buffer }[]): Promise<NonNullable<StolenStyle["sheets"]>> {
   const db = supabaseAdmin();
   const kept = await Promise.all(
     sheets.slice(0, 16).map(async (s, i) => {
-      const path = `${sheetsFolder(studioId, inspirationId)}/${String(i).padStart(2, "0")}.jpg`;
+      const path = `${folder}/${String(i).padStart(2, "0")}.jpg`;
       const { error } = await db.storage.from("media").upload(path, s.jpeg, { contentType: "image/jpeg", upsert: true });
       return error ? null : { from: s.from, to: s.to, path };
     }),
@@ -302,9 +322,14 @@ export async function modelSheets(studioId: string, inspirationId: string): Prom
 
 /** Its sheets removed (the inspiration deleted, or read again). */
 export async function dropSheets(studioId: string, inspirationId: string): Promise<void> {
+  await dropFolder(sheetsFolder(studioId, inspirationId));
+}
+
+/** The files of a folder of sheets removed. */
+async function dropFolder(folder: string): Promise<void> {
   const db = supabaseAdmin();
-  const { data } = await db.storage.from("media").list(sheetsFolder(studioId, inspirationId));
-  if (data?.length) await db.storage.from("media").remove(data.map((f) => `${sheetsFolder(studioId, inspirationId)}/${f.name}`)).catch(() => {});
+  const { data } = await db.storage.from("media").list(folder);
+  if (data?.length) await db.storage.from("media").remove(data.map((f) => `${folder}/${f.name}`)).catch(() => {});
 }
 
 /**
