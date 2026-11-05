@@ -167,3 +167,95 @@ export function fontPairLine(pair: FontPair): string {
 export function fontPairsBrief(): string[] {
   return FONT_PAIRS.map(fontPairLine);
 }
+
+// ——— A font per word ————————————————————————————————————————————————————————————————————————————————————————————————
+
+// A font for one word, for what it evokes (« Mot clé en grand », docs/fiches/mot-cle.md, effect 4: each name of a list
+// in its own font, « une manuscrite pour « soin », une ronde et grasse pour « gourmand », une condensée pour « fort »,
+// une machine à écrire pour « recette » »): Google Fonts families sorted by what they call to mind, from which a skill's
+// filler picks the font of a keyword or of each name of a list she says, beyond her two fonts (skills.ts: `font` of a
+// SkillText, `fonts` of a SkillVoice). Every family is served by Google Fonts under this exact name (each one checked on
+// its CSS API, 5 November 2026), loaded by the render like any font a text brings.
+
+export type WordFont = {
+  /** Its Google Fonts family, by its exact name (the render loads it from there, every weight it has). */
+  family: string;
+  /** The weight it reads best at in big (400 for a family that has only that one). */
+  weight: number;
+  /** Set in capitals (a family made of capitals, or one that only looks right in them). */
+  upper?: boolean;
+  /** What its letters look like, in a few French words, for the filler. */
+  looks: string;
+  /** What it evokes, in French words the filler matches with her word or what it names. */
+  evokes: string[];
+};
+
+export const WORD_FONTS: WordFont[] = [
+  // Bakery, pastry, sweet things.
+  { family: "Fraunces", weight: 900, looks: "serif molle et très grasse, des années 70 (comme Cooper Black)", evokes: ["boulangerie", "pain", "viennoiserie", "gourmand", "rétro", "chaleureux"] },
+  { family: "Leckerli One", weight: 400, looks: "manuscrite grasse et gourmande", evokes: ["pâtisserie", "gâteau", "crêpe", "goûter", "sucré"] },
+  { family: "Cookie", weight: 400, looks: "script rond de vitrine", evokes: ["pâtisserie", "cupcake", "salon de thé", "douceur"] },
+  { family: "Shrikhand", weight: 400, looks: "italique très grasse et ronde", evokes: ["gourmand", "épices", "glace", "fruits", "street food"] },
+  { family: "Lilita One", weight: 400, looks: "ronde très grasse", evokes: ["bonbon", "gourmand", "enfants", "fun", "burger"] },
+  { family: "Chewy", weight: 400, looks: "dessin animé, molle", evokes: ["bonbon", "jeu", "enfants", "fun"] },
+  // Coffee, tea, a terrace.
+  { family: "Pacifico", weight: 400, looks: "manuscrite ronde des années 50", evokes: ["café", "glace", "plage", "été", "surf", "vintage"] },
+  { family: "Satisfy", weight: 400, looks: "script léger, décontracté", evokes: ["café", "brunch", "terrasse", "été"] },
+  { family: "Yellowtail", weight: 400, looks: "script rétro d'enseigne", evokes: ["diner", "café", "rétro", "américain"] },
+  // Wine, gastronomy, luxury.
+  { family: "Playfair Display", weight: 700, looks: "didone élégante à forts contrastes", evokes: ["vin", "gastronomie", "restaurant", "luxe", "éditorial"] },
+  { family: "Cormorant Garamond", weight: 600, looks: "serif fine et classique", evokes: ["vin", "cave", "bijoux", "poésie", "élégance"] },
+  { family: "Cinzel", weight: 700, upper: true, looks: "capitales romaines gravées", evokes: ["vin", "champagne", "classique", "monument", "prestige"] },
+  { family: "Bodoni Moda", weight: 700, looks: "didone de magazine de mode", evokes: ["mode", "haute couture", "luxe", "boutique"] },
+  { family: "Italiana", weight: 400, upper: true, looks: "capitales fines et hautes", evokes: ["mode", "parfum", "chic", "boutique"] },
+  // Flowers, beauty, care.
+  { family: "Dancing Script", weight: 700, looks: "manuscrite élégante et vivante", evokes: ["fleurs", "fleuriste", "bouquet", "mariage", "douceur"] },
+  { family: "Great Vibes", weight: 400, looks: "calligraphie fine à boucles", evokes: ["beauté", "soin", "parfum", "mariage", "romantique"] },
+  { family: "Parisienne", weight: 400, looks: "calligraphie parisienne", evokes: ["beauté", "mode", "Paris", "chic", "féminin"] },
+  { family: "Sacramento", weight: 400, looks: "script monoligne très fin", evokes: ["soin", "bien-être", "spa", "douceur", "ongles"] },
+  { family: "Allura", weight: 400, looks: "calligraphie souple", evokes: ["fleurs", "beauté", "mariage", "cosmétique"] },
+  { family: "Yeseva One", weight: 400, looks: "serif grasse et féminine", evokes: ["beauté", "cosmétique", "institut", "maquillage"] },
+  // Wellness, yoga, softness.
+  { family: "Comfortaa", weight: 600, looks: "ronde légère", evokes: ["bien-être", "yoga", "doux", "zen", "bébé"] },
+  { family: "Fredoka", weight: 600, looks: "ronde douce et grasse", evokes: ["enfants", "jouets", "doux", "crèche", "animaux"] },
+  // Strength, sport, numbers.
+  { family: "Anton", weight: 400, upper: true, looks: "condensée très grasse", evokes: ["sport", "force", "fort", "muscu", "impact", "chiffre"] },
+  { family: "Bebas Neue", weight: 400, upper: true, looks: "condensée en capitales", evokes: ["sport", "salle", "course", "chiffre", "affiche"] },
+  { family: "Oswald", weight: 600, upper: true, looks: "condensée nette", evokes: ["sport", "coaching", "technique", "info"] },
+  { family: "Teko", weight: 600, upper: true, looks: "condensée carrée", evokes: ["sport", "compétition", "boxe", "jeu"] },
+  { family: "Archivo Black", weight: 400, looks: "grotesque très grasse", evokes: ["puissance", "sport", "street", "urbain"] },
+  { family: "Black Ops One", weight: 400, upper: true, looks: "pochoir militaire", evokes: ["crossfit", "outdoor", "army", "intense"] },
+  // Tech, games, the future.
+  { family: "Orbitron", weight: 700, looks: "géométrique futuriste", evokes: ["tech", "futur", "espace", "électronique"] },
+  { family: "Space Grotesk", weight: 600, looks: "grotesque techno", evokes: ["tech", "start-up", "numérique", "design"] },
+  { family: "Russo One", weight: 400, looks: "carrée et grasse", evokes: ["tech", "auto", "moto", "gaming"] },
+  { family: "VT323", weight: 400, looks: "écran de terminal", evokes: ["informatique", "code", "rétro gaming", "écran"] },
+  { family: "Press Start 2P", weight: 400, upper: true, looks: "pixels de jeu vidéo", evokes: ["jeu vidéo", "arcade", "rétro gaming"] },
+  // Vintage, typewriters, archives.
+  { family: "Special Elite", weight: 400, looks: "machine à écrire usée", evokes: ["vintage", "archives", "polar", "brocante", "recette"] },
+  { family: "Courier Prime", weight: 400, looks: "machine à écrire", evokes: ["recette", "journal", "script", "note"] },
+  { family: "Righteous", weight: 400, looks: "rétro années 70", evokes: ["vintage", "disco", "roller", "années 70"] },
+  { family: "Josefin Sans", weight: 600, upper: true, looks: "géométrique fine des années 20", evokes: ["vintage", "art déco", "années 20", "brocante"] },
+  { family: "Poiret One", weight: 400, upper: true, looks: "art déco très fine", evokes: ["art déco", "cocktail", "chic", "années 30"] },
+  { family: "Lobster", weight: 400, looks: "script gras rétro", evokes: ["rétro", "pizzeria", "enseigne", "diner"] },
+  // Craft, hand-made, the market.
+  { family: "Caveat", weight: 600, looks: "manuscrite simple", evokes: ["fait main", "note", "recette", "cahier", "école"] },
+  { family: "Permanent Marker", weight: 400, upper: true, looks: "écrit au feutre", evokes: ["atelier", "ardoise", "street", "fait main"] },
+  { family: "Amatic SC", weight: 700, upper: true, looks: "capitales dessinées à la main", evokes: ["marché", "épicerie", "bio", "potager", "fait main"] },
+  { family: "Alfa Slab One", weight: 400, looks: "slab très grasse d'atelier", evokes: ["artisan", "bois", "menuiserie", "boucherie", "brasserie"] },
+  // Western, beer, tattoos, the night.
+  { family: "Rye", weight: 400, upper: true, looks: "western à éperons", evokes: ["barbier", "whisky", "saloon", "bière", "western"] },
+  { family: "UnifrakturMaguntia", weight: 400, looks: "gothique", evokes: ["bière", "tatouage", "brasserie", "rock"] },
+  { family: "Monoton", weight: 400, upper: true, looks: "néon à lignes", evokes: ["bar", "nuit", "néon", "disco", "cocktail"] },
+  { family: "Limelight", weight: 400, looks: "art déco de cinéma", evokes: ["cinéma", "théâtre", "spectacle", "cabaret"] },
+  { family: "Bungee", weight: 400, upper: true, looks: "enseigne urbaine", evokes: ["street", "urbain", "food truck", "skate"] },
+];
+
+const fold = (s: string) => s.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+const WORD_FONT_BY_NAME = new Map(WORD_FONTS.map((f) => [fold(f.family), f]));
+
+/** A font of the library by its family as a filler wrote it (case and spacing aside); none for a family not in it. */
+export const wordFont = (name: string | undefined | null): WordFont | undefined => (name ? WORD_FONT_BY_NAME.get(fold(name)) : undefined);
+
+/** The library as the filler reads it: each family, what it looks like and what it evokes. */
+export const wordFontsBrief = (): string[] => WORD_FONTS.map((f) => `${f.family} : ${f.looks}${f.upper ? ", en capitales" : ""} ; évoque ${f.evokes.join(", ")}`);

@@ -223,7 +223,16 @@ function passageObjects(subjects: ReelInputs["subjects"], key: string): [string,
  * band, a caption), when (frames from the composition's start), the words to stress and, for a
  * message, its lines. Mirrors apps/render/src/types.ts.
  */
-export type ComposeText = { text: string; role: "hook" | "band" | "caption"; from: number; to: number; emphasis: string[]; items?: ListItem[] };
+export type ComposeText = {
+  text: string;
+  role: "hook" | "band" | "caption";
+  from: number;
+  to: number;
+  emphasis: string[];
+  items?: ListItem[];
+  /** A font of its own, picked for what its words evoke (a skill's filler, WORD_FONTS): a Google Fonts family, loaded. */
+  font?: string;
+};
 /** The Reel's end (an offer, an announcement) that a composition draws itself: its title and line, from its frame. */
 export type ComposeEnd = { title: string; subtitle: string | null; from: number };
 
@@ -236,6 +245,7 @@ export function composeTexts(texts: ReelText[], from = 0): ComposeText[] {
     to: t.from + t.durationInFrames - from,
     emphasis: t.emphasis,
     ...(t.items?.length ? { items: t.items } : {}),
+    ...(t.font ? { font: t.font } : {}),
   }));
 }
 
@@ -284,6 +294,8 @@ export type ReelText = {
   bullet?: Bullet;
   /** In a Reel, a text with items is a message: its own words are its title, its items under it (on a photo, a list's text is only its name). */
   message?: boolean;
+  /** A font of its own for its words (a skill's filler picked it for what they evoke): its composition draws it, the render loads it. */
+  font?: string;
 };
 export type ReelWord = { w: string; from: number; to: number };
 
@@ -418,6 +430,8 @@ export type ReelProps = {
     end?: ComposeEnd | null;
     /** The words said under it (frames from its start), when its code writes them (`spoken`): the engine's captions step aside. */
     spoken?: ReelWord[];
+    /** Its code only times its own words on them (a skill timed on her voice, its subtitles the engine's): the captions stay. */
+    captionsStay?: true;
   }[];
   /** Components of the studio's bank placed on a still: drawn at their design width (base), then scaled into their box (shares of the frame). */
   /** A simple copied Reel remade by code (copy.ts), in frames (mirror of the render's). */
@@ -787,6 +801,7 @@ export function buildReelProps(plan: EditPlan, inputs: ReelInputs): ReelProps {
         backdrop: t.backdrop,
         ...brandLooks(t, brand),
         ...(t.items?.length ? { message: true } : {}),
+        ...(t.font ? { font: t.font } : {}),
       };
     })
     .filter((t) => t.durationInFrames > 0);
@@ -948,9 +963,14 @@ export function buildReelProps(plan: EditPlan, inputs: ReelInputs): ReelProps {
           : {}),
         ...(track.length ? { track } : {}),
         ...(l.motion.fonts?.length ? { fonts: l.motion.fonts } : {}),
-        // An animation that writes what is said itself (Captions, around her or behind her): the words under it.
-        ...(writesSpoken(l.motion) && words.some((w) => w.from >= from && w.from < from + length)
-          ? { spoken: words.filter((w) => w.from >= from && w.from < from + length).map((w) => ({ w: w.w, from: w.from - from, to: w.to - from })) }
+        // An animation that writes what is said itself (Captions, around her or behind her): the words under it. A montage
+        // skill timed on her voice gets them whether it writes them or not (its keywords set on them): the engine's
+        // subtitles stay under it then.
+        ...((writesSpoken(l.motion) || l.motion.times_spoken) && words.some((w) => w.from >= from && w.from < from + length)
+          ? {
+              spoken: words.filter((w) => w.from >= from && w.from < from + length).map((w) => ({ w: w.w, from: w.from - from, to: w.to - from })),
+              ...(writesSpoken(l.motion) ? {} : { captionsStay: true as const }),
+            }
           : {}),
       },
     ];

@@ -31,6 +31,9 @@ import {
   leadPlan,
   soundLead,
   soundTempo,
+  hasSpeech,
+  saidCurrent,
+  skillTalk,
   type BrandProfile,
   type ClipAnalysis,
   type EditPlan,
@@ -38,16 +41,20 @@ import {
   type MediaFacts,
   type MontageSkill,
   type ReelContract,
+  type SkillFacts,
   type SkillFile,
   type SkillFillAnswer,
+  type SkillTalk,
 } from "@fauve/agent";
 import { outputFormat, readAnswer } from "@fauve/agent/answer";
 import { MONTAGE_SKILLS, skillFor } from "@fauve/agent/skills";
 import { insertPlanVersion } from "@/lib/edit-plans";
 import { usableFonts } from "@/lib/fonts";
+import { studioPlace } from "@/lib/geo";
 import { skillGate } from "@/lib/skill-reviews";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { noteGap } from "@/lib/toolkit";
+import { syncTakes } from "@/lib/video/takes";
 import { designMotionScenes, type SceneRequest } from "./motion-designer";
 import { anthropic, logClaudeCost } from "./run";
 
@@ -115,14 +122,25 @@ export async function designSkill(params: {
   const name = houseModel(skill.key)?.name ?? skill.key;
   const files = skillFiles(params.mediaIds, params.clips, params.photos);
   if (!files.length) return null;
+  // Timed on her voice: her talking video cut as a creator cuts it, her other angles of the same take synced on their sound.
+  const talk = skill.voice ? await talkOf(params.studioId, params.clips) : undefined;
+  if (skill.voice && !talk) {
+    console.log("skill: a model on her voice and no video where she speaks (or her words not read), the editor makes the Reel", params.postId, skill.key);
+    return null;
+  }
+  // What the engine writes itself in its slots: her place's coordinates (her address geocoded once, kept on the studio).
+  const known = skill.texts.some((t) => t.fact === "coordinates") ? await placeFacts(params.studioId) : undefined;
   // As many shots as her files give, or, for a length she asked for, the count (then the tempo) that comes closest to it;
   // following a sound, its tempo (its own, halved or doubled, nearest the model's), the count closest to her length at it.
-  const soundBpm = params.sound ? soundTempo(params.sound.bpm, skill.bpm) : undefined;
-  const fit = soundBpm
-    ? { n: params.contract?.duration ? skillFitAt(skill, params.contract.duration, soundBpm) : skillShotCount(skill, files), bpm: soundBpm }
-    : params.contract?.duration
-      ? skillFit(skill, params.contract.duration)
-      : { n: skillShotCount(skill, files), bpm: skill.bpm };
+  // On her voice, her talk's pieces and her length (its music under her voice, at its own tempo).
+  const soundBpm = params.sound && !skill.voice ? soundTempo(params.sound.bpm, skill.bpm) : undefined;
+  const fit = talk
+    ? { n: talk.pieces.length, bpm: skill.bpm }
+    : soundBpm
+      ? { n: params.contract?.duration ? skillFitAt(skill, params.contract.duration, soundBpm) : skillShotCount(skill, files), bpm: soundBpm }
+      : params.contract?.duration
+        ? skillFit(skill, params.contract.duration)
+        : { n: skillShotCount(skill, files), bpm: skill.bpm };
   // Its first beat: the Reel's first image held that long, then every cut on the sound's beats.
   const lead = params.sound && soundBpm ? soundLead(params.sound.offset, soundBpm) : 0;
   const n = fit.n;
@@ -133,6 +151,8 @@ export async function designSkill(params: {
   // A correction keeps the settings it had (« plus de cases » once asked) but what her request changes.
   const previousSettings = params.previous?.skill?.key === skill.key ? params.previous.skill.settings : undefined;
   const current = params.previous?.skill?.key === skill.key ? skillWordsOf(skill, params.previous.texts) : undefined;
+  // On her voice, a correction keeps what it chose in what she says (her hook, her keywords, her lists) but what she changes.
+  const currentSaid = skill.voice && params.previous?.skill?.key === skill.key ? saidCurrent(params.previous.texts) : undefined;
   const input = skillFillInput({
     skill,
     name,
@@ -142,9 +162,12 @@ export async function designSkill(params: {
     request: params.brief?.slice(0, BRIEF_MAX) || "Un Reel fait sur ce modèle, avec ses fichiers.",
     contract: contractLines(params.contract),
     ...(current && Object.keys(current).length ? { current } : {}),
+    ...(currentSaid?.length ? { currentSaid } : {}),
     ...(wordsWanted ? { wordsWanted } : {}),
     ...(bpm ? { bpm } : {}),
     ...(previousSettings && Object.keys(previousSettings).length ? { currentSettings: previousSettings } : {}),
+    ...(talk ? { talk } : {}),
+    ...(known ? { facts: known } : {}),
   });
   // One small call fills it; `again`: its answer and what the check said of it, for a second try.
   const fillIt = async (again?: { answer: SkillFillAnswer; note: string }): Promise<SkillFillAnswer | null> => {
@@ -169,12 +192,12 @@ export async function designSkill(params: {
   const facts: MediaFacts = { clips: Object.fromEntries(params.clips.map((c) => [c.media_id, c.analysis])), photos: params.photos, tracks: {} };
   // Her Reel from an answer: the plan by code, dressed as a model followed and finished as any montage, then checked.
   const made = async (answer: SkillFillAnswer): Promise<{ plan: EditPlan; error?: string } | null> => {
-    const read = readSkillFill(skill, files, n, answer, { wordsWanted });
+    const read = readSkillFill(skill, files, n, answer, { wordsWanted, ...(talk ? { talk } : {}), ...(known ? { facts: known } : {}) });
     if (!read) return null;
     // A correction keeps the settings it had but what her request changes (a new Reel: only those she asks).
     const settings = mergeSkillSettings(skill, previousSettings, answer.settings);
     const fill = { ...read, settings };
-    const plan = leadPlan(skillPlan({ skill, name, files, fill, ...(bpm ? { bpm } : {}) }), lead);
+    const plan = leadPlan(skillPlan({ skill, name, files, fill, ...(bpm ? { bpm } : {}), ...(talk ? { talk } : {}) }), lead);
     // The model's lettering when she chose it (her charter's when Edith picked it), and its finish (its grade, its grain).
     Object.assign(plan, followedLook(plan, params.followed));
     Object.assign(plan, followedFilter(plan, params.followed));
@@ -230,6 +253,33 @@ export async function designSkill(params: {
     version: row.version,
     rationale: [`Je l'ai monté sur le modèle « ${name} ».`, answer.why.trim().slice(0, 300)].filter(Boolean).join(" "),
   };
+}
+
+/**
+ * Her talk for a skill timed on her voice: the video where she says the most (its speech read: her words timed, her « euh »
+ * and pauses measured), cut as a creator cuts it, with her other videos of the same take (two phones filming her at
+ * once: the same words, synced on their sound once, takes.ts). None without a video where she speaks.
+ */
+async function talkOf(studioId: string, clips: { media_id: string; analysis: ClipAnalysis }[]): Promise<SkillTalk | undefined> {
+  const talks = clips.filter((c) => c.analysis.speech && hasSpeech(c.analysis) && (c.analysis.words?.length ?? 0) >= 3);
+  if (!talks.length) return undefined;
+  const main = talks.reduce((a, b) => ((b.analysis.words?.length ?? 0) > (a.analysis.words?.length ?? 0) ? b : a));
+  const others = talks.filter((c) => c !== main);
+  const synced = others.length ? await syncTakes(studioId, main, others).catch(() => []) : [];
+  const takes = synced.flatMap((s) => {
+    const other = others.find((c) => c.media_id === s.media_id);
+    return other ? [{ clip: s.media_id, offset: s.offset, seconds: other.analysis.duration }] : [];
+  });
+  return skillTalk({ clip: main.media_id, seconds: main.analysis.duration, words: main.analysis.words ?? [], speech: main.analysis.speech! }, { takes }) ?? undefined;
+}
+
+/** What the engine knows and writes itself in a skill's slots: her place's coordinates, when her door was found. */
+async function placeFacts(studioId: string): Promise<SkillFacts | undefined> {
+  const place = await studioPlace(studioId).catch((error: unknown) => {
+    console.warn("geo: no coordinates for this Reel", studioId, error instanceof Error ? error.message : error);
+    return null;
+  });
+  return place ? { coordinates: place.label } : undefined;
 }
 
 /** The scene check of a skill's composition on her Reel (its shots as grey cards, its texts and marks): its js, or what it refused. */

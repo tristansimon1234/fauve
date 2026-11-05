@@ -186,7 +186,7 @@ export async function saveEditPlan(postId: string, input: unknown): Promise<Save
   // Animations (scenes and animations over several shots): code already made for this post (by Fauve), never new code from the browser.
   // The fonts an animation loads, and whether a collage's composition draws the Reel's texts, follow its code, never the browser either.
   const { data: versions } = await db.from("edit_plans").select("id, version, plan").eq("post_id", postId);
-  type Coded = { motion?: { js?: string; fonts?: string[]; draws_texts?: boolean; draws_end?: boolean; writes_spoken?: boolean; sounds?: SfxCue[] } };
+  type Coded = { motion?: { js?: string; fonts?: string[]; draws_texts?: boolean; draws_end?: boolean; writes_spoken?: boolean; times_spoken?: boolean; sounds?: SfxCue[] } };
   const knownCode = new Map(
     (versions ?? []).flatMap((v) => {
       const kept = v.plan as { segments?: Coded[]; layers?: Coded[] } | null;
@@ -195,13 +195,14 @@ export async function saveEditPlan(postId: string, input: unknown): Promise<Save
   );
   const unknown = [...plan.segments, ...(plan.layers ?? [])].some((s) => "motion" in s && s.motion.js && !knownCode.has(s.motion.js));
   if (unknown) return { ok: false, error: "Une animation a été modifiée d’une façon que l’éditeur ne permet pas." };
-  const withKnownFonts = <M extends { js?: string; fonts?: string[]; draws_texts?: boolean; draws_end?: boolean; writes_spoken?: boolean; sounds?: SfxCue[] }>(motion: M): M => {
+  const withKnownFonts = <M extends { js?: string; fonts?: string[]; draws_texts?: boolean; draws_end?: boolean; writes_spoken?: boolean; times_spoken?: boolean; sounds?: SfxCue[] }>(motion: M): M => {
     const known = motion.js ? knownCode.get(motion.js) : undefined;
     const kept = { ...motion };
     delete kept.fonts;
     delete kept.draws_texts;
     delete kept.draws_end;
     delete kept.writes_spoken;
+    delete kept.times_spoken;
     delete kept.sounds;
     return {
       ...kept,
@@ -210,6 +211,8 @@ export async function saveEditPlan(postId: string, input: unknown): Promise<Save
       ...(known?.draws_end !== undefined ? { draws_end: known.draws_end } : {}),
       // Whether it writes what is said was measured on its code: it follows its code too.
       ...(known?.writes_spoken !== undefined ? { writes_spoken: known.writes_spoken } : {}),
+      // A skill timed on her voice reads her words said whatever it writes: set by the engine with its code.
+      ...(known?.times_spoken ? { times_spoken: true } : {}),
       // Its sounds follow its code too (each new one is made, and paid, by the server).
       ...(known?.sounds?.length ? { sounds: known.sounds } : {}),
     };
