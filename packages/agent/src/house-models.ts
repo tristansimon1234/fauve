@@ -17,8 +17,8 @@ import type { z } from "zod";
 
 /** The source of the inspiration row a house model is kept on, per studio (one per model, made when first used). */
 export const HOUSE_SOURCE = "house";
-/** The catalogue's version: a studio's row written by an older one is rewritten when the model is used again (3: its original's sheets; 4: no brand in a model's name; 5: Mots aux quatre coins as its original; 6: Plans fixes at 65 BPM; 7: four renamed; 8: Lieu tapé without its original's orange; 9: Plans fixes on its fiche; 10: Une journée chez toi on its fiche; 11: ten models on their fiches). */
-export const HOUSE_VERSION = 11;
+/** The catalogue's version: a studio's row written by an older one is rewritten when the model is used again (3: its original's sheets; 4: no brand in a model's name; 5: Mots aux quatre coins as its original; 6: Plans fixes at 65 BPM; 7: four renamed; 8: Lieu tapé without its original's orange; 9: Plans fixes on its fiche; 10: Une journée chez toi on its fiche; 11: ten models on their fiches; 12: Façade qui se construit and Coulisses façon fiche on their fiches). */
+export const HOUSE_VERSION = 12;
 
 export type HouseModel = {
   key: string;
@@ -450,28 +450,33 @@ export const HOUSE_MODELS: HouseModel[] = [
   model({
     key: "facade",
     name: "Façade qui se construit",
-    pitch: "Ta devanture se construit morceau par morceau sur fond noir, puis la rue s'anime.",
-    needs: "une vidéo fixe de ta devanture, filmée de face, bien droite",
+    // 12: written again on its original's fiche (v2 of its skill): 120 BPM, her sign then three far pieces, a burst of
+    // twelve, a silence, the last big pieces, each with a note, her front whole on the cut; no grain.
+    pitch: "Ta devanture se construit morceau par morceau sur le noir, chaque morceau sur une note : ton enseigne, puis une rafale, un silence, et ta façade entière qui s'anime.",
+    needs: "une vidéo fixe de ta devanture filmée de face, de l'autre côté de la rue, 9 s au moins, ton enseigne bien visible",
     files: [1, 3],
     pair: "gaufre",
     example: "H-construit",
-    tempo: 84,
-    finish: { name: "Clair", hint: "lumière douce, couleurs naturelles", contrast: 0.04, warmth: 0.06 },
+    // Counted from its first image (docs/fiches/facade.md): every piece on a beat or half beat at 120.
+    tempo: 120,
+    finish: { name: "Clair", hint: "lumineux et naturel, contraste doux, noir pur, sans grain", contrast: 0.04, warmth: 0.06 },
     look: {
       name: "façade qui se construit",
       format: "collage",
-      hook: { kind: "mystère", what: "un écran noir où apparaît une seule fenêtre de la façade" },
-      text: { amount: "aucun", composition: "aucun texte pendant la construction" },
-      layout: "un fond noir, avec des morceaux détourés de la façade posés un à un à leur place jusqu'à l'image entière",
+      hook: { kind: "mystère", what: "un écran noir où apparaît d'un coup son enseigne, puis trois morceaux de sa façade loin l'un de l'autre" },
+      text: { amount: "aucun", composition: "aucun texte pendant la construction, son nom seulement sur un morceau du noir s'il le faut" },
+      layout: "un fond noir, avec des morceaux de sa façade posés d'un coup à leur place, sa vidéo jouant dedans, jusqu'à l'image entière ; en bande sur le noir si sa vidéo est horizontale",
       moments: [
-        { at: 0.5, what: "un premier morceau de la façade (une fenêtre) apparaît d'un coup à sa place sur le noir" },
-        { at: 1, what: "un morceau de plus toutes les 0,6 s environ, chacun à sa place exacte (une fenêtre, une porte, la vitrine, un passant), jusqu'à la façade presque entière" },
-        { at: 5.3, what: "la vraie vidéo de la devanture en plein cadre : la rue s'anime" },
+        { at: 0, what: "son enseigne apparaît d'un coup sur le noir, puis trois éléments de sa façade loin l'un de l'autre, lentement, chacun sur une note" },
+        { at: 2.8, what: "une rafale de douze morceaux : ses autres éléments, puis des bandes le long de ses lignes (le trottoir, un côté, le mur)" },
+        { at: 4.4, what: "un silence, rien de nouveau" },
+        { at: 5.3, what: "les trois derniers grands morceaux (la rue, un tiers du haut, tout ce qui reste noir), sur trois temps" },
+        { at: 6.4, what: "sa façade entière, caméra fixe, tenue jusqu'à la coupe à 9 s, puis ses autres plans, une mesure chacun" },
       ],
       grade: "bright",
-      music: "minimal piano, airy and calm",
-      ending: "la devanture en plein cadre, tenue trois secondes",
-      why: "On voit le lieu naître : la curiosité tient jusqu'à l'image entière, qui devient vivante.",
+      music: "warm piano chords and harp arpeggios, soft bass on every beat, no drums",
+      ending: "sa devanture entière, tenue, coupée net sur le temps",
+      why: "On voit le lieu naître morceau par morceau : la curiosité tient jusqu'à l'image entière, qui devient vivante.",
     },
   }),
   model({
@@ -863,34 +868,42 @@ export const HOUSE_MODELS: HouseModel[] = [
   model({
     key: "coulisses",
     name: "Coulisses façon fiche",
-    pitch: "Un fond bleu quadrillé, un titre condensé, et une carte qui montre tes coulisses avec une étiquette qui change.",
-    needs: "5 à 10 petites vidéos de tes coulisses (préparation, gestes, outils)",
-    files: [4, 10],
+    // 12: written again on its original's fiche (v2 of its skill): no music but its sound effects, each named under the
+    // card as it is heard, its 28 cuts, a bold grotesque that is not condensed, its own blue, a 16:9 or square card.
+    pitch: "Une fiche technique bleue quadrillée : tes plans dans une carte, le nom de chaque bruitage au moment où on l'entend, et la timeline du montage dessous.",
+    needs: "12 à 16 petites vidéos de ton lieu, à l'horizontale de préférence : un plan large et calme pour ouvrir et finir, un plat ou un produit net vu d'en haut, une main qui tient quelque chose, ton enseigne",
+    files: [6, 16],
     pair: "coulisses",
     example: "M-coulisses",
+    // Its original has no music (sound effects alone, docs/fiches/coulisses.md): its images are counted in beats at it.
     tempo: 120,
-    finish: { name: "Net", hint: "contraste propre", contrast: 0.08 },
+    finish: { name: "Net", hint: "contraste propre, sans grain", contrast: 0.08 },
     look: {
-      name: "coulisses façon fiche",
+      name: "fiche des bruitages",
       format: "autre",
-      hook: { kind: "promesse", what: "un titre condensé en deux niveaux sur un fond bleu électrique quadrillé, et une carte avec une vidéo" },
+      hook: { kind: "mystère", what: "un grand titre gras sur une fiche bleue quadrillée, et dans une carte le titre de la vidéo qui s'écrit en trois temps, chacun sur son bruitage" },
       text: {
         amount: "plusieurs",
-        composition: "en haut, un titre condensé blanc très gras avec un petit mot au-dessus de chaque bout ; sous la carte, une étiquette en capitales qui change à chaque plan (ce qu'on voit, combien de fois)",
+        composition: "un grand mot en capitales grasses, non condensées, aussi large que la carte et posé dessus, deux petits mots sur ses bouts ; sous la carte, le nom du bruitage entendu en capitales blanches ; un petit titre de vidéo dans la carte",
         case: "upper",
-        weight: "black",
+        weight: "bold",
         tracking: "tight",
       },
-      colors: ["#2a14d6", "#ffffff"],
-      layout: "un fond bleu électrique quadrillé, avec une carte aux coins arrondis au centre qui montre les plans, et une frise en bas",
+      colors: ["#15017a", "#ffffff"],
+      layout: "un fond bleu électrique quadrillé, une carte 16:9 aux coins arrondis au milieu (carrée si ses vidéos sont verticales), une étiquette dessous, la timeline du montage en bas",
       moments: [
-        { at: 0, what: "le titre en haut, la carte au centre avec un plan, une étiquette dessous et une petite frise de montage en bas" },
-        { at: 0.6, what: "le plan dans la carte change toutes les 1,3 s, l'étiquette sous la carte change avec lui" },
+        { at: 0, what: "sur un plan large et calme, de petits mots tombent sur un whoosh, son nom clignote sur des déclics, son lieu et son logo apparaissent en trois pops" },
+        { at: 1.5, what: "le plan suivant se charge case par case sur des bips d'ordinateur, puis remplit la carte" },
+        { at: 3.6, what: "une rafale de plans éclair sur un cliquet, puis un plat détouré arrive à sa place sur le plan d'avant, juste avant la coupe" },
+        { at: 6.5, what: "trois flashs photo sur trois déclencheurs, puis une main détourée arrive avant la coupe" },
+        { at: 8.2, what: "trois coupes qui hésitent entre deux plans sur des salves de déclics, des coupes dans le silence, l'étiquette effacée" },
       ],
+      camera: "mixte",
+      transitions: "coupes nettes",
       motion: "epure",
-      music: "playful lo-fi electronic, crisp clicks",
-      ending: "la carte sur le dernier plan, l'étiquette finale",
-      why: "Ça montre le travail comme une fiche technique : précis, curieux, on apprend quelque chose.",
+      music: "none (sound effects only); asked for: a minimal glitchy beat with crisp clicks",
+      ending: "le dernier plan, comme le premier, tenu jusqu'au bout : la boucle ; l'étiquette reste",
+      why: "On voit et on entend comment le Reel est fait : chaque bruitage nommé au moment où il claque, la tête de lecture qui avance ; c'est curieux, précis, et ça se regarde en boucle.",
     },
   }),
   model({
@@ -1228,7 +1241,7 @@ export const HOUSE_WHEN: Record<string, { pour: string; pas_pour: string }> = {
   tourne: { pour: "un savoir-faire, des matières, un lieu, un look graphique de cinéma", pas_pour: "sans vidéos filmées en largeur" },
   nike: { pour: "l'effort, le geste, l'énergie (sport, danse, un service en plein rush)", pas_pour: "un lieu calme, des produits" },
   eventail: { pour: "une ouverture graphique, un lieu, une marque qui ose", pas_pour: "un message à lire" },
-  coulisses: { pour: "les coulisses, la préparation, les étapes d'un geste", pas_pour: "un lieu en plan large, une offre" },
+  coulisses: { pour: "montrer son lieu et ses gestes comme un créateur montre ses coulisses : chaque bruitage nommé, la timeline du montage", pas_pour: "une offre à lire, quelqu'un qui parle, une ambiance calme" },
   interrupteur: { pour: "présenter sa marque, un lancement, son logo qui s'allume", pas_pour: "sans vidéo d'elle qui lève la main vers un mur" },
   interface: { pour: "faire suivre son compte, une app, un service en ligne", pas_pour: "montrer un lieu ou des produits" },
   pixel: { pour: "une recette, une préparation en étapes, une ambiance chaleureuse", pas_pour: "un lieu, une rue" },
