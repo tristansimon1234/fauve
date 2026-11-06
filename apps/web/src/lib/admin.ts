@@ -1,5 +1,5 @@
 import "server-only";
-import { HOUSE_MODELS, houseOriginalPath, JOB_STALE_MINUTES, type FeedbackKind } from "@fauve/agent";
+import { HOUSE_MODELS, houseOriginalPath, houseSoundPath, JOB_STALE_MINUTES, type FeedbackKind } from "@fauve/agent";
 import { MONTAGE_SKILLS } from "@fauve/agent/skills";
 import type { SkillReviewStatus } from "@/lib/skill-reviews";
 import { brakeSettings, type BrakeSettings } from "@/lib/brake-settings";
@@ -45,6 +45,8 @@ export type AdminView = {
     reviewedAt: string | null;
     bench: { url: string; seconds: number | null; costEur: number | null; labCase: string | null; at: string } | null;
     original: { url: string | null; link: string | null };
+    /** Its bench Reel with its original's own sound laid on it, for the team only (house/sound/<key>.mp4): null when none. */
+    originalSound: string | null;
   }[];
   /** What people said of Edith and the app, the newest first: those not done yet. */
   feedback: { id: string; studio: string; kind: FeedbackKind; words: string; at: string; status: "new" | "seen"; source: string; byEdith: boolean }[];
@@ -144,7 +146,7 @@ async function skillsView(): Promise<AdminView["skills"]> {
   const reviewed = at(reviews.data);
   const benched = at(benches.data);
   const linkOf = new Map((links.data ?? []).map((l) => [l.key as string, (l.link as string | null) ?? null]));
-  const paths = [...(benches.data ?? []).map((b) => b.path as string), ...HOUSE_MODELS.map((m) => houseOriginalPath(m.key))];
+  const paths = [...(benches.data ?? []).map((b) => b.path as string), ...HOUSE_MODELS.flatMap((m) => [houseOriginalPath(m.key), houseSoundPath(m.key)])];
   const signed = paths.length ? ((await db.storage.from("media").createSignedUrls(paths, 3600)).data ?? []) : [];
   const url = new Map(signed.flatMap((s) => (s.path && s.signedUrl && !s.error ? [[s.path, s.signedUrl] as const] : [])));
   return HOUSE_MODELS.map((model) => {
@@ -166,6 +168,7 @@ async function skillsView(): Promise<AdminView["skills"]> {
           ? { url: link, seconds: bench.seconds === null ? null : Number(bench.seconds), costEur: bench.cost_eur === null ? null : Number(bench.cost_eur), labCase: bench.lab_case?.replace(/^lab:\/\//, "") ?? null, at: bench.created_at }
           : null,
       original: { url: url.get(houseOriginalPath(model.key)) ?? null, link: linkOf.get(model.key) ?? null },
+      originalSound: url.get(houseSoundPath(model.key)) ?? null,
     };
   }).sort((a, b) => REVIEW_ORDER[a.status] - REVIEW_ORDER[b.status] || a.name.localeCompare(b.name, "fr"));
 }

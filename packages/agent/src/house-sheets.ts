@@ -14,6 +14,8 @@ export const sheetSpan = (duration: number): number => Math.round(Math.max(2, du
 
 /** Where a model's original is kept. */
 export const houseOriginalPath = (key: string): string => `house/originals/${key}.mp4`;
+/** A model's bench Reel with its original's own sound laid on it, for the team's review on /admin only (never served to a business). */
+export const houseSoundPath = (key: string): string => `house/sound/${key}.mp4`;
 
 /** Where its sheets are kept, in order. */
 export const houseSheetPath = (key: string, index: number): string => `house/sheets/${key}/${String(index).padStart(2, "0")}.jpg`;
