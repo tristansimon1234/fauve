@@ -2017,6 +2017,52 @@ export const HOUSE_MODELS: HouseModel[] = [
       why: "On voit le résultat d'abord, puis comment c'est fait, geste par geste, les mots qui racontent au rythme des mains ; la réaction à la fin donne envie d'y goûter.",
     },
   }),
+  model({
+    key: "collage",
+    name: "Collage qui s'emboîte",
+    // Written on its original's fiche (v1 of its skill, docs/fiches/collage.md): a collage of still photos in stop motion,
+    // a change every 6 images, each next image arriving in a piece over the one before (its person cut out at her place,
+    // its roofs without their sky, seen through a window, a silhouette or a sky), three people cut out parading on one
+    // image, two images in black and white, its last person staying on the first image: a loop. No text in the original.
+    pitch: "Tes photos et vidéos qui s'emboîtent cinq fois par seconde : chaque image arrive d'abord en morceau sur la précédente (une personne détourée, tes toits sans leur ciel, ou vue dans ta vitrine ou dans une silhouette), puis entière, et la dernière personne revient sur la première : ça boucle.",
+    needs: "13 à 26 photos ou courtes vidéos verticales, chacune avec un sujet net : ton lieu en large, ton équipe et tes clients debout en entier ou jusqu'à la taille, ta façade ou ta rue avec du ciel, une vitrine, un miroir ou une fenêtre, un portrait de près, des détails",
+    files: [8, 26],
+    // Its title (none in the original) in white condensed capitals, like a sign's letters (font-pairs.ts, « cinema »).
+    pair: "cinema",
+    // Its skill's code is its reference.
+    example: null,
+    // Its step, a sixteenth at 75 BPM (0,2 s: the original's 6 images); the original's music is at 80 BPM, on its own clock.
+    tempo: 75,
+    finish: { name: "Collage franc", hint: "couleurs franches et contrastées comme ses photos, deux images en noir et blanc dense, sans grain ni coins sombres", contrast: 0.06, saturation: 0.06 },
+    look: {
+      name: "collage qui s'emboîte",
+      format: "collage",
+      hook: { kind: "mystère", what: "une image fixe, et la personne de l'image suivante qui arrive détourée dessus, à sa place, avant son image : on ne sait pas où l'on va" },
+      text: {
+        amount: "aucun",
+        composition: "aucun texte dans l'original ; quand il faut des mots, son nom en grandes capitales blanches étroites dans le haut de ses premières images, comme les lettres d'une enseigne, que les morceaux qui arrivent recouvrent par moments",
+        case: "upper",
+        weight: "black",
+        tracking: "normal",
+      },
+      layout: "des photos plein cadre, une à la fois, chacune arrivant d'abord en morceau sur la précédente, chaque morceau à sa place et à sa taille dans sa propre image, sans bord ni ombre",
+      moments: [
+        { at: 0, what: "une image large, puis la personne de l'image suivante détourée dessus, à sa place, puis son image entière ; un changement toutes les 6 images" },
+        { at: 0.6, what: "les maisons de l'image suivante sans leur ciel posées sur la précédente, dont on voit le haut à la place du ciel" },
+        { at: 1, what: "trois personnes détourées défilent sur le même décor, une toutes les 0,2 s, sans jamais montrer leur fond" },
+        { at: 1.6, what: "le premier plan de l'image suivante, en noir et blanc, posé sur le décor, puis son image entière en noir et blanc" },
+        { at: 2.2, what: "un visage vu dans l'iris d'un œil, puis la silhouette d'un homme remplie par un bâtiment, puis des mouettes dans l'ouverture d'une arche d'arbres" },
+        { at: 3.6, what: "une femme détourée arrive sur les mouettes, son image entière, puis elle reste détourée sur la première image, qui revient : la boucle, jouée deux fois" },
+      ],
+      camera: "fixe",
+      transitions: "coupes nettes",
+      grade: "natural",
+      motion: "energique",
+      music: "trap beat, dotted deep 808, claps on 2 and 4, crisp 16th hi-hats, 75 BPM",
+      ending: "la dernière personne détourée posée sur la première image, qui revient : la boucle repart sans couture",
+      why: "Chaque image annonce la suivante par un morceau d'elle, cinq fois par seconde : l'œil ne décroche pas, on cherche ce qui arrive, et la boucle fait revoir le Reel sans qu'on s'en rende compte.",
+    },
+  }),
 ];
 
 const BY_KEY = new Map(HOUSE_MODELS.map((m) => [m.key, m]));
@@ -2101,6 +2147,7 @@ export const HOUSE_WHEN: Record<string, { pour: string; pas_pour: string }> = {
   assiettes: { pour: "montrer sa carte, ses plats du jour, des idées de recettes ou une sélection de produits, un par un, filmés d'en haut au même endroit (un restaurant, un traiteur, une cantine, une boulangerie, des box)", pas_pour: "un seul plat, les gestes d'une recette, quelqu'un qui parle, un lieu, moins de six plats" },
   "chef-face": { pour: "un plat, une recette ou une spécialité racontée face caméra et goûtée (un restaurant, un traiteur, une pâtisserie, un café) : le résultat d'abord, puis la dégustation", pas_pour: "sans vidéo où elle parle, des images sans parole, un lieu ou une ambiance sans rien à goûter" },
   recette: { pour: "montrer un savoir-faire en étapes comme un tuto, pour tout métier qui a des gestes : une recette (cuisine, pâtisserie), un bouquet monté (fleuriste), une coupe (coiffeur, barbier), une pièce tournée (céramiste), un soin ; du résultat fini à la dégustation ou à l'essai", pas_pour: "un lieu ou une ambiance, une offre à lire, quelqu'un qui parle face caméra, des vidéos filmées à la main" },
+  collage: { pour: "présenter son lieu, son équipe et ses clients avec de l'élan et du style (un café, une boutique, un salon, un studio, un bar), une ambiance de quartier, une saison, un événement en vrac, beaucoup de photos", pas_pour: "moins de huit photos ou vidéos, un message à lire en détail, quelqu'un qui parle face caméra, un geste qu'il faut voir bouger longtemps" },
 };
 
 /** The models for Edith: their key, name, what they do, what they want, and what only she can film for one. */
