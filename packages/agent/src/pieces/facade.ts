@@ -191,27 +191,50 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   // Her own shapes when her picture gave enough of them for its rhythm (ten at least, her elements and her regions): never a
   // build stalled on one piece (the boutique's bench of v4: her door alone held 6 s on black, then all of it at once).
   if (all.length + regs.length >= 10) {
-    // Her front in its own shapes, as many pieces as her picture has, nothing invented (v4; Tristan: « toujours mettre
-    // de l'intelligence », « plus flex »): her sign first (else her largest element), then three of her elements far
-    // from it and from each other (her regions of a middle size when she has fewer), each along its own outline; the
-    // burst: her other elements (what stands in front of another first, then the lower ones, right to left), then the
-    // smaller of her regions, the lower first, spread over its notes when there are fewer; then what is left in two (the
-    // street, all that is left of the top's left half), and the rest. Her elements alone when no region was read.
-    // (Of her regions, those of her front that the frame shows whole enough: never a sliver at its edge, nor her ground.)
-    const some = all.length >= 4 ? all : [...all, ...regs.filter((r) => area(r) >= 0.012 * bw * bh && area(r) <= 0.15 * bw * bh && r.seen >= 0.6 && r.w >= 0.08 * bw && mid(r)[1] < S)];
-    const pool = some.length ? some : regs;
-    const first = sign || (all.length ? all : pool).reduce((m, b) => (area(b) > area(m) ? b : m));
-    const picked = spread(pool, [first], 4);
+    // Built as a front is, and as its original builds its own (v6, Tristan: « une règle de construire de manière
+    // cohérente »): first its large openings at their places in her front, each a real piece, never a sliver (her sign
+    // or her door when large, a window, an opening up high, her awning: the original's door, window, arched window and
+    // awning); then what links them, from the ground floor up, each piece against what is already there (never one
+    // floating far from the rest); then its sides going up; the street and what lies outside her front last. As many
+    // pieces as her picture has, nothing invented (Tristan: « toujours mettre de l'intelligence »).
+    const solid = (b) => area(b) >= 0.015 * bw * bh && b.seen >= 0.5 && b.w >= 0.05 * bw && b.h >= 0.04 * bh;
+    // Her street: what lies below the foot of her elements (her doors, her shop window), else below the street line.
+    const ground = (b) => mid(b)[1] >= (all.length ? B : S);
+    // Her front: the box of her elements (else of her regions above the street), a little wider.
+    const core = all.length ? all : regs.filter((r) => !ground(r));
+    const M = core.length ? R(Math.min(...core.map((b) => b.x)) - 0.1 * bw, Math.min(...core.map((b) => b.y)) - 0.05 * bh, Math.max(...core.map((b) => b.x + b.w)) + 0.1 * bw, Math.max(...core.map((b) => b.y + b.h)) + 0.05 * bh) : R(0, 0, bw, S);
+    const within = (b) => { const [x, y] = mid(b); return x >= M.x && x <= M.x + M.w && y >= M.y && y <= M.y + M.h; };
+    // Its openings: her large elements, then (when fewer than four) her large regions on her front, then any above the street.
+    const tiers = [all.filter(solid), regs.filter((r) => solid(r) && !ground(r) && within(r) && area(r) <= 0.15 * bw * bh), regs.filter((r) => solid(r) && !ground(r)), [...all, ...regs].sort((p, q) => area(q) - area(p))];
+    const pool = [];
+    for (const t of tiers) if (pool.length < 4) for (const b of t) if (!pool.includes(b)) pool.push(b);
+    // The first: her largest opening on the ground floor (a door, a shop window: the original's door with its name), else
+    // her sign when it is a real piece, else her largest.
+    const floor = all.filter((b) => solid(b) && b.y + b.h >= B - 0.12 * bh);
+    const largest = (list) => list.reduce((m, b) => (area(b) > area(m) ? b : m));
+    const first = floor.length ? largest(floor) : sign && solid(sign) ? sign : largest(pool);
+    const picked = spread(pool.includes(first) ? pool : [first, ...pool], [first], 4);
     slow = picked.out;
-    const restE = all.filter((b) => !slow.includes(b));
-    const ahead = (b) => restE.some((q) => inside(b, q, 0.7));
-    restE.sort((p, q) => Number(ahead(q)) - Number(ahead(p)) || lowFirst(p, q));
-    const left = regs.filter((r) => !slow.includes(r)).sort((p, q) => area(p) - area(q));
-    const take = Math.max(0, Math.min(12 - Math.min(12, restE.length), left.length - 2));
-    burst = [...restE.slice(0, 12), ...left.slice(0, take).sort(lowFirst)];
+    // Then, one at a time, the piece next to what is already there (the nearest when none touches it), the lower first,
+    // right to left; a piece cut by the frame's edge, the street and what lies outside her front kept for the end.
+    const gap = (p, q) => Math.max(0, Math.max(p.x, q.x) - Math.min(p.x + p.w, q.x + q.w), Math.max(p.y, q.y) - Math.min(p.y + p.h, q.y + q.h));
+    const rest = [...all, ...regs].filter((b) => !slow.includes(b));
+    const late = rest.filter((b) => ground(b) || !within(b) || b.seen < 0.5);
+    const todo = rest.filter((b) => !late.includes(b));
+    const placed = [...slow];
+    const near = (b) => { const n = Math.min(...placed.map((q) => gap(b, q))); return n <= 0.02 * bh ? 0 : n; };
+    // (What stands in front of a piece already there first: a plant pot before her door, as the original's people before its shop.)
+    const ahead = (b) => placed.some((q) => inside(b, q, 0.7));
+    burst = [];
+    while (burst.length < 12 && todo.length) {
+      todo.sort((p, q) => near(p) - near(q) || Number(ahead(q)) - Number(ahead(p)) || lowFirst(p, q));
+      const b = todo.shift();
+      burst.push(b);
+      placed.push(b);
+    }
     // What the burst could not take (her elements too) lands with the last ones: nothing of hers is left out.
-    const after = [...restE.slice(12), ...left.slice(take)];
-    const street = after.filter((r) => mid(r)[1] >= S);
+    const after = [...todo, ...late];
+    const street = after.filter(ground);
     const upper = after.filter((r) => !street.includes(r) && mid(r)[0] < bw / 2);
     const others = after.filter((r) => !street.includes(r) && !upper.includes(r));
     big = [join(street.length ? street : after.slice(-1)), join(upper.length ? upper : others.slice(-1))].filter(Boolean);
@@ -336,7 +359,8 @@ export const facade: EffectPiece = {
   // devrait détourer la photo pour adapter les formes tu vois ? »).
   // 5: its skill's v5: never stalled on one piece; her elements first, then her regions, else the rest of her picture
   // cut at its rhythm.
-  version: 5,
+  // 6: its skill's v6 order: its large openings first, then each piece against what is already there, the street last.
+  version: 6,
   name: "Façade qui se construit",
   how: "l'écran passe au noir et sa devanture s'y construit morceau par morceau, chaque morceau un élément de sa propre image détouré le long de ses bords (sa porte, une fenêtre, son enseigne, puis les pans de son mur, du trottoir), d'un coup à sa place, sa vidéo jouant dedans, un par note : son enseigne d'abord, trois éléments loin l'un de l'autre, une rafale de douze, une courte pause, puis les trois grands sur le temps, et sa devanture entière s'anime, caméra fixe, sans texte, jusqu'à la coupe ; posée en entier dans une bande au milieu du noir quand sa vidéo est horizontale.",
   needs: "une vidéo fixe de sa devanture filmée de face, de l'autre côté de la rue, 5 s au moins : toute la façade dans l'image, son enseigne ou sa porte à son nom bien visible, faite d'éléments qu'on reconnaît seuls (fenêtres, vitrine, store, tables), un peu de vie devant.",
