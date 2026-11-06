@@ -11,7 +11,7 @@ import type { EffectPiece, PieceTimelineInput } from "../pieces.ts";
 // blurred, then 1,04, 1,08, 1,03, 1) and its exit (0,75, then 0,42), never a fade; 31 images into the shot as the
 // original when there is room, 66 images up. Its place: on her chest or her counter, under her face as the engine
 // follows it over its two seconds (`track(frame, box).faces`), above it when her face is low, smaller when neither leaves
-// room; half the height without a face (the original's 55 %, raised to keep off a voice's subtitles, which a bank effect
+// room; half the height without a face (the original's 60 %, raised to keep off a voice's subtitles, which a bank effect
 // cannot move). Left out: the model's subtitles of two voices, its deep boom, its bass drop and its logo at the end (the
 // montage's), its format setting (the montage frames her shot).
 

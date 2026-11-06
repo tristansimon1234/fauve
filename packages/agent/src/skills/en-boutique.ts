@@ -296,7 +296,8 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
       line ? smallLine(line, key, Math.round(tall * 0.72)) : null));
   };
 
-  // 8. The title sticker, over the artisan as he smiles: its name (what they make), who makes it under it.
+  // 8. The title sticker, over the artisan as he smiles: its name (what they make), who makes it under it; its middle at
+  // 55,5 % of the height (the original's 60 %, raised so that its subtitles pass under it within the safe zone).
   const TITLE_Y = band ? Math.round(H * 0.5) : Math.round(H * 0.555);
   const titled = title && frame < endAt ? card("title", title.text, avec ? avec.text : "", pop(POP, OUT, frame), TITLE_Y, -5.5) : null;
 
