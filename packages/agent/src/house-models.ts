@@ -2017,6 +2017,60 @@ export const HOUSE_MODELS: HouseModel[] = [
       why: "On voit le résultat d'abord, puis comment c'est fait, geste par geste, les mots qui racontent au rythme des mains ; la réaction à la fin donne envie d'y goûter.",
     },
   }),
+  model({
+    key: "bienvenue",
+    name: "L'accueil, puis la rafale",
+    // Written on its original's fiche (v1 of its skill, docs/fiches/bienvenue.md): her welcome sentence written by hand,
+    // a line more on each of four calm shots of her place before it opens (darker, paler), a snap with each, no music; then
+    // the drop, her words gone, and the life of her place in a burst of twenty shots in five seconds, to her place full.
+    pitch: "Ton lieu au calme avant l'ouverture, ta phrase d'accueil qui s'écrit à la main un mot par plan, puis le drop : la vie de ton lieu en rafale, jusqu'à ta salle pleine.",
+    needs: "4 vidéos calmes de ton lieu vide, filmées téléphone posé (ta salle, un coin, un petit détail qui bouge, tes produits alignés), puis 10 à 20 courtes vidéos de ton lieu au travail (tes gestes de près, tes résultats, ton équipe, tes clients, ta salle pleine)",
+    files: [6, 24],
+    // Its capitals drawn by hand with a fine even stroke, spaced (Mynerve).
+    pair: "main-levee",
+    // Its skill's code is its reference.
+    example: null,
+    // Its drop's grid (docs/fiches/bienvenue.md): its 23 cuts within an image at 91,7 (its intro's voice has its own pace).
+    tempo: 91.7,
+    finish: { name: "Accueil", hint: "ses plans calmes assombris par le modèle, sa rafale chaude et vive, sans grain ni coins sombres", warmth: 0.05, contrast: 0.04, saturation: 0.04 },
+    look: {
+      name: "accueil mot à mot",
+      format: "pov",
+      hook: { kind: "pov", what: "son lieu vide et calme avant l'ouverture, assombri, et le premier mot de sa phrase d'accueil écrit à la main au milieu de l'image" },
+      text: {
+        amount: "une ligne",
+        composition: "sa phrase d'accueil en capitales dessinées à la main d'un trait fin, jaune fluo ou de sa couleur claire, un mot par ligne empilé au milieu de l'image, une ligne de plus à chaque plan, sans ombre ni fond",
+        case: "upper",
+        weight: "regular",
+        tracking: "wide",
+        stroke: "thin",
+        lines: "aligned",
+        tilt: 0,
+        shadow: "none",
+      },
+      layout: "quatre plans calmes de son lieu assombris, sa phrase empilée au milieu, un mot de plus à chaque plan, puis une rafale de plans courts de son lieu au travail, chacun en plein cadre",
+      moments: [
+        { at: 0, what: "son lieu vide en plan large, fixe et assombri ; le premier mot de sa phrase arrive d'un coup au milieu à 0,17 s, en capitales jaunes écrites à la main, sans musique" },
+        { at: 0.83, what: "un coin de son lieu, puis à 1,5 s un petit détail qui bouge, puis à 2,03 s ses produits alignés : un mot de plus sous les autres sur chaque coupe, empilés au milieu de l'image, un claquement de doigts chacun" },
+        { at: 2.73, what: "le drop : les mots partent d'un coup, la musique entre avec sa grosse basse, la lumière revient ; quatre plans de 0,16 s sur le temps" },
+        { at: 3.4, what: "la rafale : quinze plans de 0,13 à 0,43 s, ses gestes de près, ses résultats, son équipe et ses clients, son lieu plein, coupés sur le groove" },
+        { at: 7.43, what: "son lieu plein en plan large, la musique jusqu'à la dernière image" },
+      ],
+      sounds: [
+        { at: 0.17, what: "single finger snap, sur le premier mot (la voix de l'original compte)" },
+        { at: 0.83, what: "single finger snap, sur le deuxième mot" },
+        { at: 1.5, what: "single finger snap, sur le troisième mot" },
+        { at: 2.03, what: "single finger snap, sur le dernier mot, avant le drop" },
+      ],
+      camera: "mixte",
+      transitions: "coupes nettes",
+      grade: "natural",
+      motion: "fait_main",
+      music: "afro trap beat, heavy 808, syncopated drums, full energy from beat one, 92 BPM",
+      ending: "son lieu plein en plan large, la musique jusqu'à la dernière image",
+      why: "Le calme avant l'ouverture et une phrase qui s'écrit mot à mot font attendre ; le drop libère tout d'un coup : la vie du lieu en vingt plans, ses gestes, ses résultats, son équipe. On a envie d'entrer.",
+    },
+  }),
 ];
 
 const BY_KEY = new Map(HOUSE_MODELS.map((m) => [m.key, m]));
@@ -2101,6 +2155,7 @@ export const HOUSE_WHEN: Record<string, { pour: string; pas_pour: string }> = {
   assiettes: { pour: "montrer sa carte, ses plats du jour, des idées de recettes ou une sélection de produits, un par un, filmés d'en haut au même endroit (un restaurant, un traiteur, une cantine, une boulangerie, des box)", pas_pour: "un seul plat, les gestes d'une recette, quelqu'un qui parle, un lieu, moins de six plats" },
   "chef-face": { pour: "un plat, une recette ou une spécialité racontée face caméra et goûtée (un restaurant, un traiteur, une pâtisserie, un café) : le résultat d'abord, puis la dégustation", pas_pour: "sans vidéo où elle parle, des images sans parole, un lieu ou une ambiance sans rien à goûter" },
   recette: { pour: "montrer un savoir-faire en étapes comme un tuto, pour tout métier qui a des gestes : une recette (cuisine, pâtisserie), un bouquet monté (fleuriste), une coupe (coiffeur, barbier), une pièce tournée (céramiste), un soin ; du résultat fini à la dégustation ou à l'essai", pas_pour: "un lieu ou une ambiance, une offre à lire, quelqu'un qui parle face caméra, des vidéos filmées à la main" },
+  bienvenue: { pour: "présenter son lieu et ce qu'on y fait (un salon, un café, un restaurant, une boutique, un studio, un atelier) : une phrase d'accueil mot à mot sur son lieu au calme, puis sa vie en rafale ; une ouverture, une réouverture, une rentrée, un nouveau lieu", pas_pour: "un seul produit, quelqu'un qui parle face caméra (ses mots s'écrivent, aucune voix), un long message à lire, moins de six vidéos (la rafale en veut une dizaine)" },
 };
 
 /** The models for Edith: their key, name, what they do, what they want, and what only she can film for one. */
