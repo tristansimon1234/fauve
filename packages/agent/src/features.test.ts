@@ -1280,6 +1280,8 @@ test("each of Edith's models shows its original's frames as a Reel she sends: sh
   made["celui-la"] = 5;
   // « Ta devanture en kaléidoscope » (9 s): five sheets of 2 s.
   made.vitraux = 5;
+  // « Collage qui s'emboîte » (8,37 s): five sheets of 2 s.
+  made.collage = 5;
   for (const m of HOUSE_MODELS) assert.equal(houseSheets(m.key).length, made[m.key], m.key);
   assert.deepEqual(houseSheets("facade").at(-1), { from: 8, to: 9.4, path: "house/sheets/facade/04.jpg" });
   assert.deepEqual(houseSheets("inconnu"), []);

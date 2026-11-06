@@ -228,6 +228,10 @@ export const HOUSE_EFFECTS: Record<string, HouseEffect> = {
     effet: "quelqu'un debout devant son lieu, l'image qui recule en trois sauts, puis une masse floue passe tout près devant l'objectif : la personne a disparu, son lieu vide tenu un instant",
     il_faut: "une vidéo fixe de quelqu'un debout devant son lieu, et si possible le même endroit vide (la fin de la vidéo)",
   },
+  collage: {
+    effet: "ses images cinq fois par seconde, chacune arrivant d'abord en morceau sur la précédente (sa personne détourée à sa place, ses toits sans leur ciel, ou vue dans une vitrine, une silhouette), puis entière",
+    il_faut: "des photos ou courtes vidéos au sujet net (des personnes debout, ses produits), un plan de dehors avec du ciel",
+  },
 };
 
 /** The most of Edith's models one Reel borrows from: one charter, one music, never a patchwork. */

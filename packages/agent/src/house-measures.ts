@@ -100,4 +100,13 @@ export const HOUSE_MEASURES: Record<string, ReelMeasures> = {
   // its four journey shots, its three crowds (measure.py missed these, each image of an accelerated crowd changes as
   // much as a cut); its music's backbeat every 1,082 s counted two beats (110,9 BPM); its loudness by ebur128.
   "depart": { duration: 11.17, cuts: [0.03, 0.1, 0.17, 0.83, 1.07, 1.4, 1.7, 2.73, 3.2, 4.93, 7.27], bpm: 110.9, lufs: -16.5 },
+  // Its fiche's changes of picture (docs/fiches/collage.md): every 6 images, its loop of 125 images played twice (measure.py
+  // missed four, a cut-out laid on the same image); its tempo its cuts' grid, a sixteenth every 0,2 s (its music, at 80
+  // BPM, runs on its own clock); its loudness by ebur128.
+  "collage": {
+    duration: 8.37,
+    cuts: [...Array.from({ length: 20 }, (_, k) => 6 * (k + 1)), ...Array.from({ length: 21 }, (_, k) => 125 + 6 * k)].map((f) => Math.round((f / 30) * 100) / 100),
+    bpm: 75,
+    lufs: -8.5,
+  },
 };
