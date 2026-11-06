@@ -1,4 +1,4 @@
-import { beatSpans, toFrame, type MontageSkill } from "../skills.ts";
+import { END_CARD_SECONDS, beatSpans, toFrame, type MontageSkill } from "../skills.ts";
 
 // « Court métrage », version 2, written on its original's fiche (docs/fiches/court-metrage.md: measured image by image
 // at 30 i/s, its picture's box, its slit, its title, its burns and its film roll read on the pixels, its sound by
@@ -40,8 +40,8 @@ const BLACK = 0.05;
 /** Its shots: the opening, a bar each, the last; up to twelve for a length she asks for (42 s at its slowest tempo). */
 const FEWEST = 4;
 const LONGEST = 12;
-/** The engine's ending card: the Reel's last 1,6 s, on the black after the fade. */
-const END_CARD = 1.6;
+/** The engine's ending card: the Reel's last 2,5 s, on the black after the fade. */
+const END_CARD = END_CARD_SECONDS;
 const round = (n: number) => Math.round(n * 100) / 100;
 const round3 = (n: number) => Math.round(n * 1000) / 1000;
 
@@ -311,7 +311,7 @@ export const courtMetrage: MontageSkill = {
     const bpm = tempo ?? BPM;
     const beat = 60 / bpm;
     const count = Math.max(FEWEST, Math.min(LONGEST, n));
-    // With an ending card, its time after the fade, in whole beats (the engine's 1,6 s at least).
+    // With an ending card, its time after the fade, in whole beats (the engine's 2,5 s at least).
     const card = end ? Math.ceil((END_CARD + 0.05) / beat - 1e-6) : 0;
     const spans = beatSpans(bpm, [OPENING, ...Array.from({ length: count - 2 }, () => SHOT), LAST + card]);
     const duration = spans.at(-1)!.end;

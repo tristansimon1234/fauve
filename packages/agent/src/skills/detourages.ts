@@ -1,4 +1,4 @@
-import { beatSpans, toFrame, type MontageSkill, type SkillSound } from "../skills.ts";
+import { END_CARD_SECONDS, beatSpans, toFrame, type MontageSkill, type SkillSound } from "../skills.ts";
 
 // « Ton nom qui clignote » (`detourages`), version 2, written again on its original's fiche (docs/fiches/detourages.md:
 // a travel edit of 16,5 s measured image by image at 30 i/s, its sound by bands; Tristan: « c'est un effet que l'on
@@ -47,7 +47,7 @@ const PARTS: number[][][] = [[], [[0], [0, 3], [0, 2, 3]], [[0], [0, 1], [0, 1, 
 /** Past its 23 shots (a length she asks for): more bars of four shots before its last, each four beats. */
 const MORE = { cuts: [0, 0.7, 1.45, 2.25], length: 4 };
 const LONG = 31;
-/** Its last shot, held; with her ending card, two beats longer (its last 1,6 s over it). */
+/** Its last shot, held; with her ending card, two beats longer (its last 2,5 s over it). */
 const LAST = 3.8;
 const CARD = 2;
 /** The bass falls away this far into its last shot and comes back here (beats: the original's 15,0 and 16,1 s). */
@@ -360,7 +360,7 @@ export const detourages: MontageSkill = {
     const beat = 60 / bpm;
     const count = Math.max(11, Math.min(LONG, n));
     const { cuts, last } = burstCuts(count - 2);
-    const hold = LAST + (end ? CARD : 0);
+    const hold = LAST + (end ? Math.max(CARD, Math.ceil(END_CARD_SECONDS / beat - 1e-6)) : 0);
     // Its opening, then each shot of its burst to the next cut, then its last shot.
     const edges = [0, ...cuts.map((c) => INTRO + c.at), INTRO + last, INTRO + last + hold];
     const spans = beatSpans(bpm, edges.slice(1).map((b, i) => round3(b - edges[i]!)));

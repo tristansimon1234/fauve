@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { wordFont, wordFontsBrief } from "./font-pairs.ts";
 import { planLook, type ReelLook } from "./looks.ts";
-import { REEL_FPS } from "./motion.ts";
+import { END_CARD_SECONDS, REEL_FPS } from "./motion.ts";
 import { readMusicShape, type MusicShape } from "./music-shape.ts";
 import { SUBTITLE_ROW, subtitleRowAmong } from "./retouch.ts";
 import { MAX_SPEED, type ClipSegment, type ClipSpeech, type EditPlan, type HandMomentKind, type MotionDrawn, type PlanSegment, type SfxCue } from "./schemas.ts";
@@ -324,6 +324,16 @@ export type SkillTimeline = {
    * passage is followed.
    */
   objects?: Record<string, number>;
+  /**
+   * Its Reel ends on her name without an ending card (her name lit in the dark, a signature on black, her name typed as
+   * its last scene, her logo with it): `from`, the moment it is whole on screen for the last time (its entrance over),
+   * staying to the end. The engine holds it ENDING_LEAST at least, and, `bare` (on black, a flat ground, a still frame:
+   * nothing else to look at), ENDING_MOST at most, longer or shorter by `unit` (s; one beat by default, so its cut stays
+   * on its grid): Tristan, 6 November, « les scènes de fin avec le nom du commerce sont souvent trop courtes » (half a
+   * second of her name in the dark), and four seconds of black around a small signature were too long. With an ending
+   * card, the card is her ending (END_CARD_SECONDS, the engine's).
+   */
+  ending?: { from: number; bare?: boolean; unit?: number };
 };
 
 /**
@@ -758,6 +768,104 @@ export function beatSpans(bpm: number, beats: number[]): { start: number; end: n
 /** A time (s) in frames, for a skill's marks. */
 export const toFrame = (s: number) => Math.round(s * REEL_FPS);
 
+/** The engine's ending card (motion.ts): a skill that draws one times its ending on it. */
+export { END_CARD_SECONDS };
+/** Her name at the end of a Reel, whole on screen this long at least (s), and on a bare ending this long at most. */
+export const ENDING_LEAST = 2;
+export const ENDING_MOST = 3;
+/** The longest Reel (MAX_REEL_SECONDS of editor.ts): a held ending never makes it longer. */
+const LONGEST_REEL = 45;
+
+/**
+ * Its timeline with her name held at the end (SkillTimeline.ending): too short, the time she reads it is added there
+ * (everything after its moment later by as much: its last shot, its texts, its marks, its sounds, its music's end); bare
+ * and too long, its tail is cut (what falls after the new end ends there). By whole `unit`s (a beat by default), within
+ * the longest Reel. A timeline on her voice is hers: never changed.
+ */
+export function heldEnding(line: SkillTimeline, beat: number): SkillTimeline {
+  const ending = line.ending;
+  if (!ending || line.lead !== undefined || line.shown) return line;
+  const unit = Math.max(1 / REEL_FPS, ending.unit ?? beat);
+  const hold = line.duration - ending.from;
+  if (hold < ENDING_LEAST - 0.02) {
+    const room = Math.floor((LONGEST_REEL - line.duration) / unit + 1e-6);
+    const k = Math.min(room, Math.ceil((ENDING_LEAST - hold) / unit - 1e-6));
+    return k > 0 ? laterFrom(line, ending.from, onFrame(k * unit)) : line;
+  }
+  if (ending.bare && hold > ENDING_MOST + 0.02) {
+    let k = Math.ceil((hold - ENDING_MOST) / unit - 1e-6);
+    while (k > 0 && hold - k * unit < ENDING_LEAST - 0.02) k--;
+    const end = round(onFrame(line.duration - k * unit));
+    // Never a shot cut away: its last shot only gets shorter.
+    if (k <= 0 || line.shots.some((s) => s.start >= end - 1 / REEL_FPS)) return line;
+    return cutAt(line, end);
+  }
+  return line;
+}
+
+/** A timeline with `delta` seconds added at `at`: every moment after it later by as much. */
+function laterFrom(line: SkillTimeline, at: number, delta: number): SkillTimeline {
+  const duration = round(line.duration + delta);
+  // What ends with the Reel ends with it still (its music's end, a text to the end), on the same rounding.
+  const t = (x: number) => (Math.abs(x - line.duration) < 0.005 ? duration : x > at + 0.001 ? round3(x + delta) : x);
+  const f = (x: number) => (x > toFrame(at) ? x + toFrame(delta) : x);
+  const music = line.music;
+  return {
+    ...line,
+    duration,
+    shots: line.shots.map((s) => ({ ...s, start: round(t(s.start)), end: round(t(s.end)) })),
+    texts: Object.fromEntries(Object.entries(line.texts).map(([k, v]) => [k, { from: round(t(v.from)), to: round(t(v.to)) }])),
+    marks: Object.fromEntries(Object.entries(line.marks).map(([k, v]) => [k, f(v)])),
+    ...(line.sounds ? { sounds: line.sounds.map((x) => ({ ...x, at: t(x.at) })) } : {}),
+    ...(line.says ? { says: line.says.map((x) => ({ ...x, at: t(x.at) })) } : {}),
+    ...(music
+      ? {
+          music: {
+            ...music,
+            ...(music.downbeat !== undefined ? { downbeat: t(music.downbeat) } : {}),
+            ...(music.pauses ? { pauses: music.pauses.map((p) => ({ ...p, from: t(p.from), to: t(p.to) })) } : {}),
+            ...(music.filters ? { filters: music.filters.map((p) => ({ ...p, from: t(p.from), to: t(p.to) })) } : {}),
+            ...(music.end ? { end: { ...music.end, at: t(music.end.at) } } : {}),
+          },
+        }
+      : {}),
+  };
+}
+
+/** A timeline ended at `end` (s): what came after it ends there, or goes. */
+function cutAt(line: SkillTimeline, end: number): SkillTimeline {
+  const t = (x: number) => Math.min(x, end);
+  const music = line.music;
+  return {
+    ...line,
+    duration: end,
+    shots: line.shots.map((s) => ({ ...s, end: round(t(s.end)) })),
+    texts: Object.fromEntries(Object.entries(line.texts).map(([k, v]) => [k, { from: round(t(v.from)), to: round(t(v.to)) }])),
+    marks: Object.fromEntries(Object.entries(line.marks).map(([k, v]) => [k, Math.min(v, toFrame(end))])),
+    ...(line.sounds ? { sounds: line.sounds.filter((x) => x.at < end - 0.05) } : {}),
+    ...(line.says ? { says: line.says.filter((x) => x.at < end - 0.05) } : {}),
+    ...(music
+      ? {
+          music: {
+            ...music,
+            ...(music.pauses ? { pauses: music.pauses.filter((p) => p.from < end - 0.03).map((p) => ({ ...p, to: t(p.to) })) } : {}),
+            ...(music.filters ? { filters: music.filters.filter((p) => p.from < end - 0.03).map((p) => ({ ...p, to: t(p.to) })) } : {}),
+            ...(music.end ? { end: { ...music.end, at: end } } : {}),
+          },
+        }
+      : {}),
+  };
+}
+
+/**
+ * Its timeline for n shots as the engine plays it: the skill's own, its name held at the end (heldEnding) at its tempo.
+ * Every length of it read anywhere (its lengths, its fill, its plan, its sounds again) goes through here.
+ */
+export function skillTimeline(skill: Pick<MontageSkill, "timeline" | "bpm">, n: number, options: Parameters<MontageSkill["timeline"]>[1]): SkillTimeline {
+  const line = skill.timeline(n, options);
+  return options.said ? line : heldEnding(line, 60 / (options.bpm ?? skill.bpm));
+}
+
 /** The shortest passage a video gives a shot (shorter shots take it whole). */
 const PASSAGE_MIN = 1.2;
 /** How many shots one video gives at most, from moments that look different. */
@@ -773,18 +881,40 @@ export function skillShotCount(skill: Pick<MontageSkill, "shots">, files: SkillF
   return Math.max(skill.shots[0], Math.min(skill.shots[1], skillPassages(files)));
 }
 
-/** The tempos a skill plays at: its own range, else 0,7 to 1,2 times its tempo, always within 60 to 140. */
-export function skillTempos(skill: Pick<MontageSkill, "bpm" | "tempo">): [number, number] {
+/** Its slowest tempo, read once per skill. */
+const slowest = new WeakMap<object, number>();
+
+/**
+ * The tempos a skill plays at: its own range, else 0,7 to 1,2 times its tempo, always within 60 to 140; and never so slow
+ * that its longest Reel with its ending card passes 45 s (the card's 2,5 s, her name read: a skill timed for its 1,6 s
+ * passed it by a second at its slowest), when its timeline is given.
+ */
+export function skillTempos(skill: Pick<MontageSkill, "bpm" | "tempo"> & Partial<Pick<MontageSkill, "timeline" | "shots" | "long" | "end">> & { voice?: unknown }): [number, number] {
   const [low, high] = skill.tempo ?? [skill.bpm * 0.7, skill.bpm * 1.2];
-  return [Math.round(Math.max(60, Math.min(skill.bpm, low))), Math.round(Math.min(140, Math.max(skill.bpm, high)))];
+  const fast = Math.round(Math.min(140, Math.max(skill.bpm, high)));
+  let slow = Math.round(Math.max(60, Math.min(skill.bpm, low)));
+  if (skill.timeline && skill.shots && !skill.voice) {
+    const known = slowest.get(skill);
+    if (known !== undefined) slow = known;
+    else {
+      const timed = { timeline: skill.timeline, bpm: skill.bpm };
+      const n = skillLongest({ shots: skill.shots, long: skill.long });
+      const fits = (bpm: number) => skillTimeline(timed, n, { end: Boolean(skill.end), ...(Math.abs(bpm - skill.bpm) > 0.005 ? { bpm } : {}) }).duration <= LONGEST_REEL + 0.005;
+      // Whole tempos up to its own, never past it (at its own tempo, its own length).
+      while (slow + 1 <= skill.bpm && !fits(slow)) slow++;
+      if (!fits(slow)) slow = skill.bpm;
+      slowest.set(skill, slow);
+    }
+  }
+  return [slow, fast];
 }
 
 /** Its lengths (s) at a tempo over all its numbers of shots, without its ending card (a pile's cadence changes with its count). */
 /** The most shots a skill takes for a length she asks for. */
 export const skillLongest = (skill: Pick<MontageSkill, "shots" | "long">) => Math.max(skill.shots[1], skill.long ?? 0);
 
-const lengthsAt = (skill: Pick<MontageSkill, "shots" | "long" | "timeline">, bpm?: number) =>
-  Array.from({ length: skillLongest(skill) - skill.shots[0] + 1 }, (_, k) => ({ n: skill.shots[0] + k, duration: skill.timeline(skill.shots[0] + k, { end: false, ...(bpm ? { bpm } : {}) }).duration }));
+const lengthsAt = (skill: Pick<MontageSkill, "shots" | "long" | "timeline" | "bpm">, bpm?: number) =>
+  Array.from({ length: skillLongest(skill) - skill.shots[0] + 1 }, (_, k) => ({ n: skill.shots[0] + k, duration: skillTimeline(skill, skill.shots[0] + k, { end: false, ...(bpm ? { bpm } : {}) }).duration }));
 
 /** The lengths a skill reaches (s): its fewest at its fastest tempo, its most at its slowest; on her voice, her talk's (45 s at most). */
 export function skillLengths(skill: Pick<MontageSkill, "shots" | "long" | "timeline" | "bpm" | "tempo"> & { voice?: unknown }): { min: number; max: number } {
@@ -805,14 +935,15 @@ export function skillFit(skill: Pick<MontageSkill, "shots" | "long" | "timeline"
   if (Math.abs(closest.duration - seconds) <= 1) return { n: closest.n, bpm: skill.bpm };
   const [slow, fast] = skillTempos(skill);
   // A length is about inversely proportional to the tempo: the tempo that brings the closest count to it, within its range.
-  const bpm = Math.round(Math.min(fast, Math.max(slow, (skill.bpm * closest.duration) / Math.max(1, seconds))));
+  // (Rounded within its range: its slowest may be its own tempo, 90,73 BPM.)
+  const bpm = Math.min(fast, Math.max(slow, Math.round((skill.bpm * closest.duration) / Math.max(1, seconds))));
   const at = lengthsAt(skill, bpm);
   const best = at.reduce((a, b) => (Math.abs(b.duration - seconds) < Math.abs(a.duration - seconds) - 0.01 ? b : a));
   return { n: best.n, bpm };
 }
 
 /** At a tempo set from elsewhere (the sound she follows): the count of shots that comes closest to her length. */
-export function skillFitAt(skill: Pick<MontageSkill, "shots" | "long" | "timeline">, seconds: number, bpm: number): number {
+export function skillFitAt(skill: Pick<MontageSkill, "shots" | "long" | "timeline" | "bpm">, seconds: number, bpm: number): number {
   const at = lengthsAt(skill, bpm);
   return at.reduce((a, b) => (Math.abs(b.duration - seconds) < Math.abs(a.duration - seconds) - 0.01 ? b : a)).n;
 }
@@ -832,7 +963,7 @@ export function skillVoiceFit(
   from: { n: number; bpm: number },
   options: { follow?: boolean; fixed?: boolean } = {},
 ): { n: number; bpm: number } | null {
-  const reaches = (n: number, bpm: number) => skill.timeline(n, { end: false, ...(Math.abs(bpm - skill.bpm) > 0.005 ? { bpm } : {}) }).duration >= needed - 0.05;
+  const reaches = (n: number, bpm: number) => skillTimeline(skill, n, { end: false, ...(Math.abs(bpm - skill.bpm) > 0.005 ? { bpm } : {}) }).duration >= needed - 0.05;
   const start = options.follow && !options.fixed ? skillFit(skill, needed) : from;
   if (reaches(start.n, start.bpm)) return start;
   const counts = Array.from({ length: Math.max(0, skillLongest(skill) - start.n + 1) }, (_, k) => start.n + k);
@@ -1093,7 +1224,7 @@ export function skillPlan(input: {
   // Her words too: its sounds may follow them (a key click on each letter its code types).
   const line =
     heard?.line ??
-    skill.timeline(said ? said.shots.length : fill.shots.length, {
+    skillTimeline(skill, said ? said.shots.length : fill.shots.length, {
       end: Boolean(fill.end),
       ...(bpm ? { bpm } : {}),
       ...(played ? { settings: played } : {}),
@@ -1148,7 +1279,7 @@ export function skillPlan(input: {
     music: null,
     ...(laid ? { voice: { media_id: laid.media_id, at: laid.at } } : {}),
     ...(heard ? { voice_leads: { media_id: heard.leads.media_id, key: heard.leads.key } } : {}),
-    ...(fill.end ? { end_card: { title: fill.end.title, ...(fill.end.subtitle ? { subtitle: fill.end.subtitle } : {}) } } : {}),
+    ...(fill.end ? { end_card: { title: fill.end.title, ...(fill.end.subtitle ? { subtitle: fill.end.subtitle } : {}), seconds: END_CARD_SECONDS } } : {}),
     layers: [
       {
         from: 0,
@@ -1426,7 +1557,7 @@ export function replaySkillAudio(skill: MontageSkill, plan: EditPlan): Pick<Edit
   const lead = plan.beat_at ?? 0;
   const bpm = plan.tempo && Math.abs(plan.tempo - skill.bpm) > 0.005 ? plan.tempo : undefined;
   const settings = playedSettings(skill, plan.skill.settings && Object.keys(plan.skill.settings).length ? plan.skill.settings : undefined);
-  const line = skill.timeline(plan.segments.length, {
+  const line = skillTimeline(skill, plan.segments.length, {
     end: Boolean(plan.end_card),
     ...(bpm ? { bpm } : {}),
     ...(settings ? { settings } : {}),
@@ -2001,7 +2132,7 @@ export function skillFillInput(input: {
   const framed = skillFramed(input.skill, input.currentSettings ?? {}, input.frame);
   const played = playedSettings(input.skill, framed);
   // On her voice, no slot to cast: her talk is its shots.
-  const line = voice ? null : input.skill.timeline(input.n, { end: input.skill.end, ...(input.bpm ? { bpm: input.bpm } : {}), ...(played ? { settings: played } : {}) });
+  const line = voice ? null : skillTimeline(input.skill, input.n, { end: input.skill.end, ...(input.bpm ? { bpm: input.bpm } : {}), ...(played ? { settings: played } : {}) });
   // Her own voice leading it: its cases and its words follow what she says (never with another voice laid over it).
   const heard = input.skill.saysWords?.hers;
   const hers = !voice && input.hers && heard && input.skill.heard ? input.hers : undefined;

@@ -73,9 +73,9 @@ test("« Création à quatre mains »: its sounds and its music, as the original
   assert.deepEqual(line.music!.end, { at: line.duration, fade: 0.25 });
   // With an ending card: its last shot longer by whole beats (1,6 s at least), her logo's pop on the card.
   const ended = enBoutique.timeline(22, { end: true });
-  assert.ok(ended.duration - line.duration >= 1.6);
-  assert.equal(ended.texts.verdict!.to, Math.round((ended.duration - 1.6) * 100) / 100);
-  assert.ok(Math.abs(ended.sounds!.at(-1)!.at - (ended.duration - 1.6)) < 0.01);
+  assert.ok(ended.duration - line.duration >= 2.5);
+  assert.equal(ended.texts.verdict!.to, Math.round((ended.duration - 2.5) * 100) / 100);
+  assert.ok(Math.abs(ended.sounds!.at(-1)!.at - (ended.duration - 2.5)) < 0.01);
 });
 
 test("« Création à quatre mains »: 12 to 29 shots, its least needed first out, 24 to 44 s, never past 45 s", () => {
@@ -166,7 +166,7 @@ function drawAt(frame: number, options: { n?: number; aspect?: number; words?: R
     .filter(([, w]) => w)
     .map(([slot, text]) => ({ text, role: ROLE[slot]!, from: f(line.texts[slot]!.from), to: f(line.texts[slot]!.to), emphasis: [] }));
   const brand = { name: "Chez Léa", displayFont: "Paytone One", bodyFont: "Figtree", ...options.brand };
-  const end = options.end ? { ...options.end, from: f(line.duration - 1.6) } : null;
+  const end = options.end ? { ...options.end, from: f(line.duration - 2.5) } : null;
   return make(React, ...Object.values(scope))({ width: 1080, height: 1920, durationInFrames, brand, shots, reelTexts, end, texts: { ...marks, ...options.texts }, ...(options.spoken ? { spoken: options.spoken } : {}) });
 }
 
@@ -296,7 +296,7 @@ test("« Création à quatre mains »: her logo pops over the last shot, else he
   assert.ok(nodes(withLogo).some((n) => n.type === "Img"));
   // Her ending card in its place: its title and its line, the card's 48 px at least.
   const ended = enBoutique.timeline(16, { end: true });
-  const from = f(ended.duration - 1.6);
+  const from = f(ended.duration - 2.5);
   const card = sticker(drawAt(from + 6, { end: { title: "Ouvert dimanche", subtitle: "de 10 h à 18 h" } }), "end")!;
   assert.deepEqual(nodes(card).filter((n) => n.type === "FitText").map(own), ["Ouvert dimanche", "de 10 h à 18 h"]);
   // Every word to read between x 140 and 940 and above the bottom quarter, its stickers included, in both formats.

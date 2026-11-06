@@ -161,9 +161,9 @@ test("« Collage qui s'emboîte » (v1): 26 cases last the original's 8,4 s, its
       assert.ok(s.start >= main.start && s.end <= main.end, `n=${n}: case ${i} beside its photo`);
     }
   }
-  // With an ending card: its first image comes back for 1,8 s (whole steps over the engine's 1,6 s) after the loop.
+  // With an ending card: its first image comes back for 2,6 s (whole steps over the engine's 2,5 s) after the loop.
   const ended = collage.timeline(13, { end: true });
-  assert.ok(Math.abs(ended.duration - 4.2 - 1.8) < 0.01);
+  assert.ok(Math.abs(ended.duration - 4.2 - 2.6) < 0.01);
   assert.equal(ended.shots.at(-1)!.end, ended.duration);
   assert.equal(ended.music!.end!.at, ended.duration);
   // At another tempo, every length in steps follows it.

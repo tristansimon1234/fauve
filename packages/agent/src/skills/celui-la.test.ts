@@ -62,7 +62,7 @@ function propsFor(n: number, options: { aspect?: number; end?: { title: string; 
   const reelTexts = Object.entries(line.texts).flatMap(([slot, t]) => (words[slot] ? [{ text: words[slot], role: role[slot], from: Math.round(t.from * 30), to: Math.round(t.to * 30), emphasis: [] }] : []));
   const durationInFrames = Math.round(line.duration * 30);
   const shots = line.shots.map((s) => ({ from: Math.round(s.start * 30), durationInFrames: Math.round((s.end - s.start) * 30), kind: "video", aspect: options.aspect ?? 0.5625 }));
-  const end = options.end ? { ...options.end, from: durationInFrames - 48 } : null;
+  const end = options.end ? { ...options.end, from: durationInFrames - 75 } : null;
   return { line, props: { width: 1080, height: 1920, durationInFrames, brand: { name: "Atelier Terre", displayFont: "Instrument Serif", bodyFont: "Inter Tight", accent: "#8a3b2a", palette: { dark: "#1d1b18" } }, shots, reelTexts, end, texts: { ...marks, ...options.settings } } };
 }
 
@@ -114,7 +114,7 @@ test("« Celui-là » (v3): its original's grid (96,5 BPM), its products one a b
   assert.equal(many.marks.products, 14);
   // An ending card after its last word's hold (whole beats, 1,6 s at least); at another tempo, all of it follows.
   const ended = celuiLa.timeline(9, { end: true });
-  assert.ok(ended.duration - line.duration >= 1.6 && ended.texts.fin!.to === Math.round((ended.duration - 1.6) * 100) / 100);
+  assert.ok(ended.duration - line.duration >= 2.5 && ended.texts.fin!.to === Math.round((ended.duration - 2.5) * 100) / 100);
   const slower = celuiLa.timeline(9, { end: false, bpm: 80 });
   assert.ok(Math.abs(slower.marks.last! / line.marks.last! - 96.5 / 80) < 0.01);
 });
@@ -258,7 +258,7 @@ test("« Celui-là » (v3): full frame by default, in a 16:9 band on black when 
   assert.deepEqual(card.map((w) => w.text), ["Nouvelle fournée samedi", "dès 8 h"]);
   for (const w of card) inZone(w.box, w.text);
   assert.ok(Number(card[1]!.type.fontSize) >= 56);
-  assert.equal(wordsAt(draw(props.durationInFrames - 60, props))[0]!.text, "Tout ça !");
+  assert.equal(wordsAt(draw(props.durationInFrames - 90, props))[0]!.text, "Tout ça !");
 });
 
 test("« Celui-là » (v3): its filler's words, its code light to render: her light read on her shots, nothing cut out", () => {
@@ -338,7 +338,7 @@ test("« Celui-là » (v3): its voice says each of its words exactly when it lan
     regarde: "1 fois en 0,63 s",
     celui: "7 fois en 4,43 s",
     et: "1 fois en 1,47 s",
-    fin: "1 fois en 2,8 s",
+    fin: "1 fois en 4,06 s",
   });
   // Without its voice (she took it away, her business never wants one), or under a voice of hers laid over it: none of it.
   const quiet = skillFillInput(base) as Input;
@@ -384,7 +384,7 @@ function heardProps(line: SkillTimeline, end: { title: string } | null = null) {
     brand: { name: "Atelier Terre", displayFont: "Instrument Serif", bodyFont: "Inter Tight", accent: "#8a3b2a", palette: { dark: "#1d1b18" } },
     shots,
     reelTexts,
-    end: end ? { ...end, from: durationInFrames - 48 } : null,
+    end: end ? { ...end, from: durationInFrames - 75 } : null,
     texts: marks,
   };
 }
@@ -455,7 +455,7 @@ test("« Celui-là » (v3): under her voice, a word she does not say never shows
   // Her ending card after her last word's hold: her last word until it, no word of hers over it.
   const ended = celuiLa.heard!(HEARD, { end: true })!;
   assert.ok(Math.abs(ended.duration - 6.733 - 1.65) <= 1 / 30, String(ended.duration));
-  assert.equal(ended.shown!.at(-1)!.to, Math.round((ended.duration - 1.6) * 100) / 100);
+  assert.equal(ended.shown!.at(-1)!.to, Math.round((ended.duration - 2.5) * 100) / 100);
   const card = heardProps(ended, { title: "Nouvelle série samedi" });
   assert.deepEqual(wordsAt(draw(card.durationInFrames - 10, card)).map((w) => w.text), ["Nouvelle série samedi"]);
   const openCard = heardProps(celuiLa.heard!({ duration: 5.4, words: HEARD.words.filter((w) => w.slot !== "et" && w.slot !== "fin") }, { end: true })!, { title: "Nouvelle série samedi" });

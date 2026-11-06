@@ -27,7 +27,7 @@ function drawAt(
     { text: options.title ?? "Cinématographe", role: "hook", from: 0, to, emphasis: [] },
     { text: options.sign ?? "par Léa", role: "caption", from: 0, to, emphasis: [] },
   ];
-  const end = options.end ? { ...options.end, from: durationInFrames - 48 } : null;
+  const end = options.end ? { ...options.end, from: durationInFrames - 75 } : null;
   const React = { createElement: (type: unknown, p: Record<string, unknown> | null, ...children: unknown[]): Drawn => ({ type, props: p ?? {}, children }), Fragment: "Fragment", useMemo: (f: () => unknown) => f() };
   const scope: Record<string, unknown> = {
     AbsoluteFill: "AbsoluteFill",
@@ -97,11 +97,11 @@ test("« Titre de film signé »: fewer shots keep its title's intro, more repea
   assert.deepEqual(titreCinema.timeline(4, { end: false }).shots.slice(1).map((s) => Math.round(s.start * 30)), [183, 243, 356]);
   assert.deepEqual(titreCinema.timeline(7, { end: false }).shots.slice(1).map((s) => Math.round(s.start * 30)), [183, 243, 302, 415, 473, 565]);
   assert.ok(titreCinema.timeline(7, { end: false }).shots[5]!.want.startsWith("des gens ensemble"));
-  // An ending card: its last shot two beats longer (the card over its last 1,6 s, most of the walk alone), the music ending with it.
+  // An ending card: its last shot six beats longer (the card over its last 2,5 s, most of the walk alone), the music ending with it.
   const plain = titreCinema.timeline(6, { end: false });
   const card = titreCinema.timeline(6, { end: true });
-  assert.ok(Math.abs(card.duration - plain.duration - 2 * (60 / 124.2)) < 0.04, `${card.duration}`);
-  assert.ok(card.duration - card.shots.at(-1)!.start - 1.6 >= 2.5);
+  assert.ok(Math.abs(card.duration - plain.duration - 6 * (60 / 124.2)) < 0.04, `${card.duration}`);
+  assert.ok(card.duration - card.shots.at(-1)!.start - 2.5 >= 2.5);
   assert.equal(card.music!.end!.at, card.duration);
   // At another tempo, everything counted in beats follows it.
   const slower = titreCinema.timeline(6, { end: false, bpm: 104 });
@@ -200,8 +200,8 @@ test("« Titre de film signé » (v2): full frame by default, its near-square wi
 });
 
 test("« Titre de film signé »: its ending card on its last shot, its words set as its title; light to render", () => {
-  // Its card over its last 48 images (the Reel 646 images long with it).
-  assert.equal(Math.round(titreCinema.timeline(6, { end: true }).duration * 30), 646);
+  // Its card over its last 75 images (the Reel 704 images long with it).
+  assert.equal(Math.round(titreCinema.timeline(6, { end: true }).duration * 30), 704);
   assert.equal(lockupAt(drawAt(590, { end: { title: "Ouvert tout l'été" } }), "end"), null);
   const tree = drawAt(640, { end: { title: "Ouvert tout l'été", subtitle: "dès le 1er juin" } });
   const card = lockupAt(tree, "end")!;

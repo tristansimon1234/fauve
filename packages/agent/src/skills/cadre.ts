@@ -1,4 +1,4 @@
-import { beatSpans, type MontageSkill } from "../skills.ts";
+import { END_CARD_SECONDS, beatSpans, type MontageSkill } from "../skills.ts";
 
 // « Cadre dans le cadre », version 2, written again on its original's fiche (docs/fiches/cadre.md: measured image by
 // image at 30 i/s, its frame's box read at every image, its music and its labels; Tristan: « c'est un effet que l'on veut
@@ -28,9 +28,9 @@ const STEP = 0.5;
 const SLOW = 1;
 /** The frame reaches its last notch on beat 8 (its music's downbeat) and the last picture takes the frame on beat 8,5. */
 const WINDOW = 8.5;
-/** The last picture, full frame: a beat (with an ending card, whole beats more for its 1,6 s at least). */
+/** The last picture, full frame: a beat (with an ending card, whole beats more for its 2,5 s at least). */
 const FINAL = 1;
-const END_CARD = 1.6;
+const END_CARD = END_CARD_SECONDS;
 /** Its music is cut dead this far after the last picture takes the frame (beats: the original's 5,80 s, 3 images after its 5,70). */
 const SILENCE = 0.2;
 const round = (n: number) => Math.round(n * 100) / 100;

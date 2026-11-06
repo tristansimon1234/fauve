@@ -1,4 +1,4 @@
-import { beatSpans, toFrame, type MontageSkill, type SkillSound } from "../skills.ts";
+import { END_CARD_SECONDS, beatSpans, toFrame, type MontageSkill, type SkillSound } from "../skills.ts";
 
 // « Petites lumières », written on its original's fiche (docs/fiches/petites-lumieres.md: measured image by image at
 // 30 i/s, its lamp's light, its red disc as a blob, its windows mapped back through the picture's slow move, its sound's
@@ -55,8 +55,8 @@ const PAUSES: [number, number][] = [
 ];
 const TICK = 9.03;
 const MUSIC_END = 12.367;
-/** The engine's ending card: the Reel's last 1,6 s. */
-const END_CARD = 1.6;
+/** The engine's ending card: the Reel's last 2,5 s. */
+const END_CARD = END_CARD_SECONDS;
 const round = (n: number) => Math.round(n * 100) / 100;
 const round3 = (n: number) => Math.round(n * 1000) / 1000;
 const comma = (n: number) => String(round(n)).replace(".", ",");
@@ -385,7 +385,7 @@ export const petitesLumieres: MontageSkill = {
     const bpm = tempo ?? BPM;
     const beat = 60 / bpm;
     const verse = n > 3 ? VERSE : 0;
-    // With an ending card, its whole beats after the held picture (the engine's 1,6 s at least).
+    // With an ending card, its whole beats after the held picture (the engine's 2,5 s at least).
     const card = end ? Math.ceil((END_CARD + 0.05) / beat) : 0;
     const spans = beatSpans(bpm, [FIRST + CUT1, CUT2 - CUT1, ...(verse ? [verse] : []), END - CUT2 + card]);
     const duration = spans.at(-1)!.end;

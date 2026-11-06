@@ -1,4 +1,4 @@
-import { beatSpans, toFrame, type MontageSkill, type SkillSound } from "../skills.ts";
+import { END_CARD_SECONDS, beatSpans, toFrame, type MontageSkill, type SkillSound } from "../skills.ts";
 
 // « Façade qui se construit », version 4, written on its original's fiche (docs/fiches/facade.md: measured image
 // by image at 30 i/s and piece by piece, its notes heard, its music measured; Tristan: « c'est un effet que l'on veut
@@ -46,8 +46,8 @@ const FRONT = 18;
  */
 const BAR = 4;
 const LONG = 8;
-/** The engine's ending card: the Reel's last 1,6 s, on the black after the last shot (half beats, a few images of black first). */
-const END_CARD = 1.6;
+/** The engine's ending card: the Reel's last 2,5 s, on the black after the last shot (half beats, a few images of black first). */
+const END_CARD = END_CARD_SECONDS;
 /** A note on each slow piece, rising (the original's four lone notes), and a pluck on each of the burst, rising and louder (its arpeggio). */
 const NOTES = ["low soft harp note, long decay", "soft harp note, long decay", "high soft harp note, long decay", "very high soft harp note, long decay"];
 const PLUCKS = ["low harp pluck", "harp pluck", "high harp pluck"];

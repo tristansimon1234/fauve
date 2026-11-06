@@ -1,6 +1,5 @@
 import { shotAt, subjectPlace, type MediaFacts } from "./finish.ts";
-import { END_CARD_SECONDS } from "./editor.ts";
-import { planTimeline, REEL_FPS, sceneWords, type ComposeEnd, type ComposeText } from "./motion.ts";
+import { endCardSeconds, planTimeline, REEL_FPS, sceneWords, type ComposeEnd, type ComposeText } from "./motion.ts";
 import { SUBTITLE_ROW } from "./retouch.ts";
 import { isClipSegment, type EditPlan, type PlanLayer } from "./schemas.ts";
 
@@ -133,7 +132,7 @@ export function compositionTexts(plan: EditPlan): CompositionTexts {
       })),
       ...screens,
     ].sort((a, b) => a.from - b.from),
-    end: plan.end_card ? { title: plan.end_card.title, subtitle: plan.end_card.subtitle ?? null, from: Math.max(0, frames(plan.duration - END_CARD_SECONDS)) } : null,
+    end: plan.end_card ? { title: plan.end_card.title, subtitle: plan.end_card.subtitle ?? null, from: Math.max(0, frames(plan.duration - endCardSeconds(plan))) } : null,
     subtitles: plan.subtitles ? { y_top: px(y - 0.01), y_bottom: px(y + SUBTITLE_ROW.h * 1.6) } : null,
   };
 }

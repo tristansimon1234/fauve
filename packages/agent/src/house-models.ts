@@ -18,8 +18,8 @@ import type { z } from "zod";
 
 /** The source of the inspiration row a house model is kept on, per studio (one per model, made when first used). */
 export const HOUSE_SOURCE = "house";
-/** The catalogue's version: a studio's row written by an older one is rewritten when the model is used again (3: its original's sheets; 4: no brand in a model's name; 5: Mots aux quatre coins as its original; 6: Plans fixes at 65 BPM; 7: four renamed; 8: Lieu tapé without its original's orange; 9: Plans fixes on its fiche; 10: Une journée chez toi on its fiche; 11: ten models on their fiches; 12: Façade qui se construit and Coulisses façon fiche on their fiches; 13: Recette cosy on its fiche; 14: Titre gaufré on its fiche; 15: Mots mêlés and Interrupteur on their fiches; 16: Interface minimaliste and Fenêtres et étiquettes on theirs; 17: Mot clé en grand and Face caméra et références on theirs; 18: Photos posées sur la table and Carte au feutre on theirs; 19: « S'abonner » in Interface minimaliste; 20: the last four on their fiches, Aplat, Détourages, Silhouette and Vision machine; 21: Tristan's review of 6 November, Court métrage's light and lettering, Plans fixes' lettering, Façade's first pieces, Présente-toi in its own design, the kaléidoscope, Mot clé en grand and Face caméra et références; every model vertical by default, its band only when she asks; 22: Vision machine v2, any fixed shot of her place; 23: Voici mon travail v3, its words where her picture lets them read; 24: Façade v4, its pieces her picture's own elements). */
-export const HOUSE_VERSION = 24;
+/** The catalogue's version: a studio's row written by an older one is rewritten when the model is used again (3: its original's sheets; 4: no brand in a model's name; 5: Mots aux quatre coins as its original; 6: Plans fixes at 65 BPM; 7: four renamed; 8: Lieu tapé without its original's orange; 9: Plans fixes on its fiche; 10: Une journée chez toi on its fiche; 11: ten models on their fiches; 12: Façade qui se construit and Coulisses façon fiche on their fiches; 13: Recette cosy on its fiche; 14: Titre gaufré on its fiche; 15: Mots mêlés and Interrupteur on their fiches; 16: Interface minimaliste and Fenêtres et étiquettes on theirs; 17: Mot clé en grand and Face caméra et références on theirs; 18: Photos posées sur la table and Carte au feutre on theirs; 19: « S'abonner » in Interface minimaliste; 20: the last four on their fiches, Aplat, Détourages, Silhouette and Vision machine; 21: Tristan's review of 6 November, Court métrage's light and lettering, Plans fixes' lettering, Façade's first pieces, Présente-toi in its own design, the kaléidoscope, Mot clé en grand and Face caméra et références; every model vertical by default, its band only when she asks; 22: Vision machine v2, any fixed shot of her place; 23: Voici mon travail v3, its words where her picture lets them read; 24: Façade v4, its pieces her picture's own elements; 25: Éventail's ending readable, her name larger and its black three seconds at most). */
+export const HOUSE_VERSION = 25;
 
 export type HouseModel = {
   key: string;
@@ -969,7 +969,7 @@ export const HOUSE_MODELS: HouseModel[] = [
       hook: { kind: "geste", what: "un petit carré au milieu d'un fond bordeaux, puis une bande par temps posée d'un coup, toutes des fenêtres sur le même plan, en étoile" },
       text: {
         amount: "une ligne",
-        composition: "aucun texte avant la fin : sur le noir, son nom en petit serif blanc au milieu, comme une signature, et deux temps après une ligne rouge plus petite dessous",
+        composition: "aucun texte avant la fin : sur le noir, son nom en serif blanc au milieu, comme une signature assez grande pour se lire, et deux temps après une ligne rouge plus petite dessous",
         weight: "regular",
       },
       colors: ["#420e0f", "#972f34"],
@@ -981,12 +981,12 @@ export const HOUSE_MODELS: HouseModel[] = [
         { at: 4.63, what: "ses plans en noir et blanc aux noirs bleutés, coupés tous les deux temps sur la grosse caisse" },
         { at: 8.7, what: "un écran partagé : deux plans qui se répondent côte à côte, chacun une moitié exacte" },
         { at: 12.63, what: "un second plan aux lignes qui partent du centre, rappel de l'ouverture" },
-        { at: 15.63, what: "un noir bleuté dans le cadre : son nom en petit serif blanc au milieu, d'un coup, puis deux temps après une ligne rouge brique dessous, la musique qui continue" },
+        { at: 15.63, what: "un noir bleuté dans le cadre : son nom en serif blanc au milieu, d'un coup, puis deux temps après une ligne rouge brique dessous, la musique qui continue" },
       ],
       grade: "natural",
       motion: "epure",
       music: "festive beat, hand percussion, deep bass, kick on 1 and 3, claps on 2 and 4",
-      ending: "un noir bleuté dans le cadre, son nom en petit serif blanc et une ligne rouge brique dessous, tenus huit temps et demi ; la musique continue dessous",
+      ending: "un noir bleuté dans le cadre, son nom en serif blanc lisible et une ligne rouge brique dessous, tenus deux à trois secondes ; la musique continue dessous",
       why: "L'étoile qui se construit sur des coups seuls fait attendre le plan entier, qui tombe avec la musique : c'est graphique, ça claque, et sa signature finit comme un générique.",
     },
   }),

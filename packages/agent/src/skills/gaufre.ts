@@ -1,4 +1,4 @@
-import { beatSpans, toFrame, type MontageSkill } from "../skills.ts";
+import { END_CARD_SECONDS, beatSpans, toFrame, type MontageSkill } from "../skills.ts";
 
 // « Titre gaufré », version 2, written again on its original's fiche (docs/fiches/gaufre.md: measured image by image at
 // 30 i/s, each piece of its front box by box, its ink letter by letter, its music by bands of frequency; Tristan: « c'est
@@ -56,8 +56,8 @@ const INKED = 23.52;
 const LINE_FROM = 20.44;
 const LINE_TO = 23.77;
 const DRY = 4;
-/** The engine's ending card: the Reel's last 1.6 s (motion.ts, END_CARD_SECONDS). */
-const END_CARD = 1.6;
+/** The engine's ending card: the Reel's last 2,5 s (motion.ts, END_CARD_SECONDS). */
+const END_CARD = END_CARD_SECONDS;
 const round = (n: number) => Math.round(n * 100) / 100;
 const round3 = (n: number) => Math.round(n * 1000) / 1000;
 
@@ -412,7 +412,7 @@ export const gaufre: MontageSkill = {
     // At another tempo (a longer Reel, a music's own): every length in beats follows it.
     const bpm = options.bpm ?? BPM;
     const beat = 60 / bpm;
-    // With an ending card, the inked card held whole beats longer for its 1,6 s (under the paper: its second shot).
+    // With an ending card, the inked card held whole beats longer for its 2,5 s (under the paper: its second shot).
     const card = end ? Math.ceil(END_CARD / beat - 1e-6) : 0;
     const spans = beatSpans(bpm, [PAPER, END - PAPER + card]);
     const duration = spans.at(-1)!.end;

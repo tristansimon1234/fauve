@@ -1,4 +1,4 @@
-import { beatSpans, toFrame, type MontageSkill } from "../skills.ts";
+import { END_CARD_SECONDS, beatSpans, toFrame, type MontageSkill } from "../skills.ts";
 
 // « Pas à pas raconté », version 1, written on its original's fiche (docs/fiches/recette.md: a creator's recipe of
 // dumplings told by his voice-over, measured image by image at 30 i/s, its 56 cuts found image to image with its
@@ -54,8 +54,8 @@ const MOST = 2 + STEPS.flat().length + TASTE.length;
 const FEWEST = 12;
 /** A Reel lasts 45 s at most (MAX_REEL_SECONDS): at a slower tempo, or with an ending card, its longest are held to it. */
 const MAX_SECONDS = 45;
-/** The engine's ending card: the Reel's last 1,6 s, her end held whole beats longer for it. */
-const END_CARD = 1.6;
+/** The engine's ending card: the Reel's last 2,5 s, her end held whole beats longer for it. */
+const END_CARD = END_CARD_SECONDS;
 const round = (n: number) => Math.round(n * 100) / 100;
 const sum = (xs: number[]) => xs.reduce((a, b) => a + b, 0);
 
@@ -351,7 +351,7 @@ export const recette: MontageSkill = {
     const beat = 60 / bpm;
     const { steps, taste } = recetteSections(n);
     const gestures = [RESULT, LIFT, ...steps.flatMap((s) => s.gestures), ...taste].map((f) => f / IMAGES_A_BEAT);
-    // With an ending card, her last gesture held whole beats longer (the card's 1,6 s), as « Recette cosy » holds its loop.
+    // With an ending card, her last gesture held whole beats longer (the card's 2,5 s), as « Recette cosy » holds its loop.
     const last = gestures.length - 1;
     if (end) gestures[last] = gestures[last]! + Math.ceil(END_CARD / beat - 1e-6);
     // Never past 45 s: at a slower tempo, or with its card, its longest versions are held to it, every gesture alike.

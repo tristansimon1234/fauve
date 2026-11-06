@@ -1,4 +1,4 @@
-import { beatSpans, toFrame, type MontageSkill } from "../skills.ts";
+import { END_CARD_SECONDS, beatSpans, toFrame, type MontageSkill } from "../skills.ts";
 
 // « Teaser qui se charge » (`bientot`), version 1, written on its original's fiche (docs/fiches/bientot.md: Tristan's
 // Reel of a sewing atelier, measured image by image at 30 i/s; its counter read value by value, its 64 flashes matched to
@@ -15,7 +15,8 @@ import { beatSpans, toFrame, type MontageSkill } from "../skills.ts";
 //                earlier flashes again (the original reuses its clips), on a deep hit;
 //   6 – 7¾       14 flashes of an eighth: the last four of that run, then her place (her shelves, her products, her room);
 //   7¾ – 8½      black, her logo; a roll of ticks (25 a second) up to a deep boom on 8¼, the music muffled after it;
-//   8½ – 10¾     her name in spaced capitals on the black (the original's is cut after four images: held here to read).
+//   8½ – 10¾     her name in spaced capitals on the black (the original's is cut after four images: held here to read,
+//                two seconds at least: the engine's heldEnding adds a quarter of a beat or two).
 // The original's own (its round badge with a butterfly, « MAISON DE COUTURE », « MAISON LIFE », « Coming soon ») is never
 // drawn: her logo, her name, her word. Her shots as filmed in their box (upright full frame, a horizontal one whole in a
 // band on black as the original's one, a square one in its square), in black and white unless her words ask for her
@@ -52,8 +53,8 @@ const NAME = 8.5;
 const LENGTH = 10.75;
 /** Its two deep hits before the boom: on its eighth flash (0,66 s), and as the replays come back (5⅔, 4,30 s). */
 const HITS = [FLASHES[7]!, FLASHES[47]!];
-/** The engine's ending card: the Reel's last 1,6 s. */
-const END_CARD = 1.6;
+/** The engine's ending card: the Reel's last 2,5 s. */
+const END_CARD = END_CARD_SECONDS;
 const round = (n: number) => Math.round(n * 100) / 100;
 const round3 = (n: number) => Math.round(n * 1000) / 1000;
 
@@ -171,7 +172,9 @@ export const bientot: MontageSkill = {
   key: "bientot",
   // 2: vertical full frame by default, her horizontal files cropped on their subject, its band only when she asks for
   // it (Tristan, 6 November, on seven benches: « vertical please », « tout vertical please »).
-  version: 2,
+  // 3: her name on the black at the end held two seconds at least (heldEnding: 2,1 s at its tempo, 1,7 before; Tristan,
+  // 6 November: « les scènes de fin avec le nom du commerce sont souvent trop courtes »).
+  version: 3,
   bpm: BPM,
   // Its 64 flashes are its form: 56 of her passages, eight replays drawn by its code.
   shots: [SLOTS.length, SLOTS.length],
@@ -229,7 +232,7 @@ export const bientot: MontageSkill = {
     // At another tempo (a length she asks for, a music's own): every landmark counted in beats follows it.
     const bpm = tempo ?? BPM;
     const beat = 60 / bpm;
-    // With an ending card, its time after her name on a quarter-beat grid (the engine's 1,6 s at least).
+    // With an ending card, its time after her name on a quarter-beat grid (the engine's 2,5 s at least).
     const card = end ? Math.ceil((END_CARD + 0.05) / (beat / 4)) / 4 : 0;
     const total = LENGTH + card;
     // Each slot from its flash to the next slot's (a replay's time is the slot's before it, shown again by its code);
@@ -276,6 +279,9 @@ export const bientot: MontageSkill = {
         filters: [{ kind: "muffled", from: at(BOOM), to: duration }],
         end: { at: duration, fade: 0.5 },
       },
+      // Her name alone on the black, at once: held two seconds at least by the engine (heldEnding, on its quarter-beat
+      // grid; two beats and a quarter, 1,7 s, before).
+      ...(end ? {} : { ending: { from: round(at(NAME)), bare: true, unit: beat / 4 } }),
     };
   },
   code: CODE,

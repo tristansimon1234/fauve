@@ -68,7 +68,7 @@ test("« Petites lumières »: its music stopped dead three times for a beat, it
   assert.deepEqual(four.objects, { suite: 2, ciel_suite: 2 });
   assert.deepEqual(line.objects, { suite: 99, ciel_suite: 99 });
   const ended = petitesLumieres.timeline(3, { end: true });
-  assert.ok(ended.duration - line.duration >= 1.6 && ended.texts.nom!.to <= ended.duration - 1.6 + 0.01);
+  assert.ok(ended.duration - line.duration >= 2.5 && ended.texts.nom!.to <= ended.duration - 2.5 + 0.01);
   // At another tempo, every landmark follows it.
   const slower = petitesLumieres.timeline(3, { end: false, bpm: 70 });
   assert.ok(Math.abs(slower.marks.wave_0! / line.marks.wave_0! - 83 / 70) < 0.02 && Math.abs(slower.duration / line.duration - 83 / 70) < 0.02);

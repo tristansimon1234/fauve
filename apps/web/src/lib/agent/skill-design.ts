@@ -48,6 +48,7 @@ import {
   paleSpans,
   SKILL_VOICE_TAIL,
   skillSubtitleRow,
+  skillTimeline,
   skillVoiceFit,
   voiceEnd,
   voicePhrases,
@@ -136,7 +137,7 @@ export async function voiceSkill(input: { studioId: string; postId: string; file
   const skill = gate(skillCandidate(followed, input.contract, true));
   if (!skill) return null;
   const fit = input.contract?.duration ? skillFit(skill, input.contract.duration) : { n: skillShotCount(skill, input.files), bpm: skill.bpm };
-  const seconds = skill.timeline(fit.n, { end: false, ...(fit.bpm !== skill.bpm ? { bpm: fit.bpm } : {}) }).duration;
+  const seconds = skillTimeline(skill, fit.n, { end: false, ...(fit.bpm !== skill.bpm ? { bpm: fit.bpm } : {}) }).duration;
   return { key: skill.key, name: houseModel(skill.key)?.name ?? skill.key, how: skill.how, seconds: Math.round(seconds * 100) / 100, says: Boolean(skill.saysWords) };
 }
 

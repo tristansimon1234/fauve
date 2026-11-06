@@ -1,4 +1,4 @@
-import { beatSpans, toFrame, type MontageSkill } from "../skills.ts";
+import { END_CARD_SECONDS, beatSpans, toFrame, type MontageSkill } from "../skills.ts";
 
 // « Recette cosy, typo pixel », version 2, written again on its original's fiche (docs/fiches/pixel.md: measured image
 // by image at 30 i/s, its texts read pixel by pixel, its music and its sounds measured, the video watched and heard by
@@ -53,8 +53,8 @@ const LOOP = 10;
 const TITLE_AT = 5;
 /** Every text and drawing is drawn again every this many images (6 times a second). */
 const BOIL = 5;
-/** The engine's ending card (an option: the original has none): the Reel's last 1,6 s, its loop held whole beats longer for it. */
-const END_CARD = 1.6;
+/** The engine's ending card (an option: the original has none): the Reel's last 2,5 s, its loop held whole beats longer for it. */
+const END_CARD = END_CARD_SECONDS;
 const onFrame = (s: number) => Math.round(s * 30) / 30;
 const round = (n: number) => Math.round(n * 100) / 100;
 const round3 = (n: number) => Math.round(n * 1000) / 1000;
@@ -407,7 +407,7 @@ export const pixel: MontageSkill = {
     const bpm = options.bpm ?? BPM;
     const beat = 60 / bpm;
     const sections = pixelSections(n);
-    // Each gesture in beats of its music; with an ending card, its loop held whole beats longer (the card's 1,6 s).
+    // Each gesture in beats of its music; with an ending card, its loop held whole beats longer (the card's 2,5 s).
     const card = end ? Math.ceil(END_CARD / beat - 1e-6) : 0;
     const beats = sections.flatMap((gestures, k) => gestures.map((f, j) => f / IMAGES_A_BEAT + (k === sections.length - 1 && j === gestures.length - 1 ? card : 0)));
     const spans = beatSpans(bpm, beats);

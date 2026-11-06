@@ -72,8 +72,8 @@ test("« Pas à pas raconté »: 12 to 57 shots, its steps thinned then taken ou
   // An ending card: her last gesture longer by whole beats (1,6 s at least), her end's words up to it.
   const line = recette.timeline(24, { end: false });
   const ended = recette.timeline(24, { end: true });
-  assert.ok(ended.duration - line.duration >= 1.6);
-  assert.equal(ended.texts.fin!.to, Math.round((ended.duration - 1.6) * 100) / 100);
+  assert.ok(ended.duration - line.duration >= 2.5);
+  assert.equal(ended.texts.fin!.to, Math.round((ended.duration - 2.5) * 100) / 100);
   // At another tempo, every length counted in beats follows it.
   const fast = recette.timeline(24, { end: false, bpm: 102 });
   assert.ok(Math.abs(fast.duration / line.duration - 85 / 102) < 0.01);
@@ -267,7 +267,7 @@ test("« Pas à pas raconté »: every word in the safe zone, in both formats, i
   assert.equal(styleOf(seen(drawAt(10, banded))[0]!).top, 908);
   // Its ending card on her last shot under a veil: her title and her line, 48 px at least, inside the safe zone.
   const line = recette.timeline(14, { end: true });
-  const from = Math.round((line.duration - 1.6) * 30);
+  const from = Math.round((line.duration - 2.5) * 30);
   const end = { title: "Ouvert dimanche", subtitle: "de 10 h à 18 h", from };
   assert.equal(seen(drawAt(from - 1, { end, end_card: true })).map(own).includes("Ouvert dimanche"), false);
   const card = seen(drawAt(from + 6, { end, end_card: true }));

@@ -1,4 +1,4 @@
-import { beatSpans, toFrame, type MontageSkill } from "../skills.ts";
+import { END_CARD_SECONDS, beatSpans, toFrame, type MontageSkill } from "../skills.ts";
 
 // « Plans qui s'emboîtent » (`raccords`), version 1, written on its original's fiche (docs/fiches/raccords.md: a
 // creator's day in six shots, 7,23 s, 4:3, measured image by image at 30 i/s, its sound by bands; Tristan: « c'est un
@@ -53,8 +53,8 @@ const BREAK = 10.5;
 const BAR = 16;
 /** Its word blinks over its first 15 images (the original's « OK »: 0,5 s). */
 const WORD = 0.5;
-/** The engine's ending card: the Reel's last 1,6 s, after its last shot's own length. */
-const END_CARD = 1.6;
+/** The engine's ending card: the Reel's last 2,5 s, after its last shot's own length. */
+const END_CARD = END_CARD_SECONDS;
 /** Up to 22 shots for a length she asks for: more of its middle (29 s at its own tempo). */
 const LONG = 22;
 const round = (n: number) => Math.round(n * 100) / 100;
@@ -280,7 +280,7 @@ export const raccords: MontageSkill = {
     const bpm = tempo ?? BPM;
     const sixteenth = 15 / bpm;
     const { lengths, cuts } = raccordCuts(n);
-    // With an ending card, its last shot held whole sixteenths longer (the engine's 1,6 s at least).
+    // With an ending card, its last shot held whole sixteenths longer (the engine's 2,5 s at least).
     const card = end ? Math.ceil((END_CARD + 0.05) / sixteenth) : 0;
     const spans = beatSpans(bpm, lengths.map((l, i) => (l + (i === lengths.length - 1 ? card : 0)) / 4));
     const duration = spans.at(-1)!.end;

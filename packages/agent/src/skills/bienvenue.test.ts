@@ -76,7 +76,7 @@ test("« L'accueil, puis la rafale »: 10 to 24 shots from her files, the burst 
   // An ending card: its last shot held whole beats longer (1,6 s at least), its music to the end.
   const line = bienvenue.timeline(24, { end: false });
   const ended = bienvenue.timeline(24, { end: true });
-  assert.ok(ended.duration - line.duration >= 1.6);
+  assert.ok(ended.duration - line.duration >= 2.5);
   assert.equal(ended.shots.length, 24);
   assert.equal(ended.music!.end!.at, ended.duration);
   // At another tempo, every length counted in sixteenths follows it.
@@ -224,7 +224,7 @@ test("« L'accueil, puis la rafale »: its ink, hers when it reads on a dark pic
   assert.equal(ink("#3b2a4d", "blanc"), "#ffffff");
   // Its ending card: her last shot held under it with the calm shots' veil, her title by the same hand, its line smaller.
   const line = bienvenue.timeline(24, { end: true });
-  const from = Math.round((line.duration - 1.6) * 30);
+  const from = Math.round((line.duration - 2.5) * 30);
   const end = { title: "Ouvert dès mardi", subtitle: "12 rue des Martyrs", from };
   assert.deepEqual(written(drawAt(from - 1, { end, end_card: true })), []);
   const card = drawAt(from + 10, { end, end_card: true });

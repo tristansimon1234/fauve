@@ -1,5 +1,5 @@
 import { HEARD_CARD, HEARD_HOLD } from "../own-voice.ts";
-import { beatSpans, toFrame, type MontageSkill, type SkillHeard, type SkillTimeline } from "../skills.ts";
+import { END_CARD_SECONDS, beatSpans, toFrame, type MontageSkill, type SkillHeard, type SkillTimeline } from "../skills.ts";
 
 // « Celui-là, celui-là… », version 1, written on its original's fiche (docs/fiches/celui-la.md: a ceramist's Reel and a
 // second one made on the same template by another, measured image by image at 30 i/s: each word's box, size, colour and
@@ -55,8 +55,8 @@ const FIRST = 4;
 const AND = { from: 0.12, typed: 0.98, out: 1.95, gone: 2.21 };
 const LAST = 2.5;
 const HOLD = 1.5;
-/** The engine's ending card: the Reel's last 1,6 s. */
-const END_CARD = 1.6;
+/** The engine's ending card: the Reel's last 2,5 s. */
+const END_CARD = END_CARD_SECONDS;
 const round = (n: number) => Math.round(n * 100) / 100;
 const round3 = (n: number) => Math.round(n * 1000) / 1000;
 const comma = (n: number) => String(round(n)).replace(".", ",");
@@ -337,7 +337,7 @@ export const celuiLa: MontageSkill = {
     // Her display, her products (one a beat), her series together; at least one product.
     const products = Math.max(1, n - 2);
     const finale = FIRST + products;
-    // With an ending card, its time after her last word's hold, on whole beats (the engine's 1,6 s at least).
+    // With an ending card, its time after her last word's hold, on whole beats (the engine's 2,5 s at least).
     const card = end ? Math.ceil((END_CARD + 0.05) / beat) : 0;
     const spans = beatSpans(bpm, [FIRST - START, ...Array.from({ length: products }, () => 1), LAST + HOLD + card]);
     const duration = spans.at(-1)!.end;

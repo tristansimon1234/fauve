@@ -1,4 +1,4 @@
-import { beatSpans, toFrame, type MontageSkill, type SkillShot } from "../skills.ts";
+import { END_CARD_SECONDS, beatSpans, toFrame, type MontageSkill, type SkillShot } from "../skills.ts";
 
 // « Le grand départ », version 1, written on its original's fiche (docs/fiches/depart.md: measured image by image at
 // 30 i/s, its zooms fitted on its own frames, its colours read on the pixels, its sound by bands; Tristan: « c'est un
@@ -47,8 +47,8 @@ const LONGEST = 16;
 const RUSH = 0.5;
 /** Her two lines come a beat into the last shot of her arrival (the original's 7,8 s), and stay. */
 const TITLE_IN = 1;
-/** The engine's ending card: the Reel's last 1,6 s, over her last arrival shot held whole beats longer. */
-const END_CARD = 1.6;
+/** The engine's ending card: the Reel's last 2,5 s, over her last arrival shot held whole beats longer. */
+const END_CARD = END_CARD_SECONDS;
 const round = (n: number) => Math.round(n * 100) / 100;
 const round3 = (n: number) => Math.round(n * 1000) / 1000;
 const comma = (n: number) => String(round(n)).replace(".", ",");
@@ -223,7 +223,7 @@ export const depart: MontageSkill = {
     const beat = 60 / bpm;
     const { trip, arrival } = departCounts(n);
     const lands = arrival <= 3 ? ARRIVAL[arrival]! : [3.125, 4.375, ...Array.from({ length: arrival - 3 }, () => MORE), 7.125];
-    // With an ending card, her last arrival shot held whole beats longer (the engine's 1,6 s at least, a frame lost to rounding never cutting into it).
+    // With an ending card, her last arrival shot held whole beats longer (the engine's 2,5 s at least, a frame lost to rounding never cutting into it).
     const card = end ? Math.ceil((END_CARD + 0.05) / beat) : 0;
     const beats = [STAND, EMPTY, ...TRIP[trip]!, ...lands.slice(0, -1), lands.at(-1)! + card];
     const spans = beatSpans(bpm, beats);

@@ -1,4 +1,4 @@
-import { beatSpans, toFrame, type MontageSkill } from "../skills.ts";
+import { END_CARD_SECONDS, beatSpans, toFrame, type MontageSkill } from "../skills.ts";
 
 // « Rituel du matin », version 1, written on its original's fiche (docs/fiches/routine.md: a « day in my life » of
 // 58,5 s measured image by image at 30 i/s, its title read pixel by pixel, its sound by frequency bands; Tristan: « c'est
@@ -87,8 +87,8 @@ const DAY: [number, string][] = [
 const DAY_ADD = [3, 0, 2, 1];
 /** Its three black images at the end, the sound cut with the last one. */
 const BLACK = 3;
-/** The engine's ending card (an option: the original has none), on the black: the Reel's last 1,6 s at least. */
-const END_CARD = 1.6;
+/** The engine's ending card (an option: the original has none), on the black: the Reel's last 2,5 s at least. */
+const END_CARD = END_CARD_SECONDS;
 const round = (n: number) => Math.round(n * 100) / 100;
 const round3 = (n: number) => Math.round(n * 1000) / 1000;
 
@@ -216,7 +216,7 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const line = small && shown(small, Math.max(small.from, LINE_AT), Math.min(small.to, TRAILER, endAt)) ? fine(small.text, "line-" + keep(small.text)) : null;
 
   // 3. Its end: three black images, the sound cut with the last; her ending card (an option) typed like her title on the
-  // black, quicker (the engine gives a card 1,6 s), her line under it from its 16th image, a second on screen.
+  // black, quicker (the engine gives a card 2,5 s), her line under it from its 16th image, a second on screen.
   const CARD_LINE = endAt + 16;
   const card = end && frame >= endAt
     ? h(React.Fragment, null,
@@ -279,7 +279,7 @@ export const routine: MontageSkill = {
     const bpm = tempo ?? BPM;
     const beat = 60 / bpm;
     const { ritual, place, day } = routineSections(n);
-    // With an ending card, its time on the black instead of the three black images (the engine's 1,6 s at least,
+    // With an ending card, its time on the black instead of the three black images (the engine's 2,5 s at least,
     // rounded up to a half beat so a frame lost to rounding never cuts into it).
     const tail = end ? (Math.ceil(((END_CARD + 0.05) / beat) * 2) / 2) * IPB : BLACK;
     const roles: { kind: "trailer" | "ritual" | "served" | "place" | "day"; long?: boolean; images: number; want: string }[] = [

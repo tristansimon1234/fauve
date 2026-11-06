@@ -1,4 +1,4 @@
-import { beatSpans, toFrame, type MontageSkill, type SkillSound } from "../skills.ts";
+import { END_CARD_SECONDS, beatSpans, toFrame, type MontageSkill, type SkillSound } from "../skills.ts";
 
 // « La pièce qui se rallume », Tristan's own idea: no original Reel, written as a design (docs/fiches/rallume.md). Her
 // place in the dark, then what it has several of (her lamps, her bottles, her cups, her plants: named by the filler from
@@ -11,8 +11,9 @@ import { beatSpans, toFrame, type MontageSkill, type SkillSound } from "../skill
 //              and 3,25 (several on a step when she has many, the room's own light coming back a notch, with a flicker,
 //              on the steps left when she has few or none); everything at once on beat 4, her name lit with it;
 //   8 – …      the life of her place: shots of one, one and two beats, more of them held two beats for a longer Reel;
-//   last       her room once more, lit two beats, then off at once (the music muffled again, her name still lit), a
-//              beat of dark, or her ending card's time when she has one.
+//   last       her room once more, lit two beats, then off at once (the music muffled again, her name still lit), its
+//              dark held so her name reads (two seconds at least: four beats at its tempo; one beat, half a second, until
+//              v4), or her ending card's time when she has one.
 // Played horizontal 16:9 on black when her videos are (her name lit above the picture, its small line under it, both
 // kept to the end), else full frame (her name in the calm part of her room shot, then again in the dark at the end). Her
 // photos stay still, her videos play. No zoom, no push: clean cuts (the editor's rule; no original asks otherwise).
@@ -29,7 +30,9 @@ const MORE = 2;
 /** The last shot lit this long, then everything off, then dark this long (or her ending card's time, on whole beats). */
 const LIT = 2;
 const DARK = 1;
-const END_CARD = 1.6;
+const END_CARD = END_CARD_SECONDS;
+/** Its name's tube catches over this many images (its code's NEON). */
+const NEON_IMAGES = 5;
 /** A soft click on each light, a heavier one when the whole room comes on and when it goes off. */
 const CLICK = { sound: "light switch click", seconds: 0.5 };
 const CLUNK = { sound: "heavy light switch clunk", seconds: 0.5 };
@@ -223,7 +226,9 @@ export const rallume: MontageSkill = {
   // by halves: each piece now shows through a soft oval a little larger than its box, and pieces that touch light together.
   // 3: vertical full frame by default, her horizontal files cropped on their subject, its band only when she asks for
   // it (Tristan, 6 November, on seven benches: « vertical please », « tout vertical please »).
-  version: 3,
+  // 4: her name in the dark at the end held two seconds at least (the engine's heldEnding: four beats of dark at its
+  // tempo, one before; Tristan, 6 November: « les scènes de fin avec le nom du commerce sont souvent trop courtes »).
+  version: 4,
   bpm: BPM,
   shots: [6, 14],
   // Up to 24 for a length she asks for: about 30 s at its own tempo (the life of her place goes on, two beats a shot).
@@ -308,6 +313,11 @@ export const rallume: MontageSkill = {
       "son lieu en plan large une dernière fois (le premier plan à un autre moment, ou un autre plan large de la salle) : tout s'y éteint d'un coup",
     ];
     const at = (f: number) => round3(f / 30);
+    // Her name lit in the dark at the end (its tube catching over five images), held as the engine holds a name at the
+    // end (heldEnding: two seconds at least, the dark longer by whole beats; it was a beat, half a second, on the bench);
+    // horizontal, it is lit above the picture from the moment the room comes on. With her ending card, the card is it.
+    const wide = options.settings?.format === "horizontal";
+    const ending = options.end ? {} : { ending: { from: round3((wide ? all : off) / 30 + NEON_IMAGES / 30), bare: !wide } };
     const sounds: SkillSound[] = [
       ...steps.map((f, k) => ({ at: at(f), ...CLICK, gain: k ? -3 : -1 })),
       { at: at(all), ...CLUNK, gain: 3 },
@@ -329,6 +339,7 @@ export const rallume: MontageSkill = {
         end: { at: duration },
       },
       marks: { ...Object.fromEntries(steps.map((f, k) => [`step_${k}`, f])), all, off },
+      ...ending,
     };
   },
   code: CODE,

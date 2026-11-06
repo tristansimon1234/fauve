@@ -1,6 +1,6 @@
 import { MIX_CEILING, speechGain } from "./mix.ts";
 import type { EditPlan } from "./schemas.ts";
-import { skillSettings, skillWordsOf, type MontageSkill, type SkillSaysWords, type SkillTimeline } from "./skills.ts";
+import { skillSettings, skillTimeline, skillWordsOf, type MontageSkill, type SkillSaysWords, type SkillTimeline } from "./skills.ts";
 import { findVoice, readingVoice, spokenWords, type CopiedVoice, type OwnVoice, type PostVoice, type VoiceSetting } from "./voice-over.ts";
 import type { VoiceTranscript } from "./voice.ts";
 
@@ -64,7 +64,7 @@ export function skillSaysOn(skill: MontageSkill, plan: Pick<EditPlan, "skill" | 
   const bpm = plan.tempo && Math.abs(plan.tempo - skill.bpm) > 0.005 ? plan.tempo : undefined;
   const settings = skillSettings(skill, plan.skill.settings);
   const words = skillWordsOf(skill, plan.texts);
-  const line = skill.timeline(plan.segments.length, { end: Boolean(plan.end_card), ...(bpm ? { bpm } : {}), ...(Object.keys(settings).length ? { settings } : {}), words });
+  const line = skillTimeline(skill, plan.segments.length, { end: Boolean(plan.end_card), ...(bpm ? { bpm } : {}), ...(Object.keys(settings).length ? { settings } : {}), words });
   if (Math.abs(round2(line.duration) + lead - plan.duration) > 1 / 30 + 0.005) return null;
   return saidCues(skill, line, words, plan.duration, lead);
 }

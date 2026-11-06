@@ -1,4 +1,4 @@
-import { beatSpans, toFrame, type MontageSkill } from "../skills.ts";
+import { END_CARD_SECONDS, beatSpans, toFrame, type MontageSkill } from "../skills.ts";
 
 // « Toi sur un aplat de couleur », version 2, written again on its original's fiche (docs/fiches/aplat.md: a hiker's
 // edit of 8,8 s measured image by image at 30 i/s, its music measured by bands; Tristan: « c'est un effet que l'on veut
@@ -46,8 +46,8 @@ const LANDS = [5.75, 6, 6.5, 7, 7.5];
 const CLOSE_AFTER = 1.1;
 /** The frozen world's looks, on the notes of the phrase (beats from that shot's start: the original's images 192, 198, 207, 212, 219 and 226). */
 const STYLES = [1, 1.4, 2, 2.35, 2.85, 3.3];
-/** The engine's ending card: the Reel's last 1,6 s, on the colour (whole beats of it). */
-const END_CARD = 1.6;
+/** The engine's ending card: the Reel's last 2,5 s, on the colour (whole beats of it). */
+const END_CARD = END_CARD_SECONDS;
 const round = (n: number) => Math.round(n * 100) / 100;
 const round3 = (n: number) => Math.round(n * 1000) / 1000;
 

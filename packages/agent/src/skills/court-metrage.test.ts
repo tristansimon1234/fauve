@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { checkMotionCode } from "../motion-scene.ts";
 import { editPlanSchema } from "../schemas.ts";
-import { skillLengths, skillPlan } from "../skills.ts";
+import { skillLengths, skillPlan, skillTempos } from "../skills.ts";
 import { clearsDrawn, objectsDrawn, readsDrawn, subjectsDrawn } from "../subject.ts";
 import { courtMetrage, rollShot } from "./court-metrage.ts";
 
@@ -54,14 +54,15 @@ test("« Court métrage »: four to twelve shots, the roll after four of hers or
   // Up to twelve for a length she asks for; at its slowest tempo with an ending card, 45 s at most.
   assert.equal(courtMetrage.long, 12);
   assert.ok(Math.abs(courtMetrage.timeline(12, { end: false }).duration - 35.63) < 0.02);
-  assert.ok(courtMetrage.timeline(12, { end: true, bpm: 72 }).duration <= 45);
+  // (Its slowest tempo 73 since the card's 2,5 s: skillTempos keeps its longest with its card within 45 s.)
+  assert.ok(courtMetrage.timeline(12, { end: true, bpm: skillTempos(courtMetrage)[0] }).duration <= 45);
   assert.ok(skillLengths(courtMetrage).max <= 45);
   // An ending card: its last shot longer by whole beats (1,6 s at least), its fade before the card, its music to the end.
   const line = courtMetrage.timeline(8, { end: false });
   const ended = courtMetrage.timeline(8, { end: true });
-  assert.ok(ended.duration - line.duration >= 1.6);
+  assert.ok(ended.duration - line.duration >= 2.5);
   assert.equal(ended.marks.fade, line.marks.fade);
-  assert.ok(ended.marks.black! < Math.round((ended.duration - 1.6) * 30));
+  assert.ok(ended.marks.black! < Math.round((ended.duration - 2.5) * 30));
   assert.equal(ended.music!.end!.at, ended.duration);
   // At another tempo, every landmark counted in beats follows it.
   const slow = courtMetrage.timeline(8, { end: false, bpm: 72 });
@@ -263,7 +264,7 @@ test("« Court métrage » (v2): its title card in a display serif of strong con
 
 test("« Court métrage »: its ending card on the black after the fade, in its serif and its small roman, readable", () => {
   const line = courtMetrage.timeline(8, { end: true });
-  const from = Math.round((line.duration - 1.6) * 30);
+  const from = Math.round((line.duration - 2.5) * 30);
   const end = { title: "Ouvert dès 8 h", subtitle: "12 rue des Martyrs", from };
   assert.equal(keyed(drawAt(from - 1, { end, end_card: true }), "end"), null);
   const card = fits(drawAt(from + 12, { end, end_card: true }));

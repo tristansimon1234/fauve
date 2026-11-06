@@ -12,7 +12,7 @@ import { bientot } from "./bientot.ts";
 const ORIGINAL = [0, 3, 5, 8, 11, 14, 17, 20, 23, 26, 29, 31, 34, 37, 40, 43, 46, 49, 52, 54, 57, 60, 63, 66, 69, 72, 75, 78, 80, 83, 86, 89, 91, 93, 96, 99, 101, 104, 106, 109, 112, 114, 116, 119, 121, 124, 127, 130, 132, 134, 136, 139, 142, 145, 147, 150, 153, 156, 159, 162, 165, 168, 171, 174, 177];
 
 test("« Teaser qui se charge » (v1): 56 slots and eight replays on its cuts' grid (79 BPM), each of its 64 flashes within an image of the original's", () => {
-  assert.equal(bientot.version, 2);
+  assert.equal(bientot.version, 3);
   assert.equal(bientot.bpm, 79);
   assert.deepEqual(bientot.shots, [56, 56]);
   // Its count never moves: its flashes are its form, whatever she sends.
@@ -68,10 +68,10 @@ test("« Teaser qui se charge » (v1): its sound as the original's (two deep hit
   assert.ok(Math.abs(boom.at - 6.29) <= 1 / 30 && roll.at + roll.burst!.times.at(-1)! < boom.at, String(boom.at));
   // Its clicks stop at the boom: muffled from it to the end, faded at the end.
   assert.deepEqual(line.music, { filters: [{ kind: "muffled", from: boom.at, to: line.duration }], end: { at: line.duration, fade: 0.5 } });
-  // An ending card after her name (1,6 s at least, on a quarter-beat grid); at another tempo every landmark follows.
+  // An ending card after her name (2,5 s at least, on a quarter-beat grid); at another tempo every landmark follows.
   const ended = bientot.timeline(56, { end: true });
-  assert.ok(ended.duration - line.duration >= 1.6 && ended.duration - line.duration < 1.8);
-  assert.ok(Math.abs(ended.texts.nom!.to - (ended.duration - 1.6)) < 0.011);
+  assert.ok(ended.duration - line.duration >= 2.5 && ended.duration - line.duration < 2.75);
+  assert.ok(Math.abs(ended.texts.nom!.to - (ended.duration - 2.5)) < 0.011);
   const slower = bientot.timeline(56, { end: false, bpm: 64 });
   assert.ok(Math.abs(slower.marks.logo! / line.marks.logo! - 79 / 64) < 0.01 && Math.abs(slower.duration / line.duration - 79 / 64) < 0.01);
   assert.ok(Math.abs(slower.sounds![3]!.at / boom.at - 79 / 64) < 0.01);
@@ -247,12 +247,12 @@ test("« Teaser qui se charge »: its ending on black, her logo then her name in
   // Nothing of the original's own is ever drawn: no badge, no butterfly, no « MAISON », no « Coming soon ».
   assert.doesNotMatch(bientot.code, /MAISON|Coming soon|butterfly|papillon|LIFE/);
   // Its ending card after her name, on the black: its title in her title face, its line under it; her name gone.
-  const duration = Math.round(LINE.duration * 30) + 51;
-  const end = { title: "Ouverture le 12 novembre", subtitle: "12 rue des Martyrs", from: duration - 48 };
+  const duration = Math.round(LINE.duration * 30) + 80;
+  const end = { title: "Ouverture le 12 novembre", subtitle: "12 rue des Martyrs", from: duration - 75 };
   const card = fits(drawAt(duration - 40, { end, duration }));
   assert.deepEqual(card.map(textOf), ["Ouverture le 12 novembre", "12 rue des Martyrs"]);
   assert.equal(nameAt(duration - 40, { end, duration }), null);
-  assert.ok(nameAt(duration - 49, { end, duration }));
+  assert.ok(nameAt(duration - 76, { end, duration }));
   // Each of its words inside the safe zone: between x 140 and 940, above the bottom quarter.
   for (const f of [40, 120, 200, duration - 40]) {
     for (const n of fits(drawAt(f, { end, duration, brand: withLogo }))) {

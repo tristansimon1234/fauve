@@ -82,8 +82,8 @@ test("« Le grand départ »: 6 to 9 shots from her files (her journey and her a
   // An ending card: her last shot held whole beats longer (1,6 s at least), her two lines giving way to it.
   const line = depart.timeline(9, { end: false });
   const ended = depart.timeline(9, { end: true });
-  assert.ok(ended.duration - line.duration >= 1.6);
-  assert.equal(ended.texts.lieu!.to, Math.round((ended.duration - 1.6) * 100) / 100);
+  assert.ok(ended.duration - line.duration >= 2.5);
+  assert.equal(ended.texts.lieu!.to, Math.round((ended.duration - 2.5) * 100) / 100);
   assert.equal(ended.music!.end!.at, ended.duration);
   // At another tempo, every length in beats follows it.
   const slow = depart.timeline(9, { end: false, bpm: 92 });
@@ -269,7 +269,7 @@ test("« Le grand départ »: her two lines small in the middle, fading in a bea
   assert.equal(Number(styleOf(alone[0]!).top) + Number(styleOf(alone[0]!).height) / 2, 864);
   // Its ending card in their place over her last shot still playing; her lines gone.
   const line = depart.timeline(9, { end: true });
-  const from = Math.round((line.duration - 1.6) * 30);
+  const from = Math.round((line.duration - 2.5) * 30);
   const end = { title: "Stand 12", subtitle: "samedi et dimanche", from };
   assert.deepEqual(fits(from - 1, { end }).map((t) => t.children[0]), ["Ce week-end", "au marché aux puces"]);
   assert.deepEqual(fits(from + 12, { end }).map((t) => t.children[0]), ["Stand 12", "samedi et dimanche"]);

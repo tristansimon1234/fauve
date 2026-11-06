@@ -1,4 +1,4 @@
-import { toFrame, type MontageSkill } from "../skills.ts";
+import { END_CARD_SECONDS, toFrame, type MontageSkill } from "../skills.ts";
 
 // « Ta ville racontée », version 1, written on its original's fiche (docs/fiches/vlog-ville.md: a city film of 41,8 s in
 // 4:3, measured image by image at 30 i/s, its subtitles read frame by frame, its sound by bands; Tristan: « c'est un
@@ -119,8 +119,8 @@ const TITLE: [number, number] = [199, 257];
 /** The music: none until it drops on her name (image 79), muffled under the title (194 to 238). */
 const DROP_AT = 79;
 const MUFFLED: [number, number] = [194, 238];
-/** The engine's ending card: the Reel's last 1,6 s. */
-const END_CARD = 1.6;
+/** The engine's ending card: the Reel's last 2,5 s. */
+const END_CARD = END_CARD_SECONDS;
 const round = (n: number) => Math.round(n * 100) / 100;
 const round3 = (n: number) => Math.round(n * 1000) / 1000;
 
@@ -385,7 +385,7 @@ export const vlogVille: MontageSkill = {
     const at = (f: number) => Math.round(f * sc) / 30;
     const kept = vlogRoles(n);
     const last = kept.length - 1;
-    // With an ending card, its 1,6 s after the last sentence, on the last shot.
+    // With an ending card, its 2,5 s after the last sentence, on the last shot.
     const card = end ? Math.ceil((END_CARD + 0.02) * 30) / 30 : 0;
     const shots = kept.map((k, i) => ({ start: round(at(k.from)), end: round(at(k.to) + (i === last ? card : 0)), want: WANTS[k.role]!, ...(k.role === 0 ? { sound: true } : {}) }));
     const duration = shots[last]!.end;

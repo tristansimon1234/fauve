@@ -60,7 +60,7 @@ test("« Ta devanture en kaléidoscope »: a verse is one more of her things, ei
   assert.match(two.shots[1]!.want, /une autre de ses choses/);
   // An ending card: whole beats after its loop (1,6 s at least), her words giving way to it.
   const ended = vitraux.timeline(1, { end: true });
-  assert.ok(ended.duration - one.duration >= 1.6 && ended.texts.nom!.to <= ended.duration - 1.6 + 0.01);
+  assert.ok(ended.duration - one.duration >= 2.5 && ended.texts.nom!.to <= ended.duration - 2.5 + 0.01);
   assert.ok(ended.music!.end!.at === ended.duration);
   // At another tempo, every landmark follows it.
   const slower = vitraux.timeline(1, { end: false, bpm: 100 });
@@ -336,7 +336,7 @@ test("« Ta devanture en kaléidoscope »: her name in capitals over the mirrors
   assert.equal((words(from + 30, { reads: { light: 0.8 } })[0]!.props.innerStyle as Record<string, string>).color, "#1c1a17");
   // Her ending card in their place, after her loop.
   const ended = vitraux.timeline(1, { end: true });
-  const endFrom = Math.round((ended.duration - 1.6) * 30);
+  const endFrom = Math.round((ended.duration - 2.5) * 30);
   const card = flatten(drawAt(endFrom + 20, { hook: "Maison Farine", caption: "12 rue des Martyrs", end: { title: "Ouvert dimanche", subtitle: "de 9 h à 13 h", from: endFrom } })).filter((d) => d.type === "FitText");
   assert.deepEqual(card.map((d) => (typeof d.children[0] === "string" ? d.children[0] : (d.children[0] as Drawn).children[0])), ["Ouvert dimanche", "de 9 h à 13 h"]);
 });

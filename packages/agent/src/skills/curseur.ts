@@ -1,4 +1,4 @@
-import { beatSpans, type MontageSkill } from "../skills.ts";
+import { END_CARD_SECONDS, beatSpans, type MontageSkill } from "../skills.ts";
 
 // « Un clic sur tes produits » (`curseur`), version 1, written on its original's fiche (docs/fiches/curseur.md: measured
 // image by image at 30 i/s, its cursor tracked on every image, its freezes, its labels and its sound by frequency bands;
@@ -79,8 +79,8 @@ const NAMES = ["produit1", "produit2", "produit3"] as const;
 const HELD = 41;
 /** Its length, in images at its own tempo (the original's 306 and its one beat more). */
 const LENGTH = 326;
-/** The engine's ending card: the Reel's last 1,6 s. */
-const END_CARD = 1.6;
+/** The engine's ending card: the Reel's last 2,5 s. */
+const END_CARD = END_CARD_SECONDS;
 const round = (n: number) => Math.round(n * 100) / 100;
 const round3 = (n: number) => Math.round(n * 1000) / 1000;
 const comma = (n: number) => String(round(n)).replace(".", ",");
@@ -497,7 +497,7 @@ export const curseur: MontageSkill = {
     // At another tempo (a longer Reel, a music's own): every moment counted in beats follows it.
     const bpm = tempo ?? BPM;
     const scale = BPM / bpm;
-    // With an ending card, its time after the original's length on the half-beat grid (the engine's 1,6 s at least).
+    // With an ending card, its time after the original's length on the half-beat grid (the engine's 2,5 s at least).
     const half = 30 / bpm;
     const card = end ? Math.ceil((END_CARD + 0.05) / half) / 2 : 0;
     const spans = beatSpans(bpm, [HELD / BEAT, (CURSEUR_MOMENTS.play - HELD) / BEAT, (LENGTH - CURSEUR_MOMENTS.play) / BEAT + card]);

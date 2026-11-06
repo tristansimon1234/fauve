@@ -19,7 +19,16 @@ import { LOOK_PRESETS, lookMatrix, lookStamp, planLook, type ReelLook } from "./
 
 export const REEL_FPS = 30;
 const FADE_SECONDS = 0.35;
-const END_CARD_SECONDS = 1.6;
+/**
+ * The ending card's length: her name (or her offer) whole on screen 2 s at least once in (Tristan, 6 November: « les
+ * scènes de fin avec le nom du commerce sont souvent trop courtes »; its entrance takes half a second). A plan made
+ * before it keeps the 1,6 s it was made with (its `end_card.seconds` absent): its texts and its model's timeline were
+ * timed on it.
+ */
+export const END_CARD_SECONDS = 2.5;
+const OLD_END_CARD_SECONDS = 1.6;
+/** A plan's ending card length (s): the one it was made with. */
+export const endCardSeconds = (plan: Pick<EditPlan, "end_card">): number => plan.end_card?.seconds ?? OLD_END_CARD_SECONDS;
 
 const SIZES: Record<EditPlan["format"], { width: number; height: number }> = {
   "9:16": { width: 1080, height: 1920 },
@@ -985,7 +994,7 @@ export function buildReelProps(plan: EditPlan, inputs: ReelInputs): ReelProps {
         }).map((p) => ({ ...p, src: inputs.sfx!.sounds[p.key]!.src, from: toFrames(p.at) }))
       : [];
 
-  const endCardFrames = toFrames(END_CARD_SECONDS);
+  const endCardFrames = toFrames(endCardSeconds(plan));
 
   // A collage's composition lays her shots itself: each one's segment, span, shape and subject (a photo's cut-out too).
   const composeShots = (from: number, length: number): ComposeShot[] =>

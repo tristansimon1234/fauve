@@ -1,4 +1,4 @@
-import { beatSpans, toFrame, type MontageSkill } from "../skills.ts";
+import { END_CARD_SECONDS, beatSpans, toFrame, type MontageSkill } from "../skills.ts";
 
 // « Interrupteur », version 2, written again on its original's fiche (docs/fiches/interrupteur.md: measured image by
 // image at 30 i/s, its switch, her hand and its poster in close-ups, its sound's level, spectrum and attacks; Tristan:
@@ -41,8 +41,8 @@ const SOUND_END = FIRST + 21;
 const LENGTH = FIRST + 21.22;
 /** Where her hand is looked for on her shot, around the flip (images of 30 a second). */
 const LOOK = 75;
-/** The engine's ending card: the Reel's last 1,6 s. */
-const END_CARD = 1.6;
+/** The engine's ending card: the Reel's last 2,5 s. */
+const END_CARD = END_CARD_SECONDS;
 const round = (n: number) => Math.round(n * 100) / 100;
 const round3 = (n: number) => Math.round(n * 1000) / 1000;
 const comma = (n: number) => String(round(n)).replace(".", ",");
@@ -355,7 +355,7 @@ export const interrupteur: MontageSkill = {
     const bpm = tempo ?? BPM;
     // A beat of the original's own grid: half one of the engine's.
     const half = 30 / bpm;
-    // With an ending card, its time after the original's length on the half-beat grid (the engine's 1,6 s at least,
+    // With an ending card, its time after the original's length on the half-beat grid (the engine's 2,5 s at least,
     // rounded up so a frame lost to rounding never cuts into it).
     const card = end ? Math.ceil((END_CARD + 0.05) / half) : 0;
     const spans = beatSpans(bpm, [(LENGTH + card) / 2]);

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { editPlanSchema } from "../schemas.ts";
-import { skillPlan, skillLengths, toFrame } from "../skills.ts";
+import { skillPlan, skillLengths, skillTempos, toFrame } from "../skills.ts";
 import { checkMotionCode } from "../motion-scene.ts";
 import { subjectsDrawn, objectsDrawn, clearsDrawn, readsDrawn } from "../subject.ts";
 import { vlogVille, vlogRoles, vlogTitleFrame } from "./vlog-ville.ts";
@@ -129,11 +129,11 @@ test("« Ta ville racontée » (v1): its music drops on her name and is muffled 
   // Muffled from just before the title to the next sentence (6,47 to 7,93 s), faded on its last image.
   assert.deepEqual(music.filters!.map((f) => [f.kind, toFrame(f.from), toFrame(f.to)]), [["muffled", 194, 238]]);
   assert.ok(Math.abs(music.end!.at - (line.duration - 1 / 30)) < 0.005 && music.end!.fade === 0.4);
-  // An ending card: 1,6 s at least after its last sentence, on its last shot, within 45 s at its slowest tempo.
+  // An ending card: 2,5 s at least after its last sentence, on its last shot, within 45 s at its slowest tempo.
   const ended = vlogVille.timeline(31, { end: true });
-  assert.ok(ended.duration - line.duration >= 1.6 && ended.duration - line.duration < 1.7);
+  assert.ok(ended.duration - line.duration >= 2.5 && ended.duration - line.duration < 2.6);
   assert.equal(ended.texts.l14!.to, line.texts.l14!.to);
-  assert.ok(vlogVille.timeline(31, { end: true, bpm: 74 }).duration <= 45);
+  assert.ok(vlogVille.timeline(31, { end: true, bpm: skillTempos(vlogVille)[0] }).duration <= 45);
   // At another tempo all of it follows (its film is cut by ear: its length is its tempo's).
   const faster = vlogVille.timeline(31, { end: false, bpm: 90 });
   assert.ok(Math.abs(faster.duration - (line.duration * 76) / 90) < 0.05 && faster.marks.sc === Math.round((76 / 90) * 1000) / 1000);
