@@ -120,8 +120,10 @@ test("« Collage qui s'emboîte » (v1): the original's loop of 21 steps of 6 im
   assert.deepEqual(line.texts, { titre: { from: 0, to: 2 } });
   assert.deepEqual(line.music, { downbeat: 0.8, filters: [{ kind: "thin", from: 0, to: 0.8 }], end: { at: 4.2, fade: 0.012 } });
   assert.equal(line.sounds, undefined);
-  // Cut out: every image whose person arrives, parades, stays or makes a window: all but A and H.
-  assert.deepEqual(line.cutouts, [1, 2, 3, 4, 5, 6, 7, 8, 9, 11, 12]);
+  // Cut out: only what its moves draw: B arriving, C and D (their person arrives when no sky is read), its parade, E's
+  // window (its silhouette when no thing is found), F's silhouette, I (H's sky else her person), J arriving and staying;
+  // ten, the most photos a Reel cuts out (SUBJECT_PHOTO_MAX); G and H never.
+  assert.deepEqual(line.cutouts, [1, 2, 3, 4, 5, 6, 7, 8, 11, 12]);
 });
 
 test("« Collage qui s'emboîte » (v1): 26 cases last the original's 8,4 s, its second loop within an image of the original's; its last case closes the loop", () => {
@@ -139,7 +141,9 @@ test("« Collage qui s'emboîte » (v1): 26 cases last the original's 8,4 s, its
   assert.deepEqual(moves.slice(13), ["arrive", "ground", "arrive", "parade", "parade", "parade", "cut", "silhouette", "silhouette", "cut", "arrive", "arrive", "stay"]);
   // Its last image's person stays on the first image: cut out whatever its place; J of the first loop stays on A of the second.
   assert.equal(moves[12], "stay");
-  assert.ok(line.cutouts!.includes(25) && !line.cutouts!.includes(13) && !line.cutouts!.includes(23));
+  // Its second loop cuts out only what it draws: B', D' (C' brings her person, no sky read there), its parade, the two
+  // silhouettes, I' and J' arriving, J' staying on the first image.
+  assert.deepEqual(line.cutouts, [1, 2, 3, 4, 5, 6, 7, 8, 11, 12, 14, 16, 17, 18, 19, 20, 21, 24, 25]);
   const short = collage.timeline(14, { end: false });
   assert.deepEqual(collageChain(14).moves.slice(-2), ["stay", "stay"]);
   assert.ok(short.cutouts!.includes(13));
@@ -212,6 +216,9 @@ test("« Collage qui s'emboîte » (v1): each next image arrives in a piece over
   const loop = drawAt(122);
   assert.deepEqual(layers(loop), ["Footage 0", "Subject 12"]);
   assert.equal((loop.children as Drawn[])[0]!.props.at, 120);
+  // Without J's cut-out (ten photos a Reel at most), the latest person cut out before her stays; without any, A alone.
+  assert.deepEqual(layers(drawAt(122, { reads: { cut: (i) => i < 9 } })), ["Footage 0", "Subject 8"]);
+  assert.deepEqual(layers(drawAt(122, { reads: { cut: () => false } })), ["Footage 0"]);
   // J of a first loop stays on A of the next: A then plays at its own moment (held, not from the stay).
   const next = drawAt(122, { n: 26 });
   assert.deepEqual(layers(next), ["Footage 13", "Subject 12"]);
@@ -225,18 +232,31 @@ test("« Collage qui s'emboîte » (v1): each next image arrives in a piece over
   }
 });
 
-test("« Collage qui s'emboîte » (v1): its title in the safe zone; its format as her pictures; its ending card on its first image come back", () => {
+test("« Collage qui s'emboîte » (v1): its title on a band of her colour in the safe zone; its format as her pictures; its ending card on its first image come back", () => {
   const title = (tree: Drawn) => flatten(tree).find((n) => String(n.props.key).startsWith("title-"));
-  // Big white condensed capitals high in the frame, centred, above the middle (the apps' buttons below it).
+  const awning = (tree: Drawn) => flatten(tree).find((n) => n.props.key === "awning");
+  /** A text box inside the safe zone: above the middle within 40 to 1040, below it within 140 to 940, never in the bottom quarter. */
+  const safe = (b: Record<string, string | number>) => {
+    const [left, top, w, tall] = [Number(b.left), Number(b.top), Number(b.width), Number(b.height)];
+    return left >= (top + tall > 960 ? 140 : 40) && left + w <= (top + tall > 960 ? 940 : 1040) && top >= 80 && top + tall <= 1440;
+  };
+  // White condensed capitals on a band of her colour across the frame, high, centred, above the middle (the apps'
+  // buttons below it), the band behind its words and before what arrives (B's person passes in front of both).
   const t = title(drawAt(3))!;
   const box = styleOf(t);
-  assert.ok(Number(box.left) >= 40 && Number(box.left) + Number(box.width) <= 1040 && Number(box.top) >= 80 && Number(box.top) + Number(box.height) <= 960, JSON.stringify(box));
+  assert.ok(safe(box) && Number(box.top) + Number(box.height) <= 960, JSON.stringify(box));
   assert.equal(Number(box.left) + Number(box.width) / 2, 540);
   const inner = t.props.innerStyle as Record<string, unknown>;
   assert.equal(inner.color, "#ffffff");
   assert.equal(inner.textTransform, "uppercase");
   assert.ok(Number(inner.fontSize) >= 48);
+  const band = styleOf(awning(drawAt(3))!);
+  assert.deepEqual([band.left, band.width, band.backgroundColor], [0, 1080, "#b5293f"]);
+  assert.ok(Number(band.top) <= Number(box.top) && Number(band.top) + Number(band.height) >= Number(box.top) + Number(box.height));
+  const order = (drawAt(8).children as Drawn[]).map((n) => (n.props.key === "awning" ? "band" : n.type === "FitText" ? "title" : String(n.type)));
+  assert.deepEqual(order, ["Footage", "band", "title", "Subject"]);
   assert.equal(title(drawAt(62)), undefined);
+  assert.equal(awning(drawAt(62)), undefined);
   // No title (her pick, as the original): nothing written.
   assert.equal(title(drawAt(3, { reelTexts: [] })), undefined);
   // Mostly horizontal pictures: each one whole in a 16:9 band on black, every piece in the band's box; as her words ask, full frame.
@@ -253,8 +273,18 @@ test("« Collage qui s'emboîte » (v1): its title in the safe zone; its format 
   assert.equal((card.children as Drawn[])[0]!.props.shot, 0);
   const words = flatten(card).filter((n) => n.type === "FitText").map((n) => textOf(n).replace(/\s+/g, " "));
   assert.deepEqual(words, ["Ouvert dimanche", "de 9 h à 18 h"]);
-  const sub = styleOf(flatten(card).find((n) => String(n.props.key).startsWith("sub-"))!);
-  assert.ok(Number(sub.left) >= 140 && Number(sub.left) + Number(sub.width) <= 940 && Number(sub.top) + Number(sub.height) <= 1440, JSON.stringify(sub));
+  for (const n of flatten(card).filter((x) => x.type === "FitText")) assert.ok(safe(styleOf(n)), JSON.stringify(styleOf(n)));
+  // Her colour too pale for white letters: her dark one, else ink.
+  const pale = (brand: Record<string, unknown>) => {
+    const line13 = collage.timeline(13, { end: false });
+    const React = { createElement: (type: unknown, p: Record<string, unknown> | null, ...children: unknown[]): Drawn => ({ type, props: p ?? {}, children: children.flat(Infinity).filter((c) => c !== null && c !== undefined && c !== false) }) };
+    const scope = { AbsoluteFill: "AbsoluteFill", FitText: "FitText", Footage: "Footage", Subject: "Subject", Skyline: "Skyline", useCurrentFrame: () => 3, SubjectBox: () => null, SubjectOutline: () => null, SkylineAt: () => null };
+    const make = new Function("React", ...Object.keys(scope), `"use strict";\n${collage.code}\nreturn Scene;`) as (...args: unknown[]) => (p: Record<string, unknown>) => Drawn;
+    const tree = make(React, ...Object.values(scope))({ width: 1080, height: 1920, durationInFrames: 126, brand: { name: "x", displayFont: "Anton", bodyFont: "Inter", ...brand }, shots: shotsOf(line13.shots), reelTexts: [{ text: "Lou", role: "hook", from: 0, to: 60 }], end: null, texts: marksOf() });
+    return styleOf(awning(tree)!).backgroundColor;
+  };
+  assert.equal(pale({ accent: "#f3e7d9", palette: { dark: "#2b2420" } }), "#2b2420");
+  assert.equal(pale({ accent: "#f3e7d9" }), "#1d1d1b");
 });
 
 test("« Collage qui s'emboîte » (v1): its plan cuts out what its chain draws, reads the sky of four cases only, follows its one window", () => {
@@ -280,8 +310,8 @@ test("« Collage qui s'emboîte » (v1): its plan cuts out what its chain draws,
   assert.ok(editPlanSchema.safeParse(plan).success);
   assert.equal(plan.duration, 4.2);
   assert.deepEqual(plan.segments.flatMap((s) => ("beside" in s && s.beside ? [s.beside.at] : [])), [1, 1.2, 1.4]);
-  assert.deepEqual(plan.layers![0]!.motion.drawn, { shots: 13, subjects: [1, 2, 3, 4, 5, 6, 7, 8, 9, 11, 12], objects: [{ shot: 7, name: "shop window" }] });
-  assert.deepEqual([...subjectShots(plan)].sort((a, b) => a - b), [1, 2, 3, 4, 5, 6, 7, 8, 9, 11, 12]);
+  assert.deepEqual(plan.layers![0]!.motion.drawn, { shots: 13, subjects: [1, 2, 3, 4, 5, 6, 7, 8, 11, 12], objects: [{ shot: 7, name: "shop window" }] });
+  assert.deepEqual([...subjectShots(plan)].sort((a, b) => a - b), [1, 2, 3, 4, 5, 6, 7, 8, 11, 12]);
   assert.deepEqual(plan.music_shape, { downbeat: 0.8, filters: [{ kind: "thin", from: 0, to: 0.8, open: 0.02 }], end: { at: 4.2, fade: 0.012 } });
   // Its sky read on C, D and H (C of a second loop is not in a Reel of 13), each as a ground: four at most a Reel.
   assert.deepEqual(readPassages(plan, () => true).map((p) => [p.clip_id, p.kinds]), [

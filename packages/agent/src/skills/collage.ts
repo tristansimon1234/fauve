@@ -74,6 +74,27 @@ export function collageChain(n: number): { roles: Role[]; mains: number[]; moves
   return { roles, mains, moves };
 }
 
+/**
+ * The cases its code draws cut out, for n cases: the next photo of each « arrive », each case of its parade, the photo
+ * whose window is a thing (its silhouette when none is found) or a silhouette, the person who stays (the case before the
+ * next photo, its last case at the end), and, in its first loop only, the photo each ground or sky brings (her person
+ * arrives when no sky is read there): the most of them in its first loop, where ten photos a Reel are cut out at most.
+ */
+export function collageCutouts(n: number): number[] {
+  const { mains, moves } = collageChain(n);
+  const out = new Set<number>();
+  for (const [k, i] of mains.entries()) {
+    const next = mains[k + 1];
+    const move = moves[i]!;
+    if (move === "arrive" && next !== undefined) out.add(next);
+    if ((move === "ground" || move === "sky") && next !== undefined && next < CYCLE.length) out.add(next);
+    if (move === "window" || move === "silhouette") out.add(i);
+    if (move === "stay") out.add((next ?? n) - 1);
+  }
+  moves.forEach((m, i) => m === "parade" && out.add(i));
+  return [...out].sort((a, b) => a - b);
+}
+
 /** What each case wants, for the filler (French): what any business has, else what does. */
 function wantOf(role: Role, i: number, under: number): string {
   switch (role) {
@@ -215,37 +236,52 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
           front.push(g);
         } else arrive();
       } else if (mv === STAY) {
-        // The person of its last case stays on the next image (the first one again at the end: from its start, the loop).
-        const who = (nx > cur ? nx : n) - 1;
+        // The person of its last case stays on the next image (the first one again at the end: from its start, the loop);
+        // without her cut-out, the latest person cut out before her (ten photos a Reel are cut out at most).
+        let who = (nx > cur ? nx : n) - 1;
+        while (who > 0 && !hasCut(who, at)) who--;
         back.push(pic(nx, "s" + nx, nx > cur ? undefined : tail));
-        if (hasCut(who, at)) front.push(cutOut(who, "y" + who));
+        if (who > 0) front.push(cutOut(who, "y" + who));
       } else if (mv === ARRIVE) arrive();
       else back.push(pic(cur, "s" + cur));
     }
   }
 
-  // 5. Its title (none in the original; hers when the Reel has one): her name or a few words in big white condensed
-  // capitals high on its first steps, like the letters of a sign, the pieces that arrive passing in front of it.
-  const SHADOW = "0 2px 4px rgba(0,0,0,0.45), 0 8px 30px rgba(0,0,0,0.35)";
-  const big = (t, style, size, key) =>
-    h(FitText, { key, style: { position: "absolute", ...style }, innerStyle: { fontFamily: display, fontWeight: 800, fontSize: size, lineHeight: 0.92, letterSpacing: "0.03em", textTransform: "uppercase", color: "#ffffff", textAlign: "center", textWrap: "balance", textShadow: SHADOW } }, keep(t));
+  // 5. Its title (none in the original; hers when the Reel has one): her name or a few words in white condensed capitals
+  // on a band of her colour across the frame, like the letters of an awning (the original's only lettering, a café's
+  // sign in one of its photos), high on its first steps; what arrives passes in front of it, as the roofs of the
+  // original's third photo cover its sign. Her colour when it is dark enough for white letters, else her dark one, else ink.
+  const luma = (c) => {
+    const m = /^#?([0-9a-f]{6})$/i.exec(String(c || "").trim());
+    if (!m) return 1;
+    const v = parseInt(m[1], 16);
+    return (0.2126 * ((v >> 16) & 255) + 0.7152 * ((v >> 8) & 255) + 0.0722 * (v & 255)) / 255;
+  };
+  const AWNING = [brand.accent, brand.palette && brand.palette.dark].find((c) => luma(c) <= 0.55) || "#1d1d1b";
+  const strip = (key, top, tall) => h("div", { key, style: { position: "absolute", left: 0, top, width, height: tall, backgroundColor: AWNING } });
+  const words = (t, style, size, key, more) =>
+    h(FitText, { key, style: { position: "absolute", ...style }, innerStyle: { fontFamily: display, fontWeight: 800, fontSize: size, lineHeight: 1, letterSpacing: "0.06em", textTransform: "uppercase", color: "#ffffff", textAlign: "center", whiteSpace: "nowrap", ...(more || {}) } }, keep(t));
   const hook = reelTexts.find((t) => t.role === "hook");
-  const TB = band ? { left: 70, top: box.top + Math.round(BH * 0.06), width: width - 140, height: Math.round(BH * 0.36) } : { left: 70, top: 250, width: width - 140, height: 330 };
-  const title = hook && frame >= hook.from && frame < Math.min(hook.to, endAt) ? big(hook.text, TB, band ? 150 : 230, "title-" + hook.text) : null;
+  const AT = band ? { top: box.top + 30, tall: 120 } : { top: 250, tall: 190 };
+  const title = hook && frame >= hook.from && frame < Math.min(hook.to, endAt)
+    ? [strip("awning", AT.top, AT.tall), words(hook.text, { left: 60, top: AT.top + Math.round(AT.tall * 0.12), width: width - 120, height: Math.round(AT.tall * 0.76) }, band ? 96 : 150, "title-" + hook.text)]
+    : null;
 
-  // 6. Its ending card (in option): her words in the same capitals on its first image, come back.
+  // 6. Its ending card (in option): her words on the same band, on its first image come back, her line under them.
+  const CT = band ? { top: box.top + 20, tall: 250 } : { top: 560, tall: 330 };
   const card = end && frame >= endAt
     ? [
-        big(end.title, band ? { left: 90, top: box.top + 30, width: width - 180, height: 250 } : { left: 90, top: 560, width: width - 180, height: 360 }, band ? 160 : 210, "card-" + end.title),
+        strip("card", CT.top, CT.tall),
+        words(end.title, { left: 60, top: CT.top + 24, width: width - 120, height: end.subtitle ? Math.round(CT.tall * 0.52) : CT.tall - 48 }, band ? 110 : 160, "card-" + end.title),
         end.subtitle
-          ? h(FitText, { key: "sub-" + end.subtitle, style: { position: "absolute", left: 140, top: band ? box.top + BH + 40 : 950, width: width - 280, height: 150 }, innerStyle: { fontFamily: body, fontWeight: 500, fontSize: 56, lineHeight: 1.15, color: "#ffffff", textAlign: "center", textWrap: "balance", textShadow: SHADOW } }, keep(end.subtitle))
+          ? words(end.subtitle, { left: 90, top: CT.top + Math.round(CT.tall * 0.62), width: width - 180, height: Math.round(CT.tall * 0.28) }, 56, "sub-" + end.subtitle, { fontFamily: body, fontWeight: 600, letterSpacing: "0.04em" })
           : null,
       ]
     : [];
 
-  // Any other text of the Reel (none in its slots): a plain line high in the frame, so nothing she wrote is lost.
+  // Any other text of the Reel (none in its slots): a plain line on the band's colour, so nothing she wrote is lost.
   const extra = reelTexts.filter((t) => t !== hook && frame >= t.from && frame < Math.min(t.to, endAt)).map((t, i) =>
-    h(FitText, { key: "x" + i, style: { position: "absolute", left: 140, top: 620 + i * 110, width: width - 280, height: 100 }, innerStyle: { fontFamily: body, fontWeight: 700, fontSize: 52, color: "#ffffff", textAlign: "center", textShadow: SHADOW } }, keep(t.text)));
+    h(FitText, { key: "x" + i, style: { position: "absolute", left: 140, top: 620 + i * 110, width: width - 280, height: 100 }, innerStyle: { fontFamily: body, fontWeight: 700, fontSize: 52, color: "#ffffff", textAlign: "center" } }, h("span", { style: { backgroundColor: AWNING, padding: "4px 18px" } }, keep(t.text))));
 
   return h(AbsoluteFill, { style: { backgroundColor: "#000000" } }, back, title, front, card, extra);
 }`;
@@ -331,9 +367,11 @@ export const collage: MontageSkill = {
       // Its title over its first ten steps (through its parade, as the original's first changes).
       texts: { titre: { from: 0, to: round(Math.min(at(TITLE_STEPS), end ? at(steps - card) : duration)) } },
       marks,
-      // Every image whose person arrives, parades, stays or whose silhouette makes a window is cut out: all but the
-      // first of each loop and H (its sky shows the next image), and its last one always (its person closes the loop).
-      cutouts: roles.flatMap((r, i) => (r !== "A" && r !== "H") || i === n - 1 ? [i] : []),
+      // Only what its moves draw is cut out (ten photos a Reel at most, SUBJECT_PHOTO_MAX, and 30 s of video): the
+      // image whose person arrives, each of its parade, the image whose silhouette makes a window, the person who stays
+      // (its last case closes the loop), and in its first loop the images its grounds and its sky bring, whose person
+      // arrives instead when no sky is read (indoors, the common case).
+      cutouts: collageCutouts(n),
       // A beat's pickup without its bass (the original's intro, 0,68 s without drums), its bass coming in on the
       // downbeat; cut dead at the end, where the Reel loops.
       music: {
