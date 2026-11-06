@@ -174,6 +174,12 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
       const full = g.length >= 3 || g.join(" ").length >= 15;
       // Its last word alone would be a group of one: kept with this one when they read together (« Ça sent déjà bon ! »).
       const lastOne = next && i + 2 === words.length && g.length <= 3 && g.join(" ").length + next.length < 24;
+      // Four words ending on small ones (« une pizza avec les »): the small ones start the next group (« avec les légumes »).
+      if (next && !stop && g.length >= 4 && light(w)) {
+        let k = g.length;
+        while (k > 0 && light(g[k - 1])) k--;
+        if (k > 0) { out.push(g.slice(0, k).join(" ")); g = g.slice(k); return; }
+      }
       if (!next || stop || (full && !light(w) && !lastOne) || g.length >= 5) { out.push(g.join(" ")); g = []; }
     });
     if (g.length) out.push(g.join(" "));

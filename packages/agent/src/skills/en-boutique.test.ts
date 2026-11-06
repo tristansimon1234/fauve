@@ -202,7 +202,7 @@ test("« Création à quatre mains » writes its lines as the subtitles of two v
   // Her idea from the first image, cut as a creator subtitles it, its punctuation shown, a mark set apart the French
   // way kept with its word.
   const idea = shown(0, line.marks.artisan!).map((g) => g.text);
-  assert.deepEqual(idea, ["L'idée :", "une pizza avec mes légumes !"]);
+  assert.deepEqual(idea, ["L'idée :", "une pizza", "avec mes légumes !"]);
   // A group of three pieces or more held as the scene check reads it (0,8 s plus 0,3 s a word, at 80 %), two words 13 images.
   const reading = (g: { text: string; from: number; to: number }) => {
     const words = g.text.split(" ").filter((w) => /[\p{L}\p{N}]/u.test(w)).length;
@@ -215,7 +215,8 @@ test("« Création à quatre mains » writes its lines as the subtitles of two v
   assert.deepEqual(shown(line.marks.artisan!, line.marks.echange!).map((g) => g.text).filter(Boolean), ["Marco ne sourit jamais…", "Ah si,", "je l'ai eu !"]);
   // White for hers, the second colour (the original's yellow) for the artisan's, the lines beginning with « — ».
   const talk = shown(line.marks.echange!, line.marks.gestes!);
-  assert.deepEqual(talk.map((g) => [g.text, g.color]), [["Je pensais à tes tomates", "#ffffff"], ["Vas-y,", "#f7ce18"], ["dis-moi !", "#f7ce18"]]);
+  // Four words ending on small ones: those start the next group (« Je pensais » / « à tes tomates »).
+  assert.deepEqual(talk.map((g) => [g.text, g.color]), [["Je pensais", "#ffffff"], ["à tes tomates", "#ffffff"], ["Vas-y,", "#f7ce18"], ["dis-moi !", "#f7ce18"]]);
   const gestures = shown(line.marks.gestes!, line.marks.resultat!);
   assert.deepEqual(gestures.map((g) => [g.text, g.color]), [["D'abord la sauce", "#f7ce18"], ["Pas trop de mozza", "#f7ce18"], ["Ça sent déjà bon !", "#ffffff"]]);
   assert.deepEqual(shown(line.marks.resultat!, f(line.duration)).map((g) => g.text), ["Et voilà la pizza", "du marché !", "Waouh !", "Je la trouve", "très bonne", "Bon appétit !"]);
