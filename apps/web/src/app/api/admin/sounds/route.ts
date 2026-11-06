@@ -255,10 +255,14 @@ async function benchLinks(body: unknown) {
     links.map(async (link) => {
       const tiktok = /tiktok\.com/.test(link);
       const url = tiktok ? await longTikTok(link) : link;
-      const done = await tregCall(tiktok ? "treg.tiktok.video.detail" : "anyapi.instagram.post.detail", tiktok ? { post: url } : { url }, 0.02).catch(() => null);
+      // Instagram: the whole media (its clips_metadata carries its music); TikTok: by the video's id.
+      const videoId = /\/video\/(\d{8,25})/.exec(url)?.[1];
+      const done = tiktok
+        ? await tregCall("treg.tiktok.video.detail", { video_id: videoId ?? url }, 0.02).catch(() => null)
+        : await tregCall("scrapecreators.x.v1-instagram-post", { url }, 0.02, "GET").catch(() => null);
       costUsd += done?.costUsd ?? 0;
       const fields = soundFields(done?.answer ?? null);
-      return { link, url, found: Boolean(done?.answer), fields };
+      return { link, url, videoId: videoId ?? null, found: Boolean(done?.answer), fields, ...(Object.keys(fields).length ? {} : { raw: trimmed(done?.answer ?? null) }) };
     }),
   );
   await supabaseAdmin()
