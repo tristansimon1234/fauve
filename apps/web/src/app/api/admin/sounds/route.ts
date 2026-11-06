@@ -69,6 +69,7 @@ export async function POST(request: Request) {
   // The sounds of the top Reels of a few hashtags (Tristan: « les sons tendances insta […] aesthetic videos editing »).
   if (action === "bench_links") return Response.json(await benchLinks(await request.json().catch(() => ({}))));
   // Edith's favourite sounds made ready: each one's song and cover read once (about 0.2 cent each).
+  if (action === "check_originals") return Response.json(await checkOriginals(await request.json().catch(() => ({}))));
   if (action === "prime_house") return Response.json(await primeHouse());
   if (action === "bench_trending") return Response.json(await benchTrending());
   if (action === "bench_tags") return Response.json(await benchTags((new URL(request.url).searchParams.get("tags") ?? "").split(",")));
@@ -304,4 +305,28 @@ async function primeHouse() {
   const { data } = await supabaseAdmin().from("trend_sounds").select("audio_id, title").eq("chart", "house");
   const done = await Promise.all((data ?? []).map(async (r) => ({ title: r.title as string, heard: Boolean(await soundListen(r.audio_id as string, null).catch(() => null)) })));
   return { sounds: done };
+}
+
+/**
+ * Which sounds original to an account other accounts use too (Tristan: « un son original peut être réutilisé par un
+ * autre user ? »): the Reels of each one's page, the accounts behind them but its creator, and whether there are more
+ * (a full page). About $0.002 a sound.
+ */
+async function checkOriginals(body: unknown) {
+  const asked = Array.isArray((body as { sounds?: unknown })?.sounds) ? ((body as { sounds: unknown[] }).sounds as { audio_id?: unknown; creator?: unknown }[]) : [];
+  const sounds = asked.filter((x) => typeof x.audio_id === "string" && /^\d{5,25}$/.test(x.audio_id) && typeof x.creator === "string").slice(0, 30) as { audio_id: string; creator: string }[];
+  let costUsd = 0;
+  const read = await Promise.all(
+    sounds.map(async ({ audio_id, creator }) => {
+      const done = await tregCall(REELS, { audio_id }, MAX_COST_USD, "GET").catch(() => null);
+      costUsd += done?.costUsd ?? 0;
+      const reels = listUnder(done?.answer ?? null, ["reels", "items"]);
+      const owners = new Set(reels.map((r) => pick(r, ["username"])).filter((u): u is string => Boolean(u) && u !== creator));
+      return { audio_id, creator, reels: reels.length, others: owners.size, more: pick(done?.answer ?? null, ["has_more", "more_available"]) };
+    }),
+  );
+  await supabaseAdmin()
+    .from("cost_events")
+    .insert({ studio_id: null, kind: "trends", provider: "treg", units: sounds.length, cost_eur: usdToEur(costUsd, env("USD_TO_EUR")), meta: { purpose: "sounds_originals_check", cost_usd: costUsd } });
+  return { cost_usd: costUsd, sounds: read };
 }
