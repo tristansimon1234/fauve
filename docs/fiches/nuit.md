@@ -95,6 +95,8 @@
 Une nuit de cinéma : les noirs relevés à 9 – 10 sur 255, les blancs retenus (de 70 à 220 sur 255 selon les plans ; seuls les flashs et les brûlures montent à 250), des couleurs très éteintes (5 à 23 de saturation moyenne sur 255 ; les choses rondes 39 ; les néons, le taxi et la doudoune rose gardent leur couleur), des nuits très sombres (médiane 12 à 27), un peu froides (le ponton r−g −17, b−g +15). Aucun vignettage constant mesurable (le rapport des coins au centre suit chaque image). **Pas de grain** : les blocs les plus plats n'ont aucun détail fin (0,01 à 0,11 niveau) et les plans de nuit ne changent pas d'une image à l'autre (0,00 à 0,04 niveau). La finition « Nuit » du modèle (couleurs −0,5, contraste 0,08, noirs relevés de 0,05, un peu froide, coins sombres légers, sans grain) et la courbe de son code (noirs à 0,035, blancs à 0,82, sur ses plans seulement, pas sur ses flashs ni ses brûlures) vont dans ce sens.
 
 ## Format
+**Depuis le 6 novembre** (Tristan, sur sept bancs : « vertical please », « tout vertical please ») : `vertical` par défaut, plein écran, ses fichiers horizontaux recadrés sur leur sujet ; `horizontal` (sa bande) seulement à sa demande, ou quand elle veut ses vidéos entières (le `frame` letterbox de son contrat) ; `auto` (comme ses vidéos, ci-dessous) seulement si elle le demande. `docs/modeles.md`, « Réglages d'un modèle ».
+
 L'original est horizontal 16:9 (720 × 406), montré tel quel : dans le fil vertical, une bande de 1080 × 608 au milieu, du noir dessus et dessous. Réglage « format » : `auto` (horizontal quand la plupart de ses vidéos le sont, sinon vertical plein écran), `horizontal`, `vertical`.
 
 ## Ce qui est à l'original, jamais recopié

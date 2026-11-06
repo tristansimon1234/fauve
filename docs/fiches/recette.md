@@ -75,6 +75,8 @@ Chaud et saturé, jamais clair : le bois miel (#A67A42 de dessus, #9D6E3B de fac
 **À l'original, jamais recopiés** : sa voix, son visage et sa cuisine, ses mots (sa promesse de régime, « perdre du poids », « moins de 100 calories le ravioli », c'est la sienne : un commerce n'écrit jamais une promesse de santé qu'il ne peut pas tenir), sa recette, son t-shirt bordeaux. Le modèle écrit ses mots à elle : ce que montrent ses gestes, sa promesse à elle.
 
 ## Format
+**Depuis le 6 novembre** (Tristan, sur sept bancs : « vertical please », « tout vertical please ») : `vertical` par défaut, plein écran, ses fichiers horizontaux recadrés sur leur sujet ; `horizontal` (sa bande) seulement à sa demande, ou quand elle veut ses vidéos entières (le `frame` letterbox de son contrat) ; `auto` (comme ses vidéos, ci-dessous) seulement si elle le demande. `docs/modeles.md`, « Réglages d'un modèle ».
+
 L'original est vertical 9:16, plein cadre. Réglage « format » :
 - `auto` (par défaut, comme ses vidéos) : plein écran vertical comme l'original ; en 16:9 sur du noir quand la plupart de ses vidéos sont en largeur ;
 - `vertical` : plein écran, ses vidéos en largeur recadrées sur leur sujet ;

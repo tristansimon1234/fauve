@@ -63,6 +63,8 @@ Caméra à la main, de très près, deux panoramiques rapides dans la mercerie (
 - **Outil** : les bruitages d'un skill (`sounds` : deux coups sourds, une rafale de clics qui monte, le boum) et la forme de sa musique (`music` : étouffée à partir du boum, comme si ses clics s'arrêtaient, puis fondue à la fin). La musique d'Edith est composée à son tempo, une boucle : un lit de clics mécaniques ne se compose pas à coup sûr (sa consigne le demande).
 
 ## Format
+**Depuis le 6 novembre** (Tristan, sur sept bancs : « vertical please », « tout vertical please ») : `vertical` par défaut, plein écran, ses fichiers horizontaux recadrés sur leur sujet ; `horizontal` (sa bande) seulement à sa demande, ou quand elle veut ses vidéos entières (le `frame` letterbox de son contrat) ; `auto` (comme ses vidéos, ci-dessous) seulement si elle le demande. `docs/modeles.md`, « Réglages d'un modèle ».
+
 L'original est vertical 9:16, en plein cadre, un seul plan horizontal dans une bande. Réglage « format » : `auto` (par défaut : chaque plan comme filmé), `vertical`, `horizontal` (voir effet 5).
 
 ## Ce que Gemini a vu, et ce qu'il a raté

@@ -64,6 +64,8 @@ Rien ne s'allume ni ne clignote dans l'original. Les « clignotements » de la m
 - **Outil** : la finition du modèle (`finish` : contraste et saturation un peu montés ; ni chaleur, ni grain, ni vignettage), existante. Une chaleur posée sur tout, comme celle de la v1, réchaufferait l'heure bleue.
 
 ## Format
+**Depuis le 6 novembre** (Tristan, sur sept bancs : « vertical please », « tout vertical please ») : `vertical` par défaut, plein écran, ses fichiers horizontaux recadrés sur leur sujet ; `horizontal` (sa bande) seulement à sa demande, ou quand elle veut ses vidéos entières (le `frame` letterbox de son contrat) ; `auto` (comme ses vidéos, ci-dessous) seulement si elle le demande. `docs/modeles.md`, « Réglages d'un modèle ».
+
 L'original est une vidéo horizontale 4:3 montrée telle quelle, l'image pleine. Réglage « format », comme dans `frappe` v2 (`setting("format", "auto")`, lu sur `shots[i].aspect`) :
 - `auto` : horizontal quand la plupart de ses vidéos le sont, sinon vertical ;
 - `horizontal` : 4:3 sur du noir, comme l'original (1080 × 810 au milieu du cadre). Une vidéo 16:9 y perd un huitième de chaque côté, recadrée sur son sujet ; une vidéo verticale y perdrait plus de la moitié de sa hauteur : le remplisseur la garde pour l'autre format ;

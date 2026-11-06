@@ -90,6 +90,8 @@
 Film, retenu : les blancs tenus bas (le plus clair de chaque image à 206 sur 255 en médiane, les flashs à 217), les noirs presque noirs (7), des ombres brunes et chaudes, des couleurs douces (le taxi et la brique restent francs), des coins 20 % plus sombres que le centre. Pas de grain mesurable (Gemini en voyait un). La finition « Ville » du modèle (contraste, couleurs un peu retenues, coins sombres) va dans ce sens. Il lui manque de tenir les blancs bas (`fade` lève les noirs, rien ne retient les blancs), et son grain n'est pas dans l'original.
 
 ## Format
+**Depuis le 6 novembre** (Tristan, sur sept bancs : « vertical please », « tout vertical please ») : `vertical` par défaut, plein écran, ses fichiers horizontaux recadrés sur leur sujet ; `horizontal` (sa bande) seulement à sa demande, ou quand elle veut ses vidéos entières (le `frame` letterbox de son contrat) ; `auto` (comme ses vidéos, ci-dessous) seulement si elle le demande. `docs/modeles.md`, « Réglages d'un modèle ».
+
 L'original est horizontal 4:3 (720 × 540), montré tel quel : dans le fil vertical, une bande de 1080 × 810 au milieu, du noir dessus et dessous. Réglage « format » : `auto` (horizontal quand la plupart de ses vidéos le sont, sinon vertical plein écran), `horizontal` (4:3 sur du noir comme l'original : une vidéo 16:9 y perd 12,5 % de chaque côté ; ou 16:9 entier, à décider), `vertical` (plein écran). Le nom suit le cadre : centré, 27 % de sa largeur, au milieu de la bande en horizontal, dans le ciel au-dessus du milieu en vertical.
 
 ## Ce que Gemini a vu, et ce qu'il a raté

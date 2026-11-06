@@ -70,6 +70,8 @@ Toutes les coupes sont franches : aucun zoom, aucun coup de fouet, aucun flash. 
 - **Outil** : existant : le code du modèle (`FitText`), comme la v1 ; sa fin à elle (une offre, une annonce) prend la place de la signature.
 
 ## Format
+**Depuis le 6 novembre** (Tristan, sur sept bancs : « vertical please », « tout vertical please ») : `vertical` par défaut, plein écran, ses fichiers horizontaux recadrés sur leur sujet ; `horizontal` (sa bande) seulement à sa demande, ou quand elle veut ses vidéos entières (le `frame` letterbox de son contrat) ; `auto` (comme ses vidéos, ci-dessous) seulement si elle le demande. `docs/modeles.md`, « Réglages d'un modèle ».
+
 L'original est une vidéo horizontale 16:9 : l'étoile occupe toute l'image, puis ses plans en largeur dans le fin cadre ; Instagram la montre avec du noir au-dessus et en dessous. Réglage « format » : `auto` (horizontal quand la plupart de ses vidéos le sont, sinon vertical), `horizontal` (comme l'original : l'image 16:9 au milieu du Reel, sur du noir, l'étoile et le cadre dedans), `vertical` (plein écran : l'étoile tournée d'un quart, ses deux bandes droites vers les côtés, les quatre autres vers les coins à 54° de l'horizontale ; sur 1080 × 1920, carré ≈ 100 px, bandes ≈ 160 px, leurs bouts à 130 à 160 px du centre, cadre ≈ 35 px ; l'écran partagé l'un au-dessus de l'autre). À voir avec Tristan : en vertical, ses vidéos horizontales recadrées sur leur sujet, ou entières sur le bordeaux.
 
 ## Ce que Gemini a vu, et ce qu'il a raté

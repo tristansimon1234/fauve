@@ -81,6 +81,8 @@ Noir et blanc contrasté : noirs profonds (le 1 % le plus sombre à 9 – 13 niv
 Ses lieux et leurs mots : le panneau de rue parisien, la station de vélos, « ARRIVAL AT TOKYO », « SHIBUYA STA. » et les caractères du bus, « Slow down / Japan ». Le modèle met ses lieux à elle et ses mots, ou rien.
 
 ## Format
+**Depuis le 6 novembre** (Tristan, sur sept bancs : « vertical please », « tout vertical please ») : `vertical` par défaut, plein écran, ses fichiers horizontaux recadrés sur leur sujet ; `horizontal` (sa bande) seulement à sa demande, ou quand elle veut ses vidéos entières (le `frame` letterbox de son contrat) ; `auto` (comme ses vidéos, ci-dessous) seulement si elle le demande. `docs/modeles.md`, « Réglages d'un modèle ».
+
 L'original est vertical 9:16 plein cadre. Réglage « format » : `auto` (par défaut, comme ses vidéos : plein cadre quand la plupart sont en hauteur, sinon entières dans une bande 16:9 sur du noir), `vertical` (plein cadre, ses vidéos horizontales recadrées sur leur sujet), `horizontal` (toutes dans la bande). La masse qui passe, la poussée et ses deux lignes se posent dans la bande comme dans l'image entière.
 
 ## Ce que Gemini a vu, et ce qu'il a raté

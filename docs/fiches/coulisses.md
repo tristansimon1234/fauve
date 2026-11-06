@@ -114,6 +114,8 @@ Autour de la carte, rien ne bouge : le fond, le titre et la timeline sont là de
 Celui de la vidéo : naturel, contrasté, froid la nuit, chaud dedans ; deux plans au fisheye (l'objectif de la caméra, avec ses coins noirs, pas un effet du montage). La fiche autour est plate, sans grain. La finition « Net » du v1 suffit.
 
 ## Format
+**6 novembre** : quand tous les modèles sont passés en vertical par défaut (Tristan : « tout vertical please »), celui-ci a gardé le sien, `auto` : le Reel est déjà vertical, et sa carte sur sa page est le modèle, jamais une bande sur du noir ; `horizontal` (la carte 16:9, ses vidéos entières) est marqué comme sa bande. `docs/modeles.md`, « Décisions de Tristan sur les originaux ».
+
 L'original est vertical (9:16) ; sa vidéo, horizontale (16:9), passe entière dans la carte, qui prend 75,7 % de la largeur et 24 % de la hauteur. Ses vidéos à elle seront souvent verticales : dans une carte 16:9, il n'en reste qu'une bande (32 % de leur hauteur). Réglage « format » : `auto` (la carte 16:9 quand la plupart de ses vidéos sont horizontales, sinon carrée), `horizontal` (16:9, comme l'original ; une vidéo verticale y est cadrée sur son sujet), `vertical` (une carte carrée de la même largeur : il reste 56 % de la hauteur d'une vidéo verticale ; le bloc reste centré, l'étiquette vers 68 à 71 % de la hauteur, sous la limite des 75 %, et la timeline en décor dessous ; une carte 4:5 pousserait l'étiquette au-delà).
 
 ## Ce que Gemini a vu, et ce qu'il a raté

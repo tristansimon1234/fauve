@@ -74,6 +74,8 @@ Ce que l'original fait sur trois photos de ville, le modèle le fait sur les pho
 Teal et orange marqué : ciels sarcelle et cyan, ombres bleu-vert presque noires, tours orange (#BE6C2A) et brun chaud, couchant rose et orange sur le plan 1 (#A26F61 en haut, #2D4468 au milieu, #7C5F59 en bas) ; les rouges (lampe, disque, fenêtres) francs, posés par-dessus. Contraste fort, ni grain (l'aplat du plan 3 n'a aucun bruit), ni coins sombres.
 
 ## Format
+**Depuis le 6 novembre** (Tristan, sur sept bancs : « vertical please », « tout vertical please ») : `vertical` par défaut, plein écran, ses fichiers horizontaux recadrés sur leur sujet ; `horizontal` (sa bande) seulement à sa demande, ou quand elle veut ses vidéos entières (le `frame` letterbox de son contrat) ; `auto` (comme ses vidéos, ci-dessous) seulement si elle le demande. `docs/modeles.md`, « Réglages d'un modèle ».
+
 L'original est vertical plein cadre, le second exemple horizontal 16:9 : le format suit ses fichiers. Réglage « format » :
 - `auto` (par défaut) : vertical plein cadre quand ses fichiers le sont, sinon sa vidéo horizontale entière dans une bande 16:9 au milieu du noir (comme le second exemple) ;
 - `vertical` : plein cadre, ses fichiers horizontaux recadrés ;

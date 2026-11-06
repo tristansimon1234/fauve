@@ -59,6 +59,8 @@ Deux lumières : les plans calmes sombres, froids et pâles (effet 2), la rafale
 Le **logo du salon** au mur de la niche (son nom en lettres noires : sa marque), ses mots (« WELCOME TO OUR SALON » : ceux de ce salon), sa chanson et la voix qui compte (Edith compose sa musique, ses claquements de doigts comptent à la place). Le modèle met les siens : son lieu, sa phrase, sa couleur (son jaune fluo seulement quand sa couleur ne se lit pas sur un plan sombre).
 
 ## Format
+**Depuis le 6 novembre** (Tristan, sur sept bancs : « vertical please », « tout vertical please ») : `vertical` par défaut, plein écran, ses fichiers horizontaux recadrés sur leur sujet ; `horizontal` (sa bande) seulement à sa demande, ou quand elle veut ses vidéos entières (le `frame` letterbox de son contrat) ; `auto` (comme ses vidéos, ci-dessous) seulement si elle le demande. `docs/modeles.md`, « Réglages d'un modèle ».
+
 L'original est vertical 9:16 plein cadre. Réglage `format` :
 - `auto` (par défaut) : comme ses vidéos : plein cadre quand la plupart sont en hauteur (une vidéo horizontale recadrée sur son sujet), sinon entières dans une bande 16:9 sur du noir ;
 - `vertical` : plein cadre vertical, ses vidéos horizontales recadrées sur leur sujet ;

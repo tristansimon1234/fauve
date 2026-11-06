@@ -77,6 +77,8 @@ Chaud et franc : le marbre d'un blanc chaud (214, 203, 197 au milieu de ses zone
 « IDÉES DE RECETTES » et « simples, saines, rapides et gourmandes » sont les mots de son autrice : **à l'original, jamais recopiés** ; le modèle écrit les siens. Ses plats, son marbre et sa main sont ce qu'elle filme : ils ne disent que ce qu'il faut filmer. Ni logo, ni marque, ni mascotte.
 
 ## Format
+**Depuis le 6 novembre** (Tristan, sur sept bancs : « vertical please », « tout vertical please ») : `vertical` par défaut, plein écran, ses fichiers horizontaux recadrés sur leur sujet ; `horizontal` (sa bande) seulement à sa demande, ou quand elle veut ses vidéos entières (le `frame` letterbox de son contrat) ; `auto` (comme ses vidéos, ci-dessous) seulement si elle le demande. `docs/modeles.md`, « Réglages d'un modèle ».
+
 L'original est vertical 9:16, chaque plat plein cadre. Réglage « format » :
 - `auto` (par défaut) : vertical plein cadre quand la plupart de ses vidéos sont en hauteur (une vidéo horizontale recadrée sur son sujet) ; quand la plupart sont en largeur, chacune entière dans une bande 16:9 au milieu, sur du noir, le titre sur la bande ;
 - `vertical` : plein cadre quoi qu'elle envoie ;

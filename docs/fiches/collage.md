@@ -82,6 +82,8 @@ L'enseigne « CAFE CENTRAL » sur le store rouge (le seul texte, qui est dans la
 L'original n'en a aucun. Un titre facultatif, dans sa matière : son nom ou deux à quatre mots en capitales blanches étroites sur une bande de sa couleur en travers de l'image, comme les lettres blanches du store de B (la seule écriture de l'original), dans le haut de ses dix premières images (2 s), ses morceaux qui arrivent passant devant, comme les toits de C recouvrent l'enseigne de B. La bande vient du premier rendu local : en lettres blanches seules, le titre disparaissait sur un studio blanc et sur le ciel blanc d'une image en noir et blanc. Sa couleur quand elle est assez foncée pour des lettres blanches, sinon sa couleur sombre, sinon de l'encre. Laissé vide quand c'est elle qui choisit le modèle, écrit quand c'est Edith (le modèle donne la forme, jamais le silence). En option, une carte de fin sur sa première image revenue, ses mots sur la même bande.
 
 ## Format
+**Depuis le 6 novembre** (Tristan, sur sept bancs : « vertical please », « tout vertical please ») : `vertical` par défaut, plein écran, ses fichiers horizontaux recadrés sur leur sujet ; `horizontal` (sa bande) seulement à sa demande, ou quand elle veut ses vidéos entières (le `frame` letterbox de son contrat) ; `auto` (comme ses vidéos, ci-dessous) seulement si elle le demande. `docs/modeles.md`, « Réglages d'un modèle ».
+
 L'original est vertical plein cadre. Réglage `format` : `auto` (vertical plein cadre quand la plupart de ses images sont verticales ou carrées, sinon toutes dans une bande 16:9 sur du noir, ses morceaux à l'échelle de la bande), `vertical` (plein cadre, ses images horizontales recadrées sur leur sujet), `horizontal` (la bande).
 
 ## Ce que Gemini a vu, et ce qu'il a raté

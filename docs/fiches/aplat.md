@@ -67,6 +67,8 @@
 Des images de caméra d'action : grand angle, horizon courbé, reflets du soleil en haut de l'image. Couleurs naturelles, saturées là où il y a de la couleur (65 % de saturation sur les roches au ciel bleu profond, 36 à 45 % ailleurs), hautes lumières vers 180 sur 255 (le seul blanc pur, ce sont les silhouettes blanches), noirs vers 15 à 25. Pas de vignettage (les coins sont plus clairs que le centre), grain pas mesurable. Le rouge n'est jamais dans les images : seulement l'aplat. Outil : la finition du modèle (« Couleurs franches », contraste et saturation un peu poussés) : juste.
 
 ## Format
+**Depuis le 6 novembre** (Tristan, sur sept bancs : « vertical please », « tout vertical please ») : `vertical` par défaut, plein écran, ses fichiers horizontaux recadrés sur leur sujet ; `horizontal` (sa bande) seulement à sa demande, ou quand elle veut ses vidéos entières (le `frame` letterbox de son contrat) ; `auto` (comme ses vidéos, ci-dessous) seulement si elle le demande. `docs/modeles.md`, « Réglages d'un modèle ».
+
 L'original est une image horizontale 4:3 (720 × 540), montrée telle quelle : dans un fil vertical, des bandes dessus et dessous. Aucun texte à replacer. Réglage « format » : `auto` (4:3 quand la plupart de ses vidéos sont horizontales, sinon vertical plein écran), `horizontal` (4:3, comme l'original), `vertical` (9:16 plein écran : la silhouette, les morceaux et le cadre en parts de l'image ; le cadre de la même épaisseur en pixels sur les quatre côtés, environ 150 px sur 1080). Une personne qui marche, en pied, remplit mieux un cadre vertical.
 
 ## Ce que Gemini a vu, et ce qu'il a raté

@@ -67,6 +67,8 @@ Chaud, contrasté et saturé : des noirs denses, des reflets sur l'inox, la sauc
 L'original n'en a pas qu'on entende (plus haut) ; ses gestes ont leur son. Le moteur ne fait pas entendre les images posées sur sa parole (`refs`, jamais entendues) : une musique douce les remplace sous sa voix (la mise en forme du mixage la baisse quand elle parle), choisie à 96 BPM puisqu'aucun tempo ne se compte, et coupée net sur sa formule de fin. Si Tristan préfère sa voix seule, comme l'original : `music: { none: true }`.
 
 ## Format
+**Depuis le 6 novembre** (Tristan, sur sept bancs : « vertical please », « tout vertical please ») : `vertical` par défaut, plein écran, ses fichiers horizontaux recadrés sur leur sujet ; `horizontal` (sa bande) seulement à sa demande, ou quand elle veut ses vidéos entières (le `frame` letterbox de son contrat) ; `auto` (comme ses vidéos, ci-dessous) seulement si elle le demande. `docs/modeles.md`, « Réglages d'un modèle ».
+
 Vertical 9:16, plein cadre. Réglage `format` : `auto` (comme sa vidéo où elle parle : verticale, tout plein cadre ; horizontale, toutes ses images entières dans une bande 16:9 sur du noir, ses mots sur la même ligne), `vertical`, `horizontal`.
 
 ## Ce que Gemini a vu, et ce qu'il a raté

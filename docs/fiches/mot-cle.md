@@ -86,6 +86,8 @@ Tout ce qui s'écrit apparaît et part d'un coup, en une image, sans fondu, sauf
 Un rouge profond et saturé (saturation moyenne 0,71 à 0,79), une image sombre (luminance médiane 0,20 à 0,25), un contraste doux, la peau chaude. Le fond va de #480C01 – #6A1814 en haut à gauche à #B43C1E à droite, d'où vient la lumière (au milieu #972713, #992915 puis #A82F17 : le plan 3 est plus clair). Les coins du haut plus sombres, pas de grain qui bouge. La finition « Studio » du modèle (couleurs franches, contraste propre) va.
 
 ## Format
+**Depuis le 6 novembre** (Tristan, sur sept bancs : « vertical please », « tout vertical please ») : `vertical` par défaut, plein écran, ses fichiers horizontaux recadrés sur leur sujet ; `horizontal` (sa bande) seulement à sa demande, ou quand elle veut ses vidéos entières (le `frame` letterbox de son contrat) ; `auto` (comme ses vidéos, ci-dessous) seulement si elle le demande. `docs/modeles.md`, « Réglages d'un modèle ».
+
 L'original est vertical 9:16, plein cadre : une vidéo face caméra filmée en vertical, la tête à mi-hauteur. Réglage « format » :
 - `auto` : vertical quand sa vidéo l'est (le cas courant), horizontal sinon.
 - `vertical` : plein écran, sa tête vers 45 % de la hauteur (le recadrage suit son visage), les mots dans la moitié haute, les sous-titres dans leur rangée.

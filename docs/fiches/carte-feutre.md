@@ -59,6 +59,8 @@ Sous le carnet, tout du long : une photo toutes les 3 images (0,1 s), 23 photos 
 Ni zoom, ni poussée lente, ni mouvement de caméra dans l'original : rien de ce que Tristan trouve cheap.
 
 ## Format
+**Depuis le 6 novembre** (Tristan, sur sept bancs : « vertical please », « tout vertical please ») : `vertical` par défaut, plein écran, ses fichiers horizontaux recadrés sur leur sujet ; `bandes` (sa bande) seulement à sa demande, ou quand elle veut ses vidéos entières (le `frame` letterbox de son contrat) ; `auto` (comme ses vidéos, ci-dessous) seulement si elle le demande. `docs/modeles.md`, « Réglages d'un modèle ».
+
 L'original est vertical 9:16, ses photos verticales plein écran, sans bandes. Le carnet cache le milieu : de chaque photo, on voit surtout ses 30 % du haut et ses 30 % du bas. Réglage « format » : `vertical` (défaut, comme l'original : chaque image plein écran ; une image horizontale recadrée en 9:16 autour de son sujet, qui doit tomber au-dessus ou au-dessous du carnet) ; `deux bandes` (à essayer, quand la plupart de ses images sont horizontales : au-dessus et au-dessous du carnet restent deux bandes de 1080 × 570 px, presque du 16:9 ; une image horizontale entière dans chacune, qui changent l'une après l'autre, toujours toutes les 3 images) ; `auto` choisit d'après la plupart de ses images. Pas de Reel horizontal : rien à y gagner.
 
 ## Ce que Gemini a vu, et ce qu'il a raté

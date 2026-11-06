@@ -72,6 +72,8 @@ Des coupes franches partout, sauf ses coupes cachées et un long fondu ; ni zoom
 Un film doux de voyage : des ombres un peu froides (#191C1D, le bleu et le vert au-dessus du rouge), des médiums et des hautes lumières chauds (#7B756A, #C6C1B2), des blancs retenus (jamais au-dessus de 222 sur 255), des noirs à peine levés (9 au plus sombre), une saturation moyenne de 38 % (les plans saturés le sont d'eux-mêmes : la poudre, la mer). Aucun grain visible (le ciel du coucher de soleil, uni, a 0,4 niveau de bruit), ni coins sombres.
 
 ## Format
+**Depuis le 6 novembre** (Tristan, sur sept bancs : « vertical please », « tout vertical please ») : `vertical` par défaut, plein écran, ses fichiers horizontaux recadrés sur leur sujet ; `horizontal` (sa bande) seulement à sa demande, ou quand elle veut ses vidéos entières (le `frame` letterbox de son contrat) ; `auto` (comme ses vidéos, ci-dessous) seulement si elle le demande. `docs/modeles.md`, « Réglages d'un modèle ».
+
 L'original est vertical 9:16, plein cadre. Réglage « format » :
 - `auto` (par défaut) : comme ses vidéos : vertical plein cadre, ses vidéos horizontales entières dans une bande 16:9 sur du noir quand la plupart le sont ;
 - `vertical` : vertical plein cadre, ses vidéos horizontales recadrées sur leur sujet ;

@@ -69,6 +69,8 @@
 Film doux : blancs tenus sous 225 sur 255 (jamais de blanc pur), hautes lumières crème (≈ #D1CFC3), tons moyens un peu olive (≈ #7C7A6E), noirs à peine levés, saturation moyenne. L'ouverture en vert sauge (ciel ≈ #B5C2B5) sur une colline presque noire. Pas de vignettage mesurable. Grain : pas mesurable sur la copie, trop compressée. Outil : la finition du modèle (`finish` : `fade` léger, hautes lumières crème par `highlights` et `split`, saturation un peu baissée), pas « Ville chaude ».
 
 ## Format
+**Depuis le 6 novembre** (Tristan, sur sept bancs : « vertical please », « tout vertical please ») : `vertical` par défaut, plein écran, ses fichiers horizontaux recadrés sur leur sujet ; `fenetre` (sa bande) seulement à sa demande, ou quand elle veut ses vidéos entières (le `frame` letterbox de son contrat) ; `auto` (comme ses vidéos, ci-dessous) seulement si elle le demande. `docs/modeles.md`, « Réglages d'un modèle ».
+
 L'original est une image presque carrée, un peu plus large que haute (1,18:1), aux coins arrondis sur du noir : dans un fil vertical, des bandes noires dessus et dessous. Réglage « format » : `auto` (vertical plein écran quand la plupart de ses vidéos sont verticales, la fenêtre sinon), `fenêtre` (1,18:1 aux coins arrondis sur du noir, comme l'original, ses vidéos recadrées sur leur sujet), `vertical` (plein écran 9:16, coins arrondis et fente gardés, chaque place en part de l'image).
 
 ## Ce que Gemini a vu, et ce qu'il a raté

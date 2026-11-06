@@ -63,6 +63,8 @@ Aucun zoom ni poussée : des coupes franches (la règle du monteur ; aucun origi
 Chaud et doré, les noirs profonds, un léger halo sur les hautes lumières (ses lampes) ; ni grain ni coins sombres (le noir au-dessus et au-dessous de l'image horizontale n'en porte pas : retirés de sa finition, `MontageSkill.finish`). Le modèle dessine lui-même son noir et ses lumières : sa lumière de lecture est naturelle (`grade`), comme les skills qui dessinent la leur.
 
 ## Format
+**Depuis le 6 novembre** (Tristan, sur sept bancs : « vertical please », « tout vertical please ») : `vertical` par défaut, plein écran, ses fichiers horizontaux recadrés sur leur sujet ; `horizontal` (sa bande) seulement à sa demande, ou quand elle veut ses vidéos entières (le `frame` letterbox de son contrat) ; `auto` (comme ses vidéos, ci-dessous) seulement si elle le demande. `docs/modeles.md`, « Réglages d'un modèle ».
+
 Réglage « format », comme « Lieu tapé » (`setting("format", "auto")`, lu sur `shots[i].aspect`) :
 - `auto` : horizontal quand la plupart de ses vidéos le sont, sinon vertical ;
 - `horizontal` : 16:9 sur du noir (1080 × 608 au milieu du cadre), son nom allumé au-dessus de l'image, sa ligne dessous ;

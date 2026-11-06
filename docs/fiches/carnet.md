@@ -101,6 +101,8 @@
 Pas de look commun : des plans de nuit chauds (le bureau sous une lampe, #5F594F au mur du début), des plans de jour gris et neutres (le fond de la question #A0A097), des noirs purs (#000000 autour du rond et à la fin, sans grain dessus). Les mots blanc pur. La finition du modèle garde ses noirs noirs : ni voile, ni grain, ni coins sombres.
 
 ## Format
+**Depuis le 6 novembre** (Tristan, sur sept bancs : « vertical please », « tout vertical please ») : `vertical` par défaut, plein écran, ses fichiers horizontaux recadrés sur leur sujet ; `horizontal` (sa bande) seulement à sa demande, ou quand elle veut ses vidéos entières (le `frame` letterbox de son contrat) ; `auto` (comme ses vidéos, ci-dessous) seulement si elle le demande. `docs/modeles.md`, « Réglages d'un modèle ».
+
 L'original est vertical 9:16, plein cadre, ses plans verticaux. Réglage « format » :
 - `auto` : comme sa vidéo où elle parle : verticale, tout en plein écran (ses images horizontales recadrées sur leur sujet) ; filmée en largeur, ses images entières dans une bande 16:9 sur du noir, les mots autour.
 - `vertical` : tout en plein écran.
