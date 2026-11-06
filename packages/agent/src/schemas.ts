@@ -248,7 +248,8 @@ export type SfxLevel = z.infer<typeof sfxLevelSchema>;
 export const motionDrawnSchema = z.object({
   shots: z.number().int().min(1).max(200),
   subjects: z.array(z.number().int().min(0).max(199)).max(200).optional(),
-  objects: z.array(z.object({ shot: z.number().int().min(0).max(199), name: z.string().min(1).max(60) })).max(24).optional(),
+  // `still`: read once on its passage's first image (a still camera, whose code reads it there), not followed through it.
+  objects: z.array(z.object({ shot: z.number().int().min(0).max(199), name: z.string().min(1).max(120), still: z.boolean().optional() })).max(24).optional(),
 });
 export type MotionDrawn = z.infer<typeof motionDrawnSchema>;
 

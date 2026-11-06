@@ -61,8 +61,8 @@ export const HOUSE_EFFECTS: Record<string, HouseEffect> = {
     il_faut: "des plans larges de son lieu, de sa rue ou de son quartier, et son adresse ou un repère vrai de son commerce",
   },
   facade: {
-    effet: "sa devanture qui se construit morceau par morceau sur le noir, un par note, son enseigne d'abord, puis sa façade entière qui s'anime",
-    il_faut: "une vidéo fixe de sa devanture filmée de face, son enseigne visible, faite d'éléments séparés (fenêtres, store, tables)",
+    effet: "sa devanture qui se construit sur le noir, élément par élément détouré (sa porte, ses fenêtres, puis les pans de son mur), un par note, puis sa façade entière qui s'anime",
+    il_faut: "une vidéo fixe de sa devanture filmée de face, son enseigne visible, faite d'éléments séparés (porte, fenêtres, volets, store, tables)",
   },
   gaufre: {
     effet: "son nom pressé en creux dans un papier pêche, qui s'encre lettre à lettre comme un faire-part, une petite ligne dessous",

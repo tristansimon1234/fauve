@@ -440,16 +440,16 @@ if (clears.length) {
 // engine reads them, never a ground (a sky matte video).
 const reads = readPassages(plan, (id) => !files.find((f) => f.id === id)?.photo).map((p) => ({ ...p, kinds: p.kinds.map((k) => (k === "ground" ? ("sky" as const) : k)) }));
 if (reads.length) {
-  const jobs = reads.map((p) => ({ id: p.key, src: files.find((f) => f.id === p.clip_id)!.path, from: p.from, to: p.to, read: [...new Set(p.kinds)], ...(p.photo ? { photo: true } : {}) }));
+  const jobs = reads.map((p) => ({ id: p.key, src: files.find((f) => f.id === p.clip_id)!.path, from: p.from, to: p.first ? p.from : p.to, read: [...new Set(p.kinds)], ...(p.photo ? { photo: true } : {}) }));
   writeFileSync(`${media}/read-jobs.json`, JSON.stringify(jobs));
   try {
     const printed = execFileSync(process.env.PYTHON ?? "python3", ["-I", `${RENDER}/shot_read.py`, `${media}/read-jobs.json`], { encoding: "utf8" });
     const read = JSON.parse(printed.trim().split("\n").at(-1) ?? "{}") as Record<string, Record<string, unknown>>;
     for (const p of reads) {
       const r = read[p.key];
-      const reading = r && !r.error ? shotReadingSchema.safeParse({ motion: r.motion, sky: r.sky, vanish: r.vanish, light: r.light }).data : undefined;
+      const reading = r && !r.error ? shotReadingSchema.safeParse({ motion: r.motion, sky: r.sky, vanish: r.vanish, light: r.light, regions: r.regions }).data : undefined;
       if (reading) subjects[p.key] = { ...(subjects[p.key] ?? { src: "" }), reading };
-      console.log(`readings of ${p.clip_id} (${p.from}–${p.to} s): ${reading ? `${p.kinds.join(", ")}${reading.light ? `, light ${reading.light.mean} (high ${reading.light.high})` : ""}` : String(r?.error ?? "none")}`);
+      console.log(`readings of ${p.clip_id} (${p.from}–${p.to} s): ${reading ? `${p.kinds.join(", ")}${reading.light ? `, light ${reading.light.mean} (high ${reading.light.high})` : ""}${reading.regions ? `, ${reading.regions.length} regions` : ""}` : String(r?.error ?? "none")}`);
     }
   } catch (error) {
     console.log("shots not read (PYTHON: a Python with OpenCV and numpy):", error instanceof Error ? error.message.split("\n")[0] : error);

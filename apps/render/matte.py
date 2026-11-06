@@ -279,8 +279,8 @@ def person_masks(frames, ww, wh):
 CONTOUR_POINTS = 64
 
 
-def contour_of(m):
-    """The outline of a cut-out's largest piece: CONTOUR_POINTS points (x, y shares) clockwise from its top, or None."""
+def contour_of(m, points=CONTOUR_POINTS):
+    """The outline of a cut-out's largest piece: `points` points (x, y shares) clockwise from its top, or None."""
     import cv2
     import numpy as np
 
@@ -299,7 +299,7 @@ def contour_of(m):
     p = np.roll(p, -int(np.lexsort((p[:, 0], p[:, 1]))[0]), axis=0)
     ring = np.vstack([p, p[:1]])
     along = np.concatenate([[0.0], np.cumsum(np.linalg.norm(np.diff(ring, axis=0), axis=1))])
-    t = np.linspace(0, along[-1], CONTOUR_POINTS, endpoint=False)
+    t = np.linspace(0, along[-1], points, endpoint=False)
     return np.stack([np.interp(t, along, ring[:, 0]) / w, np.interp(t, along, ring[:, 1]) / h], axis=1)
 
 

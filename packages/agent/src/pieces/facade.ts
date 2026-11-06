@@ -4,13 +4,15 @@ import type { EffectPiece, PieceTimeline, PieceTimelineInput } from "../pieces.t
 // over one still shot of her front, the screen goes black and her front is built on it piece by piece, each piece at
 // once and at its exact place, no fade, no edge, never moving again, her video playing in it, each on a note: her sign
 // or her door with her name first, then three of her front's elements far from it and from each other, slowly; then a
-// burst of twelve, one every 3 to 6 images (her other elements, the lower first and right to left, then bands cut
-// along her front's lines: the pavement under it, a side going up, the wall above); a short pause; then the three big
-// ones a beat apart (the street, the top's left third, all that is still black), and her front plays whole, alive, the
-// camera still, nothing written on it, until the montage takes over. Her front's elements are named by its filler
-// from what her shot shows (« every window », her sign: `@morceaux`, `@enseigne`) and read once on its first image;
-// fewer than six found, her picture is cut as a front is built, in pieces of every shape (tall ones, wide ones, flat
-// bands, an arch, a band wider at its foot: v3, never a grid of near squares), laid at random on the same times.
+// burst of twelve, one every 3 to 6 images (her other elements, what stands in front of another first, then the lower
+// ones right to left, then the smaller regions of her picture); a short pause; then the big ones a beat apart (the
+// street, what is left of the top's left half, all that is still black), and her front plays whole, alive, the camera
+// still, nothing written on it, until the montage takes over. Each piece is a shape of HER picture, cut along its own
+// edges (v4, Tristan: « le montage devrait détourer la photo pour adapter les formes »): the elements her front is made
+// of, named by its filler in a detector's words (« painted door, every window, shop sign, awning »: `@morceaux`; her
+// sign: `@enseigne`) and read once on its first image (`still`), each along its own outline; then her picture's regions
+// along its edges, by colour (PictureRegions). Rectangles along her front's lines when only her elements were read; the
+// cut of every shape of v3 (tall ones, wide ones, flat bands, an arch) only when nothing of her picture was read.
 // Kept of its skill: its tools, its order, its proportions, its four rising harp notes and twelve rising plucks (one
 // per piece), its optional name (and its line) on a piece of the black while it builds, its format (her front upright
 // full frame, her front in width whole in a band across the black, no zoom to fill the screen ever). Its timing is
@@ -131,29 +133,42 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   // Upright, once her front is whole, the montage under it is her front itself: nothing left to draw.
   if (!band && frame >= WHOLE) return none;
 
-  // Read once on its first image here (a still camera): what repeats on her front, then her sign.
+  // Read once on its first image here (a still camera, read there by the engine): her sign, then the elements her front
+  // is made of, each along its own outline (v4, Tristan: « le montage devrait détourer la photo pour adapter les formes »),
+  // and her picture's regions along its own edges (by colour: a wall, a door's frame, a plinth, the pavement).
   const f0 = Math.max(0, Math.round(shot.from));
-  const parts = SubjectParts(shot, f0, laid, "@morceaux", 0);
-  const lone = parts.length ? null : SubjectBox(shot, f0, laid, "@morceaux");
-  const signAt = SubjectBox(shot, f0, laid, "@enseigne");
-  const signLine = SubjectOutline(shot, f0, laid, "@enseigne");
 
-  // 2. Its pieces, as boxes of its frame. Her elements, inside the frame, none mostly inside her sign.
+  // 2. Its pieces, each a shape of her picture (d, its outline) and the box of what the frame shows of it.
   const R = (x0, y0, x1, y1) => ({ x: Math.round(x0), y: Math.round(y0), w: Math.round(x1) - Math.round(x0), h: Math.round(y1) - Math.round(y0) });
-  const clip = (b) => { if (!b) return null; const r = R(Math.max(0, b.x), Math.max(0, b.y), Math.min(bw, b.x + b.w), Math.min(bh, b.y + b.h)); return r.w >= bw * 0.02 && r.h >= bh * 0.01 ? r : null; };
+  const fit = (b) => { if (!b) return null; const r = R(Math.max(0, b.x), Math.max(0, b.y), Math.min(bw, b.x + b.w), Math.min(bh, b.y + b.h)); return r.w >= bw * 0.02 && r.h >= bh * 0.01 ? { ...r, d: b.d || null, seen: (r.w * r.h) / Math.max(1, b.w * b.h) } : null; };
   const area = (b) => b.w * b.h;
   const inter = (p, q) => Math.max(0, Math.min(p.x + p.w, q.x + q.w) - Math.max(p.x, q.x)) * Math.max(0, Math.min(p.y + p.h, q.y + q.h) - Math.max(p.y, q.y));
-  const sign = clip(signAt);
-  const elems = (parts.length ? parts : lone ? [lone] : []).map(clip).filter((b) => b && !(sign && inter(b, sign) > 0.5 * area(b)));
+  const inside = (p, q, k) => p !== q && inter(p, q) > k * area(p);
+  const sign = fit(SubjectBox(shot, f0, laid, "@enseigne"));
+  if (sign) sign.d = SubjectOutline(shot, f0, laid, "@enseigne");
+  const parts = SubjectParts(shot, f0, laid, "@morceaux", 0);
+  const lone = parts.length ? null : SubjectBox(shot, f0, laid, "@morceaux");
+  const found = parts.length ? parts : lone ? [{ ...lone, d: SubjectOutline(shot, f0, laid, "@morceaux") }] : [];
+  // Her elements inside the frame, none her sign again; her regions, none an element again (mostly inside its box), none too small to see.
+  const elems = found.map(fit).filter((b) => b && !(sign && inside(b, sign, 0.5)));
   const all = sign ? [sign, ...elems] : elems;
+  const read = PictureRegions(shot, f0, laid).map(fit).filter((r) => r && area(r) >= 0.004 * bw * bh);
+  // A region inside an element's box is that element's (its plants, a painting on it, what its outline left out): it
+  // lands with the smallest element that holds it, so no black is left in it.
+  const shape0 = (b) => b.d || "M" + b.x + " " + b.y + "h" + b.w + "v" + b.h + "h" + -b.w + "Z";
+  const regs = read.filter((r) => {
+    const owner = all.filter((e) => inside(r, e, 0.6)).sort((p, q) => area(p) - area(q))[0];
+    if (owner) owner.ds = [...(owner.ds || [shape0(owner)]), r.d];
+    return !owner;
+  });
   const mid = (b) => [b.x + b.w / 2, b.y + b.h / 2];
   // Those far from the ones taken first, the larger ones before, and unlike them in shape (the original's door, window,
   // arched window and awning: a tall piece, a wide one, a flat band; v3, Tristan: « les formes au départ ne sont pas
   // toutes carrées »): what says her place, all over her front.
   const shape = (b) => Math.log(Math.max(1, b.h) / Math.max(1, b.w));
-  const spread = (list, first, k) => {
-    const out = [first];
-    const rest = list.filter((b) => b !== first);
+  const spread = (list, firsts, k) => {
+    const out = [...firsts];
+    const rest = list.filter((b) => !firsts.includes(b));
     const most = Math.max(...list.map(area));
     while (out.length < k && rest.length) {
       let best = 0, score = -1;
@@ -167,38 +182,48 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
     }
     return { out, rest };
   };
+  const row = (b) => Math.round((b.y + b.h) / (0.05 * bh));
+  const lowFirst = (p, q) => row(q) - row(p) || q.x - p.x;
+  const join = (list) => list.length ? { ...R(Math.min(...list.map((b) => b.x)), Math.min(...list.map((b) => b.y)), Math.max(...list.map((b) => b.x + b.w)), Math.max(...list.map((b) => b.y + b.h))), ds: list.flatMap((b) => b.ds || [shape0(b)]) } : null;
+  const B = all.length ? Math.max(...all.map((b) => b.y + b.h)) : Math.round(0.71 * bh);
+  const S = Math.round(all.length ? Math.max(0.5 * bh, Math.min(0.9 * bh, B + 0.05 * bh)) : 0.71 * bh);
   let slow, burst, big;
-  if (all.length >= 6) {
-    // Her sign first (else her largest element), then three far from it and from each other.
-    const X0 = Math.min(...all.map((b) => b.x)), X1 = Math.max(...all.map((b) => b.x + b.w));
-    const T = Math.min(...all.map((b) => b.y)), B = Math.max(...all.map((b) => b.y + b.h));
-    const S = Math.round(Math.max(0.5 * bh, Math.min(0.9 * bh, B + 0.05 * bh)));
-    const picked = spread(all, sign || all.reduce((m, b) => (area(b) > area(m) ? b : m)), 4);
+  if (all.length || regs.length) {
+    // Her front in its own shapes, as many pieces as her picture has, nothing invented (v4; Tristan: « toujours mettre
+    // de l'intelligence », « plus flex »): her sign first (else her largest element), then three of her elements far
+    // from it and from each other (her regions of a middle size when she has fewer), each along its own outline; the
+    // burst: her other elements (what stands in front of another first, then the lower ones, right to left), then the
+    // smaller of her regions, the lower first, spread over its notes when there are fewer; then what is left in two (the
+    // street, all that is left of the top's left half), and the rest. Her elements alone when no region was read.
+    // (Of her regions, those of her front that the frame shows whole enough: never a sliver at its edge, nor her ground.)
+    const some = all.length >= 4 ? all : [...all, ...regs.filter((r) => area(r) >= 0.012 * bw * bh && area(r) <= 0.15 * bw * bh && r.seen >= 0.6 && r.w >= 0.08 * bw && mid(r)[1] < S)];
+    const pool = some.length ? some : regs;
+    const first = sign || (all.length ? all : pool).reduce((m, b) => (area(b) > area(m) ? b : m));
+    const picked = spread(pool, [first], 4);
     slow = picked.out;
-    // The burst: her other elements, the lower ones first, right to left; then bands along her front's lines: the
-    // pavement under it (right to left), a side going up, the wall above it.
-    const row = (b) => Math.round((b.y + b.h) / (0.05 * bh));
-    const rest = picked.rest.sort((p, q) => row(q) - row(p) || q.x - p.x);
-    const sw = Math.max(X0, bw - X1);
-    const sx = X0 >= bw - X1 ? 0 : X1;
-    const side = sw >= 0.08 * bw ? [2, 1, 0].map((k) => R(sx, T + (k * (B - T)) / 3, sx + sw, T + ((k + 1) * (B - T)) / 3)) : [];
-    const above = T >= 0.1 * bh ? [R(X0, T - 0.06 * bh, X1, T)] : [];
-    const k = Math.max(1, Math.min(4, 12 - rest.length - side.length - above.length));
-    const pave = S - B > 0.01 * bh ? Array.from({ length: k }, (_, i) => R(((k - 1 - i) * bw) / k, B, ((k - i) * bw) / k, S)) : [];
-    burst = [...rest, ...pave, ...side, ...above].slice(0, 12);
-    // The rest, in three: the street, the top's left third, then all that is still black.
-    big = [R(0, S, bw, bh), R(0, 0, 0.339 * bw, Math.max(T, 0.5 * S))];
+    const restE = all.filter((b) => !slow.includes(b));
+    const ahead = (b) => restE.some((q) => inside(b, q, 0.7));
+    restE.sort((p, q) => Number(ahead(q)) - Number(ahead(p)) || lowFirst(p, q));
+    const left = regs.filter((r) => !slow.includes(r)).sort((p, q) => area(p) - area(q));
+    const take = Math.max(0, Math.min(12 - Math.min(12, restE.length), left.length - 2));
+    burst = [...restE.slice(0, 12), ...left.slice(0, take).sort(lowFirst)];
+    // What the burst could not take (her elements too) lands with the last ones: nothing of hers is left out.
+    const after = [...restE.slice(12), ...left.slice(take)];
+    const street = after.filter((r) => mid(r)[1] >= S);
+    const upper = after.filter((r) => !street.includes(r) && mid(r)[0] < bw / 2);
+    const others = after.filter((r) => !street.includes(r) && !upper.includes(r));
+    big = [join(street.length ? street : after.slice(-1)), join(upper.length ? upper : others.slice(-1))].filter(Boolean);
   } else {
-    // Nothing that draws her front's lines (fewer than six elements found): her picture cut as a front is built, in
-    // pieces of every shape, never a grid of squares (v3, Tristan: « les formes au départ ne sont pas toutes carrées »):
-    // the part above the street split again and again at a random place, most often across its longer side, now and
-    // then across the other (tall pieces, wide ones, flat bands, as doors, bays, windows and awnings), laid at random
-    // on the same times; its first four the farthest apart and the most unlike, the tallest topped by an arch, the
-    // flattest a band wider at its foot (the original's arched window and awning); then the street, the top's left
-    // third, then the rest.
-    const S = Math.round(bh * 0.71);
+    // Nothing read of her picture (neither an element nor its regions: the scene check, a read that failed; almost never
+    // in production, where her regions are read on one image of every front): her picture cut as a
+    // front is built, in pieces of every shape, never a grid of squares (v3, Tristan: « les formes au départ ne sont pas
+    // toutes carrées »): the part above the street split again and again at a random place, most often across its longer
+    // side, now and then across the other (tall pieces, wide ones, flat bands, as doors, bays, windows and awnings),
+    // laid at random on the same times; its first four the farthest apart and the most unlike, the tallest topped by an arch, the flattest a band wider at its foot (the original's arched window
+    // and awning); then the street, the top's left third, then the rest.
+    const S2 = Math.round(bh * 0.71);
     const cells = [];
-    const want = (bw * S) / 17;
+    const want = (bw * S2) / 17;
     const cut = (x, y, w, t, depth) => {
       const r = random("facade-c" + x + "-" + y + "-" + w + "-" + t);
       if (w * t <= want * (0.8 + 0.9 * r) || depth > 6 || Math.min(w, t) < bw * 0.14) return cells.push(R(x, y, x + w, y + t));
@@ -216,21 +241,22 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
         cut(x, y + a, w, t - a, depth + 1);
       }
     };
-    cut(0, 0, bw, S, 0);
-    const picked = spread(cells, cells[Math.floor(random("facade-first") * cells.length)], 4);
+    cut(0, 0, bw, S2, 0);
+    const picked = spread(cells, [cells[Math.floor(random("facade-first") * cells.length)]], 4);
     slow = picked.out;
-    const tall = slow.reduce((m, b) => (shape(b) > shape(m) ? b : m));
-    const flat = slow.reduce((m, b) => (shape(b) < shape(m) ? b : m));
-    if (shape(tall) > 0.25) tall.d = "M" + tall.x + " " + (tall.y + tall.h) + "L" + tall.x + " " + (tall.y + tall.w / 2) + "A" + tall.w / 2 + " " + tall.w / 2 + " 0 0 1 " + (tall.x + tall.w) + " " + (tall.y + tall.w / 2) + "L" + (tall.x + tall.w) + " " + (tall.y + tall.h) + "Z";
-    if (flat !== tall && shape(flat) < -0.6) flat.d = "M" + Math.round(flat.x + 0.05 * flat.w) + " " + flat.y + "L" + Math.round(flat.x + 0.95 * flat.w) + " " + flat.y + "L" + (flat.x + flat.w) + " " + (flat.y + flat.h) + "L" + flat.x + " " + (flat.y + flat.h) + "Z";
+    {
+      const tall = slow.reduce((m, b) => (shape(b) > shape(m) ? b : m));
+      const flat = slow.reduce((m, b) => (shape(b) < shape(m) ? b : m));
+      if (shape(tall) > 0.25) tall.d = "M" + tall.x + " " + (tall.y + tall.h) + "L" + tall.x + " " + (tall.y + tall.w / 2) + "A" + tall.w / 2 + " " + tall.w / 2 + " 0 0 1 " + (tall.x + tall.w) + " " + (tall.y + tall.w / 2) + "L" + (tall.x + tall.w) + " " + (tall.y + tall.h) + "Z";
+      if (flat !== tall && shape(flat) < -0.6) flat.d = "M" + Math.round(flat.x + 0.05 * flat.w) + " " + flat.y + "L" + Math.round(flat.x + 0.95 * flat.w) + " " + flat.y + "L" + (flat.x + flat.w) + " " + (flat.y + flat.h) + "L" + flat.x + " " + (flat.y + flat.h) + "Z";
+    }
     burst = picked.rest.map((c) => ({ c, k: random("facade-" + c.x + "-" + c.y) })).sort((p, q) => p.k - q.k).slice(0, 12).map((p) => p.c);
-    big = [R(0, S, bw, bh), R(0, 0, 0.339 * bw, 0.5 * S)];
+    big = [R(0, S2, bw, bh), R(0, 0, 0.339 * bw, 0.5 * S2)];
   }
-  // Each one on its time; a burst of fewer than twelve spread over its twelve notes. Her sign follows its outline when
-  // one was read (a door's arch, an awning's slant), a cut piece its own shape (an arch, a slanted band); the others
-  // are rectangles, as the original's.
+  // Each one on its time; a burst of fewer than twelve spread over its twelve notes; each in its own shape (its
+  // outline, its region's, or its box when only that was read).
   const pieces = [
-    ...slow.map((b, i) => ({ ...b, at: AT[i], d: b === sign && signLine ? signLine : b.d || null })),
+    ...slow.map((b, i) => ({ ...b, at: AT[i] })),
     ...burst.map((b, i) => ({ ...b, at: AT[4 + Math.round((i * 12) / Math.max(1, burst.length))] })),
     ...big.map((b, i) => ({ ...b, at: AT[16 + i] })),
   ];
@@ -240,7 +266,7 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const landed = pieces.filter((p) => frame >= p.at);
   const defs = frame < WHOLE
     ? h("svg", { key: "clip", width: 0, height: 0, style: { position: "absolute" }, "aria-hidden": "true" },
-        h("clipPath", { id: CLIP, clipPathUnits: "userSpaceOnUse" }, landed.map((p, i) => (p.d ? h("path", { key: i, d: p.d }) : h("rect", { key: i, x: p.x, y: p.y, width: p.w, height: p.h })))))
+        h("clipPath", { id: CLIP, clipPathUnits: "userSpaceOnUse" }, landed.flatMap((p, i) => (p.ds || p.d ? (p.ds || [p.d]).map((d, j) => h("path", { key: i + "-" + j, d, clipRule: "evenodd" })) : [h("rect", { key: i, x: p.x, y: p.y, width: p.w, height: p.h })]))))
     : null;
   const film = landed.length
     ? h("div", { key: "film", style: { position: "absolute", left: 0, top: 0, width: bw, height: bh, ...(frame >= WHOLE ? {} : { clipPath: "url(#" + CLIP + ")" }) } }, h(Footage, { shot: front, style: laid }))
@@ -300,9 +326,12 @@ export const facade: EffectPiece = {
   // unlike one another, and without her front's elements a cut of every shape, never a grid of near squares.
   // Also 3: vertical full frame by default, as the models, her horizontal shots cropped on their subject; its band only
   // when she asks for it (Tristan, 6 November, on seven benches: « vertical please », « tout vertical please »).
-  version: 3,
+  // 4: its skill's v4 pieces: each one a shape of her picture cut along its own edges, her front's elements (named as a
+  // list, read once on its first image, each along its own outline) then her picture's regions (Tristan: « le montage
+  // devrait détourer la photo pour adapter les formes tu vois ? »).
+  version: 4,
   name: "Façade qui se construit",
-  how: "l'écran passe au noir et sa devanture s'y construit morceau par morceau, chaque morceau d'un coup à sa place, sa vidéo jouant dedans, un par note : son enseigne d'abord, trois éléments loin l'un de l'autre, une rafale de douze, une courte pause, puis les trois grands sur le temps, et sa devanture entière s'anime, caméra fixe, sans texte, jusqu'à la coupe ; posée en entier dans une bande au milieu du noir quand sa vidéo est horizontale.",
+  how: "l'écran passe au noir et sa devanture s'y construit morceau par morceau, chaque morceau un élément de sa propre image détouré le long de ses bords (sa porte, une fenêtre, son enseigne, puis les pans de son mur, du trottoir), d'un coup à sa place, sa vidéo jouant dedans, un par note : son enseigne d'abord, trois éléments loin l'un de l'autre, une rafale de douze, une courte pause, puis les trois grands sur le temps, et sa devanture entière s'anime, caméra fixe, sans texte, jusqu'à la coupe ; posée en entier dans une bande au milieu du noir quand sa vidéo est horizontale.",
   needs: "une vidéo fixe de sa devanture filmée de face, de l'autre côté de la rue, 5 s au moins : toute la façade dans l'image, son enseigne ou sa porte à son nom bien visible, faite d'éléments qu'on reconnaît seuls (fenêtres, vitrine, store, tables), un peu de vie devant.",
   lays: "sur un seul plan, sa devanture, dès le début du plan",
   shots: [1, 1],
@@ -326,12 +355,14 @@ export const facade: EffectPiece = {
     {
       slot: "morceaux",
       shot: 0,
-      want: "ce qui se répète sur sa devanture et peut apparaître pièce par pièce sur le noir : ses fenêtres et les pans de sa vitrine (« every window »), sinon ses arcades, ses stores, ses lanternes, ses tables en terrasse, ses pots de plantes (« every arch », « every awning », « every lantern », « every table », « every plant pot ») ; toujours « every » et la chose répétée ; « none » quand rien ne s'y répète (sa devanture se construit alors en rectangles réguliers)",
+      want: "les éléments dont sa devanture est faite, qui apparaissent un à un sur le noir, chacun détouré : tous ceux qu'on voit sur son plan, séparés par des virgules, chacun en mots simples qu'un détecteur trouve, « every » devant ce qui se répète : sa porte (« door », « painted door »), ses fenêtres et les pans de sa vitrine (« every window »), ses volets (« every shutter »), son enseigne (« shop sign »), son store (« awning »), ses pots de fleurs, ses tables, ses lanternes (« every plant pot », « every table », « every lantern ») ; une forme comme « painted door, every window, every shutter, shop sign, awning, every plant pot » ; « none » quand on ne voit pas sa devanture",
+      still: true,
     },
     {
       slot: "enseigne",
       shot: 0,
       want: "ce qui dit son nom sur sa devanture et apparaît seul en premier sur le noir : son enseigne, sa porte avec son nom peint sur la vitre, son store à son nom (« shop sign », « door », « painted window lettering », « awning ») ; « none » quand on ne voit pas son nom",
+      still: true,
     },
   ],
   settings: [

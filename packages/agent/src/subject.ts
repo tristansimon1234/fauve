@@ -168,8 +168,12 @@ export function subjectShots(plan: Pick<EditPlan, "segments" | "layers">): Set<n
   return out;
 }
 
-/** An object's name as kept: lower case, its spaces single (« The coffee cup » and « the coffee cup » are one). */
-export const objectName = (name: string) => name.trim().toLowerCase().replace(/\s+/g, " ").slice(0, 60);
+/**
+ * An object's name as kept: lower case, its spaces single (« The coffee cup » and « the coffee cup » are one), 120
+ * characters at most (a list of the elements of a shop front: « painted door, every window, shop sign, awning »).
+ */
+export const objectName = (name: string) => name.trim().toLowerCase().replace(/\s+/g, " ").slice(0, OBJECT_NAME_MAX);
+export const OBJECT_NAME_MAX = 120;
 
 /** What starts a skill's object name in its code (« @lumieres »), replaced by the name its filler gives for her shot. */
 export const SKILL_OBJECT = "@";
@@ -328,10 +332,11 @@ export const OBJECT_MAX_EUR = 0.15;
  * The object passages the card's budget holds (OBJECT_MAX_EUR), in the order the code names them: its estimate, the
  * load then each one's work, at `eurPerSecond` (the card's price); the composition does without those left out.
  */
-export function objectsWithinBudget<P extends { from: number; to: number; photo?: true }>(passages: P[], eurPerSecond: number): P[] {
+export function objectsWithinBudget<P extends { from: number; to: number; photo?: true; still?: true }>(passages: P[], eurPerSecond: number): P[] {
   let seconds = passages.length ? OBJECT_CARD.load : 0;
   return passages.filter((p) => {
-    const need = p.photo ? OBJECT_CARD.photo : Math.max(0, p.to - p.from) * OBJECT_CARD.perSecond;
+    // A photo, or a video read on its first image only (still): one image.
+    const need = p.photo || p.still ? OBJECT_CARD.photo : Math.max(0, p.to - p.from) * OBJECT_CARD.perSecond;
     if ((seconds + need) * eurPerSecond > OBJECT_MAX_EUR + 1e-9) return false;
     seconds += need;
     return true;
@@ -341,8 +346,12 @@ export function objectsWithinBudget<P extends { from: number; to: number; photo?
 /** A plan whose animations follow an object (Subject, SubjectBox, SubjectOutline or Outline given its name): a composition, or one laid over the montage. */
 export const wantsObjects = (plan: Pick<EditPlan, "layers">) => (plan.layers ?? []).some((l) => objectsDrawn(l.motion?.js).length > 0);
 
-/** An object to follow through a passage of her video, or to find on one of her photos (`photo`: one image, from 0 to 0): the passage, and the object's name. */
-export type ObjectPassage = SubjectPassage & { name: string; photo?: true };
+/**
+ * An object to follow through a passage of her video, or to find on one of her photos (`photo`: one image, from 0 to 0),
+ * or on her video's first image only (`still`: a still camera its code reads there; the passage's name kept, so the
+ * render finds it on its shot): the passage, and the object's name.
+ */
+export type ObjectPassage = SubjectPassage & { name: string; photo?: true; still?: true };
 
 /** The most photos an object is looked for on in one Reel (one image each: a second of the card's time or so). */
 export const PHOTO_OBJECT_MAX = 6;
@@ -353,15 +362,18 @@ export const photoKey = (mediaId: string) => subjectKey(mediaId, 0, 0);
 /**
  * The objects an animation's code follows, by shot: as read in its code (objectsDrawn), a shot it writes as a variable
  * placed where its montage skill declared that object (motion.drawn.objects: her sign on her last shot), else on every
- * shot under it.
+ * shot under it; `still` when its skill declared it read once on that shot's first image (a still camera).
  */
-export function layerObjects(plan: Pick<EditPlan, "segments" | "layers">, layer: PlanLayer, spans = shotSpans(plan)): { shot: number; name: string }[] {
+export function layerObjects(plan: Pick<EditPlan, "segments" | "layers">, layer: PlanLayer, spans = shotSpans(plan)): { shot: number; name: string; still?: true }[] {
   const declared = declaredDrawn(plan, layer)?.objects ?? [];
-  const out = new Map<string, { shot: number; name: string }>();
+  const out = new Map<string, { shot: number; name: string; still?: true }>();
   for (const o of objectsDrawn(layer.motion?.js)) {
     const placed = o.shot === ANY_SHOT ? declared.filter((d) => objectName(d.name) === o.name).map((d) => d.shot) : [o.shot];
     const shots = o.shot === ANY_SHOT && !placed.length ? shotsUnder(spans, layer) : placed;
-    for (const shot of shots) out.set(`${shot}#${o.name}`, { shot, name: o.name });
+    for (const shot of shots) {
+      const still = declared.some((d) => d.still && d.shot === shot && objectName(d.name) === o.name);
+      out.set(`${shot}#${o.name}`, { shot, name: o.name, ...(still ? { still: true as const } : {}) });
+    }
   }
   return [...out.values()];
 }
@@ -370,6 +382,8 @@ export function layerObjects(plan: Pick<EditPlan, "segments" | "layers">, layer:
  * The objects a Reel's compositions follow, each through the passage of the shot its code names: her shot n is the
  * plan's n-th shot (video or photo, as the composition's shots list them; one its montage skill placed, layerObjects),
  * a video at its own pace only (a speed or a ramp changes which images show); OBJECT_MAX at most, OBJECT_MAX_SECONDS in all.
+ * One its skill reads once on its shot's first image (`still`: « Façade qui se construit », her front's elements) takes
+ * that image only, whatever the shot's pace: a photo's time on the card, none of the seconds.
  */
 export function objectPassages(plan: Pick<EditPlan, "segments" | "layers">, isVideo: (clipId: string) => boolean): ObjectPassage[] {
   const shots = plan.segments.filter(isClipSegment);
@@ -379,7 +393,7 @@ export function objectPassages(plan: Pick<EditPlan, "segments" | "layers">, isVi
   let seconds = 0;
   let photos = 0;
   for (const layer of plan.layers ?? []) {
-    for (const { shot, name } of layerObjects(plan, layer, spans)) {
+    for (const { shot, name, still } of layerObjects(plan, layer, spans)) {
       const s = shots[shot];
       // A photo: the object found once on it (a glass on a table, the cup she holds), whatever its move.
       if (s?.photo) {
@@ -387,6 +401,13 @@ export function objectPassages(plan: Pick<EditPlan, "segments" | "layers">, isVi
         if (out.some((p) => p.key === key) || photos >= PHOTO_OBJECT_MAX) continue;
         out.push({ clip_id: s.clip_id, from: 0, to: 0, key, name, photo: true });
         photos++;
+        continue;
+      }
+      // Read on its first image: the shot's pace changes nothing there.
+      if (still && s && isVideo(s.clip_id)) {
+        const key = objectKey(s.clip_id, s.in, s.out, name);
+        if (out.some((p) => p.key === key) || out.length >= OBJECT_MAX) continue;
+        out.push({ clip_id: s.clip_id, from: s.in, to: s.out, key, name, still: true });
         continue;
       }
       if (!s || !isVideo(s.clip_id) || s.ramp || (s.speed && Math.abs(s.speed - 1) > 0.01)) continue;
@@ -511,9 +532,10 @@ export function clearPassages(plan: Pick<EditPlan, "segments" | "layers">, isVid
 /**
  * What can be read on a passage, each for the tool of the scope that asks it: `ground` her shot without its sky at every
  * image (Skyline: a transparent video, like her cut-out), `sky` its skyline only (SkylineAt), `vanish` its vanishing
- * point (VanishingPoint), `light` the light of each cell of its picture (LightUnder).
+ * point (VanishingPoint), `light` the light of each cell of its picture (LightUnder), `regions` its picture split along its
+ * own edges on its first image (PictureRegions: by colour, a wall, a door's frame, the pavement, the sky).
  */
-export type ShotReadKind = "ground" | "sky" | "vanish" | "light";
+export type ShotReadKind = "ground" | "sky" | "vanish" | "light" | "regions";
 
 /** The most passages read for one Reel; the most of them made into a ground, and the most seconds of video they take (each image is read and written). */
 export const READ_MAX = 8;
@@ -529,12 +551,13 @@ const READ_TOOLS: [RegExp, ShotReadKind][] = [
   [/\bSkylineAt\(\s*([^,()]*)/g, "sky"],
   [/\bVanishingPoint\(\s*([^,()]*)/g, "vanish"],
   [/\bLightUnder\(\s*([^,()]*)/g, "light"],
+  [/\bPictureRegions\(\s*([^,()]*)/g, "regions"],
 ];
 
 /**
  * The shots a composition's code reads, and what it reads on each: `<Skyline shot={n} … />` (compiled or as JSX) its
  * ground, SkylineAt(shots[n], …) its skyline, VanishingPoint(shots[n], …) its vanishing point, LightUnder(shots[n], …) its
- * light; a shot written as a variable is ANY_SHOT (every shot under the animation).
+ * light, PictureRegions(shots[n], …) its regions; a shot written as a variable is ANY_SHOT (every shot under the animation).
  */
 export function readsDrawn(js: string | undefined): { shot: number; kinds: ShotReadKind[] }[] {
   if (!js) return [];
@@ -556,14 +579,18 @@ export function readsDrawn(js: string | undefined): { shot: number; kinds: ShotR
 /** A plan whose animations read one of her shots (its sky, its vanishing point, its light): a composition, or one laid over the montage. */
 export const wantsReads = (plan: Pick<EditPlan, "layers">) => (plan.layers ?? []).some((l) => readsDrawn(l.motion?.js).length > 0);
 
-/** A passage to read: its clip and seconds (a photo from 0 to 0), what to read there. */
-export type ReadPassage = SubjectPassage & { kinds: ShotReadKind[]; photo?: true };
+/**
+ * A passage to read: its clip and seconds (a photo from 0 to 0), what to read there; `first`: on its first image only (a
+ * shot at another pace, whose regions alone are read: they are read on that image anyway).
+ */
+export type ReadPassage = SubjectPassage & { kinds: ShotReadKind[]; photo?: true; first?: true };
 
 /**
  * The passages a Reel reads, each with all its compositions ask of it (her shot n is the plan's n-th shot, video or
  * photo, as its shots list them; a variable, every shot under it), a video at its own pace only (a speed or a ramp
  * changes which images show: the tools then give their fallback); READ_MAX at most, and a ground for GROUND_MAX of
- * them and GROUND_MAX_SECONDS of video at most (the others keep their skyline, read on their first image).
+ * them and GROUND_MAX_SECONDS of video at most (the others keep their skyline, read on their first image). Its regions
+ * are read on a shot at any pace (on its first image: `first`, when nothing else is read there).
  */
 export function readPassages(plan: Pick<EditPlan, "segments" | "layers">, isVideo: (clipId: string) => boolean): ReadPassage[] {
   const shots = plan.segments.filter(isClipSegment);
@@ -577,15 +604,19 @@ export function readPassages(plan: Pick<EditPlan, "segments" | "layers">, isVide
       const s = shots[shot];
       if (!s) continue;
       const photo = Boolean(s.photo);
-      if (!photo && (!isVideo(s.clip_id) || s.ramp || (s.speed && Math.abs(s.speed - 1) > 0.01))) continue;
+      if (!photo && !isVideo(s.clip_id)) continue;
+      // At another pace, only its regions (read on its first image, which the pace does not change).
+      const paced = !photo && Boolean(s.ramp || (s.speed && Math.abs(s.speed - 1) > 0.01));
+      const asked = paced ? kinds.filter((k) => k === "regions") : kinds;
+      if (!asked.length) continue;
       const from = photo ? 0 : s.in;
       const to = photo ? 0 : s.out;
       const key = readKey(s.clip_id, from, to);
       const known = out.find((p) => p.key === key);
       if (!known && out.length >= READ_MAX) continue;
-      const passage = known ?? { clip_id: s.clip_id, from, to, key, kinds: [], ...(photo ? { photo: true as const } : {}) };
+      const passage: ReadPassage = known ?? { clip_id: s.clip_id, from, to, key, kinds: [], ...(photo ? { photo: true as const } : {}), ...(paced ? { first: true as const } : {}) };
       if (!known) out.push(passage);
-      for (const kind of kinds) {
+      for (const kind of asked) {
         if (passage.kinds.includes(kind)) continue;
         if (kind === "ground") {
           const length = Math.max(0, to - from);
@@ -618,6 +649,11 @@ export const shotReadingSchema = z.object({
     .object({ cols: z.number().int().min(2).max(256), rows: z.number().int().min(2).max(256), cells: z.string().regex(/^[0-9a-f]*$/), mean: z.number(), high: z.number() })
     .refine((l) => l.cells.length === l.cols * l.rows * 2, "cells")
     .optional(),
+  /**
+   * Its picture split along its own edges on its first image (by colour: a wall, a door's frame, a plinth, the pavement,
+   * the sky): each region's outline, flat x, y shares of that image, the regions together covering it; largest first.
+   */
+  regions: z.array(z.array(z.number()).min(6).max(1200)).max(40).optional(),
 });
 export type ShotReading = z.infer<typeof shotReadingSchema>;
 

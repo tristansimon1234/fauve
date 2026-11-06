@@ -453,7 +453,7 @@ async function followObjects(studioId: string, postId: string, asked: ObjectPass
   const left = timeLeft();
   const budget = (Number.isFinite(left) ? left : 800_000) - RENDER_MARGIN_MS;
   const work =
-    missing.reduce((n, p) => n + (p.photo ? PHOTO_OBJECT_MS : (p.to - p.from) * OBJECT_WORK_PER_SECOND * 1000), 0) +
+    missing.reduce((n, p) => n + (p.photo || p.still ? PHOTO_OBJECT_MS : (p.to - p.from) * OBJECT_WORK_PER_SECOND * 1000), 0) +
     clears.reduce((n, p) => n + Math.max(1, p.to - p.from) * CLEAR_WORK_PER_SECOND * 1000, 0);
   const deadline = Math.min(budget, GPU_START_MS + (missing.length ? OBJECT_LOAD_MS : CLEAR_LOAD_MS) + 2 * work);
   if (deadline < GPU_START_MS) return;
@@ -473,7 +473,7 @@ async function followObjects(studioId: string, postId: string, asked: ObjectPass
           [false, true].map((still) => db.storage.from("media").createSignedUploadUrl(subjectPath(studioId, p.clip_id, p.key, still), { upsert: true })),
         );
         return url && webm?.data?.signedUrl && png?.data?.signedUrl
-          ? [{ key: p.key, url, from: p.from, to: p.to, name: p.name, ...(p.photo ? { photo: true as const } : {}), upload: { webm: webm.data.signedUrl, png: png.data.signedUrl } }]
+          ? [{ key: p.key, url, from: p.from, to: p.to, name: p.name, ...(p.photo ? { photo: true as const } : {}), ...(p.still ? { still: true as const } : {}), upload: { webm: webm.data.signedUrl, png: png.data.signedUrl } }]
           : [];
       }),
     )
@@ -548,7 +548,8 @@ async function followObjects(studioId: string, postId: string, asked: ObjectPass
         cleared,
         gpu: gpu ?? "none",
         photos: missing.filter((p) => p.photo).length,
-        seconds_of_video: Math.round([...missing, ...clears].reduce((n, p) => n + p.to - p.from, 0) * 10) / 10,
+        stills: missing.filter((p) => p.still).length,
+        seconds_of_video: Math.round([...missing.filter((p) => !p.still), ...clears].reduce((n, p) => n + p.to - p.from, 0) * 10) / 10,
       }),
     });
 }

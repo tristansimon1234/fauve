@@ -17,8 +17,8 @@ import type { z } from "zod";
 
 /** The source of the inspiration row a house model is kept on, per studio (one per model, made when first used). */
 export const HOUSE_SOURCE = "house";
-/** The catalogue's version: a studio's row written by an older one is rewritten when the model is used again (3: its original's sheets; 4: no brand in a model's name; 5: Mots aux quatre coins as its original; 6: Plans fixes at 65 BPM; 7: four renamed; 8: Lieu tapé without its original's orange; 9: Plans fixes on its fiche; 10: Une journée chez toi on its fiche; 11: ten models on their fiches; 12: Façade qui se construit and Coulisses façon fiche on their fiches; 13: Recette cosy on its fiche; 14: Titre gaufré on its fiche; 15: Mots mêlés and Interrupteur on their fiches; 16: Interface minimaliste and Fenêtres et étiquettes on theirs; 17: Mot clé en grand and Face caméra et références on theirs; 18: Photos posées sur la table and Carte au feutre on theirs; 19: « S'abonner » in Interface minimaliste; 20: the last four on their fiches, Aplat, Détourages, Silhouette and Vision machine; 21: Tristan's review of 6 November, Court métrage's light and lettering, Plans fixes' lettering, Façade's first pieces, Présente-toi in its own design, the kaléidoscope, Mot clé en grand and Face caméra et références; every model vertical by default, its band only when she asks; 22: Vision machine v2, any fixed shot of her place; 23: Voici mon travail v3, its words where her picture lets them read). */
-export const HOUSE_VERSION = 23;
+/** The catalogue's version: a studio's row written by an older one is rewritten when the model is used again (3: its original's sheets; 4: no brand in a model's name; 5: Mots aux quatre coins as its original; 6: Plans fixes at 65 BPM; 7: four renamed; 8: Lieu tapé without its original's orange; 9: Plans fixes on its fiche; 10: Une journée chez toi on its fiche; 11: ten models on their fiches; 12: Façade qui se construit and Coulisses façon fiche on their fiches; 13: Recette cosy on its fiche; 14: Titre gaufré on its fiche; 15: Mots mêlés and Interrupteur on their fiches; 16: Interface minimaliste and Fenêtres et étiquettes on theirs; 17: Mot clé en grand and Face caméra et références on theirs; 18: Photos posées sur la table and Carte au feutre on theirs; 19: « S'abonner » in Interface minimaliste; 20: the last four on their fiches, Aplat, Détourages, Silhouette and Vision machine; 21: Tristan's review of 6 November, Court métrage's light and lettering, Plans fixes' lettering, Façade's first pieces, Présente-toi in its own design, the kaléidoscope, Mot clé en grand and Face caméra et références; every model vertical by default, its band only when she asks; 22: Vision machine v2, any fixed shot of her place; 23: Voici mon travail v3, its words where her picture lets them read; 24: Façade v4, its pieces her picture's own elements). */
+export const HOUSE_VERSION = 24;
 
 export type HouseModel = {
   key: string;
@@ -519,7 +519,9 @@ export const HOUSE_MODELS: HouseModel[] = [
     name: "Façade qui se construit",
     // 12: written again on its original's fiche (v2 of its skill): 120 BPM, her sign then three far pieces, a burst of
     // twelve, a silence, the last big pieces, each with a note, her front whole on the cut; no grain.
-    pitch: "Ta devanture se construit morceau par morceau sur le noir, chaque morceau sur une note : ton enseigne, puis une rafale, un silence, et ta façade entière qui s'anime.",
+    // 22 (v4 of its skill): each piece an element of her own picture cut along its edges, then its regions (Tristan: « le
+    // montage devrait détourer la photo pour adapter les formes »).
+    pitch: "Ta devanture se construit sur le noir, élément par élément détouré (ta porte, tes fenêtres, ton enseigne), chacun sur une note, puis ta façade entière qui s'anime.",
     needs: "une vidéo fixe de ta devanture filmée de face, de l'autre côté de la rue, 9 s au moins, ton enseigne bien visible",
     files: [1, 3],
     pair: "gaufre",
@@ -532,12 +534,12 @@ export const HOUSE_MODELS: HouseModel[] = [
       format: "collage",
       hook: { kind: "mystère", what: "un écran noir où apparaît d'un coup son enseigne, puis trois morceaux de sa façade loin l'un de l'autre" },
       text: { amount: "aucun", composition: "aucun texte pendant la construction, son nom seulement sur un morceau du noir s'il le faut" },
-      layout: "un fond noir, avec des morceaux de sa façade posés d'un coup à leur place, sa vidéo jouant dedans, jusqu'à l'image entière ; en bande sur le noir à sa demande",
+      layout: "un fond noir, avec les éléments de sa façade détourés (sa porte, ses fenêtres, puis les pans de son mur) posés d'un coup à leur place, sa vidéo jouant dedans, jusqu'à l'image entière",
       moments: [
-        { at: 0, what: "son enseigne apparaît d'un coup sur le noir, puis trois éléments de sa façade loin l'un de l'autre, lentement, chacun sur une note" },
-        { at: 2.8, what: "une rafale de douze morceaux : ses autres éléments, puis des bandes le long de ses lignes (le trottoir, un côté, le mur)" },
+        { at: 0, what: "son enseigne apparaît d'un coup sur le noir, détourée, puis trois éléments de sa façade loin l'un de l'autre, lentement, chacun sur une note" },
+        { at: 2.8, what: "une rafale de douze morceaux : ses autres éléments, puis les pans de son image (son mur, son soubassement, le trottoir)" },
         { at: 4.4, what: "un silence, rien de nouveau" },
-        { at: 5.3, what: "les trois derniers grands morceaux (la rue, un tiers du haut, tout ce qui reste noir), sur trois temps" },
+        { at: 5.3, what: "les derniers grands morceaux (la rue, le reste du haut, tout ce qui reste noir), sur trois temps" },
         { at: 6.4, what: "sa façade entière, caméra fixe, tenue jusqu'à la coupe à 9 s, puis ses autres plans, une mesure chacun" },
       ],
       grade: "bright",

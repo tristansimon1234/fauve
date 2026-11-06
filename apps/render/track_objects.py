@@ -12,13 +12,21 @@
 # animation lights them one by one (Tristan: « enseigne, fenêtre, image qui a de quoi faire un effet stylé »).
 # Each of « every … » whose box overlaps another's there also gets its own outline at every image (`pieces`), so an
 # animation shows one alone (Subject part).
+# A name may list several kinds, comma-separated (« door, every window, every shutter, shop sign, awning »: the elements
+# a shop front is made of, « Façade qui se construit » v4): each kind is looked for on the same image, the surest one of
+# a kind alone, each one of an « every » kind, without the same thing twice from one kind to another (a window inside
+# the door's box is the door), together one object whose pieces are those elements (PARTS_MAX at most).
+# A `still` job reads its passage on its first image only (a still camera, whose code reads it there: « Façade »): one
+# image, its elements found, cut out and outlined there, its cut-out a still image (a PNG, as a photo's), every piece
+# with its own outline (`pieces`: each element along its own edge, never its box); a photo's time on the card.
 # Usage: python -I track_objects.py jobs.json → prints {"<id>": { still, frames, keys, people, top, boxes, contours,
 # found, parts?, pieces?, uploaded } | { error }}. jobs.json: [{ id, url (the clip or the photo, signed) or src (a local file), from, to,
-# name, photo?, upload?: { webm, png }, out? }]. DETECTOR_MODEL and TRACKER_MODEL: the models' folders; OBJECTS_CPU=1
+# name, photo?, still?, upload?: { webm, png }, out? }]. DETECTOR_MODEL and TRACKER_MODEL: the models' folders; OBJECTS_CPU=1
 # runs on a CPU. A job with `clear` (and no name) reads the clear areas of its passage instead (clear_area.py, ClearBox:
 # { clear, frames, still }), in the same machine, without loading the models.
 import json
 import os
+import re
 import subprocess
 import sys
 import time
@@ -38,6 +46,10 @@ EVERY = "every "
 EVERY_MAX = 12
 # The most pieces an object is told in (the letters of a sign, the windows of a facade, the bulbs of a garland).
 PARTS_MAX = 24
+# The kinds of a name that lists several (« door, every window, shop sign »): separated by commas or semicolons.
+KINDS = re.compile(r"\s*[,;]\s*")
+# A piece's own outline on a still read, in this many points (a painted dress, an arched window kept in shape).
+STILL_POINTS = 96
 
 
 def models():
@@ -61,6 +73,12 @@ def phrase(name):
     if text.startswith(EVERY):
         text = text[len(EVERY):]
     return text.rstrip(".").strip() + "."
+
+
+def kinds_of(name):
+    """The kinds a name lists (« door, every window, shop sign »: three), each as written; a plain name is one kind."""
+    kinds = [k for k in KINDS.split(name.strip()) if k]
+    return kinds or [name.strip()]
 
 
 def distinct(boxes, scores):
@@ -92,8 +110,9 @@ def find(frames, name, detector, device):
     every = name.strip().lower().startswith(EVERY)
     text = phrase(name)
     best = None
-    for share in LOOKS:
-        k = min(len(frames) - 1, max(0, int(round(share * (len(frames) - 1)))))
+    # Each image looked at once (a still read, one image: one look).
+    looks = list(dict.fromkeys(min(len(frames) - 1, max(0, int(round(share * (len(frames) - 1))))) for share in LOOKS))
+    for k in looks:
         h, w = frames[k].shape[:2]
         inputs = processor(images=Image.fromarray(frames[k]), text=text, return_tensors="pt").to(device)
         with torch.inference_mode():
@@ -110,6 +129,34 @@ def find(frames, name, detector, device):
         if best[2] >= 0.5 and not every:
             break
     return best[:3] if best else None
+
+
+def find_kinds(frames, kinds, detector, device, k=0):
+    """
+    The elements several kinds name on image k (a shop front's door, each of its windows, its sign): the surest one of a
+    kind alone, each one of an « every » kind (EVERY_MAX at most), without the same thing twice from one kind to another
+    (two boxes that mostly cover each other: a door also seen as a window), a smaller thing in front of a larger one kept
+    (a plant pot before a door, a poster on a wall), PARTS_MAX at most: (k, [[x1, y1, x2, y2] px], best score), or None
+    when none of them is seen.
+    """
+    kept, best = [], 0.0
+    for kind in kinds:
+        found = find(frames[k : k + 1], kind, detector, device)
+        if not found:
+            continue
+        best = max(best, found[2])
+        for box in found[1]:
+            if not any(same_thing(box, other) for other in kept):
+                kept.append(box)
+    kept = kept[:PARTS_MAX]
+    return (k, kept, best) if kept else None
+
+
+def same_thing(a, b):
+    """Two boxes (x1, y1, x2, y2) of one thing named twice: they cover each other for the most part (their overlap over their union)."""
+    inter = max(0.0, min(a[2], b[2]) - max(a[0], b[0])) * max(0.0, min(a[3], b[3]) - max(a[1], b[1]))
+    union = (a[2] - a[0]) * (a[3] - a[1]) + (b[2] - b[0]) * (b[3] - b[1]) - inter
+    return inter / max(1e-6, union) > 0.6
 
 
 def track(frames, k, boxes, tracker, device, dtype, size):
@@ -270,12 +317,13 @@ def parts_of(each, k, picture=None):
     return pieces_inside(picture, whole)
 
 
-def piece_outlines(each, k):
+def piece_outlines(each, k, every=False):
     """
     Each of « every … » apart (the picture kit's Subject part draws one alone): its own outline at every image (as the
     object's, half its points, shares of the picture), in the pieces' reading order on image k (that of `parts`), for
     the pieces whose box there overlaps another's (two towers, two gondolas: their boxes alone whitened them together),
-    None for the others (their box is enough); None when no box overlaps another.
+    None for the others (their box is enough); None when no box overlaps another. `every` (a still read, one image):
+    every piece's outline, in STILL_POINTS points (each element of a shop front along its own edge, never its box).
     """
     import numpy as np
 
@@ -293,7 +341,10 @@ def piece_outlines(each, k):
 
     out = []
     for a in ordered:
-        if any(b is not a and overlap(a, b) for b in ordered):
+        if every:
+            c = matte.contour_of(each[a[4]][k], STILL_POINTS)
+            out.append(None if c is None else [[round(float(v), 4) for v in c.reshape(-1)]])
+        elif any(b is not a and overlap(a, b) for b in ordered):
             out.append([None if c is None else [v for i in range(0, len(c), 4) for v in c[i:i + 2]] for c in matte.contours_of(each[a[4]])])
         else:
             out.append(None)
@@ -322,6 +373,8 @@ def follow(job, device, dtype, detector, tracker):
 
     started = time.time()
     photo = bool(job.get("photo"))
+    # Read on its first image only (a still camera), as a photo is.
+    still = photo or bool(job.get("still"))
     src_w, src_h, hdr = matte.probe(job["src"])
     scale = min(1.0, matte.OUT_LONG / max(src_w, src_h))
     ow, oh = max(2, int(round(src_w * scale / 2)) * 2), max(2, int(round(src_h * scale / 2)) * 2)
@@ -329,11 +382,13 @@ def follow(job, device, dtype, detector, tracker):
         frames = photo_frames(job["src"], ow, oh)
     else:
         start = max(0.0, float(job["from"]))
-        seconds = min(matte.MAX_SECONDS, max(1.0 / matte.FPS, float(job["to"]) - start))
+        seconds = 1.0 / matte.FPS if still else min(matte.MAX_SECONDS, max(1.0 / matte.FPS, float(job["to"]) - start))
         frames = matte.decode(job["src"], start, seconds, ow, oh, hdr)
+        frames = frames[:1] if still else frames
     n = len(frames)
     log(f"{n} images of {ow}×{oh} decoded in {time.time() - started:.1f} s")
-    seen = find(frames, job["name"], detector, device)
+    kinds = kinds_of(job["name"])
+    seen = find(frames, job["name"], detector, device) if len(kinds) == 1 else find_kinds(frames, kinds, detector, device, (n - 1) // 2)
     if not seen:
         raise RuntimeError(f"« {job['name']} » introuvable dans ce plan")
     k, boxes, score = seen
@@ -353,15 +408,16 @@ def follow(job, device, dtype, detector, tracker):
     masks = [masks[0]] + [0.6 * masks[i] + 0.2 * masks[i - 1] + 0.2 * masks[min(n - 1, i + 1)] for i in range(1, n)]
     pieces = relative(found, masks[k])
     log(f"followed through {n} images in {time.time() - tracked:.1f} s" + (f", in {len(pieces) // 4} pieces" if pieces else ""))
-    # Each of « every … » apart where their boxes overlap (Subject part); an outline missing leaves their boxes, never the object.
+    # Each of « every … » apart where their boxes overlap (Subject part), every one along its own edge on a still read; an
+    # outline missing leaves their boxes, never the object.
     apart = None
     if len(each) > 1 and pieces:
         try:
-            apart = piece_outlines(each, k)
+            apart = piece_outlines(each, k, still)
         except Exception as error:  # noqa: BLE001
             log(f"pieces' outlines not read: {error}")
-    # A photo's object: one still image (a PNG the size of the photo, laid exactly over it).
-    r = matte.finish(job, frames, masks, photo, n, False, started, ow, oh)
+    # A photo's object, or one read on a still: one still image (a PNG the size of the picture, laid exactly over it).
+    r = matte.finish(job, frames, masks, still, n, False, started, ow, oh)
     return r | {"found": round(score, 2)} | ({"parts": pieces} if pieces else {}) | ({"pieces": apart} if apart else {})
 
 

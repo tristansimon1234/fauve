@@ -8,6 +8,7 @@ import { MAX_SPEED, type ClipSegment, type ClipSpeech, type EditPlan, type HandM
 import { BURST_MAX, soundSeconds } from "./sfx.ts";
 import { laterAudio } from "./sound-follow.ts";
 import { speechCuts } from "./speech.ts";
+import { OBJECT_NAME_MAX } from "./subject.ts";
 import { followedFilter, followedLook, type FollowedStyle } from "./steal.ts";
 
 // Montage skills (Tristan: « edith pourrait choisir d'adapter ces modèles comme une librairie de "skills de montage" »,
@@ -392,6 +393,12 @@ export type SkillObject = {
   shot: number;
   /** What to look for there, in French for the filler: what can carry the effect, by kind. */
   want: string;
+  /**
+   * Read once on its shot's first image, not followed through it (a still camera, whose code reads it there only: her
+   * front's elements in « Façade qui se construit »): one image of the card instead of its whole passage, whatever its
+   * pace, every piece with its own outline (track_objects.py, `still`).
+   */
+  still?: true;
 };
 
 /** The shot an object slot is on, for its timeline's count: the timeline's placing, else its own (negative from the end); null past its shots. */
@@ -591,13 +598,23 @@ export type SkillFill = {
 
 /**
  * An object's name as the filler gave it, kept to what the detector reads (plain English words, « every » for each one
- * of them): lower case, letters, spaces, hyphens and apostrophes, 60 characters at most, a word of two letters at least;
- * empty or « none » is no object.
+ * of them; several kinds separated by commas, « door, every window, shop sign », for a slot that asks for the elements
+ * a thing is made of): lower case, letters, spaces, hyphens, apostrophes and commas, 120 characters at most and whole
+ * kinds only, a word of two letters at least; empty or « none » is no object.
  */
 export function skillObjectName(name: string | undefined): string | null {
-  const kept = (name ?? "").toLowerCase().replace(/[^a-z' -]/g, " ").replace(/\s+/g, " ").trim().slice(0, 60).trim();
-  if (!/[a-z]{2}/.test(kept) || /^(none|nothing|no|n\/a|aucun|rien)$/.test(kept)) return null;
-  return kept;
+  const kinds = (name ?? "")
+    .toLowerCase()
+    .split(/[,;]/)
+    .map((k) => k.replace(/[^a-z' -]/g, " ").replace(/\s+/g, " ").trim())
+    .filter((k) => /[a-z]{2}/.test(k) && !/^(none|nothing|no|n\/a|aucun|rien)$/.test(k));
+  let kept = "";
+  for (const k of kinds) {
+    const next = kept ? `${kept}, ${k}` : k.slice(0, OBJECT_NAME_MAX).trim();
+    if (next.length > OBJECT_NAME_MAX) break;
+    kept = next;
+  }
+  return kept || null;
 }
 
 /** Its code with its objects named: « @slot » replaced by what the filler saw in her shot, the others left (no object). */
@@ -628,7 +645,7 @@ export function skillDrawn(
   const objects = (skill.objects ?? []).flatMap((o) => {
     const shot = skillObjectShot(o, line);
     const name = skillObjectName(named?.[o.slot]);
-    return shot !== null && name ? [{ shot, name }] : [];
+    return shot !== null && name ? [{ shot, name, ...(o.still ? { still: true } : {}) }] : [];
   });
   if (!subjects && !objects.length) return undefined;
   return { shots: count, ...(subjects ? { subjects } : {}), ...(objects.length ? { objects } : {}) };
@@ -1768,7 +1785,7 @@ A model timed on her voice (« voix »): her talking video is the Reel, cut by t
 - every text is words she says, at their numbers, spelled right (a word the transcript misheard set right: « sois » for « soins »); never a word she does not say.
 
 "settings": its settings (« reglages », when it has some), like the variants of a template: one only when her request asks for what it does (« plus de cases », « plus lent », « dans le désordre », « avec ma couleur »), with the value that does it; never to vary for its own sake; otherwise none, each one plays its default. A request a setting answers fits. A format she asks for (vertical, full screen, horizontal, in a band, her videos kept whole: « cadre ») is its « format » setting when it has one, never another layout: it fits; « format » only when she asks for one, its default playing otherwise (« par défaut »: vertical full frame for almost every model), never because her files are horizontal.
-"objets": its objects (« objets », when it has some): what in the file you cast on that slot carries its effect (a sign whose letters light up one by one, windows that light up one after the other, lamps that flash), from what the file shows (« montre », « moments »): name it in plain English as the eye sees it, two to four words (« shop sign », « neon sign », « bakery sign », « every window », « string lights », « pendant lamps »); « every » before it when there are several to take one after the other (each window, each lamp); empty when nothing in that file fits (the model does without). Cast on that slot the file that has it, when one does.
+"objets": its objects (« objets », when it has some): what in the file you cast on that slot carries its effect (a sign whose letters light up one by one, windows that light up one after the other, lamps that flash), from what the file shows (« montre », « moments »): name it in plain English as the eye sees it, two to four words (« shop sign », « neon sign », « bakery sign », « every window », « string lights », « pendant lamps »); « every » before it when there are several to take one after the other (each window, each lamp); a slot that asks for the elements a thing is made of (« cherche »: a shop front's door, windows, sign) takes them all, comma-separated, each as a detector finds it (« painted door, every window, every shutter, shop sign, awning, every plant pot »); empty when nothing in that file fits (the model does without). Cast on that slot the file that has it, when one does.
 "end": optional, null unless the model has an ending (« fin ») and her request (or « contrat ») is about something to end on: an offer, an opening, a date, an event she speaks of; what we know (« ce_qu_on_sait ») may complete it (its date, its place), never bring a subject of its own: an offer, a promotion, a discount or a price only when her request is about it (« Les nouveautés de la boutique cette semaine », with « -20 % sur toute la boutique ce week-end » known: null). Its title (40 characters at most) and a subtitle or empty; when in doubt, null.
 "why": one sentence for her in French (tu), what you chose and why, in plain words.`;
 

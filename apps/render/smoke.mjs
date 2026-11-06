@@ -127,6 +127,7 @@ const scope = {
   Near: () => null,
   VanishingPoint: (shot, frame, laid, options) => options?.fallback ?? null,
   LightUnder: () => null,
+  PictureRegions: () => [],
   HeadMoves: () => [],
   Outline: () => null,
   // What is said, written: the words themselves are what the check reads.

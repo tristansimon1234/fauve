@@ -79,7 +79,7 @@ export async function ensureShotReadings(studioId: string, postId: string, plan:
   const left = timeLeft();
   let budget = (Number.isFinite(left) ? left : 800_000) - RENDER_MARGIN_MS - READ_LOAD_MS;
   const chosen = missing.filter((p) => {
-    const seconds = Math.max(1, p.to - p.from);
+    const seconds = p.first ? 1 : Math.max(1, p.to - p.from);
     const need = seconds * (READ_WORK_PER_SECOND + (p.kinds.includes("ground") ? GROUND_WORK_PER_SECOND : 0));
     if (need > budget) return false;
     budget -= need;
@@ -92,7 +92,8 @@ export async function ensureShotReadings(studioId: string, postId: string, plan:
   const url = (id: string) => signed.find((s) => s.path === paths[clips.indexOf(id)])?.signedUrl;
   const jobs = chosen.flatMap((p) => {
     const u = url(p.clip_id);
-    return u ? [{ key: p.key, url: u, from: p.from, to: p.to, read: p.kinds, ...(p.photo ? { photo: true as const } : {}) }] : [];
+    // A shot at another pace is read on its first image only (its regions: `first`).
+    return u ? [{ key: p.key, url: u, from: p.from, to: p.first ? p.from : p.to, read: p.kinds, ...(p.photo ? { photo: true as const } : {}) }] : [];
   });
   if (!jobs.length) return;
   try {
