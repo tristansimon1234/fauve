@@ -104,11 +104,11 @@ test("her own voice: her recording cut as a creator cuts a voice, never into wor
   assert.equal(gaps[0], 0.64);
   assert.ok(Math.max(...gaps) <= 0.65, JSON.stringify(gaps));
   // A false start (« je je ») goes too; her pauses read on her words' own times, as the workshop finds them.
-  const restart = ownTalk("n", { text: "", duration: 3, words: [{ w: "je", start: 0.3, end: 0.4 }, { w: "je", start: 0.6, end: 0.7 }, { w: "fais", start: 0.75, end: 1 }, { w: "ça", start: 1.05, end: 1.3 }] })!;
+  const restart = ownTalk("n", { duration: 3, words: [{ w: "je", start: 0.3, end: 0.4 }, { w: "je", start: 0.6, end: 0.7 }, { w: "fais", start: 0.75, end: 1 }, { w: "ça", start: 1.05, end: 1.3 }] })!;
   assert.deepEqual(restart.words.map((w) => w.w), ["je", "fais", "ça"]);
   assert.deepEqual(gapPauses([{ start: 0.5, end: 1 }, { start: 1.1, end: 1.4 }, { start: 2, end: 2.2 }], 3), [{ start: 0, end: 0.5 }, { start: 1.4, end: 2 }, { start: 2.2, end: 3 }]);
   // Fewer than three words: nothing to lead with.
-  assert.equal(ownTalk("n", { text: "", duration: 2, words: [{ w: "Coucou", start: 0.2, end: 0.6 }] }), null);
+  assert.equal(ownTalk("n", { duration: 2, words: [{ w: "Coucou", start: 0.2, end: 0.6 }] }), null);
 });
 
 test("her own voice may lead only a model that takes it as its words, from three words, within a Reel's 45 s", () => {
@@ -234,7 +234,7 @@ test("her own voice on the Reel: whole when nothing inside her words is cut, els
   assert.equal(words.duration, Math.round((talk.duration + 0.25) * 100) / 100);
   assert.ok(voiceTranscriptSchema.safeParse(words).success);
   // Nothing inside her words cut (a note said in one go): her recording itself, from where her first breath lands.
-  const once = ownTalk("note", { text: "", duration: 4, words: [{ w: "Coucou", start: 1, end: 1.4 }, { w: "celle-là", start: 1.6, end: 2 }, { w: "celle-là", start: 2.2, end: 2.6 }, { w: "et", start: 2.8, end: 2.9 }, { w: "celle-là", start: 2.95, end: 3.3 }] })!;
+  const once = ownTalk("note", { duration: 4, words: [{ w: "Coucou", start: 1, end: 1.4 }, { w: "celle-là", start: 1.6, end: 2 }, { w: "celle-là", start: 2.2, end: 2.6 }, { w: "et", start: 2.8, end: 2.9 }, { w: "celle-là", start: 2.95, end: 3.3 }] })!;
   assert.equal(once.pieces.length, 1);
   assert.deepEqual(ownVoicePlay(once, 0.2), { track: false, at: -0.45 });
   // The same recording, the same cut, the same lead: the same key (its track kept by a correction); else another.

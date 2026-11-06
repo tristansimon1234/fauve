@@ -21,7 +21,10 @@ export default function PrivacyPage() {
       <h2>Données traitées</h2>
       <ul>
         <li>Identité et contact : numéro de téléphone WhatsApp, prénom, nom et activité du commerce, son site et son lien de réservation.</li>
-        <li>Conversations avec Edith (WhatsApp et application) et les fichiers envoyés : photos, vidéos, messages vocaux, captures.</li>
+        <li>
+          Conversations avec Edith (WhatsApp et application) et les fichiers envoyés : photos, vidéos, messages vocaux, captures, et le son d’une de tes vidéos quand tu demandes
+          à Edith d’en prendre ta voix.
+        </li>
         <li>Ce qu’Edith prépare : légendes, plans de montage, vidéos montées, carrousels, voix off, musique, et ce qu’il retient de ton commerce (sa mémoire, ton style).</li>
         <li>
           Ta voix, si tu choisis de la faire cloner : l’enregistrement que tu fais pour cela, puis la voix clonée. Elle ne sert qu’à raconter tes Reels, avec ton accord exprès.
@@ -78,8 +81,9 @@ export default function PrivacyPage() {
       <ul>
         <li>Compte, conversations, contenus préparés et statistiques : pendant l’abonnement, puis supprimés 30 jours après sa fin. Un compte qui ne s’abonne pas est supprimé 30 jours après son dernier message. À ta demande, tout est supprimé aussitôt.</li>
         <li>
-          Photos et vidéos envoyées : supprimées 24 h après la mise en ligne de la publication qui les utilise, ou 7 jours après leur envoi si aucune ne les utilise (jusqu’à 6 mois
-          pour tes meilleures vidéos, gardées pour tes prochains Reels). Les photos de ton site restent tant que ton compte existe.
+          Photos, vidéos et messages vocaux envoyés, ta voix tirée d’une de tes vidéos ou coupée pour un Reel : supprimés 24 h après la mise en ligne de la publication qui les
+          utilise, ou 7 jours après leur envoi si aucune ne les utilise (jusqu’à 6 mois pour tes meilleures vidéos, gardées pour tes prochains Reels). Les photos de ton site
+          restent tant que ton compte existe.
         </li>
         <li>Enregistrement fait pour cloner ta voix : supprimé dès que la voix est clonée. Voix clonée : jusqu’à ce que tu la supprimes, ou que ton compte soit supprimé.</li>
         <li>

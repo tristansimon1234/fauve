@@ -74,6 +74,15 @@
 // here by espeak-ng's French voice (never Edith's: to check where each word lands), each word cut out of it on its own
 // sound and laid at its moments on one track as the engine lays it (ffmpeg here, the workshop in production), heard
 // without subtitles, the placements printed.
+//
+// Her own voice leading such a model (« Celui-là, celui-là… » v3; packages/agent/src/own-voice.ts; docs/voix.md, « Sa
+// voix mène le modèle »): --hers '{ "audio": "note.ogg", "words": [{ "w", "start", "end" }], "says": [{ "slot", "from",
+// "to", "text" }] }' (a JSON file or text: her recording, its words as Scribe times them, her « euh » among them, and what
+// her filler finds in them, by the numbers of her words once her « euh » is cut, printed here: without « says », they are
+// printed and nothing is rendered), cut as the engine cuts it (ownTalk: her silences at its ends, her « euh », false
+// starts and long pauses out), the model on her words (MontageSkill.heard: its cuts, its words, its music shape), its
+// shots cast as --cast or in turn, her track made here by ffmpeg as the workshop makes it (ownTrackFilter) when anything
+// inside her words is cut, else her recording itself, heard without subtitles; its cuts and words printed.
 
 import { execFileSync, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -94,6 +103,7 @@ import {
   dressSkillPlan,
   paleSpans,
   readSaid,
+  saidLines,
   skillLongest,
   skillPlan,
   skillShotCount,
@@ -105,13 +115,16 @@ import {
   type SkillFile,
   type SkillFill,
   type SkillFillAnswer,
+  type SkillHeard,
   type SkillTalk,
+  type SkillTimeline,
 } from "../packages/agent/src/skills.ts";
 import { pcmSamples, sameTake, TAKE_MAX_SECONDS, TAKE_RATE, takeOffset, wordsOffset } from "../packages/agent/src/takes.ts";
 import { voiceAt, voiceEnd } from "../packages/agent/src/voice.ts";
 import { SKILL_VOICE_TAIL } from "../packages/agent/src/voice-over.ts";
 import { speechGain, speechLevelsFilter } from "../packages/agent/src/mix.ts";
 import { readingSpans, saidPlacements, saidReading, saidSpans, saidTrackFilter, saidTranscript, skillSaysOn } from "../packages/agent/src/model-voice.ts";
+import { ownTalk, ownTrackFilter, ownTrackTranscript, ownVoiceKey, ownVoicePlay, readHeard } from "../packages/agent/src/own-voice.ts";
 
 const { values } = parseArgs({
   options: {
@@ -145,6 +158,7 @@ const { values } = parseArgs({
     voice: { type: "string" },
     follow: { type: "boolean", default: false },
     says: { type: "string" },
+    hers: { type: "string" },
   },
 });
 /** A JSON option given as text or as the path of a file. */
@@ -224,8 +238,31 @@ const reach = laidVoice
   ? skillVoiceFit(skill, voiceEnd({ words: laidVoice.words, duration: 0 }, laidAt) + SKILL_VOICE_TAIL, { n: asked, bpm: askedBpm ?? skill.bpm }, { follow: values.follow })
   : null;
 if (laidVoice && !reach) throw new Error("--voice: longer than this model plays (the chain would make the Reel)");
-const n = reach ? reach.n : asked;
-const bpm = reach ? (Math.abs(reach.bpm - skill.bpm) > 0.005 ? reach.bpm : undefined) : askedBpm;
+// Her own voice leading the model: her recording cut as the engine cuts it, the model's words where her filler finds
+// them, its timeline on them (its count of shots hers).
+type Heard = { audio: string; seconds: number; talk: NonNullable<ReturnType<typeof ownTalk>>; said: SkillHeard; line: SkillTimeline };
+const hers: Heard | undefined = !piece && values.hers ? hearHere(values.hers) : undefined;
+function hearHere(given: string): Heard {
+  if (!skill.heard || !skill.saysWords?.hers) throw new Error("--hers: this model takes no voice of hers as its words (MontageSkill.heard)");
+  const read = json<{ audio: string; words: Timed[]; says?: { slot: string; from: number; to: number; text: string }[] }>(given);
+  if (!read?.audio || !read.words?.length) throw new Error("--hers: { audio, words, says } (her recording, its words timed, what her filler finds in them)");
+  const audio = resolve(read.audio);
+  const seconds = Number(execFileSync("ffprobe", ["-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", audio], { encoding: "utf8" }).trim()) || 0;
+  const talk = ownTalk("hers", { text: "", duration: seconds, words: read.words });
+  if (!talk) throw new Error("--hers: fewer than three words of hers");
+  console.log(`her voice: ${seconds} s recorded, cut to ${talk.duration} s in ${talk.pieces.length} pieces (${talk.pieces.map((p) => `${p.in}–${p.out}`).join(", ")}); her words as her filler reads them:\n  ${saidLines(talk.words).join("\n  ")}`);
+  if (!read.says?.length) {
+    console.log("--hers: give « says » (her words for each of the model's slots, by these numbers) to render it");
+    process.exit(0);
+  }
+  const said = readHeard(skill, talk, { suit: true, mots: read.says });
+  if (!said) throw new Error("--hers: her words do not make this model (too few of its words, or out of their numbers)");
+  const line = skill.heard(said, { end: Boolean(values.end) });
+  if (!line) throw new Error("--hers: her words do not make this model (fewer than three things pointed at, too many, too fast)");
+  return { audio, seconds, talk, said, line };
+}
+const n = hers ? hers.line.shots.length : reach ? reach.n : asked;
+const bpm = hers ? undefined : reach ? (Math.abs(reach.bpm - skill.bpm) > 0.005 ? reach.bpm : undefined) : askedBpm;
 if (laidVoice) console.log(`voice laid from ${laidAt} s, its last word at ${voiceEnd({ words: laidVoice.words, duration: 0 }, laidAt)} s: ${n} shots${bpm ? ` at ${bpm} BPM` : ""}`);
 const seen = new Map<string, number>();
 const fill: SkillFill = {
@@ -315,7 +352,20 @@ const piecePlan = piece
   : null;
 const plan = piecePlan
   ? { ...piecePlan, ...(piece?.spoken ? { subtitles: true } : {}) }
-  : dressSkillPlan(skillPlan({ skill, name: model?.name ?? skill.key, files, fill, ...(bpm ? { bpm } : {}), ...(talk ? { talk } : {}), ...(laidVoice ? { voice: { media_id: "voice", at: laidAt } } : {}) }), skill, followed);
+  : dressSkillPlan(skillPlan({
+        skill,
+        name: model?.name ?? skill.key,
+        files,
+        fill,
+        ...(bpm ? { bpm } : {}),
+        ...(talk ? { talk } : {}),
+        ...(laidVoice ? { voice: { media_id: "voice", at: laidAt } } : {}),
+        // Her own voice leading it: its timeline on her words, her recording as its voice (set below: whole, or its track).
+        ...(hers ? { voice: { media_id: "hers", at: 0 }, heard: { line: hers.line, leads: { media_id: "hers", key: ownVoiceKey("hers", hers.talk, hers.line.lead ?? 0) } } } : {}),
+      }),
+      skill,
+      followed,
+    );
 const fonts = (values.fonts || "").split(",").map((f) => f.trim()).filter(Boolean);
 console.log(
   followed
@@ -474,6 +524,30 @@ function sayHere(given: string): { src: string; words: { w: string; start: numbe
   plan.subtitles = false;
   return { src: `/public/jobs/${job}/${basename(track)}`, words: saidTranscript(laid, plan.duration).words };
 }
+// Her own voice leading it: her track cut here as the workshop cuts it (her « euh » and long pauses out), heard from the
+// Reel's first image; or her recording itself from where its first breath lands, when nothing inside her words is cut.
+const heardVoice = hers ? voiceHere(hers) : undefined;
+function voiceHere(h: Heard): { src: string; words: Timed[] } {
+  const lead = h.line.lead ?? 0;
+  const play = ownVoicePlay(h.talk, lead);
+  console.log(`her voice leads it: from ${lead} s on the Reel, ${play.track ? `on its track (${h.talk.pieces.length} pieces)` : `whole from ${play.at} s`}, ${plan.duration} s`);
+  console.log(`  cuts: ${plan.segments.map((_, i) => (i ? hers!.line.shots[i]!.start : 0)).join(", ")} s`);
+  console.log(`  words: ${(h.line.shown ?? []).map((w) => `« ${w.text} » ${w.from}–${w.to} s`).join(", ")}`);
+  if (!play.track) {
+    const target = `${media}/hers-${createHash("sha1").update(h.audio).digest("hex").slice(0, 8)}${extname(h.audio) || ".mp3"}`;
+    copyFileSync(h.audio, target);
+    plan.voice = { media_id: "hers", at: play.at };
+    // Her words on her recording's clock, as the render gets them from her note's transcript.
+    const from = h.talk.pieces[0]!.in;
+    const words = h.talk.words.map((w) => ({ ...w, start: Math.round((w.start + from) * 100) / 100, end: Math.round((w.end + from) * 100) / 100 }));
+    return { src: `/public/jobs/${job}/${basename(target)}`, words };
+  }
+  const filter = ownTrackFilter(h.talk.pieces, { lead, duration: Math.round((h.talk.duration + lead) * 100) / 100 });
+  const track = `${media}/hers-${createHash("sha1").update(JSON.stringify([h.audio, filter])).digest("hex").slice(0, 8)}.mp3`;
+  execFileSync("ffmpeg", ["-v", "error", "-y", "-i", h.audio, "-filter_complex", filter, "-map", "[out]", "-ac", "1", "-ar", "44100", "-c:a", "libmp3lame", "-b:a", "160k", track]);
+  plan.voice = { media_id: "hers", at: 0 };
+  return { src: `/public/jobs/${job}/${basename(track)}`, words: ownTrackTranscript(h.talk, lead).words };
+}
 const props = buildReelProps(plan, {
   template: "libre",
   clipUrls: Object.fromEntries(files.map((f) => [f.id, f.src])),
@@ -490,6 +564,8 @@ const props = buildReelProps(plan, {
   ...(Object.keys(spoken).length ? { words: spoken } : {}),
   // Its words said by its voice, laid on their track (in the bundle), without subtitles.
   ...(said ? { voice: said } : {}),
+  // Her own voice leading it, without subtitles (her words are its own on screen).
+  ...(heardVoice ? { voice: heardVoice } : {}),
   // A voice laid over it: its recording (copied into the bundle) and its words, subtitled by the engine.
   ...(laidVoice
     ? (() => {
