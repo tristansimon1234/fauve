@@ -269,7 +269,19 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   })();
   const held = GONE !== null && frame >= GONE ? { at: frame - (GONE - shots[0].from) } : {};
   const wall = n ? h(Footage, { key: "wall", shot: 0, style: box, ...held }) : null;
-  const her = n && frame >= ON - 20 ? h(Subject, { key: "her", shot: 0, style: box, ...held }) : null;
+  // Her cut-out only over what is drawn on her wall (Tristan on v9: « bizarre il passe en découpé en dessous »: drawn
+  // over her whole shot from just before the flip, her body switched to its cut-out there, its soft edge and its
+  // compression seen over her own picture where nothing is drawn): over the switch from just before the flip, over her
+  // poster once it is lit, each with a little room; elsewhere her shot alone. One cut-out, its clip the two boxes.
+  const zone = (x, y, w, hh, m) => {
+    const x0 = Math.round(Math.max(0, x - m));
+    const y0 = Math.round(Math.max(0, y - m));
+    const x1 = Math.round(Math.min(width, x + w + m));
+    const y1 = Math.round(Math.min(height, y + hh + m));
+    return "M " + x0 + " " + y0 + " H " + x1 + " V " + y1 + " H " + x0 + " Z";
+  };
+  const zones = [frame >= ON - 20 ? zone(sx - SW / 2, sy - SH / 2, SW, SH, SH * 0.35) : "", lit ? zone(PX, PY, PW, PH, U * 0.02) : ""].filter(Boolean).join(" ");
+  const her = n && zones ? h("div", { key: "her", style: { position: "absolute", left: 0, top: 0, width, height, clipPath: "path('" + zones + "')" } }, h(Subject, { shot: 0, style: box, ...held })) : null;
 
   // Any other text of the Reel (none in its slots): a plain line away from the poster, so nothing she wrote is lost.
   const extra = others.filter((t) => frame >= t.from && frame < Math.min(t.to, endAt)).map((t, i) =>
@@ -290,8 +302,9 @@ export const interrupteur: MontageSkill = {
   // its filler had set her highest reach on the flip, and her video's 3 s of empty wall came after the Reel's end).
   // 8: gone under a five-hundredth (v7 froze her hand leaving at the edge, a hundredth of her); her title and lines keyed
   // by their text (its ending card's long line kept the size of « Nouvelle saison » and ran off both sides). 9: its
-  // switch as near the middle as her fingertip stays on it (Tristan: « le bouton n'est pas au centre »).
-  version: 9,
+  // switch as near the middle as her fingertip stays on it (Tristan: « le bouton n'est pas au centre »). 10: her cut-out
+  // only over the switch and her poster, never over the rest of her shot (Tristan on v9: « bizarre il passe en découpé en dessous »).
+  version: 10,
   bpm: BPM,
   shots: [1, 1],
   files: [1, 2],

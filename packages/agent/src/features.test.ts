@@ -7632,7 +7632,7 @@ test("« Mots mêlés » (v2): its picture darkened to its own light, as filmed,
 test("« Interrupteur » (v2): one shot of 9,1 s on its original's grid (143,7 BPM, one beat in two), its music stopped dead and back as she lands, its beep", async () => {
   const { interrupteur } = await import("./skills/interrupteur.ts");
   const { skillPlan } = await import("./skills.ts");
-  assert.equal(interrupteur.version, 9);
+  assert.equal(interrupteur.version, 10);
   assert.equal(interrupteur.bpm, 71.85);
   const line = interrupteur.timeline(1, { end: false });
   // One fixed shot, no cut (the original has none): its 275 images less its last two, a rest of its edit.
@@ -9300,7 +9300,7 @@ test("« Photos posées sur la table » (v2): horizontal 4:3 on black when her t
 
 test("« Interrupteur » (v4): once she has left, her wall held on that image to the end, nothing of hers coming back; never frozen when nothing says she was there", async () => {
   const { interrupteur } = await import("./skills/interrupteur.ts");
-  assert.equal(interrupteur.version, 9);
+  assert.equal(interrupteur.version, 10);
   const line = interrupteur.timeline(1, { end: false });
   const marks = Object.fromEntries(Object.entries(line.marks).map(([k, v]) => [k, String(v)]));
   const brand = { name: "Atelier Rose", displayFont: "Inter Tight", bodyFont: "Inter Tight", accent: "#7a2e3b", palette: { secondary: "#2c4a3e", light: "#f4efe9", dark: "#1d1d1b" } };
@@ -10446,6 +10446,41 @@ test("« Interrupteur » (v9): its switch as near the middle as her fingertip st
   assert.ok(Math.abs((await centre(900)) - (900 - SW * 0.42)) <= 1);
   // Near the middle: in the middle.
   assert.ok(Math.abs((await centre(600)) - Math.round(1080 * 0.499)) <= 1);
+});
+
+test("« Interrupteur » (v10): her cut-out only over the switch from just before the flip and over her poster once lit, never over the rest of her shot", async () => {
+  // Tristan on v9: « bizarre il passe en découpé en dessous ».
+  const { interrupteur } = await import("./skills/interrupteur.ts");
+  assert.equal(interrupteur.version, 10);
+  const line = interrupteur.timeline(1, { end: false });
+  const marks = Object.fromEntries(Object.entries(line.marks).map(([k, v]) => [k, String(v)]));
+  const brand = { name: "Atelier Rose", displayFont: "Inter Tight", bodyFont: "Inter Tight", accent: "#7a2e3b", palette: { secondary: "#2c4a3e", light: "#f4efe9", dark: "#1d1d1b" } };
+  const props = { width: 1080, height: 1920, durationInFrames: 273, brand, shots: rallumeShots(line, 9 / 16), reelTexts: [{ text: "Atelier Rose", role: "hook", from: 123, to: 273, emphasis: [] }], end: null, texts: marks };
+  const { draw } = await kitScene(interrupteur.code, {});
+  const clipOf = (f: number) => {
+    const nodes = drawnNodes(draw(f, props));
+    const wrap = nodes.find((n) => n.props.key === "her");
+    return { nodes, wrap, rects: wrap ? [...String(styleOf(wrap).clipPath).matchAll(/M (\d+) (\d+) H (\d+) V (\d+)/g)].map((m) => m.slice(1).map(Number)) : [] };
+  };
+  const inside = (r: number[], b: { left: number; top: number; width: number; height: number }) => r[0]! <= b.left && r[1]! <= b.top && r[2]! >= b.left + b.width && r[3]! >= b.top + b.height;
+  // Before: nothing of her cut out (the switch out of her reach).
+  assert.equal(clipOf(80).wrap, undefined);
+  // Just before the flip: her cut-out over the switch only, a little room around it, nowhere else.
+  const before = clipOf(110);
+  const sw = styleOf(before.nodes.find((n) => n.props.key === "switch")!) as unknown as { left: number; top: number; width: number; height: number };
+  assert.equal(before.rects.length, 1);
+  assert.ok(inside(before.rects[0]!, sw), JSON.stringify(before.rects));
+  const area = (r: number[]) => (r[2]! - r[0]!) * (r[3]! - r[1]!);
+  assert.ok(area(before.rects[0]!) < 0.05 * 1080 * 1920, "a small box, not her whole shot");
+  assert.ok(before.wrap!.children.some((c) => c && typeof c === "object" && (c as Drawn).type === "Subject"));
+  // Lit: over the switch and her poster, the two boxes; drawn after both.
+  const after = clipOf(140);
+  assert.equal(after.rects.length, 2);
+  assert.ok(area(after.rects[0]!) + area(after.rects[1]!) < 0.55 * 1080 * 1920, JSON.stringify(after.rects));
+  const order = after.nodes.map((n) => n.props.key);
+  assert.ok(order.indexOf("her") > order.indexOf("switch") && order.indexOf("her") > order.indexOf("poster"));
+  // Her one shot is still the only one cut out.
+  assert.deepEqual(line.cutouts, [0]);
 });
 
 test("the model picker reads her taste: her moodboard, her art direction, the Reels she sent and kept, the models she published", async () => {
