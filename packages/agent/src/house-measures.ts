@@ -76,4 +76,8 @@ export const HOUSE_MEASURES: Record<string, ReelMeasures> = {
   // Its fiche's 56 cuts (13 to a new place, 43 in the same place, a gesture each), read image to image with its
   // subtitles masked; no steady beat under its voice (its catalogue's tempo, 85, decides); its loudness by ebur128.
   "recette": { duration: 44.97, cuts: [1.03, 3.67, 4.27, 5.03, 5.73, 6.5, 7.13, 7.9, 8.53, 9.1, 9.6, 10.23, 11.87, 12.43, 13.1, 13.77, 14.43, 15.43, 15.93, 16.3, 16.93, 17.6, 18.4, 19.3, 19.83, 20.5, 21.17, 21.8, 22.57, 23.17, 23.83, 24.23, 25.2, 25.83, 26.43, 27.17, 27.73, 28.37, 29.1, 29.7, 30.4, 30.9, 31.5, 32.6, 33.3, 34.27, 35.4, 36.3, 37.37, 38.57, 39.2, 40.1, 41.27, 42.03, 42.9, 43.57], bpm: null, lufs: -14.3 },
+  // Its fiche's two cuts (the close-up opened on a click, closed on the second click of a double click), read image by
+  // image; no beat in its sound (its street's, cut by its first click and back on its last: its catalogue's tempo, 90,
+  // decides); its loudness by ebur128.
+  "curseur": { duration: 10.2, cuts: [2.27, 5.97], bpm: null, lufs: -17.3 },
 };
