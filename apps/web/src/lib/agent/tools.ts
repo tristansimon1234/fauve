@@ -1485,7 +1485,7 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
         list.sounds.slice(0, 5).map(async (sound) => {
           const example = await soundExample(sound.audioId, studioId).catch(() => null);
           if (!example) return null;
-          const chart = sound.chart === "house" ? "un son de nos modèles" : sound.chart ? `${sound.chart === "top" ? "Top 50" : "Viral 50"} n° ${sound.rank}` : null;
+          const chart = sound.chart === "house" ? "un de tes sons préférés du moment" : sound.chart ? `${sound.chart === "top" ? "Top 50" : "Viral 50"} n° ${sound.rank}` : null;
           return { sound, example, chart };
         }),
       );
