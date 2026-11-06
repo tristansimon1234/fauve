@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { editPlanSchema, type ClipAnalysis } from "../schemas.ts";
-import { layerShots, pieceMusicShape, pieceShots, pieceTestPlan, piecesOffered, readPieceFill } from "../pieces.ts";
+import { layerShots, PIECE_FILL_PROMPT, pieceFillInput, pieceMusicShape, pieceShots, pieceTestPlan, piecesOffered, readPieceFill } from "../pieces.ts";
 import { checkMotionCode } from "../motion-scene.ts";
 import { subjectShots } from "../subject.ts";
 import { curseur, curseurMoments, onWholeBeat } from "./curseur.ts";
@@ -23,7 +23,7 @@ test("« Un clic sur tes produits » (effect v1): its layer over her place and h
   const layer = plan.layers![0]!;
   assert.deepEqual(layerShots(plan, layer), [1, 2]);
   const motion = layer.motion;
-  assert.deepEqual(motion.piece, { key: "curseur", version: 1 });
+  assert.deepEqual(motion.piece, { key: "curseur", version: 2 });
   // Its moments: its pause early in her place, its second click on the cut (2,4 s in), a name a click, the play on a
   // whole beat (18 frames at 100 BPM) a second before its end at most (here the last that leaves her second name a second).
   const m = curseurMoments(198, 100, [{ from: 0, frames: 72 }, { from: 72, frames: 126 }]);
@@ -31,7 +31,7 @@ test("« Un clic sur tes produits » (effect v1): its layer over her place and h
   assert.ok(m.pause < m.zoom - 6 && m.pause > m.enter);
   assert.ok(m.label1 > m.zoom && m.label2 > m.label1 && m.play - m.label2 >= 30 && m.play % 18 === 0 && m.play <= 198 - 30, JSON.stringify(m));
   assert.ok(onWholeBeat(m.play, 100) && !onWholeBeat(m.play + 5, 100));
-  assert.deepEqual(Object.fromEntries(["enter", "pause", "zoom", "label1", "label2", "play", "out"].map((k) => [k, motion.texts![k]])), Object.fromEntries(Object.entries(m).map(([k, v]) => [k, String(v)])));
+  assert.deepEqual(Object.fromEntries(["enter", "pause", "zoom", "label1", "label2", "label3", "play", "out"].map((k) => [k, motion.texts![k]])), Object.fromEntries(Object.entries(m).map(([k, v]) => [k, String(v)])));
   // Its objects followed on its last shot only (her close-up), by the names its filler gave; nothing of her cut out.
   assert.deepEqual(motion.drawn, { shots: 4, objects: [{ shot: 2, name: "cappuccino cup" }, { shot: 2, name: "brownie" }] });
   assert.deepEqual([...subjectShots(plan)], []);
@@ -98,7 +98,7 @@ function drawAt(frame: number, props: { texts?: Record<string, string>; boxes?: 
     SubjectBox: (_shot: unknown, _f: number, _laid: unknown, name?: string) => (name && props.boxes?.[name]) ?? null,
     LightUnder: () => (props.light === undefined ? null : { mean: props.light, high: props.light }),
   };
-  const code = curseur.code.split('"@produit1"').join('"cappuccino cup"').split('"@produit2"').join('"brownie"');
+  const code = curseur.code.split('"@produit1"').join('"cappuccino cup"').split('"@produit2"').join('"brownie"').split('"@produit3"').join('"croissant"');
   const make = new Function("React", ...Object.keys(scope), `"use strict";\n${code}\nreturn Scene;`) as (...args: unknown[]) => (p: Record<string, unknown>) => Drawn;
   const durationInFrames = props.durationInFrames ?? 198;
   const m = curseurMoments(durationInFrames, 100, [{ from: 0, frames: 72 }, { from: 72, frames: 126 }]);
@@ -169,8 +169,67 @@ test("« Un clic sur tes produits »: the cursor and its clicks, her names near 
   assert.ok(strokes.every((a) => a.props.kind === "arrow" && a.props.frames === 1));
   const bright = flatten(drawAt(M.label2 + 4, { boxes, light: 0.9 })).find((n) => n.type === "FitText")!;
   assert.equal((bright.props.innerStyle as { color: string }).color, "#1d1d1b");
-  // Without anything read, at the model's places, still inside the safe zone.
+  // Without anything read: no arrow pointing at nothing (v2 pointed at the model's places), each name alone, inside the safe zone.
+  assert.equal(flatten(drawAt(M.label2 + 4, {})).filter((n) => n.type === "Scribble").length, 0);
   const bare = flatten(drawAt(M.label2 + 4, {})).filter((n) => n.type === "FitText").map((n) => styleOf(n) as unknown as R);
   assert.equal(bare.length, 2);
   for (const b of bare) assert.ok(b.left >= 40 && b.top >= 80 && b.top + b.height <= 1440 && b.left + b.width <= (b.top + b.height > 960 ? 940 : 1040), JSON.stringify(b));
+});
+
+// ——— v2: each name on the product it names (Tristan, 6 November: « il a calé “brownie” sur le café ») ———————————————————
+
+test("« Un clic sur tes produits » (effect v2): the same thing found under two names is named once, never laid on another product", () => {
+  // The detector found « brownie » on the cappuccino itself: only the cappuccino named, one arrow; its click still heard.
+  const boxes = { "cappuccino cup": { x: 120, y: 640, w: 560, h: 480 }, brownie: { x: 180, y: 700, w: 420, h: 360 } };
+  const tree = flatten(drawAt(M.label2 + 4, { boxes }));
+  assert.deepEqual(tree.filter((n) => n.type === "FitText").map(textOf), ["Cappuccino"]);
+  assert.equal(tree.filter((n) => String(n.props.key).startsWith("arrow-")).length, 1);
+});
+
+test("« Un clic sur tes produits » (effect v2): as many names as her close-up shows, a click each, an arrow only when it points at its own", () => {
+  const m = curseurMoments(198, 100, [{ from: 0, frames: 72 }, { from: 72, frames: 126 }], true);
+  // Three clicks closer together, the last read 1,7 s before the play, on a whole beat.
+  assert.ok(m.label2 > m.label1 && m.label3 > m.label2 && m.label3 - m.label2 >= 16 && m.play - m.label3 >= 30 && onWholeBeat(m.play, 100), JSON.stringify(m));
+  const fill = { texts: { produit1: "Cappuccino", produit2: "Brownie", produit3: "Croissant" }, objects: { produit1: "cappuccino cup", produit2: "brownie", produit3: "croissant" }, settings: {} };
+  const plan = pieceTestPlan({ piece: curseur, shots, span: [1.2, 7.8], fill, bpm: 100 });
+  const motion = plan.layers![0]!.motion;
+  assert.deepEqual(motion.sounds!.map((s) => Math.round(s.at * 30)), [m.pause, m.zoom, m.label1, m.label2, m.label3, m.play]);
+  assert.deepEqual(motion.drawn!.objects!.map((o) => o.name), ["cappuccino cup", "brownie", "croissant"]);
+  const boxes = { "cappuccino cup": { x: 90, y: 560, w: 400, h: 330 }, brownie: { x: 600, y: 700, w: 360, h: 260 }, croissant: { x: 260, y: 1100, w: 520, h: 280 } };
+  const marks = Object.fromEntries(Object.entries(m).map(([k, v]) => [k, String(v)]));
+  const tree = flatten(drawAt(m.label3 + 4, { boxes, texts: { ...marks, produit3: "Croissant" } }));
+  const named = tree.filter((n) => n.type === "FitText");
+  assert.deepEqual(named.map(textOf), ["Cappuccino", "Brownie", "Croissant"]);
+  type R = { left: number; top: number; width: number; height: number };
+  const own = [boxes["cappuccino cup"], boxes.brownie, boxes.croissant];
+  const hit = (a: R, b: Box) => a.left < b.x + b.w && b.x < a.left + a.width && a.top < b.y + b.h && b.y < a.top + a.height;
+  named.forEach((n, i) => own.forEach((b, j) => assert.ok(i === j || !hit(styleOf(n) as unknown as R, b), `${i} on ${j}`)));
+  for (const a of tree.filter((n) => String(n.props.key).startsWith("arrow-"))) {
+    const i = Number(String(a.props.key).slice(6));
+    const tail = a.props.from as { x: number; y: number };
+    assert.ok(tail.x >= own[i]!.x && tail.x <= own[i]!.x + own[i]!.w && tail.y >= own[i]!.y && tail.y <= own[i]!.y + own[i]!.h, JSON.stringify([i, tail]));
+  }
+});
+
+test("« Un clic sur tes produits » (effect v2): its filler's names kept only for what the shot under it shows", () => {
+  const under = [{ shows: "Un serveur sort du café avec un plateau." }, { shows: "Gros plan d'un cappuccino avec un cœur dans la mousse." }];
+  const answer = {
+    fits: true,
+    missing: "",
+    texts: [{ slot: "produit1", text: "Cappuccino" }, { slot: "produit2", text: "Brownie" }, { slot: "produit3", text: "" }],
+    objects: [{ slot: "produit1", name: "cappuccino cup", seen: "un cappuccino" }, { slot: "produit2", name: "brownie", seen: "un brownie" }, { slot: "produit3", name: "none" }],
+    settings: [],
+  };
+  // The brownie her request names is not in the shot: not written, not followed.
+  const read = readPieceFill(curseur, answer, { under })!;
+  assert.deepEqual([read.texts, read.objects], [{ produit1: "Cappuccino" }, { produit1: "cappuccino cup" }]);
+  // Seen there: kept.
+  const both = readPieceFill(curseur, answer, { under: [under[0]!, { shows: "Un cappuccino et un brownie sur une table." }] })!;
+  assert.deepEqual(both.texts, { produit1: "Cappuccino", produit2: "Brownie" });
+  // Its first product not seen there: the effect does not play.
+  assert.equal(readPieceFill(curseur, { ...answer, objects: [{ slot: "produit1", name: "brownie", seen: "un brownie" }] }, { under }), null);
+  // Its filler is told which object each name names, and the rule.
+  const input = pieceFillInput({ piece: curseur, under: [{ id: "a", photo: false, shows: under[0]!.shows }, { id: "b", photo: true, shows: under[1]!.shows }], brief: "", request: "Le cappuccino et le brownie du moment.", business: {} });
+  assert.deepEqual((input.effet.ses_objets as { slot: string; son_texte?: string }[]).map((o) => o.son_texte), ["produit1", "produit2", "produit3"]);
+  assert.match(PIECE_FILL_PROMPT, /a word written on or beside a thing \(a product's name\) names what that shot shows/);
 });

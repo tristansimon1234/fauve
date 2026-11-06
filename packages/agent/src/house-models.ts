@@ -2121,7 +2121,7 @@ export const HOUSE_MODELS: HouseModel[] = [
     // on a computer: a click pauses it and the music, a click opens the close-up of her products, a click on each writes
     // its name with a hand-drawn arrow, a click clears them, a double click goes back, a last click plays it all again.
     pitch: "Un curseur d'ordinateur met ta vidéo en pause d'un clic, ouvre la photo de près de ce que tient ton équipe, écrit d'un clic le nom de chacun de tes produits, puis relance la vidéo et la musique.",
-    needs: "une vidéo de ton lieu où quelqu'un passe ou s'avance avec ce que tu vends à la main (filmée téléphone posé), et une photo de près de deux de tes produits côte à côte",
+    needs: "une vidéo de ton lieu où quelqu'un passe ou s'avance avec ce que tu vends à la main (filmée téléphone posé), et une photo de près de un à trois de tes produits côte à côte (ceux que tu veux nommer)",
     files: [2, 3],
     // Its names in a very condensed bold family, as its original's labels (Bebas Neue).
     pair: "condensee-geometrique",
