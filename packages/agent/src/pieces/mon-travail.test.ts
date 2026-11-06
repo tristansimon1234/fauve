@@ -75,6 +75,7 @@ function drawAt(frame: number, props: Record<string, unknown>, readings: Record<
     SubjectBox: () => null,
     SubjectOutline: () => null,
     LightUnder: () => null,
+    ClearBox: (_s: unknown, _f: number, _l: unknown, o: { fallback: unknown }) => o.fallback,
     ...readings,
   };
   const make = new Function("React", ...Object.keys(scope), `"use strict";\n${monTravail.code}\nreturn Scene;`) as (...args: unknown[]) => (p: Record<string, unknown>) => Node;
@@ -113,7 +114,7 @@ test("« Voici mon travail »: what it draws, frame by frame — her and her cut
   assert.equal(worksIn(first).length, 0);
   // Her words behind her (effect v3; Tristan on its skill's v1: « la police passe pas derrière la dame »): drawn before her
   // cut-out, after the works behind her, before those over her legs.
-  assert.equal(monTravail.version, 3);
+  assert.equal(monTravail.version, 4);
   const laid = nodes(drawAt(Number(texts.l7), props));
   const wordsAt = laid.findIndex((n) => n.type === "FitText");
   assert.ok(wordsAt >= 0 && wordsAt < laid.findIndex((n) => n.type === "Subject"));
@@ -163,4 +164,35 @@ test("« Voici mon travail »: the burst follows the span (its last work about h
   assert.match(monTravail.code, /LightUnder\(/);
   assert.match(monTravail.code, /h\(Subject, \{ key: "cut"/);
   assert.doesNotMatch(monTravail.code, /interpolate\(|spring\(/);
+});
+
+test("« Voici mon travail » (effect v4): on someone filling the frame, her words in front under her face, in a colour that reads; her works she hides in front below her chin", () => {
+  const works = 10;
+  const span: [number, number] = [1.2, 1.2 + (works + 1) * 0.6];
+  const plan = pieceTestPlan({ piece: monTravail, shots: run(works), span, fill: { texts: { mots: "mes bouquets de saison" }, objects: {}, settings: {} }, bpm: 100 });
+  const texts = plan.layers![0]!.motion.texts!;
+  const F = Math.round((span[1] - span[0]) * 30);
+  const shots = [{ from: -36, durationInFrames: 36, kind: "video", aspect: 0.5625 }, ...Array.from({ length: works + 1 }, (_, i) => ({ from: i * 18, durationInFrames: 18, kind: "photo", aspect: 1 }))];
+  const props = { width: 1080, height: 1920, durationInFrames: F, brand: { displayFont: "Inter Tight", bodyFont: "Inter", accent: "#b03a5b", palette: {} }, shots, texts, track: () => ({ faces: [] }) };
+  // The florist of its skill's bench: her curls from 130 px, her shoulders wider than the frame from 760, her apron dark
+  // and her sleeves white under her words.
+  const florist = "M 470 130 L 640 130 L 790 220 L 880 420 L 900 640 L 1080 780 L 1080 1920 L 0 1920 L 0 780 L 190 640 L 210 420 L 300 220 Z";
+  const read = { SubjectBox: () => ({ x: 0, y: 130, w: 1080, h: 1790 }), SubjectOutline: () => florist, LightUnder: () => ({ mean: 0.16, high: 0.82 }) };
+  const tree = drawAt(Number(texts.l9), props, read);
+  const all = nodes(tree);
+  const block = all.find((n) => n.type === "FitText")!;
+  assert.equal(block.props.key, "words-front");
+  assert.ok(all.indexOf(block) > all.findIndex((n) => n.type === "Subject"));
+  const s = block.props.style as Record<string, number>;
+  // Its first line's capitals under her chin (660 on the bench).
+  const k = Math.min(1, s.height! / (4 * 257));
+  assert.ok(s.top! + (s.height! - 4 * 257 * k) / 2 + 257 * k * 0.5 - 0.38 * 192 * k >= 660, JSON.stringify(s));
+  const word = nodes(block).find((n) => n.type === "div" && (n.props.style as Record<string, unknown>).height === 257)!;
+  assert.equal((word.props.style as Record<string, unknown>).color, "#ffffff");
+  // Her works she would hide: in front of her below her chin; none in front at her head's height.
+  const top = tree.children.flat() as unknown[];
+  const cutAt = top.findIndex((n) => !!n && typeof n === "object" && (n as Node).type === "Subject");
+  const front = top.slice(cutAt + 1).flatMap((n) => (Array.isArray(n) ? n : [n])).filter((n) => !!n && typeof n === "object" && String((n as Node).props.key ?? "").startsWith("w")) as Node[];
+  assert.ok(front.length >= 3, `${front.length} in front`);
+  for (const w of front) assert.ok(Number((w.props.style as Record<string, number>).top) >= 660, JSON.stringify(w.props.style));
 });

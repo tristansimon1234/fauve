@@ -6353,7 +6353,7 @@ const travailMarks = (line: { marks: Record<string, number> }) => Object.fromEnt
 
 test("« Voici mon travail » (v1) lays her works where and when its original does, within two images, her shot under them all along", async () => {
   const { monTravail, workLandings, frontFrom } = await import("./skills/mon-travail.ts");
-  assert.equal(monTravail.version, 2);
+  assert.equal(monTravail.version, 3);
   assert.equal(monTravail.bpm, 120);
   const line = monTravail.timeline(38, { end: false });
   // Her shot and the original's 37 works; 9,17 s (275 images), as the original.
@@ -6423,7 +6423,7 @@ test("« Voici mon travail » (v1): the original's boxes, square but one, behind
   const line = monTravail.timeline(38, { end: false });
   const texts = travailMarks(line);
   const shots = pileShots(line, 1, "photo");
-  const draw = (f: number, extra: Record<string, unknown> = {}, read: { boxes?: Record<string, TdBox> } = { boxes: { "0": { x: 300, y: 280, w: 480, h: 1560 } } }) =>
+  const draw = (f: number, extra: Record<string, unknown> = {}, read: { boxes?: Record<string, TdBox> } = { boxes: { "0": { x: 227, y: 768, w: 270, h: 1152 } } }) =>
     travailDrawn(monTravail.code, f, { durationInFrames: 275, shots, texts, ...extra }, read);
   const box = (k: number) => draw(line.marks[`l${k}`]!).works.find((w) => w.shot === k + 1)!.box;
   // In the original's boxes (measured at 720 × 1280 where nothing hides them, at 1080 × 1920 here): centre within 12 px,
@@ -6443,14 +6443,14 @@ test("« Voici mon travail » (v1): the original's boxes, square but one, behind
   assert.ok(Math.abs(own.width / own.height - 4 / 3) < 0.01, JSON.stringify(own));
   const tall = draw(130, { texts: { ...texts, format: "portrait" } }).works.at(-1)!.box;
   assert.ok(Math.abs(tall.width / tall.height - 0.8) < 0.01, JSON.stringify(tall));
-  assert.deepEqual(monTravail.settings?.map((s) => [s.name, s.choices.map((c) => c.value)]), [["format", ["carre", "forme", "portrait"]], ["couleur", ["sienne", "pale", "original"]]]);
+  assert.deepEqual(monTravail.settings?.map((s) => [s.name, s.choices.map((c) => c.value)]), [["format", ["carre", "forme", "portrait"]], ["couleur", ["auto", "sienne", "pale", "original"]]]);
   // Fewer works: bigger squares on the same surface.
   const few = monTravail.timeline(16, { end: false });
   const fewDrawn = travailDrawn(monTravail.code, few.marks.l3!, { durationInFrames: Math.round(few.duration * 30), shots: pileShots(few, 1, "photo"), texts: travailMarks(few) });
   const third = fewDrawn.works.find((w) => w.shot === 4)!.box;
   assert.ok(third.width >= 480 && third.width === third.height, JSON.stringify(third));
   // Without her cut-out (none made in time), no work is laid over her face, as tracked: she stays seen.
-  const tracked = { track: () => ({ hands: [], faces: [{ id: 0, x: 470, y: 560, width: 150, height: 180, points: {} }], bodies: [] }) };
+  const tracked = { track: () => ({ hands: [], faces: [{ id: 0, x: 545, y: 650, width: 150, height: 180, points: {} }], bodies: [] }) };
   const bare = draw(60, tracked, {});
   const face = { x: 470, y: 560, w: 150, h: 180 };
   const covered = (b: { left: number; top: number; width: number; height: number }) =>
@@ -6510,33 +6510,44 @@ test("« Voici mon travail » (v2): her words behind her, at the original's size
   assert.doesNotMatch(monTravail.code, /THIS|WORK/);
   // Off her face: her face beside a short word, as the original's, leaves the block where it is; one under a line moves
   // it below her face (else above it).
-  const beside = { track: () => ({ hands: [], faces: [{ id: 0, x: 160, y: 770, width: 110, height: 130, points: {} }], bodies: [] }) };
+  const beside = { track: () => ({ hands: [], faces: [{ id: 0, x: 215, y: 835, width: 110, height: 130, points: {} }], bodies: [] }) };
   assert.equal(styleOf(block(draw(0, beside))).top, 394);
-  const under = { track: () => ({ hands: [], faces: [{ id: 0, x: 470, y: 420, width: 150, height: 190, points: {} }], bodies: [] }) };
+  const under = { track: () => ({ hands: [], faces: [{ id: 0, x: 545, y: 515, width: 150, height: 190, points: {} }], bodies: [] }) };
   const moved = styleOf(block(draw(0, under)));
   assert.ok(Number(moved.top) >= 610 && Number(moved.top) + Number(moved.height) === 1223, JSON.stringify(moved));
   // From her cut-out when she is not tracked: her head at the top of its outline (the ceramicist of its bench, arms out
   // holding her apron's straps: her box as wide as the frame), else the top of its box.
   const head = "M 610 397 L 687 403 L 733 459 L 742 536 L 714 605 L 1075 879 L 878 1918 L 336 1411 L 127 883 L 526 511 L 548 440 Z";
   const outlined = styleOf(block(draw(0, {}, { boxes: { "0": { x: 119, y: 397, w: 960, h: 1523 } }, outlines: { "0": head } })));
-  assert.equal(outlined.top, 397 + Math.round(207 * 1.3) + 38);
+  // (v3: her head down to where her shoulders widen to 1,8 times its width, image 627, rather than 1,3 times its width.)
+  assert.equal(outlined.top, 627 + 38);
   const cut = styleOf(block(draw(0, {}, { boxes: { "0": { x: 330, y: 450, w: 420, h: 1400 } } })));
   assert.ok(Number(cut.top) > 394 + 100, JSON.stringify(cut));
-  // Behind her, each line only where it still reads (a third of it hidden at most, measured on her outline): a woman in
-  // the middle, her arms out, swallows a short word across her chest; its block slides up the frame to where the most
-  // of its lines pass behind her head, the others laid in front of her, never on her face.
+  // Behind her when every line still reads there (a third of it hidden at most, measured on her outline): the original's
+  // slim figure on the left third, her block slid to where all its lines pass behind her. v3: a woman in the middle, her
+  // arms out (the florist of its bench filling the frame), would swallow every line: none goes behind her and none on
+  // her face; with no calm room beside or above her, all of them in front of her, under her face, in white with a firm
+  // edge (laid over her body, her shot's light unread).
+  const seenIn = (n: Drawn) => drawnNodes(n).filter((c) => c.type === "div" && styleOf(c).height === 257 && styleOf(c).visibility !== "hidden").map(drawnText);
+  const copiesOf = (d: { nodes: Drawn[] }, key: string) => d.nodes.filter((n) => n.type === "FitText" && n.props.key === key).flatMap(seenIn);
+  const slim = "M 330 768 L 430 768 L 440 900 L 497 960 L 497 1920 L 227 1920 L 227 960 L 320 900 Z";
+  const behindSlim = draw(0, {}, { boxes: { "0": { x: 227, y: 768, w: 270, h: 1152 } }, outlines: { "0": slim } });
+  assert.deepEqual(copiesOf(behindSlim, "words"), ["VOICI", "MON", "TRAVAIL"]);
+  assert.deepEqual(copiesOf(behindSlim, "words-front"), []);
+  assert.ok(behindSlim.nodes.findIndex((n) => n.props.key === "words") < behindSlim.nodes.findIndex((n) => n.type === "Subject"));
   const wide = "M 500 400 L 580 400 L 600 520 L 900 700 L 900 1500 L 700 1900 L 380 1900 L 180 1500 L 180 700 L 480 520 Z";
   const split = draw(0, {}, { boxes: { "0": { x: 180, y: 400, w: 720, h: 1500 } }, outlines: { "0": wide } });
-  const copies = split.nodes.filter((n) => n.type === "FitText" && heldText(n).includes("TRAVAIL"));
-  const seenIn = (n: Drawn) => drawnNodes(n).filter((c) => c.type === "div" && styleOf(c).height === 257 && styleOf(c).visibility !== "hidden").map(drawnText);
-  const backLines = copies.filter((c) => c.props.key === "words").flatMap(seenIn);
-  const frontLines = copies.filter((c) => c.props.key === "words-front").flatMap(seenIn);
-  assert.deepEqual([...backLines, ...frontLines].sort(), ["MON", "TRAVAIL", "VOICI"]);
-  assert.ok(backLines.length >= 2, JSON.stringify({ backLines, frontLines }));
+  assert.deepEqual(copiesOf(split, "words"), []);
+  assert.deepEqual(copiesOf(split, "words-front"), ["VOICI", "MON", "TRAVAIL"]);
   const cutAt = split.nodes.findIndex((n) => n.type === "Subject");
-  assert.ok(split.nodes.findIndex((n) => n.props.key === "words") < cutAt);
-  if (frontLines.length) assert.ok(split.nodes.findIndex((n) => n.props.key === "words-front") > cutAt);
-  assert.ok(Number(styleOf(copies[0]!).top) < 394, "slid up toward her head");
+  const frontBlock = split.nodes.find((n) => n.props.key === "words-front")!;
+  assert.ok(split.nodes.indexOf(frontBlock) > cutAt);
+  // (Its first line's capitals under her face, read from her outline down to where her shoulders widen: image 535.)
+  const fb = styleOf(frontBlock);
+  assert.ok(Number(fb.top) + (Number(fb.height) - 3 * 257) / 2 + 257 / 2 - 0.38 * 192 >= 535, JSON.stringify(fb));
+  const frontWord = styleOf(drawnNodes(frontBlock).find((c) => c.type === "div" && styleOf(c).height === 257)!);
+  assert.equal(frontWord.color, "#ffffff");
+  assert.match(String(frontWord.textShadow), /rgba\(0,0,0,0\.75\)/);
   // More than four words: four lines at most, none ending on a word that belongs to the next.
   const long = draw(0, { reelTexts: [{ text: "mes bouquets faits main à Lyon depuis dix ans", role: "hook", from: 0, to: 275, emphasis: [] }] });
   const set = words(long).map(drawnText);
@@ -6575,7 +6586,7 @@ test("« Voici mon travail » (v1): its clicks slowing down on their measured mo
   assert.deepEqual([last.clip_id, last.in, last.speed], ["v", 2, undefined]);
   assert.equal(plan.sounds?.length, 31);
   assert.deepEqual(plan.music_shape, { filters: [{ kind: "thin", from: 8, to: plan.duration, open: 0.02 }], end: { at: plan.duration, fade: 0.02 } });
-  assert.deepEqual(plan.skill, { key: "mon-travail", version: 2 });
+  assert.deepEqual(plan.skill, { key: "mon-travail", version: 3 });
   assert.equal(plan.layers![0]!.motion.texts!.front, "31");
   // Her shot alone cut out (v2: declared), her works never.
   assert.deepEqual(plan.layers![0]!.motion.drawn?.subjects, [0]);
