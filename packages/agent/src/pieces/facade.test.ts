@@ -3,6 +3,7 @@ import { test } from "node:test";
 import { checkMotionCode } from "../motion-scene.ts";
 import { pieceMusicShape, pieceTestPlan } from "../pieces.ts";
 import { editPlanSchema } from "../schemas.ts";
+import { objectPassages, readPassages } from "../subject.ts";
 import { facade, facadeLandings } from "./facade.ts";
 
 // « Façade qui se construit », the effect of the bank (facade.ts): its own checks, beside the bank's (features.test.ts).
@@ -17,16 +18,20 @@ function frontPlan(seconds: number, bpm: number, fill: { texts?: Record<string, 
   return pieceTestPlan({ piece: facade, shots, span: [1.2, 1.2 + seconds], fill: { texts: fill.texts ?? {}, objects: fill.objects ?? {}, settings: fill.settings ?? {} }, bpm });
 }
 
-test("« Façade qui se construit » (effect v2): its layer over her front, her front's elements and her sign named for that shot only", () => {
-  const plan = frontPlan(6, 100, { objects: { morceaux: "every window", enseigne: "shop sign" }, settings: { format: "horizontal" } });
+test("« Façade qui se construit » (effect v4): its layer over her front, her front's elements and her sign named for that shot only, read on its first image", () => {
+  const elements = "painted door, every window, every shutter, shop sign, awning";
+  const plan = frontPlan(6, 100, { objects: { morceaux: elements, enseigne: "shop sign" }, settings: { format: "horizontal" } });
   assert.ok(editPlanSchema.safeParse(plan).success);
   const motion = plan.layers![0]!.motion;
-  // Both followed on her front, the second of her shots, never elsewhere.
-  assert.deepEqual(motion.drawn, { shots: 3, objects: [{ shot: 1, name: "every window" }, { shot: 1, name: "shop sign" }] });
-  assert.ok(motion.code!.includes('SubjectParts(shot, f0, laid, "every window", 0)'));
+  // Both read once on her front's first image (still), the second of her shots, never elsewhere; her elements as a list.
+  assert.deepEqual(motion.drawn, { shots: 3, objects: [{ shot: 1, name: elements, still: true }, { shot: 1, name: "shop sign", still: true }] });
+  assert.deepEqual(objectPassages(plan, () => true).map((p) => [p.name, p.still]), [["shop sign", true], [elements, true]]);
+  assert.ok(motion.code!.includes(`SubjectParts(shot, f0, laid, "${elements}", 0)`));
   assert.ok(motion.code!.includes('SubjectBox(shot, f0, laid, "shop sign")'));
+  // Her picture's regions read on that shot too (PictureRegions), for the rest of her front.
+  assert.deepEqual(readPassages(plan, () => true).map((p) => p.kinds), [["regions"]]);
   assert.equal(motion.texts!.format, "horizontal");
-  // Nothing named: its code reads nothing and cuts her front in pieces of every shape (v3).
+  // Nothing named: no object read; its regions still are (the cut of every shape of v3 only when they were not read).
   assert.equal(frontPlan(6, 100).layers![0]!.motion.drawn, undefined);
   assert.deepEqual(checkMotionCode(facade.code), []);
   // A piece lands at once and never moves: nothing is animated between two landings, never a zoom.

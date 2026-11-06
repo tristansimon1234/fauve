@@ -1249,7 +1249,7 @@ test("each of Edith's models shows its original's frames as a Reel she sends: sh
   const { stolenStyleSchema } = await import("./steal.ts");
   // A studio's row written before the sheets is rewritten (11: ten models written again on their originals' fiches; 21:
   // their looks vertical full frame by default, the band on her word).
-  assert.equal(HOUSE_VERSION, 21);
+  assert.equal(HOUSE_VERSION, 22);
   for (const m of HOUSE_MODELS) {
     const sheets = houseSheets(m.key);
     // A model written as a design has no original, so no sheets (its row names none).
@@ -3422,7 +3422,7 @@ function drawCutOuts(
   code: string,
   frame: number,
   props: Record<string, unknown>,
-  read: { boxes?: Record<string, TdBox>; outlines?: Record<string, string>; parts?: Record<string, TdBox[]>; skyline?: (shot: number | undefined, span: { from?: number; to?: number }) => number | null; light?: { mean: number; high: number } } = {},
+  read: { boxes?: Record<string, TdBox>; outlines?: Record<string, string>; parts?: Record<string, (TdBox & { d?: string })[]>; regions?: Record<string, (TdBox & { d: string })[]>; skyline?: (shot: number | undefined, span: { from?: number; to?: number }) => number | null; light?: { mean: number; high: number } } = {},
 ): Drawn {
   const React = { createElement: (type: unknown, p: Record<string, unknown> | null, ...children: unknown[]): Drawn => ({ type, props: p ?? {}, children }), Fragment: "Fragment" };
   const interpolate = (x: number, [a, b]: [number, number], [y0, y1]: [number, number]) => y0 + (y1 - y0) * Math.min(1, Math.max(0, (x - a) / (b - a || 1)));
@@ -3447,6 +3447,7 @@ function drawCutOuts(
     SubjectParts: (shot: { segment?: number } | undefined, _frame: number, _laid: unknown, object?: string) => read.parts?.[key(shot, object)] ?? [],
     SkylineAt: (shot: { segment?: number } | undefined, _frame: number, _laid: unknown, span: { from?: number; to?: number } = {}) => read.skyline?.(shot?.segment, span) ?? null,
     LightUnder: () => read.light ?? null,
+    PictureRegions: (shot: { segment?: number } | undefined) => read.regions?.[key(shot)] ?? [],
   };
   const make = new Function("React", ...Object.keys(scope), `"use strict";\n${code}\nreturn Scene;`) as (...args: unknown[]) => (p: Record<string, unknown>) => Drawn;
   return make(React, ...Object.values(scope))(props);
@@ -4657,7 +4658,7 @@ const FACADE_READ = {
 test("« Façade qui se construit » (v2) lays its pieces on its original's images and notes, the rest on its music's first beats (120 BPM)", async () => {
   const { facade } = await import("./skills/facade.ts");
   const { skillPlan, skillFit } = await import("./skills.ts");
-  assert.equal(facade.version, 3);
+  assert.equal(facade.version, 4);
   assert.equal(facade.bpm, 120);
   assert.deepEqual(facade.shots, [1, 3]);
   const line = facade.timeline(1, { end: false });
@@ -4717,22 +4718,30 @@ test("« Façade qui se construit » (v2): her front's own elements, named by th
   const { skillPlan } = await import("./skills.ts");
   const { objectsDrawn, objectPassages, clearsDrawn, drawsSubject } = await import("./subject.ts");
   const { checkMotionCode } = await import("./motion-scene.ts");
-  // Unnamed, nothing is followed; named, what repeats on her front first (read first within a Reel's 20 s of objects),
-  // then her sign, both on her front's shot; nobody cut out, nothing read for a text (her name sits on the black).
+  // Unnamed, nothing is followed; named, her sign first, then her front's elements, both on her front's shot; nobody cut
+  // out, nothing read for a text (her name sits on the black).
   assert.deepEqual(objectsDrawn(facade.code), []);
   const code = await facadeNamed();
-  assert.deepEqual(objectsDrawn(code), [{ shot: 0, name: "every window" }, { shot: 0, name: "shop sign" }]);
+  assert.deepEqual(objectsDrawn(code), [{ shot: 0, name: "shop sign" }, { shot: 0, name: "every window" }]);
   assert.deepEqual(clearsDrawn(code), []);
   assert.equal(drawsSubject(code), false);
   assert.deepEqual(checkMotionCode(facade.code), []);
-  assert.deepEqual(facade.objects?.map((o) => [o.slot, o.shot]), [["morceaux", 0], ["enseigne", 0]]);
-  // A front of 9 s keeps both within them; a lone front that carries an ending card (10,8 s) keeps what repeats on it.
+  assert.deepEqual(facade.objects?.map((o) => [o.slot, o.shot, o.still]), [["morceaux", 0, true], ["enseigne", 0, true]]);
+  // Both read once on her front's first image (v4, still: its code reads them there): a photo's time on the card, none
+  // of a Reel's 20 s of objects; a lone front that carries an ending card (10,8 s) keeps both (v3 kept one: the bench of
+  // the painted shop door read « every painted shutter » alone, and its pieces fell back to the geometric cut).
   const files = [{ id: "front", photo: false, seconds: 15 }, { id: "inside", photo: false, seconds: 12 }];
   const objects = { morceaux: "every window", enseigne: "shop sign" };
   const two = skillPlan({ skill: facade, name: "Façade", files, fill: { shots: [{ file: "front", at: 0 }, { file: "inside", at: 1 }], texts: {}, end: null, objects } });
-  assert.deepEqual(objectPassages(two, () => true).map((p) => [p.name, p.from, p.to]), [["every window", 0, 9], ["shop sign", 0, 9]]);
+  assert.deepEqual(objectPassages(two, () => true).map((p) => [p.name, p.from, p.to, p.still]), [["shop sign", 0, 9, true], ["every window", 0, 9, true]]);
   const alone = skillPlan({ skill: facade, name: "Façade", files, fill: { shots: [{ file: "front", at: 0 }], texts: {}, end: { title: "Ouvert dimanche" }, objects } });
-  assert.deepEqual(objectPassages(alone, () => true).map((p) => p.name), ["every window"]);
+  assert.deepEqual(objectPassages(alone, () => true).map((p) => p.name), ["shop sign", "every window"]);
+  // A front slowed to its 9 s (a shorter video): still read on its first image.
+  const short = skillPlan({ skill: facade, name: "Façade", files: [{ id: "front", photo: false, seconds: 6 }], fill: { shots: [{ file: "front", at: 0 }], texts: {}, end: null, objects } });
+  assert.deepEqual(objectPassages(short, () => true).map((p) => p.name), ["shop sign", "every window"]);
+  // Its regions read on her front's shot, whatever its pace (on its first image then).
+  const { readPassages } = await import("./subject.ts");
+  assert.deepEqual(readPassages(two, () => true).map((p) => [p.from, p.kinds]), [[0, ["regions"]]]);
   // An upright front, as the original's, read on its first image.
   const { line, props } = await facadeProps(1);
   const at = Array.from({ length: 19 }, (_, i) => line.marks[`piece_${i}`]!);
@@ -4761,7 +4770,7 @@ test("« Façade qui se construit » (v2): her front's own elements, named by th
   assert.match(String(styleOf(film(100)).clipPath), /^url\(#fc/);
   assert.equal(styleOf(film(200)).clipPath, undefined);
   assert.deepEqual(styleOf(drawnNodes(film(100)).find((n) => n.type === "Footage")!), { left: 0, top: 0, width: 1080, height: 1920 });
-  // Fewer than six elements found (nothing named here): never a grid of near squares (v3, Tristan: « les formes au
+  // Nothing of her picture read (no element, no region: the scene check): never a grid of near squares (v3, Tristan: « les formes au
   // départ ne sont pas toutes carrées »): her picture above the street cut as a front is built, in pieces of every shape
   // (tall ones, wide ones, flat bands), laid at random on the same times; its first four far apart and unlike one
   // another, the tallest topped by an arch, the flattest a band wider at its foot; the street, the top's left third,
@@ -4782,6 +4791,79 @@ test("« Façade qui se construit » (v2): her front's own elements, named by th
   assert.deepEqual(clipAt(at[18]! - 1, {}), grid);
   // The camera never moves: no zoom nor push, even to fill the screen.
   assert.doesNotMatch(facade.code, /scale\(|transform/);
+});
+
+test("an object read once on a still (its elements listed), and her picture's regions along its own edges", async () => {
+  const { skillObjectName } = await import("./skills.ts");
+  const { objectsWithinBudget, OBJECT_CARD, OBJECT_NAME_MAX, readsDrawn, shotReadingSchema } = await import("./subject.ts");
+  const { regionsIn } = await import("../../../apps/render/src/reading.ts");
+  // A name may list the kinds a thing is made of (a shop front's elements), each kept whole, within 120 characters.
+  assert.equal(skillObjectName("Painted door, every Window; shop-sign, awning!"), "painted door, every window, shop-sign, awning");
+  assert.equal(skillObjectName("door, none, , every window"), "door, every window");
+  const long = skillObjectName(Array.from({ length: 12 }, (_, i) => `every kind number ${"x".repeat(i % 3 + 2)}`).join(", "))!;
+  assert.ok(long.length <= OBJECT_NAME_MAX && !long.endsWith(",") && long.split(", ").every((k) => /^every kind number x+$/.test(k)), long);
+  assert.equal(skillObjectName("none"), null);
+  // Read on its first image: a photo's time on the card, never its passage's seconds (the card's budget holds many).
+  const still = Array.from({ length: 6 }, (_, i) => ({ from: 0, to: 20, still: true as const, key: String(i) }));
+  assert.equal(objectsWithinBudget(still, 0.00033).length, 6);
+  assert.equal(OBJECT_CARD.photo, 8);
+  // Its regions: asked by PictureRegions, kept by the reading's schema, placed where the Reel draws the shot (its holes
+  // as further rings, each ring opened by -1, -1), the box around each.
+  assert.deepEqual(readsDrawn("PictureRegions(shots[2], frame, laid)"), [{ shot: 2, kinds: ["regions"] }]);
+  const reading = shotReadingSchema.parse({ regions: [[0, 0, 1, 0, 1, 0.5, 0, 0.5, -1, -1, 0.2, 0.1, 0.4, 0.1, 0.4, 0.3]], extra: 1 });
+  const [wall] = regionsIn(reading, { a: 1000, b: 0, c: 10, d: 0, e: 2000, f: 0 });
+  assert.equal(wall!.d, "M 10.0 0.0 L 1010.0 0.0 L 1010.0 1000.0 L 10.0 1000.0 Z M 210.0 200.0 L 410.0 200.0 L 410.0 600.0 Z");
+  assert.deepEqual([wall!.x, wall!.y, wall!.w, wall!.h], [10, 0, 1000, 1000]);
+  assert.deepEqual(regionsIn(undefined, { a: 1, b: 0, c: 0, d: 0, e: 1, f: 0 }), []);
+});
+
+/** A path around a box (as an outline or a region reads), for the tests. */
+const facadeRing = (x: number, y: number, w: number, h: number) => `M ${x} ${y} L ${x + w} ${y} L ${x + w} ${y + h} L ${x} ${y + h} Z`;
+const facadeShape = (x: number, y: number, w: number, h: number) => ({ x, y, w, h, d: facadeRing(x, y, w, h) });
+
+test("« Façade qui se construit » (v4): each piece a shape of her picture, her front's elements along their outlines, then its regions", async () => {
+  const { skillCode } = await import("./skills.ts");
+  const { facade } = await import("./skills/facade.ts");
+  // Tristan, on the bench of a painted shop door: « le montage devrait détourer la photo pour adapter les formes tu
+  // vois ? ». Her front read on its first image: her sign along its outline, its elements each along its own (her door,
+  // two windows, a plant pot before the door), and her picture's regions (her wall, a band under the windows, her
+  // plinth, the pavement, a painting inside the door's box, a sliver at the frame's edge).
+  const code = SEEDED + skillCode(facade, { morceaux: "door, every window, every plant pot", enseigne: "shop sign" });
+  const door = facadeShape(400, 900, 280, 600);
+  const pot = facadeShape(450, 1380, 120, 100);
+  const windows = [facadeShape(100, 300, 250, 300), facadeShape(730, 300, 250, 300)];
+  const painting = facadeShape(450, 1000, 150, 300);
+  const sliver = facadeShape(1050, 400, 30, 300);
+  const pavement = facadeShape(0, 1500, 1080, 420);
+  const regions = [facadeShape(0, 0, 1080, 300), facadeShape(0, 600, 400, 300), facadeShape(680, 600, 400, 300), facadeShape(0, 900, 400, 400), facadeShape(680, 900, 370, 400), facadeShape(0, 1300, 400, 200), facadeShape(680, 1300, 400, 200), pavement, painting, sliver];
+  const read = {
+    boxes: { "0#shop sign": { x: 80, y: 120, w: 700, h: 130 } },
+    outlines: { "0#shop sign": FACADE_OUTLINE },
+    parts: { "0#door, every window, every plant pot": [door, ...windows, pot] },
+    regions: { "0": regions },
+  };
+  const { line, props } = await facadeProps(1);
+  const at = Array.from({ length: 19 }, (_, i) => line.marks[`piece_${i}`]!);
+  const clipAt = (f: number) => facadeClip(drawCutOuts(code, f, props, read))!;
+  const all = clipAt(at[18]! - 1);
+  // Every piece is one of her picture's shapes: a path, never a box nor a cut of its own (no arch, no slanted band).
+  assert.ok(all.every((p) => typeof p === "string"), JSON.stringify(all));
+  assert.ok(all.every((d) => !/A/.test(String(d))));
+  // Her sign first, along its outline; her elements among the first four; the painting inside her door lands with it.
+  assert.equal(all[0], FACADE_OUTLINE);
+  const first = clipAt(at[3]!);
+  assert.ok(first.includes(door.d) && windows.every((w) => first.includes(w.d)), JSON.stringify(first));
+  assert.equal(first[first.indexOf(door.d) + 1], painting.d);
+  // Never a sliver at the frame's edge nor her ground among them; what stands before her door in the burst, first.
+  assert.ok(!first.includes(sliver.d) && !first.includes(pavement.d));
+  assert.equal(clipAt(at[4]!).at(-1), pot.d);
+  // Her regions after her elements, the street among the big ones (on the music's first beat), then all of it.
+  assert.ok(!clipAt(at[16]! - 1).includes(pavement.d));
+  assert.ok(clipAt(at[16]!).includes(pavement.d));
+  assert.equal(facadeClip(drawCutOuts(code, at[18]!, props, read)), null);
+  // Her regions without her elements (none named, or none found): her front still built in its own shapes.
+  const bare = facadeClip(drawCutOuts(SEEDED + facade.code, at[18]! - 1, props, { regions: { "0": regions } }))!;
+  assert.ok(bare.length >= 6 && bare.every((p) => typeof p === "string" && !/A/.test(p)), JSON.stringify(bare));
 });
 
 test("« Façade qui se construit » (v3): vertical as its original, her horizontal front whole in a band on the black on her word, her name on a piece of it", async () => {
@@ -4855,7 +4937,7 @@ test("« Façade qui se construit » (v3): vertical as its original, her horizon
   assert.deepEqual(input.objets?.map((o) => [o.slot, o.case]), [["morceaux", 1], ["enseigne", 1]]);
   const plan = skillPlan({ skill: facade, name: "Façade qui se construit", files, fill: { shots: [{ file: "front", at: 0 }, { file: "inside", at: 1 }], texts: {}, end: null, settings: { format: "horizontal" } } });
   assert.equal(plan.layers![0]!.motion.texts!.format, "horizontal");
-  assert.deepEqual(plan.skill, { key: "facade", version: 3, settings: { format: "horizontal" } });
+  assert.deepEqual(plan.skill, { key: "facade", version: 4, settings: { format: "horizontal" } });
 });
 
 // ——— « Coulisses façon fiche » v2, written again on its original's fiche (docs/fiches/coulisses.md) ——————————————————
