@@ -1,5 +1,5 @@
 import "server-only";
-import { BRIEF_MAX, CHAT_MODEL, CONTRACT_PROMPT, EMPTY_CONTRACT, reelContractSchema, type ReelContract } from "@fauve/agent";
+import { BRIEF_MAX, CHAT_MODEL, CONTRACT_PROMPT, EMPTY_CONTRACT, keepAskedVoice, reelContractSchema, type ReelContract } from "@fauve/agent";
 import { outputFormat, readAnswer } from "@fauve/agent/answer";
 import { anthropic, logClaudeCost } from "./run";
 
@@ -22,7 +22,9 @@ export async function readContract(studioId: string, brief: string | undefined, 
       messages: [{ role: "user", content }],
     });
     await logClaudeCost(studioId, response.usage, "contract", CHAT_MODEL);
-    return response.parsed_output ? readAnswer(reelContractSchema, response.parsed_output) : EMPTY_CONTRACT;
+    // A text to say only when her request asks for one: a sentence that describes the Reel (« Ce week-end, on part au
+    // marché aux puces. ») had been read as her words, and a voice-over nobody asked for laid on the model.
+    return response.parsed_output ? keepAskedVoice(readAnswer(reelContractSchema, response.parsed_output), brief, currentVoice) : EMPTY_CONTRACT;
   } catch (error) {
     console.warn("contract not read, the defaults decide", error);
     return EMPTY_CONTRACT;
