@@ -122,7 +122,7 @@ test("« Titre en autocollant » sits under her face, above it when her face is 
     // How far its tilted card reaches above and below its middle (its block under its lower left), at a scale.
     const tilt = (5.5 * Math.PI) / 180;
     const up = (s: number) => (400 * Math.sin(tilt) + (tall / 2) * Math.cos(tilt)) * k * s;
-    const down = (s: number) => (412 * Math.sin(tilt) + (tall / 2 + 14) * Math.cos(tilt)) * k * s;
+    const down = (s: number) => (418 * Math.sin(tilt) + (tall / 2 + 21) * Math.cos(tilt)) * k * s;
     const cy = top + tall / 2;
     return { cy, tall, k, top: cy - up(1), bottom: cy + down(1), highest: cy - up(1.08), lowest: cy + down(1.08) };
   };

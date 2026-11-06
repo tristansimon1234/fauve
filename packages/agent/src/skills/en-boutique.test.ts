@@ -130,7 +130,7 @@ test("« Création à quatre mains »: its plan subtitled for what is said in he
   // Its filler: its slots, their places, and that what she says in her videos is its subtitles.
   const input = skillFillInput({ skill: enBoutique, name: "Création à quatre mains", n: 16, files, business: { name: "Chez Léa" }, request: "" });
   assert.match(String(input.ses_paroles), /sous-titres/);
-  assert.deepEqual(input.textes.map((t) => [t.slot, t.max_caracteres, t.obligatoire]), [["idee", 72, true], ["titre", 22, true], ["artisan", 52, false], ["avec", 22, false], ["echange", 56, false], ["gestes", 110, true], ["verdict", 100, true]]);
+  assert.deepEqual(input.textes.map((t) => [t.slot, "max_caracteres" in t ? t.max_caracteres : null, t.obligatoire]), [["idee", 72, true], ["titre", 22, true], ["artisan", 52, false], ["avec", 22, false], ["echange", 56, false], ["gestes", 110, true], ["verdict", 100, true]]);
 });
 
 // ——— What its code draws, frame by frame ————————————————————————————————————————————————————————————————————————————

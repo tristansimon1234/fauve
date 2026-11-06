@@ -251,8 +251,8 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const sub = now ? h(FitText, { key: "sub-" + now.key + "-" + now.text, style: box, innerStyle: { justifyContent: "flex-end", fontFamily: body, fontWeight: 800, fontSize: SIZE, lineHeight: 1.12, color: now.second ? SECOND : "#ffffff", textShadow: shade, textAlign: "center", textWrap: "balance" } }, keep(now.text)) : null;
   const rest = lines.filter((t) => frame >= t.from && frame < Math.min(t.to, until)).map((t, i) => h("span", { key: "h" + i, style: hidden }, keep(t.text)));
 
-  // 7. A sticker: a white card tilted, thick black edges and a black block under its lower left (its 3D), two white
-  // strokes of shine on its corner; it pops in with a bounce and a blur (0,55, then 1,04, 1,08, 1,03, 1) and pops off the
+  // 7. A sticker: a white card tilted, thick black edges and a black block under its lower left (its 3D: 18 px out to the
+  // left, 21 below), two thin white strokes of shine across that block under its lower right; it pops in with a bounce and a blur (0,55, then 1,04, 1,08, 1,03, 1) and pops off the
   // same way (0,75, then 0,42), never fading.
   const SW = Math.round(W - 280);
   const pop = (from, to, f) => {
@@ -280,10 +280,10 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const EXTRUDE = Array.from({ length: 8 }, (_, k) => "-" + Math.round((k + 1) * 0.9) + "px " + (k + 1) + "px 0 #141414").join(", ");
   const sticker = (key, at, cx, cy, w, tall, tilt, inner) => at
     ? h("div", { key, style: { position: "absolute", left: Math.round(cx - w / 2), top: Math.round(cy - tall / 2), width: w, height: tall, transform: "rotate(" + tilt + "deg) scale(" + at.s + ")", filter: at.b ? "blur(" + at.b + "px)" : "none" } },
-        h("div", { style: { position: "absolute", left: -12, top: 14, width: w, height: tall, borderRadius: 16, backgroundColor: "#141414" } }),
+        h("div", { style: { position: "absolute", left: -18, top: 21, width: w, height: tall, borderRadius: 16, backgroundColor: "#141414" } }),
         h("div", { style: { position: "absolute", left: 0, top: 0, width: w, height: tall, borderRadius: 16, backgroundColor: "#ffffff", border: "9px solid #141414", boxSizing: "border-box" } }),
-        h("svg", { "data-fauve-decor": "", width: 60, height: 40, viewBox: "0 0 60 40", style: { position: "absolute", left: w - 82, top: tall - 34 } },
-          h("path", { d: "M14 30 L26 12 M30 30 L42 12", stroke: "#ffffff", strokeWidth: 6, strokeLinecap: "round" })),
+        h("svg", { "data-fauve-decor": "", width: 46, height: 32, viewBox: "0 0 46 32", style: { position: "absolute", left: w - 104, top: tall + 2 } },
+          h("path", { d: "M5 27 L22 5 M20 27 L37 5", stroke: "#ffffff", strokeWidth: 3, strokeLinecap: "round" })),
         inner)
     : null;
   const nameLines = (text, key, top, tall, size) => h(FitText, { key: "n-" + key + "-" + text, style: { position: "absolute", left: 40, top, width: SW - 80, height: tall }, innerStyle: { fontFamily: STICKER, fontWeight: 400, fontSize: size, lineHeight: 0.98, letterSpacing: "0.01em", textTransform: "uppercase", color: INK, textShadow: EXTRUDE, textAlign: "center" } },

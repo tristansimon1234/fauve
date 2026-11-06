@@ -5,7 +5,8 @@ import type { EffectPiece, PieceTimelineInput } from "../pieces.ts";
 // made (the creation of the day, an event, a collab) pops at once as a comic-strip sticker, with a pop and its little
 // sting, bounces, holds two seconds and pops off with a whoosh; then the montage goes on. Kept from the model: the white
 // card 800 px wide (x 140 to 940), tilted 5,5° rising to the right, its thick black edges and the black block under its
-// lower left (its 3D), two white strokes of shine on its corner; its name in capitals of a heavy rounded face (Paytone
+// lower left (its 3D: 18 px out to the left, 21 below), two thin white strokes of shine across that block under its
+// lower right; its name in capitals of a heavy rounded face (Paytone
 // One) on two lines, never a first line ending on a small word, in her colour when it is bright and vivid enough, else
 // the original's yellow, a black shadow down-left; who makes it under it in black capitals of 48 px; its pop (0,55
 // blurred, then 1,04, 1,08, 1,03, 1) and its exit (0,75, then 0,42), never a fade; 31 images into the shot as the
@@ -65,7 +66,7 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const tall = Math.round(H * (line ? 0.19 : 0.15));
   const TILT = (5.5 * Math.PI) / 180;
   const up = (SW / 2) * Math.sin(TILT) + (tall / 2) * Math.cos(TILT);
-  const down = (SW / 2 + 12) * Math.sin(TILT) + (tall / 2 + 14) * Math.cos(TILT);
+  const down = (SW / 2 + 18) * Math.sin(TILT) + (tall / 2 + 21) * Math.cos(TILT);
   const ROW = H * 0.64 - 8;
   const TOP = 90;
   const spot = React.useMemo(() => {
@@ -104,10 +105,10 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const EXTRUDE = Array.from({ length: 8 }, (_, q) => "-" + Math.round((q + 1) * 0.9) + "px " + (q + 1) + "px 0 #141414").join(", ");
   const card = at
     ? h("div", { key: "sticker", style: { position: "absolute", left: 140, top: Math.round(cy - tall / 2), width: SW, height: tall, transform: "rotate(-5.5deg) scale(" + Math.round(at.s * spot.k * 1000) / 1000 + ")", filter: at.b ? "blur(" + at.b + "px)" : "none" } },
-        h("div", { style: { position: "absolute", left: -12, top: 14, width: SW, height: tall, borderRadius: 16, backgroundColor: "#141414" } }),
+        h("div", { style: { position: "absolute", left: -18, top: 21, width: SW, height: tall, borderRadius: 16, backgroundColor: "#141414" } }),
         h("div", { style: { position: "absolute", left: 0, top: 0, width: SW, height: tall, borderRadius: 16, backgroundColor: "#ffffff", border: "9px solid #141414", boxSizing: "border-box" } }),
-        h("svg", { "data-fauve-decor": "", width: 60, height: 40, viewBox: "0 0 60 40", style: { position: "absolute", left: SW - 82, top: tall - 34 } },
-          h("path", { d: "M14 30 L26 12 M30 30 L42 12", stroke: "#ffffff", strokeWidth: 6, strokeLinecap: "round" })),
+        h("svg", { "data-fauve-decor": "", width: 46, height: 32, viewBox: "0 0 46 32", style: { position: "absolute", left: SW - 104, top: tall + 2 } },
+          h("path", { d: "M5 27 L22 5 M20 27 L37 5", stroke: "#ffffff", strokeWidth: 3, strokeLinecap: "round" })),
         h(FitText, { key: "n-" + title, style: { position: "absolute", left: 40, top: 26, width: SW - 80, height: Math.round(tall * (line ? 0.66 : 0.8)) }, innerStyle: { fontFamily: STICKER, fontWeight: 400, fontSize: 124, lineHeight: 0.98, letterSpacing: "0.01em", textTransform: "uppercase", color: INK, textShadow: EXTRUDE, textAlign: "center" } },
           splitName(keep(title)).map((l, i) => h("div", { key: i, style: { whiteSpace: "nowrap" } }, l))),
         line ? h(FitText, { key: "l-" + line, style: { position: "absolute", left: 40, top: Math.round(tall * 0.72), width: SW - 80, height: 62 }, innerStyle: { fontFamily: body, fontWeight: 700, fontSize: 48, lineHeight: 1.1, letterSpacing: "0.05em", textTransform: "uppercase", color: "#141414", whiteSpace: "nowrap", textAlign: "center" } }, keep(line)) : null)
