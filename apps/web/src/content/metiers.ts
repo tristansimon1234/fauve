@@ -126,7 +126,7 @@ export const TRADES: Trade[] = [
       ["Un conseil plutôt qu’une promo", "Comment bien choisir, quoi offrir à qui : des posts qu’on garde et qu’on envoie à une amie."],
       ["Des visites, en ligne et en vrai", "Edith suit d’abord les visites de ton profil et les clics sur ton lien, et te dit ce qui marche."],
     ],
-    show: { reels: ["concept-store", "joaillier", "parfumeur"], note: "Maisons d’exemple, vidéos libres de droits, montage et musique d’Edith." },
+    show: { reels: ["concept-store", "joaillier", "parfumeur"], note: "Commerces d’exemple, vidéos libres de droits, montage et musique d’Edith." },
     faq: [
       ["Je n’ai surtout que des photos.", "Edith en fait des carrousels composés comme par un graphiste, ou un Reel de photos. Pour un Reel vivant, dix secondes de vidéo font déjà beaucoup."],
       ["Je vends aussi en ligne.", "Edith met le lien de ta boutique en ligne dans les légendes et te prépare des stories avec un lien à partager."],

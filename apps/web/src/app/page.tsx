@@ -81,7 +81,7 @@ const offers = [
 const faq: [string, string][] = [
   ["Ça ne va pas faire « IA slop » ?", "C’est tout le travail d’Edith : ta meilleure image en premier, des coupes sur le temps, des mots de créateur, ta charte. Et si quelque chose ne te ressemble pas, tu le lui dis d’un mot."],
   ["Tous mes Reels vont se ressembler ?", "Non. Il part de tes images, de ton style et de ce que tu demandes, et donne à chaque Reel sa propre forme. Tu peux aussi lui montrer un Reel que tu aimes : il le refait avec tes images."],
-  ["C’est pour qui ?", "Les maisons qui soignent leur image, et les créateurs : studio de Pilates, restaurant, cave, boutique de créateur, joaillier, salon, fleuriste, photographe, styliste, céramiste… Tous ceux qui vivent de leur travail, avec ou sans site."],
+  ["C’est pour qui ?", "Les commerces qui soignent leur image, et les créateurs : studio de Pilates, restaurant, cave, boutique de créateur, joaillier, salon, fleuriste, photographe, styliste, céramiste… Tous ceux qui vivent de leur travail, avec ou sans site."],
   ["Il faut télécharger une app ?", "Non. Tout se passe sur WhatsApp, en 5 minutes pour commencer. Une app web existe pour voir tes Reels en grand sur ordinateur, si tu veux, sans rien installer."],
   ["Edith, c’est une vraie personne ?", "Non, c’est un assistant IA, et il le dit. Tu gardes toujours la main."],
   ["Qui publie sur Instagram ?", "Toi. Edith te prépare la vidéo et sa légende, et te fait signe au bon moment : tu la télécharges, tu la postes, et tu peux y ajouter un son tendance. Il suit ensuite ses chiffres depuis ton @."],
@@ -246,7 +246,7 @@ export default function LandingPage() {
                 En 5 minutes, <span className="font-[family-name:var(--font-serif)] font-normal italic">sans app</span>, directement sur WhatsApp.
               </p>
               <p className="text-[18px] leading-[1.5] text-muted sm:text-[20px]">
-                Pour les maisons qui soignent leur image, et les créateurs. Tu lui envoies tes vidéos : Edith invente pour chacune sa forme, sa typo et son rythme, écrit la légende et te fait signe au bon moment pour poster. Pas d’IA slop.
+                Pour les commerces qui soignent leur image, et les créateurs. Tu lui envoies tes vidéos : Edith invente pour chacune sa forme, sa typo et son rythme, écrit la légende et te fait signe au bon moment pour poster. Pas d’IA slop.
               </p>
             </div>
             <div className="flex flex-col gap-3 lg:items-end">
@@ -303,7 +303,7 @@ export default function LandingPage() {
       <section id="travail" className="mx-auto flex max-w-[1360px] scroll-mt-6 flex-col gap-12 px-4 pb-28 sm:px-8">
         <div className="land-reveal">
           <SectionTitle n={2} kicker="Le travail">
-            Neuf maisons, quatre créateurs, <span className="accent">treize Reels qui ne se ressemblent pas.</span>
+            Neuf commerces, quatre créateurs, <span className="accent">treize Reels qui ne se ressemblent pas.</span>
           </SectionTitle>
         </div>
         <p className="land-reveal -mt-4 max-w-[560px] text-[17px] leading-relaxed text-muted">
