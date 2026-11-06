@@ -185,16 +185,16 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const row = (b) => Math.round((b.y + b.h) / (0.05 * bh));
   const lowFirst = (p, q) => row(q) - row(p) || q.x - p.x;
   const join = (list) => list.length ? { ...R(Math.min(...list.map((b) => b.x)), Math.min(...list.map((b) => b.y)), Math.max(...list.map((b) => b.x + b.w)), Math.max(...list.map((b) => b.y + b.h))), ds: list.flatMap((b) => b.ds || [shape0(b)]) } : null;
-  const X0 = all.length ? Math.min(...all.map((b) => b.x)) : 0, X1 = all.length ? Math.max(...all.map((b) => b.x + b.w)) : bw;
-  const T = all.length ? Math.min(...all.map((b) => b.y)) : 0, B = all.length ? Math.max(...all.map((b) => b.y + b.h)) : Math.round(0.71 * bh);
+  const B = all.length ? Math.max(...all.map((b) => b.y + b.h)) : Math.round(0.71 * bh);
   const S = Math.round(all.length ? Math.max(0.5 * bh, Math.min(0.9 * bh, B + 0.05 * bh)) : 0.71 * bh);
   let slow, burst, big;
-  if (regs.length >= 3) {
-    // Her front in its own shapes (v4): her sign first (else her largest element), then three of her elements far from
-    // it and from each other (her regions of a middle size when she has fewer), each along its own outline; the burst:
-    // her other elements (what stands in front of another first, then the lower ones, right to left), then the smaller
-    // of her regions, the lower first; then the larger ones that are left in two (the street, all that is left of the
-    // top's left half), and the rest.
+  if (all.length || regs.length) {
+    // Her front in its own shapes, as many pieces as her picture has, nothing invented (v4; Tristan: « toujours mettre
+    // de l'intelligence », « plus flex »): her sign first (else her largest element), then three of her elements far
+    // from it and from each other (her regions of a middle size when she has fewer), each along its own outline; the
+    // burst: her other elements (what stands in front of another first, then the lower ones, right to left), then the
+    // smaller of her regions, the lower first, spread over its notes when there are fewer; then what is left in two (the
+    // street, all that is left of the top's left half), and the rest. Her elements alone when no region was read.
     // (Of her regions, those of her front that the frame shows whole enough: never a sliver at its edge, nor her ground.)
     const some = all.length >= 4 ? all : [...all, ...regs.filter((r) => area(r) >= 0.012 * bw * bh && area(r) <= 0.15 * bw * bh && r.seen >= 0.6 && r.w >= 0.08 * bw && mid(r)[1] < S)];
     const pool = some.length ? some : regs;
@@ -205,35 +205,21 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
     const ahead = (b) => restE.some((q) => inside(b, q, 0.7));
     restE.sort((p, q) => Number(ahead(q)) - Number(ahead(p)) || lowFirst(p, q));
     const left = regs.filter((r) => !slow.includes(r)).sort((p, q) => area(p) - area(q));
-    const take = Math.max(0, Math.min(12 - restE.length, left.length - 2));
+    const take = Math.max(0, Math.min(12 - Math.min(12, restE.length), left.length - 2));
     burst = [...restE.slice(0, 12), ...left.slice(0, take).sort(lowFirst)];
-    const after = left.slice(take);
+    // What the burst could not take (her elements too) lands with the last ones: nothing of hers is left out.
+    const after = [...restE.slice(12), ...left.slice(take)];
     const street = after.filter((r) => mid(r)[1] >= S);
     const upper = after.filter((r) => !street.includes(r) && mid(r)[0] < bw / 2);
-    big = [join(street.length ? street : after.slice(-1)), join(upper.length ? upper : after.filter((r) => !street.includes(r)).slice(-1))].filter(Boolean);
-  } else if (all.length >= 6) {
-    // No regions read, her elements alone (v2): her sign first, then three far from it and from each other; the burst:
-    // her other elements, the lower ones first, right to left; then bands along her front's lines: the pavement under
-    // it (right to left), a side going up, the wall above it; the rest, in three: the street, the top's left third, then
-    // all that is still black.
-    const picked = spread(all, [sign || all.reduce((m, b) => (area(b) > area(m) ? b : m))], 4);
-    slow = picked.out;
-    const rest = picked.rest.sort(lowFirst);
-    const sw = Math.max(X0, bw - X1);
-    const sx = X0 >= bw - X1 ? 0 : X1;
-    const side = sw >= 0.08 * bw ? [2, 1, 0].map((k) => R(sx, T + (k * (B - T)) / 3, sx + sw, T + ((k + 1) * (B - T)) / 3)) : [];
-    const above = T >= 0.1 * bh ? [R(X0, T - 0.06 * bh, X1, T)] : [];
-    const k = Math.max(1, Math.min(4, 12 - rest.length - side.length - above.length));
-    const pave = S - B > 0.01 * bh ? Array.from({ length: k }, (_, i) => R(((k - 1 - i) * bw) / k, B, ((k - i) * bw) / k, S)) : [];
-    burst = [...rest, ...pave, ...side, ...above].slice(0, 12);
-    big = [R(0, S, bw, bh), R(0, 0, 0.339 * bw, Math.max(T, 0.5 * S))];
+    const others = after.filter((r) => !street.includes(r) && !upper.includes(r));
+    big = [join(street.length ? street : after.slice(-1)), join(upper.length ? upper : others.slice(-1))].filter(Boolean);
   } else {
-    // Nothing read of her picture (its regions not read: the scene check, a read that failed): her picture cut as a
+    // Nothing read of her picture (neither an element nor its regions: the scene check, a read that failed; almost never
+    // in production, where her regions are read on one image of every front): her picture cut as a
     // front is built, in pieces of every shape, never a grid of squares (v3, Tristan: « les formes au départ ne sont pas
     // toutes carrées »): the part above the street split again and again at a random place, most often across its longer
     // side, now and then across the other (tall pieces, wide ones, flat bands, as doors, bays, windows and awnings),
-    // laid at random on the same times; its first four her elements when some were found, else the farthest apart and
-    // the most unlike, the tallest topped by an arch, the flattest a band wider at its foot (the original's arched window
+    // laid at random on the same times; its first four the farthest apart and the most unlike, the tallest topped by an arch, the flattest a band wider at its foot (the original's arched window
     // and awning); then the street, the top's left third, then the rest.
     const S2 = Math.round(bh * 0.71);
     const cells = [];
@@ -256,13 +242,11 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
       }
     };
     cut(0, 0, bw, S2, 0);
-    const firsts = all.length ? all.slice(0, 4) : [cells[Math.floor(random("facade-first") * cells.length)]];
-    const picked = spread([...firsts, ...cells], firsts, 4);
+    const picked = spread(cells, [cells[Math.floor(random("facade-first") * cells.length)]], 4);
     slow = picked.out;
-    const cutOnes = slow.filter((b) => !all.includes(b));
-    if (cutOnes.length) {
-      const tall = cutOnes.reduce((m, b) => (shape(b) > shape(m) ? b : m));
-      const flat = cutOnes.reduce((m, b) => (shape(b) < shape(m) ? b : m));
+    {
+      const tall = slow.reduce((m, b) => (shape(b) > shape(m) ? b : m));
+      const flat = slow.reduce((m, b) => (shape(b) < shape(m) ? b : m));
       if (shape(tall) > 0.25) tall.d = "M" + tall.x + " " + (tall.y + tall.h) + "L" + tall.x + " " + (tall.y + tall.w / 2) + "A" + tall.w / 2 + " " + tall.w / 2 + " 0 0 1 " + (tall.x + tall.w) + " " + (tall.y + tall.w / 2) + "L" + (tall.x + tall.w) + " " + (tall.y + tall.h) + "Z";
       if (flat !== tall && shape(flat) < -0.6) flat.d = "M" + Math.round(flat.x + 0.05 * flat.w) + " " + flat.y + "L" + Math.round(flat.x + 0.95 * flat.w) + " " + flat.y + "L" + (flat.x + flat.w) + " " + (flat.y + flat.h) + "L" + flat.x + " " + (flat.y + flat.h) + "Z";
     }

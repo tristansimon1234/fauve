@@ -4746,25 +4746,25 @@ test("« Façade qui se construit » (v2): her front's own elements, named by th
   const { line, props } = await facadeProps(1);
   const at = Array.from({ length: 19 }, (_, i) => line.marks[`piece_${i}`]!);
   const clipAt = (f: number, read: Parameters<typeof drawCutOuts>[3] = FACADE_READ) => facadeClip(drawCutOuts(code, f, props, read));
-  // On pure black at first; each piece at once on its image, never moving again; whole on the last one (no clip).
+  // On pure black at first; each piece at once on one of its images, never moving again; whole on the last one (no clip).
   assert.deepEqual(clipAt(0), []);
-  for (let i = 0; i < 18; i++) {
-    assert.equal(clipAt(at[i]!)!.length, i + 1, `image ${at[i]}`);
-    assert.equal(clipAt(at[i + 1]! - 1)!.length, i + 1, `image ${at[i + 1]! - 1}`);
+  const counts = Array.from({ length: at[18]! }, (_, f) => clipAt(f)!.length);
+  for (let f = 1; f < counts.length; f++) {
+    assert.ok(counts[f]! >= counts[f - 1]!, `image ${f}`);
+    if (counts[f] !== counts[f - 1]) assert.ok(at.includes(f), `a piece lands on image ${f}, one of its notes`);
   }
   assert.equal(clipAt(at[18]!), null);
-  // Her sign first, along its outline; then three far from it and from each other (her door, a pane, an upper window),
-  // the larger first; the burst: her other windows, the lower first and right to left, then the pavement under them
-  // right to left, the side of her front going up, the wall above it; then the street, the top's left third, the rest.
+  // Only what her picture has, nothing invented (Tristan: « toujours mettre de l'intelligence »): her sign along its
+  // outline first, then three far from it and from each other (her door, a pane, an upper window), the larger first;
+  // then her other windows, the lower first and right to left, spread over the burst's notes; no band along her
+  // front's lines (v2 laid some): the rest of it comes whole with the last piece.
   assert.deepEqual(clipAt(at[18]! - 1), [
     FACADE_OUTLINE,
     [700, 740, 160, 480], [560, 260, 200, 240], [40, 760, 200, 400],
     [480, 760, 200, 400], [260, 760, 200, 400], [360, 280, 160, 200], [120, 260, 200, 240],
-    [810, 1220, 270, 96], [540, 1220, 270, 96], [270, 1220, 270, 96], [0, 1220, 270, 96],
-    [860, 900, 220, 320], [860, 580, 220, 320], [860, 260, 220, 320],
-    [40, 145, 820, 115],
-    [0, 1316, 1080, 604], [0, 0, 366, 658],
   ]);
+  assert.deepEqual(clipAt(at[4]!)!.length, 5);
+  assert.deepEqual(clipAt(at[15]!)!.length, 8);
   // Its video plays in them: her front's shot laid over the whole frame, seen through the clip until it is whole.
   const film = (f: number) => drawnNodes(drawCutOuts(code, f, props, FACADE_READ)).find((n) => n.type === "div" && n.children.some((c) => Boolean(c) && typeof c === "object" && (c as Drawn).type === "Footage"))!;
   assert.match(String(styleOf(film(100)).clipPath), /^url\(#fc/);
