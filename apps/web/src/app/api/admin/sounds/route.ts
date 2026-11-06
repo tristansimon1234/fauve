@@ -69,6 +69,10 @@ export async function POST(request: Request) {
   // The sounds of the top Reels of a few hashtags (Tristan: « les sons tendances insta […] aesthetic videos editing »).
   if (action === "bench_links") return Response.json(await benchLinks(await request.json().catch(() => ({}))));
   // Edith's favourite sounds made ready: each one's song and cover read once (about 0.2 cent each).
+  if (action === "bench_account") {
+    const params = new URL(request.url).searchParams;
+    return Response.json(await benchAccount(params.get("handle") ?? "", Number(params.get("pages") ?? 6)));
+  }
   if (action === "check_originals") return Response.json(await checkOriginals(await request.json().catch(() => ({}))));
   if (action === "prime_house") return Response.json(await primeHouse());
   if (action === "bench_trending") return Response.json(await benchTrending());
@@ -329,4 +333,48 @@ async function checkOriginals(body: unknown) {
     .from("cost_events")
     .insert({ studio_id: null, kind: "trends", provider: "treg", units: sounds.length, cost_eur: usdToEur(costUsd, env("USD_TO_EUR")), meta: { purpose: "sounds_originals_check", cost_usd: costUsd } });
   return { cost_usd: costUsd, sounds: read };
+}
+
+/**
+ * The songs an account puts on its Reels (Tristan: « ba ponce muse »: the songs @muse.templates puts forward), page
+ * after page of its Reels (anyapi.instagram.user.reels, its cursor), sounds original to an account left out, counted
+ * with their plays and whether Instagram marks them trending. About $0.002 a page.
+ */
+async function benchAccount(handle: string, pages: number) {
+  const name = handle.trim().replace(/^@/, "").toLowerCase();
+  if (!/^[a-z0-9._]{1,30}$/.test(name)) return { error: "handle=<account>" };
+  let costUsd = 0;
+  let cursor: string | null = null;
+  let reels = 0;
+  const songs = new Map<string, { title: string; artist: string | null; audio_id: string | null; reels: number; plays: number; codes: string[]; trending: boolean }>();
+  for (let page = 0; page < Math.min(Math.max(pages, 1), 10); page += 1) {
+    const done = await tregCall("anyapi.instagram.user.reels", { handle: name, ...(cursor ? { cursor } : {}) }, 0.02).catch(() => null);
+    costUsd += done?.costUsd ?? 0;
+    const posts = listUnder(done?.answer ?? null, ["reels", "posts", "items"]);
+    for (const post of posts) {
+      reels += 1;
+      const f = soundFields(post);
+      const entries = Object.entries(f);
+      const value = (re: RegExp) => entries.find(([k]) => re.test(k.split(".").pop() ?? k))?.[1] ?? null;
+      const title = f.soundTitle ?? f.audioTitle ?? value(/^(song_name|title|original_audio_title)$/i);
+      if (!title || /^(original audio|son original|audio original|original sound)/i.test(title)) continue;
+      if (/true/i.test(value(/uses_original_audio|is_original/i) ?? "")) continue;
+      const artist = f.soundAuthor ?? f.audioAuthor ?? value(/^(artist_name|display_artist|author)$/i);
+      const key = `${title.toLowerCase()}|${(artist ?? "").toLowerCase()}`;
+      const kept = songs.get(key) ?? { title, artist, audio_id: f.audioId ?? value(/^(audio_id|audio_cluster_id)$/i), reels: 0, plays: 0, codes: [], trending: false };
+      kept.reels += 1;
+      kept.plays += Number(pick(post, ["views", "play_count", "playCount"]) ?? 0) || 0;
+      const code = pick(post, ["shortcode", "code"]);
+      if (code && kept.codes.length < 3) kept.codes.push(code);
+      kept.trending ||= /true/i.test(value(/is_trending_in_clips/i) ?? "");
+      songs.set(key, kept);
+    }
+    const next = pick(done?.answer ?? null, ["nextCursor", "next_cursor", "end_cursor"]);
+    if (!next || next === cursor || !posts.length) break;
+    cursor = next;
+  }
+  await supabaseAdmin()
+    .from("cost_events")
+    .insert({ studio_id: null, kind: "trends", provider: "treg", units: 1, cost_eur: usdToEur(costUsd, env("USD_TO_EUR")), meta: { purpose: "sounds_account_bench", cost_usd: costUsd, handle: name } });
+  return { handle: name, cost_usd: costUsd, reels, songs: [...songs.values()].sort((a, b) => b.reels - a.reels || b.plays - a.plays) };
 }
