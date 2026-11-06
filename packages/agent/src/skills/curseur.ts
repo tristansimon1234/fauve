@@ -271,7 +271,8 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
     const spots = [[0.828, 0.554], [0.17, 0.554], [0.828, 0.33], [0.17, 0.33]].map((s) => at(B1, s[0], s[1]));
     return spots.find((p) => !busy.some((b) => p.x >= b.x - 30 && p.x <= b.x + b.w + 30 && p.y >= b.y - 30 && p.y <= b.y + b.h + 30)) || spots[0];
   })();
-  const t6 = at(B1.height < H ? FULL : B1, 0.622, 0.2);
+  // Its double click high in the frame (the original's, at the top of its close-up).
+  const t6 = at(FULL, 0.622, 0.2);
   const keys = [
     [T.enter, { x: -W * 0.03, y: H * 0.391 }],
     [T.reach, { x: reads.t1.x - W * 0.015, y: Math.min(H * 0.9, reads.t1.y + H * 0.09) }],
