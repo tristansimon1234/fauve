@@ -49,8 +49,8 @@ export type StyleForm = {
   voice_id: string;
 };
 
-/** When Edith puts her voice over a Reel (brand_profiles.profile.voice.use). */
-export const VOICE_USES = ["auto", "always", "never"] as const;
+/** When Edith puts her voice over a Reel (brand_profiles.profile.voice.use; « always » is gone, read as auto). */
+export const VOICE_USES = ["auto", "never"] as const;
 
 export type Logo = { url: string; source: "upload" | "website" } | null;
 

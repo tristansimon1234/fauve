@@ -176,7 +176,7 @@ export type StudioContextForPrompt = {
   /** Her presence: days since her last publication, the last reminder, videos sorted lately. */
   routine?: string[];
   /** Edith's voice over her Reels (Style): when, and the voice's name. */
-  voice?: { use: "auto" | "always" | "never"; name: string };
+  voice?: { use: "auto" | "never"; name: string };
   /** The Reel she sent to copy that no Reel of hers has used yet (« Steal », one shot): its name and what her Reel takes from it, once read. */
   copying?: { inspirationId: string; name: string | null; lines: string[] };
   /** Her Reels kept as models (« Garder comme modèle »), read: a new Reel can be made like one of them. */
@@ -203,8 +203,7 @@ export function finishDefaultWords(finish: Partial<Record<"sound" | "video_sound
 }
 
 const VOICE_USE_LINES: Record<NonNullable<StudioContextForPrompt["voice"]>["use"], string> = {
-  auto: "quand ses images (au moins 12 s de vidéos ou de photos) racontent quelque chose et que personne ne parle déjà dans ses vidéos ; jamais sur un Reel entièrement en motion design, sauf si elle en demande une",
-  always: "sur tous ses nouveaux Reels",
+  auto: "quand ses images (au moins 12 s de vidéos ou de photos) racontent quelque chose et que personne ne parle déjà dans ses vidéos ; jamais d'office sur un modèle, sur un Reel recopié qui n'en a pas ni sur un Reel entièrement en motion design, mais elle peut toujours en demander une pour un Reel",
   never: "jamais, sauf si elle en demande une pour un Reel",
 };
 

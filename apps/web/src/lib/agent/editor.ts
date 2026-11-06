@@ -786,7 +786,10 @@ export async function designEdit(params: {
     const soundBpm = sound ? soundTempo(sound.bpm, fromEditor.tempo ?? 100) : undefined;
     const lead = sound && soundBpm ? soundLead(sound.offset, soundBpm) : 0;
     const read = soundBpm ? { ...fromEditor, tempo: soundBpm, ...(lead ? { beat_at: lead } : {}) } : fromEditor;
-    const written = writeSpoken ? { ...read, subtitles: true } : read;
+    // Her voice (or Edith's) is on the plan before it is normalized: its cuts stay on her phrases, never snapped to the beat,
+    // and no « euh » is cut under a voice nobody hears (set after, the engine snapped a voice Reel's cuts like any other).
+    const heard = voice && voiceId && spoken ? { ...read, voice: { media_id: voiceId, at: voiceStart } } : read;
+    const written = writeSpoken ? { ...heard, subtitles: true } : heard;
     const withWritten = keepWrittenAnimations(Object.keys(finish).length ? { ...written, finish } : written, params.fresh ? null : base);
     // A correction that redraws nothing keeps the composition's code as it is: never written again for a voice or a subtitle.
     const drafted = correction && !params.fresh && params.contract?.redraw === false ? keepComposition(withWritten, base) : withWritten;

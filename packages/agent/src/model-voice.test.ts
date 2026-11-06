@@ -158,14 +158,14 @@ test("a model's said words: the voice chosen, Edith's default for her or hers, a
   // Another business's clone (or a voice deleted since) is never read for her: the default voice.
   assert.equal(modelVoiceChoice({ says, post: { mode: "on", voice_id: "SomeoneElse1234" }, studio: auto, own: clone }), DEFAULT_VOICE_ID);
   // None: « Sans voix » on this Reel, « Jamais » for her business, her own voice laid over it, the sound of the Reel she copies kept.
-  assert.equal(modelVoiceChoice({ says, post: { mode: "off" }, studio: { use: "always" }, own: null }), null);
+  assert.equal(modelVoiceChoice({ says, post: { mode: "off" }, studio: auto, own: null }), null);
   assert.equal(modelVoiceChoice({ says, post: null, studio: { use: "never" }, own: null }), null);
   assert.equal(modelVoiceChoice({ says, post: null, studio: auto, own: null, laid: true }), null);
   assert.equal(modelVoiceChoice({ says, post: null, studio: auto, own: null, keptSound: true }), null);
   // Asked for this Reel, over her business's « Jamais »; a Reel she copies without a voice gets none unless she asks.
   assert.equal(modelVoiceChoice({ says, post: { mode: "on" }, studio: { use: "never" }, own: null }), DEFAULT_VOICE_ID);
   assert.equal(modelVoiceChoice({ says, post: null, studio: auto, own: null, copied: "aucune" }), null);
-  assert.equal(modelVoiceChoice({ says, post: null, studio: { use: "always" }, own: null, copied: "aucune" }), DEFAULT_VOICE_ID);
+  assert.equal(modelVoiceChoice({ says, post: { mode: "on" }, studio: auto, own: null, copied: "aucune" }), DEFAULT_VOICE_ID);
   assert.equal(modelVoiceChoice({ says, post: null, studio: auto, own: null, copied: "quelqu'un parle" }), DEFAULT_VOICE_ID);
   // A model that would not say them by default: only when she asks.
   assert.equal(modelVoiceChoice({ says: { ...says!, default: false }, post: null, studio: auto, own: null }), null);
@@ -283,7 +283,7 @@ test("nothing said for a model that does not declare it: no moments, no voice, i
   for (const skill of Object.values(MONTAGE_SKILLS)) {
     if (skill.key === "celui-la") continue;
     assert.equal(skill.saysWords, undefined, skill.key);
-    assert.equal(modelVoiceChoice({ says: skill.saysWords, post: { mode: "on" }, studio: { use: "always" }, own: null }), null, skill.key);
+    assert.equal(modelVoiceChoice({ says: skill.saysWords, post: { mode: "on" }, studio: { use: "auto" }, own: null }), null, skill.key);
     assert.deepEqual(saidCues(skill, skill.timeline(skill.shots[0], { end: false }), WORDS, 30), [], skill.key);
   }
   const mosaique = MONTAGE_SKILLS.mosaique!;

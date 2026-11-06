@@ -35,6 +35,10 @@ export type DeliveryTarget = {
   voice?: string;
   /** She wanted a voice over, but someone speaks in her videos: their words were kept instead, said. */
   spokenKept?: boolean;
+  /** Edith chose no voice for this Reel (she said nothing of it): she is told she can ask for one. */
+  voiceOffer?: boolean;
+  /** A sound she had chosen gave way to the voice (a song added in Instagram would cover it): said. */
+  soundGaveWay?: boolean;
   /** What the montage used, and what is left (charged right after the delivery): said in the message. */
   cost?: { credits: number; left: number } | null;
   /** The same, read once the video is rendered (a montage is charged on what it really cost, the render and music included). */
@@ -171,7 +175,18 @@ export async function deliverMontage(target: DeliveryTarget, r: { title: string;
   // Short paragraphs, the link right under the first line: it is the one action.
   const intro = `Ton montage « ${r.title} » est prêt 🎬${seconds ? ` (${seconds} s)` : ""}.`;
   // Short (Tristan: « un user aura la flemme de tout lire »): what she must know, the video shows the rest.
-  const voiceLine = target.voice ? `Voix off : ${target.voice}.` : target.spokenKept ? "J’ai gardé les paroles de ta vidéo plutôt qu’une voix off." : "";
+  // Without a voice Edith chose (she said nothing of it): one line that she can ask for one (Tristan: « le tout ce que le
+  // user soit au courant qu'il peut si il le souhaite poser une voix off »).
+  const gaveWay = target.soundGaveWay ? " J’ai mis ma musique sous la voix : un son ajouté dans Instagram la couvrirait." : "";
+  const voiceLine = target.voice
+    ? `Voix off : ${target.voice}.${gaveWay}`
+    : gaveWay
+      ? gaveWay.trim()
+      : target.spokenKept
+        ? "J’ai gardé les paroles de ta vidéo plutôt qu’une voix off."
+        : target.voiceOffer
+          ? "Tu peux y poser une voix off : dis-le-moi."
+          : "";
   // Without music for the sound of the Reel she copies: how to add it in Instagram, and the Business caveat.
   const { data: sounded } = await supabaseAdmin().from("posts").select("music").eq("id", target.postId).eq("studio_id", target.studioId).maybeSingle();
   const sound = readPostMusic(sounded?.music).mode === "model" ? await modelSound(target.studioId, target.postId).catch(() => null) : null;

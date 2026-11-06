@@ -267,7 +267,7 @@ export function modelVoiceChoice(p: {
   copied?: CopiedVoice;
 }): string | null {
   if (!p.says || p.laid || p.keptSound || p.post?.mode === "off") return null;
-  const asked = p.post?.mode === "on" || p.studio.use === "always";
+  const asked = p.post?.mode === "on";
   if (!asked && (p.studio.use === "never" || p.copied === "aucune" || !p.says.default)) return null;
   return readingVoice(p.post?.voice_id ?? p.studio.voice_id, p.own, p.gender);
 }

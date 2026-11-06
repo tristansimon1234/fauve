@@ -5,6 +5,7 @@ import {
   CHAT_MODEL,
   CLAUDE_MODEL,
   contractLines,
+  contractVoice,
   clipAnalysisSchema,
   editPlanSchema,
   findVoice,
@@ -21,6 +22,7 @@ import {
   readingVoice,
   readOwnVoice,
   readPostVoice,
+  type PostVoice,
   readVoiceSetting,
   sentencePauses,
   voiceLeftToSimone,
@@ -53,6 +55,7 @@ import { judgeHooks } from "@/lib/agent/hook-judge";
 import { anthropic, logClaudeCost } from "@/lib/agent/run";
 import { voiceSkill, type VoiceSkill } from "@/lib/agent/skill-design";
 import { env } from "@/lib/env";
+import { readPostMusic } from "@/lib/render/music";
 import { levelSpeechInSandbox } from "@/lib/render/sandbox";
 import { postStyle, STEAL_WAIT_MS } from "@/lib/steal";
 import { supabaseAdmin } from "@/lib/supabase/admin";
@@ -181,8 +184,14 @@ export async function writeVoiceScript(
     const asked = voiceWordsFor(0, contract.duration);
     read.longueur = { mots_min: asked.min, mots_max: asked.max };
   }
+  // The length she asked for is a target, not a ceiling: the voice carries her Reel to its end (her Pauline Reel's stopped at
+  // 14 s of 20 to 30, the end played in silence).
+  const askedLength = !skill && contract?.duration ? contract.duration : null;
   const input = {
     ...read,
+    ...(askedLength
+      ? { duree_demandee: `environ ${askedLength} s : la voix porte le Reel jusqu'au bout, entre ${read.longueur.mots_min} et ${read.longueur.mots_max} mots` }
+      : {}),
     ...(skill ? { modele: { nom: skill.name, deroule: skill.how, duree: `${String(skill.seconds).replace(".", ",")} s` } } : {}),
     ...(wish ? { consigne_voix: wish } : {}),
     ...(whispered ? { voix: "chuchotée (ASMR)" } : {}),
@@ -209,12 +218,18 @@ export async function writeVoiceScript(
   };
   let draft = await write();
   if (draft.format === "message") return { format: "message", why: draft.why, hook: "", script: "" };
-  // Too long, it would not fit in a Reel: once more. Shorter than its target is fine: the length is a ceiling,
-  // a voice that filled it described the images (Tristan: « le scénariste des reels est un peu naze »).
+  // Too long, it would not fit in a Reel: once more. Shorter than its target is fine without a length asked: the length is
+  // a ceiling, a voice that filled it described the images (Tristan: « le scénariste des reels est un peu naze »). With a
+  // length she asked for, its minimum holds: the voice reaches the end of her Reel.
   const { mots_min: min, mots_max: max } = input.longueur;
+  const floor = askedLength ? min : Math.round(min * 0.5);
   const words = spokenWords(scriptFrom(draft.hooks[0] ?? "", draft.rest).script);
-  if (words > max + slack || words < Math.round(min * 0.5)) {
-    const again = await write({ longueur_precedente: `La version précédente faisait ${words} mots : ${max} au plus.` }).catch(() => draft);
+  if (words > max + slack || words < floor) {
+    const note =
+      words > max + slack
+        ? `La version précédente faisait ${words} mots : ${max} au plus.`
+        : `La version précédente faisait ${words} mots, trop court : il en faut entre ${min} et ${max}${askedLength ? `, pour porter les ${askedLength} s qu'elle a demandées jusqu'au bout` : ""}, sans remplissage (une idée de plus, pas une description des images).`;
+    const again = await write({ longueur_precedente: note }).catch(() => draft);
     if (again.format !== "message" && again.hooks.length) draft = again;
   }
   // Its first sentence decides whether anyone stays: the strongest of its hooks (and the judge's own), for the image it opens on.
@@ -246,7 +261,8 @@ export async function writeVoiceScript(
       { version_precedente: { accroche: hook, reste: draft.rest }, accroche_gardee: hook, a_corriger: chosen.script.fixes },
       false,
     ).catch((error: unknown) => (console.warn("voice script kept as first written", error), null));
-    if (fixed?.rest.trim() && spokenWords(scriptFrom(hook, fixed.rest).script) <= max + slack) rest = fixed.rest;
+    const fixedWords = fixed?.rest.trim() ? spokenWords(scriptFrom(hook, fixed.rest).script) : 0;
+    if (fixed?.rest.trim() && fixedWords <= max + slack && fixedWords >= floor) rest = fixed.rest;
   }
   return { ...scriptFrom(hook, rest), format: draft.format, why: draft.why };
 }
@@ -410,15 +426,20 @@ export async function voiceOverIfWanted(params: {
   brief?: string;
   /** What she fixed: her own text asks for a voice reading it, at her pace, with the voice she asked. */
   contract?: ReelContract;
-}): Promise<{ mediaId: string; voice: string } | { format: Extract<ReelFormat, "message">; why: string } | { spokenKept: true } | null> {
+}): Promise<{ mediaId: string; voice: string } | { format: Extract<ReelFormat, "message">; why: string } | { spokenKept: true } | { offer: true } | null> {
   if (!env("ELEVENLABS_API_KEY")) return null;
   const db = supabaseAdmin();
   const [post, brand] = await Promise.all([
-    db.from("posts").select("kind, voice_media_id, voice_over, media_ids").eq("id", params.postId).eq("studio_id", params.studioId).single(),
+    db.from("posts").select("kind, voice_media_id, voice_over, media_ids, music").eq("id", params.postId).eq("studio_id", params.studioId).single(),
     db.from("brand_profiles").select("profile").eq("studio_id", params.studioId).order("version", { ascending: false }).limit(1).maybeSingle(),
   ]);
   if (post.error || post.data.kind !== "reel") return null;
-  const choice = readPostVoice(post.data.voice_over);
+  // This Reel's choice: set on the post (Créer, set_voice), else her answer read from her own words (« Avec une voix off »,
+  // « Juste la musique »), which nothing recorded when Edith asked it before the post existed.
+  const choice: PostVoice | null = readPostVoice(post.data.voice_over) ?? contractVoice(params.contract);
+  // A sound she chose for it (a trending one, the sound of the Reel she copies) plays instead of the video's sound: no voice
+  // of Edith's over it unless she asks for one (then the voice wins, with Edith's music: settleReelSound).
+  if (readPostMusic(post.data.music).mode === "model" && choice?.mode !== "on") return null;
   const setting = readVoiceSetting((brand.data?.profile as { voice?: unknown } | null)?.voice);
   const ids = params.mediaIds?.length ? params.mediaIds : ((post.data.media_ids as string[] | null) ?? []);
   const { data: media } = ids.length
@@ -475,11 +496,15 @@ export async function voiceOverIfWanted(params: {
       console.warn("voice: the model it is laid on not read, written for her footage", params.postId, error);
       return null;
     }));
-  // She chose a voice (for this Reel, or always) but someone speaks in her videos: their words stay, and the delivery says
+  // She chose a voice for this Reel but someone speaks in her videos: their words stay, and the delivery says
   // so; a model whose voice says its words never keeps their sound (its shots are silent), its voice says them.
-  if (!wanted && speechInClips && !choices.onReel && !choices.correction && choice?.mode !== "off" && (choice?.mode === "on" || setting.use === "always"))
+  if (!wanted && speechInClips && !choices.onReel && !choices.correction && choice?.mode === "on")
     return (await modelOf())?.says ? null : { spokenKept: true };
-  if (!wanted) return null;
+  // Edith chose none (a model, a copy without a voice, too little to show): she is told she can ask for one (Tristan: « le tout
+  // ce que le user soit au courant qu'il peut si il le souhaite poser une voix off »). Never after her own « non », nor over
+  // someone who speaks in her videos.
+  // A model whose own voice says its words (« Celui-là ») already speaks: nothing to offer.
+  if (!wanted) return voiceLeftToSimone(choices) && !speechInClips && !(await modelOf())?.says ? { offer: true } : null;
   const model = await modelOf();
   // A model whose words are what its voice says (« Celui-là, celui-là… »): no voice is written for it, its voice says its
   // words when it is designed (model-voice.ts), unless she gave her own words for a voice to say.

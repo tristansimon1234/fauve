@@ -11,10 +11,10 @@ import { chooseVoice } from "./actions";
 
 const SAMPLES = `${publicEnv.supabaseUrl}/storage/v1/object/public/landing`;
 
-type Use = "auto" | "always" | "never";
+// « Sur tous mes Reels » is gone (Tristan: « faut enlever ça »): a voice is asked for one Reel.
+type Use = "auto" | "never";
 const USES: { value: Use; label: string; hint: string }[] = [
-  { value: "auto", label: "Quand ça raconte", hint: "Quand tes images racontent quelque chose et que personne ne parle déjà dedans." },
-  { value: "always", label: "Sur tous mes Reels", hint: "Chaque nouveau Reel a sa voix off (ton propre vocal passe toujours avant)." },
+  { value: "auto", label: "Quand ça raconte", hint: "Quand tes images racontent quelque chose et que personne ne parle déjà dedans. Tu peux toujours en demander une pour un Reel précis." },
   { value: "never", label: "Jamais", hint: "Juste la musique. Tu peux toujours en demander une pour un Reel précis." },
 ];
 

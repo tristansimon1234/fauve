@@ -23,6 +23,12 @@ export const reelContractSchema = z.object({
   voice_pace: z.enum(["lente", "normale", "rapide"]),
   /** Woman or man, when she said it. */
   voice_gender: z.enum(["femme", "homme", "libre"]),
+  /**
+   * Her answer for this Reel's voice-over (« Avec une voix off », « Juste la musique »): asked by Edith before a new Reel, it
+   * reached nothing when Edith did not set it on the post (the post did not exist yet), and the Reel came out without the
+   * voice she asked for. libre: she did not say (« Fais comme tu le sens »), her setting decides.
+   */
+  voice_over: z.enum(["avec", "sans", "libre"]).default("libre"),
   /** The length she asked for, in seconds; null when she did not say. */
   duration: z.number().min(5).max(60).nullable(),
   /** The layout she asked for in her words (« écran partagé 50/50, l'animation en haut, moi en bas »); null when she did not say. */
@@ -72,6 +78,7 @@ export const CONTRACT_PROMPT = `You read a person's request for a Reel and note,
 - voice_text_mode: « polish » when they ask to improve it, to rephrase it, or say « dans l'idée », « genre »; otherwise « verbatim ».
 - person: « je » when they want to speak in their own name or their text is in the first person; « nous » or « il_elle » if they say so; otherwise « libre ».
 - voice_pace: « rapide » or « lente » if they ask for it; otherwise « normale ». voice_gender: if they say a man's or a woman's voice.
+- voice_over: « avec » when they want a voice-over on this Reel (« avec une voix off », « mets une voix », « Avec une voix off » answered to Edith's question), « sans » when they want none (« juste la musique », « sans voix off », « Juste la musique »); otherwise « libre » (« fais comme tu le sens » included).
 - duration: the length in seconds if they give it. layout: the layout they describe (split screen, half and half, a shot in a frame…), in their words; never the format alone (vertical, full screen, horizontal, in bands, their videos kept whole: that is « frame »), so « en vertical plein écran » leaves layout null.
 - screen_text: an on-screen text they give word for word. ending: the ending they describe.
 - Words they give for the screen (screen_text, call_to_action_text) keep their words and order but are always written right: spelling, accents, apostrophes and hyphens, capitals of names (WhatsApp, Instagram), French punctuation (« Parles en a Edith, ton IA sur whatapps » → « Parles-en à Edith, ton IA sur WhatsApp. »). Never one of their typos on screen.
@@ -90,6 +97,7 @@ export const EMPTY_CONTRACT: ReelContract = {
   person: "libre",
   voice_pace: "normale",
   voice_gender: "libre",
+  voice_over: "libre",
   duration: null,
   layout: null,
   screen_text: null,
@@ -193,6 +201,7 @@ export const contractIsEmpty = (c: ReelContract | null | undefined): boolean =>
     c.person === "libre" &&
     c.voice_pace === "normale" &&
     c.voice_gender === "libre" &&
+    (c.voice_over ?? "libre") === "libre" &&
     c.duration === null &&
     !c.layout &&
     !c.screen_text &&
@@ -213,6 +222,7 @@ export function contractLines(c: ReelContract | null | undefined): string[] {
     c.person !== "libre" ? `La voix parle ${c.person === "je" ? "à la première personne (« je »), en son nom" : c.person === "nous" ? "en « nous »" : "à la troisième personne"}` : null,
     c.voice_pace !== "normale" ? `Voix ${c.voice_pace === "rapide" ? "plus rapide" : "plus lente"}` : null,
     c.voice_gender !== "libre" ? `Voix d'${c.voice_gender === "homme" ? "homme" : "femme"}` : null,
+    c.voice_over === "avec" ? "Une voix off sur ce Reel" : c.voice_over === "sans" ? "Pas de voix off sur ce Reel : juste la musique" : null,
     c.duration ? `Durée : ${c.duration} s environ` : null,
     c.frame === "letterbox"
       ? "Cadre : ses vidéos entières et horizontales, sur du noir au-dessus et en dessous ; le moteur les pose ainsi (form montage, jamais une composition pour ça), les textes restent les tiens"
@@ -265,6 +275,13 @@ export function keepAskedVoice(contract: ReelContract, request: string, currentV
   if (asksSpokenText(request, `${contract.voice_text ?? ""} ${contract.voice_text_rest ?? ""}`)) return contract;
   return { ...contract, voice_text: null, voice_text_rest: null, voice_text_mode: "verbatim" };
 }
+
+/**
+ * Her answer for this Reel's voice-over as a post's own choice (« Avec une voix off »: on; « Juste la musique »: off), for
+ * when nothing set one on the post: the code applies it, Edith never has to remember to.
+ */
+export const contractVoice = (c: ReelContract | null | undefined): { mode: "on" | "off" } | null =>
+  c?.voice_over === "avec" ? { mode: "on" } : c?.voice_over === "sans" ? { mode: "off" } : null;
 
 /** Her text as it was asked for, to tell whether the voice on the Reel already says it (its continuation included). */
 export const ownTextKey = (c: ReelContract): string =>

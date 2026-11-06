@@ -3,7 +3,7 @@ import { linkExpiry, stolenStyleSchema, usdToEur } from "@fauve/agent";
 import { costMeta } from "@/lib/cost-scope";
 import { env } from "@/lib/env";
 import { readPostMusic } from "@/lib/render/music";
-import { SENT_TO_COPY } from "@/lib/steal";
+import { postStyle, SENT_TO_COPY, STEAL_WAIT_MS } from "@/lib/steal";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { instagramVideo } from "@/lib/treg";
 import { soundExample } from "@/lib/trend-sounds";
@@ -51,9 +51,10 @@ export async function keepModelSound(studioId: string, postId: string, keep: boo
   const db = supabaseAdmin();
   const { data: post } = await db.from("posts").select("music, publish_by_hand").eq("id", postId).eq("studio_id", studioId).maybeSingle();
   const music = readPostMusic(post?.music);
+  // Given back by her (« mets ta musique »): Edith's music is her choice, the sound of the Reel she copies is never kept after.
   const update = keep
-    ? { music: { ...music, mode: "model" as const, hand: !post?.publish_by_hand || Boolean(music.hand) }, publish_by_hand: true }
-    : { music: { ...music, mode: "on" as const, hand: undefined }, ...(music.hand ? { publish_by_hand: false } : {}) };
+    ? { music: { ...music, mode: "model" as const, chosen: undefined, hand: !post?.publish_by_hand || Boolean(music.hand) }, publish_by_hand: true }
+    : { music: { ...music, mode: "on" as const, chosen: "edith" as const, hand: undefined }, ...(music.hand ? { publish_by_hand: false } : {}) };
   const { error } = await db.from("posts").update(update).eq("id", postId).eq("studio_id", studioId).not("status", "in", "(published,measured)");
   if (error) throw new Error(error.message);
   return sound;
@@ -70,12 +71,62 @@ export async function keepsModelSound(studioId: string, postId: string): Promise
   const { data: post } = await db.from("posts").select("inspiration_id, voice_media_id, voice_over, music").eq("id", postId).eq("studio_id", studioId).maybeSingle();
   if (!post?.inspiration_id || post.voice_media_id || (post.voice_over as { mode?: string } | null)?.mode === "on") return false;
   const music = readPostMusic(post.music);
-  if (music.mode !== "on" || music.sound || music.wish) return false;
+  if (music.mode !== "on" || music.sound || music.wish || music.chosen) return false;
   const { data: inspiration } = await db.from("inspirations").select("source, url, style").eq("id", post.inspiration_id as string).eq("studio_id", studioId).maybeSingle();
   const link = inspiration?.url as string | null | undefined;
   if (!link || !INSTAGRAM.test(link) || !SENT_TO_COPY.includes(inspiration?.source as string)) return false;
   const style = stolenStyleSchema.safeParse(inspiration?.style);
   return style.success && style.data.look.voice === "aucune";
+}
+
+/** Someone speaks in one of her videos (six words or more, read by the analysis): their words carry the Reel. */
+async function speechIn(studioId: string, mediaIds: string[]): Promise<boolean> {
+  if (!mediaIds.length) return false;
+  const db = supabaseAdmin();
+  const { data: own } = await db.from("media_assets").select("id").eq("studio_id", studioId).in("id", mediaIds);
+  const ids = (own ?? []).map((m) => m.id as string);
+  if (!ids.length) return false;
+  const { data } = await db.from("clip_analyses").select("analysis").in("media_id", ids);
+  return (data ?? []).some((row) => ((row.analysis as { words?: unknown[] } | null)?.words?.length ?? 0) >= 6);
+}
+
+/**
+ * The sound of her Reel, settled once at the start of its montage, its voice known (Tristan: simplify, one decision for the
+ * sound): a voice on it (hers or Edith's), the words of her videos, or a music she asked for give it Edith's music, never a
+ * sound to add in Instagram (it would cover the voice; her wish is the composer's brief). Otherwise a new Reel that copies
+ * an Instagram Reel nobody speaks on keeps its sound (keepsModelSound), its reading waited for: decided at the launch, it
+ * depended on whether that reading was done yet. Returns what the Reel plays: « model » (a sound she adds), « edith »
+ * (the sound kept gave way), or null (nothing changed). `gaveWay`: a sound she had chosen herself gave way to a voice.
+ */
+export async function settleReelSound(
+  studioId: string,
+  postId: string,
+  o: { correction: boolean; mediaIds?: string[]; wish: boolean },
+): Promise<{ plays: "model" | "edith"; gaveWay?: boolean } | null> {
+  const db = supabaseAdmin();
+  const { data: post } = await db.from("posts").select("kind, music, voice_media_id, media_ids, publish_by_hand").eq("id", postId).eq("studio_id", studioId).maybeSingle();
+  if (!post || post.kind !== "reel") return null;
+  const music = readPostMusic(post.music);
+  const ids = o.mediaIds?.length ? o.mediaIds : ((post.media_ids as string[] | null) ?? []);
+  const voiced = Boolean(post.voice_media_id) || o.wish || (await speechIn(studioId, ids));
+  if (music.mode === "model") {
+    if (!voiced) return { plays: "model" };
+    // A song added in Instagram plays instead of the video's own sound: the voice wins, with Edith's music under it.
+    const { error } = await db
+      .from("posts")
+      .update({ music: { ...music, mode: "on" as const, sound: undefined, hand: undefined }, ...(music.hand ? { publish_by_hand: false } : {}) })
+      .eq("id", postId)
+      .eq("studio_id", studioId)
+      .not("status", "in", "(published,measured)");
+    if (error) throw new Error(error.message);
+    return { plays: "edith", gaveWay: Boolean(music.sound) && Boolean(post.voice_media_id) };
+  }
+  if (o.correction || voiced || music.mode !== "on") return null;
+  // The Reel she copies is read after her message: its reading says whether anyone speaks on it.
+  await postStyle(studioId, postId, { waitMs: STEAL_WAIT_MS }).catch(() => undefined);
+  if (!(await keepsModelSound(studioId, postId))) return null;
+  await keepModelSound(studioId, postId, true);
+  return { plays: "model" };
 }
 
 /** What the delivery tells her of a Reel without music for the model's sound: how to add it, and the Business caveat. */

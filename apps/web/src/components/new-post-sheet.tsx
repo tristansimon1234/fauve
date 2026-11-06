@@ -64,11 +64,9 @@ const SCENARIO_EXAMPLE: Record<PostKind, string> = {
 
 const SAMPLES = `${publicEnv.supabaseUrl}/storage/v1/object/public/landing`;
 
-/** Her studio's voice setting (Style), as the first choice: « Edith choisit », without, or its voice. */
+/** Her studio's voice setting (Style), as the first choice: « Edith choisit », or without. */
 function defaultVoice(o: NewPostOptions | null): string {
-  if (!o || o.voice.use === "auto") return "auto";
-  if (o.voice.use === "never") return "off";
-  return knownVoice(o, o.voice.voiceId) ? o.voice.voiceId! : SIMONE_VOICES[0]!.id;
+  return o?.voice.use === "never" ? "off" : "auto";
 }
 
 /** One of Edith's voices, or her own (her clone). */
@@ -245,7 +243,7 @@ function Create({
   const chosenWhen = when ?? defaultWhen(options, date);
   const chosenVoice = voice ?? defaultVoice(options);
   // With or without a voice over: always asked for a Reel (Tristan: « il faut demander si voix off ou pas »),
-  // unless her Style already says always or never.
+  // unless her Style already says never.
   const voiceAsked = Boolean(soundOn) || voice !== null || (options?.voice.use ?? "auto") !== "auto";
   const [launchOnVoice, setLaunchOnVoice] = useState(false);
   const sent = options?.copy ?? null;

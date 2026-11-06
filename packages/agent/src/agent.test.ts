@@ -1701,10 +1701,11 @@ test("voice over: when Edith puts her voice on a Reel, and which voice", async (
   assert.equal(wantsVoiceOver({ ...base, studio: "never" }), false);
   assert.equal(wantsVoiceOver({ ...base, studio: "never", post: { mode: "on" } }), true);
   // Someone speaking keeps their words over her choice or her setting; a voice she asked for again, with what it says, goes on.
-  assert.equal(wantsVoiceOver({ ...base, studio: "always", speechInClips: true }), false);
+  // « Sur tous mes Reels » is gone: a setting saved with it reads as auto, its voice kept.
+  assert.deepEqual(readVoiceSetting({ use: "always", voice_id: SIMONE_VOICES[2].id }), { use: "auto", voice_id: SIMONE_VOICES[2].id });
   assert.equal(wantsVoiceOver({ ...base, post: { mode: "on" }, speechInClips: true }), false);
   assert.equal(wantsVoiceOver({ ...base, post: { mode: "on", wish: "raconte le cours du matin" }, speechInClips: true }), true);
-  assert.equal(wantsVoiceOver({ ...base, studio: "always", post: { mode: "off" } }), false);
+  assert.equal(wantsVoiceOver({ ...base, post: { mode: "off" } }), false);
   // Her own voice note is never covered; Edith's voice is made again only when asked (another text or voice).
   assert.equal(wantsVoiceOver({ ...base, onReel: "hers", post: { mode: "on", remake: true } }), false);
   assert.equal(wantsVoiceOver({ ...base, onReel: "simone", post: { mode: "on" } }), false);
@@ -2146,8 +2147,7 @@ test("copy first: what the Reel she copies (or her request) does not have is nev
   assert.equal(wantsVoiceOver({ ...base, copied: "voix off", footageSeconds: 6 }), false, "too little to show while a voice speaks");
   assert.equal(voiceLeftToSimone({ ...base, post: { mode: "on" } }), false);
   assert.equal(wantsVoiceOver({ ...base, post: { mode: "on" }, copied: "aucune" }), true);
-  assert.equal(voiceLeftToSimone({ ...base, studio: "always" }), false);
-  assert.equal(wantsVoiceOver({ ...base, studio: "always", copied: "aucune" }), true);
+  assert.equal(voiceLeftToSimone({ ...base, studio: "never" }), false);
   assert.equal(voiceLeftToSimone({ ...base, correction: true }), false);
   assert.equal(voiceLeftToSimone({ ...base, onReel: "simone" }), false);
 
@@ -4766,6 +4766,36 @@ test("a composition keeps the faces of a shot whole in a wide box (half of a spl
   assert.deepEqual(faceFocus(body, face, 9 / 16, 9 / 16), { x: 0.5, y: 0.55 });
   assert.deepEqual(faceFocus(body, undefined, 9 / 16, 2), body);
   assert.equal(faceZone(file, 5, 1), null);
+});
+
+test("her answer on the voice-over reaches the montage, and a voice Reel keeps its cuts on her phrases", async () => {
+  const { contractVoice, reelContractSchema } = await import("./contract.ts");
+  const { normalizeEditPlan } = await import("./editor.ts");
+  // « Avec une voix off » / « Juste la musique », read from her own words: the Reel's own choice, applied by the code.
+  assert.deepEqual(contractVoice({ ...EMPTY_CONTRACT, voice_over: "avec" }), { mode: "on" });
+  assert.deepEqual(contractVoice({ ...EMPTY_CONTRACT, voice_over: "sans" }), { mode: "off" });
+  assert.equal(contractVoice(EMPTY_CONTRACT), null);
+  assert.equal(contractVoice(undefined), null);
+  assert.ok(!contractIsEmpty({ ...EMPTY_CONTRACT, voice_over: "avec" }));
+  assert.ok(contractLines({ ...EMPTY_CONTRACT, voice_over: "sans" }).includes("Pas de voix off sur ce Reel : juste la musique"));
+  // A contract read before the field existed says nothing of it.
+  assert.equal(reelContractSchema.parse({ ...EMPTY_CONTRACT, voice_over: undefined }).voice_over, "libre");
+  // The plan is normalized with its voice: its cuts stay where the editor put them on her phrases, never on the beat.
+  const plan = editPlanObjectSchema.parse({
+    ...validPlan,
+    template: "libre",
+    tempo: 100,
+    duration: 6,
+    texts: [],
+    images: [],
+    segments: [
+      { clip_id: "a", in: 0, out: 2.37, zoom: "none" },
+      { clip_id: "b", in: 0, out: 3.21, zoom: "none" },
+    ],
+  });
+  const out = (p: { segments: unknown[] }) => (p.segments[0] as { out: number }).out;
+  assert.equal(out(normalizeEditPlan(plan, { a: 10, b: 10 })), 2.4, "without a voice, on the beat (100 BPM)");
+  assert.equal(out(normalizeEditPlan({ ...plan, voice: { media_id: "v", at: 0 } }, { a: 10, b: 10 })), 2.37, "on her phrase");
 });
 
 test("contract: only what she fixed, in plain lines", () => {

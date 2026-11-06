@@ -28,7 +28,6 @@ import { acceptQuote, createMontageQuote, pricedAsEffect } from "@/lib/credits";
 import { env } from "@/lib/env";
 import { queueWait } from "@/lib/montage-queue";
 import { startMontage } from "@/lib/montage-start";
-import { keepModelSound, keepsModelSound } from "@/lib/model-sound";
 import { isFirstReel } from "@/lib/onboarding";
 import { followSound } from "@/lib/sound-follow";
 import { pendingSteal } from "@/lib/steal";
@@ -179,13 +178,11 @@ export async function launchCreation(input: LaunchInput): Promise<LaunchResult> 
   }
   if (kind !== "reel") return { ok: true, postId: created.id, title: created.title, kind, mediaIds, refIds, montage: null };
 
-  // Its sound: the one she picked (cut on its beats), else the sound of the Instagram Reel she copies, kept without
-  // asking when nobody speaks on it (keepsModelSound). Silent then: she adds it in Instagram and posts it herself.
+  // Its sound: the one she picked (cut on its beats). The sound of an Instagram Reel she copies is settled once the
+  // montage starts, its voice known (settleReelSound): kept when nobody speaks on it and no voice goes on hers.
   if (sound) {
     const followed = await followSound(studioId, created.id, sound.link, { title: sound.title, artist: sound.artist, audioId: sound.audioId }).catch(() => null);
     if (!followed?.ok) console.warn("create: sound not followed", followed?.why);
-  } else if (copying && (await keepsModelSound(studioId, created.id).catch(() => false))) {
-    await keepModelSound(studioId, created.id, true).catch((e: unknown) => console.warn("create: model sound not kept", e));
   }
 
   // The level of care of the studio (Réglages); her first Reel gets its made-to-measure animations, as in the chat.

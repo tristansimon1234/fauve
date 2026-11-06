@@ -15,15 +15,14 @@ import { FoldedSection, Segmented } from "./ui";
 
 const SAMPLES = `${publicEnv.supabaseUrl}/storage/v1/object/public/landing`;
 
+// « Sur tous mes Reels » is gone (Tristan: « faut enlever ça »): a voice is asked for one Reel.
 const USE_OPTIONS = [
   { value: "auto", label: "Quand ça raconte" },
-  { value: "always", label: "Sur tous mes Reels" },
   { value: "never", label: "Jamais" },
 ] as const;
 
 const USE_HINTS: Record<StyleForm["voice_use"], string> = {
-  auto: "Edith en pose une quand tes images racontent quelque chose (un geste, un avant/après, une histoire) et que personne ne parle déjà dans tes vidéos.",
-  always: "Chaque nouveau Reel a sa voix off, sauf quand tu m’envoies ton propre vocal : c’est lui qui passe.",
+  auto: "Edith en pose une quand tes images racontent quelque chose (un geste, un avant/après, une histoire) et que personne ne parle déjà dans tes vidéos. Tu peux toujours en demander une pour un Reel précis.",
   never: "Tes Reels n’ont que leur musique. Tu peux toujours en demander une pour un Reel précis.",
 };
 

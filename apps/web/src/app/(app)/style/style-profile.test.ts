@@ -14,7 +14,7 @@ const form = {
   hashtags: ["#pilates", "pilates", "reformer"],
   dos: ["Montrer les mains", " ", ""],
   donts: [],
-  voice_use: "always" as const,
+  voice_use: "never" as const,
   voice_id: "8qnuneLiGjGrT4A62CCe",
 };
 
@@ -49,8 +49,8 @@ test("style: the form is normalized and applied over the current profile", () =>
   assert.deepEqual(next.extra, { kept: true });
   // The missing body font takes the default one.
   assert.deepEqual(next.fonts, ["Fraunces", "Inter Tight"]);
-  assert.deepEqual(next.voice, { use: "always", voice_id: "8qnuneLiGjGrT4A62CCe" });
-  assert.equal(toStyleForm(next).voice_use, "always");
+  assert.deepEqual(next.voice, { use: "never", voice_id: "8qnuneLiGjGrT4A62CCe" });
+  assert.equal(toStyleForm(next).voice_use, "never");
 });
 
 test("style: emptied optional fields are removed", () => {

@@ -138,10 +138,15 @@ export function readingVoice(picked: string | null | undefined, own: OwnVoice | 
   return SIMONE_VOICES.find((v) => v.gender === want && !v.asmr)?.id ?? id;
 }
 
-/** The studio's voice over its Reels (Style): when, and which voice. */
+/** When Edith puts a voice over her Reels: auto (when it helps the Reel, see wantsVoiceOver) or never. */
+export const VOICE_USES = ["auto", "never"] as const;
+
+/**
+ * The studio's voice over its Reels (Style): when, and which voice. « Sur tous mes Reels » (always) is gone
+ * (Tristan: « faut enlever ça »): a voice is asked for one Reel, and a setting saved with it reads as auto.
+ */
 export const voiceSettingSchema = z.object({
-  /** auto: when it helps the Reel (see wantsVoiceOver); always; never. */
-  use: z.enum(["auto", "always", "never"]).default("auto"),
+  use: z.preprocess((value) => (value === "always" ? "auto" : value), z.enum(VOICE_USES)).default("auto"),
   voice_id: z.string().regex(/^[A-Za-z0-9]{10,40}$/).optional(),
 });
 export type VoiceSetting = z.infer<typeof voiceSettingSchema>;
@@ -195,12 +200,11 @@ export function wantsVoiceOver(
 ): boolean {
   if (p.onReel === "hers" || p.post?.mode === "off") return false;
   if (p.onReel === "simone") return Boolean(p.post?.remake);
-  // Someone speaking in her videos keeps their words, even when she chose « Une voix off » or « toujours »
+  // Someone speaking in her videos keeps their words, even when she chose « Une voix off »
   // (Tristan: « ok » to « ses paroles passent avant la voix off ») ; only a voice she asked for again, with what it says, goes over them.
   if (p.speechInClips && !p.post?.wish) return false;
   if (p.post?.mode === "on") return true;
   if (p.correction || p.studio === "never") return false;
-  if (p.studio === "always") return true;
   if (p.copied && p.copied !== "voix off") return false;
   return !p.speechInClips && p.footageSeconds + p.photos * 3 >= VOICE_MIN_FOOTAGE_SECONDS;
 }
@@ -254,7 +258,7 @@ If her request already says the form (a voice that tells, no voice, a single mes
 
 export const VOICE_OVER_PROMPT = `You write the voice-over of an Instagram Reel for a neighbourhood business: what a real person says over its images, like a creator talking to their followers, never like an ad. This voice makes people stay to the end: it must make them want to come, not sell. You write it in French.
 
-What you get: the business (name, trade, what we know about it), the post's idea and, when there are some, the request made for this Reel (« publication.demande », often in the words of the person who runs it) and what she wants to hear (« consigne_voix »), the business's tone, what her images show (« images », in the order they were filmed: to know what the person watching already sees, never a list to narrate), the image the Reel opens on (« ouverture », the strongest shot to hook), the length to aim for (« longueur »: from mots_min to mots_max words) and, when she copies one, the Reel she sent (« reel_a_recopier »: the form of its hook and its ending), and this business's latest voices (« voix_recentes »). « modele », when given: the Reel is one of Edith's models played as it is (its name, how it goes, its length), and your voice is laid over it: « longueur » is set for that model, your voice runs from its first image and stops a breath before its end, and its words on screen are written after your voice, from it (one message for both, never two).
+What you get: the business (name, trade, what we know about it), the post's idea and, when there are some, the request made for this Reel (« publication.demande », often in the words of the person who runs it) and what she wants to hear (« consigne_voix »), the business's tone, what her images show (« images », in the order they were filmed: to know what the person watching already sees, never a list to narrate), the image the Reel opens on (« ouverture », the strongest shot to hook), its length (« longueur »: from mots_min to mots_max words; « duree_demandee » when she asked for a length) and, when she copies one, the Reel she sent (« reel_a_recopier »: the form of its hook and its ending), and this business's latest voices (« voix_recentes »). « modele », when given: the Reel is one of Edith's models played as it is (its name, how it goes, its length), and your voice is laid over it: « longueur » is set for that model, your voice runs from its first image and stops a breath before its end, and its words on screen are written after your voice, from it (one message for both, never two).
 
 « contrat », when there is one, is what she fixed herself for this Reel: it comes before everything else, these rules included. A person (« je »: the voice speaks in her name, in the first person, and the rule of the creator who talks about the business does not apply), an invitation (« aucune »: no invitation nor call to comment; « la sienne »: her words), an ending, a length, her requests: you follow them to the letter.
 
@@ -269,7 +273,7 @@ The examples between quotes show a form, never words to reuse: always write your
 Rules:
 - the voice says what the image cannot: why, since when, how much, the detail only a regular knows, what it changes, what you think of it. Before keeping a sentence, ask: does someone who sees this image learn or feel something new from it? A sentence that only names what is on screen (a gesture, an action, a colour, a texture, the light, « elle sourit », « on l'étire à la main », « ça file au four ») is cut, however well written; you name a moment only to put a why, a number, a joke or a feeling on it. Never the inventory of the shots in their order;
 - one idea, never a list: no enumeration of services or dishes (« les pâtes, les pizzas, les desserts »); a single true and precise fact, well told, is worth more than five. Except when her request itself says what must be understood, point by point: then each of her points is said, in its order, as a progression that leads to the message (what you do, what it does for you, what it brings you), in sentences that flow into each other, never a list read aloud;
-- « longueur » is a ceiling, not a target: mots_max at most, and say the angle and stop; images that breathe between two sentences are better than a voice that fills them; whole, short sentences that flow into each other; never telegraphic fragments (« Et hop, au four. »); every sentence brings something new, never the same idea said again;
+- « longueur » is a ceiling, not a target: mots_max at most, and say the angle and stop; except when she asked for a length (« duree_demandee »): then the voice carries her Reel to its end, between mots_min and mots_max, with one more true idea rather than filler; images that breathe between two sentences are better than a voice that fills them; whole, short sentences that flow into each other; never telegraphic fragments (« Et hop, au four. »); every sentence brings something new, never the same idea said again;
 - the first sentence decides whether people stay: it is said in under three seconds (9 words at most), hooks from its first three words and opens the message (without saying it straight away), for the image that opens the Reel (« ouverture », unless her request says what to start with). What hooks: a question you want answered, two things that don't go together, a precise number, what you don't usually see, a challenge, the person watching put in the scene (« tu »); what makes people scroll on: the business's name, « bienvenue », « aujourd'hui », « voici », « découvrez », a limp question (« tu connais… ? »), a vague promise (« tu vas adorer »), a sentence that would fit any business. Write 4 first sentences of different forms (hooks), your favourite first, all leading to your second sentence: the strongest will be kept;
 - a little story around the angle: (1) the first sentence opens it; (2) the next one answers or deepens it with what the image cannot show; (3) the heart gives the proof or the detail that makes the message true, with a point of view (a fair exaggeration, humour); (4) a punchline that makes it stick; (5) the ending. Form only: « Personne ne te dit pourquoi on attend dix minutes ici. » then « C'est le temps qu'il faut au café pour reposer. »;
 - only true facts (those you are given and what the images show), nothing invented: no price, number or promise that is not in what you are given; a proof when there is one (the queue outside, the full room, a regular);

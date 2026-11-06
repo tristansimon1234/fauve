@@ -36,7 +36,7 @@ export async function chooseVoice(raw: unknown): Promise<VoiceChoiceResult> {
   const line =
     parsed.data.use === "never"
       ? "C’est noté : plus de voix off sur tes Reels, juste la musique. Tu peux toujours m’en demander une pour un Reel précis."
-      : `C’est noté 🎙️ ${voice.own ? "Tes Reels seront racontés avec ta propre voix" : `Tes Reels seront racontés par ${voice.name}`}${parsed.data.use === "always" ? ", sur chacun d’eux" : ", quand tes images racontent quelque chose"}.`;
+      : `C’est noté 🎙️ ${voice.own ? "Tes Reels seront racontés avec ta propre voix" : `Tes Reels seront racontés par ${voice.name}`}, quand tes images racontent quelque chose.`;
   return { ok: true, answered: await tellOnWhatsApp(studioId, member.phone_e164, line) };
 }
 

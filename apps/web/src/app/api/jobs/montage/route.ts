@@ -41,6 +41,7 @@ import {
   type EffectsState,
 } from "@/lib/agent/effects-agent";
 import { voiceOverIfWanted } from "@/lib/voice-over";
+import { settleReelSound } from "@/lib/model-sound";
 import { saidVoiceOf } from "@/lib/model-voice";
 import { chargeQuote, montageCost, quoteSuperseded, restoreChainQuote, setQuoteStage, switchQuoteToEffect } from "@/lib/credits";
 import { insertPlanVersion } from "@/lib/edit-plans";
@@ -131,6 +132,12 @@ const bodySchema = z.object({
   voice: z.string().max(40).optional(),
   /** She wanted a voice over, but someone speaks in her videos: their words were kept, told at delivery. */
   spokenKept: z.boolean().optional(),
+  /** Edith chose no voice for this Reel (she said nothing of it): the delivery tells her she can ask for one. */
+  voiceOffer: z.boolean().optional(),
+  /** Its sound is settled for this montage (settleReelSound), once its voice is known. */
+  soundSettled: z.boolean().optional(),
+  /** A sound she had chosen gave way to a voice (a song added in Instagram would cover it): told at delivery. */
+  soundGaveWay: z.boolean().optional(),
   /** The voice step is done: the design goes on (in its own invocation when a voice was recorded). */
   voiced: z.boolean().optional(),
   /** A simple copied Reel remade by code (copy.ts), or a Reel made on a montage skill (skills.ts): rendered and delivered as it is, no second take nor critic. */
@@ -308,6 +315,8 @@ async function runStep(job: Job) {
           offerVariant: true,
           voice: job.voice,
           spokenKept: job.spokenKept,
+          voiceOffer: job.voiceOffer,
+          soundGaveWay: job.soundGaveWay,
           costOf: async () => (job.quoteId ? montageCost(job.quoteId, job.newScenes ?? 0) : null),
         },
         async () => !(await quoteSuperseded(job.quoteId)),
@@ -336,6 +345,8 @@ async function runStep(job: Job) {
         effort: job.effort,
         voice: job.voice,
         spokenKept: job.spokenKept,
+        voiceOffer: job.voiceOffer,
+        soundGaveWay: job.soundGaveWay,
       };
       // The director's Reel: its look first (its own step, with all of the job: her files, her request, her contract), then the render.
       if (!(await toDirectorLook(job, edit, "render", { ...job, ...rendering }))) await queueJob("montage", rendering);
@@ -432,21 +443,34 @@ const scenesLeft = (job: Job) => Math.max(0, (job.maxNewScenes ?? 2) - (job.newS
  */
 async function voiceFirst(job: Job): Promise<boolean> {
   await withContract(job);
-  if (job.voiced) return false;
-  // A Reel with an effect too, as any Reel (Tristan: « oui »): her choice, else her business's, else Edith's.
-  const made = await voiceOverIfWanted({ studioId: job.studioId, postId: job.postId, mediaIds: job.mediaIds, correction: job.correction, brief: job.brief, contract: job.contract });
-  if (!made) return false;
-  if ("spokenKept" in made) {
-    Object.assign(job, { voiced: true, spokenKept: true });
-    return false;
+  if (!job.voiced) {
+    // A Reel with an effect too, as any Reel (Tristan: « oui »): her choice, else her business's, else Edith's.
+    const made = await voiceOverIfWanted({ studioId: job.studioId, postId: job.postId, mediaIds: job.mediaIds, correction: job.correction, brief: job.brief, contract: job.contract });
+    // A voice recorded: the design goes on in its own invocation (the sound is settled there, the voice on the post).
+    if (made && "mediaId" in made) {
+      await next(job, { step: "design", voiced: true, voice: made.voice, format: "raconte" });
+      return true;
+    }
+    if (made && "spokenKept" in made) Object.assign(job, { voiced: true, spokenKept: true });
+    else if (made && "offer" in made) Object.assign(job, { voiced: true, voiceOffer: true });
+    // A key message with the music suits it better: no voice, the editor knows it, the design goes on now.
+    else if (made && "format" in made) Object.assign(job, { voiced: true, format: made.format });
   }
-  // A key message with the music suits it better: no voice, the editor knows it, the design goes on now.
-  if ("format" in made) {
-    Object.assign(job, { voiced: true, format: made.format });
-    return false;
-  }
-  await next(job, { step: "design", voiced: true, voice: made.voice, format: "raconte" });
-  return true;
+  await settleSound(job);
+  return false;
+}
+
+/**
+ * Its sound, settled once its voice is known (settleReelSound): a voice, the words of her videos or a music she asked
+ * for give it Edith's music; otherwise the sound of an Instagram Reel she copies is kept. Decided once per montage.
+ */
+async function settleSound(job: Job): Promise<void> {
+  if (job.soundSettled) return;
+  const settled = await settleReelSound(job.studioId, job.postId, { correction: Boolean(job.correction), mediaIds: job.mediaIds, wish: Boolean(job.contract?.music) }).catch((error: unknown) => {
+    console.warn("sound: not settled, kept as it was", job.postId, error);
+    return null;
+  });
+  Object.assign(job, { soundSettled: true, ...(settled?.gaveWay ? { soundGaveWay: true } : {}) });
 }
 
 /**
@@ -923,6 +947,8 @@ async function deliver(job: Job, best: Version, outcome: Care | null): Promise<b
         offerVariant: !job.compared && !outcome?.effect,
         voice,
         spokenKept: job.spokenKept,
+        voiceOffer: job.voiceOffer,
+        soundGaveWay: job.soundGaveWay,
         cost,
       },
       { title, durationMs: (render.data?.duration_ms as number | null) ?? 0 },

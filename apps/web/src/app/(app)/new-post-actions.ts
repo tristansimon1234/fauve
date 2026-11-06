@@ -33,7 +33,7 @@ export type NewPostOptions = {
   /** One-tap ideas by format, for this kind of business: a label, and the request it fills in. */
   ideas: Record<"reel" | "carousel" | "post" | "story", PostIdea[]>;
   /** Her voice-over setting (Style), the first choice for a Reel. */
-  voice: { use: "auto" | "always" | "never"; voiceId: string | null };
+  voice: { use: "auto" | "never"; voiceId: string | null };
   /** Her own voice (a clone made in Style), heard by its sample. */
   ownVoice: { id: string; sampleUrl: string | null } | null;
   /** TikTok connected: a Reel goes there too, unless she says otherwise. */

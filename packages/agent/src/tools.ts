@@ -479,13 +479,13 @@ export const toolSpecs = {
   },
   set_voice: {
     description:
-      "Voix off d'Edith sur les Reels (une vraie voix française qui raconte les images, texte écrit par toi, posée avant le montage, la musique passe dessous) : voix Eva, Victoria, Lucie, Koraly (chuchotée, ASMR) pour les femmes, Neto, Antonin, Jules, Mister K (chuchotée, ASMR) pour les hommes ; « sa voix » quand elle a cloné sa propre voix dans Style › Voix off (sa ligne « Voix off » le dit) ; une voix chuchotée seulement si elle la veut (spa, massage, soin, un moment très calme). Avec post_id, pour ce Reel : mode on (en mettre une), off (sans voix, ni la sienne), redo (refaire le texte, avec wish : ce qu'elle veut qu'on dise) ; voice pour changer de voix. Sans post_id : le réglage du commerce pour ses prochains Reels (use : auto = quand ça raconte quelque chose et que personne ne parle déjà dans ses vidéos, always, never ; voice). Gratuit. off sur un Reel monté refait la vidéo tout de suite ; on, redo et voice valent pour le prochain montage du Reel : sur un Reel déjà monté, propose de le refaire (montage avec correction).",
+      "Voix off d'Edith sur les Reels (une vraie voix française qui raconte les images, texte écrit par toi, posée avant le montage, la musique passe dessous) : voix Eva, Victoria, Lucie, Koraly (chuchotée, ASMR) pour les femmes, Neto, Antonin, Jules, Mister K (chuchotée, ASMR) pour les hommes ; « sa voix » quand elle a cloné sa propre voix dans Style › Voix off (sa ligne « Voix off » le dit) ; une voix chuchotée seulement si elle la veut (spa, massage, soin, un moment très calme). Avec post_id, pour ce Reel : mode on (en mettre une), off (sans voix, ni la sienne), redo (refaire le texte, avec wish : ce qu'elle veut qu'on dise) ; voice pour changer de voix. Sans post_id : le réglage du commerce pour ses prochains Reels (use : auto = quand ça raconte quelque chose et que personne ne parle déjà dans ses vidéos, always, never ; voice). Gratuit. off sur un Reel monté refait la vidéo tout de suite ; on, redo et voice valent pour le prochain montage du Reel : sur un Reel déjà monté, sa demande vaut accord, lance aussitôt la correction (montage avec correction: true).",
     input: z.object({
       post_id: z.string().uuid().optional(),
       mode: z.enum(["on", "off", "redo"]).optional(),
       wish: z.string().max(300).optional().describe("redo : ce que la voix doit dire ou comment (« parle de la promo », « plus drôle »)"),
       voice: z.string().max(40).optional().describe("Le prénom d'une voix (Eva, Victoria, Lucie, Koraly, Neto, Antonin, Jules, Mister K)"),
-      use: z.enum(["auto", "always", "never"]).optional().describe("Sans post_id : quand mettre une voix sur ses Reels"),
+      use: z.enum(["auto", "never"]).optional().describe("Sans post_id : quand mettre une voix sur ses Reels (auto : quand ses images racontent quelque chose ; never : jamais). Pour un Reel précis, post_id avec mode on"),
     }),
   },
   schedule_post: {

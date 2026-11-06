@@ -82,7 +82,7 @@ import { bakedReel, insertPlanVersion } from "@/lib/edit-plans";
 import { effectRoute } from "@/lib/agent/effects-agent";
 import { fewSubjects } from "@/lib/agent/copy-design";
 import { skillTooShort, skillWantsMore } from "@/lib/agent/skill-design";
-import { keepModelSound, keepsModelSound } from "@/lib/model-sound";
+import { keepModelSound } from "@/lib/model-sound";
 import { followSound } from "@/lib/sound-follow";
 import { searchSounds, soundExample, trendSounds } from "@/lib/trend-sounds";
 import { skillGate } from "@/lib/skill-reviews";
@@ -713,12 +713,11 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
         if (!known.data) return "Inspiration introuvable : reprends un inspiration_id de list_inspirations.";
         check(await db.from("posts").update({ inspiration_id }).eq("id", post_id).eq("studio_id", studioId));
       }
-      // The sound of the Instagram Reel she copies is kept without asking her (keepsModelSound: nobody speaks on it, no
-      // voice on hers), unless she has asked for Edith's music; her answer, when she gave one, decides. No music of
-      // Edith's then: she posts it herself and adds its sound in Instagram.
+      // Her answer on the sound of the Instagram Reel she copies, when she gave one (« Garder son son », « Ta musique », or
+      // « mets ta musique » in her words). Otherwise its sound is settled once the montage starts, its voice known
+      // (settleReelSound): kept when nobody speaks on it and no voice goes on hers.
       const askedMusic = (ctx.exchange ?? []).some((r) => r.direction === "inbound" && EDITH_MUSIC.test(r.body?.trim() ?? ""));
-      const keptByDefault = !son && !correction && !variant && !post.edit_plan_id && !askedMusic && (await keepsModelSound(studioId, post_id).catch(() => false));
-      const choice = son ?? (keptByDefault ? "modele" : undefined);
+      const choice = son ?? (askedMusic && !correction && !variant ? "edith" : undefined);
       const sound = choice ? await keepModelSound(studioId, post_id, choice === "modele").catch(() => null) : null;
       if ((correction || variant) && !post.edit_plan_id) return "Pas encore de montage pour cette publication : lance d'abord un montage (correction: false).";
       // A model coded as a montage skill takes a few files at least: with fewer, she is asked first whether she has others
@@ -807,7 +806,6 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
         ...(route === "agent" ? { atelier: "effet dessiné image par image, sur ce qui bouge dans sa vidéo", duree: `${minutes} min` } : level ? { niveau: level.label, duree: `${minutes} min` } : {}),
         ...(job.effort && job.effort !== wanted && route !== "agent" ? { attention: `Le solde ne permettait pas le niveau ${EFFORTS[wanted].label} : lancé en ${level?.label}.` } : {}),
         ...(son === "modele" && !sound ? { son: "Ce Reel ne recopie pas un Reel d'Instagram : il n'y a pas de son à garder, il part avec ta musique. Dis-le en une phrase." } : {}),
-        ...(keptByDefault && sound && !sound.business ? { son: "Son son est gardé d'office : la vidéo sortira sans ta musique, sur ses coupes, et la livraison lui dira comment l'ajouter dans Instagram. N'en parle pas ; si elle veut ta musique, set_music on." } : {}),
         ...(choice === "modele" && sound?.business ? { son: "Sans ta musique, pour son son. Son compte Instagram est un compte Entreprise, où Instagram ne propose pas tous les sons : dis-lui que si « Utiliser l'audio » n'apparaît pas, elle te dit « mets ta musique »." } : {}),
         ...(subjects !== null
           ? {
@@ -1238,7 +1236,7 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
       return json({
         ok: true,
         note: post.edit_plan_id
-          ? "C'est noté. Ce Reel est déjà monté : la voix arrive avec un nouveau montage (une correction). Propose-le-lui (montage avec correction: true), et lance-le quand elle est d'accord."
+          ? "C'est noté. Ce Reel est déjà monté : la voix arrive avec un nouveau montage (une correction). Sa demande vaut accord : lance aussitôt la correction (montage avec correction: true), sans le lui redemander."
           : "C'est noté : la voix sera posée à son montage.",
       });
     },
