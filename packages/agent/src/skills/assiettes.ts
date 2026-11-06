@@ -1,6 +1,6 @@
 import { toFrame, type MontageSkill, type SkillShot } from "../skills.ts";
 
-// « Défilé d'assiettes », version 1, written on its original's fiche (docs/fiches/assiettes.md: measured image by image
+// « Défilé d'assiettes », version 2 (its slots say what a business films for it, their passage and fallback), written on its original's fiche (docs/fiches/assiettes.md: measured image by image
 // at 30 i/s, its title's typing and its ink read on the pixels, its plates' place in each of its 31 shots, its sound by
 // bands; Tristan: « c'est un effet que l'on veut pouvoir faire, pas exactement reproduire l'image »). Her menu shown dish
 // by dish: each plate seen from above, held out over the same counter, in the middle of the frame and nearly as wide as
@@ -207,7 +207,7 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
 
 export const assiettes: MontageSkill = {
   key: "assiettes",
-  version: 1,
+  version: 2,
   bpm: BPM,
   shots: [FEWEST, ORIGINAL],
   long: LONGEST,
@@ -292,16 +292,23 @@ export const assiettes: MontageSkill = {
     const duration = secs(total);
     const spans = times.map((t, i) => ({ start: t, end: i + 1 < times.length ? times[i + 1]! : duration }));
     const hold = (i: number) => comma(spans[i]!.end - spans[i]!.start);
+    // What a business films for it (version 2, Tristan's review of 6 November: « trouver d'autres photos / vidéos »): what
+    // she serves (a dish, a cup, a cake), seen from above and whole in the middle of an upright frame; which passage of a
+    // video (the plate still and whole, never while it comes in or leaves); and each slot's fallback, as every model has.
+    const served = "ce qu'elle sert (un plat, un bol, une tasse ou un verre, une pâtisserie, une part de gâteau)";
+    const above = "vu d'en haut, l'assiette entière au milieu de l'image et presque aussi large qu'elle (en vertical, ses bords dans la largeur)";
+    const passage = "d'une vidéo, le moment où l'assiette est immobile et entière dans l'image, jamais quand elle entre, sort ou qu'une main la cache";
+    const fallback = "sinon ce même genre de plat vu de trois quarts, ou une photo de plat bien nette";
     const want = (k: PhraseKey | "flash", i: number, first: boolean): string => {
-      if (i === 0) return "le premier plat, le plus coloré, vu d'en haut et tenu à la main au milieu de l'image, presque aussi large qu'elle : son titre se tape dessus au milieu";
-      if (k === "flash") return "un plat de plus vu d'en haut, montré trois images seulement (un éclair), juste avant le plat vedette";
-      if (k === "vedette") return `le plat vedette, tenu ${hold(i)} s pendant que la musique se pose : le plus beau et le plus généreux (un sandwich, un plat à partager, un gâteau entier, son best-seller), vu d'en haut et de plus près, la caméra posée ou qui bouge à peine`;
-      if (k === "avant" && !first) return "un plat juste avant le drop, pendant le presque-silence (on coupe sur le drop), vu d'en haut au milieu de l'image";
-      if (k === "fin" && i === spans.length - 1) return `le dernier plat, ${hold(i)} s : un plat qui donne envie d'y revenir, vu d'en haut au milieu de l'image (le Reel boucle sur le premier)`;
-      if (k === "drop" && first) return "le plat du drop, le plus fort de la musique : un plat très coloré, vu d'en haut au milieu de l'image";
+      if (i === 0) return `le premier plat, le plus coloré : ${served}, ${above}, tenu à la main ou posé ; ${passage} ; son titre se tape dessus au milieu ; ${fallback}`;
+      if (k === "flash") return `un plat de plus, ${above}, montré trois images seulement (un éclair), juste avant le plat vedette ; ${fallback}`;
+      if (k === "vedette") return `le plat vedette, tenu ${hold(i)} s pendant que la musique se pose : le plus beau et le plus généreux (un sandwich, un plat à partager, un gâteau entier, son best-seller), vu d'en haut et de plus près, la caméra posée ou qui bouge à peine ; ${passage} ; sinon son plus beau plat de près, de trois quarts`;
+      if (k === "avant" && !first) return `un plat juste avant le drop, pendant le presque-silence (on coupe sur le drop), ${above} ; ${fallback}`;
+      if (k === "fin" && i === spans.length - 1) return `le dernier plat, ${hold(i)} s : un plat qui donne envie d'y revenir, ${above} (le Reel boucle sur le premier) ; ${passage} ; ${fallback}`;
+      if (k === "drop" && first) return `le plat du drop, le plus fort de la musique : un plat très coloré, ${above} ; ${fallback}`;
       return k === "intro"
-        ? "un plat vu d'en haut, l'assiette au milieu de l'image et presque aussi large qu'elle, tenue à la main au-dessus du même comptoir ou de la même table ; un plat différent du précédent (son titre est encore là, au milieu)"
-        : "un plat vu d'en haut, l'assiette au milieu de l'image et presque aussi large qu'elle, tenue à la main (ou posée) au même endroit que les autres ; un plat différent du précédent";
+        ? `${served}, ${above}, tenu à la main au-dessus du même comptoir ou de la même table ; un plat différent du précédent (son titre est encore là, au milieu) ; ${passage} ; ${fallback}`
+        : `${served}, ${above}, tenu à la main (ou posé) au même endroit que les autres ; un plat différent du précédent ; ${passage} ; ${fallback}`;
     };
     const shots: SkillShot[] = spans.map((s, i) => ({ ...s, want: want(kindsAll[i]!, i, firsts[i]!) }));
     const scale = BPM / bpm;

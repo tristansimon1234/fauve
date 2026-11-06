@@ -6,13 +6,13 @@ import { skillFit, skillLengths, skillPlan } from "../skills.ts";
 import { clearsDrawn, objectsDrawn, readsDrawn, subjectsDrawn } from "../subject.ts";
 import { assiettes, keptCuts, phraseCounts } from "./assiettes.ts";
 
-// « Défilé d'assiettes », the model (assiettes.ts, version 1), on its original's fiche (docs/fiches/assiettes.md).
+// « Défilé d'assiettes », the model (assiettes.ts, version 2), on its original's fiche (docs/fiches/assiettes.md).
 
 /** The original's 30 cuts, the first image of each new dish (measured image by image; measure.py found them all). */
 const ORIGINAL_CUTS = [14, 31, 46, 64, 74, 85, 97, 108, 129, 140, 154, 169, 188, 191, 277, 291, 313, 329, 348, 358, 368, 383, 392, 418, 426, 437, 446, 463, 472, 490];
 
-test("« Défilé d'assiettes » (v1): its 31 dishes on its original's cuts (91,6 BPM, in sixteenths), its flash, its vedette, 16,9 s", () => {
-  assert.equal(assiettes.version, 1);
+test("« Défilé d'assiettes » (v2): its 31 dishes on its original's cuts (91,6 BPM, in sixteenths), its flash, its vedette, 16,9 s", () => {
+  assert.equal(assiettes.version, 2);
   assert.equal(assiettes.bpm, 91.6);
   const line = assiettes.timeline(31, { end: false });
   // 507 images, the original's; each cut within an image of the original's, eleven right on it.
@@ -100,7 +100,7 @@ test("« Défilé d'assiettes »: its plan (its words by role, its music's shape
   assert.deepEqual(plan.texts.map((t) => [t.style, t.text]), [["hook", "Notre carte d'hiver"], ["caption", "faite maison"]]);
   assert.equal(plan.sounds?.length ?? 0, 0);
   assert.equal(plan.music_shape?.pauses?.length, 1);
-  assert.deepEqual(plan.skill, { key: "assiettes", version: 1 });
+  assert.deepEqual(plan.skill, { key: "assiettes", version: 2 });
   assert.equal(plan.tempo, 91.6);
   // Light to render: nothing cut out nor followed, no clear area, no reading of her shots.
   assert.deepEqual(checkMotionCode(assiettes.code), []);
@@ -207,4 +207,19 @@ test("« Défilé d'assiettes »: its ending card over its last dish, typed as i
   assert.deepEqual(card.map((t) => t.props.at), [from + 2, from]);
   // Over her last dish, still playing.
   assert.equal(of(drawAt(from + 20, { end, end_card: true }), "Footage")[0]!.props.shot, 30);
+});
+
+test("« Défilé d'assiettes » (v2): its slots say what a business films for it, which passage, and their fallback", () => {
+  // Tristan of its bench (« encore une fois à mettre en vertical, trouver d'autres photos / vidéos »): each slot says what
+  // she serves, seen from above and whole in an upright frame, the passage where the plate is still and whole, and what
+  // fills it otherwise (as every model's slots do).
+  const line = assiettes.timeline(31, { end: false });
+  for (const [i, s] of line.shots.entries()) {
+    assert.match(s.want, /sinon /, `slot ${i + 1}`);
+    if (i !== 14) assert.match(s.want, /vu d'en haut, l'assiette entière au milieu de l'image et presque aussi large qu'elle \(en vertical, ses bords dans la largeur\)/, `slot ${i + 1}`);
+  }
+  assert.match(line.shots[0]!.want, /^le premier plat, le plus coloré : ce qu'elle sert \(un plat, un bol, une tasse ou un verre, une pâtisserie/);
+  assert.match(line.shots[0]!.want, /le moment où l'assiette est immobile et entière dans l'image, jamais quand elle entre, sort ou qu'une main la cache/);
+  assert.match(line.shots[14]!.want, /^le plat vedette, tenu 2,87 s .* ; sinon son plus beau plat de près, de trois quarts$/);
+  assert.match(line.shots[30]!.want, /^le dernier plat, .*le Reel boucle sur le premier/);
 });
