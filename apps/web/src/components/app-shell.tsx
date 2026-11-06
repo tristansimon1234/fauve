@@ -19,7 +19,9 @@ export function AppShell({
 }) {
   return (
     <div className="flex min-h-dvh bg-white">
-      <aside className="sticky top-0 hidden h-dvh w-[232px] shrink-0 flex-col gap-9 border-r border-line px-4 pt-7 pb-6 lg:flex">
+      {/* Fixed, not sticky (Tristan: « la side bar ne reste pas statique »): sticky stays only within its parent's
+          height, so a page taller than the shell (or one that scrolls the window past it) took the menu away. */}
+      <aside className="fixed inset-y-0 left-0 z-20 hidden w-[232px] flex-col gap-9 overflow-y-auto border-r border-line bg-white px-4 pt-7 pb-6 lg:flex">
         <div className="px-1.5">
           <Logo />
         </div>
@@ -33,7 +35,7 @@ export function AppShell({
 
       {/* Room under the content for the phone's tab bar, its home bar included. A page that fills the
           screen (data-fill: the chat) gets exactly what is left between the header and the bar. */}
-      <div className="flex min-w-0 flex-1 flex-col pb-[calc(5rem+env(safe-area-inset-bottom))] lg:pb-0 [&:has(>[data-fill])]:h-dvh">
+      <div className="flex min-w-0 flex-1 flex-col pb-[calc(5rem+env(safe-area-inset-bottom))] lg:ml-[232px] lg:pb-0 [&:has(>[data-fill])]:h-dvh">
         <header className="flex items-center justify-between border-b border-line px-4 py-3 lg:hidden">
           <Logo size={30} />
           {avatar}
