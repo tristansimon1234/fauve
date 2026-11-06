@@ -1006,6 +1006,35 @@ export const skillFact = (t: Pick<SkillText, "fact" | "max">, facts: SkillFacts 
 /** The brief a skill's composition carries (what the motion designer reads if her request ever needs it changed). */
 export const skillBrief = (name: string) => `Le modèle « ${name} » joué tel quel : ses plans dans ses cases, ses textes à leur place, sa fin.`;
 
+/** On her own voice leading a model: what it does, in her words (never the model's name). */
+export const SKILL_HEARD_WORDS = "Je l'ai calé sur ta voix : chaque mot s'affiche quand tu le dis.";
+
+const plainWords = (s: string) =>
+  s
+    .normalize("NFD")
+    .replace(/\p{M}/gu, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+
+/**
+ * What Edith says of a Reel played on one of her models, on its post (posts.agent_note; the delivery keeps only what
+ * follows its first sentence, deliveryWords): the filler's sentence on what it chose, and on her own voice what it does.
+ * Her models are an internal tool (Tristan, 6 November: « je préfère ne pas divulguer nos modèles »): a sentence that
+ * names the model (`name`) or speaks of a model or a template is left out, never shown to her.
+ */
+export function skillNote(why: string, name: string, heard = false): string {
+  const named = plainWords(name);
+  // Its name marked first: a name with its own stop (« Celui-là, celui-là… ») is never cut in two sentences.
+  const marked = name.trim() ? why.replace(new RegExp(name.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "giu"), "\u0001") : why;
+  const said = marked
+    .trim()
+    .split(/(?<=[.!?…][»"”)]?)\s+(?![»"”)])/)
+    .map((s) => s.trim())
+    .filter((s) => s && !s.includes("\u0001") && !/\bmod[eè]les?\b|\btemplates?\b|\bskills?\b/i.test(s) && !(named && ` ${plainWords(s)} `.includes(` ${named} `)));
+  return [said.join(" ").slice(0, 300), heard ? SKILL_HEARD_WORDS : ""].filter(Boolean).join(" ");
+}
+
 /**
  * Her Reel on a skill, built by code: her files in its shots (on its beats), her words in its texts at their moments,
  * its composition over the whole Reel drawing everything (shots, texts, ending), its tempo for the music. `voice`: a
@@ -1813,7 +1842,7 @@ export const skillFillSchema = z.object({
     )
     .optional()
     .describe("Only when the model has objects (« objets »): one per object slot"),
-  why: z.string().describe("One sentence in French for her (tu): why these shots in this model"),
+  why: z.string().describe("One sentence in French for her (tu): what these shots show and why, never the model's name nor the word « modèle »"),
 });
 export type SkillFillAnswer = z.infer<typeof skillFillSchema>;
 
@@ -1856,7 +1885,7 @@ A model timed on her voice (« voix »): her talking video is the Reel, cut by t
 "settings": its settings (« reglages », when it has some), like the variants of a template: one only when her request asks for what it does (« plus de cases », « plus lent », « dans le désordre », « avec ma couleur »), with the value that does it; never to vary for its own sake; otherwise none, each one plays its default. A request a setting answers fits. A format she asks for (vertical, full screen, horizontal, in a band, her videos kept whole: « cadre ») is its « format » setting when it has one, never another layout: it fits; « format » only when she asks for one, its default playing otherwise (« par défaut »: vertical full frame for almost every model), never because her files are horizontal.
 "objets": its objects (« objets », when it has some): what in the file you cast on that slot carries its effect (a sign whose letters light up one by one, windows that light up one after the other, lamps that flash), from what the file shows (« montre », « moments »): name it in plain English as the eye sees it, two to four words (« shop sign », « neon sign », « bakery sign », « every window », « string lights », « pendant lamps »); « every » before it when there are several to take one after the other (each window, each lamp); a slot that asks for the elements a thing is made of (« cherche »: a shop front's door, windows, sign) takes them all, comma-separated, each as a detector finds it (« painted door, every window, every shutter, shop sign, awning, every plant pot »); empty when nothing in that file fits (the model does without). Cast on that slot the file that has it, when one does. "seen": the few words of that file's « montre » or « moments » that show it, copied as they are. One a text names (« son_texte ») is a different thing of that file each time, named only when the file shows it, else empty, its text too.
 "end": optional, null unless the model has an ending (« fin ») and her request (or « contrat ») is about something to end on: an offer, an opening, a date, an event she speaks of; what we know (« ce_qu_on_sait ») may complete it (its date, its place), never bring a subject of its own: an offer, a promotion, a discount or a price only when her request is about it (« Les nouveautés de la boutique cette semaine », with « -20 % sur toute la boutique ce week-end » known: null). Its title (40 characters at most) and a subtitle or empty; when in doubt, null.
-"why": one sentence for her in French (tu), what you chose and why, in plain words.`;
+"why": one sentence for her in French (tu), what you chose and why, in plain words. The model is Edith's internal tool, never shown to her: never its name, never « modèle », « template » or « skill »; say what her Reel does with her images (« J'ouvre sur ta devanture, puis tes plats un par un »).`;
 
 /** What the filler is told when a voice says the model's words (« mots_dits »), in French like the rest of its input. */
 export const SAID_WORDS =

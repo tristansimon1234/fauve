@@ -699,6 +699,9 @@ export function laidOver(look: Pick<StolenLook, "shots" | "layout">): { short: s
 /** Something laid over full-frame shots: a cut-out, a print, another image in a window. */
 const LAID_OVER = /détour|par-dessus|superpos|collée?s?\b|autocollant|incrust|fenêtre|écran partagé|plusieurs (plans|images)|posée?s? (sur|en grand|au centre)/i;
 
+/** Edith's models are an internal tool (Tristan, 6 November: « je préfère ne pas divulguer nos modèles »): the editor never names one to her. */
+const HOUSE_UNSEEN = ". Un outil interne qu'elle ne voit jamais : ni son nom ni « modèle d'Edith » dans « rationale »";
+
 export function followedForEditor(followed: FollowedStyle) {
   const { look } = followed;
   const layout = composedLayout(look);
@@ -708,8 +711,8 @@ export function followedForEditor(followed: FollowedStyle) {
     ...(followed.house
       ? {
           origine: followed.dressed
-            ? "un modèle d'Edith, choisi par Edith comme forme de ce Reel (sa direction artistique par défaut) : sa forme, son rythme, ses moments et sa finition sont à refaire avec ses images et ses mots à elle, habillés de sa charte (ses polices, ses couleurs) ; sa demande passe avant le modèle. Le modèle ne donne ni la longueur ni le silence : 7 à 15 s pour une ambiance ou une annonce quand personne ne parle, une accroche écrite lisible dès la première seconde et une fin (son nom ou une invitation), même si le modèle n'en a pas"
-            : "un modèle d'Edith qu'elle a choisi : sa forme, son rythme, ses moments et sa finition sont à refaire avec ses images et ses mots à elle ; le motion designer reçoit la composition de référence de ce modèle",
+            ? `un modèle d'Edith, choisi par Edith comme forme de ce Reel (sa direction artistique par défaut) : sa forme, son rythme, ses moments et sa finition sont à refaire avec ses images et ses mots à elle, habillés de sa charte (ses polices, ses couleurs) ; sa demande passe avant le modèle. Le modèle ne donne ni la longueur ni le silence : 7 à 15 s pour une ambiance ou une annonce quand personne ne parle, une accroche écrite lisible dès la première seconde et une fin (son nom ou une invitation), même si le modèle n'en a pas${HOUSE_UNSEEN}`
+            : `un modèle d'Edith qu'elle a choisi : sa forme, son rythme, ses moments et sa finition sont à refaire avec ses images et ses mots à elle ; le motion designer reçoit la composition de référence de ce modèle${HOUSE_UNSEEN}`,
         }
       : {}),
     // Its plan, when it is one of hers: the same build, shot for shot and text for text, cut to her new images.

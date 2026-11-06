@@ -6,7 +6,7 @@ import {
   compositionShots,
   compositionTexts,
   copyByModel,
-  copyByModelWords,
+  COPY_BY_MODEL_WORDS,
   dressSkillPlan,
   fewFiles,
   finishPlan,
@@ -27,6 +27,7 @@ import {
   skillFillInput,
   skillFillSchema,
   skillPlan,
+  skillNote,
   skillShotCount,
   skillFit,
   skillFitAt,
@@ -72,7 +73,7 @@ import {
   type VoiceTranscript,
 } from "@fauve/agent";
 import { outputFormat, readAnswer } from "@fauve/agent/answer";
-import { MONTAGE_SKILLS, skillFor } from "@fauve/agent/skills";
+import { skillFor } from "@fauve/agent/skills";
 import { insertPlanVersion } from "@/lib/edit-plans";
 import { modelVoiceFor, sayModelWords } from "@/lib/model-voice";
 import { ownVoiceOnReel } from "@/lib/own-voice";
@@ -509,9 +510,8 @@ export async function designSkill(params: {
     editPlanId: row.id,
     version: row.version,
     // A Reel she sent, played by one of Edith's models: one sentence on the post, nothing more (the delivery says none of it).
-    rationale: params.copied
-      ? copyByModelWords(name)
-      : [heard ? `Je l'ai monté sur le modèle « ${name} », sur ta voix : chaque mot s'affiche quand tu le dis.` : `Je l'ai monté sur le modèle « ${name} ».`, answer.why.trim().slice(0, 300)].filter(Boolean).join(" "),
+    // The model itself is never named to her (Tristan, 6 November: « je préfère ne pas divulguer nos modèles »).
+    rationale: params.copied ? COPY_BY_MODEL_WORDS : skillNote(answer.why, name, Boolean(heard)),
   };
 }
 
@@ -587,7 +587,7 @@ async function checkSkill(
  * At launch: the Reel follows a model coded as a skill she (or Edith in the chat) chose, and she gave fewer files than
  * it wants: Edith asks her first whether she has others. Null when there is nothing to ask.
  */
-export async function skillWantsMore(studioId: string, postId: string, mediaIds: string[]): Promise<{ name: string; least: number; files: number } | null> {
+export async function skillWantsMore(studioId: string, postId: string, mediaIds: string[]): Promise<{ least: number; files: number } | null> {
   const db = supabaseAdmin();
   const { data: post } = await db.from("posts").select("inspiration_id, edith_pick, media_ids").eq("id", postId).eq("studio_id", studioId).maybeSingle();
   // Picked by Edith while the Reel is made: she only picks a model her files fill.
@@ -597,15 +597,15 @@ export async function skillWantsMore(studioId: string, postId: string, mediaIds:
   const skill = inspiration?.source === "house" ? gate(skillFor(inspiration.external_id as string | null)) : undefined;
   if (!skill) return null;
   const files = new Set(mediaIds.length ? mediaIds : ((post.media_ids as string[] | null) ?? [])).size;
-  return fewFiles(skill, files) ? { name: houseModel(skill.key)?.name ?? skill.key, least: skill.files[0], files } : null;
+  return fewFiles(skill, files) ? { least: skill.files[0], files } : null;
 }
 
 /**
  * The length she asked for is past what her model does (Tristan: « si un modèle fait 10 secondes mais qu'elle veut un
  * Reel de 30 ? »): stretched further, a model made for a moment loses what makes it good, so Edith tells her first and
- * offers its longest, or a model made to last. Its longest (s, rounded down) and the models that reach her length.
+ * offers its longest (s, rounded down), the model never named to her.
  */
-export async function skillTooShort(studioId: string, postId: string, seconds: number): Promise<{ name: string; max: number; others: string[] } | null> {
+export async function skillTooShort(studioId: string, postId: string, seconds: number): Promise<{ max: number } | null> {
   const db = supabaseAdmin();
   const { data: post } = await db.from("posts").select("inspiration_id").eq("id", postId).eq("studio_id", studioId).maybeSingle();
   if (!post?.inspiration_id) return null;
@@ -615,9 +615,5 @@ export async function skillTooShort(studioId: string, postId: string, seconds: n
   if (!skill) return null;
   const { max } = skillLengths(skill);
   if (seconds <= max + 1) return null;
-  const others = Object.values(MONTAGE_SKILLS)
-    .filter((s) => s.key !== skill.key && gate(s) && skillLengths(s).max + 1 >= seconds)
-    .flatMap((s) => houseModel(s.key)?.name ?? [])
-    .slice(0, 2);
-  return { name: houseModel(skill.key)?.name ?? skill.key, max: Math.floor(max), others };
+  return { max: Math.floor(max) };
 }

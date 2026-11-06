@@ -38,7 +38,7 @@ export const directorOutputSchema = z.object({
   plan: editorOutputSchema.shape.plan.omit({ captions: true, look: true, colors: true, fonts: true }),
   rationale: z.string(),
   composition_code: z.string().describe("The composition's code when the plan's form is composition, else empty"),
-  composition_name: z.string().describe("Its name in a few French words (she sees it), else empty"),
+  composition_name: z.string().describe("Its name in a few French words (she sees it; never the name of a model of Edith's), else empty"),
   keep: z.boolean().describe("After a look at your Reel only: true when nothing needs fixing (plan and code are then kept as they were); false otherwise"),
 });
 export type DirectorOutput = z.infer<typeof directorOutputSchema>;

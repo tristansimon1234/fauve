@@ -2,7 +2,7 @@ import { fontPair, pairFonts, type FontPair } from "./font-pairs.ts";
 import { HOUSE_MEASURES } from "./house-measures.ts";
 import { houseSheets } from "./house-sheets.ts";
 import { reelLookSchema, type ReelLook } from "./looks.ts";
-import { filmWords, STEAL_READER, stolenStyleLines, type StolenLook, type StolenStyle } from "./steal.ts";
+import { STEAL_READER, stolenStyleLines, type StolenLook, type StolenStyle } from "./steal.ts";
 import type { z } from "zod";
 
 // Edith's own models (lot 5; Tristan: « chaque référence deviendra un modèle soigné qu'Edith sait refaire quand on
@@ -11,9 +11,10 @@ import type { z } from "zod";
 // ending), with what the sandbox measured on it (its cuts and its tempo, house-measures.ts), the finish it wears (its
 // look: grade, grain, vignette), the font pairing it is set in (font-pairs.ts) and, for most, a reference composition
 // written with the kit and timed on it (house-examples.ts, shown to the motion designer as a worked example).
-// A model is never one shot: she picks it in Créer › « Un modèle d'Edith » (or Edith takes it in the chat), and the
-// Reel follows it as it follows a Reel she sends (posts.inspiration_id on a row of hers, source « house »), never
-// its images, its words nor its music. Readings written by hand, in French like the reader's.
+// A model is never one shot, and never shown to her (Tristan, 6 November: « je préfère ne pas divulguer nos modèles »):
+// an internal tool Edith picks while the Reel is made (house-pick.ts), never offered, listed nor named to her. The Reel
+// follows it as it follows a Reel she sends (posts.inspiration_id on a row of hers, source « house »), never its
+// images, its words nor its music. Readings written by hand, in French like the reader's.
 
 /** The source of the inspiration row a house model is kept on, per studio (one per model, made when first used). */
 export const HOUSE_SOURCE = "house";
@@ -2566,12 +2567,3 @@ export const HOUSE_WHEN: Record<string, { pour: string; pas_pour: string }> = {
   collage: { pour: "présenter son lieu, son équipe et ses clients avec de l'élan et du style (un café, une boutique, un salon, un studio, un bar), une ambiance de quartier, une saison, un événement en vrac, beaucoup de photos", pas_pour: "moins de huit photos ou vidéos, un message à lire en détail, quelqu'un qui parle face caméra, un geste qu'il faut voir bouger longtemps" },
   "en-boutique": { pour: "une création faite à deux devant la caméra (avec une cliente, un créateur, un commerçant voisin, quelqu'un de l'équipe) ou un défi relevé derrière le comptoir : un plat, une boisson, un bouquet, une coupe, une pièce, de l'idée à la dégustation ou à l'essai", pas_pour: "sans personne filmée face caméra derrière son comptoir ou à son poste, un lieu ou une ambiance sans personne, un produit seul, une offre à lire en détail, moins de quatre vidéos" },
 };
-
-/** The models for Edith: their key, name, what they do, what they want, and what only she can film for one. */
-export function houseModelsForEdith(): { key: string; nom: string; ce_que_ca_fait: string; il_faut: string; pour?: string; pas_pour?: string; a_lui_dire?: string }[] {
-  return HOUSE_MODELS.map((m) => {
-    const film = filmWords(m.look);
-    const when = HOUSE_WHEN[m.key];
-    return { key: m.key, nom: m.name, ce_que_ca_fait: m.pitch, il_faut: m.needs, ...(when ? { pour: when.pour, pas_pour: when.pas_pour } : {}), ...(film ? { a_lui_dire: film } : {}) };
-  });
-}

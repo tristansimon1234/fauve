@@ -24,8 +24,7 @@ import { useRouter } from "next/navigation";
 import { createContext, useContext, useEffect, useId, useRef, useState, useTransition, type ReactNode } from "react";
 import { creationProgress, launchCreation, type CreationProgress, type LaunchResult } from "@/app/(app)/create-actions";
 import { FileStrip, MAX_FILE_BYTES, MAX_FILES, useChatUploads, type DraftFile } from "@/app/(app)/fauve/chat-uploads";
-import { copyReel, copyState, newPostOptions, pickHouseModel, proposePlan, type CopyState, type NewPostOptions } from "@/app/(app)/new-post-actions";
-import type { HouseCard } from "@/lib/house-models";
+import { copyReel, copyState, newPostOptions, proposePlan, type CopyState, type NewPostOptions } from "@/app/(app)/new-post-actions";
 import { useFauveDrawer } from "./fauve-drawer";
 import { publicEnv } from "@/lib/public-env";
 import { supabaseBrowser } from "@/lib/supabase/client";
@@ -195,13 +194,7 @@ function Create({
   const [given, setGiven] = useState<string | null>(null);
   const [copyChoice, setCopyChoice] = useState<"mine" | "copy" | null>(null);
   const [copyRead, setCopyRead] = useState<CopyState | null>(null);
-  // One of Edith's models she picked here: its key and the studio's row it is kept on.
-  const [house, setHouse] = useState<{ key: string; id: string; needs: string } | null>(null);
-  const [houseBusy, setHouseBusy] = useState<string | null>(null);
-  const [sheet, setSheet] = useState<"format" | "date" | "voice" | "nothing" | "more" | null>(null);
-  // A model coded as a montage skill takes a few files at least: with fewer, she is asked first whether she has
-  // others (Tristan: « tu n'as que 3 plans, en as-tu d'autres pour moi ? »); « Fais avec ceux-là » is kept.
-  const [fewOk, setFewOk] = useState(false);
+  const [sheet, setSheet] = useState<"format" | "date" | "voice" | "nothing" | null>(null);
   const [all, setAll] = useState(false);
   const [dragging, setDragging] = useState(false);
   const [pending, start] = useTransition();
@@ -260,23 +253,6 @@ function Create({
     setCopyRead({ state: "read", name: m.name, lines: m.lines });
     setCopyChoice("copy");
   };
-  // One of Edith's models: kept on a row of hers at once (already read: the catalogue is its reading).
-  const pickHouse = (card: HouseCard) => {
-    if (houseBusy) return;
-    setHouseBusy(card.key);
-    pickHouseModel(card.key)
-      .then((r) => {
-        if (!r.ok) return setError(r.error);
-        setHouse({ key: card.key, id: r.id, needs: card.needs });
-        setFewOk(false);
-        setGiven(r.id);
-        setCopyRead({ state: "read", name: r.name, lines: r.lines });
-        setCopyChoice("copy");
-      })
-      .catch(() => setError("Je n’arrive pas à prendre ce modèle pour l’instant. Réessaie dans un instant."))
-      .finally(() => setHouseBusy(null));
-  };
-  const houseOn = house && copying === house.id ? house.key : null;
   // Its reading followed until it is done (about a minute): what her Reel takes from it, or why not.
   const waiting = model && reading?.state !== "read" && reading?.state !== "missed" ? model : null;
   useEffect(() => {
@@ -405,11 +381,6 @@ function Create({
   };
 
   const launch = () => {
-    const least = kind === "reel" && houseOn ? (options?.house?.find((c) => c.key === houseOn)?.least ?? 0) : 0;
-    if (least > picked.length && !fewOk) {
-      setSheet("more");
-      return;
-    }
     if (kind === "reel" && !voiceAsked) {
       setLaunchOnVoice(true);
       setSheet("voice");
@@ -771,7 +742,7 @@ function Create({
                     }}
                   />
                 )}
-                {usable && !models.some((m) => m.id === usable) && usable !== house?.id && (
+                {usable && !models.some((m) => m.id === usable) && (
                   <Choice
                     on={Boolean(copying)}
                     title={given ? "Comme le Reel que tu aimes" : "Comme le Reel que tu m’as envoyé"}
@@ -788,13 +759,6 @@ function Create({
                       <Choice key={m.id} on={copying === m.id} title={`Comme ton Reel « ${m.title} »`} hint={`Même rythme, mêmes textes : ${m.name}`} onClick={() => pickModel(m)} />
                     ))}
                   </div>
-                </div>
-              )}
-              {(options.house?.length ?? 0) > 0 && (
-                <div className="flex flex-col gap-2">
-                  <span className="text-[13px] font-bold">Ou un modèle d’Edith</span>
-                  <HouseGallery cards={options.house} chosen={houseOn} busy={houseBusy} onPick={pickHouse} />
-                  {houseOn && house && <p className="text-[13px] leading-snug text-muted">Il me faut : {house.needs}.</p>}
                 </div>
               )}
               {copying && reading?.state === "read" && reading.lines.length > 0 && (
@@ -1074,45 +1038,6 @@ function Create({
               }
             }}
           />
-        </Sheet>
-      )}
-
-      {sheet === "more" && (
-        <Sheet label="Plus de fichiers" onClose={() => setSheet(null)}>
-          <SheetHead
-            title="Tu en as d’autres ?"
-            hint={`Ce modèle prend au moins ${options?.house?.find((c) => c.key === houseOn)?.least ?? 0} photos ou vidéos, tu m’en as donné ${picked.length}. Sinon, je coupe plusieurs passages dans tes vidéos.`}
-            onClose={() => setSheet(null)}
-          />
-          <div className="flex flex-col gap-2">
-            <button
-              type="button"
-              onClick={() => {
-                setSheet(null);
-                setStepAt(Math.max(0, steps.indexOf("files")));
-              }}
-              className="btn btn-primary h-[52px] text-[16px] font-extrabold"
-            >
-              Ajouter des fichiers
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setFewOk(true);
-                setSheet(null);
-                // Her answer launches it, as « C’est parti » would have (the voice is asked next when it has to be).
-                if (kind === "reel" && !voiceAsked) {
-                  setLaunchOnVoice(true);
-                  setSheet("voice");
-                  return;
-                }
-                go(chosenVoice);
-              }}
-              className="btn btn-secondary h-[52px] text-[16px] font-extrabold"
-            >
-              Fais avec ceux-là
-            </button>
-          </div>
         </Sheet>
       )}
 
@@ -1526,57 +1451,6 @@ function SheetHead({ title, hint, onClose }: { title: string; hint: string; onCl
       <button type="button" onClick={onClose} aria-label="Fermer" className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[#F3F1F5] text-ink">
         <XIcon size={16} />
       </button>
-    </div>
-  );
-}
-
-/**
- * Edith's models as a strip of their previews (each a loop rendered from its reference composition), played only
- * while they are in view; a tap picks one.
- */
-function HouseGallery({ cards, chosen, busy, onPick }: { cards: HouseCard[]; chosen: string | null; busy: string | null; onPick: (card: HouseCard) => void }) {
-  const strip = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    const root = strip.current;
-    if (!root || typeof IntersectionObserver === "undefined") return;
-    const seen = new IntersectionObserver(
-      (entries) => {
-        for (const e of entries) {
-          const video = e.target as HTMLVideoElement;
-          if (e.isIntersecting) void video.play().catch(() => {});
-          else video.pause();
-        }
-      },
-      { root, threshold: 0.6 },
-    );
-    root.querySelectorAll("video").forEach((v) => seen.observe(v));
-    return () => seen.disconnect();
-  }, [cards]);
-  return (
-    <div ref={strip} role="radiogroup" aria-label="Un modèle d’Edith" className="-mx-1 flex snap-x gap-2.5 overflow-x-auto px-1 pb-1">
-      {cards.map((card) => {
-        const on = chosen === card.key;
-        return (
-          <button
-            key={card.key}
-            type="button"
-            role="radio"
-            aria-checked={on}
-            onClick={() => onPick(card)}
-            className={`fauve-press flex w-[118px] shrink-0 snap-start flex-col gap-1.5 p-1 text-left ${on ? "bg-violet-tint ring-2 ring-violet" : "hover:bg-soft"}`}
-          >
-            <span className="relative block aspect-[9/16] w-full overflow-hidden bg-ink">
-              <video src={card.video} poster={card.poster} muted loop playsInline preload="none" className="absolute inset-0 size-full object-cover" />
-              {busy === card.key && (
-                <span className="absolute inset-0 flex items-center justify-center bg-black/35 text-white">
-                  <Spinner />
-                </span>
-              )}
-            </span>
-            <span className="px-1 text-[12.5px] leading-tight font-bold">{card.name}</span>
-          </button>
-        );
-      })}
     </div>
   );
 }

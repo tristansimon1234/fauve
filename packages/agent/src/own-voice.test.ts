@@ -312,7 +312,7 @@ test("her own voice in what Edith knows: her tool takes a video's voice only whe
   const field = toolSpecs.update_post.input.shape.voice_media_id;
   assert.match(field.description ?? "", /prends ma voix de la vidéo/);
   assert.match(field.description ?? "", /Jamais la voix de quelqu'un d'autre/);
-  assert.match(APP_GUIDES.voix, /sa voix qui mène le modèle/);
+  assert.match(APP_GUIDES.voix, /sa voix qui mène ce Reel/);
   assert.match(APP_GUIDES.voix, /la voix d'une de ses vidéos où elle parle/);
   // Her own voice's words on her talk's clock: as she says them, the same model of her voice note.
   const kept: SkillHeard = readHeard(celui, ownTalk("note", NOTE)!, FOUND)!;

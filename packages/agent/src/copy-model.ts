@@ -86,5 +86,8 @@ export function keptSoundTempo(music: { mode?: string; sound?: unknown }, bpm: n
   return music.mode === "model" && !music.sound && bpm ? { bpm, offset: 0 } : undefined;
 }
 
-/** What Edith says of it, in the note she writes on the post: one sentence, nothing more (the delivery says none of it). */
-export const copyByModelWords = (name: string): string => `Je l'ai refait avec mon modèle « ${name} », qui fait la même chose.`;
+/**
+ * What Edith says of it, in the note she writes on the post: one sentence, nothing more (the delivery says none of it),
+ * and never the model that played it (Tristan, 6 November: « je préfère ne pas divulguer nos modèles »).
+ */
+export const COPY_BY_MODEL_WORDS = "J'ai repris sa forme et son rythme, avec tes images et tes mots.";

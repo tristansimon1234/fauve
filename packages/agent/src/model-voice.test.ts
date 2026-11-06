@@ -170,8 +170,10 @@ test("a model's said words: the voice chosen, Edith's default for her or hers, a
   // A model that would not say them by default: only when she asks.
   assert.equal(modelVoiceChoice({ says: { ...says!, default: false }, post: null, studio: auto, own: null }), null);
   assert.equal(modelVoiceChoice({ says: { ...says!, default: false }, post: { mode: "on" }, studio: auto, own: null }), DEFAULT_VOICE_ID);
-  // Edith knows it, in her mode d'emploi.
-  assert.match(APP_GUIDES.voix, /Celui-là, celui-là/);
+  // Edith knows it, in her mode d'emploi, by what it does: never by the model's name (Tristan, 6 November: « je préfère
+  // ne pas divulguer nos modèles »).
+  assert.match(APP_GUIDES.voix, /le même petit mot tombe sur chacun de ses produits \(« Celui-là »\), la voix dit les mots écrits à l'écran/);
+  assert.doesNotMatch(APP_GUIDES.voix, /Celui-là, celui-là/);
 });
 
 test("a model's said words: a correction keeps the voice and its words but what her request changes; « Sans voix » takes it away", () => {
