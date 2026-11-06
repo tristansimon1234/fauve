@@ -6278,7 +6278,7 @@ const travailMarks = (line: { marks: Record<string, number> }) => Object.fromEnt
 
 test("« Voici mon travail » (v1) lays her works where and when its original does, within two images, her shot under them all along", async () => {
   const { monTravail, workLandings, frontFrom } = await import("./skills/mon-travail.ts");
-  assert.equal(monTravail.version, 1);
+  assert.equal(monTravail.version, 2);
   assert.equal(monTravail.bpm, 120);
   const line = monTravail.timeline(38, { end: false });
   // Her shot and the original's 37 works; 9,17 s (275 images), as the original.
@@ -6387,7 +6387,7 @@ test("« Voici mon travail » (v1): the original's boxes, square but one, behind
   assert.deepEqual([monTravail.files, monTravail.shots], [[16, 41], [9, 41]]);
 });
 
-test("« Voici mon travail » (v1): her words in front, at the original's size, one a line, in her colour, off her face", async () => {
+test("« Voici mon travail » (v2): her words behind her, at the original's size, one a line, in her colour, off her face", async () => {
   const { monTravail } = await import("./skills/mon-travail.ts");
   const line = monTravail.timeline(38, { end: false });
   const texts = travailMarks(line);
@@ -6396,19 +6396,26 @@ test("« Voici mon travail » (v1): her words in front, at the original's size, 
     travailDrawn(monTravail.code, f, { durationInFrames: 275, shots: pileShots(line, 1, "photo"), texts, reelTexts, ...extra }, read);
   const words = (d: { nodes: Drawn[] }) => d.nodes.filter((n) => n.type === "div" && styleOf(n).height === 257);
   const block = (d: { nodes: Drawn[] }) => d.nodes.find((n) => n.type === "FitText" && heldText(n).includes("TRAVAIL"))!;
-  // One word a line, from the first image to the last, drawn after her works and her cut-out (in front of everything).
+  // One word a line, from the first image to the last, behind her (v2; Tristan on v1: « la police passe pas derrière la
+  // dame »): drawn after the works behind her, before her cut-out and the works over her legs.
   for (const f of [0, 130, 274]) assert.deepEqual(words(draw(f)).map(drawnText), ["VOICI", "MON", "TRAVAIL"]);
   const flat = draw(130).nodes;
-  assert.ok(flat.findIndex((n) => n.type === "FitText") > flat.findIndex((n) => n.type === "Subject"));
-  assert.ok(flat.findIndex((n) => n.type === "FitText") > flat.map((n) => n.type === "Footage" && Number(n.props.shot) > 31).lastIndexOf(true));
+  const wordsAt = flat.findIndex((n) => n.type === "FitText");
+  assert.ok(wordsAt < flat.findIndex((n) => n.type === "Subject"));
+  assert.ok(wordsAt > flat.map((n) => n.type === "Footage" && Number(n.props.shot) >= 1 && Number(n.props.shot) <= 31).lastIndexOf(true));
+  assert.ok(wordsAt < flat.findIndex((n) => n.type === "Footage" && Number(n.props.shot) > 31));
+  assert.deepEqual(monTravail.timeline(38, { end: false }).cutouts, [0]);
   // Bold capitals as tall as the original's (7,3 % of the frame: a size of a tenth of it), a line every 13,4 %, centred in
-  // its box, kept clear of the apps' caption and their buttons.
+  // its box, kept clear of the apps' caption and their buttons, and above the works over her legs (their top 1223 px
+  // here: drawn over her, they would hide its last line), down to four fifths of its height.
   const style = styleOf(words(draw(0))[0]!);
   assert.equal(style.fontSize, 192);
   assert.equal(style.fontWeight, 700);
   assert.equal(style.lineHeight, "257px");
   const b = styleOf(block(draw(0)));
-  assert.deepEqual([b.left, b.width, b.top, Number(b.top) + Number(b.height)], [140, 800, 394, 1430]);
+  assert.deepEqual([b.left, b.width, b.top, Number(b.top) + Number(b.height)], [140, 800, 394, 1223]);
+  const lowWorks = draw(130).works.filter((w) => w.shot > 31);
+  assert.ok(lowWorks.length > 0 && lowWorks.every((w) => w.box.top >= 1223), JSON.stringify(lowWorks.map((w) => w.box.top)));
   // In her colour as it is (a soft light halo keeping it on a darker picture), a pale one deepened (its hue kept): on
   // the white walls of a workshop, a pale tint did not read. On her word a pale tint of hers, vivid, with a thin dark
   // edge, as the original's lime, or that lime itself; never its words.
@@ -6432,7 +6439,7 @@ test("« Voici mon travail » (v1): her words in front, at the original's size, 
   assert.equal(styleOf(block(draw(0, beside))).top, 394);
   const under = { track: () => ({ hands: [], faces: [{ id: 0, x: 470, y: 420, width: 150, height: 190, points: {} }], bodies: [] }) };
   const moved = styleOf(block(draw(0, under)));
-  assert.ok(Number(moved.top) >= 610 && Number(moved.top) + Number(moved.height) === 1430, JSON.stringify(moved));
+  assert.ok(Number(moved.top) >= 610 && Number(moved.top) + Number(moved.height) === 1223, JSON.stringify(moved));
   // From her cut-out when she is not tracked: her head at the top of its outline (the ceramicist of its bench, arms out
   // holding her apron's straps: her box as wide as the frame), else the top of its box.
   const head = "M 610 397 L 687 403 L 733 459 L 742 536 L 714 605 L 1075 879 L 878 1918 L 336 1411 L 127 883 L 526 511 L 548 440 Z";
@@ -6440,6 +6447,21 @@ test("« Voici mon travail » (v1): her words in front, at the original's size, 
   assert.equal(outlined.top, 397 + Math.round(207 * 1.3) + 38);
   const cut = styleOf(block(draw(0, {}, { boxes: { "0": { x: 330, y: 450, w: 420, h: 1400 } } })));
   assert.ok(Number(cut.top) > 394 + 100, JSON.stringify(cut));
+  // Behind her, each line only where it still reads (a third of it hidden at most, measured on her outline): a woman in
+  // the middle, her arms out, swallows a short word across her chest; its block slides up the frame to where the most
+  // of its lines pass behind her head, the others laid in front of her, never on her face.
+  const wide = "M 500 400 L 580 400 L 600 520 L 900 700 L 900 1500 L 700 1900 L 380 1900 L 180 1500 L 180 700 L 480 520 Z";
+  const split = draw(0, {}, { boxes: { "0": { x: 180, y: 400, w: 720, h: 1500 } }, outlines: { "0": wide } });
+  const copies = split.nodes.filter((n) => n.type === "FitText" && heldText(n).includes("TRAVAIL"));
+  const seenIn = (n: Drawn) => drawnNodes(n).filter((c) => c.type === "div" && styleOf(c).height === 257 && styleOf(c).visibility !== "hidden").map(drawnText);
+  const backLines = copies.filter((c) => c.props.key === "words").flatMap(seenIn);
+  const frontLines = copies.filter((c) => c.props.key === "words-front").flatMap(seenIn);
+  assert.deepEqual([...backLines, ...frontLines].sort(), ["MON", "TRAVAIL", "VOICI"]);
+  assert.ok(backLines.length >= 2, JSON.stringify({ backLines, frontLines }));
+  const cutAt = split.nodes.findIndex((n) => n.type === "Subject");
+  assert.ok(split.nodes.findIndex((n) => n.props.key === "words") < cutAt);
+  if (frontLines.length) assert.ok(split.nodes.findIndex((n) => n.props.key === "words-front") > cutAt);
+  assert.ok(Number(styleOf(copies[0]!).top) < 394, "slid up toward her head");
   // More than four words: four lines at most, none ending on a word that belongs to the next.
   const long = draw(0, { reelTexts: [{ text: "mes bouquets faits main à Lyon depuis dix ans", role: "hook", from: 0, to: 275, emphasis: [] }] });
   const set = words(long).map(drawnText);
@@ -6478,8 +6500,10 @@ test("« Voici mon travail » (v1): its clicks slowing down on their measured mo
   assert.deepEqual([last.clip_id, last.in, last.speed], ["v", 2, undefined]);
   assert.equal(plan.sounds?.length, 31);
   assert.deepEqual(plan.music_shape, { filters: [{ kind: "thin", from: 8, to: plan.duration, open: 0.02 }], end: { at: plan.duration, fade: 0.02 } });
-  assert.deepEqual(plan.skill, { key: "mon-travail", version: 1 });
+  assert.deepEqual(plan.skill, { key: "mon-travail", version: 2 });
   assert.equal(plan.layers![0]!.motion.texts!.front, "31");
+  // Her shot alone cut out (v2: declared), her works never.
+  assert.deepEqual(plan.layers![0]!.motion.drawn?.subjects, [0]);
   // The filler sees her shot first, then her works, and her words' slot.
   const input = skillFillInput({ skill: monTravail, name: "Voici mon travail", n: 38, files, business: {}, request: "voici mon travail" });
   assert.match(input.cases[0]!.veut, /debout dans son lieu/);
@@ -7628,7 +7652,7 @@ test("« Mots mêlés » (v2): its picture darkened to its own light, as filmed,
 test("« Interrupteur » (v2): one shot of 9,1 s on its original's grid (143,7 BPM, one beat in two), its music stopped dead and back as she lands, its beep", async () => {
   const { interrupteur } = await import("./skills/interrupteur.ts");
   const { skillPlan } = await import("./skills.ts");
-  assert.equal(interrupteur.version, 9);
+  assert.equal(interrupteur.version, 10);
   assert.equal(interrupteur.bpm, 71.85);
   const line = interrupteur.timeline(1, { end: false });
   // One fixed shot, no cut (the original has none): its 275 images less its last two, a rest of its edit.
@@ -9296,7 +9320,7 @@ test("« Photos posées sur la table » (v2): horizontal 4:3 on black when her t
 
 test("« Interrupteur » (v4): once she has left, her wall held on that image to the end, nothing of hers coming back; never frozen when nothing says she was there", async () => {
   const { interrupteur } = await import("./skills/interrupteur.ts");
-  assert.equal(interrupteur.version, 9);
+  assert.equal(interrupteur.version, 10);
   const line = interrupteur.timeline(1, { end: false });
   const marks = Object.fromEntries(Object.entries(line.marks).map(([k, v]) => [k, String(v)]));
   const brand = { name: "Atelier Rose", displayFont: "Inter Tight", bodyFont: "Inter Tight", accent: "#7a2e3b", palette: { secondary: "#2c4a3e", light: "#f4efe9", dark: "#1d1d1b" } };
@@ -10462,6 +10486,41 @@ test("« Interrupteur » (v9): its switch as near the middle as her fingertip st
   assert.ok(Math.abs((await centre(900)) - (900 - SW * 0.42)) <= 1);
   // Near the middle: in the middle.
   assert.ok(Math.abs((await centre(600)) - Math.round(1080 * 0.499)) <= 1);
+});
+
+test("« Interrupteur » (v10): her cut-out only over the switch from just before the flip and over her poster once lit, never over the rest of her shot", async () => {
+  // Tristan on v9: « bizarre il passe en découpé en dessous ».
+  const { interrupteur } = await import("./skills/interrupteur.ts");
+  assert.equal(interrupteur.version, 10);
+  const line = interrupteur.timeline(1, { end: false });
+  const marks = Object.fromEntries(Object.entries(line.marks).map(([k, v]) => [k, String(v)]));
+  const brand = { name: "Atelier Rose", displayFont: "Inter Tight", bodyFont: "Inter Tight", accent: "#7a2e3b", palette: { secondary: "#2c4a3e", light: "#f4efe9", dark: "#1d1d1b" } };
+  const props = { width: 1080, height: 1920, durationInFrames: 273, brand, shots: rallumeShots(line, 9 / 16), reelTexts: [{ text: "Atelier Rose", role: "hook", from: 123, to: 273, emphasis: [] }], end: null, texts: marks };
+  const { draw } = await kitScene(interrupteur.code, {});
+  const clipOf = (f: number) => {
+    const nodes = drawnNodes(draw(f, props));
+    const wrap = nodes.find((n) => n.props.key === "her");
+    return { nodes, wrap, rects: wrap ? [...String(styleOf(wrap).clipPath).matchAll(/M (\d+) (\d+) H (\d+) V (\d+)/g)].map((m) => m.slice(1).map(Number)) : [] };
+  };
+  const inside = (r: number[], b: { left: number; top: number; width: number; height: number }) => r[0]! <= b.left && r[1]! <= b.top && r[2]! >= b.left + b.width && r[3]! >= b.top + b.height;
+  // Before: nothing of her cut out (the switch out of her reach).
+  assert.equal(clipOf(80).wrap, undefined);
+  // Just before the flip: her cut-out over the switch only, a little room around it, nowhere else.
+  const before = clipOf(110);
+  const sw = styleOf(before.nodes.find((n) => n.props.key === "switch")!) as unknown as { left: number; top: number; width: number; height: number };
+  assert.equal(before.rects.length, 1);
+  assert.ok(inside(before.rects[0]!, sw), JSON.stringify(before.rects));
+  const area = (r: number[]) => (r[2]! - r[0]!) * (r[3]! - r[1]!);
+  assert.ok(area(before.rects[0]!) < 0.05 * 1080 * 1920, "a small box, not her whole shot");
+  assert.ok(before.wrap!.children.some((c) => c && typeof c === "object" && (c as Drawn).type === "Subject"));
+  // Lit: over the switch and her poster, the two boxes; drawn after both.
+  const after = clipOf(140);
+  assert.equal(after.rects.length, 2);
+  assert.ok(area(after.rects[0]!) + area(after.rects[1]!) < 0.55 * 1080 * 1920, JSON.stringify(after.rects));
+  const order = after.nodes.map((n) => n.props.key);
+  assert.ok(order.indexOf("her") > order.indexOf("switch") && order.indexOf("her") > order.indexOf("poster"));
+  // Her one shot is still the only one cut out.
+  assert.deepEqual(line.cutouts, [0]);
 });
 
 test("the model picker reads her taste: her moodboard, her art direction, the Reels she sent and kept, the models she published", async () => {

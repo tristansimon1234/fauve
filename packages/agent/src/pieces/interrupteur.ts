@@ -222,7 +222,17 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   }, [track, k0, ON, D]);
   const held = k0 >= 0 && GONE !== null && frame >= GONE ? { at: frame - (GONE - list[k0].from) } : {};
   const wall = k0 >= 0 ? h(Footage, { key: "wall", shot: k0, style: BOX, ...held }) : null;
-  const her = k0 >= 0 && frame >= ON - 20 ? h(Subject, { key: "her", shot: k0, style: BOX, ...held }) : null;
+  // Her cut-out only over what is drawn on her wall (v2, as its skill's v10; Tristan: « bizarre il passe en découpé en
+  // dessous »): over the switch from just before the flip, over her poster once lit; elsewhere her shot alone.
+  const zone = (x, y, w, hh, m) => {
+    const x0 = Math.round(Math.max(0, x - m));
+    const y0 = Math.round(Math.max(0, y - m));
+    const x1 = Math.round(Math.min(W, x + w + m));
+    const y1 = Math.round(Math.min(H, y + hh + m));
+    return "M " + x0 + " " + y0 + " H " + x1 + " V " + y1 + " H " + x0 + " Z";
+  };
+  const zones = [frame >= ON - 20 ? zone(sx - SW / 2, sy - SH / 2, SW, SH, SH * 0.35) : "", lit ? zone(PX, PY, PW, PH, H * 0.02) : ""].filter(Boolean).join(" ");
+  const her = k0 >= 0 && zones ? h("div", { key: "her", style: { position: "absolute", left: 0, top: 0, width: W, height: H, clipPath: "path('" + zones + "')" } }, h(Subject, { shot: k0, style: BOX, ...held })) : null;
   return h(AbsoluteFill, null, wall, toggle, poster, her);
 }`;
 
@@ -234,7 +244,8 @@ export function interrupteurFlip(frames: number, bpm: number): number {
 
 export const interrupteur: EffectPiece = {
   key: "interrupteur",
-  version: 1,
+  // 2: her cut-out only over the switch and her poster (its skill's v10).
+  version: 2,
   name: "Interrupteur",
   how: "un grand interrupteur de téléphone dessiné à plat sur son mur, éteint, là où sa main montera le plus haut ; quand elle saute ou tend le bras et le touche, il bascule d'un coup sur sa couleur avec un clic, et son affiche est là d'un coup sur le mur dessous (son logo, sinon son nom ou ce qu'elle lance en grand, sa ligne en capitales entre deux traits, un petit détail), elle passant devant ; une fois qu'elle est sortie du cadre, le mur reste avec l'affiche jusqu'à la fin ; puis le montage reprend.",
   needs: "une vidéo fixe, téléphone posé, de quelqu'un qui saute ou tend le bras vers un point haut d'un mur clair et uni, puis sort du cadre (le mur vide à la fin).",

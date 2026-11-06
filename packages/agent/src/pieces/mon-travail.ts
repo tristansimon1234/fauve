@@ -2,7 +2,8 @@ import type { EffectPiece, PieceTimeline } from "../pieces.ts";
 
 // « Voici mon travail », the effect (its whole Reel is skills/mon-travail.ts, written on docs/fiches/mon-travail.md,
 // effects 1 to 5; Tristan's idea): over a run of her shots, the first one is her, standing in her place, full frame and
-// still, her words in very big capitals in front of her; the others are photos of her work, laid at once behind her in a
+// still, her words in very big capitals behind her (v3: her cut-out over their letters; Tristan on its skill's v1: « la
+// police passe pas derrière la dame »); the others are photos of her work, laid at once behind her in a
 // burst down the frame in a zigzag (the original's boxes, square, no border, no shadow, never moving), slower and slower
 // for the last ones, the very last ones in front of her legs; she stays cut out in front of them. They leave at once, one
 // by one from the top in the order they came, from about halfway to the hit (the original's top leaves while its last
@@ -241,7 +242,8 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const before = [];
   for (let k = 0; k < m; k++) (inFront(k) ? before : behind).push(work(k));
 
-  // 5. Her words, in front of everything from its first image to its last: one a line, all at one size (one box shrinks
+  // 5. Her words, behind her from its first image to its last (her cut-out over their letters, the works behind her under
+  // them; without her cut-out, in front of her), kept above the works over her legs: one a line, all at one size (one box shrinks
   // them together for a long word), wide bold capitals as tall as the original's (a line every 13,4 % of the frame),
   // centred. More than four words: four lines at most, the longest as short as can be, never a line ending on a word
   // that belongs to the next.
@@ -301,7 +303,11 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
     return null;
   };
   const TOP = Math.round(height * 0.205);
-  const BOTTOM = Math.round(height * 0.745);
+  // Its bottom above the works in front of her legs (drawn over her, so over her words), down to four fifths of its height.
+  const lowest = Math.round(height * 0.745);
+  const fronts = Array.from({ length: m }, (_, k) => k).filter(inFront);
+  const frontTop = fronts.length ? Math.min.apply(null, fronts.map((k) => boxOf(k).y)) - Math.round(height * 0.01) : lowest;
+  const BOTTOM = Math.max(Math.round(TOP + 0.8 * (lowest - TOP)), Math.min(lowest, frontTop));
   const light = LightUnder(herInfo, still, laid, { x: 140, y: TOP, w: width - 280, h: BOTTOM - TOP });
   const asked = setting("couleur", "auto");
   const pale = asked === "pale" || (asked === "auto" && light && Number(light.mean) < 0.42);
@@ -336,20 +342,69 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
     if (above - roof >= 0.4 * (BOTTOM - TOP)) return { top: roof, bottom: above };
     return { top: TOP, bottom: BOTTOM };
   };
-  const at = placeFor(said);
-  const shownWords = said.length
-    ? h(FitText, { key: "words", style: { position: "absolute", left: 140, top: at.top, width: BOX_W, height: at.bottom - at.top } },
-        h("div", { style: { display: "flex", flexDirection: "column", alignItems: "center" } }, said.map((w, i) => h("div", { key: i, style: wordStyle }, w))))
-    : null;
+  // Behind her, each line only where it still reads (a third of it hidden at most, measured on her outline at three
+  // heights of its capitals, else on her cut-out's box), else in front of her (a short word across her body would be
+  // swallowed whole); its block slid up or down the frame to where the most of its lines read behind her (a fiftieth of
+  // it a step, each step weighing a twentieth of a line), a line in front never on her face.
+  const across = (y, x0, x1) => {
+    if (pts.length >= 6) {
+      const xs = [];
+      for (let i = 0; i < pts.length; i++) {
+        const p = pts[i];
+        const q = pts[(i + 1) % pts.length];
+        if ((p[1] <= y) !== (q[1] <= y)) xs.push(p[0] + ((y - p[1]) * (q[0] - p[0])) / (q[1] - p[1]));
+      }
+      xs.sort((u, v) => u - v);
+      let c = 0;
+      for (let i = 0; i + 1 < xs.length; i += 2) c += Math.max(0, Math.min(x1, xs[i + 1]) - Math.max(x0, xs[i]));
+      return c;
+    }
+    if (cutBox && y >= cutBox.y && y <= cutBox.y + cutBox.h) return Math.max(0, Math.min(x1, cutBox.x + cutBox.w) - Math.max(x0, cutBox.x));
+    return 0;
+  };
+  const laidLines = (list, top, bottom) => {
+    const widths = list.map((l) => Array.from(l).reduce((a, ch) => a + glyph(ch), 0) * SIZE * 0.99);
+    const s = Math.min(1, BOX_W / Math.max(1, Math.max.apply(null, widths)), (bottom - top) / (list.length * LINE));
+    const mid = (top + bottom) / 2;
+    return list.map((l, i) => {
+      const w = Math.max(1, widths[i] * s);
+      return { x: width / 2 - w / 2, y: mid + (i - (list.length - 1) / 2) * LINE * s - 0.38 * SIZE * s, w, h: 0.76 * SIZE * s };
+    });
+  };
+  const behindHer = (list, top, bottom) => (!cutBox ? list.map(() => true) : laidLines(list, top, bottom).map((b) => [0.1, 0.5, 0.9].reduce((a, k) => a + across(b.y + k * b.h, b.x, b.x + b.w) / b.w, 0) / 3 <= 0.38));
+  const settle = (list, place) => {
+    if (!cutBox || !list.length) return { ...place, back: behindHer(list, place.top, place.bottom) };
+    const tall = place.bottom - place.top;
+    const step = Math.round(height * 0.02);
+    const near = face ? { x: face.x - height * 0.01, y: face.y - height * 0.01, w: face.w + height * 0.02, h: face.h + height * 0.02 } : null;
+    const tries = [place.top];
+    for (let t = Math.round(height * 0.07); t + tall <= BOTTOM; t += step) tries.push(t);
+    let best = null;
+    for (const t of tries) {
+      const back = behindHer(list, t, t + tall);
+      if (near && laidLines(list, t, t + tall).some((b, i) => !back[i] && overlap(b, near) > 0)) continue;
+      const score = back.filter(Boolean).length - (0.05 * Math.abs(t - place.top)) / step;
+      if (!best || score > best.score + 1e-9) best = { score, top: t, bottom: t + tall, back };
+    }
+    return best || { ...place, back: behindHer(list, place.top, place.bottom) };
+  };
+  const at = settle(said, placeFor(said));
+  const copy = (key, shown) => h(FitText, { key, style: { position: "absolute", left: 140, top: at.top, width: BOX_W, height: at.bottom - at.top } },
+    h("div", { style: { display: "flex", flexDirection: "column", alignItems: "center" } }, said.map((w, i) => h("div", { key: i, style: shown(i) ? wordStyle : { ...wordStyle, visibility: "hidden" } }, w))));
+  const shownWords = said.length && at.back.some(Boolean) ? copy("words", (i) => at.back[i]) : null;
+  const frontWords = said.length && at.back.some((b) => !b) ? copy("words-front", (i) => !at.back[i]) : null;
 
-  return h(AbsoluteFill, { style: { backgroundColor: "#000000" } }, herShot, behind, cutOut, before, shownWords);
+  // Drawn from the back: her place, the works behind her, her words, her cut-out, the works over her legs, the lines that
+  // would not read behind her.
+  return h(AbsoluteFill, { style: { backgroundColor: "#000000" } }, herShot, behind, shownWords, cutOut, before, frontWords);
 }`;
 
 export const monTravail: EffectPiece = {
   key: "mon-travail",
-  version: 2,
+  // 3: her words behind her, her cut-out over their letters (Tristan on its skill's v1: « la police passe pas derrière la dame »).
+  version: 3,
   name: "Voici mon travail",
-  how: "elle debout dans son lieu, plein écran et immobile, ses mots en très grandes capitales devant elle ; les photos de son travail se posent d'un coup derrière elle en rafale, en zigzag du haut vers le bas, de plus en plus lentement, les dernières devant ses jambes, elle détourée devant ; puis elles repartent une à une, l'avant-dernière sur un temps, et elle finit seule avec ses mots.",
+  how: "elle debout dans son lieu, plein écran et immobile, ses mots en très grandes capitales derrière elle (elle détourée passe devant leurs lettres) ; les photos de son travail se posent d'un coup derrière elle en rafale, en zigzag du haut vers le bas, de plus en plus lentement, les dernières devant ses jambes, elle détourée devant ; puis elles repartent une à une, l'avant-dernière sur un temps, et elle finit seule avec ses mots.",
   needs: "une photo ou une vidéo d'elle (ou de quelqu'un de l'équipe) debout face à l'objectif, téléphone posé, en entier ou jusqu'aux genoux, avec de la place au-dessus et autour d'elle, puis 5 à 15 photos de son travail (gros plans de ses pièces, de ses bouquets, de ses plats), qui changent de couleur et de cadrage.",
   lays: "sur son plan à elle debout (le premier sous lui, il reste figé derrière ses mots), suivi de 5 à 15 photos de son travail coupées d'un temps chacune, sa plus belle en dernier",
   shots: [6, 16],

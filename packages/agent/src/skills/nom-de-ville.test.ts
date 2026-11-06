@@ -74,8 +74,8 @@ function faces(tree: Drawn) {
 }
 const shownFace = (tree: Drawn) => faces(tree).find((f) => f.shown)!.family;
 
-test("« Nom aux cinq polices » (v1): 15 shots on its original's first grid (142,4 BPM, one beat in two), its faces on beats 1 to 4, its music dropped and back", () => {
-  assert.equal(nomDeVille.version, 1);
+test("« Nom aux cinq polices » (v2): 15 shots on its original's first grid (142,4 BPM, one beat in two), its faces on beats 1 to 4, its music dropped and back", () => {
+  assert.equal(nomDeVille.version, 2);
   assert.equal(nomDeVille.bpm, 71.2);
   const line = nomDeVille.timeline(15, { end: false });
   assert.equal(line.shots.length, 15);
@@ -144,7 +144,7 @@ test("« Nom aux cinq polices »: 8 to 15 shots from her files, up to 30 for a l
   assert.deepEqual(plan.music_shape?.pauses?.map((p) => p.tail), [2.4]);
   assert.deepEqual(plan.layers![0]!.motion.fonts, ["Lilita One", "Bungee", "League Gothic"]);
   assert.equal(plan.layers![0]!.motion.drawn, undefined);
-  assert.deepEqual(plan.skill, { key: "nom-de-ville", version: 1 });
+  assert.deepEqual(plan.skill, { key: "nom-de-ville", version: 2 });
   assert.deepEqual(nomDeVille.settings?.map((s) => [s.name, s.choices.map((c) => c.value)]), [["format", ["auto", "horizontal", "vertical"]]]);
 });
 
@@ -268,10 +268,10 @@ test("« Nom aux cinq polices »: it rises from under its place and lands on bea
   };
   // 0,4 of its capitals (0,288 of its size) under its place at first, 70 % of the way in its first 0,6 s, landed on beat 4.
   assert.ok(Math.abs(rise(0) - 0.288) < 0.001);
-  // The same behind a flat roofline (a fifth of its letters hidden once landed, 60 % at first, as the original's) ;
-  // behind mountains that bite 45 % of a letter, it rises from closer, never more than 65 % of a letter hidden at first.
+  // The same behind a flat roofline (a fifth of its letters hidden once landed, 60 % at first, as the original's), and
+  // behind mountains that bite 45 % of a letter (v2: v1 rose by half as much there, and the name hardly came out).
   assert.ok(Math.abs(rise(0, { skyline: () => 300 }) - 0.288) < 0.001);
-  assert.ok(Math.abs(rise(0, { skyline: (_f, span) => (span.from < 300 ? 200 : 300) }) - 0.2 * 0.72) < 0.005);
+  assert.ok(Math.abs(rise(0, { skyline: (_f, span) => (span.from < 300 ? 200 : 300) }) - 0.288) < 0.001);
   assert.ok(rise(18) < 0.288 * 0.35 && rise(18) > 0);
   assert.equal(rise(56), 0);
   assert.equal(rise(67), 0);
@@ -279,6 +279,35 @@ test("« Nom aux cinq polices »: it rises from under its place and lands on bea
   // Its small words up, its signature down, a quarter of their size over the shot.
   const kick = (f: number) => Number(/translateY\(([-\d.]+)em\)/.exec(String(styleOf(flatten(title(drawAt(f, {}))!).find((n) => textOf(n) === "les rues de" && "data-fauve-accent" in n.props)!).transform))![1]);
   assert.ok(kick(0) === 0 && kick(60) < 0 && kick(60) >= -0.25);
+});
+
+test("« Nom aux cinq polices » (v2): it comes out from behind a line at every image, its roofline or the foot of its place, whether her ground was made or not", () => {
+  // Tristan on v1: « l'aspect du texte qui apparaît derrière n'est pas là ». Its letters under the line are cut away
+  // (a clip over its frame's box, its small words above the line untouched).
+  const line = (tree: Drawn) => {
+    const wrap = flatten(tree).find((n) => n.props.key === "name-line");
+    const m = wrap ? /^inset\(0 0 (\d+)px 0\)$/.exec(String(styleOf(wrap).clipPath)) : null;
+    return m ? 608 - Number(m[1]) : null;
+  };
+  const caps = Math.round(0.72 * 210 * Math.min(1, 800 / (0.775 * 210 * 10)));
+  // Behind a flat roofline at 300 px: the line on her roofs, its foot a fifth of its capitals under it.
+  assert.equal(line(drawAt(30, { reads: { skyline: () => 300 } })), 300);
+  // A tower biting 45 % of a letter lifts its foot above her median roofline: the line is its foot.
+  const tower = line(drawAt(30, { reads: { skyline: (_f, span) => (span.from > 300 && span.from < 400 ? 220 : 300) } }))!;
+  assert.ok(Math.abs(tower - (220 + 0.45 * caps)) <= 1, `${tower}`);
+  // In front (no sky read; a calm area; a scenery too high): the foot of its place, so it still rises out of a line.
+  assert.equal(line(drawAt(30, {})), Math.round(608 * 0.475));
+  assert.equal(line(drawAt(30, { reads: { clear: { x: 100, y: 40, w: 800, h: 200 } } })), 240);
+  assert.ok(line(drawAt(30, { reads: { skyline: (_f, span) => (span.from < 600 ? 120 : 300) } })) !== null);
+  // The whole of its letters under it at its first image but 40 %, out but a fifth behind a roofline once landed: its
+  // box's bottom (its foot and a little) under the line by its rise at first.
+  const box = (tree: Drawn) => styleOf(flatten(tree).find((n) => String(n.props.key).startsWith("title-"))!) as unknown as Box;
+  const landed = box(drawAt(60, { reads: { skyline: () => 300 } }));
+  assert.ok(Math.abs(landed.top + landed.height - 0.07 * caps - (300 + 0.2 * caps)) <= 2, JSON.stringify(landed));
+  // Its small words above the line, in the same clip but over it.
+  const kickTree = drawAt(30, { reads: { skyline: () => 300 } });
+  const kickBox = box(kickTree);
+  assert.ok(kickBox.top + kickBox.height - 1.05 * 210 * Math.min(1, 800 / (0.775 * 210 * 10)) < 300);
 });
 
 test("« Nom aux cinq polices »: its ending card, its last shot darkened, its words through three faces then hers", () => {

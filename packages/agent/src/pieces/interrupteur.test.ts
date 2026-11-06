@@ -20,7 +20,7 @@ test("« Interrupteur » (effect v1): its layer over her one shot, her cut out t
   const layer = plan.layers![0]!;
   assert.deepEqual(layerShots(plan, layer), [1]);
   const motion = layer.motion;
-  assert.deepEqual(motion.piece, { key: "interrupteur", version: 1 });
+  assert.deepEqual(motion.piece, { key: "interrupteur", version: 2 });
   // Its fallback moment on the beat nearest to the original's (45 % of it), and the window where her hand is looked for.
   assert.equal(interrupteurFlip(180, 100), 90);
   assert.deepEqual(motion.texts, { beat: "18", flip: "90", look_from: "12", look_to: "150", mine: "1", nom: "Soirée vinyles" });
@@ -225,7 +225,10 @@ test("« Interrupteur »: once she has left, her wall is held on that image to t
   // The image of her shot on screen at 120 (it started 15 frames before the effect): held there.
   assert.equal(140 - at(140), 135);
   assert.equal(179 - at(179), 135);
-  assert.equal(keyed(drawAt(150, { track, subject: leaving }), "her")!.props.at, at(150));
+  // Her cut-out held on the same image, inside the clip of what is drawn on her wall (v2).
+  const cut = flatten(keyed(drawAt(150, { track, subject: leaving }), "her")!).find((n) => n.type === "Subject")!;
+  assert.equal(cut.props.at, at(150));
+  assert.match(String(styleOf(keyed(drawAt(150, { track, subject: leaving }), "her")!).clipPath), /^path\(.M \d+ \d+ H \d+ V \d+ H \d+ Z M /);
   // Her hands still at the picture's edge (a hundredth of her): she has not left, her shot plays on.
   const edge = (f: number): Box => (f < 120 ? her : { x: 1040, y: 900, w: 40, h: 140 });
   assert.equal(keyed(drawAt(170, { track, subject: edge }), "wall")!.props.at, undefined);
