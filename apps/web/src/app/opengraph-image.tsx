@@ -25,7 +25,7 @@ const [semi, medium, serif, logo, ...reels] = await Promise.all([
   asset("intertight-500.ttf"),
   asset("instrument-italic.ttf"),
   readFile(join(process.cwd(), "public/icon.svg"), "utf8").then(lineLogo),
-  ...["coiffure", "bar", "fleuriste"].map((reel) => dataUrl(`reel-${reel}.jpg`, "image/jpeg")),
+  ...["concept-store", "cave", "styliste"].map((reel) => dataUrl(`reel-${reel}.jpg`, "image/jpeg")),
 ]);
 
 export default function Image() {

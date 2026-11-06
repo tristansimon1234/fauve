@@ -390,7 +390,8 @@ const CASES: Record<string, LabCase> = {
     ],
   },
   // The other Reels of the landing's wall, on their very clips (Tristan: « renvoie les mêmes photos et reproduis les
-  // reels »): steal=https://edith-ai.app/landing/reels/<id>.mp4 copies the one made by hand, none lets Edith choose.
+  // reels »): steal=https://edith-ai.app/landing/reels/<id>.mp4 copies the one made by hand (only coiffure, barbier and
+  // yoga are still on the site since 6 November 2026; the others are in the git history), none lets Edith choose.
   meche: {
     name: "Atelier Mèche",
     business: "salon de coiffure",
