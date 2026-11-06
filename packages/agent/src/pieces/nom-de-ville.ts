@@ -103,10 +103,11 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const SKY = { prefer: "top", min: { w: Math.round(width * 0.5), h: Math.round(height * 0.06) }, within: { x: 0, y: 0, w: width, h: footMax }, pad: 4, fallback: null };
   const sky = behind ? null : ClearBox(list[g], LOOK, laid, SKY);
   const foot = Math.round(within(behind ? under : sky ? sky.y + sky.h : height * 0.42, footMin, footMax));
-  // How deep its deepest letter is behind her scenery once landed, and so how far under its place it rises from: 0,4 of
-  // its capitals over a flat roofline, never more than 65 % of a letter hidden at its first image.
-  const deepest = behind ? Math.max(0, ...tops.map((y) => (foot - y) / caps)) : 0;
-  const RISE = behind ? within(0.65 - deepest, 0, 0.4) : 0.4;
+  // It comes out from behind a line at every image (v2, as its skill's v2; Tristan: « l'aspect du texte qui apparaît
+  // derrière n'est pas là »): her roofline (their median, its foot a fifth of its capitals lower), whether or not her shot
+  // without its sky was made, else the foot of its place; rising 0,4 of its capitals from under it whatever its scenery.
+  const LINE = Math.round(behind ? Math.min(median, foot) : foot);
+  const RISE = 0.4;
 
   // 3. Its colour: her main colour as it is when it stands out 2:1 from her sky under it, else a shade of it a step at a
   // time on its own side of her sky (the other side if that one never gets there); its small words white with a tight
@@ -141,8 +142,10 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
     FACES.map((f, i) => h("div", { key: "f" + i, style: { gridArea: "1 / 1", fontFamily: f.family, fontWeight: f.weight, fontSynthesis: "none", fontSize: Math.round(F * f.size), lineHeight: 0.8, letterSpacing: "0.01em", color: INK, whiteSpace: "nowrap", visibility: i === shown ? "visible" : "hidden" } }, name)));
   const lettering = h("div", { style: { transform: "translateY(" + rise.toFixed(3) + "em)", fontSize: F } }, grid);
   const BOXH = Math.round(F * (small ? 1.7 : 1.05));
-  const title = h(FitText, { key: "title-" + name, style: { position: "absolute", left: Math.round(x0), top: Math.round(foot + 0.07 * caps - BOXH), width: TW, height: BOXH }, innerStyle: { justifyContent: "flex-end" } },
-    h("div", { style: { display: "flex", flexDirection: "column", alignItems: "center" } }, kicker, lettering));
+  // Its letters under the line cut away (its small words above it untouched).
+  const title = h("div", { key: "name-line", style: { ...box, clipPath: "inset(0 0 " + Math.max(0, height - LINE) + "px 0)" } },
+    h(FitText, { key: "title-" + name, style: { position: "absolute", left: Math.round(x0), top: Math.round(foot + 0.07 * caps - BOXH), width: TW, height: BOXH }, innerStyle: { justifyContent: "flex-end" } },
+      h("div", { style: { display: "flex", flexDirection: "column", alignItems: "center" } }, kicker, lettering)));
   // What stands under her sky, laid over it at every image, across its band only.
   const front = behind ? h("div", { key: "front", style: { ...box, clipPath: "inset(" + Math.max(0, Math.round(foot - 1.5 * caps)) + "px 0 " + Math.max(0, Math.round(height - foot - 0.7 * caps)) + "px 0)" } }, h(Skyline, { shot: g, style: box })) : null;
   return h(AbsoluteFill, null, title, front);
@@ -150,7 +153,8 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
 
 export const nomDeVille: EffectPiece = {
   key: "nom-de-ville",
-  version: 1,
+  // 2: its name comes out from behind a line at every image, rising 0,4 of its capitals whatever its scenery.
+  version: 2,
   name: "Son nom aux cinq polices",
   how: "son nom géant dans le ciel de son plan large, derrière ses toits (ils passent devant ses lettres), qui monte doucement pendant que sa police change d'un coup à chaque temps, à la même place et dans la même couleur : ronde et très grasse, carrée, étroite, carrée plus grande, puis la sienne, qui reste ; deux à quatre petits mots au-dessus ; le nom part avec la coupe.",
   needs: "un plan large et fixe (le téléphone posé) de sa rue, de ses toits, de sa devanture ou d'un paysage, avec du ciel calme dans le haut de l'image et des toits, des arbres ou des collines qui y montent.",

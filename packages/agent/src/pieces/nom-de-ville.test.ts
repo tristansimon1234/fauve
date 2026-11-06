@@ -15,12 +15,12 @@ const shots = [
   { file: "after", at: 2, seconds: 1.8 },
 ];
 
-test("« Son nom aux cinq polices » (effect v1): its layer over her one wide shot, its step on the Reel's beat or half of it, nothing cut out", () => {
+test("« Son nom aux cinq polices » (effect v2): its layer over her one wide shot, its step on the Reel's beat or half of it, nothing cut out", () => {
   const plan = pieceTestPlan({ piece: nomDeVille, shots, span: [1.2, 3.6], fill: { texts: { nom: "Belleville", surtitre: "les rues de" }, objects: {}, settings: {} }, bpm: 100 });
   assert.ok(editPlanSchema.safeParse(plan).success);
   const layer = plan.layers![0]!;
   assert.deepEqual(layerShots(plan, layer), [1]);
-  assert.deepEqual(layer.motion.piece, { key: "nom-de-ville", version: 1 });
+  assert.deepEqual(layer.motion.piece, { key: "nom-de-ville", version: 2 });
   // At 100 BPM a beat is 18 images: half of it (9) is nearer the original's 12,6; its 72 images hold four changes.
   assert.deepEqual(layer.motion.texts, { beat: "18", step: "9", changes: "4", mine: "1", nom: "Belleville", surtitre: "les rues de" });
   assert.equal(layer.motion.drawn, undefined);

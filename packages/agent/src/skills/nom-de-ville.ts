@@ -1,6 +1,6 @@
 import { beatSpans, toFrame, type MontageSkill } from "../skills.ts";
 
-// « Nom aux cinq polices », version 1, written on its original's fiche (docs/fiches/nom-de-ville.md: Tristan's travel
+// « Nom aux cinq polices », written on its original's fiche (docs/fiches/nom-de-ville.md: Tristan's travel
 // film of a city, measured image by image at 30 i/s, its title's red read pixel by pixel image by image, its sound by
 // bands; Tristan: « c'est un effet que l'on veut pouvoir faire, pas exactement reproduire l'image »). A 16:9 film of a
 // city in 15 shots and clean cuts. Its music is two pieces and a break; one grid is kept, its first piece's, 142,4 BPM
@@ -140,11 +140,15 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const SKY = { prefer: "top", min: { w: Math.round(bw * 0.5), h: Math.round(bh * 0.08) }, within: { x: 0, y: 0, w: bw, h: footMax }, origin: { x: 0, y: by }, pad: 4, fallback: null };
   const sky = !behind && shots[0] ? ClearBox(shots[0], LAND, laid, SKY) : null;
   const foot = Math.round(within(behind ? under : sky ? sky.y + sky.h : bh * (band ? 0.475 : 0.42), footMin, footMax));
-  // How deep its deepest letter is behind her scenery once landed (a share of its capitals), and so how far under its
-  // place it rises from: 0,4 of its capitals as the original over a flat roofline, never more than 65 % of a letter
-  // hidden at its first image (the hook reads).
-  const deepest = behind ? Math.max(0, ...tops.map((y) => (foot - y) / caps)) : 0;
-  const RISE = behind ? within(0.65 - deepest, 0, 0.4) : 0.4;
+  // It comes out from behind a line at every image, as the original's red never goes under its roofline (193 px on all
+  // its images): under her roofs, the line where they stand (their median, its foot a fifth of its capitals lower,
+  // hidden), whether or not her shot without its sky was made in time (Skyline then draws her roofs over it too); in
+  // front, the foot of its place (the bottom of her sky or calm area, else the original's place). It rises 0,4 of its
+  // capitals from under that line, easing out until it lands: 60 % of it hidden at its first image over a flat roofline,
+  // 40 % in front, as the original's (Tristan on v1: « l'aspect du texte qui apparaît derrière n'est pas là »: behind a
+  // jagged roofline v1 rose by less, and in front, with nothing over its foot, it only slid up whole).
+  const LINE = Math.round(behind ? Math.min(median, foot) : foot);
+  const RISE = 0.4;
 
   // 5. Its colour: hers, flat and full (the model's red when she chose it), as it is when it stands out 2:1 from her sky
   // under it (the original's red on its pale sky), else a shade of it a step at a time on its own side of her sky,
@@ -182,9 +186,11 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
     : null;
   const lettering = h("div", { style: { transform: "translateY(" + rise.toFixed(3) + "em)", fontSize: F } }, cycle(name, faceAt(frame), F, "name", INK, false));
   const BOXH = Math.round(F * (small ? 1.7 : 1.05));
+  // Its letters under the line cut away (its small words above it untouched).
   const title = titleOn
-    ? h(FitText, { key: "title-" + name, style: { position: "absolute", left: Math.round(x0), top: Math.round(foot + 0.07 * caps - BOXH), width: TW, height: BOXH }, innerStyle: { justifyContent: "flex-end" } },
-        h("div", { style: { display: "flex", flexDirection: "column", alignItems: "center" } }, kicker, lettering))
+    ? h("div", { key: "name-line", style: { ...box, clipPath: "inset(0 0 " + Math.max(0, bh - LINE) + "px 0)" } },
+        h(FitText, { key: "title-" + name, style: { position: "absolute", left: Math.round(x0), top: Math.round(foot + 0.07 * caps - BOXH), width: TW, height: BOXH }, innerStyle: { justifyContent: "flex-end" } },
+          h("div", { style: { display: "flex", flexDirection: "column", alignItems: "center" } }, kicker, lettering)))
     : null;
   // What stands under her sky, laid over it at every image (her roofs, trees, poles, wires and passers-by in front of
   // its letters), across its band only: elsewhere it would lay her shot over itself, a softer copy.
@@ -227,7 +233,9 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
 
 export const nomDeVille: MontageSkill = {
   key: "nom-de-ville",
-  version: 1,
+  // 2: its name comes out from behind a line at every image, its roofline (else the foot of its place), rising 0,4 of
+  // its capitals whatever its scenery (Tristan on v1: « l'aspect du texte qui apparaît derrière n'est pas là »).
+  version: 2,
   bpm: BPM,
   shots: [FIXED, 15],
   // Up to 30 for a length she asks for: the life of the place in the original's pattern of shots (29 s at its tempo).
