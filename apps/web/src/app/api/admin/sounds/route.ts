@@ -68,6 +68,7 @@ export async function POST(request: Request) {
   if (action === "drop_trend_covers") return Response.json(await dropTrendCovers());
   // The sounds of the top Reels of a few hashtags (Tristan: « les sons tendances insta […] aesthetic videos editing »).
   if (action === "bench_links") return Response.json(await benchLinks(await request.json().catch(() => ({}))));
+  if (action === "bench_trending") return Response.json(await benchTrending());
   if (action === "bench_tags") return Response.json(await benchTags((new URL(request.url).searchParams.get("tags") ?? "").split(",")));
   if (action !== "bench") return Response.json({ error: "action=bench|refresh" }, { status: 400 });
   let costUsd = 0;
@@ -271,4 +272,27 @@ async function benchLinks(body: unknown) {
     .from("cost_events")
     .insert({ studio_id: null, kind: "trends", provider: "treg", units: links.length, cost_eur: usdToEur(costUsd, env("USD_TO_EUR")), meta: { purpose: "sounds_links_bench", cost_usd: costUsd } });
   return { cost_usd: costUsd, read: read.length, answered: read.filter((r) => r.found).length, links: read };
+}
+
+/**
+ * The bench of Instagram's own trending Reels (its public instagram.com/reels page, ScrapeCreators): each one's sound,
+ * whether Instagram marks it trending (is_trending_in_clips, the arrow of its audio menu), its cover. About $0.002.
+ */
+async function benchTrending() {
+  const done = await tregCall("scrapecreators.x.v1-instagram-reels-trending", {}, 0.02, "GET").catch(() => null);
+  const costUsd = done?.costUsd ?? 0;
+  await supabaseAdmin()
+    .from("cost_events")
+    .insert({ studio_id: null, kind: "trends", provider: "treg", units: 1, cost_eur: usdToEur(costUsd, env("USD_TO_EUR")), meta: { purpose: "sounds_trending_bench", cost_usd: costUsd } });
+  const reels = listUnder(done?.answer ?? null, ["reels", "items", "data"]);
+  return {
+    cost_usd: costUsd,
+    reels: reels.length,
+    sounds: reels.map((reel) => ({
+      code: pick(reel, ["code", "shortcode"]),
+      plays: pick(reel, ["play_count", "ig_play_count", "view_count"]),
+      fields: soundFields(reel),
+    })),
+    sample: trimmed(reels[0] ?? done?.answer ?? null),
+  };
 }
