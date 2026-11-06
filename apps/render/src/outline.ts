@@ -3,7 +3,7 @@
 // Effects.tsx places it (SubjectOutline) and draws it (Outline).
 
 /** An object's name as the engine keeps it (packages/agent objectName): lower case, its spaces single. */
-export const objectName = (name: string) => name.trim().toLowerCase().replace(/\s+/g, " ").slice(0, 60);
+export const objectName = (name: string) => name.trim().toLowerCase().replace(/\s+/g, " ").slice(0, 120);
 
 /** A point of an outline closer than this to the picture's edge (a share of it) lies on the edge. */
 const EDGE = 0.004;

@@ -50,7 +50,8 @@ export type PieceText = { slot: string; want: string; max: number; required: boo
  * « @slot » in its code, named by its filler in plain English from what that shot shows. `shot`: which of its shots
  * (0 its first; negative, from its last: −1).
  */
-export type PieceObject = { slot: string; shot: number; want: string };
+/** `still`: read once on its shot's first image, as a skill's (SkillObject.still). */
+export type PieceObject = { slot: string; shot: number; want: string; still?: true };
 
 /** A shot's size, as the analysis reads it. */
 export type PieceFraming = "wide" | "medium" | "close" | "detail";
@@ -495,7 +496,7 @@ export function pieceMotion(input: {
   const objects = (piece.objects ?? []).flatMap((o) => {
     const shot = at(o.shot);
     const name = skillObjectName(fill.objects[o.slot]);
-    return shot !== undefined && name ? [{ shot, name }] : [];
+    return shot !== undefined && name ? [{ shot, name, ...(o.still ? { still: true } : {}) }] : [];
   });
   const count = plan.segments.filter(isClipSegment).length;
   const drawn: MotionDrawn | undefined = subjects.length || objects.length ? { shots: count, ...(subjects.length ? { subjects } : {}), ...(objects.length ? { objects } : {}) } : undefined;

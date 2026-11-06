@@ -16,7 +16,7 @@ import { Fit } from "./Fit";
 import { makeKit } from "./Kit";
 import { makeType } from "./Type";
 import { makeGraphic } from "./Graphic";
-import { ClearBox, HeadMoves, LightUnder, makeEffects, SkylineAt, SubjectBox, SubjectOutline, SubjectParts, SubjectPiece, VanishingPoint } from "./Effects";
+import { ClearBox, HeadMoves, LightUnder, makeEffects, PictureRegions, SkylineAt, SubjectBox, SubjectOutline, SubjectParts, SubjectPiece, VanishingPoint } from "./Effects";
 import { objectName } from "./outline";
 import { Marker } from "./Marker";
 import { Captions } from "./Captions";
@@ -445,6 +445,7 @@ export const SCOPE = {
   Near,
   VanishingPoint,
   LightUnder,
+  PictureRegions,
   HeadMoves,
   Look: looks.Look,
 };

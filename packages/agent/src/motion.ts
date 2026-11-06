@@ -218,7 +218,7 @@ export type ShotCamera = {
 };
 
 /** An animation's code that draws one of her shots or what is cut out of it (her, an object, its depth, its ground), or reads it (its sky, its lines, its light, her head). */
-const DRAWS_SHOTS = /\b(?:Footage|Subject|SubjectBox|SubjectOutline|SubjectParts|Outline|Depth|ClearBox|Skyline|SkylineAt|Near|VanishingPoint|LightUnder|HeadMoves)\b/;
+const DRAWS_SHOTS = /\b(?:Footage|Subject|SubjectBox|SubjectOutline|SubjectParts|Outline|Depth|ClearBox|Skyline|SkylineAt|Near|VanishingPoint|LightUnder|PictureRegions|HeadMoves)\b/;
 
 /** An animation's code that lays a ready look on one of its passages (Look in the scope, PassageLook.tsx). */
 const LAYS_LOOK = /\bLook\b/;
@@ -1015,8 +1015,13 @@ export function buildReelProps(plan: EditPlan, inputs: ReelInputs): ReelProps {
               }
             : {}),
           ...(inputs.subjects?.[clearKey(s.clip_id, s.in, s.out)]?.clear ? { clear: inputs.subjects[clearKey(s.clip_id, s.in, s.out)]!.clear } : {}),
-          // Its sky, vanishing point and light (shot_read.py), at its own pace only (a speed changes which images show).
-          ...(!s.ramp && !(s.speed && Math.abs(s.speed - 1) > 0.01) && inputs.subjects?.[readKey(s.clip_id, s.in, s.out)]?.reading ? { read: inputs.subjects[readKey(s.clip_id, s.in, s.out)]!.reading } : {}),
+          // Its sky, vanishing point and light (shot_read.py), at its own pace only (a speed changes which images show);
+          // at another pace, what was read on its first image alone (its regions: no camera move read).
+          ...((!s.ramp && !(s.speed && Math.abs(s.speed - 1) > 0.01)) || !inputs.subjects?.[readKey(s.clip_id, s.in, s.out)]?.reading?.motion
+            ? inputs.subjects?.[readKey(s.clip_id, s.in, s.out)]?.reading
+              ? { read: inputs.subjects[readKey(s.clip_id, s.in, s.out)]!.reading }
+              : {}
+            : {}),
         },
       ];
     });

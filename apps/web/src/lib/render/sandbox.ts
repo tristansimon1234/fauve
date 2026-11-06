@@ -49,6 +49,7 @@ import {
   type ScenePhoto,
   type MotionTemplate,
   type TrackPiece,
+  type ShotReadKind,
 } from "@fauve/agent";
 import type { SceneBackdrop } from "@render/contrast";
 import { env } from "@/lib/env";
@@ -1980,7 +1981,7 @@ function readSandbox(): Promise<Sandbox> {
 }
 
 /** A passage read for a composition: its clip or photo (signed), its seconds, what to read (shot_read.py). */
-export type ShotReadJob = { key: string; url: string; from: number; to: number; read: ("ground" | "sky" | "vanish" | "light")[]; photo?: true };
+export type ShotReadJob = { key: string; url: string; from: number; to: number; read: ShotReadKind[]; photo?: true };
 /** What was read: its readings (ShotReading), its images, and the file of its ground when one was made (a WebM, or a PNG for a photo). */
 export type ShotRead = { reading: Record<string, unknown>; frames: number; still: boolean; ground?: { file: Buffer; still: boolean } };
 

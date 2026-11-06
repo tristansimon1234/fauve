@@ -16,9 +16,12 @@
 # lines (a closing), so a wire never cuts it; then, at full size, its edge snapped to the picture's (a guided filter on
 # its light) and the thin things across it (wires, poles, masts, a bird: darker or lighter than the sky just around them,
 # a black-hat and a top-hat) put back in front.
-# Usage: python -I shot_read.py jobs.json → prints {"<id>": { frames, still, motion?, sky?, vanish?, light?, file? } |
-# { error }}. jobs.json: [{ id, src (a local video or photo), from, to, photo?, read: ["ground" | "sky" | "vanish" |
-# "light"], out? (the ground's path, without its extension) }]. FFMPEG: ffmpeg; HDR_FILTER: NORMALIZE's tone mapping.
+# - its regions (PictureRegions): its first image split along its own edges, by colour (a wall, a door's frame, a plinth,
+#   the pavement, the sky, a poster), each region's outline with its holes, together covering it (« Façade qui se
+#   construit » v4: the rest of her front built in its own shapes after its elements, never in rectangles).
+# Usage: python -I shot_read.py jobs.json → prints {"<id>": { frames, still, motion?, sky?, vanish?, light?, regions?,
+# file? } | { error }}. jobs.json: [{ id, src (a local video or photo), from, to, photo?, read: ["ground" | "sky" |
+# "vanish" | "light" | "regions"], out? (the ground's path, without its extension) }]. FFMPEG: ffmpeg; HDR_FILTER: NORMALIZE's tone mapping.
 # `python -I shot_read.py --test` checks it on synthetic images.
 import json
 import os
@@ -86,6 +89,21 @@ LIGHT_KEYS = 9
 # The longest passage read (seconds); the ground at full size is read for GROUND_SECONDS at most.
 MAX_SECONDS = 30.0
 GROUND_SECONDS = 20.0
+# Its regions (PictureRegions): its first image at this long side, flattened (mean shift: REGION_SPACE px, REGION_RANGE
+# of colour), its colours in REGION_COLOURS groups; each group's pieces of REGION_SEED of the picture at least seed a
+# region, grown along the picture's edges (a watershed), then the smallest merged into the neighbour of the nearest
+# colour until each is REGION_LEAST of the picture at least and there are REGION_MAX at most; each one's outline in
+# REGION_POINTS points at most (its holes besides, REGION_HOLE of the picture at least), two pixels wider all round so
+# neighbours overlap without a speck of black between them.
+REGION_LONG = 480
+REGION_SPACE = 8
+REGION_RANGE = 16
+REGION_COLOURS = 7
+REGION_SEED = 0.003
+REGION_LEAST = 0.006
+REGION_MAX = 28
+REGION_POINTS = 160
+REGION_HOLE = 0.004
 FFMPEG = os.environ.get("FFMPEG", "ffmpeg")
 HDR_FILTER = os.environ.get("HDR_FILTER", "")
 
@@ -666,8 +684,105 @@ def ground_file(job, src, start, seconds, hdr, sw, sh, photo):
     return out, count, shares, profile
 
 
+def region_labels(rgb):
+    """
+    Its picture split along its own edges, at REGION_LONG: a label per pixel (1…n). Flattened, its colours sorted in
+    groups; each group's larger pieces seed a region, grown along the picture's edges (watershed); then the smallest
+    merged into the neighbour whose colour is nearest, until each is large enough and they are few enough.
+    """
+    import cv2
+    import numpy as np
+
+    h, w = rgb.shape[:2]
+    sw, sh = even_size(w, h, REGION_LONG)
+    small = cv2.resize(np.ascontiguousarray(rgb), (sw, sh), interpolation=cv2.INTER_AREA)
+    flat = cv2.pyrMeanShiftFiltering(cv2.cvtColor(small, cv2.COLOR_RGB2BGR), REGION_SPACE, REGION_RANGE, maxLevel=1)
+    lab = cv2.cvtColor(flat, cv2.COLOR_BGR2LAB).astype(np.float32)
+    cv2.setRNGSeed(7)
+    _, groups, _ = cv2.kmeans(lab.reshape(-1, 3), REGION_COLOURS, None, (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 0.5), 3, cv2.KMEANS_PP_CENTERS)
+    groups = groups.reshape(sh, sw)
+    seeds = np.zeros((sh, sw), np.int32)
+    n = 0
+    for g in range(REGION_COLOURS):
+        layer = cv2.morphologyEx((groups == g).astype(np.uint8), cv2.MORPH_OPEN, np.ones((5, 5), np.uint8))
+        count, pieces, stats, _ = cv2.connectedComponentsWithStats(layer, 8)
+        for i in range(1, count):
+            if stats[i, cv2.CC_STAT_AREA] >= REGION_SEED * sw * sh:
+                n += 1
+                core = cv2.erode((pieces == i).astype(np.uint8), np.ones((3, 3), np.uint8)) > 0
+                seeds[core & (seeds == 0)] = n
+    if n == 0:
+        return np.ones((sh, sw), np.int32)
+    labels = cv2.watershed(flat.copy(), seeds)
+    # Its edges (-1) and anything left to the neighbouring region.
+    labels[labels < 1] = 0
+    while (labels == 0).any():
+        grown = cv2.dilate(labels.astype(np.float32), np.ones((3, 3), np.uint8)).astype(np.int32)
+        empty = labels == 0
+        labels[empty] = grown[empty]
+    ring = np.ones((3, 3), np.uint8)
+    while True:
+        ids, areas = np.unique(labels, return_counts=True)
+        smallest = int(np.argmin(areas))
+        if len(ids) <= 1 or (len(ids) <= REGION_MAX and areas[smallest] >= REGION_LEAST * sw * sh):
+            break
+        r = ids[smallest]
+        mine = labels == r
+        around = (cv2.dilate(mine.astype(np.uint8), ring) > 0) & ~mine
+        near, shared = np.unique(labels[around], return_counts=True)
+        if not len(near):
+            break
+        colour = lab[mine].mean(axis=0)
+        # The neighbour of the nearest colour, a long shared edge breaking a near tie.
+        best = min(range(len(near)), key=lambda i: float(np.linalg.norm(lab[labels == near[i]].mean(axis=0) - colour)) - 0.002 * shared[i])
+        labels[mine] = near[best]
+    return labels
+
+
+def regions_of(rgb):
+    """
+    Its picture's regions (PictureRegions): each one's outline in shares of the picture, flat [x0, y0, x1, y1…], its holes
+    after it (each ring opened by -1, -1), largest first, together covering the picture; each a pixel wider all round.
+    """
+    import cv2
+    import numpy as np
+
+    labels = region_labels(rgb)
+    sh, sw = labels.shape
+    ids, areas = np.unique(labels, return_counts=True)
+    out = []
+    for r in ids[np.argsort(-areas)]:
+        mask = cv2.medianBlur((labels == r).astype(np.uint8) * 255, 7)
+        mask = cv2.dilate(mask, np.ones((5, 5), np.uint8))
+        found, tree = cv2.findContours(mask, cv2.RETR_CCOMP, cv2.CHAIN_APPROX_SIMPLE)
+        if not found:
+            continue
+        tree = tree[0]
+        outer = [i for i in range(len(found)) if tree[i][3] < 0]
+        if not outer:
+            continue
+        main = max(outer, key=lambda i: cv2.contourArea(found[i]))
+        rings = [found[main]] + [found[i] for i in range(len(found)) if tree[i][3] == main and cv2.contourArea(found[i]) >= REGION_HOLE * sw * sh]
+        flat = []
+        for k, c in enumerate(rings):
+            eps = 0.8
+            p = cv2.approxPolyDP(c, eps, True)
+            while len(p) > REGION_POINTS // (2 if k else 1) and eps < 20:
+                eps *= 1.5
+                p = cv2.approxPolyDP(c, eps, True)
+            # Its holes while it stays within what is kept of a region (1 200 numbers: ShotReading).
+            if len(p) < 3 or len(flat) + 2 * len(p) + 2 > 1200:
+                continue
+            if k:
+                flat += [-1, -1]
+            flat += [round(float(v), 4) for x, y in p[:, 0, :] for v in (min(1.0, max(0.0, x / (sw - 1))), min(1.0, max(0.0, y / (sh - 1))))]
+        if len(flat) >= 6:
+            out.append(flat)
+    return out
+
+
 def read(job):
-    """A job's readings: { frames, still, motion?, sky?, vanish?, light?, file? }."""
+    """A job's readings: { frames, still, motion?, sky?, vanish?, light?, regions?, file? }."""
     import cv2
     import numpy as np
 
@@ -678,7 +793,8 @@ def read(job):
     photo = bool(job.get("photo"))
     wanted = set(job.get("read") or ["sky", "vanish", "light"])
     start = 0.0 if photo else max(0.0, float(job.get("from") or 0))
-    seconds = 1.0 / FPS if photo else min(MAX_SECONDS, max(1.0 / FPS, float(job.get("to") or 0) - start))
+    # Its regions alone are read on its first image: one image read, whatever the passage's length.
+    seconds = 1.0 / FPS if photo or wanted == {"regions"} else min(MAX_SECONDS, max(1.0 / FPS, float(job.get("to") or 0) - start))
     sw, sh, hdr = matte.probe(job["src"])
     # The grid and the camera's move, as clear_area.py reads them (its images at 384 px).
     frames = clear_area.decode(job["src"], start, seconds, photo)
@@ -690,6 +806,10 @@ def read(job):
         out["motion"] = found["motion"]
     if "light" in wanted:
         out["light"] = light_grid(frames, moves, cols, rows)
+    if "regions" in wanted:
+        # On its first image at its own size (its edges finer than the grid's 384 px).
+        first = next(stream(job["src"], start, 1.0 / FPS, *even_size(sw, sh, REGION_LONG), hdr, photo), None)
+        out["regions"] = regions_of(first) if first is not None else []
     if "vanish" in wanted:
         keys = sorted(set(int(round(k)) for k in np.linspace(0, len(frames) - 1, min(len(frames), VANISH_KEYS))))
         kw, kh = even_size(sw, sh, SKY_LONG)
@@ -805,6 +925,40 @@ def self_test():
     busy = np.random.default_rng(2).integers(0, 255, (h, w, 3)).astype(np.uint8)
     none, _ = sky_of(busy, w, h)
     assert none is None, "nothing calm at the top, no sky"
+    # Regions: a shop front (a cream wall, two red doors, a dark window between them, a grey pavement) split along its
+    # own edges: each door its own region, the wall one with the doors as holes, the whole picture covered.
+    front = np.zeros((360, 640, 3), np.uint8)
+    front[:] = (232, 222, 196)
+    front[280:] = (120, 118, 115)
+    for x0 in (80, 400):
+        front[80:280, x0 : x0 + 140] = (170, 30, 60)
+    front[110:200, 270:370] = (40, 45, 60)
+    front = np.clip(front.astype(np.float32) + np.random.default_rng(3).normal(0, 2, front.shape), 0, 255).astype(np.uint8)
+    regions = regions_of(front)
+    assert 4 <= len(regions) <= REGION_MAX, len(regions)
+    labels = region_labels(front)
+    lh, lw = labels.shape
+    at = lambda x, y: labels[int(y * lh), int(x * lw)]  # noqa: E731
+    assert at(0.23, 0.5) != at(0.73, 0.5) and at(0.23, 0.5) != at(0.5, 0.05), "each door its own region, not the wall's"
+    assert at(0.5, 0.42) != at(0.5, 0.05) and at(0.5, 0.9) != at(0.5, 0.05), "the window and the pavement are not the wall"
+    assert at(0.05, 0.05) not in (at(0.23, 0.5), at(0.73, 0.5)), "the wall is no door"
+    assert any(-1 in flat for flat in regions), "a region around others (the wall) keeps its holes"
+    canvas = np.zeros((360, 640), np.uint8)
+    for flat in regions:
+        rings, ring = [], []
+        for i in range(0, len(flat), 2):
+            if flat[i] < 0:
+                rings.append(ring)
+                ring = []
+            else:
+                ring.append((flat[i] * 639, flat[i + 1] * 359))
+        rings.append(ring)
+        layer = np.zeros_like(canvas)
+        cv2.fillPoly(layer, [np.array(rings[0], np.int32)], 1)
+        for hole in rings[1:]:
+            cv2.fillPoly(layer, [np.array(hole, np.int32)], 0)
+        canvas |= layer
+    assert canvas.mean() > 0.97, canvas.mean()
     print("shot_read: ok")
 
 

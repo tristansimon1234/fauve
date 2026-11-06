@@ -13,7 +13,48 @@ export type ShotReading = {
   sky?: { share: number; profile: number[] };
   vanish?: { x: number; y: number; strength: number } | null;
   light?: { cols: number; rows: number; cells: string; mean: number; high: number };
+  regions?: number[][];
 };
+
+/**
+ * A region of the picture where the Reel draws it: its outline as an SVG path (px, straight sides; its holes as further
+ * rings, to fill with the even-odd rule: clip-rule="evenodd") and the box around it.
+ */
+export type PictureRegion = { d: string; x: number; y: number; w: number; h: number };
+
+/**
+ * Its picture split along its own edges (read on its first image: a wall, a door's frame, a plinth, the pavement, the
+ * sky), each region at that image where the Reel draws it, largest first: an outline (px, its holes after it, each ring
+ * opened by -1, -1 in the reading) and its box; none when it was not read.
+ */
+export function regionsIn(reading: ShotReading | undefined, place: Affine): PictureRegion[] {
+  const out: PictureRegion[] = [];
+  for (const flat of reading?.regions ?? []) {
+    if (!Array.isArray(flat) || flat.length < 6) continue;
+    let d = "";
+    let ring = true;
+    let x0 = Infinity;
+    let y0 = Infinity;
+    let x1 = -Infinity;
+    let y1 = -Infinity;
+    for (let i = 0; i + 1 < flat.length; i += 2) {
+      if (flat[i]! < 0) {
+        ring = true;
+        continue;
+      }
+      const [x, y] = apply(place, flat[i]!, flat[i + 1]!);
+      if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
+      d += `${ring ? `${d ? " Z " : ""}M` : " L"} ${x.toFixed(1)} ${y.toFixed(1)}`;
+      ring = false;
+      x0 = Math.min(x0, x);
+      y0 = Math.min(y0, y);
+      x1 = Math.max(x1, x);
+      y1 = Math.max(y1, y);
+    }
+    if (d && x1 > x0 && y1 > y0) out.push({ d: `${d} Z`, x: x0, y: y0, w: x1 - x0, h: y1 - y0 });
+  }
+  return out;
+}
 
 /** Less sky than this share of the picture is no sky: SkylineAt gives null. */
 export const SKY_LEAST = 0.01;

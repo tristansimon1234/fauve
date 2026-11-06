@@ -3,7 +3,7 @@ import { Easing, interpolate, random } from "remotion";
 import { affineOf, cameraAt, chooseClear, clearRoom, placeClear, readableMap, withCamera, type ClearMap, type ClearOptions } from "./clear";
 import type { Box, KitHooks } from "./Kit";
 import { objectName, outlinePath } from "./outline";
-import { lightIn, readingPlace, shotHeadMoves, skylineIn, vanishIn, type HeadMove } from "./reading";
+import { lightIn, readingPlace, regionsIn, shotHeadMoves, skylineIn, vanishIn, type HeadMove, type PictureRegion } from "./reading";
 import { coverLayout } from "./Retouch";
 import { about, burnsMotion, cameraMotion, faceFocus, framingPercent, punchScale, straightening } from "./track";
 import type { ComposeShot } from "./types";
@@ -426,9 +426,10 @@ export function SubjectBox(shot: ComposeShot | undefined, frame: number, laid?: 
  * garland, each window of « every window »), in reading order, in the box the shot was laid in, as Footage frames it:
  * { x, y, w, h } px each, placed on the object's box at that frame, so they light up one by one where they are. An
  * object in one piece (a board, a shop window) is cut in `slices` equal pieces along its length instead (none: no
- * pieces); nothing when it was not followed there (the animation does without).
+ * pieces); nothing when it was not followed there (the animation does without). A piece whose own outline the card
+ * read (each element of a shop front on a still read, two windows that overlap) also gives it, `d`: an SVG path (px).
  */
-export function SubjectParts(shot: ComposeShot | undefined, frame: number, laid?: Laid, object?: string, slices = 0): Box[] {
+export function SubjectParts(shot: ComposeShot | undefined, frame: number, laid?: Laid, object?: string, slices = 0): (Box & { d?: string })[] {
   if (!shot || !object) return [];
   const o = shot.objects?.[objectName(object)];
   const b = nearest(o?.boxes, shot, frame);
@@ -439,8 +440,12 @@ export function SubjectParts(shot: ComposeShot | undefined, frame: number, laid?
   // In one piece: slices along its longer side (on the picture, its width and height in the same unit).
   const along = b[2]! * (shot.aspect || 9 / 16) >= b[3]!;
   const { at } = placer(shot, laid, frame);
-  const out: Box[] = [];
+  const out: (Box & { d?: string })[] = [];
   for (let i = 0; i < n; i++) {
+    // Its own outline, when read.
+    const own = flat ? o?.pieces?.[i] : null;
+    const c = own?.length ? nearest(own, shot, frame) : null;
+    const d = c ? outlinePath(c, at) : null;
     const [rx, ry, rw, rh] = flat ? [flat[i * 4]!, flat[i * 4 + 1]!, flat[i * 4 + 2]!, flat[i * 4 + 3]!] : along ? [i / n, 0, 1 / n, 1] : [0, i / n, 1, 1 / n];
     const x0 = b[0]! + rx * b[2]!;
     const y0 = b[1]! + ry * b[3]!;
@@ -451,7 +456,7 @@ export function SubjectParts(shot: ComposeShot | undefined, frame: number, laid?
     const ys = corners.map((c) => c[1]);
     const x = Math.min(...xs);
     const y = Math.min(...ys);
-    out.push({ x, y, w: Math.max(...xs) - x, h: Math.max(...ys) - y });
+    out.push({ x, y, w: Math.max(...xs) - x, h: Math.max(...ys) - y, ...(d ? { d } : {}) });
   }
   return out;
 }
@@ -555,6 +560,18 @@ export function VanishingPoint(shot: ComposeShot | undefined, frame: number, lai
 export function LightUnder(shot: ComposeShot | undefined, frame: number, laid?: Laid, box?: Box | null): { mean: number; high: number } | null {
   if (!shot?.read) return null;
   return lightIn(shot.read, readPlace(shot, frame, laid), box, laid ?? { left: 0, top: 0, width: 1080, height: 1920 });
+}
+
+/**
+ * Her shot's picture split along its own edges (read on its first image, by colour: a wall, a door's frame, a plinth,
+ * the pavement, the sky, a poster), each region where the Reel draws it at a frame of the composition, in the box it
+ * was laid in, largest first: { d, x, y, w, h } px (`d` its outline as an SVG path, straight sides), together covering
+ * the picture. To build or reveal her picture piece by piece along its own shapes, never boxes; empty when it was not
+ * read (the scene check, a shot not read): keep shapes of your own.
+ */
+export function PictureRegions(shot: ComposeShot | undefined, frame: number, laid?: Laid): PictureRegion[] {
+  if (!shot?.read?.regions?.length) return [];
+  return regionsIn(shot.read, readPlace(shot, frame, laid));
 }
 
 /**

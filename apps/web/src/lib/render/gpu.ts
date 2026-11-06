@@ -407,8 +407,11 @@ export async function photosOnGpu(photos: GpuPhoto[], deadlineMs: number, option
   return { results, seconds, gpu };
 }
 
-/** A passage where an object is followed: the passage's, and the object's name (as its animation gives it); `photo`: one of her photos, the object found on it once. */
-export type GpuObjectPassage = GpuPassage & { name: string; photo?: true };
+/**
+ * A passage where an object is followed: the passage's, and the object's name (as its animation gives it); `photo`: one
+ * of her photos, the object found on it once; `still`: found on the passage's first image only, every piece outlined.
+ */
+export type GpuObjectPassage = GpuPassage & { name: string; photo?: true; still?: true };
 /** A passage whose clear areas are read (clear_area.py, in the same machine): its clip or photo (signed), its seconds; nothing to send. */
 export type GpuClearPassage = { key: string; url: string; from: number; to: number; photo?: true };
 /** Its clear areas: their grid and the camera's move, its images, whether the camera holds. */
@@ -428,7 +431,7 @@ export async function objectsOnGpu(
 ): Promise<{ results: Record<string, GpuCut | Error>; clears: Record<string, GpuClear | Error>; seconds: number; gpu: string | null }> {
   if (!passages.length && !clears.length) return { results: {}, clears: {}, seconds: 0, gpu: null };
   const jobs = [
-    ...passages.map((p) => ({ id: p.key, url: p.url, from: p.from, to: p.to, name: p.name, ...(p.photo ? { photo: true } : {}), upload: p.upload })),
+    ...passages.map((p) => ({ id: p.key, url: p.url, from: p.from, to: p.to, name: p.name, ...(p.photo ? { photo: true } : {}), ...(p.still ? { still: true } : {}), upload: p.upload })),
     ...clears.map((p) => ({ id: p.key, url: p.url, from: p.from, to: p.to, clear: true, ...(p.photo ? { photo: true } : {}) })),
   ];
   const { readings, seconds, gpu } = await onCard(
