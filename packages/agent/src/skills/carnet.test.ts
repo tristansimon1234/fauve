@@ -121,7 +121,7 @@ const f = (s: number) => Math.round(s * 30);
 
 test("« Ton produit raconté » (v1): its words on its original's words, its window's black and jump, its question, its end, within two images", () => {
   const { talk, plan } = onOriginal();
-  assert.equal(carnet.version, 1);
+  assert.equal(carnet.version, 2);
   assert.equal(carnet.bpm, 90);
   assert.ok(carnet.voice && carnet.voice.cut === "attack" && carnet.voice.subtitles === "own" && carnet.voice.angles === false && !carnet.voice.hook);
   // His long pauses shortened as everywhere: 33,5 s of his 37,36.
@@ -335,13 +335,17 @@ test("« Ton produit raconté » (v1): its subtitles a short phrase at a time, n
   const last = drawAt(layer.durationInFrames - 2, layer);
   assert.deepEqual([footage(last).length, fits(last).length], [0, 0]);
   assert.ok(footage(drawAt(end - 1, layer)).length >= 1);
-  // Its format: as his video (full frame), or his pictures whole in a 16:9 band on black, on her word or for a video filmed in width.
-  assert.deepEqual(carnet.settings?.map((s) => [s.name, s.choices.map((c) => c.value)]), [["format", ["auto", "vertical", "horizontal"]]]);
+  // Its format: full frame by default (Tristan, 6 November: « tout vertical please »), a video filmed in width cropped on
+  // him; his pictures whole in a 16:9 band on black on her word, or as his video when it is filmed in width.
+  assert.deepEqual(carnet.settings?.map((s) => [s.name, s.choices.map((c) => c.value)]), [["format", ["vertical", "horizontal", "auto"]]]);
+  assert.equal(layer.texts.format, "vertical");
   const box = (tree: Drawn) => { const s = styleOf(footage(tree)[0]!); return [s.left, s.top, s.width, s.height]; };
   assert.deepEqual(box(drawAt(f(4), layer)), [0, 0, 1080, 1920]);
   assert.deepEqual(box(drawAt(f(4), layer, { texts: { format: "horizontal" } })), [0, 656, 1080, 608]);
   const wide = layer.shots.map((s, i) => (i === 0 ? { ...s, aspect: 16 / 9 } : s));
-  assert.deepEqual(box(drawAt(f(4), layer, { shots: wide })), [0, 656, 1080, 608]);
+  assert.deepEqual(box(drawAt(f(4), layer, { shots: wide })), [0, 0, 1080, 1920]);
+  assert.deepEqual(box(drawAt(f(4), layer, { shots: wide, texts: { format: "auto" } })), [0, 656, 1080, 608]);
+  assert.deepEqual(box(drawAt(f(4), layer, { texts: { format: "auto" } })), [0, 0, 1080, 1920]);
   assert.deepEqual(box(drawAt(f(4), layer, { shots: wide, texts: { format: "vertical" } })), [0, 0, 1080, 1920]);
 });
 

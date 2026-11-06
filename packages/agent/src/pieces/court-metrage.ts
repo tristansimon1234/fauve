@@ -233,7 +233,7 @@ export const courtMetrage: EffectPiece = {
       want: "le format de ce moment : sa pellicule en horizontal sur du noir, ou plein écran aux coins arrondis",
       choices: [
         { value: "auto", says: "comme ses vidéos : en horizontal 1,94:1 sur du noir quand la plupart sont horizontales, sinon plein écran" },
-        { value: "horizontal", says: "en horizontal 1,94:1 au milieu de l'écran, sur du noir, comme une pellicule projetée" },
+        { value: "horizontal", says: "en horizontal 1,94:1 au milieu de l'écran, sur du noir, comme une pellicule projetée", band: true },
         { value: "vertical", says: "plein écran, coins arrondis, une fine marge noire en haut et en bas" },
       ],
     },

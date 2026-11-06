@@ -53,7 +53,8 @@ function drawAt(frame: number, props: { shots?: { from: number; durationInFrames
     shots: props.shots ?? shotsOf(nomDeVille.timeline(15, { end: false }).shots, 16 / 9),
     reelTexts: props.reelTexts ?? WORDS,
     end: props.end ?? null,
-    texts: { ...marksOf(), ...props.texts },
+    // « Comme ses vidéos » unless said (her words: « comme mes vidéos »): its 16:9 frame for her horizontal videos.
+    texts: { ...marksOf(), format: "auto", ...props.texts },
   });
 }
 
@@ -145,7 +146,7 @@ test("« Nom aux cinq polices »: 8 to 15 shots from her files, up to 30 for a l
   assert.deepEqual(plan.layers![0]!.motion.fonts, ["Lilita One", "Bungee", "League Gothic"]);
   assert.equal(plan.layers![0]!.motion.drawn, undefined);
   assert.deepEqual(plan.skill, { key: "nom-de-ville", version: 2 });
-  assert.deepEqual(nomDeVille.settings?.map((s) => [s.name, s.choices.map((c) => c.value)]), [["format", ["auto", "horizontal", "vertical"]]]);
+  assert.deepEqual(nomDeVille.settings?.map((s) => [s.name, s.choices.map((c) => c.value)]), [["format", ["vertical", "horizontal", "auto"]]]);
 });
 
 test("« Nom aux cinq polices »: its name in five faces, one shown at a time, changing at once on its marks, all in one box, hers last", () => {
@@ -217,9 +218,14 @@ test("« Nom aux cinq polices »: behind her roofs when her sky is read, its foo
   assert.equal(front(drawAt(30, { reads: { skyline: towers } })), null);
 });
 
-test("« Nom aux cinq polices »: 16:9 on black when her files are horizontal, full frame otherwise, its words in the safe zone, in her colour against her sky", () => {
+test("« Nom aux cinq polices » (v2): full frame by default, 16:9 on black on her word or as her files, its words in the safe zone, in her colour against her sky", () => {
   const frameBox = (tree: Drawn) => styleOf((tree.children as Drawn[])[0]!) as unknown as Box;
   const line = nomDeVille.timeline(15, { end: false });
+  // By default (Tristan, 6 November: « tout vertical please »), the whole frame whatever her files: as the engine plays it
+  // (its format told), and as its code reads none (an empty setting is its own default).
+  assert.equal(frameBox(drawAt(30, { texts: { format: "vertical" } })).height, 1920);
+  assert.equal(frameBox(drawAt(30, { texts: { format: "" } })).height, 1920);
+  // As her files (« comme mes vidéos »), horizontal: its 16:9 frame on black.
   assert.deepEqual(frameBox(drawAt(30, {})), { position: "absolute", left: 0, top: 656, width: 1080, height: 608, overflow: "hidden", backgroundColor: "#000000" } as unknown as Box);
   const upright = shotsOf(line.shots, 9 / 16);
   assert.equal(frameBox(drawAt(30, { shots: upright })).height, 1920);

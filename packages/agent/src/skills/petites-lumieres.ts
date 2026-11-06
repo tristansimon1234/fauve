@@ -75,7 +75,7 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const card = Boolean(end) && frame >= endAt;
 
   // 1. Its frame: vertical full frame when her files are upright, else whole in a 16:9 band on black (its second example).
-  const format = setting("format", "auto");
+  const format = setting("format", "vertical");
   const wideShots = shots.filter((s) => (Number(s.aspect) || 0.5625) > 1.15).length;
   const wide = format === "horizontal" || (format === "auto" && wideShots * 2 > n);
   const bw = width;
@@ -253,7 +253,9 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
 
 export const petitesLumieres: MontageSkill = {
   key: "petites-lumieres",
-  version: 1,
+  // 2: vertical full frame by default, her horizontal files cropped on their subject, its band only when she asks for
+  // it (Tristan, 6 November, on seven benches: « vertical please », « tout vertical please »).
+  version: 2,
   bpm: BPM,
   // Three shots, as the original (three videos giving several passages each still make three); a verse for a longer Reel she asks for.
   shots: [3, 3],
@@ -297,9 +299,9 @@ export const petitesLumieres: MontageSkill = {
       name: "format",
       want: "le format : vertical plein écran comme l'original, ou ses images horizontales entières dans une bande 16:9 sur du noir",
       choices: [
-        { value: "auto", says: "comme ses images (horizontal sur du noir si elles le sont surtout)" },
         { value: "vertical", says: "vertical plein écran, ses images horizontales recadrées" },
-        { value: "horizontal", says: "ses images entières dans une bande 16:9 sur du noir, son nom allumé au-dessus" },
+        { value: "horizontal", says: "ses images entières dans une bande 16:9 sur du noir, son nom allumé au-dessus", band: true },
+        { value: "auto", says: "comme ses images (horizontal sur du noir si elles le sont surtout)" },
       ],
     },
     {

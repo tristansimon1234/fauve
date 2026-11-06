@@ -109,7 +109,7 @@ test("« Écran partagé titré » (effect v1): an odd count takes one shot alon
   assert.deepEqual(lone[0]!.footage, [{ shot: 1, at: undefined, opacity: undefined }]);
 });
 
-test("« Écran partagé titré » (effect v1): the original's card for vertical shots, one half above the other for horizontal ones, or on her word", () => {
+test("« Écran partagé titré » (effect v2): over the whole screen, side by side for vertical shots, one above the other for horizontal ones, the card on her word", () => {
   const plan = pieceTestPlan({ piece: ecranPartage, shots: run(4), span: [1.2, 3.6], fill: fill(), bpm: 100 });
   const layout = (props: Record<string, unknown>) => {
     const tree = drawAt(ecranPartage.code, 10, props);
@@ -117,10 +117,14 @@ test("« Écran partagé titré » (effect v1): the original's card for vertical
     const parts = nodes(keyed(tree, "card")!).filter((n) => n.type === "div" && /^[pq]\d+$/.test(String(n.props.key))).map((n) => [styleOf(n).left, styleOf(n).top, styleOf(n).width, styleOf(n).height]);
     return { card: [card.left, card.top, card.width, card.height, card.borderRadius], parts };
   };
-  // Vertical: the 4:3 card at the middle of the screen on black, its halves side by side (2:3), touching.
-  assert.deepEqual(layout(layerProps(plan)), { card: [10, 570, 1060, 783, 30], parts: [[0, 0, 530, 783], [530, 0, 530, 783]] });
-  // Horizontal: the card over the whole screen, one half above the other.
+  // By default (Tristan, 6 November: « tout vertical please »), vertical: its halves side by side over the whole screen.
+  assert.deepEqual(layout(layerProps(plan)), { card: [10, 35, 1060, 1856, 30], parts: [[0, 0, 530, 1856], [530, 0, 530, 1856]] });
+  // Horizontal: one half above the other over the whole screen.
   assert.deepEqual(layout(layerProps(plan, 16 / 9)), { card: [10, 35, 1060, 1856, 30], parts: [[0, 0, 1060, 928], [0, 928, 1060, 928]] });
+  // On her word, the original's 4:3 card at the middle of the screen on black, its halves side by side (2:3), touching.
+  const card = pieceTestPlan({ piece: ecranPartage, shots: run(4), span: [1.2, 3.6], fill: fill({ format: "carte" }), bpm: 100 });
+  assert.deepEqual(layout(layerProps(card)), { card: [10, 570, 1060, 783, 30], parts: [[0, 0, 530, 783], [530, 0, 530, 783]] });
+  assert.equal(ecranPartage.settings?.[0]?.choices.find((c) => c.band)?.value, "carte");
   // On her word: side by side over the whole screen; the default never kept as a setting.
   const tall = pieceTestPlan({ piece: ecranPartage, shots: run(4), span: [1.2, 3.6], fill: fill({ format: "plein-ecran" }), bpm: 100 });
   assert.deepEqual(layout(layerProps(tall, 16 / 9)).parts, [[0, 0, 530, 1856], [530, 0, 530, 1856]]);
@@ -144,8 +148,12 @@ test("« Écran partagé titré » (effect v1): its two titles answer each other
       }
     }
   }
-  // Side by side, just under the middle of the card, one on each half.
-  const side = nodes(drawAt(ecranPartage.code, 10, layerProps(plan))).filter((n) => n.type === "FitText").map((n) => styleOf(n) as { left: number; top: number; width: number; height: number });
+  // On its card (her word), side by side, just under the middle of the card, one on each half.
+  const onCard = pieceTestPlan({ piece: ecranPartage, shots: run(4), span: [1.2, 3.6], fill: fill({ format: "carte" }), bpm: 100 });
+  const side = nodes(drawAt(ecranPartage.code, 10, layerProps(onCard))).filter((n) => n.type === "FitText").map((n) => styleOf(n) as { left: number; top: number; width: number; height: number });
   assert.ok(side[0]!.left + side[0]!.width <= 540 && side[1]!.left >= 540, JSON.stringify(side));
   assert.ok(Math.abs(side[0]!.top + side[0]!.height / 2 - (570 + 783 * 0.54)) <= 2);
+  // Over the whole screen, one on each half too.
+  const wide = nodes(drawAt(ecranPartage.code, 10, layerProps(plan))).filter((n) => n.type === "FitText").map((n) => styleOf(n) as { left: number; width: number });
+  assert.ok(wide[0]!.left + wide[0]!.width <= 540 && wide[1]!.left >= 540, JSON.stringify(wide));
 });

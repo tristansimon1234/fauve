@@ -62,7 +62,7 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
 
   // Its frame: horizontal 16:9 on black when her videos are mostly horizontal (or she asks), else the whole vertical
   // frame; every place below is a share of it.
-  const format = setting("format", "auto");
+  const format = setting("format", "vertical");
   const wideShots = shots.filter((s) => (Number(s.aspect) || 0.5625) > 1.15).length;
   const wide = format === "horizontal" || (format === "auto" && wideShots * 2 > n);
   const bw = width;
@@ -221,13 +221,15 @@ export const rallume: MontageSkill = {
   key: "rallume",
   // 2: its first bench (a hotel bar's pendant lamps read on the card) lit small lamps as sharp rectangles and a big one
   // by halves: each piece now shows through a soft oval a little larger than its box, and pieces that touch light together.
-  version: 2,
+  // 3: vertical full frame by default, her horizontal files cropped on their subject, its band only when she asks for
+  // it (Tristan, 6 November, on seven benches: « vertical please », « tout vertical please »).
+  version: 3,
   bpm: BPM,
   shots: [6, 14],
   // Up to 24 for a length she asks for: about 30 s at its own tempo (the life of her place goes on, two beats a shot).
   long: 24,
   files: [4, 12],
-  how: "Son lieu dans le noir : ce qu'il a plusieurs fois (ses lampes, ses bouteilles, ses tasses, ses plantes) se rallume un par un, de plus en plus vite, chacun à sa lumière avec un halo chaud et un petit clic, la musique étouffée comme derrière un mur ; puis toute la pièce d'un coup sur le temps, la musique qui s'ouvre et son nom qui s'allume comme une enseigne ; puis la vie de son lieu en plans courts coupés sur le temps ; à la fin, tout s'éteint d'un coup et le Reel reboucle sur son début. En horizontal 16:9 sur du noir quand ses vidéos le sont (son nom allumé au-dessus de l'image), sinon plein écran.",
+  how: "Son lieu dans le noir : ce qu'il a plusieurs fois (ses lampes, ses bouteilles, ses tasses, ses plantes) se rallume un par un, de plus en plus vite, chacun à sa lumière avec un halo chaud et un petit clic, la musique étouffée comme derrière un mur ; puis toute la pièce d'un coup sur le temps, la musique qui s'ouvre et son nom qui s'allume comme une enseigne ; puis la vie de son lieu en plans courts coupés sur le temps ; à la fin, tout s'éteint d'un coup et le Reel reboucle sur son début. En vertical plein écran, ses vidéos horizontales recadrées sur leur sujet ; en horizontal 16:9 sur du noir à sa demande (son nom allumé au-dessus de l'image).",
   end: true,
   texts: [
     {
@@ -270,11 +272,11 @@ export const rallume: MontageSkill = {
   settings: [
     {
       name: "format",
-      want: "le format : horizontal sur du noir avec son nom allumé au-dessus, ou vertical plein écran",
+      want: "le format : vertical plein écran, ou horizontal sur du noir avec son nom allumé au-dessus",
       choices: [
+        { value: "vertical", says: "vertical plein écran, ses vidéos horizontales recadrées sur leur sujet" },
+        { value: "horizontal", says: "horizontal 16:9 sur du noir, son nom allumé au-dessus de l'image", band: true },
         { value: "auto", says: "comme ses vidéos (horizontal si elles le sont)" },
-        { value: "horizontal", says: "horizontal 16:9 sur du noir, son nom allumé au-dessus de l'image" },
-        { value: "vertical", says: "vertical plein écran" },
       ],
     },
     {

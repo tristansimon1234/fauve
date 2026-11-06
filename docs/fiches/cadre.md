@@ -57,6 +57,8 @@
 Le fond en noir et blanc sombre et contrasté ; les photos telles quelles, naturelles, neutres (du gris béton), à peine chaudes (Gemini les disait froides). Ni grain qui bouge, ni coins sombres, ni flash, ni clignotement (le script n'en trouve aucun), ni autre transition que la coupe.
 
 ## Format
+**Depuis le 6 novembre** (Tristan, sur sept bancs : « vertical please », « tout vertical please ») : `vertical` par défaut, plein écran, ses fichiers horizontaux recadrés sur leur sujet ; `horizontal` (sa bande) seulement à sa demande, ou quand elle veut ses vidéos entières (le `frame` letterbox de son contrat) ; `auto` (comme ses vidéos, ci-dessous) seulement si elle le demande. `docs/modeles.md`, « Réglages d'un modèle ».
+
 L'original est vertical 9:16, plein écran ; le cadre est debout (2:3) et toutes ses photos sont verticales. Réglage « format » : `vertical` (par défaut, comme l'original : un cadre 2:3, une vidéo horizontale y est recadrée sur son sujet), `auto` (le cadre prend la forme de la plupart de ses images : 2:3 debout, ou 3:2 couché quand ses vidéos sont horizontales, mêmes crans en largeur ; le fond et la dernière image recadrés en 9:16 sur leur centre), `horizontal` (tout en 16:9 quand presque toutes ses vidéos le sont : fond horizontal, cadre 3:2 jusqu'au plein cadre, montré sur du noir dans un fil vertical).
 
 ## Ce que Gemini a vu, et ce qu'il a raté

@@ -80,6 +80,8 @@ Plan fixe, téléphone posé : il flotte de 7 px au plus (1 % de la largeur). Ni
 Neutre et doux : un mur gris chaud un peu rosé (#8C7C77 au milieu, #A19692 en bas, presque blanc en haut sous une lumière), peu saturé, contraste doux, ni grain ni vignettage. L'exposition automatique du téléphone éclaircit le mur de 10 niveaux quand elle entre (0,6 – 2 s), puis l'assombrit quand elle sort (5,8 – 6,7 s) : ce n'est pas un effet.
 
 ## Format
+**Depuis le 6 novembre** (Tristan, sur sept bancs : « vertical please », « tout vertical please ») : `vertical` par défaut, plein écran, ses fichiers horizontaux recadrés sur leur sujet ; `horizontal` (sa bande) seulement à sa demande, ou quand elle veut ses vidéos entières (le `frame` letterbox de son contrat) ; `auto` (comme ses vidéos, ci-dessous) seulement si elle le demande. `docs/modeles.md`, « Réglages d'un modèle ».
+
 L'original est vertical 9:16, un seul plan plein cadre. Réglage « format » :
 - `vertical` (par défaut) : sa vidéo plein cadre. Une vidéo horizontale est recadrée en vertical sur une fenêtre fixe, centrée sur l'endroit où sa main monte le plus haut. La fenêtre ne la suit jamais : l'interrupteur et l'affiche restent sur le mur, et elle entre puis sort du cadre.
 - `horizontal` : sa vidéo horizontale entière sur du noir. L'interrupteur est au-dessus de sa main, l'affiche sous lui ou à côté, à l'échelle de la bande.

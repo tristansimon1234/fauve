@@ -59,7 +59,7 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
 
   // Its pictures full frame, as the original's; or, when most of hers are in width (or she asks), two bands of them
   // above and under the notebook (a horizontal picture whole in each, almost 16:9), changing one after the other.
-  const format = setting("format", "auto");
+  const format = setting("format", "vertical");
   const wideShots = shots.filter((s) => (Number(s.aspect) || 0.5625) > 1.15).length;
   const bands = format === "bandes" || (format === "auto" && wideShots * 2 > n);
 
@@ -202,11 +202,13 @@ export const carteFeutre: MontageSkill = {
   // every 3 images in her order round after round, her words one at a time on the original's moments with a new pose of
   // the notebook each (4 to 7°), the name she announces in the music's one-beat blank; 135 BPM in half time (v1 counted
   // 72), its late start, its blank and its fading end; a hand that never repeats; two bands for her pictures in width.
-  version: 2,
+  // 3: vertical full frame by default, her horizontal files cropped on their subject, its band only when she asks for
+  // it (Tristan, 6 November, on seven benches: « vertical please », « tout vertical please »).
+  version: 3,
   bpm: BPM,
   shots: [10, 25],
   files: [10, 25],
-  how: "Un carnet ouvert, gris clair, posé au milieu de l'écran par-dessus ses photos qui défilent en stop motion, une nouvelle toutes les 3 images (un dixième de seconde), toujours dans son ordre, tour après tour (une vidéo y avance un peu à chaque tour) ; en deux bandes au-dessus et au-dessous du carnet quand la plupart de ses images sont horizontales. Le carnet reste vide une seconde, puis son message s'y écrit à la main au feutre rouge en capitales, un mot à la fois (un petit mot avec le suivant), le carnet changeant de pose à chaque mot ; le nom de ce qu'elle annonce arrive d'un coup, la plus grande ligne, dans le blanc de la musique ; la phrase entière reste jusqu'à la fin, les photos défilant toujours. Le milieu des images est caché par le carnet.",
+  how: "Un carnet ouvert, gris clair, posé au milieu de l'écran par-dessus ses photos qui défilent en stop motion, une nouvelle toutes les 3 images (un dixième de seconde), toujours dans son ordre, tour après tour (une vidéo y avance un peu à chaque tour) ; une image horizontale y est recadrée sur son sujet, ou, à sa demande, ses images entières en deux bandes au-dessus et au-dessous du carnet. Le carnet reste vide une seconde, puis son message s'y écrit à la main au feutre rouge en capitales, un mot à la fois (un petit mot avec le suivant), le carnet changeant de pose à chaque mot ; le nom de ce qu'elle annonce arrive d'un coup, la plus grande ligne, dans le blanc de la musique ; la phrase entière reste jusqu'à la fin, les photos défilant toujours. Le milieu des images est caché par le carnet.",
   end: true,
   texts: [
     {
@@ -227,11 +229,11 @@ export const carteFeutre: MontageSkill = {
   settings: [
     {
       name: "format",
-      want: "la place de ses images sous le carnet : plein écran comme l'original, ou en deux bandes au-dessus et au-dessous du carnet (pour des images horizontales)",
+      want: "la place de ses images sous le carnet : plein écran comme l'original, ou en deux bandes au-dessus et au-dessous du carnet, ses images horizontales entières",
       choices: [
-        { value: "auto", says: "comme ses images : plein écran, ou deux bandes quand la plupart sont horizontales" },
         { value: "vertical", says: "chaque image plein écran, comme l'original (une image horizontale y est recadrée)" },
-        { value: "bandes", says: "deux bandes d'images horizontales entières au-dessus et au-dessous du carnet, qui changent l'une après l'autre" },
+        { value: "bandes", says: "deux bandes d'images horizontales entières au-dessus et au-dessous du carnet, qui changent l'une après l'autre", band: true },
+        { value: "auto", says: "comme ses images : plein écran, ou deux bandes quand la plupart sont horizontales" },
       ],
     },
     {

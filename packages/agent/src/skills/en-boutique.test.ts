@@ -11,7 +11,7 @@ import { boutiqueSlots, enBoutique } from "./en-boutique.ts";
 const f = (s: number) => Math.round(s * 30);
 
 test("« Création à quatre mains » (v1): its sections on its original's, 133,75 BPM, the sticker 31 images into the artisan's smile", () => {
-  assert.equal(enBoutique.version, 1);
+  assert.equal(enBoutique.version, 2);
   assert.equal(enBoutique.bpm, 133.75);
   assert.deepEqual([enBoutique.shots, enBoutique.long, enBoutique.files, enBoutique.tempo], [[12, 22], 29, [4, 16], [114, 140]]);
   const line = enBoutique.timeline(29, { end: false });
@@ -115,7 +115,7 @@ test("« Création à quatre mains »: its plan subtitled for what is said in he
   const plan = skillPlan({ skill: enBoutique, name: "Création à quatre mains", files, fill });
   assert.ok(editPlanSchema.safeParse(plan).success);
   assert.deepEqual(plan.texts.map((t) => t.style), ["hook", "band", "caption", "caption", "caption", "caption", "caption"]);
-  assert.deepEqual(plan.skill, { key: "en-boutique", version: 1 });
+  assert.deepEqual(plan.skill, { key: "en-boutique", version: 2 });
   assert.equal(plan.tempo, 133.75);
   // What is said in her shots is written by its code (the engine's subtitles step aside).
   assert.equal(enBoutique.spoken, "own");
@@ -128,7 +128,7 @@ test("« Création à quatre mains »: its plan subtitled for what is said in he
   assert.deepEqual(checkMotionCode(enBoutique.code), []);
   assert.deepEqual([subjectsDrawn(enBoutique.code), objectsDrawn(enBoutique.code), clearsDrawn(enBoutique.code), readsDrawn(enBoutique.code)], [[], [], [], []]);
   assert.ok(enBoutique.code.length < 24000);
-  assert.deepEqual(enBoutique.settings?.map((s) => [s.name, s.choices.map((c) => c.value)]), [["format", ["auto", "vertical", "horizontal"]]]);
+  assert.deepEqual(enBoutique.settings?.map((s) => [s.name, s.choices.map((c) => c.value)]), [["format", ["vertical", "horizontal", "auto"]]]);
   // Its filler: its slots, their places, and that what she says in her videos is its subtitles.
   const input = skillFillInput({ skill: enBoutique, name: "Création à quatre mains", n: 16, files, business: { name: "Chez Léa" }, request: "" });
   assert.match(String(input.ses_paroles), /sous-titres/);
@@ -300,9 +300,9 @@ test("« Création à quatre mains »: her logo pops over the last shot, else he
   const card = sticker(drawAt(from + 6, { end: { title: "Ouvert dimanche", subtitle: "de 10 h à 18 h" } }), "end")!;
   assert.deepEqual(nodes(card).filter((n) => n.type === "FitText").map(own), ["Ouvert dimanche", "de 10 h à 18 h"]);
   // Every word to read between x 140 and 940 and above the bottom quarter, its stickers included, in both formats.
-  for (const aspect of [9 / 16, 16 / 9]) {
+  for (const options of [{ aspect: 9 / 16 }, { aspect: 16 / 9 }, { aspect: 16 / 9, texts: { format: "auto" } }]) {
     for (let k = 0; k < f(line.duration); k += 9) {
-      const tree = drawAt(k, { aspect });
+      const tree = drawAt(k, options);
       for (const t of nodes(tree).filter((n) => n.type === "FitText")) {
         const b = styleOf(t) as unknown as Box;
         const inCard = !String(t.props.key).startsWith("sub-") && !String(t.props.key).startsWith("x");
@@ -317,10 +317,14 @@ test("« Création à quatre mains »: her logo pops over the last shot, else he
       }
     }
   }
-  // Her videos upright: full frame; in width, whole in a 16:9 band on black, its subtitles under it; as she asks.
+  // Her videos full frame by default (Tristan, 6 November: « tout vertical please »), in width cropped on their subject;
+  // whole in a 16:9 band on black, its subtitles under it, on her word or as her videos (« auto »).
   const box = (tree: Drawn) => styleOf(nodes(tree).find((n) => n.children.some((c) => (c as Drawn)?.type === "Footage"))!);
   assert.deepEqual([box(drawAt(20)).top, box(drawAt(20)).height], [0, 1920]);
-  assert.deepEqual([box(drawAt(20, { aspect: 16 / 9 })).top, box(drawAt(20, { aspect: 16 / 9 })).height], [656, 608]);
+  assert.deepEqual([box(drawAt(20, { aspect: 16 / 9 })).top, box(drawAt(20, { aspect: 16 / 9 })).height], [0, 1920]);
+  const banded = { aspect: 16 / 9, texts: { format: "auto" } };
+  assert.deepEqual([box(drawAt(20, banded)).top, box(drawAt(20, banded)).height], [656, 608]);
+  assert.deepEqual([box(drawAt(20, { texts: { format: "horizontal" } })).top, box(drawAt(20, { texts: { format: "horizontal" } })).height], [656, 608]);
   assert.equal(box(drawAt(20, { aspect: 16 / 9, texts: { format: "vertical" } })).height, 1920);
-  assert.equal(subtitle(drawAt(20, { aspect: 16 / 9 }))!.box.top + 133, Math.round(1920 * 0.735));
+  assert.equal(subtitle(drawAt(20, banded))!.box.top + 133, Math.round(1920 * 0.735));
 });

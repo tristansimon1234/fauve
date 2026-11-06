@@ -95,6 +95,8 @@
 Heure dorée, chaud et contrasté : hautes lumières crème (#E6DDD4, #E9D8C2), tenues sous 233 sur 255 ; ombres presque noires, un peu bleutées (#070A16, #0B0B13) ; ciels bleu profond (#03447A, #021F45), sauf le ciel voilé du titre (#ABB4BA) ; un coucher de soleil orange (#D97B12), des briques chaudes (#452620). Saturation de 0,2 à 0,7 selon les plans. Grain : pas mesurable sur la copie, trop lisse. Pas de vignettage net (les coins sont plus sombres de 12 % en moyenne, mais plus clairs sur la moitié des images : ceux des plans). Outil : la finition du modèle (chaude, contrastée, hautes lumières crème, ombres un peu bleues) ; « Ciné chaud » (grain 0,3, coins sombres 0,4) en met plus que l'original n'en montre.
 
 ## Format
+**Depuis le 6 novembre** (Tristan, sur sept bancs : « vertical please », « tout vertical please ») : `vertical` par défaut, plein écran, ses fichiers horizontaux recadrés sur leur sujet ; `horizontal` (sa bande) seulement à sa demande, ou quand elle veut ses vidéos entières (le `frame` letterbox de son contrat) ; `auto` (comme ses vidéos, ci-dessous) seulement si elle le demande. `docs/modeles.md`, « Réglages d'un modèle ».
+
 L'original est une vidéo horizontale 4:3 montrée telle quelle. Réglage « format » : `auto` (horizontal quand la plupart de ses vidéos le sont, sinon vertical plein écran), `horizontal` (4:3 sur du noir, comme l'original : ses vidéos 16:9 recadrées en 4:3 sur leur sujet ; ou gardées en 16:9 entières, à voir), `vertical` (plein écran 9:16, chaque place en part de l'image : le titre sur toute la largeur dans la moitié haute, son pied sur le haut de ce qui est devant ; les silhouettes, la vague et le clignotement ne changent pas).
 
 ## Ce que Gemini a vu, et ce qu'il a raté

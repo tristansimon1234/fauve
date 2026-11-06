@@ -59,6 +59,8 @@ Ce que l'original fait sur la porte d'un immeuble, le modèle le fait sur ce qu'
 Lumière du jour naturelle : pierre beige chaude (#DABB97 sur le pilier, #B89F6E sous l'arche), bois brun (#63452B à #6B492A), vitre claire crème (#B0A481), vitre sombre presque noire (#15120E), trottoir gris neutre (#777577 : la balance des blancs est juste, le chaud vient des matières). Noirs profonds (1 % des pixels sous 6 niveaux), blancs à 218, saturation moyenne (0,39), aucun grain, aucun coin sombre (les coins sont plus clairs que le milieu). Outil : la finition du modèle (« Lumière du jour » : contraste et couleurs un peu poussés, sans grain ni coins sombres).
 
 ## Format
+**Depuis le 6 novembre** (Tristan, sur sept bancs : « vertical please », « tout vertical please ») : `vertical` par défaut, plein écran, ses fichiers horizontaux recadrés sur leur sujet ; `horizontal` (sa bande) seulement à sa demande, ou quand elle veut ses vidéos entières (le `frame` letterbox de son contrat) ; `auto` (comme ses vidéos, ci-dessous) seulement si elle le demande. `docs/modeles.md`, « Réglages d'un modèle ».
+
 L'original est vertical 9:16, un seul plan plein cadre. Réglage « format » :
 - `auto` (par défaut) : comme son fichier : vertical plein cadre quand il l'est ; un fichier horizontal recadré en vertical sur sa chose quand elle tient dans le cadre, sinon entier dans une bande 16:9 sur du noir ;
 - `vertical` : plein cadre, son fichier horizontal recadré sur sa chose ;

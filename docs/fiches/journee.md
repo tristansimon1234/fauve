@@ -94,6 +94,8 @@ Aucun zoom, aucune poussée ajoutée, aucun filé : la taille de l'image ne boug
 Hautes lumières chaudes qui n'atteignent jamais le blanc (crème : #EAD2AD, #DAC6AE, #D8CFB8 ; 230 sur 255 au plus, aucun pixel blanc pur), noirs un peu bleus (#08090E, #131C25, #181B22), contraste doux, couleurs un peu éteintes (ciels crème #BEAB92 ou gris-bleu #67787F). Aucun grain visible (0,3 à 0,6 niveau de bruit dans les ciels) et pas de coins sombres (les coins aussi clairs que le centre sur la façade et le peintre) ; la copie est très compressée : pas clair s'il y avait du grain. Outil : `finish` (existant) : chaleur, `highlights` crème, `shadows` bleu nuit (`split`), un peu de `fade` ; ni grain ni coins sombres.
 
 ## Format
+**Depuis le 6 novembre** (Tristan, sur sept bancs : « vertical please », « tout vertical please ») : `vertical` par défaut, plein écran, ses fichiers horizontaux recadrés sur leur sujet ; `horizontal` (sa bande) seulement à sa demande, ou quand elle veut ses vidéos entières (le `frame` letterbox de son contrat) ; `auto` (comme ses vidéos, ci-dessous) seulement si elle le demande. `docs/modeles.md`, « Réglages d'un modèle ».
+
 L'original est une vidéo horizontale 4:3 montrée telle quelle, l'image pleine. Réglage « format », comme dans `frappe` v2 (`setting("format", "auto")`, lu sur `shots[i].aspect`) :
 - `auto` : horizontal quand la plupart de ses vidéos le sont, sinon vertical ;
 - `horizontal` : 4:3 sur du noir, comme l'original (1 080 × 810 au milieu du cadre). Une vidéo 16:9 y perd un huitième de chaque côté, recadrée sur son sujet ; une vidéo verticale y perdrait plus de la moitié de sa hauteur : le remplisseur la garde pour l'autre format ;

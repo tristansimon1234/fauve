@@ -414,7 +414,7 @@ export const coulisses: MontageSkill = {
       want: "le format de la carte : 16:9 comme l'original, ou carrée",
       choices: [
         { value: "auto", says: "comme ses vidéos (16:9 si la plupart sont horizontales, carrée sinon)" },
-        { value: "horizontal", says: "une carte 16:9, comme l'original (une vidéo verticale y est cadrée sur son sujet)" },
+        { value: "horizontal", says: "une carte 16:9, comme l'original (une vidéo verticale y est cadrée sur son sujet)", band: true },
         { value: "vertical", says: "une carte carrée de la même largeur, pour des vidéos verticales" },
       ],
     },

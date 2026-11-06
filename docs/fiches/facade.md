@@ -47,6 +47,8 @@
 Lumineux et naturel, contraste doux : mur crème #EDE4CB, briques #DA9C74, tuiles #D7BCA8, rue #C3B9B0, ciel brûlé en blanc #FFFFFF. Les coins du bas plus sombres de 12 à 22 % (un vignettage léger, de l'objectif ou ajouté : pas clair). Aucun grain mesuré. Le fond : noir pur.
 
 ## Format
+**Depuis le 6 novembre** (Tristan, sur sept bancs : « vertical please », « tout vertical please ») : `vertical` par défaut, plein écran, ses fichiers horizontaux recadrés sur leur sujet ; `horizontal` (sa bande) seulement à sa demande, ou quand elle veut ses vidéos entières (le `frame` letterbox de son contrat) ; `auto` (comme ses vidéos, ci-dessous) seulement si elle le demande. `docs/modeles.md`, « Réglages d'un modèle ».
+
 L'original est vertical 9:16 plein écran, filmé de l'autre côté de la rue : la rue en bas (29 % de la hauteur), la maison au milieu, du ciel en haut. Une devanture est souvent plus large que haute, et ses vidéos peuvent être horizontales : le fond du modèle est déjà noir, donc une vidéo horizontale se pose en entier sur la largeur, au milieu du noir, et se construit là. Réglage « format » : `auto` (vertical plein écran quand sa vidéo de devanture est verticale, sinon posée en entier dans une bande au milieu du noir), `vertical` (plein écran ; une vidéo horizontale coupée autour de sa porte, on perd la largeur de sa devanture), `horizontal` (la bande 16:9 sur le noir). Dans tous les cas, l'image entière reste à sa taille jusqu'à la fin : aucun zoom pour remplir l'écran (Tristan trouve ça cheap).
 
 ## Ce que Gemini a vu, et ce qu'il a raté

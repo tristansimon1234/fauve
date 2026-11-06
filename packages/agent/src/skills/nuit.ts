@@ -117,7 +117,7 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
 
   // Its frame: a horizontal 16:9 picture on black, as the original, when most of her files are horizontal (or she asks),
   // else the whole vertical frame; every place below is in it.
-  const format = setting("format", "auto");
+  const format = setting("format", "vertical");
   const wideShots = shots.filter((s) => (Number(s.aspect) || 0.5625) > 1.15).length;
   const wide = format === "horizontal" || (format === "auto" && wideShots * 2 > n);
   const bw = width;
@@ -343,7 +343,9 @@ const EXTRA = "encore un moment de sa nuit : un geste au comptoir, un verre serv
 
 export const nuit: MontageSkill = {
   key: "nuit",
-  version: 1,
+  // 2: vertical full frame by default, her horizontal files cropped on their subject, its band only when she asks for
+  // it (Tristan, 6 November, on seven benches: « vertical please », « tout vertical please »).
+  version: 2,
   bpm: BPM,
   shots: [FEWEST, MOST],
   files: [6, 20],
@@ -351,7 +353,7 @@ export const nuit: MontageSkill = {
   long: LONGEST,
   // The moments something passes right before her lens, measured on her videos: its hidden cut gets a real one.
   reads: ["covered"],
-  how: "Sa nuit sous tous les angles, en horizontal 16:9 comme l'original quand ses vidéos le sont : son enseigne (ou l'objet qui la représente) vue sous quatre à six angles, toujours au même endroit et à la même taille, coupée de plus en plus vite sur un roulement qui accélère, le dernier tour filé ; puis ses choses rondes qui se remplacent au même endroit, une ou deux images chacune, jusqu'à la dernière qui s'éclaire en blanc et passe en négatif ; le noir et un silence, et la musique tombe sur une brûlure de pellicule : sa nuit en plans d'une demi-seconde à une seconde, enchaînés en flashs blancs, en négatifs (sa nuit devient blanche, ses lumières sombres), en brûlures, en coupes cachées par quelqu'un qui passe, une lumière orange, quelqu'un qui prend une photo au flash (son appareil puis sa silhouette deviennent blancs) ; un dernier plan large de sa nuit coupé d'une brûlure, qui revient sur la première image de son enseigne pour boucler.",
+  how: "Sa nuit sous tous les angles, en vertical plein écran (en horizontal 16:9 comme l'original à sa demande) : son enseigne (ou l'objet qui la représente) vue sous quatre à six angles, toujours au même endroit et à la même taille, coupée de plus en plus vite sur un roulement qui accélère, le dernier tour filé ; puis ses choses rondes qui se remplacent au même endroit, une ou deux images chacune, jusqu'à la dernière qui s'éclaire en blanc et passe en négatif ; le noir et un silence, et la musique tombe sur une brûlure de pellicule : sa nuit en plans d'une demi-seconde à une seconde, enchaînés en flashs blancs, en négatifs (sa nuit devient blanche, ses lumières sombres), en brûlures, en coupes cachées par quelqu'un qui passe, une lumière orange, quelqu'un qui prend une photo au flash (son appareil puis sa silhouette deviennent blancs) ; un dernier plan large de sa nuit coupé d'une brûlure, qui revient sur la première image de son enseigne pour boucler.",
   end: true,
   texts: [
     {
@@ -365,11 +367,11 @@ export const nuit: MontageSkill = {
   settings: [
     {
       name: "format",
-      want: "le format : horizontal 16:9 comme l'original, ou vertical plein écran",
+      want: "le format : vertical plein écran, ou horizontal 16:9 comme l'original",
       choices: [
+        { value: "vertical", says: "vertical plein écran, ses vidéos horizontales recadrées sur leur sujet" },
+        { value: "horizontal", says: "horizontal 16:9 sur du noir, comme l'original", band: true },
         { value: "auto", says: "comme ses vidéos (horizontal si la plupart le sont)" },
-        { value: "horizontal", says: "horizontal 16:9 sur du noir, comme l'original" },
-        { value: "vertical", says: "vertical plein écran" },
       ],
     },
   ],

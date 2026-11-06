@@ -88,6 +88,8 @@
 Teal and orange : ciels cyan (#5F99BC, #4689AA), nuit bleu profond (#153046), terres et roches ocre et brunes (#967E45, #57413B), blancs crème (#FAF9E9), ombres un peu vertes (#414B46) ; contrasté, saturé sans excès. Ni grain ni vignettage visibles (la copie est très compressée, 570 kb/s).
 
 ## Format
+**Depuis le 6 novembre** (Tristan, sur sept bancs : « vertical please », « tout vertical please ») : `vertical` par défaut, plein écran, ses fichiers horizontaux recadrés sur leur sujet ; `horizontal` (sa bande) seulement à sa demande, ou quand elle veut ses vidéos entières (le `frame` letterbox de son contrat) ; `auto` (comme ses vidéos, ci-dessous) seulement si elle le demande. `docs/modeles.md`, « Réglages d'un modèle ».
+
 L'original est une vidéo horizontale 16:9 montrée telle quelle. Tout y est en proportion de l'image : les tiers de la grille, les fenêtres de 21, 28 et 33 %, les étiquettes à 10 % des bords. Réglage « format » : `auto` (horizontal quand la plupart de ses vidéos le sont, sinon vertical), `horizontal` (16:9 sur du noir, comme l'original ; ses vidéos verticales y perdent beaucoup), `vertical` (plein écran : les cases et les fenêtres deviennent 9:16, les étiquettes juste au-dessus du milieu, hors des boutons des applis à droite).
 
 ## Ce que Gemini a vu, et ce qu'il a raté

@@ -72,6 +72,8 @@ Chaud et net, à la manière d'un « teal & orange » doux : des ombres bleu-ver
 Le nom et le logo du restaurant (son enseigne, son store, l'inscription de sa vitrine, le logo du tee-shirt), les noms de ses plats (« Shakshuka », « Halloumi »), ses poussins qui traversent le trottoir et rentrent dans le restaurant, leurs piaillements, le son de sa rue. Le modèle met ses produits à elle, leurs noms, sa vidéo et la musique d'Edith.
 
 ## Format
+**Depuis le 6 novembre** (Tristan, sur sept bancs : « vertical please », « tout vertical please ») : `vertical` par défaut, plein écran, ses fichiers horizontaux recadrés sur leur sujet ; `horizontal` (sa bande) seulement à sa demande, ou quand elle veut ses vidéos entières (le `frame` letterbox de son contrat) ; `auto` (comme ses vidéos, ci-dessous) seulement si elle le demande. `docs/modeles.md`, « Réglages d'un modèle ».
+
 L'original est vertical 9:16, ses trois plans plein cadre. Réglage « format » :
 - `auto` (par défaut) : comme ses vidéos : une verticale plein écran, une horizontale entière dans une bande 16:9 sur du noir (chaque plan comme il a été filmé : son gros plan vertical s'ouvre alors plein écran entre deux bandes) ; dans une bande, les noms de ses produits sur le noir au-dessus ou au-dessous, leurs flèches dans l'image ;
 - `vertical` : tout plein écran, ses vidéos horizontales recadrées sur leur sujet ;

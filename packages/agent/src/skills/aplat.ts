@@ -73,7 +73,7 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
 
   // Its frame: a horizontal 4:3 picture on black, as the original, when most of her files are horizontal (or she asks),
   // else the whole vertical frame; every place below is a share of it.
-  const format = setting("format", "auto");
+  const format = setting("format", "vertical");
   const wideShots = shots.filter((s) => (Number(s.aspect) || 0.5625) > 1.15).length;
   const wide = format === "horizontal" || (format === "auto" && wideShots * 2 > n);
   const bw = width;
@@ -277,14 +277,16 @@ export const aplat: MontageSkill = {
   // 2: written again on its original's fiche (its 123 BPM and its cuts, its 4:3 format, its pure red, her shot rebuilt
   // from the nearest to the farthest, the next shot's still pieces one an eighth, its overexposed arrival, its frame
   // closing at a constant speed, the frozen world in a new look on each note, its end on the colour; no title of its own).
-  version: 2,
+  // 3: vertical full frame by default, her horizontal files cropped on their subject, its band only when she asks for
+  // it (Tristan, 6 November, on seven benches: « vertical please », « tout vertical please »).
+  version: 3,
   bpm: BPM,
   // Her walk, the next shot framed, someone in front of a background, the same later; past them (more of her files), more framed shots.
   shots: [4, 6],
   // Up to 14 for a length she asks for (about 28 s at its own tempo): more of her shots framed by the colour.
   long: LONG,
   files: [3, 10],
-  how: "Sa silhouette détourée (quelqu'un qui marche, de dos ou de profil) seule sur un grand aplat rouge pur (ou sa couleur quand elle est vive), blanche et lumineuse trois images, puis à ses couleurs avec son ombre ; son vrai plan revient autour d'elle du plus près au plus loin, puis le reste du sol en un flash blanc, puis le ciel ; le plan suivant se pose dessus morceau par morceau, figé, un par croche, puis arrive surexposé ; un cadre de la même couleur se referme sur lui à vitesse constante ; puis quelqu'un devant un fond : le décor derrière se fige et change de look sur chaque note pendant que la personne bouge ; le même plan plus tard, et le Reel finit sur la couleur. En horizontal 4:3 comme l'original quand ses vidéos le sont.",
+  how: "Sa silhouette détourée (quelqu'un qui marche, de dos ou de profil) seule sur un grand aplat rouge pur (ou sa couleur quand elle est vive), blanche et lumineuse trois images, puis à ses couleurs avec son ombre ; son vrai plan revient autour d'elle du plus près au plus loin, puis le reste du sol en un flash blanc, puis le ciel ; le plan suivant se pose dessus morceau par morceau, figé, un par croche, puis arrive surexposé ; un cadre de la même couleur se referme sur lui à vitesse constante ; puis quelqu'un devant un fond : le décor derrière se fige et change de look sur chaque note pendant que la personne bouge ; le même plan plus tard, et le Reel finit sur la couleur. En vertical plein écran, ses vidéos horizontales recadrées sur leur sujet ; en horizontal 4:3 comme l'original à sa demande.",
   end: true,
   texts: [
     { slot: "titre", role: "hook", want: "facultatif : 1 à 3 mots sur l'aplat de couleur, au-dessus de la silhouette, en capitales : ce qu'on va voir, ou son nom s'il est court (une forme comme « un samedi », « au marché », « chez Lou »)", max: 18, required: false },
@@ -300,11 +302,11 @@ export const aplat: MontageSkill = {
   settings: [
     {
       name: "format",
-      want: "le format : horizontal 4:3 comme l'original, ou vertical plein écran",
+      want: "le format : vertical plein écran, ou horizontal 4:3 comme l'original",
       choices: [
+        { value: "vertical", says: "vertical plein écran, ses vidéos horizontales recadrées sur leur sujet" },
+        { value: "horizontal", says: "horizontal 4:3 sur du noir, comme l'original", band: true },
         { value: "auto", says: "comme ses vidéos (horizontal si la plupart le sont)" },
-        { value: "horizontal", says: "horizontal 4:3 sur du noir, comme l'original" },
-        { value: "vertical", says: "vertical plein écran" },
       ],
     },
     {

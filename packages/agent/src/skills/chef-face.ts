@@ -48,7 +48,7 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
 
   // 1. Its frame, as her talking video: upright, every shot full frame; in width (or on her word), every shot whole in a
   // 16:9 band on black, her words on the same line.
-  const format = setting("format", "auto");
+  const format = setting("format", "vertical");
   const wideTalk = (Number(list[0] && list[0].aspect) || 0.5625) > 1.15;
   const band = format === "horizontal" || (format === "auto" && wideTalk);
   const BH = Math.round((W * 9) / 16);
@@ -145,7 +145,9 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
 
 export const chefFace: MontageSkill = {
   key: "chef-face",
-  version: 1,
+  // 2: vertical full frame by default, her horizontal files cropped on their subject, its band only when she asks for
+  // it (Tristan, 6 November, on seven benches: « vertical please », « tout vertical please »).
+  version: 2,
   // Its original has no music one hears and no beat to count: its tempo only sets the music under her voice (her cuts are hers).
   bpm: BPM,
   // Her talk's pieces (the engine cuts them): as many as her pauses and ideas make.
@@ -168,11 +170,11 @@ export const chefFace: MontageSkill = {
   settings: [
     {
       name: "format",
-      want: "le format : comme sa vidéo où elle parle, tout plein cadre en vertical, ou ses vidéos entières dans une bande 16:9 sur du noir",
+      want: "le format : tout plein cadre en vertical, ses vidéos entières dans une bande 16:9 sur du noir, ou comme sa vidéo où elle parle",
       choices: [
-        { value: "auto", says: "comme sa vidéo où elle parle : verticale, tout plein cadre (comme l'original) ; horizontale, tout dans une bande 16:9 sur du noir" },
         { value: "vertical", says: "tout plein cadre en vertical, ses vidéos horizontales recadrées" },
-        { value: "horizontal", says: "chaque vidéo entière dans une bande 16:9 au milieu, sur du noir, ses mots sur la même ligne" },
+        { value: "horizontal", says: "chaque vidéo entière dans une bande 16:9 au milieu, sur du noir, ses mots sur la même ligne", band: true },
+        { value: "auto", says: "comme sa vidéo où elle parle : verticale, tout plein cadre (comme l'original) ; horizontale, tout dans une bande 16:9 sur du noir" },
       ],
     },
   ],

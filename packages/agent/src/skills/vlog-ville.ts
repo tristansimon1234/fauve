@@ -160,7 +160,7 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
 
   // 1. Its frame: a 4:3 picture on black, as the original, when most of her shots are horizontal (or she asks), else
   // the whole vertical frame; every place below is in it.
-  const format = setting("format", "auto");
+  const format = setting("format", "vertical");
   const wideShots = shots.filter((s) => (Number(s.aspect) || 0.5625) > 1.15).length;
   const band = format === "horizontal" || (format === "auto" && wideShots * 2 > n);
   const BW = width;
@@ -328,13 +328,15 @@ const SUBTITLE = "une phrase de sous-titre en minuscules, courte (une ligne, deu
 
 export const vlogVille: MontageSkill = {
   key: "vlog-ville",
-  version: 1,
+  // 2: vertical full frame by default, her horizontal files cropped on their subject, its band only when she asks for
+  // it (Tristan, 6 November, on seven benches: « vertical please », « tout vertical please »).
+  version: 2,
   bpm: BPM,
   shots: [FEWEST, MOST],
   files: [6, 16],
   // Its length is its film's (41,8 s at 76 BPM): its tempo moves it, from 35 to 43 s, its card within 45.
   tempo: [74, 90],
-  how: "Un court-métrage de son quartier raconté en petits sous-titres : un plan large et calme où ses premiers mots arrivent un à un, la musique qui tombe sur le nom de son lieu avec une rafale de gros plans d'un détail, puis elle de dos, immobile, pendant que tout passe, et le nom en grandes capitales rouges (ou à sa couleur quand elle est vive) entre guillemets, sa signature au-dessus et « un court-métrage. » dessous ; puis sa ville qui bouge (passants, foule, lumières, une rafale de nuit), une rafale qui rappelle les plans déjà vus, des plans calmes quand le texte dit de ralentir, et la fin qui revient au plan du titre. Ses phrases racontent tout du long, en bas de l'image ; en 4:3 sur du noir quand ses vidéos sont horizontales.",
+  how: "Un court-métrage de son quartier raconté en petits sous-titres : un plan large et calme où ses premiers mots arrivent un à un, la musique qui tombe sur le nom de son lieu avec une rafale de gros plans d'un détail, puis elle de dos, immobile, pendant que tout passe, et le nom en grandes capitales rouges (ou à sa couleur quand elle est vive) entre guillemets, sa signature au-dessus et « un court-métrage. » dessous ; puis sa ville qui bouge (passants, foule, lumières, une rafale de nuit), une rafale qui rappelle les plans déjà vus, des plans calmes quand le texte dit de ralentir, et la fin qui revient au plan du titre. Ses phrases racontent tout du long, en bas de l'image ; en vertical plein écran, ses vidéos horizontales recadrées sur leur sujet (en 4:3 sur du noir à sa demande).",
   end: true,
   texts: [
     { slot: "accroche", role: "hook", want: "sa première phrase, qui arrive mot à mot sur le premier plan, en minuscules comme un sous-titre : le rythme ou l'âme de son quartier, de sa ville ou de son lieu (une forme comme « Chaque quartier a son rythme », « Ici, le matin commence tôt ») ; 5 mots au plus", max: 32, required: true },
@@ -360,11 +362,11 @@ export const vlogVille: MontageSkill = {
   settings: [
     {
       name: "format",
-      want: "le format : comme ses vidéos, en 4:3 sur du noir comme l'original, ou vertical plein écran",
+      want: "le format : vertical plein écran, en 4:3 sur du noir comme l'original, ou comme ses vidéos",
       choices: [
+        { value: "vertical", says: "vertical plein écran, ses vidéos horizontales recadrées sur leur sujet" },
+        { value: "horizontal", says: "en 4:3 sur du noir, comme l'original", band: true },
         { value: "auto", says: "comme ses vidéos : en 4:3 sur du noir quand la plupart sont horizontales, sinon plein écran" },
-        { value: "horizontal", says: "en 4:3 sur du noir, comme l'original" },
-        { value: "vertical", says: "vertical plein écran" },
       ],
     },
     {

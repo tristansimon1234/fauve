@@ -80,6 +80,8 @@ Lumineux, chaud et saturé : le vert du t-shirt de l'artisan, sa casquette rouge
 **À l'original, jamais recopiés** : le badge du créateur en haut à droite de tout le Reel et son logo animé de la fin, leurs visages et leurs prénoms, la halle, leur pizza « anti-gaspi » et tous leurs mots. Le modèle écrit les siens : le nom de sa création à elle, ses prénoms à elle seulement quand elle les a donnés, ses répliques.
 
 ## Format
+**Depuis le 6 novembre** (Tristan, sur sept bancs : « vertical please », « tout vertical please ») : `vertical` par défaut, plein écran, ses fichiers horizontaux recadrés sur leur sujet ; `horizontal` (sa bande) seulement à sa demande, ou quand elle veut ses vidéos entières (le `frame` letterbox de son contrat) ; `auto` (comme ses vidéos, ci-dessous) seulement si elle le demande. `docs/modeles.md`, « Réglages d'un modèle ».
+
 L'original est vertical 9:16, plein cadre. Réglage « format » :
 - `auto` (par défaut, comme ses vidéos) : plein écran vertical comme l'original ; en 16:9 sur du noir quand la plupart de ses vidéos sont en largeur ;
 - `vertical` : plein écran, ses vidéos en largeur recadrées sur leur sujet ;

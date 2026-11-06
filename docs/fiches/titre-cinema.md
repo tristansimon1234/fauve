@@ -53,6 +53,8 @@ Les coupes : 6,10 · 8,10 · 10,07 · 13,83 s sur la grosse caisse du premier te
 Cinéma sarcelle et orange : des noirs profonds mais pas bouchés (1er centile à 4 – 11 niveaux sur 255, à peine décollés), des **hautes lumières crème tenues sous le blanc** (99e centile à 170 – 222, #EBDDA7 sur le manège, #E5DAA6 au couchant, #BCA87A sur la plage), des ombres bleutées ou sarcelle (#040913 au crépuscule, #032A32 dans l'aquarium, #0A1316 sur la plage) et chaudes au couchant (#130D0D), des couleurs riches (saturation médiane de 0,3 à 0,85 selon les plans). Grain : pas mesurable sur la copie, trop compressée. Pas de vignettage constant (les coins font de 0,27 à 1,2 fois le milieu, selon les plans). Outil : la finition du modèle (contraste et saturation un peu montés, ombres #071216 et hautes lumières #E8D9AE en virage, sans grain ni coins sombres).
 
 ## Format
+**Depuis le 6 novembre** (Tristan, sur sept bancs : « vertical please », « tout vertical please ») : `vertical` par défaut, plein écran, ses fichiers horizontaux recadrés sur leur sujet ; `fenetre` (sa bande) seulement à sa demande, ou quand elle veut ses vidéos entières (le `frame` letterbox de son contrat) ; `auto` (comme ses vidéos, ci-dessous) seulement si elle le demande. `docs/modeles.md`, « Réglages d'un modèle ».
+
 L'original est presque carré (10:9), montré tel quel : une fenêtre de toute la largeur sur du noir. Réglage « format » :
 - `auto` (par défaut) : comme ses vidéos ; la fenêtre de l'original (1080 × 972 au milieu du cadre) quand la plupart sont horizontales (une vidéo 16:9 y garde ses 62,5 % du milieu, recadrée sur son sujet), sinon vertical plein écran ;
 - `vertical` : plein écran ;

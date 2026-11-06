@@ -94,6 +94,8 @@ Tout le Reel : 10 cadres (le premier revient à la fin), tous fixes (ni zoom ni 
 - **Outil** : existant : la finition du modèle (chaude, un peu de contraste), sans grain, sans vignettage, sans noirs levés.
 
 ## Format
+**Depuis le 6 novembre** (Tristan, sur sept bancs : « vertical please », « tout vertical please ») : `vertical` par défaut, plein écran, ses fichiers horizontaux recadrés sur leur sujet ; `horizontal` (sa bande) seulement à sa demande, ou quand elle veut ses vidéos entières (le `frame` letterbox de son contrat) ; `auto` (comme ses vidéos, ci-dessous) seulement si elle le demande. `docs/modeles.md`, « Réglages d'un modèle ».
+
 L'original est vertical 9:16, filmé en vertical, plein écran, sans bandes. Réglage « format » : `vertical` seulement (défaut, comme l'original) : les gros plans remplissent l'image et les petits textes se posent dans ses vides. Une vidéo horizontale est recadrée en 9:16 autour du geste (les mains, au milieu). Pas de version horizontale ni carrée : rien à y gagner.
 
 ## Ce que Gemini a vu, et ce qu'il a raté

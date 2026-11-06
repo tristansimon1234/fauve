@@ -115,7 +115,7 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
 
   // Its frame: horizontal 16:9 on black as the original when her videos are mostly horizontal (or she asks), else the
   // whole vertical frame; every place below is a share of it.
-  const format = setting("format", "auto");
+  const format = setting("format", "vertical");
   const wideShots = shots.filter((s) => (Number(s.aspect) || 0.5625) > 1.15).length;
   const wide = format === "horizontal" || (format === "auto" && wideShots * 2 > n);
   const bw = width;
@@ -282,13 +282,15 @@ export const decode: MontageSkill = {
   // images, the calm shot in silence, its ending by layers (a subject that stays while the place changes), its sounds
   // and its music's shape (late, out of a small speaker, stopped, full), a finish without grain nor dark corners.
   // 4: its last hit's tail dies away over the calm shot (a pause's `tail`) instead of a dead cut 0,1 s after it.
-  version: 4,
+  // 5: vertical full frame by default, her horizontal files cropped on their subject, its band only when she asks for
+  // it (Tristan, 6 November, on seven benches: « vertical please », « tout vertical please »).
+  version: 5,
   bpm: BPM,
   shots: [FEWEST, MOST],
   // Up to 23 for a length she asks for: about 30 s at its own tempo, more of her shots full frame after the calm one.
   long: LONGEST,
   files: [3, 12],
-  how: "Six de ses plans entrent en bandes verticales l'un après l'autre, puis la rangée se replie en un trait en trois marches ; sur le noir, trois petits mots et le titre brouillé qui se décode ; avec la musique, une bande de vidéo s'ouvre derrière le titre et grandit jusqu'au plein écran, un montage éclair de toutes ses vidéos y défile (une coupe toutes les 4 images) ; le titre part d'un coup sur un plan calme tenu presque en silence ; puis la musique pleine sur un plan qui suit quelqu'un, le lieu qui change derrière lui, la chose du plan suivant qui arrive en avance, et une personne détourée qui reste pendant que ses lieux changent derrière elle. En horizontal comme l'original quand ses vidéos le sont.",
+  how: "Six de ses plans entrent en bandes verticales l'un après l'autre, puis la rangée se replie en un trait en trois marches ; sur le noir, trois petits mots et le titre brouillé qui se décode ; avec la musique, une bande de vidéo s'ouvre derrière le titre et grandit jusqu'au plein écran, un montage éclair de toutes ses vidéos y défile (une coupe toutes les 4 images) ; le titre part d'un coup sur un plan calme tenu presque en silence ; puis la musique pleine sur un plan qui suit quelqu'un, le lieu qui change derrière lui, la chose du plan suivant qui arrive en avance, et une personne détourée qui reste pendant que ses lieux changent derrière elle. En vertical plein écran, ses vidéos horizontales recadrées sur leur sujet ; en horizontal comme l'original à sa demande.",
   end: true,
   texts: [
     { slot: "surtitre", role: "caption", want: "1 à 3 petits mots qui amènent le titre, en minuscules, posés sur sa ligne au-dessus de lui : le premier sur son bord gauche, le dernier sur son bord droit (une forme comme « un samedi à », « bienvenue chez », « le matin au »)", max: 24, required: true },
@@ -297,11 +299,11 @@ export const decode: MontageSkill = {
   settings: [
     {
       name: "format",
-      want: "le format : horizontal comme l'original, ou vertical plein écran",
+      want: "le format : vertical plein écran, ou horizontal comme l'original",
       choices: [
+        { value: "vertical", says: "vertical plein écran, ses vidéos horizontales recadrées sur leur sujet" },
+        { value: "horizontal", says: "horizontal 16:9 sur du noir, comme l'original", band: true },
         { value: "auto", says: "comme ses vidéos (horizontal si la plupart le sont)" },
-        { value: "horizontal", says: "horizontal 16:9 sur du noir, comme l'original" },
-        { value: "vertical", says: "vertical plein écran" },
       ],
     },
   ],

@@ -84,5 +84,7 @@ test("« Mots aux quatre coins »: its optional words left out, its first words 
   assert.deepEqual(quatreCoinsPieces({ debut: "chez", nom: "Lino", adresse: "ouvert dès 8 h" }), ["top0", "nom", "adresse"]);
   // Its format, a setting her words may ask for.
   assert.equal(placePlan(5, 92, WORDS, { format: "horizontal" }).layers![0]!.motion.texts!.format, "horizontal");
-  assert.deepEqual(quatreCoins.settings![0]!.choices.map((c) => c.value), ["auto", "horizontal", "vertical"]);
+  // Vertical full frame by default (Tristan, 6 November: « tout vertical please »), as its model; its band on her word.
+  assert.deepEqual(quatreCoins.settings![0]!.choices.map((c) => c.value), ["vertical", "horizontal", "auto"]);
+  assert.equal(quatreCoins.settings![0]!.choices.find((c) => c.band)?.value, "horizontal");
 });

@@ -66,6 +66,8 @@
 La vidéo : lumière du jour douce, couleurs naturelles peu saturées, blancs brûlés (le ciel) ; crème #EFE6CF, brique #CA956D, vitres #292924, rue #B0A69B. Le papier et l'encre restent dans ces tons chauds (pêche, rouille). Ni grain, ni flash, ni clignotement (mesuré). Pas de bruitage mesurable (un son aigu, 3,2 kHz, sous le premier accord : musique ou bruitage, pas clair).
 
 ## Format
+**Depuis le 6 novembre** (Tristan, sur sept bancs : « vertical please », « tout vertical please ») : `vertical` par défaut, plein écran, ses fichiers horizontaux recadrés sur leur sujet ; `horizontal` (sa bande) seulement à sa demande, ou quand elle veut ses vidéos entières (le `frame` letterbox de son contrat) ; `auto` (comme ses vidéos, ci-dessous) seulement si elle le demande. `docs/modeles.md`, « Réglages d'un modèle ».
+
 L'original est vertical 9:16 en plein cadre : une vidéo filmée en hauteur (la façade sur toute la largeur, le ciel au-dessus, la rue en dessous) ; le papier est dessiné en plein cadre. Réglage « format » : `auto` (comme sa vidéo de devanture), `vertical` (sa vidéo en plein cadre, coupée en morceaux), `horizontal` (sa vidéo entière dans une bande 16:9 au milieu : la façade se construit dans la bande, sur le noir qui est déjà le fond ; le papier reste en plein cadre).
 
 ## Ce que Gemini a vu, et ce qu'il a raté

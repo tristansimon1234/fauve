@@ -14,7 +14,7 @@ const ORIGINAL_CUTS = [39, 78, 124, 162, 188];
 const ORIGINAL_POPS = [[53, 58, 66, 71], [101, 106, 114], [142, 146, 154], [176]];
 
 test("« Plans qui s'emboîtent » (v1): its six shots on its original's cuts (95 BPM, in sixteenths), 7,23 s", () => {
-  assert.equal(raccords.version, 1);
+  assert.equal(raccords.version, 2);
   assert.equal(raccords.bpm, 95);
   const line = raccords.timeline(6, { end: false });
   // 217 images, the original's; each cut within an image of the original's.
@@ -98,7 +98,7 @@ test("« Plans qui s'emboîtent »: its plan (its word, its music's shape, its c
   assert.deepEqual(plan.texts.map((t) => [t.style, t.text]), [["hook", "Farine"]]);
   assert.equal(plan.sounds?.length ?? 0, 0);
   assert.equal(plan.music_shape?.filters?.length, 3);
-  assert.deepEqual(plan.skill, { key: "raccords", version: 1 });
+  assert.deepEqual(plan.skill, { key: "raccords", version: 2 });
   assert.equal(plan.tempo, 95);
   // Only the three shots whose subject arrives cut out are cut out; no object followed, no clear area; the light under
   // its word read on its first shot only.
@@ -168,8 +168,8 @@ test("« Plans qui s'emboîtent »: her word, very big across the frame, blinkin
   assert.equal(inner.color, "#b5543a");
   assert.equal((of(drawAt(4, { light: 0.2 }), "FitText")[0]!.props.innerStyle as Record<string, unknown>).color, "#f6efe4");
   assert.equal((of(drawAt(4, { light: 0.2, brand: { accent: "#123456", palette: {} } }), "FitText")[0]!.props.innerStyle as Record<string, unknown>).color, "#ffffff");
-  // Her shots in a band (most of them in width): the word within the apps' margins, inside the band.
-  const banded = styleOf(of(drawAt(4, { aspect: 16 / 9 }), "FitText")[0]!);
+  // Her shots in a band (most of them in width, on her word): the word within the apps' margins, inside the band.
+  const banded = styleOf(of(drawAt(4, { aspect: 16 / 9, texts: { format: "auto" } }), "FitText")[0]!);
   assert.deepEqual([banded.left, banded.width], [140, 800]);
   assert.ok(Number(banded.top) >= 656 && Number(banded.top) + Number(banded.height) <= 1264);
 });
@@ -240,14 +240,19 @@ test("« Plans qui s'emboîtent »: the next subject cut out in three pieces whe
   assert.ok(keyed(drawAt(176, { subject: () => ({ x: 500, y: 900, w: 60, h: 80 }) }), "c5"));
 });
 
-test("« Plans qui s'emboîtent »: its frame as her videos, or as she asks", () => {
+test("« Plans qui s'emboîtent » (v2): full frame by default, its band as her videos or as she asks", () => {
   const frameOf = (tree: Drawn) => styleOf(keyed(tree, "frame")!);
   assert.deepEqual([frameOf(drawAt(40)).top, frameOf(drawAt(40)).height], [0, 1920]);
-  assert.deepEqual([frameOf(drawAt(40, { aspect: 16 / 9 })).top, frameOf(drawAt(40, { aspect: 16 / 9 })).height], [656, 608]);
+  // By default (Tristan, 6 November: « tout vertical please »), her videos in width full frame, cropped on their subject.
+  assert.deepEqual([frameOf(drawAt(40, { aspect: 16 / 9 })).top, frameOf(drawAt(40, { aspect: 16 / 9 })).height], [0, 1920]);
+  const asVideos = { aspect: 16 / 9, texts: { format: "auto" } };
+  assert.deepEqual([frameOf(drawAt(40, asVideos)).top, frameOf(drawAt(40, asVideos)).height], [656, 608]);
+  assert.equal(frameOf(drawAt(40, { texts: { format: "auto" } })).height, 1920);
   assert.equal(frameOf(drawAt(40, { texts: { format: "horizontal" } })).height, 608);
   assert.equal(frameOf(drawAt(40, { aspect: 16 / 9, texts: { format: "vertical" } })).height, 1920);
+  assert.deepEqual(raccords.settings?.map((s) => [s.name, s.choices.map((c) => c.value)]), [["format", ["vertical", "horizontal", "auto"]]]);
   // In a band, the cells are the band's: 0,62 of its height.
-  const cells = rects(styleOf(keyed(drawAt(57, { aspect: 16 / 9 }), "c2")!).clipPath);
+  const cells = rects(styleOf(keyed(drawAt(57, asVideos), "c2")!).clipPath);
   assert.ok(cells.every((c) => c.w === 102), JSON.stringify(cells));
 });
 

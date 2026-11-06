@@ -91,6 +91,8 @@ Les plans sont des images de banque (l'original les a pris tels quels, certains 
 « MOMENTS », « SHORT CINEMA » et « Archived by : your name » sont les mots du modèle CapCut que son auteur a repris (« your name » est même resté tel quel) : **à l'original, jamais recopiés**. Le modèle écrit les siens : un petit mot, le titre de son film, sa signature. Ses plans de voyage (Paris, un tram, un ferry, une cathédrale) sont des images de banque : ils ne disent que ce qu'il faut filmer.
 
 ## Format
+**6 novembre** : quand tous les modèles sont passés en vertical par défaut (Tristan : « tout vertical please »), celui-ci a gardé le sien, `auto` : sa pellicule projetée aux coins arrondis sur un noir doux est sa signature ; `horizontal` est sa bande (ses vidéos entières, à sa demande), `vertical` le plein écran à sa demande. `docs/modeles.md`, « Décisions de Tristan sur les originaux ».
+
 L'original est horizontal (16:9), son image en 1,94:1 aux coins arrondis. Réglage « format » :
 - `auto` (par défaut) : en horizontal quand la plupart de ses vidéos le sont (1080 × 557 au milieu du cadre, sur le noir doux), sinon plein écran ;
 - `horizontal` : comme l'original ; une vidéo verticale y perd l'essentiel de sa hauteur (le remplisseur la garde pour l'autre format) ;

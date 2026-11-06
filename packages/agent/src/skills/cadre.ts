@@ -63,7 +63,7 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
 
   // Its format: the whole vertical frame, its frame upright (2:3) as the original's, or lying (3:2) when most of her
   // pictures in it are in width; on her word, all of it in a 16:9 picture on black (her wide shot whole).
-  const format = setting("format", "auto");
+  const format = setting("format", "vertical");
   const aspect = (s) => Number(s && s.aspect) || 0.5625;
   const lyingShots = shots.slice(0, m).filter((s) => aspect(s) > 1.15).length;
   const boxed = format === "horizontal";
@@ -165,11 +165,13 @@ export const cadre: MontageSkill = {
   // 2: written again on its original's fiche: its tempo (90) and its cuts (an eighth note each), its wide shot frozen in
   // a dark black and white, a notch at each cut from 15 % to 95 %, its door or window when there is one, its labels at its
   // size, its last picture full frame at once and its music cut dead, its format; no grain nor dark corners.
-  version: 2,
+  // 3: vertical full frame by default, her horizontal files cropped on their subject, its band only when she asks for
+  // it (Tristan, 6 November, on seven benches: « vertical please », « tout vertical please »).
+  version: 3,
   bpm: BPM,
   shots: [8, 18],
   files: [4, 12],
-  how: "Son plan le plus large du lieu, figé en noir et blanc sombre, remplit l'écran ; au milieu (ou dans sa porte, sa fenêtre, son miroir au fond, quand il y en a un), un cadre sans bord montre ses images en couleur, une nouvelle à chaque demi-temps, la première son plan large lui-même : à chaque coupe, le cadre grandit d'un cran, d'un coup, de 15 % à 95 % de la largeur ; puis sa plus belle image prend tout l'écran d'un coup et la musique se coupe net. Deux petites étiquettes blanches en capitales restent fixes à mi-hauteur, une à gauche, une à droite, tout le Reel. Le cadre est debout comme l'original, couché quand ses images sont en largeur.",
+  how: "Son plan le plus large du lieu, figé en noir et blanc sombre, remplit l'écran ; au milieu (ou dans sa porte, sa fenêtre, son miroir au fond, quand il y en a un), un cadre sans bord montre ses images en couleur, une nouvelle à chaque demi-temps, la première son plan large lui-même : à chaque coupe, le cadre grandit d'un cran, d'un coup, de 15 % à 95 % de la largeur ; puis sa plus belle image prend tout l'écran d'un coup et la musique se coupe net. Deux petites étiquettes blanches en capitales restent fixes à mi-hauteur, une à gauche, une à droite, tout le Reel. Le cadre est debout comme l'original, une image en largeur y est recadrée sur son sujet.",
   end: true,
   texts: [
     {
@@ -191,11 +193,11 @@ export const cadre: MontageSkill = {
   settings: [
     {
       name: "format",
-      want: "le format : le cadre comme ses images, debout comme l'original, ou tout en horizontal",
+      want: "le format : le cadre debout en plein écran vertical comme l'original, tout en horizontal sur du noir, ou le cadre comme ses images",
       choices: [
-        { value: "auto", says: "comme ses images : le cadre debout (2:3), ou couché (3:2) quand la plupart sont en largeur, en plein écran vertical" },
-        { value: "horizontal", says: "tout en horizontal 16:9 sur du noir : son plan large en entier, le cadre couché jusqu'au plein cadre" },
         { value: "vertical", says: "comme l'original : le cadre debout (2:3) en plein écran vertical, ses vidéos en largeur recadrées sur leur sujet" },
+        { value: "horizontal", says: "tout en horizontal 16:9 sur du noir : son plan large en entier, le cadre couché jusqu'au plein cadre", band: true },
+        { value: "auto", says: "comme ses images : le cadre debout (2:3), ou couché (3:2) quand la plupart sont en largeur, en plein écran vertical" },
       ],
     },
   ],

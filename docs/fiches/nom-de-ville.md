@@ -69,6 +69,8 @@
 Chaud et terreux : ombres presque noires et un peu chaudes (#16120C, #070606 ; jusqu'à #040404 dans les plans sombres : les noirs ne sont pas relevés, Gemini se trompe), tons moyens terre cuite et bruns (#9D4F39, #5F371D, #6A3C1B), hautes lumières jaune crème (#D2D2A4 à #EDCC74), le ciel bleu tiré vers un kaki pâle (#CCC999). Saturation de 0,26 à 0,63 selon les plans. **Pas de grain mesurable** sur la copie (le ciel du plan fixe varie de 0,14 niveau d'une image à l'autre) ni de vignettage net (les coins sont plus clairs que le centre sur 31 % des images). Outil : la finition du modèle (« Ocre » : chaude, contrastée, ombres #16120C, hautes lumières #EDCC74, sans grain ni coins sombres).
 
 ## Format
+**Depuis le 6 novembre** (Tristan, sur sept bancs : « vertical please », « tout vertical please ») : `vertical` par défaut, plein écran, ses fichiers horizontaux recadrés sur leur sujet ; `horizontal` (sa bande) seulement à sa demande, ou quand elle veut ses vidéos entières (le `frame` letterbox de son contrat) ; `auto` (comme ses vidéos, ci-dessous) seulement si elle le demande. `docs/modeles.md`, « Réglages d'un modèle ».
+
 L'original est une vidéo horizontale 16:9 montrée telle quelle. Réglage « format » : `auto` (16:9 sur du noir quand la plupart de ses vidéos sont horizontales, sinon vertical plein écran), `horizontal`, `vertical`. Le nom garde sa largeur dans les deux (de 40 à 80 % de la largeur du cadre selon sa police) ; en vertical, son pied sous ses toits dans le haut de l'image, sa signature au-dessus du quart du bas.
 
 ## Ce qui le distingue des autres films de ville

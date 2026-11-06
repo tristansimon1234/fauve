@@ -63,6 +63,8 @@ Naturel, lumière du jour douce, tons neutres et chauds (le mur blanc, le bois c
 - Les tasses de la céramiste et son tabouret. Rien d'autre : ni logo, ni marque, ni symbole.
 
 ## Format
+**Depuis le 6 novembre** (Tristan, sur sept bancs : « vertical please », « tout vertical please ») : `vertical` par défaut, plein écran, ses fichiers horizontaux recadrés sur leur sujet ; `horizontal` (sa bande) seulement à sa demande, ou quand elle veut ses vidéos entières (le `frame` letterbox de son contrat) ; `auto` (comme ses vidéos, ci-dessous) seulement si elle le demande. `docs/modeles.md`, « Réglages d'un modèle ».
+
 L'original est vertical 9:16, chaque plan plein cadre. Réglage `format` :
 - `auto` (par défaut) : comme ses fichiers : plein écran vertical, ou chaque plan entier dans une bande 16:9 au milieu du noir quand la plupart sont horizontaux ;
 - `vertical` : chaque plan plein écran, un plan horizontal recadré sur son sujet, comme l'original ;

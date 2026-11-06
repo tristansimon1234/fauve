@@ -12,7 +12,7 @@ import { bientot } from "./bientot.ts";
 const ORIGINAL = [0, 3, 5, 8, 11, 14, 17, 20, 23, 26, 29, 31, 34, 37, 40, 43, 46, 49, 52, 54, 57, 60, 63, 66, 69, 72, 75, 78, 80, 83, 86, 89, 91, 93, 96, 99, 101, 104, 106, 109, 112, 114, 116, 119, 121, 124, 127, 130, 132, 134, 136, 139, 142, 145, 147, 150, 153, 156, 159, 162, 165, 168, 171, 174, 177];
 
 test("« Teaser qui se charge » (v1): 56 slots and eight replays on its cuts' grid (79 BPM), each of its 64 flashes within an image of the original's", () => {
-  assert.equal(bientot.version, 1);
+  assert.equal(bientot.version, 2);
   assert.equal(bientot.bpm, 79);
   assert.deepEqual(bientot.shots, [56, 56]);
   // Its count never moves: its flashes are its form, whatever she sends.
@@ -99,7 +99,7 @@ test("« Teaser qui se charge » (v1): its plan, 56 of her passages, its sounds 
   assert.ok(bientot.code.length < 12000);
   // Its finish takes out the grade its code draws (its black and white, or her colours).
   assert.deepEqual(bientot.finish, { saturation: 0, contrast: 0, exposure: 0 });
-  assert.deepEqual(bientot.settings?.map((s) => [s.name, s.choices.map((c) => c.value)]), [["compteur", ["88", "100"]], ["couleur", ["noir-et-blanc", "couleur"]], ["format", ["auto", "vertical", "horizontal"]]]);
+  assert.deepEqual(bientot.settings?.map((s) => [s.name, s.choices.map((c) => c.value)]), [["compteur", ["88", "100"]], ["couleur", ["noir-et-blanc", "couleur"]], ["format", ["vertical", "horizontal", "auto"]]]);
 });
 
 // ——— What its code draws, frame by frame ————————————————————————————————————————————————————————————————————————————
@@ -169,16 +169,21 @@ test("« Teaser qui se charge »: her flashes one after the other in black and w
   assert.equal(footage(drawAt(LINE.marks.logo! - 1))!.props.shot, 55);
 });
 
-test("« Teaser qui se charge »: each shot in its box as filmed (a horizontal one whole in its band on black, a square one in its square), or as her words ask", () => {
+test("« Teaser qui se charge » (v2): every shot full frame by default, each in its box as filmed or all in a band as her words ask", () => {
   const box = (f: number, aspects: (i: number) => number, texts?: Record<string, string>) => {
     const s = styleOf(footage(drawAt(f, { aspects, ...(texts ? { texts } : {}) }))!);
     return [s.left, s.top, s.width, s.height];
   };
-  // Slot 19 horizontal (the original's band, images 54 to 56): whole in a 16:9 band at the middle, on black.
+  // By default (Tristan, 6 November: « tout vertical please »), every shot full frame, a horizontal or square one cropped.
   const wide = (i: number) => (i === 19 ? 16 / 9 : 9 / 16);
-  assert.deepEqual(box(55, wide), [0, 656, 1080, 608]);
-  assert.deepEqual(box(50, wide), [0, 0, 1080, 1920]);
-  assert.deepEqual(box(55, () => 1), [0, 420, 1080, 1080]);
+  assert.deepEqual(box(55, wide), [0, 0, 1080, 1920]);
+  assert.deepEqual(box(55, () => 1), [0, 0, 1080, 1920]);
+  // As filmed, on her word (« comme mes vidéos »): slot 19 horizontal (the original's band, images 54 to 56) whole in a
+  // 16:9 band at the middle, on black; a square one in its square.
+  const asFilmed = { format: "auto" };
+  assert.deepEqual(box(55, wide, asFilmed), [0, 656, 1080, 608]);
+  assert.deepEqual(box(50, wide, asFilmed), [0, 0, 1080, 1920]);
+  assert.deepEqual(box(55, () => 1, asFilmed), [0, 420, 1080, 1080]);
   // All full frame, or all in a 16:9 band, as her words ask.
   assert.deepEqual(box(55, wide, { format: "vertical" }), [0, 0, 1080, 1920]);
   assert.deepEqual(box(50, wide, { format: "horizontal" }), [0, 656, 1080, 608]);

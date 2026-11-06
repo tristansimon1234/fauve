@@ -74,7 +74,7 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
 
   // Its frame: horizontal 16:9 on black as the original when her files are mostly horizontal (or she asks), else the
   // whole vertical frame.
-  const format = setting("format", "auto");
+  const format = setting("format", "vertical");
   const wideShots = shots.filter((s) => (Number(s.aspect) || 0.5625) > 1.15).length;
   const wide = format === "horizontal" || (format === "auto" && wideShots * 2 > n);
   const bw = width;
@@ -186,12 +186,14 @@ export const quatreCoins: MontageSkill = {
   // area), its address on one line, its music losing its bass on the whole sentence and back on the first cut, its front
   // held 7,5 s with her name alone in the middle, no vignette.
   // 3: its music's first strong beat half a beat in (`downbeat`): its reprise and its first cuts on the music's beats.
-  version: 3,
+  // 4: vertical full frame by default, her horizontal files cropped on their subject, its band only when she asks for
+  // it (Tristan, 6 November, on seven benches: « vertical please », « tout vertical please »).
+  version: 4,
   bpm: BPM,
   shots: SHOTS,
   long: LONGEST,
   files: [4, 12],
-  how: "Sur le premier plan de son lieu, fixe et vivant, une phrase se pose mot à mot sur les bords du cadre, un mot tous les trois quarts de temps, en petites minuscules crème toutes à la même taille, sans ombre : ses premiers mots en haut (à gauche, au tiers, à droite), son nom au milieu à gauche et son quartier au milieu à droite, son adresse en bas sur une ligne ; quand la phrase est complète, la musique perd sa basse et sa grosse caisse, puis repart d'un coup sur la première coupe, où tous les mots partent. Puis la vie du lieu en dix plans courts plein cadre, sans texte, larges et serrés en alternance ; puis sa devanture de face, tenue jusqu'à la fin, où son nom se pose seul au milieu. En horizontal comme l'original quand ses vidéos le sont.",
+  how: "Sur le premier plan de son lieu, fixe et vivant, une phrase se pose mot à mot sur les bords du cadre, un mot tous les trois quarts de temps, en petites minuscules crème toutes à la même taille, sans ombre : ses premiers mots en haut (à gauche, au tiers, à droite), son nom au milieu à gauche et son quartier au milieu à droite, son adresse en bas sur une ligne ; quand la phrase est complète, la musique perd sa basse et sa grosse caisse, puis repart d'un coup sur la première coupe, où tous les mots partent. Puis la vie du lieu en dix plans courts plein cadre, sans texte, larges et serrés en alternance ; puis sa devanture de face, tenue jusqu'à la fin, où son nom se pose seul au milieu. En vertical plein écran, ses vidéos horizontales recadrées sur leur sujet ; en horizontal comme l'original à sa demande.",
   end: true,
   texts: [
     { slot: "debut", role: "caption", want: "1 à 3 petits mots qui ouvrent la phrase, posés en haut à gauche, au tiers et à droite (une forme comme « un matin chez », « un samedi au », « une journée chez ») ; chacun court", max: 24, required: true },
@@ -202,11 +204,11 @@ export const quatreCoins: MontageSkill = {
   settings: [
     {
       name: "format",
-      want: "le format : horizontal comme l'original, ou vertical plein écran",
+      want: "le format : vertical plein écran, ou horizontal comme l'original",
       choices: [
+        { value: "vertical", says: "vertical plein écran, les mots en haut, au milieu et en bas du cadre, ses vidéos horizontales recadrées sur leur sujet" },
+        { value: "horizontal", says: "horizontal 16:9 sur du noir, comme l'original, les mots sur les bords de l'image", band: true },
         { value: "auto", says: "comme ses vidéos (horizontal si la plupart le sont)" },
-        { value: "horizontal", says: "horizontal 16:9 sur du noir, comme l'original, les mots sur les bords de l'image" },
-        { value: "vertical", says: "vertical plein écran, les mots en haut, au milieu et en bas du cadre" },
       ],
     },
   ],

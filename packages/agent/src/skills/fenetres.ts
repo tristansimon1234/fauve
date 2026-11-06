@@ -140,7 +140,7 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const n = shots.length, DAY = mark("day", -1), K = mark("beat", 19.376) / 19.376, o = (x) => mx(1, R(x * K));
   const endAt = end ? end.from : durationInFrames + 1;
   // Its frame: 16:9 on black when her videos mostly are (or on her word), else the whole vertical frame.
-  const format = setting("format", "auto");
+  const format = setting("format", "vertical");
   const main = shots.map((s, i) => i).filter((i) => i !== DAY);
   const wide = format === "horizontal" || (format === "auto" && main.filter((i) => (Number(shots[i].aspect) || 0.5625) > 1.15).length * 2 > main.length);
   const bw = width, bh = wide ? R((width * 9) / 16) : height, by = wide ? R((height - bh) / 2) : 0;
@@ -277,7 +277,9 @@ export const fenetres: MontageSkill = {
   key: "fenetres",
   // 3: its labels read over any shot (heavier, larger, a soft shadow) and its ending card on black (Tristan, on a Reel
   // of his account: « ce qui est écrit se voit moyen », « le texte n'est pas sur un écran noir »).
-  version: 3,
+  // 4: vertical full frame by default, her horizontal files cropped on their subject, its band only when she asks for
+  // it (Tristan, 6 November, on seven benches: « vertical please », « tout vertical please »).
+  version: 4,
   bpm: BPM,
   // Its original's 22 (21 one after the other, the shot by day beside the night); 11 at least (its signature moments).
   shots: [11, 22],
@@ -306,11 +308,11 @@ export const fenetres: MontageSkill = {
   settings: [
     {
       name: "format",
-      want: "le format : horizontal 16:9 sur du noir comme l'original, ou vertical plein écran",
+      want: "le format : vertical plein écran, ou horizontal 16:9 sur du noir comme l'original",
       choices: [
+        { value: "vertical", says: "vertical plein écran, ses cases et ses fenêtres à la forme de l'écran, ses vidéos horizontales recadrées sur leur sujet" },
+        { value: "horizontal", says: "horizontal 16:9 sur du noir, comme l'original (ses vidéos verticales y perdent beaucoup)", band: true },
         { value: "auto", says: "comme ses vidéos (horizontal si la plupart le sont)" },
-        { value: "horizontal", says: "horizontal 16:9 sur du noir, comme l'original (ses vidéos verticales y perdent beaucoup)" },
-        { value: "vertical", says: "vertical plein écran, ses cases et ses fenêtres à la forme de l'écran" },
       ],
     },
   ],

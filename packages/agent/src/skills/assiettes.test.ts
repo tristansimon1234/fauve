@@ -150,10 +150,14 @@ test("« Défilé d'assiettes » draws the dish on now full frame, as filmed, on
     assert.equal(dish[0]!.props.shot, k, `image ${f}`);
     assert.deepEqual(styleOf(dish[0]!), { position: "absolute", left: 0, top: 0, width: 1080, height: 1920 });
   }
-  // Most of her videos in width (or her word): whole in a 16:9 band in the middle, on black; upright as asked.
-  assert.deepEqual(styleOf(of(drawAt(20, { aspect: 16 / 9 }), "Footage")[0]!), { position: "absolute", left: 0, top: 656, width: 1080, height: 608 });
+  // Most of her videos in width: full frame too by default (Tristan, 6 November: « tout vertical please »), cropped on
+  // their subject; whole in a 16:9 band in the middle, on black, on her word or as her videos (« auto »); upright as asked.
+  assert.deepEqual(styleOf(of(drawAt(20, { aspect: 16 / 9 }), "Footage")[0]!), { position: "absolute", left: 0, top: 0, width: 1080, height: 1920 });
+  assert.deepEqual(styleOf(of(drawAt(20, { aspect: 16 / 9, texts: { format: "auto" } }), "Footage")[0]!), { position: "absolute", left: 0, top: 656, width: 1080, height: 608 });
+  assert.equal(styleOf(of(drawAt(20, { texts: { format: "auto" } }), "Footage")[0]!).height, 1920);
   assert.equal(styleOf(of(drawAt(20, { texts: { format: "horizontal" } }), "Footage")[0]!).height, 608);
   assert.equal(styleOf(of(drawAt(20, { aspect: 16 / 9, texts: { format: "vertical" } }), "Footage")[0]!).height, 1920);
+  assert.deepEqual(assiettes.settings?.map((s) => [s.name, s.choices.map((c) => c.value)]), [["format", ["vertical", "horizontal", "auto"]]]);
 });
 
 test("« Défilé d'assiettes » types its title and its line together, at an even pace, its caret on the line only, both gone at once", () => {

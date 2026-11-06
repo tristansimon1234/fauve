@@ -122,7 +122,7 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   // to it is seamless), or in width whole in a band across the middle of the black (16:9 when she asks it of an
   // upright one); never zoomed to fill the screen.
   const a = Number(shot.aspect) || 0.5625;
-  const format = setting("format", "auto");
+  const format = setting("format", "vertical");
   const band = format === "horizontal" || (format === "auto" && a > 1.15);
   const bw = width;
   const bh = band ? Math.min(height, Math.round(width / (a > 1.15 ? a : 16 / 9))) : height;
@@ -298,6 +298,8 @@ export const facade: EffectPiece = {
   key: "facade",
   // 3: its skill's v3 pieces (Tristan: « les formes au départ ne sont pas toutes carrées »): its first four far apart and
   // unlike one another, and without her front's elements a cut of every shape, never a grid of near squares.
+  // Also 3: vertical full frame by default, as the models, her horizontal shots cropped on their subject; its band only
+  // when she asks for it (Tristan, 6 November, on seven benches: « vertical please », « tout vertical please »).
   version: 3,
   name: "Façade qui se construit",
   how: "l'écran passe au noir et sa devanture s'y construit morceau par morceau, chaque morceau d'un coup à sa place, sa vidéo jouant dedans, un par note : son enseigne d'abord, trois éléments loin l'un de l'autre, une rafale de douze, une courte pause, puis les trois grands sur le temps, et sa devanture entière s'anime, caméra fixe, sans texte, jusqu'à la coupe ; posée en entier dans une bande au milieu du noir quand sa vidéo est horizontale.",
@@ -335,11 +337,11 @@ export const facade: EffectPiece = {
   settings: [
     {
       name: "format",
-      want: "le format : comme sa vidéo de devanture, ou vertical plein écran, ou horizontal sur du noir",
+      want: "le format : vertical plein écran, horizontal sur du noir, ou comme sa vidéo de devanture",
       choices: [
-        { value: "auto", says: "comme sa vidéo de devanture : en plein écran si elle est verticale, posée en entier dans une bande au milieu du noir si elle est horizontale" },
-        { value: "horizontal", says: "horizontal : sa devanture dans une bande 16:9 au milieu du noir" },
         { value: "vertical", says: "vertical plein écran : une vidéo horizontale cadrée comme le reste du montage (on perd la largeur de sa devanture)" },
+        { value: "horizontal", says: "horizontal : sa devanture dans une bande 16:9 au milieu du noir", band: true },
+        { value: "auto", says: "comme sa vidéo de devanture : en plein écran si elle est verticale, posée en entier dans une bande au milieu du noir si elle est horizontale" },
       ],
     },
   ],

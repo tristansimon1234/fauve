@@ -72,6 +72,7 @@ import {
   type ReelFinish,
   HOUSE_SOURCE,
   houseModelsForEdith,
+  settingWords,
 } from "@fauve/agent";
 import { createLoginLink } from "@/lib/auth/login-link";
 import { supabaseAdmin } from "@/lib/supabase/admin";
@@ -1465,7 +1466,7 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
         // coded with settings says what her words can change in it (« plus de cases », « plus lent »).
         modeles_edith: houseModelsForEdith().map((m) => {
           const skill = gate(MONTAGE_SKILLS[m.key]);
-          return skill?.settings?.length ? { ...m, reglages: skill.settings.map((x) => `${x.want} : ${x.choices.map((c) => c.says).join(", ")}`).join(" ; ") } : m;
+          return skill?.settings?.length ? { ...m, reglages: skill.settings.map(settingWords).join(" ; ") } : m;
         }),
         note: `${items.length ? "Propose-en 2 au plus, par leur titre." : "Aucune inspiration à elle : elle peut envoyer le lien d'un Reel qu'elle aime."} Les modèles d'Edith : propose-en 2 ou 3 qui vont avec ses fichiers et son idée (par leur nom, en une phrase chacun), jamais toute la liste ; elle les voit en vidéo dans Créer › « Un modèle d'Edith ». Quand elle en choisit un qui a a_lui_dire (ce qu'elle seule peut filmer), dis-le-lui avec ses fichiers à envoyer, tel quel, avant de lancer. Un modèle qui a reglages se règle avec ses mots (« plus de cases », « plus lent », « avec ma couleur ») : mets-les dans brief, tu peux les lui proposer une fois quand ça sert son idée.`,
       });

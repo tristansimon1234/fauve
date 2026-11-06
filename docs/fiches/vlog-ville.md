@@ -83,6 +83,8 @@
 Cinéma retenu : les blancs tenus bas (le plus clair à 200 – 215 sur 255), les noirs à peine levés (11 à 21), des ombres bleu-vert (13, 16, 17) et des hautes lumières chaudes (207, 209, 185), des couleurs douces (saturation 0,16 à 0,35) sauf les rouges francs (les rames, les lanternes, le titre) ; pas de grain mesurable sur cette copie (Gemini en voyait un), pas de coins sombres. La finition « Film doux » du modèle (contraste +0,08, saturation −0,1, noirs levés 0,05, ombres #1C2B2E, hautes lumières #E6DCC0) va dans ce sens.
 
 ## Format
+**Depuis le 6 novembre** (Tristan, sur sept bancs : « vertical please », « tout vertical please ») : `vertical` par défaut, plein écran, ses fichiers horizontaux recadrés sur leur sujet ; `horizontal` (sa bande) seulement à sa demande, ou quand elle veut ses vidéos entières (le `frame` letterbox de son contrat) ; `auto` (comme ses vidéos, ci-dessous) seulement si elle le demande. `docs/modeles.md`, « Réglages d'un modèle ».
+
 L'original est horizontal 4:3 (720 × 540), montré tel quel. Réglage « format » : `auto` (4:3 sur du noir, 1080 × 810 au milieu du cadre, quand la plupart de ses vidéos sont horizontales ; sinon vertical plein écran), `horizontal`, `vertical`. Le titre reste au milieu de l'image (48 % de la bande ; 46 % du cadre en vertical), les sous-titres en bas de l'image (le bas de la bande ; 0,70 du cadre en vertical), jamais dans le quart du bas. Réglage « couleur » (comme celui d'« aplat ») : `sienne` par défaut (sa couleur quand elle est vive, celle de sa charte ; sinon le rouge de titre de film de l'original, #D7261E), `rouge` (ce rouge, quelle que soit sa couleur), pour le titre, la signature et la petite ligne.
 
 ## Ce que Gemini a vu, et ce qu'il a raté

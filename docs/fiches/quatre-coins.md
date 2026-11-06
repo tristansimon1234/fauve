@@ -53,6 +53,8 @@ Chaud naturel. Hautes lumières crème, jamais blanches (le plus clair vers 230 
 Rien ne clignote ni ne s'allume : les 12 « clignotements » relevés par la mesure sont des gens et des objets qui bougent (un rire, une tasse, le pull blanc qui passe la porte, le chrome de la machine).
 
 ## Format
+**Depuis le 6 novembre** (Tristan, sur sept bancs : « vertical please », « tout vertical please ») : `vertical` par défaut, plein écran, ses fichiers horizontaux recadrés sur leur sujet ; `horizontal` (sa bande) seulement à sa demande, ou quand elle veut ses vidéos entières (le `frame` letterbox de son contrat) ; `auto` (comme ses vidéos, ci-dessous) seulement si elle le demande. `docs/modeles.md`, « Réglages d'un modèle ».
+
 L'original est une vidéo horizontale de 1,57:1 montrée telle quelle. Réglage « format » (comme Lieu tapé v2) : `auto` (horizontal quand la plupart de ses vidéos le sont, sinon vertical), `horizontal` (sa vidéo entière en 16:9 sur du noir, les mots aux coins de l'image), `vertical` (plein écran, les trois rangées en haut, au milieu et en bas du cadre). Chaque place est une part de l'image. Les marges de l'original (3 % des bords) sortent de la zone sûre d'Edith (13 % sur les côtés). En vertical, v1 posait les mots à 40 px des bords et la rangée du milieu au-dessus de la colonne des boutons. En horizontal, l'image tient entre 34 et 66 % de la hauteur, mais l'adresse, en bas à droite de l'image, peut passer sous les boutons d'Instagram : à vérifier.
 
 ## Ce que Gemini a vu, et ce qu'il a raté

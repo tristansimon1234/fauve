@@ -90,6 +90,8 @@ Rien ne s'allume ni ne clignote. La luminosité monte doucement de 79 à 82 sur 
 - **Si rien ne s'y prête** : toujours faisable. Une carte de fin (une offre) viendrait après la tenue, pas à sa place : à voir avec Tristan.
 
 ## Format
+**Depuis le 6 novembre** (Tristan, sur sept bancs : « vertical please », « tout vertical please ») : `vertical` par défaut, plein écran, ses fichiers horizontaux recadrés sur leur sujet ; `horizontal` (sa bande) seulement à sa demande, ou quand elle veut ses vidéos entières (le `frame` letterbox de son contrat) ; `auto` (comme ses vidéos, ci-dessous) seulement si elle le demande. `docs/modeles.md`, « Réglages d'un modèle ».
+
 L'original est horizontal 16:9 (720 × 406), montré tel quel : la grille couvre toute l'image. Réglage « format », comme dans `frappe` (`setting("format", "auto")`) :
 - `auto` : horizontal quand la plupart de ses vidéos le sont, sinon vertical.
 - `horizontal` : sa vidéo en 16:9 sur du noir (1080 × 608 au milieu du cadre), la grille sur la vidéo seule, 16 × 10 comme l'original. Les mots à entourer évitent les boutons d'Instagram (les deux dernières colonnes, sur les cinq rangées du bas). Mais les lettres y feraient 12 px de capitale (une police d'environ 17 px), loin des 48 px que le contrôle demande à un texte à lire. À décider avec Tristan : les mots entourés comptent comme décor (on les lit par leurs boucles, comme dans l'original), ou la grille grossit et perd l'air de l'original.

@@ -5,7 +5,6 @@ import {
   CHAT_MODEL,
   compositionShots,
   compositionTexts,
-  contractLines,
   copyByModel,
   copyByModelWords,
   dressSkillPlan,
@@ -31,6 +30,7 @@ import {
   skillShotCount,
   skillFit,
   skillFitAt,
+  skillFramed,
   skillLengths,
   skillWordsOf,
   skillWordsWanted,
@@ -88,6 +88,7 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 import { noteGap } from "@/lib/toolkit";
 import { syncTakes } from "@/lib/video/takes";
 import { designMotionScenes, type SceneRequest } from "./motion-designer";
+import { skillContract } from "./reel-frame";
 import { anthropic, logClaudeCost } from "./run";
 
 // A Reel made on a montage skill (packages/agent/src/skills.ts): one of Edith's models coded once for the whole Reel,
@@ -346,7 +347,8 @@ export async function designSkill(params: {
       files,
       business: { name: params.studio.name, activity: params.studio.business, facts: memoryLines(params.studio.memory), booking: params.studio.booking, tone: params.profile.tone },
       request: params.brief?.slice(0, BRIEF_MAX) || "Un Reel fait sur ce modèle, avec ses fichiers.",
-      contract: contractLines(params.contract),
+      // Her frame is the model's format (« cadre »: its band when she wants her videos whole), never the editor's line.
+      ...skillContract(params.contract),
       ...(current && Object.keys(current).length ? { current } : {}),
       ...(currentSaid?.length ? { currentSaid } : {}),
       ...(wordsWanted ? { wordsWanted } : {}),
@@ -395,8 +397,9 @@ export async function designSkill(params: {
     const asked = [input.demande, ...(input.contrat ?? [])].join("\n");
     const read = readSkillFill(skill, files, n, answer, { wordsWanted, asked, ...(talk ? { talk } : {}), ...(known ? { facts: known } : {}), ...(heard ? { heard: heard.said } : {}) });
     if (!read) return null;
-    // A correction keeps the settings it had but what her request changes (a new Reel: only those she asks).
-    const settings = mergeSkillSettings(skill, previousSettings, answer.settings);
+    // A correction keeps the settings it had but what her request changes (a new Reel: only those she asks); her videos
+    // kept whole (the contract's frame) play its band when her words chose no format (vertical full frame by default).
+    const settings = skillFramed(skill, mergeSkillSettings(skill, previousSettings, answer.settings), params.contract?.frame);
     const fill = { ...read, settings };
     // Her voice leading it: its timeline on her words, with its ending card when she has one (45 s at most).
     const line = heard ? skill.heard!(heard.said, { end: Boolean(fill.end), settings }) : null;

@@ -91,7 +91,7 @@ test("« Le grand départ »: 6 to 9 shots from her files (her journey and her a
   assert.ok(Math.abs(slow.marks.title! / line.marks.title! - 110.9 / 92) < 0.01);
   // Her arrival at its real pace when she asks.
   assert.ok(depart.timeline(9, { end: false, settings: { arrivee: "normale" } }).shots.every((s) => s.speed === undefined));
-  assert.deepEqual(depart.settings?.map((s) => [s.name, s.choices.map((c) => c.value)]), [["format", ["auto", "vertical", "horizontal"]], ["arrivee", ["acceleree", "normale"]]]);
+  assert.deepEqual(depart.settings?.map((s) => [s.name, s.choices.map((c) => c.value)]), [["format", ["vertical", "horizontal", "auto"]], ["arrivee", ["acceleree", "normale"]]]);
 });
 
 test("« Le grand départ »: its plan (her arrival played faster, her journey heard, its words by role), nothing cut out, followed or read", () => {
@@ -234,8 +234,11 @@ test("« Le grand départ »: her journey as filmed, the last shot rushing onto 
   assert.ok(scales[1]! > 1 && scales[2]! - scales[1]! < scales[4]! - scales[3]!, scales.join(" "));
   assert.match(footage(drawAt(96))[0]!.filter, /blur\(2\.5px\)/);
   assert.equal(footage(drawAt(97))[0]!.scale, 1);
-  // Its band: most of her videos in width (or her word), whole in a 16:9 band on black; full frame as she asks.
-  assert.deepEqual(styleOf(nodes(drawAt(60, { aspect: 16 / 9 })).find((n) => n.props.key === "t4")!), { position: "absolute", left: 0, top: 656, width: 1080, height: 608, overflow: "hidden" });
+  // Most of her videos in width: full frame by default (Tristan, 6 November: « tout vertical please »), cropped on their
+  // subject; whole in a 16:9 band on black on her word or as her videos (« auto »); full frame as she asks.
+  assert.equal(styleOf(nodes(drawAt(60, { aspect: 16 / 9 })).find((n) => n.props.key === "t4")!).height, 1920);
+  assert.deepEqual(styleOf(nodes(drawAt(60, { aspect: 16 / 9, texts: { format: "auto" } })).find((n) => n.props.key === "t4")!), { position: "absolute", left: 0, top: 656, width: 1080, height: 608, overflow: "hidden" });
+  assert.equal(styleOf(nodes(drawAt(60, { texts: { format: "auto" } })).find((n) => n.props.key === "t4")!).height, 1920);
   assert.equal(styleOf(nodes(drawAt(60, { aspect: 16 / 9, texts: { format: "vertical" } })).find((n) => n.props.key === "t4")!).height, 1920);
   assert.equal(styleOf(nodes(drawAt(60, { texts: { format: "horizontal" } })).find((n) => n.props.key === "t4")!).height, 608);
 });

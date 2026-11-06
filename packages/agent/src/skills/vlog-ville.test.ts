@@ -83,11 +83,12 @@ function propsFor(n: number, aspect: number, extra: Record<string, unknown> = {}
   const roles = Object.fromEntries(vlogVille.texts.map((t) => [t.slot, t.role]));
   const reelTexts = vlogVille.texts.map((t) => ({ text: WORDS[t.slot as keyof typeof WORDS], role: roles[t.slot], from: toFrame(line.texts[t.slot]!.from), to: toFrame(line.texts[t.slot]!.to), emphasis: [] }));
   const brand = { name: "Café des Arts", displayFont: "Unbounded", bodyFont: "Inter", accent: "#1f6b4f", palette: {} };
-  return { width: 1080, height: 1920, durationInFrames: toFrame(line.duration), brand, shots, reelTexts, end: null, texts: marks, ...extra };
+  // « Comme ses vidéos » (her words: « comme mes vidéos »): its 4:3 picture on black for her horizontal videos.
+  return { width: 1080, height: 1920, durationInFrames: toFrame(line.duration), brand, shots, reelTexts, end: null, texts: { ...marks, format: "auto" }, ...extra };
 }
 
 test("« Ta ville racontée » (v1): its 31 shots cut where its original's are, within an image at 76 BPM, its 41,8 s; fewer shots keep its film's parts", () => {
-  assert.equal(vlogVille.version, 1);
+  assert.equal(vlogVille.version, 2);
   assert.equal(vlogVille.bpm, 76);
   assert.deepEqual(vlogVille.shots, [18, 31]);
   const line = vlogVille.timeline(31, { end: false });
@@ -148,7 +149,7 @@ test("« Ta ville racontée » (v1): its plan, its words in its slots, its music
   assert.ok(editPlanSchema.safeParse(plan).success);
   assert.equal(plan.segments.length, 31);
   assert.equal(plan.texts.length, vlogVille.texts.length);
-  assert.deepEqual(plan.skill, { key: "vlog-ville", version: 1 });
+  assert.deepEqual(plan.skill, { key: "vlog-ville", version: 2 });
   assert.equal(plan.tempo, 76);
   assert.deepEqual(plan.music_shape?.pauses, [{ from: 0, to: 2.633 }]);
   assert.equal(plan.music_shape?.filters?.[0]?.kind, "muffled");
@@ -161,12 +162,16 @@ test("« Ta ville racontée » (v1): its plan, its words in its slots, its music
   assert.equal(plan.subtitles, false);
   assert.deepEqual(checkMotionCode(vlogVille.code), []);
   assert.ok(vlogVille.code.length < 24000, String(vlogVille.code.length));
-  assert.deepEqual(vlogVille.settings?.map((s) => [s.name, s.choices.map((c) => c.value)]), [["format", ["auto", "horizontal", "vertical"]], ["couleur", ["sienne", "rouge"]]]);
+  assert.deepEqual(vlogVille.settings?.map((s) => [s.name, s.choices.map((c) => c.value)]), [["format", ["vertical", "horizontal", "auto"]], ["couleur", ["sienne", "rouge"]]]);
 });
 
-test("« Ta ville racontée » (v1): 4:3 on black as her horizontal videos, full frame as her vertical ones; its burst of nine close-ups on the drop", () => {
+test("« Ta ville racontée » (v2): full frame by default, 4:3 on black on her word or as her horizontal videos; its burst of nine close-ups on the drop", () => {
   const draw = sceneOf(vlogVille.code);
   const picture = (tree: Drawn) => nodes(tree).find((n) => n.props.key === "picture")!;
+  // By default (Tristan, 6 November: « tout vertical please »), the whole frame whatever her videos.
+  const { format: _asVideos, ...plain } = propsFor(31, 16 / 9).texts;
+  assert.deepEqual([styleOf(picture(draw(40, propsFor(31, 16 / 9, { texts: plain })))).top, styleOf(picture(draw(40, propsFor(31, 16 / 9, { texts: plain })))).height], [0, 1920]);
+  assert.equal(styleOf(picture(draw(40, propsFor(31, 16 / 9, { texts: { ...plain, format: "vertical" } })))).height, 1920);
   // Horizontal: a 1080 × 810 picture in the middle of the frame, on black; vertical: the whole frame; or as she asks.
   assert.deepEqual([styleOf(picture(draw(40, propsFor(31, 16 / 9)))).top, styleOf(picture(draw(40, propsFor(31, 16 / 9)))).height], [555, 810]);
   assert.deepEqual([styleOf(picture(draw(40, propsFor(31, 9 / 16)))).top, styleOf(picture(draw(40, propsFor(31, 9 / 16)))).height], [0, 1920]);

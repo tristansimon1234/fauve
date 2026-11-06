@@ -73,7 +73,7 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
 
   // 1. Its frame: a 16:9 picture on black, as the original, when most of her files are horizontal (or she asks), else
   // the whole vertical frame; every place below is in its box.
-  const format = setting("format", "auto");
+  const format = setting("format", "vertical");
   const wideShots = shots.filter((s) => (Number(s.aspect) || 0.5625) > 1.15).length;
   const band = format === "horizontal" || (format === "auto" && wideShots * 2 > n);
   const bw = width;
@@ -235,13 +235,15 @@ export const nomDeVille: MontageSkill = {
   key: "nom-de-ville",
   // 2: its name comes out from behind a line at every image, its roofline (else the foot of its place), rising 0,4 of
   // its capitals whatever its scenery (Tristan on v1: « l'aspect du texte qui apparaît derrière n'est pas là »).
+  // Also 2: vertical full frame by default, her horizontal files cropped on their subject, its band only when she asks for
+  // it (Tristan, 6 November, on seven benches: « vertical please », « tout vertical please »).
   version: 2,
   bpm: BPM,
   shots: [FIXED, 15],
   // Up to 30 for a length she asks for: the life of the place in the original's pattern of shots (29 s at its tempo).
   long: LONG,
   files: [4, 15],
-  how: "Un plan large et fixe de sa rue, de ses toits ou d'un paysage où son nom géant est posé dans le ciel, derrière ses toits (ils passent devant ses lettres), et monte doucement pendant que sa police change d'un coup à chaque temps, à la même place et dans la même couleur : ronde et très grasse, carrée, étroite, carrée plus grande, puis la sienne, qui reste ; deux à quatre petits mots au-dessus, sa signature en petit en bas. Puis quatre détails d'un temps chacun, un plan qui avance dans une rue ou un passage pendant que la musique tombe, quelque chose qui passe au ras de l'objectif quand elle revient, la vie de son lieu un plan tous les deux ou trois temps, et un coucher de soleil coupé net. En horizontal 16:9 comme l'original quand ses vidéos le sont.",
+  how: "Un plan large et fixe de sa rue, de ses toits ou d'un paysage où son nom géant est posé dans le ciel, derrière ses toits (ils passent devant ses lettres), et monte doucement pendant que sa police change d'un coup à chaque temps, à la même place et dans la même couleur : ronde et très grasse, carrée, étroite, carrée plus grande, puis la sienne, qui reste ; deux à quatre petits mots au-dessus, sa signature en petit en bas. Puis quatre détails d'un temps chacun, un plan qui avance dans une rue ou un passage pendant que la musique tombe, quelque chose qui passe au ras de l'objectif quand elle revient, la vie de son lieu un plan tous les deux ou trois temps, et un coucher de soleil coupé net. En vertical plein écran, ses vidéos horizontales recadrées sur leur sujet ; en horizontal 16:9 comme l'original à sa demande.",
   end: true,
   texts: [
     {
@@ -269,11 +271,11 @@ export const nomDeVille: MontageSkill = {
   settings: [
     {
       name: "format",
-      want: "le format : horizontal 16:9 comme l'original, ou vertical plein écran",
+      want: "le format : vertical plein écran, ou horizontal 16:9 comme l'original",
       choices: [
+        { value: "vertical", says: "vertical plein écran, ses vidéos horizontales recadrées sur leur sujet" },
+        { value: "horizontal", says: "horizontal 16:9 sur du noir, comme l'original", band: true },
         { value: "auto", says: "comme ses vidéos (horizontal si la plupart le sont)" },
-        { value: "horizontal", says: "horizontal 16:9 sur du noir, comme l'original" },
-        { value: "vertical", says: "vertical plein écran" },
       ],
     },
   ],

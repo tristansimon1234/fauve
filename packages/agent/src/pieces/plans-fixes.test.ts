@@ -109,7 +109,7 @@ test("« Plans fixes de cinéma » (effect v1): each word shown on the frame its
   }
 });
 
-test("« Plans fixes de cinéma » (effect v1): her shots in a 4:3 picture on black as in a film, full frame on her word, never moved", () => {
+test("« Plans fixes de cinéma » (effect v2): full frame by default, her shots in a 4:3 picture on black as in a film on her word, never moved", () => {
   const plan = pieceTestPlan({ piece: plansFixes, shots: run(3), span: [1.2, 4.8], fill: fill({ accroche: "un soir à", titre: "Belleville" }), bpm: 100 });
   const props = layerProps(plan);
   const frameOf = (tree: Drawn) => {
@@ -117,20 +117,23 @@ test("« Plans fixes de cinéma » (effect v1): her shots in a 4:3 picture on bl
     const footage = nodes(box).find((n) => n.type === "Footage")!;
     return { top: styleOf(box).top, height: styleOf(box).height, shot: footage.props.shot, style: styleOf(footage) };
   };
-  // The first shot under it is her second one (the lead shot plays before it); the 4:3 picture at the middle of the frame.
-  assert.deepEqual(frameOf(drawAt(plansFixes.code, 10, props)), { top: 555, height: 810, shot: 1, style: { position: "absolute", left: 0, top: 0, width: 1080, height: 810 } });
+  // By default (Tristan, 6 November: « tout vertical please »), the whole frame, her shots in width cropped on their subject.
+  assert.deepEqual(frameOf(drawAt(plansFixes.code, 10, props)), { top: 0, height: 1920, shot: 1, style: { position: "absolute", left: 0, top: 0, width: 1080, height: 1920 } });
+  // On her word (or as her videos, « auto »): the first shot under it is her second one (the lead shot plays before it);
+  // the 4:3 picture at the middle of the frame.
+  const banded = pieceTestPlan({ piece: plansFixes, shots: run(3), span: [1.2, 4.8], fill: fill({ accroche: "un soir à", titre: "Belleville" }, { format: "horizontal" }), bpm: 100 });
+  assert.deepEqual(frameOf(drawAt(plansFixes.code, 10, layerProps(banded))), { top: 555, height: 810, shot: 1, style: { position: "absolute", left: 0, top: 0, width: 1080, height: 810 } });
+  const asVideos = pieceTestPlan({ piece: plansFixes, shots: run(3), span: [1.2, 4.8], fill: fill({ accroche: "un soir à", titre: "Belleville" }, { format: "auto" }), bpm: 100 });
+  assert.equal(frameOf(drawAt(plansFixes.code, 10, layerProps(asVideos))).height, 810);
+  assert.equal(frameOf(drawAt(plansFixes.code, 10, layerProps(asVideos, 9 / 16))).height, 1920);
   // Each of her shots in its turn, at its cut (two beats in: her third).
   assert.equal(frameOf(drawAt(plansFixes.code, 72, props)).shot, 2);
-  // On her word, full frame; the default is never kept as a setting.
-  const vertical = pieceTestPlan({ piece: plansFixes, shots: run(3), span: [1.2, 4.8], fill: fill({ accroche: "un soir à", titre: "Belleville" }, { format: "vertical" }), bpm: 100 });
-  assert.deepEqual(frameOf(drawAt(plansFixes.code, 10, layerProps(vertical))).height, 1920);
-  // As her videos by default: upright ones full frame, the band on her word.
+  // Upright ones full frame; the band on her word; the default is never kept as a setting.
   assert.equal(frameOf(drawAt(plansFixes.code, 10, layerProps(plan, 9 / 16))).height, 1920);
-  const banded = pieceTestPlan({ piece: plansFixes, shots: run(3), span: [1.2, 4.8], fill: fill({ accroche: "un soir à", titre: "Belleville" }, { format: "horizontal" }), bpm: 100 });
   assert.equal(frameOf(drawAt(plansFixes.code, 10, layerProps(banded, 9 / 16))).height, 810);
-  assert.deepEqual(skillSettings(plansFixes, [{ name: "format", value: "auto" }]), {});
+  assert.deepEqual(skillSettings(plansFixes, [{ name: "format", value: "vertical" }]), {});
   assert.deepEqual(skillSettings(plansFixes, [{ name: "format", value: "horizontal" }]), { format: "horizontal" });
-  assert.deepEqual(skillSettings(plansFixes, [{ name: "format", value: "vertical" }]), { format: "vertical" });
+  assert.deepEqual(skillSettings(plansFixes, [{ name: "format", value: "auto" }]), { format: "auto" });
   // A still shot is the effect: nothing zooms, turns or slides.
   assert.doesNotMatch(plansFixes.code, /transform|scale\(|interpolate\(/);
 });

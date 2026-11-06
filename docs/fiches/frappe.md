@@ -58,6 +58,8 @@
 Teal and orange : ciels cyan, peaux et enseignes orangées, chaud et saturé, contrasté.
 
 ## Format
+**Depuis le 6 novembre** (Tristan, sur sept bancs : « vertical please », « tout vertical please ») : `vertical` par défaut, plein écran, ses fichiers horizontaux recadrés sur leur sujet ; `horizontal` (sa bande) seulement à sa demande, ou quand elle veut ses vidéos entières (le `frame` letterbox de son contrat) ; `auto` (comme ses vidéos, ci-dessous) seulement si elle le demande. `docs/modeles.md`, « Réglages d'un modèle ».
+
 L'original est une vidéo horizontale 16:9 montrée telle quelle. Réglage « format » : `auto` (horizontal quand la plupart de ses vidéos le sont, sinon vertical plein écran), `horizontal` (16:9 sur du noir, comme l'original), `vertical` (plein écran, chaque place en part de l'image).
 
 ## Ce que Gemini a vu, et ce qu'il a raté

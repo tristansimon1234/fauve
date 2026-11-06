@@ -57,7 +57,7 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   // 1. Its frame: the original's near-square window (10:9, the whole width, black above and below, as its 720 × 648
   // picture shows in a vertical feed) when most of her shots are horizontal, or when she asks; else her vertical frame,
   // full. Every place below is a share of it.
-  const format = setting("format", "auto");
+  const format = setting("format", "vertical");
   const wideShots = shots.filter((s) => (Number(s.aspect) || 0.5625) > 1.15).length;
   const windowed = format === "fenetre" || (format === "auto" && wideShots * 2 > n);
   const BH = windowed ? Math.round(width * 0.9) : height;
@@ -145,7 +145,9 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
 
 export const titreCinema: MontageSkill = {
   key: "titre-cinema",
-  version: 1,
+  // 2: vertical full frame by default, her horizontal files cropped on their subject, its band only when she asks for
+  // it (Tristan, 6 November, on seven benches: « vertical please », « tout vertical please »).
+  version: 2,
   bpm: BPM,
   shots: [4, 8],
   // Up to 11 for a length she asks for: its middle again (a bar, a bar, two bars), about 32 s at its own tempo.
@@ -153,7 +155,7 @@ export const titreCinema: MontageSkill = {
   files: [3, 8],
   // Its intro under the title and a bar a shot: within 104 to 140, so its longest stays under 45 s.
   tempo: [104, 140],
-  how: "Un plan large et fixe au crépuscule où quelqu'un marche lentement ou se tient, le titre de son film en très grandes capitales carrées blanches au milieu du cadre, là dès la première image et immobile, et sous sa fin sa signature en serif (« par Léa »), derrière la personne : sa tête passe devant la signature, jamais devant le titre ; la musique joue son intro sans basse, puis la coupe emporte le titre et la basse tombe ; ensuite des plans fixes d'une ou deux mesures coupés sur le temps fort : quelqu'un seul de dos devant ce qui brille, une vue, un plan plus long de près, des gens ensemble, et pour finir quelqu'un qui marche au soleil couchant, coupé net. Dans une fenêtre presque carrée sur du noir comme l'original quand ses vidéos sont horizontales, sinon en vertical plein écran.",
+  how: "Un plan large et fixe au crépuscule où quelqu'un marche lentement ou se tient, le titre de son film en très grandes capitales carrées blanches au milieu du cadre, là dès la première image et immobile, et sous sa fin sa signature en serif (« par Léa »), derrière la personne : sa tête passe devant la signature, jamais devant le titre ; la musique joue son intro sans basse, puis la coupe emporte le titre et la basse tombe ; ensuite des plans fixes d'une ou deux mesures coupés sur le temps fort : quelqu'un seul de dos devant ce qui brille, une vue, un plan plus long de près, des gens ensemble, et pour finir quelqu'un qui marche au soleil couchant, coupé net. En vertical plein écran, ses vidéos horizontales recadrées sur leur sujet ; dans une fenêtre presque carrée sur du noir comme l'original à sa demande.",
   end: true,
   texts: [
     {
@@ -174,11 +176,11 @@ export const titreCinema: MontageSkill = {
   settings: [
     {
       name: "format",
-      want: "le format : la fenêtre presque carrée de l'original sur du noir, ou le vertical plein écran",
+      want: "le format : le vertical plein écran, ou la fenêtre presque carrée de l'original sur du noir",
       choices: [
+        { value: "vertical", says: "vertical plein écran, ses vidéos horizontales recadrées sur leur sujet" },
+        { value: "fenetre", says: "une fenêtre presque carrée (10:9) sur du noir, comme l'original, ses vidéos recadrées sur leur sujet", band: true },
         { value: "auto", says: "comme ses vidéos (la fenêtre presque carrée si la plupart sont horizontales, sinon vertical plein écran)" },
-        { value: "vertical", says: "vertical plein écran" },
-        { value: "fenetre", says: "une fenêtre presque carrée (10:9) sur du noir, comme l'original, ses vidéos recadrées sur leur sujet" },
       ],
     },
   ],

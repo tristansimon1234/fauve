@@ -94,6 +94,7 @@ import {
   withoutVoiceVideo,
   type MontageSkill,
 } from "@fauve/agent";
+import { chainLetterbox } from "./reel-frame";
 import { outputFormat } from "@fauve/agent/answer";
 import { HOUSE_EXAMPLES } from "@fauve/agent/house-examples";
 import { ensureCutouts, photoOffers } from "@/lib/render/cutout";
@@ -800,8 +801,8 @@ export async function designEdit(params: {
   };
   let plan = toPlan(output);
   // Her videos whole and horizontal on black (her contract): the engine draws it on every version.
-  // A correction keeps it (its request is about something else).
-  const letterbox = params.contract?.frame === "letterbox" || (correction && base?.frame === "letterbox");
+  // A correction keeps it (its request is about something else), unless it asks for the whole vertical frame again.
+  const letterbox = chainLetterbox({ contract: params.contract, correction, base, brief: params.brief });
   // The sounds she asked for on what appears (her contract), placed on each version's texts or cuts; a correction
   // keeps those of the version it corrects.
   const asking = params.contract?.asked_sounds?.length

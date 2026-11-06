@@ -158,7 +158,7 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   // 2. Its frame: her upright or square pictures full frame, as the original; mostly horizontal ones whole in a 16:9
   // band on black, every piece at the band's scale; or as her words ask.
   const upright = shots.filter((s) => (Number(s.aspect) || 0.5625) < 1.15).length;
-  const format = setting("format", "auto");
+  const format = setting("format", "vertical");
   const band = format === "horizontal" || (format === "auto" && n > 0 && upright * 2 < n);
   const BH = Math.round((width * 9) / 16);
   const box = band ? { left: 0, top: Math.round((height - BH) / 2), width, height: BH } : { left: 0, top: 0, width, height };
@@ -288,7 +288,9 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
 
 export const collage: MontageSkill = {
   key: "collage",
-  version: 1,
+  // 2: vertical full frame by default, her horizontal files cropped on their subject, its band only when she asks for
+  // it (Tristan, 6 November, on seven benches: « vertical please », « tout vertical please »).
+  version: 2,
   bpm: BPM,
   // One loop of the original (13 cases, 4,2 s) to two (26 cases, its 8,4 s), each case one of her images.
   shots: [13, 26],
@@ -318,9 +320,9 @@ export const collage: MontageSkill = {
       name: "format",
       want: "le format : vertical plein cadre comme l'original, ou ses images horizontales entières dans une bande 16:9 sur du noir",
       choices: [
-        { value: "auto", says: "comme ses images (vertical plein cadre, une bande 16:9 sur du noir quand la plupart sont horizontales)" },
         { value: "vertical", says: "vertical plein cadre, ses images horizontales recadrées sur leur sujet" },
-        { value: "horizontal", says: "toutes ses images entières dans une bande 16:9 sur du noir" },
+        { value: "horizontal", says: "toutes ses images entières dans une bande 16:9 sur du noir", band: true },
+        { value: "auto", says: "comme ses images (vertical plein cadre, une bande 16:9 sur du noir quand la plupart sont horizontales)" },
       ],
     },
     {

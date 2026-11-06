@@ -144,7 +144,7 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
 
   // 1. Its frame: as her talking video (upright: full frame, as the original; filmed in width: her pictures whole in a
   // 16:9 band on black), or as her words ask. The window is the same in both.
-  const format = setting("format", "auto");
+  const format = setting("format", "vertical");
   const wideTalk = (Number(shots[0] && shots[0].aspect) || 0.5625) > 1.15;
   const banded = format === "horizontal" || (format === "auto" && wideTalk);
   const BAND = { left: 0, top: Math.round((H - (W * 9) / 16) / 2), width: W, height: Math.round((W * 9) / 16) };
@@ -401,7 +401,9 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
 
 export const carnet: MontageSkill = {
   key: "carnet",
-  version: 1,
+  // 2: vertical full frame by default, her horizontal files cropped on their subject, its band only when she asks for
+  // it (Tristan, 6 November, on seven benches: « vertical please », « tout vertical please »).
+  version: 2,
   // Its original's weak pulse (89,8 BPM, its music under his voice): her music is composed at it, her voice leads its cuts.
   bpm: BPM,
   // Her talk's pieces (the engine cuts them): as many as her pauses and ideas make.
@@ -426,11 +428,11 @@ export const carnet: MontageSkill = {
   settings: [
     {
       name: "format",
-      want: "le format : comme sa vidéo, vertical plein écran, ou ses images entières dans une bande horizontale",
+      want: "le format : tout en plein écran vertical, ses images entières dans une bande horizontale, ou comme sa vidéo",
       choices: [
-        { value: "auto", says: "comme sa vidéo où elle parle : verticale, tout en plein écran comme l'original ; filmée en largeur, ses images entières dans une bande 16:9 sur du noir" },
         { value: "vertical", says: "tout en plein écran vertical, ses images horizontales recadrées sur leur sujet" },
-        { value: "horizontal", says: "ses images entières dans une bande 16:9 au milieu, sur du noir, les mots autour" },
+        { value: "horizontal", says: "ses images entières dans une bande 16:9 au milieu, sur du noir, les mots autour", band: true },
+        { value: "auto", says: "comme sa vidéo où elle parle : verticale, tout en plein écran comme l'original ; filmée en largeur, ses images entières dans une bande 16:9 sur du noir" },
       ],
     },
   ],

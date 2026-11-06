@@ -84,7 +84,7 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   // in its square; or all full frame, or all in a 16:9 band, as her words ask. In dense black and white unless she wants
   // her colours (its blacks crushed, its whites held: a little lighter, then more contrast). Some flashes replay an
   // earlier slot from its first image, as the original reuses its clips.
-  const format = setting("format", "auto");
+  const format = setting("format", "vertical");
   const colour = setting("couleur", "noir-et-blanc") === "couleur";
   const GREY = "grayscale(1) brightness(1.06) contrast(1.22)";
   const FULL = { left: 0, top: 0, width: W, height: H };
@@ -169,7 +169,9 @@ function want(slot: number): string {
 
 export const bientot: MontageSkill = {
   key: "bientot",
-  version: 1,
+  // 2: vertical full frame by default, her horizontal files cropped on their subject, its band only when she asks for
+  // it (Tristan, 6 November, on seven benches: « vertical please », « tout vertical please »).
+  version: 2,
   bpm: BPM,
   // Its 64 flashes are its form: 56 of her passages, eight replays drawn by its code.
   shots: [SLOTS.length, SLOTS.length],
@@ -215,11 +217,11 @@ export const bientot: MontageSkill = {
     },
     {
       name: "format",
-      want: "le format de ses plans : comme ses vidéos, tout en plein écran vertical, ou tout dans une bande 16:9 sur du noir",
+      want: "le format de ses plans : tout en plein écran vertical, tout dans une bande 16:9 sur du noir, ou comme ses vidéos",
       choices: [
-        { value: "auto", says: "comme ses vidéos : les verticales en plein écran, une horizontale entière dans une bande sur du noir, comme l'original" },
         { value: "vertical", says: "tout en plein écran vertical, ses vidéos horizontales recadrées" },
-        { value: "horizontal", says: "tout dans une bande 16:9 sur du noir, comme un film" },
+        { value: "horizontal", says: "tout dans une bande 16:9 sur du noir, comme un film", band: true },
+        { value: "auto", says: "comme ses vidéos : les verticales en plein écran, une horizontale entière dans une bande sur du noir, comme l'original" },
       ],
     },
   ],

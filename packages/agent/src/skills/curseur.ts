@@ -92,7 +92,7 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
 
   // 1. Each shot in its box, as her videos are (an upright one full frame, a horizontal one whole in a 16:9 band on
   // black), or as her words ask: all full frame, or all in the band.
-  const format = setting("format", "auto");
+  const format = setting("format", "vertical");
   const FULL = { left: 0, top: 0, width: W, height: H };
   const BH = Math.round((W * 9) / 16);
   const BAND = { left: 0, top: Math.round((H - BH) / 2), width: W, height: BH };
@@ -338,7 +338,9 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
 
 export const curseur: MontageSkill = {
   key: "curseur",
-  version: 1,
+  // 2: vertical full frame by default, her horizontal files cropped on their subject, its band only when she asks for
+  // it (Tristan, 6 November, on seven benches: « vertical please », « tout vertical please »).
+  version: 2,
   bpm: BPM,
   // Her place, her products close, her place again (the same video, from where it stopped).
   shots: [3, 3],
@@ -370,11 +372,11 @@ export const curseur: MontageSkill = {
   settings: [
     {
       name: "format",
-      want: "le format : comme ses vidéos, vertical plein écran, ou ses vidéos horizontales entières dans une bande 16:9 sur du noir",
+      want: "le format : tout en vertical plein écran, ses vidéos horizontales entières dans une bande 16:9 sur du noir, ou comme ses vidéos",
       choices: [
-        { value: "auto", says: "comme ses vidéos (une vidéo verticale plein écran, une horizontale entière dans une bande sur du noir)" },
         { value: "vertical", says: "tout en vertical plein écran, ses vidéos horizontales recadrées" },
-        { value: "horizontal", says: "tout dans une bande 16:9 sur du noir, les noms de ses produits sur le noir" },
+        { value: "horizontal", says: "tout dans une bande 16:9 sur du noir, les noms de ses produits sur le noir", band: true },
+        { value: "auto", says: "comme ses vidéos (une vidéo verticale plein écran, une horizontale entière dans une bande sur du noir)" },
       ],
     },
   ],

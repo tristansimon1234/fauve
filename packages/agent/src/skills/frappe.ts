@@ -80,7 +80,7 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
 
   // Its frame: horizontal 16:9 on black as the original when her videos are mostly horizontal (or she asks), else the
   // whole vertical frame; every place below is a share of it.
-  const format = setting("format", "auto");
+  const format = setting("format", "vertical");
   const wideShots = shots.filter((s) => (Number(s.aspect) || 0.5625) > 1.15).length;
   const wide = format === "horizontal" || (format === "auto" && wideShots * 2 > n);
   const bw = width;
@@ -226,11 +226,13 @@ export const frappe: MontageSkill = {
   // 3: the original's own marks left to it (its arrow, its colours): her logo and her colour, or nothing.
   // 4: on its bench on a Paris café (Le Petit Pont): any piece of her place stands out, not only lights, the rest dimmed
   // and each piece at its own light (no white blot on a lit neon); the original's quick zoom kept.
-  version: 4,
+  // 5: vertical full frame by default, her horizontal files cropped on their subject, its band only when she asks for
+  // it (Tristan, 6 November, on seven benches: « vertical please », « tout vertical please »).
+  version: 5,
   bpm: BPM,
   shots: [12, 18],
   files: [5, 12],
-  how: "Un plan large et ensoleillé de son lieu qui zoome vite dans le suivant, le même plus serré, où ce qui peut ressortir morceau par morceau (les lettres de son enseigne, ses tasses ou ses pâtisseries côte à côte, les livres d'une étagère, ses fenêtres, une guirlande) ressort un morceau après l'autre, le reste assombri, puis tout d'un coup sur un temps ; un plan fixe avec du ciel à côté d'un bâtiment, où son nom se tape à la main en capitales de sa couleur, puis son logo apparaît au-dessus (si elle en a un), et la coupe tombe sur son enseigne de nuit, qui clignote ; trois plans éclair, un plan large, une façade sur laquelle des bandes de cinéma se ferment, six plans éclair entre les bandes, un passant qui flashe en blanc, et le noir. En horizontal comme l'original quand ses vidéos le sont.",
+  how: "Un plan large et ensoleillé de son lieu qui zoome vite dans le suivant, le même plus serré, où ce qui peut ressortir morceau par morceau (les lettres de son enseigne, ses tasses ou ses pâtisseries côte à côte, les livres d'une étagère, ses fenêtres, une guirlande) ressort un morceau après l'autre, le reste assombri, puis tout d'un coup sur un temps ; un plan fixe avec du ciel à côté d'un bâtiment, où son nom se tape à la main en capitales de sa couleur, puis son logo apparaît au-dessus (si elle en a un), et la coupe tombe sur son enseigne de nuit, qui clignote ; trois plans éclair, un plan large, une façade sur laquelle des bandes de cinéma se ferment, six plans éclair entre les bandes, un passant qui flashe en blanc, et le noir. En vertical plein écran, ses vidéos horizontales recadrées sur leur sujet ; en horizontal comme l'original à sa demande.",
   end: true,
   texts: [
     {
@@ -252,11 +254,11 @@ export const frappe: MontageSkill = {
   settings: [
     {
       name: "format",
-      want: "le format : horizontal comme l'original, ou vertical plein écran",
+      want: "le format : vertical plein écran, ou horizontal comme l'original",
       choices: [
+        { value: "vertical", says: "vertical plein écran, ses vidéos horizontales recadrées sur leur sujet" },
+        { value: "horizontal", says: "horizontal 16:9 sur du noir, comme l'original", band: true },
         { value: "auto", says: "comme ses vidéos (horizontal si elles le sont)" },
-        { value: "horizontal", says: "horizontal 16:9 sur du noir, comme l'original" },
-        { value: "vertical", says: "vertical plein écran" },
       ],
     },
     {

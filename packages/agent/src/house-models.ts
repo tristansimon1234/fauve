@@ -17,7 +17,7 @@ import type { z } from "zod";
 
 /** The source of the inspiration row a house model is kept on, per studio (one per model, made when first used). */
 export const HOUSE_SOURCE = "house";
-/** The catalogue's version: a studio's row written by an older one is rewritten when the model is used again (3: its original's sheets; 4: no brand in a model's name; 5: Mots aux quatre coins as its original; 6: Plans fixes at 65 BPM; 7: four renamed; 8: Lieu tapé without its original's orange; 9: Plans fixes on its fiche; 10: Une journée chez toi on its fiche; 11: ten models on their fiches; 12: Façade qui se construit and Coulisses façon fiche on their fiches; 13: Recette cosy on its fiche; 14: Titre gaufré on its fiche; 15: Mots mêlés and Interrupteur on their fiches; 16: Interface minimaliste and Fenêtres et étiquettes on theirs; 17: Mot clé en grand and Face caméra et références on theirs; 18: Photos posées sur la table and Carte au feutre on theirs; 19: « S'abonner » in Interface minimaliste; 20: the last four on their fiches, Aplat, Détourages, Silhouette and Vision machine; 21: Tristan's review of 6 November, Court métrage's light and lettering, Plans fixes' lettering, Façade's first pieces, Présente-toi in its own design, the kaléidoscope, Mot clé en grand and Face caméra et références). */
+/** The catalogue's version: a studio's row written by an older one is rewritten when the model is used again (3: its original's sheets; 4: no brand in a model's name; 5: Mots aux quatre coins as its original; 6: Plans fixes at 65 BPM; 7: four renamed; 8: Lieu tapé without its original's orange; 9: Plans fixes on its fiche; 10: Une journée chez toi on its fiche; 11: ten models on their fiches; 12: Façade qui se construit and Coulisses façon fiche on their fiches; 13: Recette cosy on its fiche; 14: Titre gaufré on its fiche; 15: Mots mêlés and Interrupteur on their fiches; 16: Interface minimaliste and Fenêtres et étiquettes on theirs; 17: Mot clé en grand and Face caméra et références on theirs; 18: Photos posées sur la table and Carte au feutre on theirs; 19: « S'abonner » in Interface minimaliste; 20: the last four on their fiches, Aplat, Détourages, Silhouette and Vision machine; 21: Tristan's review of 6 November, Court métrage's light and lettering, Plans fixes' lettering, Façade's first pieces, Présente-toi in its own design, the kaléidoscope, Mot clé en grand and Face caméra et références; every model vertical by default, its band only when she asks). */
 export const HOUSE_VERSION = 21;
 
 export type HouseModel = {
@@ -91,7 +91,7 @@ export const HOUSE_MODELS: HouseModel[] = [
     // every 4 images, a calm shot in silence, its ending by layers; an electro-pop beat at 122, cream highlights over
     // green-blue shadows (not the « cine » preset's orange), no grain nor dark corners; its small words in its title's face.
     pitch: "Six de tes plans en bandes, puis ton nom qui se décode sur le noir comme un générique, un montage éclair dans une bande qui grandit derrière lui, et une fin où ton lieu change derrière une personne.",
-    needs: "3 à 12 vidéos ou photos de ton lieu, en largeur de préférence : des sujets debout au centre, plein de petits moments, un plan calme, quelqu'un qu'on suit, toi ou quelqu'un de l'équipe en entier, caméra posée, et des photos de tes lieux",
+    needs: "3 à 12 vidéos ou photos de ton lieu : des sujets debout au centre, plein de petits moments, un plan calme, quelqu'un qu'on suit, toi ou quelqu'un de l'équipe en entier, caméra posée, et des photos de tes lieux",
     files: [3, 12],
     pair: "decodage",
     example: "E-decode",
@@ -110,7 +110,7 @@ export const HOUSE_MODELS: HouseModel[] = [
         weight: "regular",
         tracking: "normal",
       },
-      layout: "six bandes verticales côte à côte, puis une bande de vidéo qui s'ouvre derrière le titre et grandit, en 16:9 sur du noir comme l'original quand ses vidéos sont horizontales",
+      layout: "six bandes verticales côte à côte, puis une bande de vidéo qui s'ouvre derrière le titre et grandit, en plein écran vertical (en 16:9 sur du noir comme l'original à sa demande)",
       moments: [
         { at: 0.13, what: "six bandes verticales de vidéo entrent d'un coup une à une, de gauche à droite, toutes les 0,2 s, chacune avec un déclic" },
         { at: 2.27, what: "la rangée se replie vers un trait au milieu en trois marches, une par temps, un souffle chacune ; puis le noir" },
@@ -156,7 +156,7 @@ export const HOUSE_MODELS: HouseModel[] = [
         align: "left",
         shadow: "none",
       },
-      layout: "des mots posés le long des bords du cadre sur le premier plan, en 16:9 sur du noir comme l'original quand ses vidéos sont horizontales",
+      layout: "des mots posés le long des bords du cadre sur le premier plan, en plein écran vertical (en 16:9 sur du noir comme l'original à sa demande)",
       moments: [
         { at: 0, what: "le premier plan de son lieu, fixe, quelqu'un au travail un peu à gauche du centre, sans un mot les deux tiers d'une seconde" },
         { at: 0.67, what: "un mot posé d'un coup tous les trois quarts de temps sur les bords : trois en haut (à gauche, au tiers, à droite), son nom et son quartier au milieu, son adresse en bas" },
@@ -191,7 +191,7 @@ export const HOUSE_MODELS: HouseModel[] = [
       format: "autre",
       hook: { kind: "geste", what: "la première image déjà coupée en douze tirages sur du papier gris clair, et une case qui change aussitôt" },
       text: { amount: "aucun", composition: "aucun texte : les images seules" },
-      layout: "ses images coupées en 3 × 4 tirages posés à la main sur un papier gris clair, une fine marge et un trait clair ; ses images horizontales entières dans un bloc 16:9 au milieu du papier",
+      layout: "ses images coupées en 3 × 4 tirages posés à la main sur un papier gris clair, une fine marge et un trait clair ; entières dans un bloc 16:9 à sa demande",
       moments: [
         { at: 0, what: "la première image déjà coupée en 12 tirages sur du papier gris clair" },
         { at: 0.1, what: "l'image suivante remplace les cases une à une dans l'ordre de lecture, une toutes les 3 images, chacune posée de travers puis droite : une image toutes les 1,2 s, jamais tenue" },
@@ -233,7 +233,7 @@ export const HOUSE_MODELS: HouseModel[] = [
         tilt: 0,
       },
       colors: ["#b20b21"],
-      layout: "plein cadre, ses photos en stop motion une toutes les 3 images, et par-dessus un carnet ouvert gris clair, sans ombre, qui change de pose à chaque mot ; en deux bandes pour des images horizontales",
+      layout: "plein cadre, ses photos en stop motion une toutes les 3 images, et par-dessus un carnet ouvert gris clair, sans ombre, qui change de pose à chaque mot ; en deux bandes à sa demande",
       moments: [
         { at: 0, what: "le carnet ouvert vide, penché à gauche, au milieu de l'image ; dessous, une nouvelle photo toutes les 3 images, toujours dans le même ordre" },
         { at: 0.9, what: "un mot de plus au feutre rouge toutes les 0,8 s environ, chacun sur un changement de photo (un petit mot avec le suivant), le carnet changeant de pose à chaque mot, 4 à 7° à gauche puis à droite" },
@@ -379,7 +379,7 @@ export const HOUSE_MODELS: HouseModel[] = [
         weight: "regular",
         stroke: "thin",
       },
-      layout: "sa table en plein cadre, ses photos tirées posées en pile au centre, puis un écran partagé en deux moitiés côte à côte ; en 4:3 sur du noir quand sa table est filmée en largeur",
+      layout: "sa table en plein cadre, ses photos tirées posées en pile au centre, puis un écran partagé en deux moitiés l'une sur l'autre ; en 4:3 sur du noir, ses moitiés côte à côte, à sa demande",
       moments: [
         { at: 0.3, what: "deux petits mots manuscrits crème apparaissent en fondu de part et d'autre du milieu de sa table" },
         { at: 0.43, what: "dix photos tirées se posent d'un coup au centre, l'une sur l'autre, onze par seconde, sans bord ni ombre, chacune un peu tournée, sur un cliquetis sec" },
@@ -413,13 +413,13 @@ export const HOUSE_MODELS: HouseModel[] = [
     look: {
       name: "écran partagé titré",
       format: "autre",
-      hook: { kind: "geste", what: "une carte coupée en deux sur du noir : quelqu'un au travail d'un côté, ce que son geste donne de l'autre, au même moment" },
+      hook: { kind: "geste", what: "l'écran coupé en deux : quelqu'un au travail d'un côté, ce que son geste donne de l'autre, au même moment" },
       text: {
         amount: "une ligne",
         composition: "deux petits titres en serif de labeur blanc, romain, la première lettre en capitale, un sur chaque moitié juste sous le milieu de la carte, qui se répondent (qui fait, puis ce que ça donne), tenus tout le Reel",
         weight: "regular",
       },
-      layout: "une carte aux coins arrondis sur du noir, coupée en deux moitiés qui se touchent : côte à côte comme l'original, l'une sur l'autre quand ses vidéos sont horizontales",
+      layout: "l'écran coupé en deux moitiés qui se touchent : côte à côte comme l'original, l'une sur l'autre quand ses vidéos sont horizontales ; sa carte sur du noir à sa demande",
       moments: [
         { at: 0, what: "la carte et ses deux titres dès la première image : d'un côté quelqu'un au travail, de l'autre le plat qui entre par le bas et se pose au centre" },
         { at: 2.23, what: "les deux moitiés coupent ensemble sur la même image, jamais l'une sans l'autre, jamais un plan seul en plein cadre : une nouvelle paire toutes les deux à trois secondes et demie" },
@@ -457,7 +457,7 @@ export const HOUSE_MODELS: HouseModel[] = [
         weight: "regular",
         tracking: "normal",
       },
-      layout: "son plan large figé en noir et blanc plein écran et, au milieu, un cadre debout sans bord qui montre ses images en couleur et grandit à chaque coupe ; couché quand ses images sont en largeur",
+      layout: "son plan large figé en noir et blanc plein écran et, au milieu, un cadre debout sans bord qui montre ses images en couleur et grandit à chaque coupe ; debout comme l'original",
       moments: [
         { at: 0, what: "son plan le plus large figé en noir et blanc sombre et contrasté, plein écran ; au milieu, un cadre debout sans bord, à 15 % de la largeur, sur une image en couleur" },
         { at: 0.33, what: "une nouvelle image en couleur dans le cadre à chaque demi-temps ; à chaque coupe, le cadre grandit d'un coup de 5 % de la largeur, rien ne bouge entre deux, jamais un zoom" },
@@ -478,7 +478,7 @@ export const HOUSE_MODELS: HouseModel[] = [
     // cells, windows, silhouettes, split screen, squares and loop, its teal and orange without grain (« Voyage » was
     // desaturated with grain, « pov » vertical, an indie electronic music).
     pitch: "Des fenêtres s'ouvrent sur tes plans pendant que deux étiquettes techniques restent fixes, comme un carnet de voyage.",
-    needs: "10 à 14 vidéos de ton lieu, de ta rue ou de ton quartier, en largeur de préférence : un beau plan large pour ouvrir (il revient à la fin), quelqu'un debout au milieu, le même endroit le jour et la nuit, des plans larges et courts",
+    needs: "10 à 14 vidéos de ton lieu, de ta rue ou de ton quartier : un beau plan large pour ouvrir (il revient à la fin), quelqu'un debout au milieu, le même endroit le jour et la nuit, des plans larges et courts",
     files: [5, 14],
     pair: "technique",
     example: "P-fenetres-etiquettes",
@@ -496,7 +496,7 @@ export const HOUSE_MODELS: HouseModel[] = [
         weight: "regular",
         tracking: "normal",
       },
-      layout: "une image 16:9 sur du noir (plein écran en vertical) : le plan suivant entre par une grille 3 × 3, des fenêtres qui sautent, une fenêtre derrière quelqu'un ; jour et nuit côte à côte puis en damier",
+      layout: "plein écran vertical (16:9 sur du noir à sa demande) : le plan suivant entre par une grille 3 × 3, des fenêtres qui sautent, une fenêtre derrière quelqu'un ; jour et nuit côte à côte puis en damier",
       moments: [
         { at: 0, what: "cinq plans coulent l'un dans l'autre : le suivant, qui joue déjà, prend les 3 × 3 cases de l'image une ou deux à la fois toutes les deux images, en serpentin depuis un coin" },
         { at: 2.47, what: "dans le creux de la musique, des fenêtres aux proportions de l'image s'ouvrent d'un coup sur le plan suivant et sautent, de plus en plus grandes et nombreuses ; la silhouette blanche de ce qui arrive, puis la coupe" },
@@ -532,7 +532,7 @@ export const HOUSE_MODELS: HouseModel[] = [
       format: "collage",
       hook: { kind: "mystère", what: "un écran noir où apparaît d'un coup son enseigne, puis trois morceaux de sa façade loin l'un de l'autre" },
       text: { amount: "aucun", composition: "aucun texte pendant la construction, son nom seulement sur un morceau du noir s'il le faut" },
-      layout: "un fond noir, avec des morceaux de sa façade posés d'un coup à leur place, sa vidéo jouant dedans, jusqu'à l'image entière ; en bande sur le noir si sa vidéo est horizontale",
+      layout: "un fond noir, avec des morceaux de sa façade posés d'un coup à leur place, sa vidéo jouant dedans, jusqu'à l'image entière ; en bande sur le noir à sa demande",
       moments: [
         { at: 0, what: "son enseigne apparaît d'un coup sur le noir, puis trois éléments de sa façade loin l'un de l'autre, lentement, chacun sur une note" },
         { at: 2.8, what: "une rafale de douze morceaux : ses autres éléments, puis des bandes le long de ses lignes (le trottoir, un côté, le mur)" },
@@ -570,7 +570,7 @@ export const HOUSE_MODELS: HouseModel[] = [
         tracking: "tight",
       },
       colors: ["#b43c01", "#f5cca4"],
-      layout: "sa devanture qui se construit sur du noir, puis un papier pêche plein cadre où son nom est gaufré ; en bande 16:9 si sa vidéo est horizontale",
+      layout: "sa devanture qui se construit sur du noir, puis un papier pêche plein cadre où son nom est gaufré ; une vidéo horizontale recadrée sur sa devanture (en bande 16:9 à sa demande)",
       moments: [
         { at: 0.03, what: "son nom, puis trois morceaux de sa devanture loin l'un de l'autre, lentement, sur le noir" },
         { at: 2.67, what: "une rafale de morceaux, puis les murs entre les rangées, de bas en haut" },
@@ -612,7 +612,7 @@ export const HOUSE_MODELS: HouseModel[] = [
         weight: "bold",
         subtitles: false,
       },
-      layout: "elle assise face caméra devant un mur uni, plein cadre vertical (sa vidéo horizontale entière dans une bande 16:9 sur du noir), un autre cadre entre deux idées, les mots au-dessus de sa tête",
+      layout: "elle assise face caméra devant un mur uni, plein cadre vertical (en bande 16:9 sur du noir à sa demande), un autre cadre entre deux idées, les mots au-dessus de sa tête",
       moments: [
         { at: 0, what: "ses deux premiers mots glissent de la gauche, flous, rebondissent sur un souffle grave, tenus jusqu'à ce qu'elle dise la suite" },
         { at: 1.07, what: "ses mots s'écrivent un à un sur une petite ligne très espacée ; le mot clé glisse dessous sur son mot (1,73 s) et reste toute l'idée" },
@@ -692,7 +692,7 @@ export const HOUSE_MODELS: HouseModel[] = [
         tracking: "tight",
       },
       colors: ["#640005"],
-      layout: "un titre géant posé dans le ciel du premier plan, derrière le décor qui passe devant lui, en 4:3 sur du noir comme l'original quand ses vidéos sont horizontales",
+      layout: "un titre géant posé dans le ciel du premier plan, derrière le décor qui passe devant lui, en plein écran vertical (en 4:3 sur du noir comme l'original à sa demande)",
       moments: [
         { at: 0, what: "un plan large et fixe de sa rue, en silence, un souffle grave qui monte" },
         { at: 0.33, what: "le titre monte d'en bas en trois images, flou, et se pose sur un coup, derrière les toits ; ses petits mots au stylo une image après" },
@@ -721,7 +721,7 @@ export const HOUSE_MODELS: HouseModel[] = [
     // (136,8, Gemini heard 115), a burst of things alike, blurred passes over the cuts, the title fading in behind one,
     // flashes and film burns with a click, her day into night; no grain nor dark corners its original does not have.
     pitch: "Une rafale de choses pareilles, un titre rouge élégant qui apparaît derrière un passage flou, puis ta journée en plans courts, avec des flashs photo, jusqu'à la nuit.",
-    needs: "10 à 16 vidéos de ta journée, à l'horizontale de préférence : plusieurs fois la même chose côte à côte (tes tasses, tes fenêtres), ton lieu de jour puis de nuit, des gens et des gestes",
+    needs: "10 à 16 vidéos de ta journée : plusieurs fois la même chose côte à côte (tes tasses, tes fenêtres), ton lieu de jour puis de nuit, des gens et des gestes",
     files: [6, 16],
     pair: "didone",
     example: "S-journee",
@@ -740,7 +740,7 @@ export const HOUSE_MODELS: HouseModel[] = [
         tracking: "tight",
       },
       colors: ["#fa010c"],
-      layout: "4:3 horizontal sur du noir comme l'original, plein cadre si ses vidéos sont verticales",
+      layout: "en plein cadre vertical (4:3 horizontal sur du noir comme l'original à sa demande)",
       moments: [
         { at: 0, what: "une rafale de choses pareilles, une par image à la même place, puis une bande floue passe devant l'objectif et cache la coupe" },
         { at: 1.47, what: "le titre rouge apparaît en fondu derrière la bande qui repart, avec un déclic, et reste sur un plan sombre" },
@@ -780,7 +780,7 @@ export const HOUSE_MODELS: HouseModel[] = [
         weight: "regular",
         tracking: "normal",
       },
-      layout: "une image 16:9 sur du noir, son nom allumé au-dessus (plein écran si ses vidéos sont verticales) ; ses objets allumés un par un dans la salle assombrie, puis toute la salle",
+      layout: "en plein écran vertical (une image 16:9 sur du noir, son nom allumé au-dessus, à sa demande) ; ses objets allumés un par un dans la salle assombrie, puis toute la salle",
       moments: [
         { at: 0, what: "la salle dans le noir, un cinquième de sa lumière ; ce qu'elle a plusieurs fois se rallume pièce par pièce, de plus en plus vite, chacune à sa lumière avec un halo chaud et un clic, la musique étouffée" },
         { at: 2.5, what: "toute la salle d'un coup sur le temps, deux images plus vives ; la musique s'ouvre et le nom s'allume comme un néon qui prend" },
@@ -801,7 +801,7 @@ export const HOUSE_MODELS: HouseModel[] = [
     // 9: written again on its original's fiche (v3 of its skill): horizontal 4:3 on black when her videos are, its tempo, its
     // bold serif under spaced small words, no warmth, grain nor vignette its original does not have. Its pair's serif is
     // EB Garamond 700 since its v4 (HOUSE_VERSION 21: measured on its original's letters, Lora's eye was too large).
-    pitch: "Des plans fixes, la caméra posée, coupés sur la musique, en horizontal comme au cinéma, et un petit titre qui arrive mot par mot au centre.",
+    pitch: "Des plans fixes, la caméra posée, coupés sur la musique, comme au cinéma, et un petit titre qui arrive mot par mot au centre.",
     needs: "5 à 10 vidéos fixes (posées, sans bouger) de ton lieu et de ta rue, idéalement en fin de journée",
     files: [4, 10],
     pair: "serif-grasse",
@@ -818,7 +818,7 @@ export const HOUSE_MODELS: HouseModel[] = [
         composition: "un petit titre au centre en deux niveaux : trois petits mots sans serif au-dessus, un ou deux mots en serif dessous, blancs, sur le premier plan",
         weight: "bold",
       },
-      layout: "plein cadre, des plans fixes l'un après l'autre, en 4:3 sur du noir quand ses vidéos sont horizontales",
+      layout: "plein cadre, des plans fixes l'un après l'autre (en 4:3 sur du noir à sa demande)",
       moments: [
         { at: 0, what: "le premier plan fixe tenu 4 s, le petit titre apparaît au centre, mot par mot" },
         { at: 4.2, what: "des plans fixes coupés toutes les secondes" },
@@ -854,7 +854,7 @@ export const HOUSE_MODELS: HouseModel[] = [
         weight: "black",
         tracking: "tight",
       },
-      layout: "des plans d'une seconde enchaînés par des coupes franches, des flashs blancs et des fouets éclair (deux images floues et claires), en 4:3 sur du noir quand ses vidéos sont horizontales",
+      layout: "des plans d'une seconde enchaînés par des coupes franches, des flashs blancs et des fouets éclair (deux images floues et claires), en plein cadre vertical (en 4:3 sur du noir à sa demande)",
       moments: [
         { at: 0.67, what: "un flash blanc, puis le nom posé dans le ciel, immobile, l'image qui pousse derrière" },
         { at: 1.8, what: "un fouet éclair, puis des plans d'une seconde : une contre-plongée en noir et blanc, un plan qui arrive en filant, des flashs blancs" },
@@ -953,7 +953,7 @@ export const HOUSE_MODELS: HouseModel[] = [
     // tempo (119,8), a festive beat, its black and white with blue blacks and no grain (its code draws it and takes the
     // whole finish out: no grade over its shots either, its contrast crushed the blue blacks), an editorial serif for its end.
     pitch: "Ton premier plan apparaît en étoile, une bande par temps sur un fond bordeaux, puis en entier quand la musique entre ; tes plans défilent en noir et blanc sur le rythme, jusqu'à ton nom signé sur le noir.",
-    needs: "5 à 12 vidéos de ton lieu, en largeur de préférence : un plan qui ouvre avec un centre et des lignes qui en partent (vu d'en haut, d'en bas ou en perspective), tes lumières, des gens qui bougent, deux plans qui se répondent",
+    needs: "5 à 12 vidéos de ton lieu : un plan qui ouvre avec un centre et des lignes qui en partent (vu d'en haut, d'en bas ou en perspective), tes lumières, des gens qui bougent, deux plans qui se répondent",
     files: [5, 12],
     pair: "editorial",
     example: "L-eventail",
@@ -970,7 +970,7 @@ export const HOUSE_MODELS: HouseModel[] = [
         weight: "regular",
       },
       colors: ["#420e0f", "#972f34"],
-      layout: "des bandes posées en étoile sur un fond bordeaux, fenêtres sur un seul plan, puis ses plans dans un fin cadre bordeaux, en 16:9 sur du noir comme l'original quand ses vidéos sont horizontales",
+      layout: "des bandes posées en étoile sur un fond bordeaux, fenêtres sur un seul plan, puis ses plans dans un fin cadre bordeaux, en plein écran vertical (en 16:9 sur du noir comme l'original à sa demande)",
       moments: [
         { at: 0.13, what: "un petit carré au milieu du fond bordeaux, fenêtre sur le cœur du plan qui ouvre" },
         { at: 0.63, what: "une bande par temps, posée d'un coup, six en tout, toutes des fenêtres sur ce même plan à sa place : trois traits qui passent par le centre, chacun en deux moitiés, sur sept petits coups de musique seuls" },
@@ -1132,7 +1132,7 @@ export const HOUSE_MODELS: HouseModel[] = [
         composition: "un titre en pixels sur deux lignes au tiers haut, une petite tête avant et une étoile après, qui tremblent ; deux lignes en machine à écrire ; une petite légende par étape",
         weight: "regular",
       },
-      layout: "plein cadre, téléphone posé, ses étapes coupées geste par geste, de petits textes posés par-dessus ; en 16:9 sur du noir si ses vidéos sont en largeur",
+      layout: "plein cadre, téléphone posé, ses étapes coupées geste par geste, de petits textes posés par-dessus ; en 16:9 sur du noir à sa demande",
       moments: [
         { at: 0, what: "le plat fini vu d'en haut, son titre en pixels arrive d'un coup à la 5e image et tremble" },
         { at: 1.2, what: "ses étapes, chacune en plusieurs gestes courts du même plan, avec sa petite légende" },
@@ -1153,7 +1153,7 @@ export const HOUSE_MODELS: HouseModel[] = [
     // 15: written again on its original's fiche (v2 of its skill): its 16:9 frame and its grid's proportions, its loops
     // at a hand's pace chained one after the other, its sentence held 5 s, its light dosed, no grain.
     pitch: "Un plan calme sous une grille de lettres, où des boucles tracées à la main entourent les mots cachés un à un.",
-    needs: "une vidéo calme et fixe de ton lieu ou de toi au travail, d'environ 20 secondes, à l'horizontale de préférence",
+    needs: "une vidéo calme et fixe de ton lieu ou de toi au travail, d'environ 20 secondes",
     files: [1, 2],
     pair: "grotesque",
     example: "A-mots-meles",
@@ -1174,7 +1174,7 @@ export const HOUSE_MODELS: HouseModel[] = [
         stress: "marker",
         stroke: "thin",
       },
-      layout: "un seul plan fixe en 16:9 sur du noir comme l'original (plein cadre en vertical), une grille de lettres posée sur toute l'image",
+      layout: "un seul plan fixe en plein cadre vertical (en 16:9 sur du noir comme l'original à sa demande), une grille de lettres posée sur toute l'image",
       moments: [
         { at: 0, what: "la grille de lettres sur toute l'image, le plan calme et un peu assombri dessous, téléphone posé" },
         { at: 0.13, what: "une boucle blanche tracée à la main entoure le premier mot, au-dessus de sa première lettre, à l'allure d'une main (2,6 s), puis chaque mot de la phrase dès que la précédente se ferme ; un mot sur deux rangées en escalier, un en diagonale" },
@@ -1208,7 +1208,7 @@ export const HOUSE_MODELS: HouseModel[] = [
       hook: { kind: "geste", what: "une personne qui marche, détourée sur un aplat rouge pur, blanche et lumineuse trois images, puis à ses couleurs avec son ombre" },
       text: { amount: "aucun", composition: "aucun texte" },
       colors: ["#ff0000"],
-      layout: "en 4:3 sur du noir quand ses vidéos sont horizontales : la silhouette sur l'aplat, son plan qui revient autour d'elle, le plan suivant posé morceau par morceau, un cadre rouge qui se referme",
+      layout: "en plein écran vertical (en 4:3 sur du noir à sa demande) : la silhouette sur l'aplat, son plan qui revient autour d'elle, le plan suivant posé morceau par morceau, un cadre rouge qui se referme",
       moments: [
         { at: 0, what: "sa silhouette blanche dans un halo pendant trois images sur un aplat rouge pur, puis à ses couleurs, seule avec son ombre" },
         { at: 0.5, what: "son plan revient autour d'elle du plus près au plus loin : le sol sous ses pieds, le chemin, puis tout le sol en blanc, le ciel en blanc, le plan entier" },
@@ -1253,7 +1253,7 @@ export const HOUSE_MODELS: HouseModel[] = [
         weight: "black",
         tracking: "normal",
       },
-      layout: "une fenêtre un peu plus large que haute aux coins arrondis sur du noir quand ses vidéos sont horizontales, sinon plein cadre aux coins arrondis ; ses plans en coupes franches",
+      layout: "plein cadre aux coins arrondis (une fenêtre un peu plus large que haute sur du noir à sa demande) ; ses plans en coupes franches",
       moments: [
         { at: 0, what: "noir, puis une fente verticale au milieu qui s'élargit à vitesse constante jusqu'à toute la largeur, sur un plan large et fixe" },
         { at: 3.6, what: "le nom s'allume lettre par lettre dans le désordre, de plus en plus vite : chacune clignote, s'éteint puis tient, derrière le décor" },
@@ -1490,7 +1490,7 @@ export const HOUSE_MODELS: HouseModel[] = [
         tracking: "normal",
         shadow: "none",
       },
-      layout: "une fenêtre presque carrée (10:9) sur du noir quand ses vidéos sont horizontales, sinon plein cadre ; le titre sur le premier plan seulement",
+      layout: "plein cadre (une fenêtre presque carrée, 10:9, sur du noir à sa demande) ; le titre sur le premier plan seulement",
       moments: [
         { at: 0, what: "un plan large et fixe au crépuscule, quelqu'un petit au milieu en bas qui avance lentement en levant les yeux ; le titre et sa signature là dès la première image, immobiles, la musique sans basse" },
         { at: 0.4, what: "sa tête passe devant la signature, de plus en plus, jamais devant le titre" },
@@ -1579,7 +1579,7 @@ export const HOUSE_MODELS: HouseModel[] = [
         tracking: "tight",
       },
       colors: ["#f6e2c1"],
-      layout: "une bande-annonce de ses plans à venir en éclairs sous le titre, puis ses plans un à un, son rituel filmé de face téléphone posé ; en 16:9 sur du noir si ses vidéos sont en largeur",
+      layout: "une bande-annonce de ses plans à venir en éclairs sous le titre, puis ses plans un à un, son rituel filmé de face téléphone posé ; en 16:9 sur du noir à sa demande",
       moments: [
         { at: 0, what: "la bande-annonce : 13 éclairs de 4 ou 5 images, chacun un moment d'un plan à venir dans l'ordre du Reel, sous le titre tapé lettre à lettre avec son curseur, puis sa petite ligne d'un coup ; tout part à la coupe" },
         { at: 2.07, what: "son rituel au comptoir, filmé de face à hauteur de poitrine, téléphone posé : un geste par plan (0,4 à 1,6 s, coupes au même endroit), les ingrédients qui entrent un à un, chaque préparation finie présentée des deux mains" },
@@ -1623,7 +1623,7 @@ export const HOUSE_MODELS: HouseModel[] = [
         tracking: "wide",
       },
       filter: "nuit de cinéma : couleurs très éteintes sauf les lumières (néons, phares, taxi), noirs relevés, blancs retenus ; flashs blancs, négatifs, brûlures de pellicule chaudes, une lumière orange",
-      layout: "son objet au même endroit dans chaque angle, puis des plans d'une demi-seconde à une seconde en flashs blancs, brûlures de pellicule et coupes cachées, en 16:9 sur du noir quand ses vidéos le sont",
+      layout: "son objet au même endroit dans chaque angle, puis des plans d'une demi-seconde à une seconde en flashs blancs, brûlures de pellicule et coupes cachées, en plein écran (16:9 sur du noir à sa demande)",
       moments: [
         { at: 0, what: "le même objet (un feu piéton) sous six angles, au même endroit et à la même taille, coupé sur chaque coup d'un roulement qui accélère, de 5 images à 2 ; le dernier tour filé" },
         { at: 1.53, what: "un flou sombre, puis des choses rondes au même endroit, une ou deux images chacune (un objectif, un bagel, une horloge, un café), et l'objectif tenu : son verre s'éclaire en blanc, l'image passe en négatif" },
@@ -1673,7 +1673,7 @@ export const HOUSE_MODELS: HouseModel[] = [
         weight: "regular",
       },
       effect: "bw",
-      layout: "des éclairs de 0,1 s en noir et blanc comme filmés (plein cadre, une horizontale entière dans une bande sur du noir), un petit compteur au centre, puis le noir",
+      layout: "des éclairs de 0,1 s en noir et blanc, plein cadre (comme filmés, une horizontale entière dans une bande sur du noir, à sa demande), un petit compteur au centre, puis le noir",
       moments: [
         { at: 0, what: "des éclairs de 2 ou 3 images (64 en 6 s) de gestes, de mains et de matières de près, en noir et blanc ; au centre exact, un petit compteur blanc en serif à 1 %" },
         { at: 0.1, what: "le compteur monte de 3 % toutes les 3 images, sur sa propre horloge et pas sur les coupes, jusqu'à 88 %, jamais 100 %" },
@@ -1724,7 +1724,7 @@ export const HOUSE_MODELS: HouseModel[] = [
         tracking: "tight",
       },
       colors: ["#fd4c4c"],
-      layout: "un nom géant posé dans le ciel du premier plan, derrière ses toits, en 16:9 sur du noir comme l'original quand ses vidéos sont horizontales, puis ses plans en plein cadre",
+      layout: "un nom géant posé dans le ciel du premier plan, derrière ses toits, en plein écran vertical (en 16:9 sur du noir comme l'original à sa demande), puis ses plans en plein cadre",
       moments: [
         { at: 0, what: "un plan large et fixe de ses toits au soleil bas ; son nom géant dans le ciel, le pied derrière les toits, qui monte lentement ; deux à quatre petits mots blancs au-dessus, une signature en petit en bas" },
         { at: 0.6, what: "à chaque temps (0,42 s), la police du nom change d'un coup, en une image, à la même place et dans la même couleur : très grasse et ronde, carrée, étroite, carrée plus grande, puis la sienne, qui reste jusqu'à la coupe" },
@@ -1867,7 +1867,7 @@ export const HOUSE_MODELS: HouseModel[] = [
       },
       colors: ["#d7261e"],
       filter: "couleurs de cinéma retenues : les blancs jamais au-dessus de 215 sur 255, les noirs un peu levés, des ombres bleu-vert et des hautes lumières chaudes, des rouges francs (le titre, les lanternes, les rames), sans grain visible ni coins sombres",
-      layout: "des plans plein cadre, en 4:3 sur du noir quand ses vidéos sont horizontales, coupés à l'oreille sur ce qui est dit ; trois rafales de plans de deux à six images",
+      layout: "des plans plein cadre (en 4:3 sur du noir à sa demande), coupés à l'oreille sur ce qui est dit ; trois rafales de plans de deux à six images",
       moments: [
         { at: 0, what: "un plan large et calme, quelqu'un d'immobile au milieu, le son de la ville ; sa première phrase arrive mot à mot en petits sous-titres, puis la deuxième, qui finit sur le nom du lieu" },
         { at: 2.63, what: "la musique tombe sur le nom : neuf gros plans d'une carte pleine de détails, deux et trois images chacun, puis le même plan filé" },
@@ -2008,7 +2008,7 @@ export const HOUSE_MODELS: HouseModel[] = [
         weight: "bold",
         shadow: "soft",
       },
-      layout: "plein cadre, téléphone posé, chaque étape coupée geste par geste dans le même plan, ses mots posés par-dessus au milieu de l'image ; en 16:9 sur du noir si ses vidéos sont en largeur",
+      layout: "plein cadre, téléphone posé, chaque étape coupée geste par geste dans le même plan, ses mots posés par-dessus au milieu de l'image ; en 16:9 sur du noir à sa demande",
       moments: [
         { at: 0, what: "son résultat fini posé sur son plan de travail devant l'objectif, de face, ses premiers mots au milieu dès la première image" },
         { at: 1.03, what: "de tout près, ce qu'on en prend soulevé vers l'objectif, la promesse qui continue en sous-titres" },
@@ -2298,7 +2298,7 @@ export const HOUSE_MODELS: HouseModel[] = [
         weight: "regular",
         tracking: "normal",
       },
-      layout: "des plans en plein cadre sur les temps, dix coupes cachées par ce qui passe devant l'objectif, un compteur posé sur le plan fort ; en 16:9 sur du noir si ses vidéos sont en largeur",
+      layout: "des plans en plein cadre sur les temps, dix coupes cachées par ce qui passe devant l'objectif, un compteur posé sur le plan fort ; en 16:9 sur du noir à sa demande",
       moments: [
         { at: 0, what: "trois plans éclair (une façade en contre-plongée, une rue, un plan de nuit), chaque coupe cachée derrière quelque chose de sombre qui passe devant l'objectif ; la musique sans sa basse" },
         { at: 2.07, what: "la basse tombe sur un visage de près dans un moment fort, au ralenti : un compteur de deux lignes en capitales étroites, blanches et translucides, au milieu ; un temps plus tard son nombre prend un de plus et gonfle trois images" },

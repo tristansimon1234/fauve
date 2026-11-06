@@ -45,13 +45,13 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const setting = (k, d) => { const v = texts && texts[k]; return typeof v === "string" && v ? v : d; };
   const n = shots.length;
 
-  // Its layout, as her files are: the original's 4:3 card at the middle of the screen, its halves side by side (2:3), when
-  // most of them are vertical; the card over the whole screen, one half above the other (9:8), when most are horizontal;
-  // or as she asks: the card, side by side over the whole screen (9:32), one above the other.
+  // Its layout over the whole screen, as her files are: its halves side by side (9:32) when most of them are vertical, one
+  // above the other (9:8) when most are horizontal; or as she asks: the original's 4:3 card on black, its halves side by
+  // side (2:3), side by side over the whole screen, one above the other.
   const format = setting("format", "auto");
   const wideShots = shots.filter((s) => (Number(s.aspect) || 0.5625) > 1.15).length;
   const stacked = format === "empile" || (format === "auto" && wideShots * 2 > n);
-  const boxed = format === "carte" || (format === "auto" && !stacked);
+  const boxed = format === "carte";
   const fh = boxed ? Math.round((width * 3) / 4) : height;
   const fy = boxed ? Math.round((height - fh) / 2) : 0;
 
@@ -210,13 +210,16 @@ export const ecranPartage: MontageSkill = {
   // 3: its two halves laid on the same moment (the engine's simultaneous shots), each at its own speed, as the
   // original's, where they played at half speed, their images blended; a video alone in its pair plays its gesture
   // beside its last image.
-  version: 3,
+  // 4: over the whole screen by default, its halves side by side for her vertical files, one above the other for her
+  // horizontal ones; the original's card on black only when she asks for it (Tristan, 6 November, on seven benches:
+  // « vertical please », « tout vertical please »).
+  version: 4,
   bpm: BPM,
   shots: [6, 10],
   // Up to 22 for a length she asks for: eleven pairs, about 30 s at its own tempo.
   long: 22,
   files: [4, 10],
-  how: "Une carte aux coins arrondis sur du noir, coupée en deux moitiés qui se touchent : côte à côte, hautes et étroites (la carte 4:3 de l'original au milieu de l'écran), quand la plupart de ses fichiers sont verticaux ; l'une sur l'autre, larges, sur tout l'écran, quand ils sont horizontaux (un fichier de l'autre format n'y garde que son milieu : son sujet doit être au centre de l'image). Dans l'une, elle ou son équipe au travail ; dans l'autre, au même moment, ce que ce geste donne : le plat qu'on pose devant la caméra, la dernière touche. Les deux moitiés jouent en même temps, chacune à sa vitesse, et coupent toujours ensemble, une paire toutes les deux à trois secondes et demie ; la dernière sur le résultat fini. Deux petits titres en serif blanc, un sur chaque moitié, qui se répondent (« Les artistes » / « L'art »), tenus tout le Reel. Il finit net sur la dernière paire, sans carte de fin, sauf si elle en demande une (une offre, une annonce).",
+  how: "L'écran coupé en deux moitiés qui se touchent, sur tout l'écran : côte à côte, hautes et étroites, quand la plupart de ses fichiers sont verticaux ; l'une sur l'autre, larges, quand ils sont horizontaux (un fichier de l'autre format n'y garde que son milieu : son sujet doit être au centre de l'image) ; la carte 4:3 aux coins arrondis de l'original, sur du noir, à sa demande. Dans l'une, elle ou son équipe au travail ; dans l'autre, au même moment, ce que ce geste donne : le plat qu'on pose devant la caméra, la dernière touche. Les deux moitiés jouent en même temps, chacune à sa vitesse, et coupent toujours ensemble, une paire toutes les deux à trois secondes et demie ; la dernière sur le résultat fini. Deux petits titres en serif blanc, un sur chaque moitié, qui se répondent (« Les artistes » / « L'art »), tenus tout le Reel. Il finit net sur la dernière paire, sans carte de fin, sauf si elle en demande une (une offre, une annonce).",
   end: true,
   texts: [
     {
@@ -237,10 +240,10 @@ export const ecranPartage: MontageSkill = {
   settings: [
     {
       name: "format",
-      want: "la mise en page : la carte de l'original, ses deux moitiés côte à côte sur tout l'écran, ou l'une sur l'autre",
+      want: "la mise en page : sur tout l'écran comme ses fichiers, la carte de l'original sur du noir, ses deux moitiés côte à côte sur tout l'écran, ou l'une sur l'autre",
       choices: [
-        { value: "auto", says: "comme ses fichiers : la carte de l'original quand ils sont verticaux, les deux moitiés l'une sur l'autre quand ils sont horizontaux" },
-        { value: "carte", says: "la carte 4:3 de l'original au milieu de l'écran, sur du noir, ses deux moitiés côte à côte" },
+        { value: "auto", says: "sur tout l'écran, comme ses fichiers : les deux moitiés côte à côte quand ils sont verticaux, l'une sur l'autre quand ils sont horizontaux" },
+        { value: "carte", says: "la carte 4:3 de l'original au milieu de l'écran, sur du noir, ses deux moitiés côte à côte", band: true },
         { value: "plein-ecran", says: "deux moitiés côte à côte, hautes et étroites, sur tout l'écran" },
         { value: "empile", says: "deux moitiés l'une sur l'autre sur tout l'écran : la personne en haut, le résultat en bas" },
       ],

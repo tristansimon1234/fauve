@@ -55,6 +55,8 @@ Rien ne clignote, rien ne s'allume, aucun flash, aucun noir : les « clignotemen
 Sombre et chaud : des noirs profonds (0 à 14 sur 255 dans les plans de cuisine), des bruns chauds dans les tons moyens, l'inox de la cuisine froid (vert-bleu), les plats orange et rouges saturés, les assiettes crème (≈ #CEC2BA). Pas de vignettage visible, pas de grain (les zones immobiles ne changent pas d'une image à l'autre). La lumière dure d'une fenêtre raye la table en diagonale dans les plats vus du dessus : filmée, pas ajoutée.
 
 ## Format
+**Depuis le 6 novembre** (Tristan, sur sept bancs : « vertical please », « tout vertical please ») : `auto` passe sur tout l'écran, ses moitiés côte à côte (9:32) pour des fichiers verticaux, l'une sur l'autre (9:8) pour des horizontaux ; la carte 4:3 de l'original sur du noir (`carte`, sa bande) seulement à sa demande, ou quand elle veut ses vidéos entières. `docs/modeles.md`, « Réglages d'un modèle ».
+
 L'original est horizontal 4:3 : une carte de deux moitiés verticales 2:3, montrée sur du noir (sur un téléphone : une bande sur toute la largeur, du noir dessus et dessous). Ses moitiés étant verticales, ses vidéos verticales y vont bien : une vidéo 9:16 recadrée en 2:3 garde toute sa largeur et 84 % de sa hauteur. Une vidéo horizontale n'en garde que 38 % de la largeur. Réglage « format » :
 - `carte` (comme l'original) : la carte 4:3 au milieu de l'écran vertical, 1080 × 810 sur du noir ;
 - `plein écran` : la carte remplit l'écran, deux moitiés de 540 × 1920 (9:32) : chaque vidéo verticale ne garde que la moitié de sa largeur, son sujet au centre ;

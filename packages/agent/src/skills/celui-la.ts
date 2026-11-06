@@ -91,7 +91,7 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
 
   // 1. Its frame: her shots full frame, upright as the original; each one whole in a 16:9 band on black when most of
   // her files are horizontal (or as her words ask). Only the shot on screen is laid: a video plays, a photo stays still.
-  const format = setting("format", "auto");
+  const format = setting("format", "vertical");
   const wideShots = shots.filter((s) => (Number(s.aspect) || 0.5625) > 1.15).length;
   const band = format === "horizontal" || (format === "auto" && wideShots * 2 > n);
   const BH = Math.round((width * 9) / 16);
@@ -246,6 +246,8 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
 
 export const celuiLa: MontageSkill = {
   key: "celui-la",
+  // Also 3: vertical full frame by default, her horizontal files cropped on their subject, its band only when she asks for
+  // it (Tristan, 6 November, on seven benches: « vertical please », « tout vertical please »).
   version: 3,
   bpm: BPM,
   // Its original's words are what its voice says: a voice says hers, each at its moments, unless she takes it away; or her
@@ -313,9 +315,9 @@ export const celuiLa: MontageSkill = {
       name: "format",
       want: "le format : comme ses fichiers, vertical plein écran comme l'original, ou chaque plan entier dans une bande 16:9 sur du noir",
       choices: [
-        { value: "auto", says: "comme ses fichiers : plein écran vertical, ou dans une bande 16:9 sur du noir quand la plupart sont horizontaux" },
         { value: "vertical", says: "chaque plan plein écran, comme l'original (un plan horizontal y est recadré sur son sujet)" },
-        { value: "horizontal", says: "chaque plan entier dans une bande 16:9 au milieu du noir, les mots posés sur la bande et sur le noir" },
+        { value: "horizontal", says: "chaque plan entier dans une bande 16:9 au milieu du noir, les mots posés sur la bande et sur le noir", band: true },
+        { value: "auto", says: "comme ses fichiers : plein écran vertical, ou dans une bande 16:9 sur du noir quand la plupart sont horizontaux" },
       ],
     },
     {

@@ -150,7 +150,7 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   // Its frame: the original's window, a little wider than high (1,18:1), when most of her videos are horizontal or
   // square (or she asks), else the whole vertical frame; its corners rounded on black either way (a radius of 3 % of the
   // width), a fine black line on the window's sides. Every place below is a share of it.
-  const format = setting("format", "auto");
+  const format = setting("format", "vertical");
   const upright = shots.filter((s) => (Number(s.aspect) || 0.5625) < 0.87).length;
   const windowed = format === "fenetre" || (format === "auto" && upright * 2 <= n);
   const bw = width;
@@ -316,7 +316,9 @@ export const detourages: MontageSkill = {
   // 2: written again on its original's fiche (its 140 BPM and its cuts, its window opening as a slit, her name flashing
   // letter by letter behind her scenery, its burst on the dotted rhythm with its two sweeps, its rounded window on black,
   // its last shot held while the bass falls away, its soft film grade); no cut-out surges any more.
-  version: 2,
+  // 3: vertical full frame by default, her horizontal files cropped on their subject, its band only when she asks for
+  // it (Tristan, 6 November, on seven benches: « vertical please », « tout vertical please »).
+  version: 3,
   bpm: BPM,
   // Its opening, its burst (whole bars of it left out when her files are fewer), its last shot.
   shots: [11, 23],
@@ -326,7 +328,7 @@ export const detourages: MontageSkill = {
   fonts: ["Montserrat"],
   // Its sweeps: her real whips, when she filmed some.
   reads: ["moves"],
-  how: "Un plan large et fixe de son lieu ou de son paysage qui s'ouvre comme une fenêtre : une fente noire au milieu qui s'élargit lentement jusqu'à toute la largeur ; son nom s'y allume en très grandes capitales blanches, lettre par lettre dans le désordre (chacune clignote, s'éteint puis tient), derrière le décor (ses toits, ses collines, quelqu'un debout passent devant) ; puis, sur le drop, une rafale de plans courts coupés sur le rythme pointé de la chanson (des gens qui font un geste, des mains et des matières de près, son nom écrit, son lieu vu d'en haut, deux balayages très rapides), et un dernier plan tenu de quelqu'un de dos, les bras levés. Dans une fenêtre aux coins arrondis sur du noir, un peu plus large que haute, quand ses vidéos sont horizontales.",
+  how: "Un plan large et fixe de son lieu ou de son paysage qui s'ouvre comme une fenêtre : une fente noire au milieu qui s'élargit lentement jusqu'à toute la largeur ; son nom s'y allume en très grandes capitales blanches, lettre par lettre dans le désordre (chacune clignote, s'éteint puis tient), derrière le décor (ses toits, ses collines, quelqu'un debout passent devant) ; puis, sur le drop, une rafale de plans courts coupés sur le rythme pointé de la chanson (des gens qui font un geste, des mains et des matières de près, son nom écrit, son lieu vu d'en haut, deux balayages très rapides), et un dernier plan tenu de quelqu'un de dos, les bras levés. En vertical plein écran aux coins arrondis, ses vidéos horizontales recadrées sur leur sujet ; dans une fenêtre un peu plus large que haute sur du noir, comme l'original, à sa demande.",
   end: true,
   texts: [
     {
@@ -340,11 +342,11 @@ export const detourages: MontageSkill = {
   settings: [
     {
       name: "format",
-      want: "le format : la fenêtre aux coins arrondis de l'original, ou vertical plein écran",
+      want: "le format : vertical plein écran, ou la fenêtre aux coins arrondis de l'original",
       choices: [
+        { value: "vertical", says: "vertical plein écran, ses coins arrondis et sa fente gardés, ses vidéos horizontales recadrées sur leur sujet" },
+        { value: "fenetre", says: "une fenêtre un peu plus large que haute (1,18:1) aux coins arrondis sur du noir, comme l'original", band: true },
         { value: "auto", says: "comme ses vidéos (la fenêtre si la plupart sont horizontales ou carrées)" },
-        { value: "fenetre", says: "une fenêtre un peu plus large que haute (1,18:1) aux coins arrondis sur du noir, comme l'original" },
-        { value: "vertical", says: "vertical plein écran, ses coins arrondis et sa fente gardés" },
       ],
     },
   ],

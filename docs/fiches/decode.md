@@ -99,6 +99,8 @@
 - Aucun zoom posé par le monteur, ni en transition ni en poussée lente : la bande grandit par son masque, et la seule caméra qui avance est celle qui suit le skateur.
 
 ## Format
+**Depuis le 6 novembre** (Tristan, sur sept bancs : « vertical please », « tout vertical please ») : `vertical` par défaut, plein écran, ses fichiers horizontaux recadrés sur leur sujet ; `horizontal` (sa bande) seulement à sa demande, ou quand elle veut ses vidéos entières (le `frame` letterbox de son contrat) ; `auto` (comme ses vidéos, ci-dessous) seulement si elle le demande. `docs/modeles.md`, « Réglages d'un modèle ».
+
 L'original est une vidéo horizontale 16:9 (720 × 406), montrée telle quelle : ses bandes, sa bande et son titre vivent dans ce cadre. Réglage « format » (comme `frappe`) :
 - `auto` : horizontal quand la plupart de ses vidéos le sont, sinon vertical.
 - `horizontal` : tout dans un cadre 16:9 sur du noir, comme l'original. Les bandes font 180 px de large, la bande grandit jusqu'au cadre 16:9.

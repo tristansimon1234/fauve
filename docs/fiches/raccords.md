@@ -73,6 +73,8 @@ Naturel, à peine chaud dedans (rouge, vert, bleu à 126 · 107 · 87 dans le sa
 Le mot « OK » et son rouge ; le métro de Londres et son logo rond ; les marques de ses appareils ; le dessin du carnet. Le modèle prend son mot à elle, ses couleurs, ses images.
 
 ## Format
+**Depuis le 6 novembre** (Tristan, sur sept bancs : « vertical please », « tout vertical please ») : `vertical` par défaut, plein écran, ses fichiers horizontaux recadrés sur leur sujet ; `horizontal` (sa bande) seulement à sa demande, ou quand elle veut ses vidéos entières (le `frame` letterbox de son contrat) ; `auto` (comme ses vidéos, ci-dessous) seulement si elle le demande. `docs/modeles.md`, « Réglages d'un modèle ».
+
 L'original est horizontal 4:3, ses six plans plein cadre. Réglage « format » :
 - `auto` (par défaut) : comme ses vidéos, plein écran vertical quand la plupart le sont ; sinon ses vidéos horizontales entières dans une bande 16:9 au milieu, sur du noir.
 - `vertical` : plein écran vertical, une vidéo horizontale recadrée sur son sujet.

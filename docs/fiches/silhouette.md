@@ -118,6 +118,8 @@ Aucun zoom ni poussée sur une vidéo. Les seuls changements de taille touchent 
 Deux aplats et un accent, aucune image filmée à étalonner. Bleu nuit #0D0D1B (le début, les paupières, la fin ; la silhouette #0F0F1C, la pupille), pâle froid #F3F4F9 (le milieu, le blanc de l'œil), pêche #D99868 (curseur, traîne, pastille, iris), blanc pur sur le sombre, encre #0A0A10 sur le pâle. Ni grain, ni vignettage, ni dégradé. (Une colonne grise d'un pixel au bord droit des images pâles est un reste de l'export, pas un effet.)
 
 ## Format
+**Depuis le 6 novembre** : `vertical` est le premier choix (le défaut, déjà le sien), `horizontal` sa bande, à sa demande.
+
 L'original est horizontal 16:9 (720 × 406), montré tel quel : dans un fil vertical, des bandes noires dessus et dessous. Tout est dessiné sur deux aplats, sauf sa silhouette : le format ne dépend presque pas de ses vidéos. Réglage « format » :
 - `vertical` (par défaut) : 9:16 plein écran. Les aplats remplissent tout, sa silhouette en bas au centre, coupée par le bas comme l'original (environ 60 % de la largeur), l'amande de l'œil sur 80 % de la largeur. Les mots au milieu, plutôt au-dessus du milieu : le quart du bas est couvert par Instagram, et ses boutons à droite sous le milieu (la ligne des métiers, calée à gauche, s'étend vers la droite). Sa vidéo, horizontale ou verticale, est recadrée autour de sa tête.
 - `horizontal` : le cadre 16:9 de l'original, au milieu du Reel, sur des bandes bleu nuit (les scènes sombres remplissent alors l'écran, les pâles font une bande).

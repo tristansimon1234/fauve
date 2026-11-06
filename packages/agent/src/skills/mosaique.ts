@@ -63,7 +63,7 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   // Its frame: vertical full frame as the original (3 × 4 prints standing) when most of her files are vertical (or she
   // asks); her horizontal pictures whole in a 16:9 block of 4 × 3 lying prints in the middle of the paper; a square
   // block of 3 × 3 on her word. A print every STEP images in each (3 in the original).
-  const format = setting("format", "auto");
+  const format = setting("format", "vertical");
   const wideShots = shots.filter((s) => (Number(s.aspect) || 0.5625) > 1.15).length;
   const kind = format === "carre" ? "carre" : format === "horizontal" || (format === "auto" && wideShots * 2 > n) ? "horizontal" : "vertical";
   const COLS = kind === "horizontal" ? B : A;
@@ -206,17 +206,19 @@ export const mosaique: MontageSkill = {
   // 3: written again on its original's fiche: its tempo (130 BPM, its waves in its beats, the loop a whole number of
   // them), its paper and margins, each print landing askew then straight, its format (vertical full frame, a horizontal
   // 16:9 block when her files are, a square block on her word), its music cut dead with the loop, no grain nor vignette.
-  version: 3,
+  // 4: vertical full frame by default, her horizontal files cropped on their subject, its band only when she asks for
+  // it (Tristan, 6 November, on seven benches: « vertical please », « tout vertical please »).
+  version: 4,
   bpm: BPM,
   shots: [4, 10],
   files: [4, 10],
-  how: "Ses images coupées en une grille de 3 × 4 tirages posés à la main sur un papier gris clair, avec une fine marge ; l'image suivante remplace les cases une à une dans l'ordre de lecture, une case toutes les 3 images, chacune posée un instant de travers puis droite, si bien qu'une case change toujours et qu'une image passe en 1,2 s ; ses photos restent figées, ses vidéos jouent ; la dernière vague ramène la première image et le Reel tourne en boucle. En vertical plein cadre comme l'original quand ses images sont verticales, ses images horizontales entières dans un bloc 16:9 au milieu du papier sinon.",
+  how: "Ses images coupées en une grille de 3 × 4 tirages posés à la main sur un papier gris clair, avec une fine marge ; l'image suivante remplace les cases une à une dans l'ordre de lecture, une case toutes les 3 images, chacune posée un instant de travers puis droite, si bien qu'une case change toujours et qu'une image passe en 1,2 s ; ses photos restent figées, ses vidéos jouent ; la dernière vague ramène la première image et le Reel tourne en boucle. En vertical plein cadre comme l'original, ses images horizontales recadrées sur leur sujet ; entières dans un bloc 16:9 au milieu du papier à sa demande.",
   end: true,
   texts: [
     {
       slot: "titre",
       role: "hook",
-      want: "facultatif : un titre court (son nom, son plat, son moment), le temps des deux premières vagues, sur une étiquette de papier en haut, ou sur le papier au-dessus des cases quand ses images sont horizontales ; seulement quand le Reel a besoin de mots",
+      want: "facultatif : un titre court (son nom, son plat, son moment), le temps des deux premières vagues, sur une étiquette de papier en haut, ou sur le papier au-dessus des cases quand ses images sont dans un bloc 16:9 ; seulement quand le Reel a besoin de mots",
       max: 28,
       required: false,
     },
@@ -263,10 +265,10 @@ export const mosaique: MontageSkill = {
       name: "format",
       want: "le format : vertical plein cadre comme l'original, ou ses images horizontales entières dans un bloc au milieu du papier",
       choices: [
-        { value: "auto", says: "comme ses images (horizontal si la plupart le sont)" },
-        { value: "vertical", says: "vertical plein cadre, 3 × 4 cases debout, comme l'original" },
-        { value: "horizontal", says: "ses images horizontales entières : 4 × 3 cases couchées dans un bloc 16:9 au milieu du papier, son titre au-dessus" },
+        { value: "vertical", says: "vertical plein cadre, 3 × 4 cases debout, comme l'original, ses images horizontales recadrées sur leur sujet" },
+        { value: "horizontal", says: "ses images horizontales entières : 4 × 3 cases couchées dans un bloc 16:9 au milieu du papier, son titre au-dessus", band: true },
         { value: "carre", says: "un bloc carré de 3 × 3 cases au milieu du papier, pour un mélange d'images verticales et horizontales" },
+        { value: "auto", says: "comme ses images (horizontal si la plupart le sont)" },
       ],
     },
   ],

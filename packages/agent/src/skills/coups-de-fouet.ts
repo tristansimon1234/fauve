@@ -89,7 +89,7 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
 
   // Its frame: a horizontal 4:3 picture on black, as the original, when most of her files are horizontal (or she asks),
   // else the whole vertical frame; every place below is in it.
-  const format = setting("format", "auto");
+  const format = setting("format", "vertical");
   const wideShots = shots.filter((s) => (Number(s.aspect) || 0.5625) > 1.15).length;
   const wide = format === "horizontal" || (format === "auto" && wideShots * 2 > n);
   const bw = width;
@@ -305,13 +305,15 @@ export const coupsDeFouet: MontageSkill = {
   // in and its sweep out, its jerky whip and its fades, its music muffled where its percussion is silent, its whoosh and
   // its thud, its sound dying away, its whites held low and no grain).
   // 3: its opening shot and its tram keep their own sound under its music (SkillShot.sound), as the original's city.
-  version: 3,
+  // 4: vertical full frame by default, her horizontal files cropped on their subject, its band only when she asks for
+  // it (Tristan, 6 November, on seven benches: « vertical please », « tout vertical please »).
+  version: 4,
   bpm: BPM,
   shots: [12, 23],
   files: [6, 16],
   // Her camera's own whips, sweeps and rushes in, measured on her videos (video_read.py): its slots that want one get a real one.
   reads: ["moves"],
-  how: "Une ville en coups de fouet, en horizontal 4:3 comme l'original quand ses vidéos le sont : un plan qui défile déjà, un flash blanc, puis son nom en capitales blanches très condensées posé, immobile, dans le ciel d'un plan large qui avance doucement ; puis des plans d'une seconde environ, enchaînés par des coupes franches, des flashs blancs et des fouets éclair (deux images floues et claires de son ciel) : une contre-plongée en noir et blanc, un plan qui arrive en filant et freine sur un détail, la musique qui repart sur un détail de couleur, quelqu'un qui passe en noir et blanc avec des images fantômes, sa rue calme sous la musique étouffée, un tram qui file quand elle revient, un fouet saccadé, un balayage du ciel de plus en plus vite ; et un dernier plan large et calme tenu jusqu'à la fin, le son qui s'éteint.",
+  how: "Une ville en coups de fouet, en vertical plein écran (en horizontal 4:3 comme l'original à sa demande) : un plan qui défile déjà, un flash blanc, puis son nom en capitales blanches très condensées posé, immobile, dans le ciel d'un plan large qui avance doucement ; puis des plans d'une seconde environ, enchaînés par des coupes franches, des flashs blancs et des fouets éclair (deux images floues et claires de son ciel) : une contre-plongée en noir et blanc, un plan qui arrive en filant et freine sur un détail, la musique qui repart sur un détail de couleur, quelqu'un qui passe en noir et blanc avec des images fantômes, sa rue calme sous la musique étouffée, un tram qui file quand elle revient, un fouet saccadé, un balayage du ciel de plus en plus vite ; et un dernier plan large et calme tenu jusqu'à la fin, le son qui s'éteint.",
   end: true,
   texts: [
     {
@@ -325,11 +327,11 @@ export const coupsDeFouet: MontageSkill = {
   settings: [
     {
       name: "format",
-      want: "le format : horizontal 4:3 comme l'original, ou vertical plein écran",
+      want: "le format : vertical plein écran, ou horizontal 4:3 comme l'original",
       choices: [
+        { value: "vertical", says: "vertical plein écran, ses vidéos horizontales recadrées sur leur sujet" },
+        { value: "horizontal", says: "horizontal 4:3 sur du noir, comme l'original", band: true },
         { value: "auto", says: "comme ses vidéos (horizontal si la plupart le sont)" },
-        { value: "horizontal", says: "horizontal 4:3 sur du noir, comme l'original" },
-        { value: "vertical", says: "vertical plein écran" },
       ],
     },
   ],

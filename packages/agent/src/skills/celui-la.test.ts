@@ -237,14 +237,17 @@ test("« Celui-là » (v3): its ink, the original's cream where it reads on her 
   assert.equal(ink(0.85, { couleur: "blanc" }).color, "#2b2118");
   assert.equal(ink(0.85, { couleur: "sa-couleur" }).color, "#8a3b2a");
   assert.equal(ink(0.1, { couleur: "sa-couleur" }).color, "#fffcc0");
-  assert.deepEqual(celuiLa.settings?.map((s) => [s.name, s.choices.map((c) => c.value)]), [["format", ["auto", "vertical", "horizontal"]], ["couleur", ["creme", "blanc", "sa-couleur"]]]);
+  assert.deepEqual(celuiLa.settings?.map((s) => [s.name, s.choices.map((c) => c.value)]), [["format", ["vertical", "horizontal", "auto"]], ["couleur", ["creme", "blanc", "sa-couleur"]]]);
 });
 
-test("« Celui-là » (v3): upright as her files, in a 16:9 band on black when most are horizontal or she asks; its ending card", () => {
+test("« Celui-là » (v3): full frame by default, in a 16:9 band on black when she asks or as her files; its ending card", () => {
   const draw = scene();
   const footage = (tree: Drawn) => flatten(tree).find((n) => n.type === "Footage")!.props.style as Box;
   assert.deepEqual(footage(draw(80, propsFor(9).props)), { left: 0, top: 0, width: 1080, height: 1920 });
-  assert.deepEqual(footage(draw(80, propsFor(9, { aspect: 16 / 9 }).props)), { left: 0, top: 656, width: 1080, height: 608 });
+  // By default (Tristan, 6 November: « tout vertical please »), her horizontal files full frame, cropped on their subject.
+  assert.deepEqual(footage(draw(80, propsFor(9, { aspect: 16 / 9 }).props)), { left: 0, top: 0, width: 1080, height: 1920 });
+  assert.deepEqual(footage(draw(80, propsFor(9, { aspect: 16 / 9, settings: { format: "auto" } }).props)), { left: 0, top: 656, width: 1080, height: 608 });
+  assert.deepEqual(footage(draw(80, propsFor(9, { settings: { format: "auto" } }).props)), { left: 0, top: 0, width: 1080, height: 1920 });
   assert.deepEqual(footage(draw(80, propsFor(9, { aspect: 16 / 9, settings: { format: "vertical" } }).props)), { left: 0, top: 0, width: 1080, height: 1920 });
   assert.deepEqual(footage(draw(80, propsFor(9, { settings: { format: "horizontal" } }).props)), { left: 0, top: 656, width: 1080, height: 608 });
   // Only the shot on screen is laid: the one of that frame.
@@ -480,6 +483,7 @@ test("« Celui-là » (v3): what she says does not make it when she points at fe
     });
     assert.ok(editPlanSchema.safeParse(plan).success);
     assert.equal(plan.texts.length, HEARD.words.length);
-    for (const v of Object.values(plan.layers![0]!.motion.texts!)) assert.ok(Number.isFinite(Number(v)));
+    // Its marks are numbers (its format, told to its code since vertical became the default, is a word).
+    for (const [k, v] of Object.entries(plan.layers![0]!.motion.texts!)) if (k !== "format") assert.ok(Number.isFinite(Number(v)), k);
   }
 });

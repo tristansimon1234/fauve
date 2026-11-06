@@ -117,7 +117,7 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   // never follows her) when her whole gesture fits in it, else whole on black in a 16:9 band; or as her words ask.
   const aspect = n ? Number(shots[0].aspect) || 0.5625 : 0.5625;
   const wideVideo = aspect > 1.15;
-  const format = setting("format", "auto");
+  const format = setting("format", "vertical");
   const FULL = { left: 0, top: 0, width, height };
   const BAND = { left: 0, top: Math.round((height - (width * 9) / 16) / 2), width, height: Math.round((width * 9) / 16) };
   const layout = React.useMemo(() => {
@@ -304,6 +304,8 @@ export const interrupteur: MontageSkill = {
   // by their text (its ending card's long line kept the size of « Nouvelle saison » and ran off both sides). 9: its
   // switch as near the middle as her fingertip stays on it (Tristan: « le bouton n'est pas au centre »). 10: her cut-out
   // only over the switch and her poster, never over the rest of her shot (Tristan on v9: « bizarre il passe en découpé en dessous »).
+  // Also 10: vertical full frame by default, her horizontal files cropped on their subject, its band only when she asks for
+  // it (Tristan, 6 November, on seven benches: « vertical please », « tout vertical please »).
   version: 10,
   bpm: BPM,
   shots: [1, 1],
@@ -342,9 +344,9 @@ export const interrupteur: MontageSkill = {
       name: "format",
       want: "le format : vertical plein écran comme l'original, ou sa vidéo horizontale entière dans une bande 16:9 sur du noir",
       choices: [
-        { value: "auto", says: "comme sa vidéo (une vidéo horizontale recadrée sur son geste s'il tient dans le cadre, sinon entière sur du noir)" },
         { value: "vertical", says: "vertical plein écran, sa vidéo horizontale recadrée sur son geste" },
-        { value: "horizontal", says: "sa vidéo entière dans une bande 16:9 sur du noir, l'interrupteur et l'affiche à l'échelle de la bande" },
+        { value: "horizontal", says: "sa vidéo entière dans une bande 16:9 sur du noir, l'interrupteur et l'affiche à l'échelle de la bande", band: true },
+        { value: "auto", says: "comme sa vidéo (une vidéo horizontale recadrée sur son geste s'il tient dans le cadre, sinon entière sur du noir)" },
       ],
     },
   ],

@@ -73,6 +73,8 @@ Ni zoom, ni poussée, ni flash, ni fondu nulle part : des coupes franches (rien 
 Naturel et doux, lumière du jour : des blancs neutres un peu froids (#E0E2E9 au plus clair du comptoir), des ombres chaudes (#3B1F14, le bois), des noirs un peu levés (le plus sombre à 30 – 47 sur 255), une saturation modérée, contraste doux ; ni grain, ni coins sombres. Gemini le voyait « chaud, doré » : seulement ses ombres le sont.
 
 ## Format
+**Depuis le 6 novembre** (Tristan, sur sept bancs : « vertical please », « tout vertical please ») : `vertical` par défaut, plein écran, ses fichiers horizontaux recadrés sur leur sujet ; `horizontal` (sa bande) seulement à sa demande, ou quand elle veut ses vidéos entières (le `frame` letterbox de son contrat) ; `auto` (comme ses vidéos, ci-dessous) seulement si elle le demande. `docs/modeles.md`, « Réglages d'un modèle ».
+
 L'original est vertical 9:16, plein cadre. Réglage « format » :
 - `auto` (par défaut) : comme ses vidéos : vertical plein cadre, ses vidéos horizontales entières dans une bande 16:9 sur du noir quand la plupart le sont ;
 - `vertical` : vertical plein cadre, ses vidéos horizontales recadrées sur leur sujet ;

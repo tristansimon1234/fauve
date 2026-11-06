@@ -91,6 +91,8 @@ Passe par passe (image de départ, puis nombre d'images ; les noms sont ceux des
 Le plan est laissé tel que filmé par temps gris : peu de couleur (saturation moyenne de 0,09 à 0,12), noirs profonds un peu bleus (#0B0F15), gris neutres (#7F8182), clairs #C7C8C9. Les blancs des passes sont purs (#FDFDFD, à peine vert pour le graphe et les points, #FBFDFA). Pas de grain qui bouge (deux images de suite identiques sur les parties fixes), pas de vignettage. La seule couleur ajoutée : le bleu des cadres.
 
 ## Format
+**Depuis le 6 novembre** : `vertical` est le premier choix (le défaut, déjà le sien), `horizontal` sa bande, à sa demande.
+
 L'original est vertical (720 × 1280), filmé en vertical, de haut, caméra fixe. Tout se joue dans le plein cadre : les fonds blancs et noirs, les dalles, le graphe. Réglage « format » :
 - `vertical` (l'original, par défaut) : son plan vertical plein cadre.
 - `auto` : vertical ; un plan en largeur est recadré sur son sujet immobile, gardé au milieu du cadre.
