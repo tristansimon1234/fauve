@@ -136,7 +136,7 @@ test("« Le kaléidoscope »: inside her door when it is found, her picture real
   assert.equal(flatten(drawAt(marks.name! - 1, { door, texts: { nom: "Maison Farine" } })).filter((d) => d.type === "FitText").length, 0);
   const name = flatten(drawAt(marks.name! + 20, { door, texts: { nom: "Maison Farine" } })).find((d) => d.type === "FitText")!;
   const b = styleOf(name);
-  assert.ok(Number(b.top) >= 100 && Number(b.top) + Number(b.height) <= 500 - 20, JSON.stringify(b));
+  assert.ok(Number(b.top) >= 100 && Number(b.top) + Number(b.height) <= 500 - 10 && Number(b.top) + Number(b.height) >= 500 - 40, JSON.stringify(b));
   assert.ok(Number(b.left) >= 140 && Number(b.left) + Number(b.width) <= 940);
   assert.equal((name.props.innerStyle as Record<string, string>).color, "#ffffff");
   const inked = flatten(drawAt(marks.name! + 20, { door, texts: { nom: "Maison Farine" }, light: 0.8 })).find((d) => d.type === "FitText")!;

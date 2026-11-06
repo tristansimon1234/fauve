@@ -202,10 +202,11 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const from = hook ? hook.from : end ? endAt : durationInFrames;
   const place = React.useMemo(() => {
     const thing = n ? zoneOf(last, from, lastBox) : null;
-    const room = thing && thing.h < lastBox.height ? thing.y - 30 - top0 : 0;
-    if (room >= 250) {
-      const tall = Math.min(210, room - 100);
-      return { x: 140, y: Math.round(thing.y - 30 - 90 - tall), w: 800, h: Math.round(tall) };
+    // Right above it, like a sign on its lintel: its line just over it, her name over its line.
+    const room = thing && thing.h < lastBox.height ? thing.y - 16 - top0 : 0;
+    if (room >= 220) {
+      const tall = Math.min(170, room - 90);
+      return { x: 140, y: Math.round(thing.y - 16 - 90 - tall), w: 800, h: Math.round(tall) };
     }
     const c = n ? ClearBox(shots[last], from, lastBox, { aspect: 3.6, min: 420, max: 900, prefer: "top", pad: 24, fallback }) : null;
     const p = c || fallback;

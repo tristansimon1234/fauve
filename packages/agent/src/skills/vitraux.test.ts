@@ -177,8 +177,9 @@ test("« Ta devanture en kaléidoscope »: her real picture first, mirrors that 
   const at = (f: number) => strips(drawAt(f)).map((s) => s.left).join(",");
   assert.notEqual(at(100), at(130));
   assert.notEqual(at(130), at(160));
-  // Closing: fewer and wider strips, then none.
-  assert.ok(strips(drawAt(250)).find((s) => s.left <= 540 && s.right >= 540)!.right - strips(drawAt(250)).find((s) => s.left <= 540 && s.right >= 540)!.left > 600);
+  // Closing: its middle strip wide again, then none.
+  const closing = strips(drawAt(250)).find((s) => s.left <= 540 && s.right >= 540)!;
+  assert.ok(closing.right - closing.left > 600, JSON.stringify(closing));
 });
 
 test("« Ta devanture en kaléidoscope »: inside her door when it is found (clipped to its outline when whole), her picture real around it", () => {
@@ -260,7 +261,7 @@ test("« Ta devanture en kaléidoscope »: her name in capitals over the mirrors
   // her picture when there is one; white on a dark one, an ink on a bright one.
   const over = words(from + 30, { reads: { box: { x: 200, y: 620, w: 680, h: 1000 } } });
   const sign = styleOf(over[1]!);
-  assert.ok(Number(sign.top) + Number(sign.height) <= 620 - 10 && Number(styleOf(over[0]!).top) >= 110, JSON.stringify([styleOf(over[0]!), sign]));
+  assert.ok(Number(sign.top) + Number(sign.height) <= 620 - 10 && Number(sign.top) + Number(sign.height) >= 620 - 40 && Number(styleOf(over[0]!).top) >= 110, JSON.stringify([styleOf(over[0]!), sign]));
   const clear = { x: 200, y: 900, w: 680, h: 180 };
   assert.equal(styleOf(words(from + 30, { reads: { clear } })[0]!).top, 900);
   assert.equal((words(from + 30)[0]!.props.innerStyle as Record<string, string>).color, "#ffffff");

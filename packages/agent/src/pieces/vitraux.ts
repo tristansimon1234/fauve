@@ -151,9 +151,10 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   let name = null;
   if (nom && frame >= NAME) {
     const thing = zoneOf(kl, NAME);
-    const room = thing.h < H ? thing.y - 30 - 110 : 0;
+    // Right above it, like a sign on its lintel.
+    const room = thing.h < H ? thing.y - 16 - 110 : 0;
     const fallback = { x: 140, y: 150, w: 800, h: 200 };
-    const spot = room >= 160 ? { x: 140, y: Math.round(thing.y - 30 - Math.min(200, room)), w: 800, h: Math.round(Math.min(200, room)) } : ClearBox(list[kl], Math.max(NAME, list[kl].from), BOX, { aspect: 4, min: 420, max: 900, prefer: "top", pad: 24, fallback }) || fallback;
+    const spot = room >= 140 ? { x: 140, y: Math.round(thing.y - 16 - Math.min(150, room)), w: 800, h: Math.round(Math.min(150, room)) } : ClearBox(list[kl], Math.max(NAME, list[kl].from), BOX, { aspect: 4, min: 420, max: 900, prefer: "top", pad: 24, fallback }) || fallback;
     const y = Math.round(within(spot.y, 100, H * 0.75 - 220));
     const tall = Math.round(within(spot.h, 140, 200));
     const light = LightUnder(list[kl], frame, BOX, { x: 140, y, w: 800, h: tall });
