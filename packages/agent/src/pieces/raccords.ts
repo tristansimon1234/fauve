@@ -137,7 +137,8 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
         cut.kind === 1 ? h("div", { style: { ...box, backgroundColor: "#000000", opacity: DIM } }) : null));
     }
   }
-  return h(AbsoluteFill, null, ...drawn);
+  // Its layer always laid (nothing drawn before its first hit, the montage playing under it).
+  return h(AbsoluteFill, { style: { overflow: "hidden" } }, ...drawn);
 }`;
 
 export const raccords: EffectPiece = {

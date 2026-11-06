@@ -107,8 +107,10 @@ const styleOf = (node: Drawn | null) => (node?.props.style ?? {}) as Record<stri
 const rects = (clip: unknown) => [...String(clip).matchAll(/M(-?\d+) (-?\d+)h(-?\d+)v(-?\d+)/g)].map((m) => ({ x: Number(m[1]), y: Number(m[2]), w: Number(m[3]), h: Number(m[4]) }));
 
 test("« Raccords en morceaux » (effect v1): the next shot in nine cells, dimmed, then lit after its cut", () => {
-  // Nothing before its first hit; then one, three, five, nine cells of shot 1's first image, square, about the middle.
+  // Nothing before its first hit but its layer itself (the scene check refuses an empty one at its first image); then
+  // one, three, five, nine cells of shot 1's first image, square, about the middle.
   assert.equal(keyed(drawAt(14), "c1"), null);
+  assert.deepEqual([drawAt(0).type, drawAt(0).props.style, drawAt(0).children.length], ["AbsoluteFill", { overflow: "hidden" }, 0]);
   assert.deepEqual([15, 20, 29, 34, 39].map((f) => rects(styleOf(keyed(drawAt(f), "c1")).clipPath).length), [1, 3, 5, 9, 9]);
   const cells = rects(styleOf(keyed(drawAt(34), "c1")).clipPath);
   assert.ok(cells.every((c) => c.w === 204 && c.h === 204));
