@@ -26,6 +26,9 @@ import { beatSpans, toFrame, type MontageSkill, type SkillShot } from "../skills
 // signs and its places are its author's: never copied). Vertical full frame as the original when her videos are upright,
 // whole in 16:9 bands on black when most are in width, or as her words ask (Tristan: « format par défaut [comme ses
 // vidéos], et changement à la demande du user »). More of her arrival for a length she asks for, 4 beats a shot.
+// Version 2 (Tristan's review of 6 November: « pas trop de rapport »): its slots follow her request, her departure from
+// her own place, her journey towards where her request goes, her arrival that very place as it is (a flea market's
+// stalls, never a food market's tomatoes), its middle shot closer on what one does there.
 
 const BPM = 110.9;
 /** Its opening in beats: her at her place (the cut under what passes on its last image), her place empty, held. */
@@ -165,7 +168,7 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
 
 export const depart: MontageSkill = {
   key: "depart",
-  version: 1,
+  version: 2,
   bpm: BPM,
   shots: [FEWEST, ORIGINAL],
   long: LONGEST,
@@ -175,7 +178,7 @@ export const depart: MontageSkill = {
   // The moments something passes right before her lens (video_read.py): the filler sets her first passage so the most
   // covered image falls on the cut where she vanishes.
   reads: ["covered"],
-  how: "La personne debout devant son lieu, le téléphone posé : l'image part de près sur elle et recule en trois sauts, en noir et blanc saccadé ; quelque chose passe tout près devant l'objectif (une voiture, un bus, quelqu'un, sinon une masse floue dessinée) et la personne a disparu : son lieu vide, tenu un instant ; puis son trajet en éclairs, chaque plan avec son propre son et sans musique (une vitre de train, la route, un métro, un escalier), le dernier qui fonce d'un coup sur ce vers quoi elle va ; la musique arrive avec l'arrivée, un endroit plein de vie en accéléré, et deux petites lignes dorées au milieu de l'image. En vertical plein écran ; ses vidéos horizontales entières dans une bande 16:9 sur du noir.",
+  how: "La personne debout devant son lieu, le téléphone posé : l'image part de près sur elle et recule en trois sauts, en noir et blanc saccadé ; quelque chose passe tout près devant l'objectif (une voiture, un bus, quelqu'un, sinon une masse floue dessinée) et la personne a disparu : son lieu vide, tenu un instant ; puis son trajet en éclairs, chaque plan avec son propre son et sans musique (une vitre de train, la route, un métro, un escalier), le dernier qui fonce d'un coup sur ce vers quoi elle va ; la musique arrive avec l'arrivée à l'endroit que sa demande nomme, plein de vie en accéléré (une fois de plus près : ce qu'on y fait), et deux petites lignes dorées au milieu de l'image. En vertical plein écran ; ses vidéos horizontales entières dans une bande 16:9 sur du noir.",
   end: true,
   texts: [
     {
@@ -228,17 +231,24 @@ export const depart: MontageSkill = {
     const length = (i: number) => round(spans[i]!.end - spans[i]!.start);
     const want = (i: number): string => {
       if (i === 0)
-        return `la personne debout devant son lieu (sa porte, sa devanture, son comptoir, sa rue), en entier ou à mi-corps au milieu de l'image, le téléphone posé, ${comma(length(0))} s : le mieux, quelque chose qui passe tout près devant le téléphone (une voiture, un bus, un vélo, quelqu'un) : le passage commence alors ${comma(length(0))} s avant l'instant où il cache le plus l'image (une coupe s'y cache) ; sinon n'importe quelle vidéo fixe où quelqu'un se tient dans son lieu ; sinon une vidéo fixe de son lieu`;
+        return `la personne debout devant son lieu à elle, celui qu'elle quitte (sa boutique, sa porte, sa devanture, son comptoir), jamais un autre endroit, en entier ou à mi-corps au milieu de l'image, le téléphone posé, ${comma(length(0))} s : le mieux, quelque chose qui passe tout près devant le téléphone (une voiture, un bus, un vélo, quelqu'un) : le passage commence alors ${comma(length(0))} s avant l'instant où il cache le plus l'image (une coupe s'y cache) ; sinon n'importe quelle vidéo fixe où quelqu'un se tient dans son lieu ; sinon une vidéo fixe de son lieu`;
       if (i === 1)
         return "le même endroit sans la personne, cadré pareil, tenu un instant : la fin de la même vidéo une fois qu'elle est hors du cadre (le mieux), ou une autre prise du même endroit vide ; sinon une vidéo ou une photo de son lieu sans personne";
       if (i === first - 1)
-        return `le dernier plan du trajet, ${comma(length(i))} s, avec son son : ce vers quoi on avance (un escalier, un escalator, un couloir, une porte, une enseigne, l'entrée de l'endroit où l'on va), au milieu de l'image ; sa fin fonce d'un coup dessus ; sinon un plan du trajet qui bouge`;
+        return `le dernier plan du trajet, ${comma(length(i))} s, avec son son : ce vers quoi on avance, l'entrée de l'endroit que sa demande nomme quand ses fichiers l'ont (son allée, sa porte, son enseigne), sinon un escalier, un escalator, un couloir, une porte, au milieu de l'image ; sa fin fonce d'un coup dessus ; sinon un plan du trajet qui bouge`;
       if (i < first)
-        return `un plan du trajet qui bouge, ${comma(length(i))} s, avec son son : par la vitre d'un train, d'un bus ou d'une voiture, la route ou la rue qui défile, un métro, un vélo, des pieds qui marchent ; un autre que le précédent ; sinon n'importe quelle vidéo où l'image ou ce qu'on voit bouge vite`;
+        return `un plan du trajet vers l'endroit que sa demande nomme, qui bouge, ${comma(length(i))} s, avec son son : par la vitre d'un train, d'un bus ou d'une voiture, la route ou la rue qui défile, un métro, un vélo, des pieds qui marchent ; un autre que le précédent ; sinon n'importe quelle vidéo où l'image ou ce qu'on voit bouge vite`;
       const room = fast ? ` ; joué deux fois plus vite : il prend ${comma(2 * length(i))} s de sa vidéo` : "";
-      return i === spans.length - 1
-        ? `le dernier plan de l'arrivée, ${comma(length(i))} s : un endroit plein de vie (une foule, une rue passante, un marché, un salon, une terrasse ou sa boutique pleine), filmé à hauteur des gens, de loin au zoom de préférence ; ses deux petites lignes s'y posent au milieu${room} ; sinon une vidéo de son lieu où il se passe quelque chose`
-        : `l'arrivée, ${comma(length(i))} s : un endroit plein de vie (une foule, une rue passante, un marché, un salon, une terrasse ou sa boutique pleine), filmé à hauteur des gens, un autre que le précédent${room} ; sinon une vidéo de son lieu où il se passe quelque chose`;
+      // Her arrival is where her request goes, as it is: never another place that only fills the slot (its bench of 6
+      // November laid a food market's tomatoes under « au marché aux puces »; Tristan: « pas trop de rapport »).
+      const there = "l'endroit que sa demande nomme, tel qu'il est (le marché aux puces : ses stands, ses portants, ses objets, des gens qui chinent ; un salon : ses allées et ses stands ; la plage, la gare, sa nouvelle adresse), jamais un autre endroit qui ne fait que remplir la case (un marché de fruits pour un marché aux puces)";
+      const near = "sinon ce qui s'en approche le plus dans ses fichiers, sinon une vidéo de son lieu où il se passe quelque chose";
+      if (i === spans.length - 1)
+        return `le dernier plan de l'arrivée, ${comma(length(i))} s : ${there}, en large, plein de vie, filmé à hauteur des gens, de loin au zoom de préférence ; ses deux petites lignes s'y posent au milieu${room} ; ${near}`;
+      // Between her first sight of it and its last wide shot (three or more), what one does there, closer.
+      if (arrival >= 3 && i === first + 1)
+        return `l'arrivée de plus près, ${comma(length(i))} s : ce qu'on fait dans ${there} : des mains qui fouillent un bac ou un portant, une pièce qu'on choisit, ce qu'on y trouve ou ce qu'on rapporte${room} ; ${near}`;
+      return `l'arrivée, ${comma(length(i))} s : ${there}, plein de vie, filmé à hauteur des gens, un autre plan que le précédent${room} ; ${near}`;
     };
     const shots: SkillShot[] = spans.map((s, i) => ({ ...s, want: want(i), ...(i < first ? { sound: true } : fast ? { speed: 2 } : {}) }));
     const lands0 = spans[first]!.start;
