@@ -6,8 +6,8 @@ import type { EffectPiece, PieceTimelineInput } from "../pieces.ts";
 // the editor lays it: on a strong beat, the original's drop); one beat later its number takes one more (« 4 ANS », then
 // « 5 ANS », hers: never invented) and swells a quarter for three images, its other line still; before the cut into
 // the next shot, the colours of her strong shot fill the lens (its powder, its flour, its steam: a copy of it enlarged
-// and very blurred) and hide the cut; the counter stays over it and goes at once three beats after it came; then the
-// montage resumes. Kept from the model: its counter's lettering (her title font, the model's Bebas Neue when she chose
+// and very blurred) and hide the cut; the counter stays over it and goes at once with the effect's last image (laid
+// over three beats, as the original's); then the montage resumes. Kept from the model: its counter's lettering (her title font, the model's Bebas Neue when she chose
 // it; capitals 8 % of the height, centred a little under the middle, about 48 % white), its tick and swell, its cover's
 // timing (in over six images, out over three towards the top left), its dark ink on a bright place (her light read
 // under it). Left out: its other hidden cuts, its plunge, its music (the montage's runs under an effect: a drop on its
@@ -26,7 +26,7 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const mine = given.length ? given : list.map((s, i) => i).filter((i) => list[i].from < D && list[i].from + list[i].durationInFrames > 0);
   const BEAT = mark("beat", 18);
   const TICK = Math.round(mark("tick", Math.round(1.05 * BEAT)));
-  const OUT = Math.round(mark("out", Math.min(D, Math.round(3 * BEAT))));
+  const OUT = Math.round(mark("out", D));
   const BOX = { left: 0, top: 0, width, height };
   const k0 = mine.length ? mine[0] : -1;
   const k1 = mine.length > 1 ? mine[1] : -1;
@@ -77,22 +77,25 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   return h(AbsoluteFill, null, fill, counter);
 }`;
 
-/** Its counter's moments, frames from its start: its number one more a beat in (the original's 14 images), gone three beats in (40), within it. */
+/**
+ * Its counter's moments, frames from its start: its number one more a beat in (the original's 14 images), ten images
+ * before its end at the latest; it goes with the effect's last image (laid over three beats, as the original's: an
+ * effect draws something at every image of its span, the scene check refuses an empty one).
+ */
 export function aventureMoments(frames: number, bpm: number): { tick: number; out: number } {
   const beat = (60 / bpm) * 30;
-  const tick = Math.max(1, Math.min(frames - 10, Math.round(1.05 * beat)));
-  return { tick, out: Math.min(frames, Math.max(tick + 12, Math.round(3 * beat))) };
+  return { tick: Math.max(1, Math.min(frames - 10, Math.round(1.05 * beat))), out: frames };
 }
 
 export const aventure: EffectPiece = {
   key: "aventure",
   version: 1,
   name: "Un an de plus",
-  how: "son compteur en capitales étroites, blanches et translucides, posé au milieu de son plan le plus fort ; un temps plus tard son nombre prend un de plus (« 4 ANS », puis « 5 ANS ») et gonfle trois images ; les couleurs de ce plan remplissent l'objectif et cachent la coupe sur le suivant, et le compteur part d'un coup trois temps après son arrivée ; puis le montage reprend.",
+  how: "son compteur en capitales étroites, blanches et translucides, posé au milieu de son plan le plus fort ; un temps plus tard son nombre prend un de plus (« 4 ANS », puis « 5 ANS ») et gonfle trois images ; les couleurs de ce plan remplissent l'objectif et cachent la coupe sur le suivant, et le compteur part d'un coup avec la fin de l'effet ; puis le montage reprend.",
   needs: "un gros plan fort au milieu de l'image (un visage dans un moment fort, de la farine, des confettis, de la vapeur), et ce qu'elle compte (ses années, une saison, une édition, l'année qu'elle raconte).",
-  lays: "en ouverture ou sur un temps fort : son plan le plus fort d'abord (un peu plus d'une seconde), puis un ou deux plans qui bougent ; trois temps en tout",
+  lays: "en ouverture ou sur un temps fort : son plan le plus fort d'abord (un peu plus d'une seconde, deux temps et demi), puis le début du plan suivant, qui bouge ; trois temps en tout, le compteur part avec sa fin",
   shots: [1, 3],
-  seconds: [1.2, 3.5],
+  seconds: [1.2, 2.5],
   require: { files: 1, shot: { framing: ["close", "medium"] } },
   texts: [
     {

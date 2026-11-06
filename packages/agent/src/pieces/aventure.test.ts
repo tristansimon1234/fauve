@@ -23,10 +23,10 @@ test("« Un an de plus » (effect v1): its layer over her strong shot and the ne
   assert.deepEqual(layerShots(plan, layer), [1, 2]);
   const motion = layer.motion;
   assert.deepEqual(motion.piece, { key: "aventure", version: 1 });
-  // Its number one more a beat in (14 images at the original's tempo), gone three beats in (40).
-  assert.deepEqual(aventureMoments(48, 134.87), { tick: 14, out: 40 });
+  // Its number one more a beat in (14 images at the original's tempo), gone with its last image (three beats: 40 there).
+  assert.deepEqual(aventureMoments(48, 134.87), { tick: 14, out: 48 });
   assert.equal(motion.texts!.tick, "14");
-  assert.equal(motion.texts!.out, "40");
+  assert.equal(motion.texts!.out, "48");
   assert.equal(motion.texts!.compteur, "5 ans");
   // Nothing cut out, no sound, no music shaped: the montage's runs under it.
   assert.equal(motion.drawn, undefined);
@@ -34,7 +34,7 @@ test("« Un an de plus » (effect v1): its layer over her strong shot and the ne
   assert.equal(plan.music_shape, undefined);
   // A short one: its tick ten images before its end at the latest, its counter to its end.
   assert.deepEqual(aventureMoments(36, 60), { tick: 26, out: 36 });
-  assert.deepEqual(aventureMoments(105, 100), { tick: 19, out: 54 });
+  assert.deepEqual(aventureMoments(75, 100), { tick: 19, out: 75 });
   // Its code: checked, nothing cut out, only the light under its counter on its shots.
   assert.deepEqual(checkMotionCode(aventure.code), []);
   assert.deepEqual(subjectsDrawn(aventure.code), []);
@@ -93,7 +93,7 @@ function drawAt(frame: number, props: { texts?: Record<string, string>; light?: 
     durationInFrames: 48,
     brand: { name: "Farine", displayFont: "Bebas Neue", bodyFont: "Jost", accent: "#b5293f", palette: {} },
     shots: list,
-    texts: { beat: "13.346", tick: "14", out: "40", mine: props.one ? "1" : "1,2", compteur: "5 ans", ...props.texts },
+    texts: { beat: "13.346", tick: "14", out: "48", mine: props.one ? "1" : "1,2", compteur: "5 ans", ...props.texts },
   });
 }
 const flatten = (node: unknown): Drawn[] => {
@@ -106,13 +106,15 @@ const counter = (tree: Drawn) => flatten(tree).filter((n) => n.type === "FitText
 const textOf = (n: Drawn) => String(n.children[0]);
 const styleOf = (n: Drawn) => (n.props.style ?? {}) as Record<string, number | string>;
 
-test("« Un an de plus » draws its counter: one less first, hers a beat later swelling three images, gone three beats in", () => {
+test("« Un an de plus » draws its counter: one less first, hers a beat later swelling three images, to its last image", () => {
   assert.deepEqual(counter(drawAt(0)).map(textOf), ["4", "ans"]);
   assert.deepEqual(counter(drawAt(13)).map(textOf), ["4", "ans"]);
   assert.deepEqual(counter(drawAt(14)).map(textOf), ["5", "ans"]);
   assert.deepEqual([15, 16, 17, 18].map((f) => String(styleOf(counter(drawAt(f))[0]!).transform ?? "none")), ["scale(1.25)", "scale(1.35)", "scale(1.12)", "none"]);
   assert.equal(styleOf(counter(drawAt(16))[1]!).transform, undefined);
-  assert.equal(counter(drawAt(40)).length, 0);
+  // There to its last image (never an empty one: the scene check refuses it), gone from its mark.
+  assert.equal(counter(drawAt(47)).length, 2);
+  assert.equal(counter(drawAt(40, { texts: { out: "40" } })).length, 0);
   // Translucent white, centred a little under the middle; dark ink on a bright place.
   const [top, bottom] = counter(drawAt(5));
   assert.equal(styleOf(top!).opacity, 0.48);
