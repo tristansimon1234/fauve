@@ -104,9 +104,10 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const empty = n > 1 ? pic(1, 1, 0.5, 0.5, { hold: Math.max(2, shots[1].durationInFrames) }, GREY, "empty") : null;
 
   // 3. What passes before her lens, as the original's bus: a dark mass streaked by its speed (her picture held on its
-  // image before the cut, enlarged, blurred along the way it goes, darkened) from the right, covering her whole picture
-  // from six images before the cut to one after (the cut under it, unseen), then leaving to the left, its edge sweeping
-  // over her place empty; at 15 images a second like the shot. The same mass over her own passer-by.
+  // image before the cut, its middle blown up 9,6 times so nothing of her is recognisable, blurred along the way it goes,
+  // darkened) from the right, covering her whole picture from six images before the cut to one after (the cut under it,
+  // unseen), then leaving to the left, its edge sweeping over her place empty; at 15 images a second like the shot. The
+  // same mass over her own passer-by.
   const E = BOX.width * 0.22;
   const v0 = CUT - 12;
   const step = v0 + Math.floor((frame - v0) / 2) * 2;
@@ -114,13 +115,13 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const R = interpolate(step, [CUT + 1, CUT + 6], [BOX.width + E, 0], clamp);
   const mask = "linear-gradient(to right, transparent " + Math.round(L) + "px, #000 " + Math.round(L + E) + "px, #000 " + Math.round(R - E) + "px, transparent " + Math.round(R) + "px)";
   const vid = "dp-veil-" + frame;
-  const big = { position: "absolute", left: Math.round(-BOX.width * 0.3), top: Math.round(-BOX.height * 0.3), width: Math.round(BOX.width * 1.6), height: Math.round(BOX.height * 1.6) };
+  const small = { position: "absolute", left: 0, top: 0, width: Math.round(BOX.width / 4), height: Math.round(BOX.height / 4) };
   const veil = n > 1 && frame >= v0 && frame < CUT + 6
     ? h("div", { key: "veil", style: { ...boxed, WebkitMaskImage: mask, maskImage: mask } },
         h("svg", { width: 0, height: 0, style: { position: "absolute" } },
-          h("filter", { id: vid, x: "-15%", y: "-5%", width: "130%", height: "110%", colorInterpolationFilters: "sRGB" }, h("feGaussianBlur", { stdDeviation: "54 4" }))),
-        h("div", { style: { ...big, filter: "url(#" + vid + ") brightness(0.4) grayscale(1)" } },
-          h(Footage, { shot: 0, at: frame - Math.max(0, CUT - 1 - at(0, 0)), style: { ...big, left: 0, top: 0 } })))
+          h("filter", { id: vid, x: "-25%", y: "-5%", width: "150%", height: "110%", colorInterpolationFilters: "sRGB" }, h("feGaussianBlur", { stdDeviation: "16 1.2" }))),
+        h("div", { style: { ...small, left: Math.round(BOX.width * 0.375), top: Math.round(BOX.height * 0.375), transform: "scale(9.6)", filter: "url(#" + vid + ") brightness(0.36) grayscale(1)" } },
+          h(Footage, { shot: 0, at: frame - Math.max(0, CUT - 1 - at(0, 0)), style: small })))
     : null;
 
   // 4. Her journey, each shot as filmed (its sound heard: no music yet); the last one rushes onto where she arrives on its

@@ -106,10 +106,13 @@ test("« Disparition au passage » draws her stepping back in three jumps at 15 
   // Her place empty from the cut, its first image held seven images, then playing on.
   assert.deepEqual(shotAt(drawAt(42)), [{ shot: 1, scale: 1, hold: 7 }]);
   assert.deepEqual(shotAt(drawAt(49)), [{ shot: 1, scale: 1, hold: undefined }]);
-  // The mass is her own shot held on its image before the cut, enlarged, blurred and darkened.
+  // The mass is her own shot held on its image before the cut, its middle blown up 9,6 times, streaked along x, darkened.
   const copy = flatten(drawAt(40)).find((n) => n.type === "Footage" && n.props.at !== undefined)!;
   assert.equal(copy.props.shot, 0);
   assert.equal(40 - Number(copy.props.at), 41);
+  const blown = flatten(drawAt(40)).find((n) => styleOf(n).transform === "scale(9.6)")!;
+  assert.match(String(styleOf(blown).filter), /^url\(#dp-pass-40\) brightness\(0\.36\)/);
+  assert.equal(flatten(drawAt(40)).find((n) => n.type === "feGaussianBlur")!.props.stdDeviation, "16 1.2");
   // Her shot alone: the mass covers the last six images, the montage's next shot comes from under it.
   for (const f of [34, 37, 39]) {
     const [, l1, r1] = edgesAt(drawAt(f, { alone: true }))!;

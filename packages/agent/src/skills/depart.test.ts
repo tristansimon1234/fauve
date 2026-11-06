@@ -183,16 +183,16 @@ test("« Le grand départ »: a dark blurred mass passes from the right over the
   // At 15 images a second: the same place on two frames in a row.
   assert.deepEqual(edges(14), edges(15));
   assert.notDeepEqual(edges(15), edges(16));
-  // A copy of her shot, held on its image before the cut, enlarged 1,6 times, streaked along the way it goes (a blur
-  // along x, its id this image's), darkened, in black and white.
+  // A copy of her shot, held on its image before the cut, its middle blown up 9,6 times (nothing of her recognisable),
+  // streaked along the way it goes (a blur along x, its id this image's), darkened, in black and white.
   const veil = keyed(drawAt(20), "veil")!;
   const copy = of(veil, "Footage")[0]!;
   assert.equal(copy.props.shot, 0);
   assert.equal(20 - Number(copy.props.at), 23);
   const streaked = nodes(veil).find((n) => /url\(#dp-veil-20\)/.test(String(styleOf(n).filter ?? "")))!;
-  assert.match(String(styleOf(streaked).filter), /brightness\(0\.4\) grayscale\(1\)/);
-  assert.equal(Number(styleOf(streaked).width), 1728);
-  assert.equal(of(veil, "feGaussianBlur")[0]!.props.stdDeviation, "54 4");
+  assert.match(String(styleOf(streaked).filter), /brightness\(0\.36\) grayscale\(1\)/);
+  assert.equal(styleOf(streaked).transform, "scale(9.6)");
+  assert.equal(of(veil, "feGaussianBlur")[0]!.props.stdDeviation, "16 1.2");
   assert.equal(of(veil, "filter")[0]!.props.id, "dp-veil-20");
 });
 

@@ -59,17 +59,17 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, shots,
   const L = interpolate(step, [v0, CUT - 6], [W, -E], clamp);
   const R = interpolate(step, [CUT + 1, CUT + 6], [W + E, 0], clamp);
   const mask = "linear-gradient(to right, transparent " + Math.round(L) + "px, #000 " + Math.round(L + E) + "px, #000 " + Math.round(R - E) + "px, transparent " + Math.round(R) + "px)";
-  // Her picture held on its image before the cut, enlarged, streaked along the way it goes (a blur along x, its id this
-  // image's), darkened.
+  // Her picture held on its image before the cut, its middle blown up 9,6 times (nothing of her recognisable: something
+  // out of focus right before the lens), streaked along the way it goes (a blur along x, its id this image's), darkened.
   const held = k0 >= 0 ? Math.max(0, Math.min(list[k0].durationInFrames - 1, CUT - 1 - Math.round(list[k0].from))) : 0;
   const vid = "dp-pass-" + frame;
-  const big = { position: "absolute", left: Math.round(-W * 0.3), top: Math.round(-H * 0.3), width: Math.round(W * 1.6), height: Math.round(H * 1.6) };
+  const small = { position: "absolute", left: 0, top: 0, width: Math.round(W / 4), height: Math.round(H / 4) };
   const veil = k0 >= 0 && frame >= v0 && frame < CUT + 6
     ? h("div", { key: "veil", style: { ...BOX, WebkitMaskImage: mask, maskImage: mask } },
         h("svg", { width: 0, height: 0, style: { position: "absolute" } },
-          h("filter", { id: vid, x: "-15%", y: "-5%", width: "130%", height: "110%", colorInterpolationFilters: "sRGB" }, h("feGaussianBlur", { stdDeviation: "54 4" }))),
-        h("div", { style: { ...big, filter: "url(#" + vid + ") brightness(0.4) saturate(0.6)" } },
-          h(Footage, { shot: k0, at: frame - held, style: { ...big, left: 0, top: 0 } })))
+          h("filter", { id: vid, x: "-25%", y: "-5%", width: "150%", height: "110%", colorInterpolationFilters: "sRGB" }, h("feGaussianBlur", { stdDeviation: "16 1.2" }))),
+        h("div", { style: { ...small, left: Math.round(W * 0.375), top: Math.round(H * 0.375), transform: "scale(9.6)", filter: "url(#" + vid + ") brightness(0.36) saturate(0.5)" } },
+          h(Footage, { shot: k0, at: frame - held, style: small })))
     : null;
   return h(AbsoluteFill, null, stand, empty, veil);
 }`;
