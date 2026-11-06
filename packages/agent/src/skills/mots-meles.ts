@@ -49,7 +49,7 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const keep = (s) => String(s || "").replace(/(\d) (?=\d)/g, "$1 ").replace(/ ([·•|–—]) /g, " $1 ");
 
   // Its frame: horizontal 16:9 on black as the original when her video is (or she asks), else the whole vertical frame.
-  const format = setting("format", "auto");
+  const format = setting("format", "vertical");
   const wideShots = shots.filter((s) => (Number(s.aspect) || 0.5625) > 1.15).length;
   const wide = format === "horizontal" || (format === "auto" && n > 0 && wideShots * 2 > n);
   const bw = width;
@@ -330,13 +330,15 @@ export const motsMeles: MontageSkill = {
   // 3: its letters 1,4 times bigger on the 16:9 frame and a soft dark halo under its letters and loops, to read on a
   // bright shot (Tristan, on its first bench: « un peu plus grosse et parfois on voit pas »). 4: that halo stronger where
   // the picture stays bright under the letters, by the light read there (« il devrait appliquer un filtre »).
-  version: 4,
+  // 5: vertical full frame by default, her horizontal files cropped on their subject, its band only when she asks for
+  // it (Tristan, 6 November, on seven benches: « vertical please », « tout vertical please »).
+  version: 5,
   bpm: BPM,
   // A calm music without marked drums: its length follows it (21,4 s at 70 BPM, 16,7 s at 90), its loops the hand.
   tempo: [70, 90],
   shots: [1, 1],
   files: [1, 2],
-  how: "Un seul plan calme, téléphone posé, assombri juste ce qu'il faut sous une grille de fines capitales blanches qui couvre tout le cadre, comme un mots mêlés (16 × 10 sur sa vidéo horizontale en 16:9 sur du noir, 9 × 16 en vertical) ; les mots de sa phrase y sont cachés dans l'ordre, de haut en bas (un sur deux rangées, un en diagonale qui monte), parmi d'autres mots de son univers jamais entourés ; une boucle blanche tracée à la main, à l'allure d'une main, entoure un mot, la suivante part dès qu'elle se ferme, et toute la phrase entourée reste tenue au moins trois secondes à la fin. Rien ne s'allume, rien ne coupe.",
+  how: "Un seul plan calme, téléphone posé, assombri juste ce qu'il faut sous une grille de fines capitales blanches qui couvre tout le cadre, comme un mots mêlés (9 × 16 en vertical plein écran ; 16 × 10 sur sa vidéo horizontale en 16:9 sur du noir, à sa demande) ; les mots de sa phrase y sont cachés dans l'ordre, de haut en bas (un sur deux rangées, un en diagonale qui monte), parmi d'autres mots de son univers jamais entourés ; une boucle blanche tracée à la main, à l'allure d'une main, entoure un mot, la suivante part dès qu'elle se ferme, et toute la phrase entourée reste tenue au moins trois secondes à la fin. Rien ne s'allume, rien ne coupe.",
   end: true,
   texts: [
     {
@@ -357,11 +359,11 @@ export const motsMeles: MontageSkill = {
   settings: [
     {
       name: "format",
-      want: "le format : horizontal comme l'original (sa vidéo en 16:9 sur du noir, la grille dessus), ou vertical plein écran",
+      want: "le format : vertical plein écran, ou horizontal comme l'original (sa vidéo en 16:9 sur du noir, la grille dessus)",
       choices: [
+        { value: "vertical", says: "vertical plein écran, la grille sur tout le cadre, sa vidéo horizontale recadrée sur son sujet" },
+        { value: "horizontal", says: "horizontal 16:9 sur du noir, la grille sur la vidéo, comme l'original", band: true },
         { value: "auto", says: "comme sa vidéo (horizontal si elle l'est)" },
-        { value: "horizontal", says: "horizontal 16:9 sur du noir, la grille sur la vidéo, comme l'original" },
-        { value: "vertical", says: "vertical plein écran, la grille sur tout le cadre" },
       ],
     },
   ],
@@ -379,7 +381,7 @@ export const motsMeles: MontageSkill = {
       duration,
       shots: spans.map((s) => ({
         ...s,
-        want: `sa vidéo la plus calme, filmée téléphone posé (sur un pied, une étagère, une table), d'au moins ${comma(duration)} s sans coupe ni mouvement de caméra : quelqu'un qui fait une chose simple dans son lieu (manger, boire un café, lire, des mains au travail, une posture tenue), avec de la place autour et une lumière douce, à l'horizontale de préférence ; une photo marche aussi, tenue fixe : une grille de lettres la recouvre tout le Reel`,
+        want: `sa vidéo la plus calme, filmée téléphone posé (sur un pied, une étagère, une table), d'au moins ${comma(duration)} s sans coupe ni mouvement de caméra : quelqu'un qui fait une chose simple dans son lieu (manger, boire un café, lire, des mains au travail, une posture tenue), avec de la place autour et une lumière douce ; une photo marche aussi, tenue fixe : une grille de lettres la recouvre tout le Reel`,
       })),
       // The grid is there from the first image with her words in it; with an ending card, it dims under it.
       texts: { mots: { from: 0, to: grid }, autres: { from: 0, to: grid } },

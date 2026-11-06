@@ -64,7 +64,7 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
 
   // 1. Its frame: her video full frame when vertical (as the original), whole in a 16:9 band on black when horizontal
   // (or on her word), its words in the black above it.
-  const format = setting("format", "auto");
+  const format = setting("format", "vertical");
   const wideTalk = (Number(shots[0] && shots[0].aspect) || 0.5625) > 1.15;
   const wide = format === "horizontal" || (format === "auto" && wideTalk);
   const bw = width;
@@ -202,7 +202,9 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
 
 export const motCle: MontageSkill = {
   key: "mot-cle",
-  version: 1,
+  // 2: vertical full frame by default, her horizontal files cropped on their subject, its band only when she asks for
+  // it (Tristan, 6 November, on seven benches: « vertical please », « tout vertical please »).
+  version: 2,
   bpm: BPM,
   // Her talk's pieces (the engine cuts them): as many as her pauses and ideas make.
   shots: [1, 40],
@@ -223,11 +225,11 @@ export const motCle: MontageSkill = {
   settings: [
     {
       name: "format",
-      want: "le format : comme sa vidéo, vertical plein écran, ou horizontal",
+      want: "le format : vertical plein écran, sa vidéo entière dans une bande 16:9, ou comme sa vidéo",
       choices: [
-        { value: "auto", says: "comme sa vidéo : vertical plein écran quand elle est verticale (comme l'original), horizontal sinon" },
         { value: "vertical", says: "vertical plein écran, recadré sur son visage, les mots au-dessus de sa tête" },
-        { value: "horizontal", says: "sa vidéo entière dans une bande 16:9 au milieu, sur du noir, les mots dans le noir au-dessus" },
+        { value: "horizontal", says: "sa vidéo entière dans une bande 16:9 au milieu, sur du noir, les mots dans le noir au-dessus", band: true },
+        { value: "auto", says: "comme sa vidéo : vertical plein écran quand elle est verticale (comme l'original), horizontal sinon" },
       ],
     },
   ],

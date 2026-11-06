@@ -99,7 +99,7 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
 
   // Its frame: horizontal 4:3 on black as the original when her videos are mostly horizontal (or she asks), else the
   // whole vertical frame; every place and size below is a share of it.
-  const format = setting("format", "auto");
+  const format = setting("format", "vertical");
   const wideShots = shots.filter((s) => (Number(s.aspect) || 0.5625) > 1.15).length;
   const wide = format === "horizontal" || (format === "auto" && wideShots * 2 > n);
   const bw = width;
@@ -246,7 +246,9 @@ export const journee: MontageSkill = {
   key: "journee",
   // 2: written again on its original's fiche (its format, its tempo and cuts, its burst, its bands, its title behind the
   // band, its flashes, burns and clicks, its jerky walk, its day-to-night match, its muffled music; no card of its own).
-  version: 2,
+  // 3: vertical full frame by default, her horizontal files cropped on their subject, its band only when she asks for
+  // it (Tristan, 6 November, on seven benches: « vertical please », « tout vertical please »).
+  version: 3,
   bpm: BPM,
   shots: [16, 22],
   // Up to 33 for a length she asks for: about 30 s at its own tempo (its day goes on in moments held three beats).
@@ -254,7 +256,7 @@ export const journee: MontageSkill = {
   files: [6, 16],
   // The moments something passes right before her lens (video_read.py): the filler casts them where its cut hides under a band.
   reads: ["covered"],
-  how: "Son lieu large et calme, puis une rafale de choses pareilles côte à côte dans son plan (ses bocaux, ses tasses, ses fenêtres), une par image à la même place, et une bande floue qui passe devant l'objectif et cache la coupe ; un plan du matin, une autre bande, et le haut de sa façade contre le ciel où son titre rouge apparaît derrière la bande qui repart, en didone capitales au milieu, de petits mots écrits à la main au-dessus, avec un déclic ; le titre reste sur un plan sombre (une porte, une arche) et part à la coupe ; puis sa journée en plans courts, avec des flashs d'appareil photo et des brûlures de pellicule sur les coupes, chacun avec son déclic ; des gens à contre-jour qui marchent en saccadé, le crépuscule, son lieu le soir puis le même de nuit au même endroit de l'image, la musique étouffée, et un dernier plan de nuit pendant qu'elle s'éteint. En horizontal comme l'original quand ses vidéos le sont.",
+  how: "Son lieu large et calme, puis une rafale de choses pareilles côte à côte dans son plan (ses bocaux, ses tasses, ses fenêtres), une par image à la même place, et une bande floue qui passe devant l'objectif et cache la coupe ; un plan du matin, une autre bande, et le haut de sa façade contre le ciel où son titre rouge apparaît derrière la bande qui repart, en didone capitales au milieu, de petits mots écrits à la main au-dessus, avec un déclic ; le titre reste sur un plan sombre (une porte, une arche) et part à la coupe ; puis sa journée en plans courts, avec des flashs d'appareil photo et des brûlures de pellicule sur les coupes, chacun avec son déclic ; des gens à contre-jour qui marchent en saccadé, le crépuscule, son lieu le soir puis le même de nuit au même endroit de l'image, la musique étouffée, et un dernier plan de nuit pendant qu'elle s'éteint. En vertical plein écran, ses vidéos horizontales recadrées sur leur sujet ; en horizontal comme l'original à sa demande.",
   end: true,
   texts: [
     {
@@ -282,11 +284,11 @@ export const journee: MontageSkill = {
   settings: [
     {
       name: "format",
-      want: "le format : horizontal comme l'original, ou vertical plein écran",
+      want: "le format : vertical plein écran, ou horizontal comme l'original",
       choices: [
+        { value: "vertical", says: "vertical plein écran, ses vidéos horizontales recadrées sur leur sujet" },
+        { value: "horizontal", says: "horizontal 4:3 sur du noir, comme l'original", band: true },
         { value: "auto", says: "comme ses vidéos (horizontal si elles le sont)" },
-        { value: "horizontal", says: "horizontal 4:3 sur du noir, comme l'original" },
-        { value: "vertical", says: "vertical plein écran" },
       ],
     },
   ],

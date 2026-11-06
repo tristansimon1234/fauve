@@ -15,7 +15,7 @@ const ORIGINAL = { cuts: [124, 200], end: 295, lamp: [[4, 8], [33, 37], [39, 43]
 
 test("« Petites lumières » (v1): three still shots on its original's grid (83 BPM, its first beat at 0,09 s), its cuts within an image of the original's", () => {
   assert.equal(petitesLumieres.key, "petites-lumieres");
-  assert.equal(petitesLumieres.version, 1);
+  assert.equal(petitesLumieres.version, 2);
   assert.equal(petitesLumieres.bpm, 83);
   // Three shots as the original; a fourth, its verse, only for a longer Reel she asks for.
   assert.deepEqual(petitesLumieres.shots, [3, 3]);
@@ -279,13 +279,19 @@ test("« Petites lumières »: a verse keeps its column on to its cut; horizonta
   // Its own object (« @suite »), on its own shot; the last shot's column off at its end.
   assert.ok(flatten(keyed(at(cut2 + m.step_3!), "column")).some((d) => d.type === "Subject" && d.props.shot === 2));
   assert.equal(keyed(at(cut3 + m.off!), "column"), null);
-  // Horizontal: the band at the middle of the frame, on black; her name above it.
-  const wide = drawAt(Math.round(four.duration * 30) - 1, { shots: 4, aspect: 16 / 9, reads: reads(column), hook: "Café Lune" });
+  // Horizontal files: full frame by default (Tristan, 6 November: « tout vertical please »), cropped on their subject.
+  const end = Math.round(four.duration * 30) - 1;
+  const plain = drawAt(end, { shots: 4, aspect: 16 / 9, reads: reads(column), hook: "Café Lune" });
+  assert.equal(styleOf(flatten(plain).find((d) => styleOf(d).overflow === "hidden")!).height, 1920);
+  // On her word, or as her files (« comme mes images »): the band at the middle of the frame, on black; her name above it.
+  const wide = drawAt(end, { shots: 4, aspect: 16 / 9, reads: reads(column), hook: "Café Lune", texts: { format: "auto" } });
   const band = flatten(wide).find((d) => styleOf(d).overflow === "hidden")!;
   assert.deepEqual([styleOf(band).top, styleOf(band).height], [656, 608]);
   const name = flatten(wide).find((d) => String(d.props.key).startsWith("name-"))!;
   assert.ok(Number(styleOf(name).top) + Number(styleOf(name).height) <= 656 && Number(styleOf(name).top) >= 80);
+  assert.deepEqual([styleOf(flatten(drawAt(10, { reads: reads(), texts: { format: "horizontal" } })).find((d) => styleOf(d).overflow === "hidden")!).top], [656]);
   // Vertical as asked: full frame.
   const asked = drawAt(10, { aspect: 16 / 9, reads: reads(), texts: { format: "vertical" } });
   assert.equal(styleOf(flatten(asked).find((d) => styleOf(d).overflow === "hidden")!).height, 1920);
+  assert.deepEqual(petitesLumieres.settings?.find((s) => s.name === "format")?.choices.map((c) => c.value), ["vertical", "horizontal", "auto"]);
 });

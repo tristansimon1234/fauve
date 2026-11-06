@@ -12,7 +12,7 @@ import { recette, recetteSections } from "./recette.ts";
 const ORIGINAL_CUTS = [31, 110, 128, 151, 172, 195, 214, 237, 256, 273, 288, 307, 356, 373, 393, 413, 433, 463, 478, 489, 508, 528, 552, 579, 595, 615, 635, 654, 677, 695, 715, 727, 756, 775, 793, 815, 832, 851, 873, 891, 912, 927, 945, 978, 999, 1028, 1062, 1089, 1121, 1157, 1176, 1203, 1238, 1261, 1287, 1307];
 
 test("« Pas à pas raconté » (v1): its 57 shots on its original's cuts, 44,97 s at 85 BPM, its words over their sections", () => {
-  assert.equal(recette.version, 1);
+  assert.equal(recette.version, 2);
   assert.equal(recette.bpm, 85);
   const line = recette.timeline(57, { end: false });
   // 1349 images, the original's; each of its 56 cuts within an image of the original's.
@@ -91,7 +91,7 @@ test("« Pas à pas raconté »: its plan (its words by role), nothing cut out n
   const plan = skillPlan({ skill: recette, name: "Pas à pas raconté", files, fill });
   assert.ok(editPlanSchema.safeParse(plan).success);
   assert.deepEqual(plan.texts.map((t) => [t.style, t.text]), [["hook", fill.texts.accroche], ["band", fill.texts.etapes_1], ["caption", fill.texts.fin]]);
-  assert.deepEqual(plan.skill, { key: "recette", version: 1 });
+  assert.deepEqual(plan.skill, { key: "recette", version: 2 });
   assert.equal(plan.tempo, 85);
   assert.equal(plan.sounds, undefined);
   assert.equal(plan.music_shape, undefined);
@@ -100,7 +100,7 @@ test("« Pas à pas raconté »: its plan (its words by role), nothing cut out n
   assert.deepEqual([subjectsDrawn(recette.code), objectsDrawn(recette.code), clearsDrawn(recette.code), readsDrawn(recette.code)], [[], [], [], []]);
   assert.ok(recette.code.length < 24000);
   assert.doesNotMatch(recette.code, /transform|scale\(/);
-  assert.deepEqual(recette.settings?.map((s) => [s.name, s.choices.map((c) => c.value)]), [["format", ["auto", "vertical", "horizontal"]]]);
+  assert.deepEqual(recette.settings?.map((s) => [s.name, s.choices.map((c) => c.value)]), [["format", ["vertical", "horizontal", "auto"]]]);
 });
 
 // ——— What its code draws, frame by frame ————————————————————————————————————————————————————————————————————————————
@@ -243,24 +243,28 @@ test("« Pas à pas raconté »: fewer words than steps leave a step quiet; more
 });
 
 test("« Pas à pas raconté »: every word in the safe zone, in both formats, its ending card readable", () => {
-  for (const aspect of [9 / 16, 16 / 9]) {
+  const banded = { aspect: 16 / 9, texts: { format: "auto" } };
+  for (const options of [{ aspect: 9 / 16 }, { aspect: 16 / 9 }, banded]) {
     for (let f = 0; f < 400; f += 7) {
-      for (const t of seen(drawAt(f, { aspect }))) {
+      for (const t of seen(drawAt(f, options))) {
         const b = styleOf(t) as unknown as Box;
         assert.ok(b.top >= 80 && b.top + b.height <= 1440, `${own(t)} at ${f}: ${b.top}`);
         assert.ok(b.left >= 140 && b.left + b.width <= 940, `${own(t)} at ${f}: ${b.left} ${b.width}`);
       }
     }
   }
-  // Her videos upright: full frame; in width, whole in a 16:9 band on black, her words in its middle; as she asks.
+  // Her videos full frame by default (Tristan, 6 November: « tout vertical please »), in width cropped on their subject;
+  // whole in a 16:9 band on black, her words in its middle, on her word or as her videos (« auto »).
   const frameOf = (tree: Drawn) => styleOf(nodes(tree).find((n) => n.type === "Footage")!);
   const box = (tree: Drawn) => styleOf(nodes(tree).find((n) => n.children.some((c) => (c as Drawn)?.type === "Footage"))!);
   assert.deepEqual([box(drawAt(20)).top, box(drawAt(20)).height], [0, 1920]);
-  assert.deepEqual([box(drawAt(20, { aspect: 16 / 9 })).top, box(drawAt(20, { aspect: 16 / 9 })).height], [656, 608]);
-  assert.equal(frameOf(drawAt(20, { aspect: 16 / 9 })).height, 608);
+  assert.deepEqual([box(drawAt(20, { aspect: 16 / 9 })).top, box(drawAt(20, { aspect: 16 / 9 })).height], [0, 1920]);
+  assert.deepEqual([box(drawAt(20, banded)).top, box(drawAt(20, banded)).height], [656, 608]);
+  assert.equal(frameOf(drawAt(20, banded)).height, 608);
+  assert.equal(box(drawAt(20, { texts: { format: "auto" } })).height, 1920);
   assert.equal(box(drawAt(20, { texts: { format: "horizontal" } })).height, 608);
   assert.equal(box(drawAt(20, { aspect: 16 / 9, texts: { format: "vertical" } })).height, 1920);
-  assert.equal(styleOf(seen(drawAt(10, { aspect: 16 / 9 }))[0]!).top, 908);
+  assert.equal(styleOf(seen(drawAt(10, banded))[0]!).top, 908);
   // Its ending card on her last shot under a veil: her title and her line, 48 px at least, inside the safe zone.
   const line = recette.timeline(14, { end: true });
   const from = Math.round((line.duration - 1.6) * 30);

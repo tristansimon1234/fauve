@@ -305,16 +305,57 @@ export type SkillTimeline = {
  * A setting of a skill that her words can ask (Tristan: « on peut se dire qu'il faut plus de cases ? »), like the
  * variants of an Edits or CapCut template: the filler picks a choice only when her request asks for what it does, its
  * code reads it by name (setting(name, default)) and its timeline gets it (options.settings). Its first choice is the
- * default, the original's.
+ * default, the original's; but a model's format (SKILL_FORMAT) is vertical full frame by default, her horizontal files
+ * cropped on their subject, whatever its original's (Tristan, 6 November, on seven benches: « vertical please », « tout
+ * vertical please »), unless its band is its signature (« Court métrage »: a film projected on a soft black).
  */
 export type SkillSetting = {
   /** Read by its code and its timeline (« cases »). */
   name: string;
   /** What it changes, in French, for the filler and Edith. */
   want: string;
-  /** Its values, the default first: each one's value and what it looks like, in French. */
-  choices: { value: string; says: string }[];
+  /**
+   * Its values, the default first: each one's value and what it looks like, in French. `band`, on a format: the choice
+   * that lays her files whole in a band (on black, or on its own ground), the one she asks with « en bande », « garde mes
+   * vidéos entières », « en horizontal » (the contract's frame letterbox: skillFramed).
+   */
+  choices: { value: string; says: string; band?: boolean }[];
 };
+
+/** The setting that frames a model (« format »): vertical full frame by default, her files whole in a band on request. */
+export const SKILL_FORMAT = "format";
+
+/** Its format setting, when it has one. */
+const formatOf = (skill: Pick<MontageSkill, "settings">) => skill.settings?.find((s) => s.name === SKILL_FORMAT);
+
+/** Its format's band (SkillSetting.choices' `band`): her files whole in a band; none when it has no such choice. */
+export const skillBand = (skill: Pick<MontageSkill, "settings">): string | undefined => formatOf(skill)?.choices.find((c) => c.band)?.value;
+
+/**
+ * The settings a model plays with, as its code and its timeline get them: those her words chose, and its format at its
+ * default when she asked none (its first choice: vertical full frame), so that no code's own fallback ever decides how
+ * her files are framed (a code written when the format followed her videos still read « auto »). Undefined when it has
+ * none of them.
+ */
+export function playedSettings(skill: Pick<MontageSkill, "settings">, chosen: Record<string, string> | undefined): Record<string, string> | undefined {
+  const format = formatOf(skill)?.choices[0]?.value;
+  const played = { ...(format ? { [SKILL_FORMAT]: format } : {}), ...(chosen ?? {}) };
+  return Object.keys(played).length ? played : undefined;
+}
+
+/**
+ * Its settings with the frame she asked for her Reel (the contract's `frame`, read once in her words): « letterbox », her
+ * videos kept whole on black, sets its format at its band when her words chose no format of their own (a model without a
+ * band keeps its frame; its filler said whether it still fits). Only the skill's own settings, never its default.
+ */
+export function skillFramed(skill: Pick<MontageSkill, "settings">, settings: Record<string, string>, frame: "vertical" | "letterbox" | undefined): Record<string, string> {
+  const band = skillBand(skill);
+  if (frame !== "letterbox" || !band || settings[SKILL_FORMAT]) return settings;
+  return skillSettings(skill, { ...settings, [SKILL_FORMAT]: band });
+}
+
+/** A setting in Edith's words (list_inspirations' « reglages »): what it changes, then its choices, the default said. */
+export const settingWords = (s: Pick<SkillSetting, "want" | "choices">): string => `${s.want} : ${s.choices.map((c, i) => `${c.says}${i === 0 ? " (par défaut)" : ""}`).join(", ")}`;
 
 /**
  * Something in one of its shots its code lights up, cuts out or follows (her sign, her windows, her lamps: Tristan,
@@ -840,13 +881,15 @@ export function skillPlan(input: { skill: MontageSkill; name: string; files: Ski
   const bpm = input.bpm && input.bpm !== skill.bpm && !voice ? input.bpm : undefined;
   const settings = skillSettings(skill, fill.settings);
   const chosen = Object.keys(settings).length ? settings : undefined;
+  // What its code and its timeline play: her choices, and its format at its default (vertical full frame) when she asked none.
+  const played = playedSettings(skill, chosen);
   // Timed on her voice: her talk cut and what the filler chose in it, on the Reel's clock.
   const said = voice ? skillSaid(input.talk!, fill.said!, voice) : undefined;
   // Her words too: its sounds may follow them (a key click on each letter its code types).
   const line = skill.timeline(said ? said.shots.length : fill.shots.length, {
     end: Boolean(fill.end),
     ...(bpm ? { bpm } : {}),
-    ...(chosen ? { settings: chosen } : {}),
+    ...(played ? { settings: played } : {}),
     words: said ? { ...fill.texts, ...saidWords(said) } : fill.texts,
     ...(said ? { said } : {}),
   });
@@ -898,8 +941,8 @@ export function skillPlan(input: { skill: MontageSkill; name: string; files: Ski
           // Its objects named for her shots (her sign, her windows): the engine follows them before the render.
           code: skillCode(skill, fill.objects),
           js: skillCode(skill, fill.objects),
-          // Its marks (numbers) and its settings (her words' choices), read by its code by name.
-          texts: { ...Object.fromEntries(Object.entries(marks).map(([k, v]) => [k, String(Math.round(v * 1000) / 1000)])), ...(chosen ?? {}) },
+          // Its marks (numbers) and its settings (her words' choices, its format always), read by its code by name.
+          texts: { ...Object.fromEntries(Object.entries(marks).map(([k, v]) => [k, String(Math.round(v * 1000) / 1000)])), ...(played ?? {}) },
           draws_texts: true,
           draws_end: Boolean(fill.end),
           ...(skill.fonts?.length ? { fonts: skill.fonts.slice(0, 3) } : {}),
@@ -1162,7 +1205,7 @@ export function replaySkillAudio(skill: MontageSkill, plan: EditPlan): Pick<Edit
   if (plan.skill?.key !== skill.key || plan.skill.version !== skill.version) return null;
   const lead = plan.beat_at ?? 0;
   const bpm = plan.tempo && Math.abs(plan.tempo - skill.bpm) > 0.005 ? plan.tempo : undefined;
-  const settings = plan.skill.settings && Object.keys(plan.skill.settings).length ? plan.skill.settings : undefined;
+  const settings = playedSettings(skill, plan.skill.settings && Object.keys(plan.skill.settings).length ? plan.skill.settings : undefined);
   const line = skill.timeline(plan.segments.length, {
     end: Boolean(plan.end_card),
     ...(bpm ? { bpm } : {}),
@@ -1583,7 +1626,7 @@ export type SkillFillAnswer = z.infer<typeof skillFillSchema>;
 
 export const SKILL_FILL_PROMPT = `You fill one of Edith's montage models for a local business: a whole Reel coded once, like an Edits or CapCut template. Its shots are slots timed on its music, its texts have their place, its look, its signature moment and its ending are in its code. You only choose which of her files plays in each slot and from where, and write its words: the code plays everything else exactly as the model does.
 
-First decide "fits": true when the model, filled with her files and her words, gives her what she asked for. Her request may simply ask for this model, give her words, a mood, her files: that fits (the music and the caption are made elsewhere, never a reason for false). A length she asks for inside the model's lengths (« longueurs ») fits: the code has already set the number of slots and its tempo for it. When she asks for something the model does not do and that matters to her (an animation of its own, another layout, a text the model has no slot for, a shot at a precise moment, another ending, a length outside its lengths, and, without « voix_off », a voice-over or subtitles of what she says), "fits" is false and "missing" says what in a few words: the editor then makes her Reel from this model. When in doubt about something she clearly wants, false.
+First decide "fits": true when the model, filled with her files and her words, gives her what she asked for. Her request may simply ask for this model, give her words, a mood, her files: that fits (the music and the caption are made elsewhere, never a reason for false). A length she asks for inside the model's lengths (« longueurs ») fits: the code has already set the number of slots and its tempo for it. When she asks for something the model does not do and that matters to her (an animation of its own, another layout (a format she asks for is none: « settings »), a text the model has no slot for, a shot at a precise moment, another ending, a length outside its lengths, and, without « voix_off », a voice-over or subtitles of what she says), "fits" is false and "missing" says what in a few words: the editor then makes her Reel from this model. When in doubt about something she clearly wants, false.
 With « voix_off », a voice is laid over this Reel (her own voice note, or the voice Edith wrote for it from her request): the engine plays it over the model's music and writes its subtitles, so a voice-over, its words and its subtitles fit.
 With « mots_dits », a voice says this model's own words, each at its moments, as its original's voice does: a voice-over, another voice (a man's, hers) or no voice fit (the engine sets the voice), and a change of what the voice says is a change of those words.
 With « recopie », she sent a Reel to copy and this model does its form: what her request describes of that Reel (its opening, its texts, its rhythm, its ending) the model does its own way, never a reason for false; only what she asks beyond that Reel is.
@@ -1593,7 +1636,7 @@ Then cast her files on its slots (« cases », in order: each with its length an
 - each slot gets the file and the passage that suits what it wants; the first slot opens the Reel: the strongest, most beautiful image;
 - a video's passage starts at "at" (seconds) and lasts the slot's length: choose it inside one of its good moments (« moments »), never a blurry or dark one when another exists;
 - never the same passage twice; a video may fill several slots only with moments that look different; her files all used before one comes back, never the same file on two slots in a row when another fits;
-- a file's format (« format »: verticale, horizontale, carrée) matters where the model lays a slot in a box of another shape (its « veut » or « deroule » says: a tall half, a wide band): there a file of that shape when one fits, else a passage whose subject is in the middle of its picture (only its middle shows);
+- a file's format (« format »: verticale, horizontale, carrée) matters: the Reel is vertical full frame unless the model's « format » setting lays it otherwise (« cadre », her request), so a horizontal file there shows only its middle, cropped on its subject: a passage whose subject is in the middle of its picture, never at its edge; and where the model lays a slot in a box of another shape (its « veut » or « deroule » says: a tall half, a wide band), a file of that shape when one fits, else such a passage;
 - a slot that plays at the same time as another (« en_meme_temps_que »: a split screen's other half) is seen beside it, each at its own speed: the two answer each other as its « veut » says (the gesture and what it gives), each from another file, never the same passage;
 - what was measured on a file is surer than what was seen: « mouvements_rapides » (her camera's whips, fast sweeps, rushes in, with their way), « objectif_couvert » (something passing right before the lens: a cut hides there), « gestes_mesures » (what her hands and head do), « couleur » (how colourful it is): a slot that wants one of them gets a passage that has it, timed on it (its « at » so the move or the cover falls where the slot wants it), and a slot left in colour gets one of her most colourful files;
 - a photo plays still (at 0).
@@ -1615,7 +1658,7 @@ A model timed on her voice (« voix »): her talking video is the Reel, cut by t
 - "name", only when the model shows something when she names her business (« son_nom »): the numbers of the first and last words of her business's name (« commerce.nom », or what she calls it) the first time she says it; null when she never says it;
 - every text is words she says, at their numbers, spelled right (a word the transcript misheard set right: « sois » for « soins »); never a word she does not say.
 
-"settings": its settings (« reglages », when it has some), like the variants of a template: one only when her request asks for what it does (« plus de cases », « plus lent », « dans le désordre », « avec ma couleur »), with the value that does it; never to vary for its own sake; otherwise none, each one plays the original's. A request a setting answers fits.
+"settings": its settings (« reglages », when it has some), like the variants of a template: one only when her request asks for what it does (« plus de cases », « plus lent », « dans le désordre », « avec ma couleur »), with the value that does it; never to vary for its own sake; otherwise none, each one plays its default. A request a setting answers fits. A format she asks for (vertical, full screen, horizontal, in a band, her videos kept whole: « cadre ») is its « format » setting when it has one, never another layout: it fits; « format » only when she asks for one, its default playing otherwise (« par défaut »: vertical full frame for almost every model), never because her files are horizontal.
 "objets": its objects (« objets », when it has some): what in the file you cast on that slot carries its effect (a sign whose letters light up one by one, windows that light up one after the other, lamps that flash), from what the file shows (« montre », « moments »): name it in plain English as the eye sees it, two to four words (« shop sign », « neon sign », « bakery sign », « every window », « string lights », « pendant lamps »); « every » before it when there are several to take one after the other (each window, each lamp); empty when nothing in that file fits (the model does without). Cast on that slot the file that has it, when one does.
 "end": only when the model has an ending (« fin ») and she has something to end on (an offer, an opening, a date, in her request or what we know): its title (40 characters at most) and a subtitle or empty; otherwise null.
 "why": one sentence for her in French (tu), what you chose and why, in plain words.`;
@@ -1690,10 +1733,27 @@ export function skillFillInput(input: {
    * told how many times and in how long the voice says it, so its words are short enough to be said in time.
    */
   says?: boolean;
+  /**
+   * The frame she asked for (the contract's): « letterbox », her videos kept whole on black, plays its format's band
+   * (skillFramed), its slots told so; the filler hears that a model without one does not do it.
+   */
+  frame?: "vertical" | "letterbox";
 }) {
   const voice = input.skill.voice;
+  // Its slots as its format lays them: the one she asked for, else its default (vertical full frame).
+  const framed = skillFramed(input.skill, input.currentSettings ?? {}, input.frame);
+  const played = playedSettings(input.skill, framed);
   // On her voice, no slot to cast: her talk is its shots.
-  const line = voice ? null : input.skill.timeline(input.n, { end: input.skill.end, ...(input.bpm ? { bpm: input.bpm } : {}) });
+  const line = voice ? null : input.skill.timeline(input.n, { end: input.skill.end, ...(input.bpm ? { bpm: input.bpm } : {}), ...(played ? { settings: played } : {}) });
+  // Her videos kept whole, as she asked: its band does it, or this model does not.
+  const band = skillBand(input.skill);
+  const bandSays = formatOf(input.skill)?.choices.find((c) => c.value === band)?.says;
+  const cadre =
+    input.frame === "letterbox"
+      ? band
+        ? `ses vidéos entières, comme elle le demande : le réglage « format » de ce modèle les pose ainsi (« ${band} » : ${bandSays}), le code s'en charge`
+        : "ses vidéos entières et horizontales sur du noir, comme elle le demande : ce modèle ne le fait pas"
+      : undefined;
   // A voice laid over it (never on a skill timed on her filmed talk): its words and when each of its texts shows.
   const laid = !voice && input.voiceOver?.text.trim() ? input.voiceOver : undefined;
   // Its words said by a voice (never with a voice laid over it): how many times and in how long each one is said.
@@ -1710,6 +1770,7 @@ export function skillFillInput(input: {
     },
     demande: input.request,
     ...(input.contract?.length ? { contrat: input.contract } : {}),
+    ...(cadre ? { cadre } : {}),
     ...(input.copied ? { recopie: COPIED_REEL } : {}),
     ...(said ? { mots_dits: SAID_WORDS } : {}),
     // A model that writes what is said in her videos: subtitles of what she says are its own.
@@ -1767,7 +1828,7 @@ export function skillFillInput(input: {
     }),
     ...(fonts ? { polices: wordFontsBrief() } : {}),
     ...(input.skill.settings?.length
-      ? { reglages: input.skill.settings.map((x) => ({ nom: x.name, change: x.want, choix: x.choices.map((c, i) => `${c.value} : ${c.says}${i === 0 ? " (celui de l'original, par défaut)" : ""}`) })) }
+      ? { reglages: input.skill.settings.map((x) => ({ nom: x.name, change: x.want, choix: x.choices.map((c, i) => `${c.value} : ${c.says}${i === 0 ? " (par défaut)" : ""}`) })) }
       : {}),
     // Each object on the slot its timeline gives it for this count (counted from the end, or placed by the timeline); none past its slots.
     ...(input.skill.objects?.length && line

@@ -67,7 +67,7 @@ function cursorAt(tree: Drawn) {
 }
 
 test("« Un clic sur tes produits » (v1): its three shots and its moments at the original's images (90 BPM, a beat every 20), one beat more for her second name", () => {
-  assert.equal(curseur.version, 1);
+  assert.equal(curseur.version, 2);
   assert.equal(curseur.bpm, 90);
   assert.deepEqual(curseur.shots, [3, 3]);
   const line = curseur.timeline(3, { end: false });
@@ -268,23 +268,27 @@ test("« Un clic sur tes produits »: the cursor goes to the person and to her p
   assert.equal((nodes(bright(120, props)).find((n) => n.type === "FitText")!.props.innerStyle as { color: string }).color, "#1d1d1b");
 });
 
-test("« Un clic sur tes produits »: a horizontal video whole in a band on black, its names on the black; or as her words ask", () => {
+test("« Un clic sur tes produits » (v2): full frame by default; a horizontal video whole in a band on black, its names on the black, as her words ask", () => {
   const draw = sceneOf(curseur.code);
   const wide: [number, number, number] = [16 / 9, 16 / 9, 16 / 9];
   const footage = (f: number, p: Record<string, unknown>) => styleOf(nodes(draw(f, p)).find((n) => n.type === "Footage")!);
-  assert.deepEqual(footage(20, propsFor(wide, WORDS)), { left: 0, top: 656, width: 1080, height: 608 });
-  // Its upright close-up full frame, between her horizontal place in its band (each shot as it was filmed).
+  // By default (Tristan, 6 November: « tout vertical please »), every shot full frame, a horizontal one cropped.
+  assert.deepEqual(footage(20, propsFor(wide, WORDS)), { left: 0, top: 0, width: 1080, height: 1920 });
+  // As her videos (« comme mes vidéos »): her horizontal place in its band, its upright close-up full frame between (each
+  // shot as it was filmed).
+  const asFilmed = (aspects: [number, number, number]) => propsFor(aspects, WORDS, { texts: { ...propsFor(aspects, WORDS).texts, format: "auto" } });
+  assert.deepEqual(footage(20, asFilmed(wide)), { left: 0, top: 656, width: 1080, height: 608 });
   const mixed: [number, number, number] = [16 / 9, 3 / 4, 16 / 9];
-  assert.deepEqual(footage(100, propsFor(mixed, WORDS)), { left: 0, top: 0, width: 1080, height: 1920 });
-  assert.deepEqual(footage(20, propsFor(mixed, WORDS)).top, 656);
+  assert.deepEqual(footage(100, asFilmed(mixed)), { left: 0, top: 0, width: 1080, height: 1920 });
+  assert.deepEqual(footage(20, asFilmed(mixed)).top, 656);
   // In the band, her names on the black above or below the picture.
-  const names = nodes(draw(120, propsFor(wide, WORDS))).filter((n) => n.type === "FitText").map((n) => styleOf(n) as { top: number; height: number });
+  const names = nodes(draw(120, asFilmed(wide))).filter((n) => n.type === "FitText").map((n) => styleOf(n) as { top: number; height: number });
   assert.equal(names.length, 2);
   assert.ok(names.every((b) => b.top + b.height <= 656 || b.top >= 1264), JSON.stringify(names));
   // As her words ask: all upright, or all in the band.
   assert.deepEqual(footage(20, propsFor(wide, WORDS, { texts: { ...propsFor(wide, WORDS).texts, format: "vertical" } })), { left: 0, top: 0, width: 1080, height: 1920 });
   assert.deepEqual(footage(100, propsFor(UPRIGHT, WORDS, { texts: { ...propsFor(UPRIGHT, WORDS).texts, format: "horizontal" } })).height, 608);
-  assert.deepEqual(curseur.settings?.map((s) => [s.name, s.choices.map((c) => c.value)]), [["format", ["auto", "vertical", "horizontal"]]]);
+  assert.deepEqual(curseur.settings?.map((s) => [s.name, s.choices.map((c) => c.value)]), [["format", ["vertical", "horizontal", "auto"]]]);
 });
 
 test("« Un clic sur tes produits »: one name only, its second click skipped; its ending card after a click, in the same capitals", () => {

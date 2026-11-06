@@ -149,7 +149,7 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
 
   // Its frame: the whole vertical frame, as the original; her videos whole in a 16:9 band on black when most of them
   // are in width (or she asks). Its title stays where the original sets it, a little over the frame's middle.
-  const format = setting("format", "auto");
+  const format = setting("format", "vertical");
   const wideShots = shots.filter((s) => (Number(s.aspect) || 0.5625) > 1.15).length;
   const wide = format === "horizontal" || (format === "auto" && wideShots * 2 > n);
   const bh = wide ? Math.round((width * 9) / 16) : height;
@@ -233,7 +233,9 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
 
 export const routine: MontageSkill = {
   key: "routine",
-  version: 1,
+  // 2: vertical full frame by default, her horizontal files cropped on their subject, its band only when she asks for
+  // it (Tristan, 6 November, on seven benches: « vertical please », « tout vertical please »).
+  version: 2,
   bpm: BPM,
   // From her files alone, up to 22 shots (about 30 s); up to 33 for a length she asks for (about 42 s: more gestures,
   // more of her place, then the rest of her day), never past 45 s, its card included.
@@ -243,7 +245,7 @@ export const routine: MontageSkill = {
   files: [5, 22],
   // Never slower than 89 BPM: its longest stays under 45 s with its card; up to 1,2 times faster for a short Reel.
   tempo: [89, 109],
-  how: "La bande-annonce de sa journée en ouverture : 13 éclairs de ses plans à venir, un tous les cinq images, sous son titre tapé lettre à lettre au milieu avec son curseur, en minuscules italiques sur deux lignes, puis une petite ligne fine dessous ; puis son rituel du matin au comptoir, filmé de face téléphone posé, un geste par plan (moins d'une seconde chacun, les coupes au même endroit), chaque préparation finie présentée des deux mains ; ce qu'elle a préparé, servi, vu d'en haut ; son lieu plan par plan (son enseigne, ses coins, ses gens, elle qui entre dans la salle, elle au travail) ; dans sa version longue, la suite de sa journée ; trois images noires à la fin. En vertical plein cadre ; ses vidéos horizontales entières dans une bande 16:9 sur du noir quand la plupart le sont.",
+  how: "La bande-annonce de sa journée en ouverture : 13 éclairs de ses plans à venir, un tous les cinq images, sous son titre tapé lettre à lettre au milieu avec son curseur, en minuscules italiques sur deux lignes, puis une petite ligne fine dessous ; puis son rituel du matin au comptoir, filmé de face téléphone posé, un geste par plan (moins d'une seconde chacun, les coupes au même endroit), chaque préparation finie présentée des deux mains ; ce qu'elle a préparé, servi, vu d'en haut ; son lieu plan par plan (son enseigne, ses coins, ses gens, elle qui entre dans la salle, elle au travail) ; dans sa version longue, la suite de sa journée ; trois images noires à la fin. En vertical plein cadre, ses vidéos horizontales recadrées sur leur sujet ; entières dans une bande 16:9 sur du noir à sa demande.",
   end: true,
   texts: [
     {
@@ -266,9 +268,9 @@ export const routine: MontageSkill = {
       name: "format",
       want: "le format : vertical plein cadre comme l'original, ou ses vidéos entières dans une bande 16:9 sur du noir",
       choices: [
-        { value: "auto", says: "comme ses vidéos (vertical plein cadre ; ses vidéos horizontales entières sur du noir quand la plupart le sont)" },
         { value: "vertical", says: "vertical plein cadre, ses vidéos horizontales recadrées sur leur sujet" },
-        { value: "horizontal", says: "ses vidéos entières dans une bande 16:9 sur du noir" },
+        { value: "horizontal", says: "ses vidéos entières dans une bande 16:9 sur du noir", band: true },
+        { value: "auto", says: "comme ses vidéos (vertical plein cadre ; ses vidéos horizontales entières sur du noir quand la plupart le sont)" },
       ],
     },
   ],

@@ -294,9 +294,9 @@ export const vision: MontageSkill = {
       name: "format",
       want: "le format : vertical plein écran comme l'original, ou son plan en largeur dans une bande 16:9 sur le blanc des passes",
       choices: [
-        { value: "auto", says: "vertical plein écran, un plan en largeur recadré sur la personne immobile, gardée au milieu" },
-        { value: "horizontal", says: "son plan en largeur dans une bande 16:9 au milieu, sur le blanc des passes (les noirs en plein écran)" },
         { value: "vertical", says: "vertical plein écran" },
+        { value: "horizontal", says: "son plan en largeur dans une bande 16:9 au milieu, sur le blanc des passes (les noirs en plein écran)", band: true },
+        { value: "auto", says: "vertical plein écran, un plan en largeur recadré sur la personne immobile, gardée au milieu" },
       ],
     },
   ],

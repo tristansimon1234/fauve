@@ -386,9 +386,9 @@ export const silhouette: MontageSkill = {
       name: "format",
       want: "le format : vertical plein écran, ou le cadre horizontal 16:9 de l'original au milieu sur des bandes bleu nuit",
       choices: [
-        { value: "auto", says: "vertical plein écran (tout est dessiné sur deux aplats, sa vidéo recadrée autour de sa tête)" },
-        { value: "horizontal", says: "le cadre 16:9 de l'original au milieu, sur des bandes bleu nuit" },
         { value: "vertical", says: "vertical plein écran" },
+        { value: "horizontal", says: "le cadre 16:9 de l'original au milieu, sur des bandes bleu nuit", band: true },
+        { value: "auto", says: "vertical plein écran (tout est dessiné sur deux aplats, sa vidéo recadrée autour de sa tête)" },
       ],
     },
   ],

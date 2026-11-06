@@ -76,7 +76,7 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const TITLE = Math.round(mark("title", durationInFrames - 6 * BEAT));
 
   // 1. Its frame: her upright videos full frame; whole in a 16:9 band on black when most are in width (or as she asks).
-  const format = setting("format", "auto");
+  const format = setting("format", "vertical");
   const inWidth = shots.filter((s) => (Number(s.aspect) || 0.5625) > 1.15).length;
   const band = format === "horizontal" || (format === "auto" && n > 0 && inWidth * 2 > n);
   const BH = Math.round((width * 9) / 16);
@@ -165,7 +165,9 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
 
 export const depart: MontageSkill = {
   key: "depart",
-  version: 1,
+  // 2: vertical full frame by default, her horizontal files cropped on their subject, its band only when she asks for
+  // it (Tristan, 6 November, on seven benches: « vertical please », « tout vertical please »).
+  version: 2,
   bpm: BPM,
   shots: [FEWEST, ORIGINAL],
   long: LONGEST,
@@ -198,9 +200,9 @@ export const depart: MontageSkill = {
       name: "format",
       want: "le format : vertical plein écran comme l'original, ou ses vidéos horizontales entières dans une bande 16:9 sur du noir",
       choices: [
-        { value: "auto", says: "comme ses vidéos : plein écran quand la plupart sont en hauteur, sinon entières dans une bande 16:9 sur du noir" },
         { value: "vertical", says: "vertical plein écran, ses vidéos horizontales recadrées sur leur sujet" },
-        { value: "horizontal", says: "ses vidéos entières dans une bande 16:9 au milieu de l'écran, sur du noir" },
+        { value: "horizontal", says: "ses vidéos entières dans une bande 16:9 au milieu de l'écran, sur du noir", band: true },
+        { value: "auto", says: "comme ses vidéos : plein écran quand la plupart sont en hauteur, sinon entières dans une bande 16:9 sur du noir" },
       ],
     },
     {

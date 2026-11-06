@@ -74,7 +74,7 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
 
   // Its frame: a horizontal 4:3 picture on black, as the original, when most of her files are horizontal (or she asks),
   // else the whole vertical frame; every place below is in it.
-  const format = setting("format", "auto");
+  const format = setting("format", "vertical");
   const wideShots = shots.filter((s) => (Number(s.aspect) || 0.5625) > 1.15).length;
   const wide = format === "horizontal" || (format === "auto" && wideShots * 2 > n);
   const bw = width;
@@ -206,13 +206,15 @@ export const plansFixes: MontageSkill = {
   // 3: written again on its original's fiche: its format (horizontal 4:3 when her files are), its tempo (64,6 BPM) and
   // its cuts, its title's words on its beats, set on a calm area in a bold serif, its closing line that fades in, its
   // music dying away with the picture, no move on any shot, its finish without warmth, grain nor vignette.
-  version: 3,
+  // 4: vertical full frame by default, her horizontal files cropped on their subject, its band only when she asks for
+  // it (Tristan, 6 November, on seven benches: « vertical please », « tout vertical please »).
+  version: 4,
   bpm: BPM,
   shots: [5, 12],
   // Up to 20 for a length she asks for: about 30 s at its own tempo.
   long: 20,
   files: [4, 10],
-  how: "Des plans fixes, la caméra posée, le monde qui bouge dedans, en horizontal 4:3 sur du noir comme l'original quand ses vidéos sont horizontales (sinon plein écran) : le premier tenu quatre temps et demi, un petit titre blanc au milieu sur une zone calme, en deux niveaux, ses petits mots sans serif au-dessus puis ses mots en serif gras dessous, chaque mot posé d'un coup avec un clic sec ; puis un plan fixe par temps, coupé sur la musique, un passage tout près du téléphone au milieu, le soir qui tombe sur les derniers ; et un dernier plan du soir ou de nuit tenu deux temps, où sa phrase de fin (ou son nom) se fond en petit au milieu, sans voile.",
+  how: "Des plans fixes, la caméra posée, le monde qui bouge dedans, en vertical plein écran (en horizontal 4:3 sur du noir comme l'original à sa demande) : le premier tenu quatre temps et demi, un petit titre blanc au milieu sur une zone calme, en deux niveaux, ses petits mots sans serif au-dessus puis ses mots en serif gras dessous, chaque mot posé d'un coup avec un clic sec ; puis un plan fixe par temps, coupé sur la musique, un passage tout près du téléphone au milieu, le soir qui tombe sur les derniers ; et un dernier plan du soir ou de nuit tenu deux temps, où sa phrase de fin (ou son nom) se fond en petit au milieu, sans voile.",
   end: true,
   texts: [
     {
@@ -233,11 +235,11 @@ export const plansFixes: MontageSkill = {
   settings: [
     {
       name: "format",
-      want: "le format : horizontal 4:3 comme l'original, ou vertical plein écran",
+      want: "le format : vertical plein écran, ou horizontal 4:3 comme l'original",
       choices: [
+        { value: "vertical", says: "vertical plein écran, ses vidéos horizontales recadrées sur leur sujet" },
+        { value: "horizontal", says: "horizontal 4:3 sur du noir, comme l'original", band: true },
         { value: "auto", says: "comme ses vidéos (horizontal si la plupart le sont)" },
-        { value: "horizontal", says: "horizontal 4:3 sur du noir, comme l'original" },
-        { value: "vertical", says: "vertical plein écran" },
       ],
     },
   ],
@@ -263,7 +265,7 @@ export const plansFixes: MontageSkill = {
     const passing = Math.max(1, Math.round((count - 3) * 0.75));
     const dusk = count >= 7 ? [count - 3, count - 2] : [];
     const wants = [
-      "le plan fixe qui ouvre, large et beau, le téléphone posé sans bouger (à l'horizontale de préférence) : sa rue, sa devanture ou son lieu, idéalement au coucher du soleil ; le milieu de l'image calme et plutôt sombre (le petit titre s'y pose) ; tenu quatre secondes",
+      "le plan fixe qui ouvre, large et beau, le téléphone posé sans bouger : sa rue, sa devanture ou son lieu, idéalement au coucher du soleil ; le milieu de l'image calme et plutôt sombre (le petit titre s'y pose) ; tenu quatre secondes",
       ...middle.map((_, k) =>
         k + 1 === passing
           ? "un plan fixe où quelqu'un ou quelque chose passe tout près du téléphone posé (un serveur, un client, un vélo, une voiture, un chien) : le seul plan qui bouge fort ; sinon un plan où des gens bougent"

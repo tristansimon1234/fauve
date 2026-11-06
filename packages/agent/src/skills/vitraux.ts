@@ -66,7 +66,7 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const REAL = Math.max(CLOSE + 1, mark("real", 255));
   const TURN = mark("turn", 11.25);
   const figure = setting("figure", "battants");
-  const format = setting("format", "auto");
+  const format = setting("format", "vertical");
   const display = "'" + brand.displayFont + "', 'Inter Tight', sans-serif";
   const body = "'" + brand.bodyFont + "', 'Inter Tight', sans-serif";
 
@@ -243,7 +243,9 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
 
 export const vitraux: MontageSkill = {
   key: "vitraux",
-  version: 1,
+  // 2: vertical full frame by default, her horizontal files cropped on their subject, its band only when she asks for
+  // it (Tristan, 6 November, on seven benches: « vertical please », « tout vertical please »).
+  version: 2,
   bpm: BPM,
   shots: [1, 1],
   files: [1, 3],
@@ -280,9 +282,9 @@ export const vitraux: MontageSkill = {
       name: "format",
       want: "le format : vertical plein écran comme l'original, ou sa vidéo horizontale entière dans une bande 16:9 sur du noir",
       choices: [
-        { value: "auto", says: "comme son fichier (une vidéo horizontale recadrée sur sa chose si elle tient dans le cadre, sinon entière sur du noir)" },
         { value: "vertical", says: "vertical plein écran, sa vidéo horizontale recadrée sur sa chose" },
-        { value: "horizontal", says: "sa vidéo entière dans une bande 16:9 sur du noir, les miroirs dans la bande" },
+        { value: "horizontal", says: "sa vidéo entière dans une bande 16:9 sur du noir, les miroirs dans la bande", band: true },
+        { value: "auto", says: "comme son fichier (une vidéo horizontale recadrée sur sa chose si elle tient dans le cadre, sinon entière sur du noir)" },
       ],
     },
   ],

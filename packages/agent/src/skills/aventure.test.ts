@@ -17,7 +17,7 @@ const kinds = (n: number) => {
 };
 
 test("« Un an de plus » (v1): its tempo, its 44 shots at the original's lengths, 41 s at most (42,8 with its card), never past 45", () => {
-  assert.equal(aventure.version, 1);
+  assert.equal(aventure.version, 2);
   assert.equal(aventure.bpm, 134.87);
   assert.deepEqual(aventure.shots, [20, 44]);
   assert.deepEqual(aventure.files, [8, 30]);
@@ -114,7 +114,7 @@ test("« Un an de plus »: its plan, her files in its slots, her counter at its 
   assert.equal(plan.music_shape?.downbeat, plan.texts[0]!.from);
   assert.equal(plan.sounds, undefined);
   assert.equal(plan.layers![0]!.motion.drawn, undefined);
-  assert.deepEqual(plan.skill, { key: "aventure", version: 1 });
+  assert.deepEqual(plan.skill, { key: "aventure", version: 2 });
   assert.deepEqual(aventure.reads, ["moves", "covered"]);
   // Nothing cut out, followed or cleared; only the light under its counter on the shots it can be on (its strong shot,
   // the third, fourth or fifth; then the next one).
@@ -123,7 +123,7 @@ test("« Un an de plus »: its plan, her files in its slots, her counter at its 
   assert.deepEqual(readsDrawn(aventure.code), [2, 3, 4, 5].map((shot) => ({ shot, kinds: ["light"] })));
   assert.ok(aventure.code.length < 24000);
   assert.deepEqual(aventure.finish, { grain: 0, vignette: 0 });
-  assert.deepEqual(aventure.settings?.map((s) => [s.name, s.choices.map((c) => c.value)]), [["format", ["auto", "vertical", "horizontal"]]]);
+  assert.deepEqual(aventure.settings?.map((s) => [s.name, s.choices.map((c) => c.value)]), [["format", ["vertical", "horizontal", "auto"]]]);
   assert.deepEqual(aventure.texts.map((t) => [t.slot, t.role, t.max, t.required]), [["compteur", "hook", 12, true]]);
 });
 
@@ -282,10 +282,16 @@ test("« Un an de plus » hides its cuts: covers made of her shots, its whips, t
   assert.deepEqual(plain.map((x) => [x.props.shot, styleOf(x)]), [[20, { position: "absolute", left: 0, top: 0, width: 1080, height: 1920 }]]);
 });
 
-test("« Un an de plus »: its format as her videos, its ending card on its last shot held", () => {
+test("« Un an de plus » (v2): full frame by default, its band on her word or as her videos, its ending card on its last shot held", () => {
   const draw = scene();
-  // Her videos in width: whole in a 16:9 band on black, its counter in the band's middle, bigger to read; full frame as she asks.
-  const wide = props(30, { aspect: 16 / 9 });
+  // By default (Tristan, 6 November: « tout vertical please »), her videos in width full frame, cropped on their subject.
+  const plain = props(30, { aspect: 16 / 9 });
+  const at0 = Math.round(plain.line.texts.compteur!.from * 30);
+  assert.deepEqual(styleOf(nodes(draw(at0 + 2, plain.p)).find((x) => x.type === "Footage")!), { position: "absolute", left: 0, top: 0, width: 1080, height: 1920 });
+  // On her word, or as her videos (« auto »), in width: whole in a 16:9 band on black, its counter in the band's middle,
+  // bigger to read; full frame as she asks.
+  const wide = props(30, { aspect: 16 / 9, settings: { format: "auto" } });
+  assert.deepEqual(styleOf(nodes(draw(at0 + 2, props(30, { aspect: 16 / 9, settings: { format: "horizontal" } }).p)).find((x) => x.type === "Footage")!).height, 608);
   const from = Math.round(wide.line.texts.compteur!.from * 30);
   const band = nodes(draw(from + 2, wide.p)).find((x) => x.type === "Footage")!;
   assert.deepEqual(styleOf(band), { position: "absolute", left: 0, top: 0, width: 1080, height: 608 });

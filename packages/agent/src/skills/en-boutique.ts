@@ -120,7 +120,7 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
 
   // 2. Its frame: her videos full frame, upright, as the original; whole in a 16:9 band on black when most of them are
   // in width (or she asks). Its subtitles at 65 % of the height (on the black under the band), lower while the sticker is up.
-  const format = setting("format", "auto");
+  const format = setting("format", "vertical");
   const wideShots = list.filter((s) => (Number(s.aspect) || 0.5625) > 1.15).length;
   const band = format === "horizontal" || (format === "auto" && wideShots * 2 > n);
   const BH = band ? Math.round((W * 9) / 16) : H;
@@ -328,7 +328,9 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
 
 export const enBoutique: MontageSkill = {
   key: "en-boutique",
-  version: 1,
+  // 2: vertical full frame by default, her horizontal files cropped on their subject, its band only when she asks for
+  // it (Tristan, 6 November, on seven benches: « vertical please », « tout vertical please »).
+  version: 2,
   bpm: BPM,
   shots: [FEWEST, OWN],
   long: MOST,
@@ -393,9 +395,9 @@ export const enBoutique: MontageSkill = {
       name: "format",
       want: "le format : vertical plein écran comme l'original, ou ses vidéos horizontales entières dans une bande 16:9 sur du noir",
       choices: [
-        { value: "auto", says: "comme ses vidéos (vertical plein écran ; horizontal 16:9 sur du noir quand la plupart sont en largeur)" },
         { value: "vertical", says: "vertical plein écran comme l'original, ses vidéos en largeur recadrées sur leur sujet" },
-        { value: "horizontal", says: "ses vidéos entières dans une bande 16:9 sur du noir, les sous-titres dessous" },
+        { value: "horizontal", says: "ses vidéos entières dans une bande 16:9 sur du noir, les sous-titres dessous", band: true },
+        { value: "auto", says: "comme ses vidéos (vertical plein écran ; horizontal 16:9 sur du noir quand la plupart sont en largeur)" },
       ],
     },
   ],

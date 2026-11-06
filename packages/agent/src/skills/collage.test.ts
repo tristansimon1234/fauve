@@ -77,7 +77,7 @@ function layers(tree: Drawn): string[] {
 }
 
 test("« Collage qui s'emboîte » (v1): the original's loop of 21 steps of 6 images in 13 cases, its cuts on the original's within an image", () => {
-  assert.equal(collage.version, 1);
+  assert.equal(collage.version, 2);
   assert.equal(collage.bpm, 75);
   assert.deepEqual([collage.shots, collage.files, collage.long], [[13, 26], [8, 26], 39]);
   const line = collage.timeline(13, { end: false });
@@ -259,8 +259,11 @@ test("« Collage qui s'emboîte » (v1): its title on a band of her colour in th
   assert.equal(awning(drawAt(62)), undefined);
   // No title (her pick, as the original): nothing written.
   assert.equal(title(drawAt(3, { reelTexts: [] })), undefined);
-  // Mostly horizontal pictures: each one whole in a 16:9 band on black, every piece in the band's box; as her words ask, full frame.
-  const wide = drawAt(8, { aspect: 16 / 9 });
+  // Mostly horizontal pictures: full frame by default (Tristan, 6 November: « tout vertical please »), cropped on their
+  // subject; each one whole in a 16:9 band on black, every piece in the band's box, as her words ask (or as her pictures).
+  assert.deepEqual(styleOf((drawAt(8, { aspect: 16 / 9 }).children as Drawn[])[0]!), { left: 0, top: 0, width: 1080, height: 1920 });
+  assert.deepEqual(styleOf((drawAt(8, { texts: { format: "auto" } }).children as Drawn[])[0]!), { left: 0, top: 0, width: 1080, height: 1920 });
+  const wide = drawAt(8, { aspect: 16 / 9, texts: { format: "auto" } });
   for (const node of (wide.children as Drawn[]).filter((n) => n.type === "Footage" || n.type === "Subject")) assert.deepEqual(styleOf(node), { left: 0, top: 656, width: 1080, height: 608 });
   const tb = styleOf(title(wide)!);
   assert.ok(Number(tb.top) >= 656 && Number(tb.top) + Number(tb.height) <= 960, JSON.stringify(tb));
@@ -321,7 +324,10 @@ test("« Collage qui s'emboîte » (v1): its plan cuts out what its chain draws,
   ]);
   // Its fewest cases from one photo; her settings kept on the plan.
   assert.equal(skillShotCount(collage, [{ id: "p", photo: true, seconds: 0 }]), 13);
-  const set = skillPlan({ skill: collage, name: "Collage", files, fill: { ...fill, settings: { couleur: "toutes", format: "vertical" } } });
-  assert.deepEqual(set.skill?.settings, { couleur: "toutes", format: "vertical" });
+  const set = skillPlan({ skill: collage, name: "Collage", files, fill: { ...fill, settings: { couleur: "toutes", format: "horizontal" } } });
+  assert.deepEqual(set.skill?.settings, { couleur: "toutes", format: "horizontal" });
   assert.equal(set.layers![0]!.motion.texts!.g6, undefined);
+  // Its default format asked again is no setting of hers: vertical, told to its code all the same.
+  const plain = skillPlan({ skill: collage, name: "Collage", files, fill: { ...fill, settings: { format: "vertical" } } });
+  assert.deepEqual([plain.skill?.settings, plain.layers![0]!.motion.texts!.format], [undefined, "vertical"]);
 });

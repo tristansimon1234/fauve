@@ -73,7 +73,7 @@ function made(options: { aspect?: number } = {}) {
 }
 
 test("« Le plat, puis la dégustation » (v1): timed on her voice, her words its own, her images in turn on what she says", () => {
-  assert.equal(chefFace.version, 1);
+  assert.equal(chefFace.version, 2);
   assert.equal(chefFace.bpm, 96);
   const voice = chefFace.voice!;
   assert.equal(voice.cut, "attack");
@@ -102,7 +102,7 @@ test("« Le plat, puis la dégustation » (v1): timed on her voice, her words it
 test("« Le plat, puis la dégustation »: her dish first in turn, her tasting before her face, each step on its word, her formula and the music cut", () => {
   const { talk, plan } = made();
   assert.ok(editPlanSchema.safeParse(plan).success);
-  assert.deepEqual(plan.skill, { key: "chef-face", version: 1 });
+  assert.deepEqual(plan.skill, { key: "chef-face", version: 2 });
   assert.equal(plan.subtitles, true);
   const word = (w: string, from = 0) => talk.words[talk.words.findIndex((x, i) => i >= from && x.w.replace(/[.,]$/, "") === w)]!;
   // Her talk cut by the engine (her long pause shortened), the frame changing on the first word of each idea.
@@ -230,7 +230,7 @@ test("« Le plat, puis la dégustation » draws her dish first, her words a few 
   assert.ok(Math.abs(ORIGINAL.formula / ORIGINAL.small - 3.5) < 0.1 && Math.abs(ORIGINAL.big / ORIGINAL.small - 1.78) < 0.05);
 });
 
-test("« Le plat, puis la dégustation »: every word in the safe zone, off her face on her shots, its format as her talking video", () => {
+test("« Le plat, puis la dégustation » (v2): every word in the safe zone, off her face on her shots, full frame or in its band", () => {
   const { layer } = made();
   // Every box centred between x 140 and 940 (left of the apps' buttons), above the bottom quarter, at every frame.
   for (let f = 0; f < layer.durationInFrames; f += 3) {
@@ -252,9 +252,12 @@ test("« Le plat, puis la dégustation »: every word in the safe zone, off her 
   // A face above the line leaves it where the original has it.
   const high = seen(drawAt(layer, onHer, { face: { ...face, y: 500 } }));
   assert.ok(Math.abs(Number(high.at!.top) + Number(high.at!.height) / 2 - Math.round(0.593 * 1920)) <= 1);
-  // Her talk in width: every shot whole in a 16:9 band on black; upright on her word.
+  // Her talk in width: full frame by default (Tristan, 6 November: « tout vertical please »), cropped on her; every shot
+  // whole in a 16:9 band on black on her word or as her talking video (« auto »); upright on her word.
   const wide = made({ aspect: 16 / 9 }).layer;
-  assert.deepEqual([seen(drawAt(wide, 0)).box!.top, seen(drawAt(wide, 0)).box!.height], [656, 608]);
+  assert.deepEqual([seen(drawAt(wide, 0)).box!.top, seen(drawAt(wide, 0)).box!.height], [0, 1920]);
+  assert.deepEqual([seen(drawAt(wide, 0, { texts: { format: "auto" } })).box!.top, seen(drawAt(wide, 0, { texts: { format: "auto" } })).box!.height], [656, 608]);
+  assert.equal(seen(drawAt(layer, 0, { texts: { format: "auto" } })).box!.height, 1920);
   assert.equal(seen(drawAt(wide, 0, { texts: { format: "vertical" } })).box!.height, 1920);
   assert.equal(seen(drawAt(layer, 0, { texts: { format: "horizontal" } })).box!.height, 608);
 });

@@ -65,7 +65,7 @@ const order = (tree: Drawn) =>
     .map((n) => (n.type === "Footage" ? "film" : n.type === "Subject" ? "her" : "title"));
 
 test("« Titre de film signé » (v1): six shots on its original's cuts at 124,2 BPM, its title over its intro without bass, the beat on the cut", () => {
-  assert.equal(titreCinema.version, 1);
+  assert.equal(titreCinema.version, 2);
   assert.equal(titreCinema.bpm, 124.2);
   const line = titreCinema.timeline(6, { end: false });
   // Each cut on the original's image (6,10 · 8,10 · 10,07 · 13,83 · 16,90 s), its end on its last (20,57 s).
@@ -177,20 +177,26 @@ test("« Titre de film signé »: her head covers the bottom of her signature's 
   assert.ok(low.box.top + low.box.height - low.pad <= 1440);
 });
 
-test("« Titre de film signé »: its near-square window on black when her videos are horizontal, full frame when upright, as her words ask", () => {
+test("« Titre de film signé » (v2): full frame by default, its near-square window on black on her word or as her horizontal videos", () => {
   const film = (tree: Drawn) => styleOf(flatten(tree).find((n) => n.type === "Footage")!);
-  // The original's 10:9: the whole width, 972 px high in the middle of the frame.
-  assert.deepEqual(film(drawAt(30, { aspect: 16 / 9 })), { position: "absolute", left: 0, top: 474, width: 1080, height: 972 });
+  // By default (Tristan, 6 November: « tout vertical please »), full frame whatever her videos, cropped on their subject.
+  assert.deepEqual(film(drawAt(30, { aspect: 16 / 9 })), { position: "absolute", left: 0, top: 0, width: 1080, height: 1920 });
+  // As her videos (« auto »), horizontal: the original's 10:9, the whole width, 972 px high in the middle of the frame.
+  const asVideos = { settings: { format: "auto" } };
+  assert.deepEqual(film(drawAt(30, { aspect: 16 / 9, ...asVideos })), { position: "absolute", left: 0, top: 474, width: 1080, height: 972 });
+  assert.deepEqual(film(drawAt(30, { aspect: 9 / 16, ...asVideos })), { position: "absolute", left: 0, top: 0, width: 1080, height: 1920 });
   assert.deepEqual(film(drawAt(30, { aspect: 9 / 16 })), { position: "absolute", left: 0, top: 0, width: 1080, height: 1920 });
   assert.deepEqual(film(drawAt(30, { aspect: 9 / 16, settings: { format: "fenetre" } })).height, 972);
   assert.deepEqual(film(drawAt(30, { aspect: 16 / 9, settings: { format: "vertical" } })).height, 1920);
-  assert.deepEqual(titreCinema.settings?.map((s) => [s.name, s.choices.map((c) => c.value)]), [["format", ["auto", "vertical", "fenetre"]]]);
+  assert.deepEqual(titreCinema.settings?.map((s) => [s.name, s.choices.map((c) => c.value)]), [["format", ["vertical", "fenetre", "auto"]]]);
   // In the window, its title centred on its middle (the frame's), its words inside it.
-  const k = lockupAt(drawAt(30, { aspect: 16 / 9 }))!;
+  const k = lockupAt(drawAt(30, { aspect: 16 / 9, settings: { format: "fenetre" } }))!;
   assert.equal(k.box.top + k.pad, Math.round(474 + 486 - 0.535 * 67));
-  // Her cut-out laid in the same box as her shot.
-  const tree = drawAt(30, { aspect: 16 / 9, subject: () => ({ x: 600, y: 1000, w: 90, h: 300 }) });
-  assert.deepEqual(styleOf(flatten(tree).find((n) => n.type === "Subject")!), film(tree));
+  // Her cut-out laid in the same box as her shot, in both.
+  for (const settings of [{}, { format: "fenetre" }] as Record<string, string>[]) {
+    const tree = drawAt(30, { aspect: 16 / 9, settings, subject: () => ({ x: 600, y: 1000, w: 90, h: 300 }) });
+    assert.deepEqual(styleOf(flatten(tree).find((n) => n.type === "Subject")!), film(tree));
+  }
 });
 
 test("« Titre de film signé »: its ending card on its last shot, its words set as its title; light to render", () => {

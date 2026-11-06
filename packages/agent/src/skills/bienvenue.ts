@@ -112,7 +112,7 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
 
   // 1. Its frame: her pictures full frame, as the original's; or her videos whole in a 16:9 band on black in the middle
   // when most of them are in width (or she asks). Her sentence stays where it is, stacked in the middle of the frame.
-  const format = setting("format", "auto");
+  const format = setting("format", "vertical");
   const inWidth = shots.filter((s) => (Number(s.aspect) || 0.5625) > 1.15).length;
   const band = format === "horizontal" || (format === "auto" && n > 0 && inWidth * 2 > n);
   const BH = Math.round((width * 9) / 16);
@@ -197,7 +197,9 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
 
 export const bienvenue: MontageSkill = {
   key: "bienvenue",
-  version: 1,
+  // 2: vertical full frame by default, her horizontal files cropped on their subject, its band only when she asks for
+  // it (Tristan, 6 November, on seven benches: « vertical please », « tout vertical please »).
+  version: 2,
   bpm: BPM,
   shots: [FEWEST, ORIGINAL],
   long: LONGEST,
@@ -220,9 +222,9 @@ export const bienvenue: MontageSkill = {
       name: "format",
       want: "le format : ses vidéos en plein écran vertical, ou entières dans une bande 16:9 sur du noir",
       choices: [
-        { value: "auto", says: "comme ses vidéos : en plein écran quand la plupart sont en hauteur (une vidéo horizontale recadrée sur son sujet), sinon entières dans une bande 16:9 sur du noir" },
         { value: "vertical", says: "en plein écran vertical, comme l'original, ses vidéos horizontales recadrées sur leur sujet" },
-        { value: "horizontal", says: "ses vidéos entières dans une bande 16:9 au milieu de l'écran, sur du noir, sa phrase par-dessus" },
+        { value: "horizontal", says: "ses vidéos entières dans une bande 16:9 au milieu de l'écran, sur du noir, sa phrase par-dessus", band: true },
+        { value: "auto", says: "comme ses vidéos : en plein écran quand la plupart sont en hauteur (une vidéo horizontale recadrée sur son sujet), sinon entières dans une bande 16:9 sur du noir" },
       ],
     },
     {

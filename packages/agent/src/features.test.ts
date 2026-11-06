@@ -1381,7 +1381,11 @@ test("montage skills: each one's plan holds for every number of shots it takes, 
         assert.equal(plan.segments.length, n);
         assert.ok(plan.duration <= 45, `${skill.key}: ${plan.duration} s`);
         const marks = plan.layers![0]!.motion.texts!;
-        for (const v of Object.values(marks)) assert.ok(Number.isFinite(Number(v)), `${skill.key}: marks are numbers`);
+        // Its marks are numbers; its format is always told to its code, at its default when none was asked.
+        const named = new Set((skill.settings ?? []).map((s) => s.name));
+        for (const [k, v] of Object.entries(marks)) if (!named.has(k)) assert.ok(Number.isFinite(Number(v)), `${skill.key}: marks are numbers`);
+        const format = skill.settings?.find((s) => s.name === "format");
+        assert.equal(marks.format, format?.choices[0]!.value, `${skill.key}: its format played at its default`);
         assert.equal(plan.skill?.key, skill.key);
         assert.equal(plan.layers![0]!.compose, true);
         assert.equal(plan.texts.length, skill.texts.length);
@@ -2041,7 +2045,7 @@ const composeShots = (aspects: number[]) => aspects.map((aspect, i) => ({ src: `
 test("« Plans fixes de cinéma » (v3) cuts where its original does, on its own music (64,6 BPM), its words on its beats", async () => {
   const { plansFixes, wordFrames } = await import("./skills/plans-fixes.ts");
   const { clearsDrawn, objectsDrawn } = await import("./subject.ts");
-  assert.equal(plansFixes.version, 3);
+  assert.equal(plansFixes.version, 4);
   assert.equal(plansFixes.bpm, 64.6);
   const line = plansFixes.timeline(9, { end: false, words: { accroche: "The power of", titre: "Static shot" } });
   // The original's nine shots, cut on its images 125, 155, 183, 210, 236, 265, 293 and 319 (measured image by image at
@@ -2086,7 +2090,7 @@ test("« Plans fixes de cinéma » (v3) cuts where its original does, on its own
   assert.deepEqual(["The", "power", "of", "Static", "shot"].map((w) => shown.get(w)), clicks);
 });
 
-test("« Plans fixes de cinéma » (v3): horizontal 4:3 on black as its original when her files are, full frame otherwise or on her word", async () => {
+test("« Plans fixes de cinéma » (v4): full frame by default, horizontal 4:3 on black as its original on her word, or as her files", async () => {
   const { plansFixes } = await import("./skills/plans-fixes.ts");
   const { skillPlan, skillFillInput, skillSettings } = await import("./skills.ts");
   const reelTexts = [
@@ -2103,20 +2107,24 @@ test("« Plans fixes de cinéma » (v3): horizontal 4:3 on black as its original
   };
   const wide = Array(12).fill(16 / 9);
   const tall = Array(12).fill(9 / 16);
-  // Her files mostly horizontal: the original's 4:3 picture (1080 × 810) at the middle of the frame, on black; a 16:9
-  // video covers it (an eighth of each side cut, on its subject).
-  assert.deepEqual(frameOf(draw(wide, 60)), { top: 555, height: 810, shot: { position: "absolute", left: 0, top: 0, width: 1080, height: 810 } });
-  assert.equal(frameOf(draw([...Array(7).fill(16 / 9), ...Array(5).fill(9 / 16)], 60)).height, 810);
-  // Mostly vertical (half and half too): full frame.
+  const as = (format: string) => ({ texts: { beat: "27.864", close: "400", close_in: "19", format } });
+  // By default (Tristan, 6 November: « tout vertical please »), full frame whatever her files: a 16:9 video cropped on its subject.
+  assert.deepEqual(frameOf(draw(wide, 60)), { top: 0, height: 1920, shot: { position: "absolute", left: 0, top: 0, width: 1080, height: 1920 } });
   assert.deepEqual(frameOf(draw(tall, 60)), { top: 0, height: 1920, shot: { position: "absolute", left: 0, top: 0, width: 1080, height: 1920 } });
-  assert.equal(frameOf(draw([...Array(6).fill(16 / 9), ...Array(6).fill(9 / 16)], 60)).height, 1920);
-  // On her word, the other format.
-  assert.equal(frameOf(draw(wide, 60, { texts: { beat: "27.864", close: "400", close_in: "19", format: "vertical" } })).height, 1920);
-  assert.equal(frameOf(draw(tall, 60, { texts: { beat: "27.864", close: "400", close_in: "19", format: "horizontal" } })).top, 555);
+  // On her word, the original's 4:3 picture (1080 × 810) at the middle of the frame, on black; a 16:9 video covers it (an
+  // eighth of each side cut, on its subject).
+  assert.deepEqual(frameOf(draw(wide, 60, as("horizontal"))), { top: 555, height: 810, shot: { position: "absolute", left: 0, top: 0, width: 1080, height: 810 } });
+  assert.equal(frameOf(draw(tall, 60, as("horizontal"))).top, 555);
+  // « Comme mes vidéos »: the band when her files are mostly horizontal, full frame when mostly vertical (half and half too).
+  assert.equal(frameOf(draw(wide, 60, as("auto"))).height, 810);
+  assert.equal(frameOf(draw([...Array(7).fill(16 / 9), ...Array(5).fill(9 / 16)], 60, as("auto"))).height, 810);
+  assert.equal(frameOf(draw(tall, 60, as("auto"))).height, 1920);
+  assert.equal(frameOf(draw([...Array(6).fill(16 / 9), ...Array(6).fill(9 / 16)], 60, as("auto"))).height, 1920);
+  assert.equal(frameOf(draw(wide, 60, as("vertical"))).height, 1920);
   // Its title at the very middle of its picture in both formats (ClearBox's fallback: no clear area read here), its
   // small words a label over its serif; its lines in the safe zone, left of the apps' buttons.
-  for (const aspects of [wide, tall]) {
-    const tree = draw(aspects, 100);
+  for (const [aspects, extra] of [[wide, as("horizontal")], [wide, {}], [tall, {}]] as const) {
+    const tree = draw(aspects, 100, extra);
     const { top } = frameOf(tree);
     const boxes = drawnNodes(tree).filter((n) => n.type === "FitText").map((n) => n.props.style as { left: number; top: number; width: number; height: number });
     assert.equal(boxes.length, 2);
@@ -2137,15 +2145,21 @@ test("« Plans fixes de cinéma » (v3): horizontal 4:3 on black as its original
   const card = draw(wide, 430, { end: { title: "Réserve ton bouquet", subtitle: null, from: 412 } });
   assert.equal(styleOf(closing(card, "Réserve ton bouquet")!).opacity, 1);
   assert.equal(closing(card, "Atelier Rose"), undefined);
-  // The setting: the filler sees it (the original's first, the default), the plan keeps a choice her words asked for.
-  assert.deepEqual(plansFixes.settings?.map((s) => [s.name, s.choices.map((c) => c.value)]), [["format", ["auto", "horizontal", "vertical"]]]);
-  assert.deepEqual(skillSettings(plansFixes, [{ name: "format", value: "auto" }]), {});
+  // The setting: the filler sees it (vertical first, the default; its band marked), the plan keeps a choice her words asked for.
+  assert.deepEqual(plansFixes.settings?.map((s) => [s.name, s.choices.map((c) => c.value)]), [["format", ["vertical", "horizontal", "auto"]]]);
+  assert.equal(plansFixes.settings?.[0]?.choices.find((c) => c.band)?.value, "horizontal");
+  assert.deepEqual(skillSettings(plansFixes, [{ name: "format", value: "vertical" }]), {});
   const files = Array.from({ length: 6 }, (_, i) => ({ id: `v${i}`, photo: false, seconds: 12 }));
-  const input = skillFillInput({ skill: plansFixes, name: "Plans fixes", n: 9, files, business: {}, request: "en vertical" });
+  const input = skillFillInput({ skill: plansFixes, name: "Plans fixes", n: 9, files, business: {}, request: "en horizontal" });
   assert.equal(input.reglages?.[0]?.nom, "format");
-  const plan = skillPlan({ skill: plansFixes, name: "Plans fixes", files, fill: { shots: Array.from({ length: 9 }, (_, i) => ({ file: files[i % 6]!.id, at: 1 })), texts: { accroche: "un soir à", titre: "Belleville" }, end: null, settings: { format: "vertical" } } });
-  assert.equal(plan.layers![0]!.motion.texts!.format, "vertical");
-  assert.deepEqual(plan.skill, { key: "plans-fixes", version: 3, settings: { format: "vertical" } });
+  const fill = { shots: Array.from({ length: 9 }, (_, i) => ({ file: files[i % 6]!.id, at: 1 })), texts: { accroche: "un soir à", titre: "Belleville" }, end: null };
+  const plan = skillPlan({ skill: plansFixes, name: "Plans fixes", files, fill: { ...fill, settings: { format: "horizontal" } } });
+  assert.equal(plan.layers![0]!.motion.texts!.format, "horizontal");
+  assert.deepEqual(plan.skill, { key: "plans-fixes", version: 4, settings: { format: "horizontal" } });
+  // Nothing asked: its code is told its default, the plan keeps nothing.
+  const plain = skillPlan({ skill: plansFixes, name: "Plans fixes", files, fill });
+  assert.equal(plain.layers![0]!.motion.texts!.format, "vertical");
+  assert.deepEqual(plain.skill, { key: "plans-fixes", version: 4 });
 });
 
 // ——— « Une journée chez toi » v2, written again on its original's fiche (docs/fiches/journee.md) ———————————————————
@@ -2203,26 +2217,34 @@ test("« Une journée chez toi » (v2) cuts where its original does, on its own 
   assert.ok(Math.abs(journee.timeline(33, { end: false }).duration - 29.5) < 0.2);
 });
 
-test("« Une journée chez toi » (v2): horizontal 4:3 on black as its original when her videos are, her setting else", async () => {
+test("« Une journée chez toi » (v3): full frame by default, horizontal 4:3 on black as its original on her word or as her videos", async () => {
   const { journee } = await import("./skills/journee.ts");
   const { skillCode } = await import("./skills.ts");
   const { drawsSubject, objectsDrawn } = await import("./subject.ts");
   const line = journee.timeline(22, { end: false });
-  const marks = Object.fromEntries(Object.entries(line.marks).map(([k, v]) => [k, String(v)]));
+  const plain = Object.fromEntries(Object.entries(line.marks).map(([k, v]) => [k, String(v)]));
+  // What follows is drawn in its 4:3 band, on her word.
+  const marks: Record<string, string> = { ...plain, format: "horizontal" };
   const shots = (aspect: number) => line.shots.map((s) => ({ from: Math.round(s.start * 30), durationInFrames: Math.round((s.end - s.start) * 30), kind: "video", aspect }));
   const frameBox = (tree: Drawn) => tree.children[0] as Drawn;
   const style = (d: Drawn) => d.props.style as Record<string, number | string>;
-  // Her videos in width (the Budapest bench: 16:9): its 4:3 frame, 1080 × 810 in the middle of the vertical frame.
+  // By default (Tristan, 6 November: « tout vertical please »), the whole frame, her videos in width (the Budapest bench:
+  // 16:9) cropped on their subject.
+  const full = style(frameBox(sceneAt(journee.code, 100, { shots: shots(16 / 9), texts: plain })));
+  assert.deepEqual([full.top, full.height], [0, 1920]);
+  // On her word, its 4:3 frame, 1080 × 810 in the middle of the vertical frame, for any of her videos.
   const wide = style(frameBox(sceneAt(journee.code, 100, { shots: shots(16 / 9), texts: marks })));
   assert.deepEqual([wide.top, wide.width, wide.height], [555, 1080, 810]);
-  // Upright videos: the whole frame; her setting prevails both ways.
-  const tall = style(frameBox(sceneAt(journee.code, 100, { shots: shots(9 / 16), texts: marks })));
-  assert.deepEqual([tall.top, tall.height], [0, 1920]);
-  const asked = style(frameBox(sceneAt(journee.code, 100, { shots: shots(9 / 16), texts: { ...marks, format: "horizontal" } })));
+  const asked = style(frameBox(sceneAt(journee.code, 100, { shots: shots(9 / 16), texts: marks })));
   assert.deepEqual([asked.top, asked.height], [555, 810]);
-  const upright = style(frameBox(sceneAt(journee.code, 100, { shots: shots(16 / 9), texts: { ...marks, format: "vertical" } })));
+  // « Comme mes vidéos »: the band for videos in width, the whole frame for upright ones.
+  const auto = style(frameBox(sceneAt(journee.code, 100, { shots: shots(16 / 9), texts: { ...plain, format: "auto" } })));
+  assert.deepEqual([auto.top, auto.height], [555, 810]);
+  const tall = style(frameBox(sceneAt(journee.code, 100, { shots: shots(9 / 16), texts: { ...plain, format: "auto" } })));
+  assert.deepEqual([tall.top, tall.height], [0, 1920]);
+  const upright = style(frameBox(sceneAt(journee.code, 100, { shots: shots(16 / 9), texts: { ...plain, format: "vertical" } })));
   assert.deepEqual([upright.top, upright.height], [0, 1920]);
-  assert.deepEqual(journee.settings?.[0]?.choices.map((c) => c.value), ["auto", "horizontal", "vertical"]);
+  assert.deepEqual(journee.settings?.[0]?.choices.map((c) => c.value), ["vertical", "horizontal", "auto"]);
   // Its title red, centred a little under the middle of its frame (52 %), in it.
   const titled = sceneAt(journee.code, 60, { shots: shots(16 / 9), texts: marks, reelTexts: [{ text: "Paris", role: "hook", from: 45, to: 75 }, { text: "une journée à", role: "caption", from: 45, to: 75 }] });
   const fit = drawnIn(frameBox(titled)).find((d) => d.type === "FitText")!;
@@ -2306,7 +2328,7 @@ const MOSAIC_BRAND = { name: "La Fripe Rétro", displayFont: "Instrument Serif",
 
 test("« Mosaïque qui change » (v3) changes its prints on its original's images, on its own music (130 BPM)", async () => {
   const { mosaique } = await import("./skills/mosaique.ts");
-  assert.equal(mosaique.version, 3);
+  assert.equal(mosaique.version, 4);
   assert.equal(mosaique.bpm, 130);
   // Its five pictures in 6 s, 13 beats of its music: a wave of 2,6 beats (36 images) each, as the original's.
   const line = mosaique.timeline(5, { end: false });
@@ -2355,7 +2377,7 @@ test("« Mosaïque qui change » (v3) changes its prints on its original's image
   assert.ok((mosaique.finish?.fade ?? 0) > 0);
 });
 
-test("« Mosaïque qui change » (v3): vertical full frame as its original, her horizontal pictures whole in a 16:9 block, a square on her word", async () => {
+test("« Mosaïque qui change » (v4): vertical full frame as its original, her horizontal pictures whole in a 16:9 block or a square on her word", async () => {
   const { mosaique } = await import("./skills/mosaique.ts");
   const { skillPlan, skillFillInput, skillSettings } = await import("./skills.ts");
   const title = { text: "La Fripe Rétro", role: "hook", from: 0, to: 78, emphasis: [] };
@@ -2388,10 +2410,14 @@ test("« Mosaïque qui change » (v3): vertical full frame as its original, her 
   const standing = printsOf(draw(tall, 0));
   assert.equal(standing.length, 12);
   assert.ok(standing.every((p) => Math.abs(p.w - 346.5) <= 6 && Math.abs(p.h - 472.5) <= 6 && p.x >= 6 && p.x + p.w <= 1074), JSON.stringify(standing));
-  // Mostly horizontal: her pictures whole in a 16:9 block in the middle of the paper, 4 × 3 lying prints.
+  // Mostly horizontal, by default (Tristan, 6 November: « tout vertical please »): the full frame too, cropped on their
+  // subject. On her word (or « comme mes images »): her pictures whole in a 16:9 block in the middle of the paper, 4 × 3
+  // lying prints.
+  assert.deepEqual(blockOf(draw(wide, 0)), full);
   const block = { left: 13, top: 664, width: 1054, height: 593 };
-  assert.deepEqual(blockOf(draw(wide, 0)), block);
-  const lying = printsOf(draw(wide, 0));
+  assert.deepEqual(blockOf(draw(wide, 0, { format: "auto" })), block);
+  assert.deepEqual(blockOf(draw(tall, 0, { format: "auto" })), full);
+  const lying = printsOf(draw(wide, 0, { format: "horizontal" }));
   assert.equal(lying.length, 12);
   assert.ok(lying.every((p) => p.w > p.h && p.y >= 660 && p.y + p.h <= 1261), JSON.stringify(lying[0]));
   assert.equal(new Set(lying.map((p) => Math.round(p.x / 100))).size, 4);
@@ -2408,25 +2434,27 @@ test("« Mosaïque qui change » (v3): vertical full frame as its original, her 
   const onLabel = titleBox(draw(tall, 10));
   assert.equal(styleOf(onLabel).top, 150);
   assert.ok(drawnNodes(onLabel).some((n) => n.type === "span" && styleOf(n).background));
-  const above = titleBox(draw(wide, 10));
+  const above = titleBox(draw(wide, 10, { format: "horizontal" }));
   assert.ok(Number(styleOf(above).top) + Number(styleOf(above).height) <= 664 && Number(styleOf(above).top) >= 80, JSON.stringify(styleOf(above)));
   assert.match(String((above.props.innerStyle as Record<string, unknown>).fontFamily), /Instrument Serif/);
   // Its ending card on blank paper prints laid by its last wave, its words on them, in its block.
-  const card = draw(wide, 220, {}, { durationInFrames: 264, end: { title: "Ouvert dimanche", subtitle: "12 rue des Martyrs", from: 216 } });
+  const card = draw(wide, 220, { format: "horizontal" }, { durationInFrames: 264, end: { title: "Ouvert dimanche", subtitle: "12 rue des Martyrs", from: 216 } });
   assert.ok(printsOf(card).length === 12 && drawnNodes(card).filter((n) => n.type === "Footage").length === 0);
   const words = drawnNodes(card).filter((n) => n.type === "FitText").map((n) => ({ text: heldText(n), box: styleOf(n) }));
   assert.deepEqual(words.map((w) => w.text.trim()), ["Ouvert dimanche", "12 rue des Martyrs"]);
   for (const w of words) assert.ok(Number(w.box.top) >= 664 && Number(w.box.top) + Number(w.box.height) <= 1257, JSON.stringify(w.box));
-  // Its settings: the original's first (the default); the filler sees them; the plan keeps the one her words asked for.
+  // Its settings: the default first (the original's; its format vertical); the filler sees them; the plan keeps the one
+  // her words asked for.
   assert.deepEqual(mosaique.settings?.map((s) => s.name), ["cases", "vitesse", "ordre", "papier", "format"]);
-  assert.deepEqual(mosaique.settings?.at(-1)?.choices.map((c) => c.value), ["auto", "vertical", "horizontal", "carre"]);
-  assert.deepEqual(skillSettings(mosaique, [{ name: "format", value: "auto" }]), {});
+  assert.deepEqual(mosaique.settings?.at(-1)?.choices.map((c) => c.value), ["vertical", "horizontal", "carre", "auto"]);
+  assert.equal(mosaique.settings?.at(-1)?.choices.find((c) => c.band)?.value, "horizontal");
+  assert.deepEqual(skillSettings(mosaique, [{ name: "format", value: "vertical" }]), {});
   const files = Array.from({ length: 6 }, (_, i) => ({ id: `v${i}`, photo: false, seconds: 12 }));
   const input = skillFillInput({ skill: mosaique, name: "Mosaïque", n: 6, files, business: {}, request: "en horizontal" });
   assert.equal(input.reglages?.at(-1)?.nom, "format");
   const plan = skillPlan({ skill: mosaique, name: "Mosaïque", files, fill: { shots: files.map((f) => ({ file: f.id, at: 1 })), texts: {}, end: null, settings: { format: "horizontal" } } });
   assert.equal(plan.layers![0]!.motion.texts!.format, "horizontal");
-  assert.deepEqual(plan.skill, { key: "mosaique", version: 3, settings: { format: "horizontal" } });
+  assert.deepEqual(plan.skill, { key: "mosaique", version: 4, settings: { format: "horizontal" } });
   assert.deepEqual(plan.music_shape, { end: { at: plan.duration, fade: 0.012 } });
 });
 
@@ -2435,7 +2463,7 @@ test("« Mosaïque qui change » (v3): vertical full frame as its original, her 
 test("« Mots aux quatre coins » (v2) cuts where its original does, on its own music (92 BPM), its words and its pause on its beats", async () => {
   const { quatreCoins } = await import("./skills/quatre-coins.ts");
   const { clearsDrawn, objectsDrawn } = await import("./subject.ts");
-  assert.equal(quatreCoins.version, 3);
+  assert.equal(quatreCoins.version, 4);
   assert.equal(quatreCoins.bpm, 92);
   const line = quatreCoins.timeline(12, { end: false });
   const f = (s: number) => Math.round(s * 30);
@@ -2494,7 +2522,7 @@ test("« Mots aux quatre coins » (v2) cuts where its original does, on its own 
   assert.deepEqual(quatreCoins.finish, { vignette: 0 });
 });
 
-test("« Mots aux quatre coins » (v2): horizontal 16:9 on black as its original when her files are, full frame otherwise or on her word; its words on the edges", async () => {
+test("« Mots aux quatre coins » (v4): full frame by default, horizontal 16:9 on black as its original on her word or as her files; its words on the edges", async () => {
   const { quatreCoins } = await import("./skills/quatre-coins.ts");
   const { skillPlan, skillFillInput, skillSettings } = await import("./skills.ts");
   const line = quatreCoins.timeline(12, { end: false });
@@ -2507,7 +2535,9 @@ test("« Mots aux quatre coins » (v2): horizontal 16:9 on black as its original
     { text: "Brighton", role: "band", ...at("lieu") },
     { text: "Madeira Dr, Brighton BN2 1TW", role: "caption", ...at("adresse") },
   ];
-  const marks = Object.fromEntries(Object.entries(line.marks).map(([k, v]) => [k, String(v)]));
+  const plain = Object.fromEntries(Object.entries(line.marks).map(([k, v]) => [k, String(v)]));
+  // Drawn below « comme ses vidéos » (her words: « comme mes vidéos »), its band for her horizontal files.
+  const marks: Record<string, string> = { ...plain, format: "auto" };
   const draw = (aspects: number[], frame: number, extra: Record<string, unknown> = {}) =>
     drawScene(quatreCoins.code, frame, { width: 1080, height: 1920, durationInFrames: f(line.duration), brand: { name: "Brighton Pier", displayFont: "Inter Tight", bodyFont: "Inter Tight" }, shots: shotsOf(aspects), reelTexts, end: null, texts: marks, ...extra });
   const frameOf = (tree: Drawn) => {
@@ -2517,7 +2547,10 @@ test("« Mots aux quatre coins » (v2): horizontal 16:9 on black as its original
   const boxes = (tree: Drawn) => drawnNodes(tree).filter((n) => n.type === "FitText").map((n) => ({ ...(n.props.style as { left: number; top: number; width: number; height: number }), text: heldText(n).trim() }));
   const wide = Array(12).fill(16 / 9);
   const tall = Array(12).fill(9 / 16);
-  // Her files mostly horizontal: a 16:9 picture (1080 × 608) at the middle of the frame, on black; mostly vertical (half and half too): full frame.
+  // By default (Tristan, 6 November: « tout vertical please »), full frame whatever her files.
+  assert.deepEqual(frameOf(draw(wide, 100, { texts: plain })), { top: 0, height: 1920 });
+  assert.deepEqual(frameOf(draw(tall, 100, { texts: plain })), { top: 0, height: 1920 });
+  // As her files: mostly horizontal, a 16:9 picture (1080 × 608) at the middle of the frame, on black; mostly vertical (half and half too): full frame.
   assert.deepEqual(frameOf(draw(wide, 100)), { top: 656, height: 608 });
   assert.equal(frameOf(draw([...Array(7).fill(16 / 9), ...Array(5).fill(9 / 16)], 100)).height, 608);
   assert.deepEqual(frameOf(draw(tall, 100)), { top: 0, height: 1920 });
@@ -2565,19 +2598,20 @@ test("« Mots aux quatre coins » (v2): horizontal 16:9 on black as its original
   const card = boxes(draw(wide, endAt + 20, { end: { title: "Ouvert tous les jours", subtitle: "dès 10 h", from: endAt } }));
   assert.deepEqual(card.map((b) => b.text), ["Ouvert tous les jours", "dès 10 h"]);
   assert.equal(drawnNodes(draw(wide, endAt + 20, { end: { title: "Ouvert", subtitle: null, from: endAt } })).filter((n) => /rgba/.test(String(styleOf(n).backgroundColor ?? ""))).length, 0);
-  // The setting: the filler sees it (the original's first, the default), the plan keeps a choice her words asked for;
+  // The setting: the filler sees it (vertical first, the default), the plan keeps a choice her words asked for;
   // its music shape and its marks are on the plan.
-  assert.deepEqual(quatreCoins.settings?.map((s) => [s.name, s.choices.map((c) => c.value)]), [["format", ["auto", "horizontal", "vertical"]]]);
-  assert.deepEqual(skillSettings(quatreCoins, [{ name: "format", value: "auto" }]), {});
+  assert.deepEqual(quatreCoins.settings?.map((s) => [s.name, s.choices.map((c) => c.value)]), [["format", ["vertical", "horizontal", "auto"]]]);
+  assert.deepEqual(skillSettings(quatreCoins, [{ name: "format", value: "vertical" }]), {});
   const files = Array.from({ length: 12 }, (_, i) => ({ id: `v${i}`, photo: false, seconds: 9 }));
-  const input = skillFillInput({ skill: quatreCoins, name: "Mots aux quatre coins", n: 12, files, business: {}, request: "en vertical" });
+  const input = skillFillInput({ skill: quatreCoins, name: "Mots aux quatre coins", n: 12, files, business: {}, request: "en horizontal" });
   assert.equal(input.reglages?.[0]?.nom, "format");
   assert.equal(input.cases.length, 12);
-  const fill = { shots: files.map((x) => ({ file: x.id, at: 0.5 })), texts: { debut: "un matin chez", nom: "Farine", lieu: "Belleville", adresse: "12 rue Ramponeau" }, end: null, settings: { format: "vertical" } };
+  const fill = { shots: files.map((x) => ({ file: x.id, at: 0.5 })), texts: { debut: "un matin chez", nom: "Farine", lieu: "Belleville", adresse: "12 rue Ramponeau" }, end: null, settings: { format: "horizontal" } };
   const plan = skillPlan({ skill: quatreCoins, name: "Mots aux quatre coins", files, fill });
   assert.ok(editPlanSchema.safeParse(plan).success);
-  assert.equal(plan.layers![0]!.motion.texts!.format, "vertical");
-  assert.deepEqual(plan.skill, { key: "quatre-coins", version: 3, settings: { format: "vertical" } });
+  assert.equal(plan.layers![0]!.motion.texts!.format, "horizontal");
+  assert.deepEqual(plan.skill, { key: "quatre-coins", version: 4, settings: { format: "horizontal" } });
+  assert.equal(skillPlan({ skill: quatreCoins, name: "Mots aux quatre coins", files, fill: { ...fill, settings: {} } }).layers![0]!.motion.texts!.format, "vertical");
   const { readMusicShape } = await import("./music-shape.ts");
   assert.deepEqual(plan.music_shape, readMusicShape(line.music, line.duration));
   assert.equal(plan.sounds, undefined);
@@ -2588,7 +2622,7 @@ test("« Mots aux quatre coins » (v2): horizontal 16:9 on black as its original
 test("« Éventail de bandes » (v2) cuts where its original does, on its own music (119,8 BPM): its star, its drop, its intro of hits alone", async () => {
   const { eventail } = await import("./skills/eventail.ts");
   const { readMusicShape } = await import("./music-shape.ts");
-  assert.equal(eventail.version, 2);
+  assert.equal(eventail.version, 3);
   assert.equal(eventail.bpm, 119.8);
   const line = eventail.timeline(13, { end: false });
   // The original's thirteen shots and its black (images at 30 i/s, docs/fiches/eventail.md), counted from its first
@@ -2639,12 +2673,14 @@ test("« Éventail de bandes » (v2) cuts where its original does, on its own mu
   assert.ok(Math.abs(readMusicShape(slower.music, slower.duration)!.filters![0]!.to - 7 * 0.6) < 0.002);
 });
 
-test("« Éventail de bandes » (v2): horizontal 16:9 on black when her videos are, its star of windows on one shot, its frame, its split, its end", async () => {
+test("« Éventail de bandes » (v3): full frame by default, 16:9 on black as her videos or on her word, its star of windows on one shot, its frame, its split, its end", async () => {
   const { eventail } = await import("./skills/eventail.ts");
   const { skillCode, skillPlan, skillFillInput, skillSettings } = await import("./skills.ts");
   const { drawsSubject, objectsDrawn } = await import("./subject.ts");
   const line = eventail.timeline(13, { end: false });
-  const marks = Object.fromEntries(Object.entries(line.marks).map(([k, v]) => [k, String(v)]));
+  const plain = Object.fromEntries(Object.entries(line.marks).map(([k, v]) => [k, String(v)]));
+  // Drawn below « comme ses vidéos » (her words: « comme mes vidéos »), its 16:9 frame for her horizontal videos.
+  const marks: Record<string, string> = { ...plain, format: "auto" };
   const shots = (aspect: number) => line.shots.map((s) => ({ from: Math.round(s.start * 30), durationInFrames: Math.round((s.end - s.start) * 30), kind: "video", aspect }));
   // The kit pieces its code lays besides the stand-in scope's, as named elements too; its shot's heart when one is found.
   const run = (frame: number, props: Record<string, unknown>, heart: unknown = null) =>
@@ -2662,13 +2698,15 @@ test("« Éventail de bandes » (v2): horizontal 16:9 on black when her videos a
     const landed = starRays(S, p.upright).filter((_, k) => frame >= Math.round(p.at + (k + 1) * p.every));
     return starPath(p.center, 0.094 * S, landed, p.box.w + p.box.h).match(/M[^MZ]*Z/g)!;
   };
-  // Her videos in width: the original's 16:9 frame, 1080 × 608 in the middle of the vertical frame, on black.
+  // By default (Tristan, 6 November: « tout vertical please »), the whole frame for any of her videos.
+  assert.deepEqual([style(frameBox(run(60, { shots: shots(16 / 9), texts: plain }))).top, style(frameBox(run(60, { shots: shots(16 / 9), texts: plain }))).height], [0, 1920]);
+  // As her videos, in width: the original's 16:9 frame, 1080 × 608 in the middle of the vertical frame, on black.
   assert.deepEqual([style(frameBox(run(60, { shots: shots(16 / 9), texts: marks }))).top, style(frameBox(run(60, { shots: shots(16 / 9), texts: marks }))).height], [656, 608]);
   // Upright videos: the whole frame; her setting prevails both ways.
   assert.deepEqual([style(frameBox(run(60, { shots: shots(9 / 16), texts: marks }))).top, style(frameBox(run(60, { shots: shots(9 / 16), texts: marks }))).height], [0, 1920]);
   assert.equal(style(frameBox(run(60, { shots: shots(9 / 16), texts: { ...marks, format: "horizontal" } }))).height, 608);
   assert.equal(style(frameBox(run(60, { shots: shots(16 / 9), texts: { ...marks, format: "vertical" } }))).height, 1920);
-  assert.deepEqual(eventail.settings?.map((s) => [s.name, s.choices.map((c) => c.value)]), [["format", ["auto", "horizontal", "vertical"]], ["fond", ["bordeaux", "sienne"]]]);
+  assert.deepEqual(eventail.settings?.map((s) => [s.name, s.choices.map((c) => c.value)]), [["format", ["vertical", "horizontal", "auto"]], ["fond", ["bordeaux", "sienne"]]]);
   // The star: on its bordeaux ground, the square alone on its first image, a band more on each beat, all windows onto her
   // opening shot laid whole at its place, in black and white; no frame around it.
   const wide = (frame: number) => run(frame, { shots: shots(16 / 9), texts: marks });
@@ -2748,7 +2786,7 @@ test("« Éventail de bandes » (v2): horizontal 16:9 on black when her videos a
   assert.deepEqual(skillSettings(eventail, [{ name: "fond", value: "bordeaux" }]), {});
   const plan = skillPlan({ skill: eventail, name: "Éventail de bandes", files, fill: { shots: Array.from({ length: 13 }, (_, i) => ({ file: files[i % 12]!.id, at: 1 })), texts: { signature: "Brighton Pier" }, end: null, settings: { fond: "sienne" } } });
   assert.equal(plan.layers![0]!.motion.texts!.fond, "sienne");
-  assert.deepEqual(plan.skill, { key: "eventail", version: 2, settings: { fond: "sienne" } });
+  assert.deepEqual(plan.skill, { key: "eventail", version: 3, settings: { fond: "sienne" } });
   assert.equal(plan.music_shape?.pauses?.length, 7);
 });
 
@@ -2788,7 +2826,7 @@ const drawnDeep = (node: unknown): Drawn[] => drawnNodes(node).flatMap((n) => (n
 test("« Titre qui se décode » (v3) cuts and lands where its original does, on its own music (122 BPM), with its sounds and its music's shape", async () => {
   const { decode, decodeParts } = await import("./skills/decode.ts");
   const { objectsDrawn, drawsSubject, clearsDrawn, depthsDrawn } = await import("./subject.ts");
-  assert.equal(decode.version, 4);
+  assert.equal(decode.version, 5);
   assert.equal(decode.bpm, 122);
   const line = decode.timeline(16, { end: false });
   // The original's 22,64 s (679 images), its last image black.
@@ -2876,11 +2914,13 @@ test("« Titre qui se décode » (v3) cuts and lands where its original does, on
   assert.equal(decode.finish?.vignette, 0);
 });
 
-test("« Titre qui se décode » (v3): its bands, its fold, its title, its band and its montage, its ending by layers, in its 16:9 frame or full frame", async () => {
+test("« Titre qui se décode » (v5): its bands, its fold, its title, its band and its montage, its ending by layers, full frame or in its 16:9 frame", async () => {
   const { decode, decodeParts } = await import("./skills/decode.ts");
   const { skillPlan, skillFillInput, skillSettings } = await import("./skills.ts");
   const line = decode.timeline(16, { end: false });
-  const marks = Object.fromEntries(Object.entries(line.marks).map(([k, v]) => [k, String(v)]));
+  const plain = Object.fromEntries(Object.entries(line.marks).map(([k, v]) => [k, String(v)]));
+  // Drawn below « comme ses vidéos » (her words: « comme mes vidéos »), its 16:9 frame for her horizontal videos.
+  const marks: Record<string, string> = { ...plain, format: "auto" };
   const reelTexts = [
     { text: "un matin chez", role: "caption", from: 119, to: 398, emphasis: [] },
     { text: "Atelier Rose", role: "hook", from: 119, to: 398, emphasis: [] },
@@ -2890,7 +2930,9 @@ test("« Titre qui se décode » (v3): its bands, its fold, its title, its band 
   const frameOf = (tree: Drawn) => styleOf(drawnNodes(tree).find((n) => n.type === "div" && styleOf(n).overflow === "hidden" && styleOf(n).backgroundColor === "#000000")!);
   const footage = (tree: Drawn) => drawnNodes(tree).filter((n) => n.type === "Footage").map((n) => ({ shot: n.props.shot as number, at: n.props.at as number | undefined }));
   const subjects = (tree: Drawn) => drawnNodes(tree).filter((n) => n.type === "Subject").map((n) => n.props.shot as number);
-  // Her videos horizontal: its original's 16:9 frame (1080 × 608) at the middle, on black; vertical, or on her word, full frame.
+  // By default (Tristan, 6 November: « tout vertical please »), full frame whatever her videos.
+  assert.deepEqual([frameOf(draw(50, { texts: plain })).top, frameOf(draw(50, { texts: plain })).height], [0, 1920]);
+  // As her videos, horizontal: its original's 16:9 frame (1080 × 608) at the middle, on black; vertical, or on her word, full frame.
   assert.deepEqual([frameOf(draw(50)).top, frameOf(draw(50)).height], [656, 608]);
   assert.deepEqual([frameOf(draw(50, {}, 9 / 16)).top, frameOf(draw(50, {}, 9 / 16)).height], [0, 1920]);
   assert.equal(frameOf(draw(50, { texts: { ...marks, format: "vertical" } })).height, 1920);
@@ -2976,16 +3018,16 @@ test("« Titre qui se décode » (v3): its bands, its fold, its title, its band 
   assert.deepEqual(subjects(draw(570)), []);
   assert.deepEqual(footage(draw(625)), [{ shot: P, at: undefined }]);
   assert.deepEqual(footage(draw(640)), [{ shot: B1, at: 634 }]);
-  // The setting: the filler sees it (the original's first, the default), the plan keeps a choice her words asked for.
-  assert.deepEqual(decode.settings?.map((s) => [s.name, s.choices.map((c) => c.value)]), [["format", ["auto", "horizontal", "vertical"]]]);
-  assert.deepEqual(skillSettings(decode, [{ name: "format", value: "auto" }]), {});
+  // The setting: the filler sees it (vertical first, the default), the plan keeps a choice her words asked for.
+  assert.deepEqual(decode.settings?.map((s) => [s.name, s.choices.map((c) => c.value)]), [["format", ["vertical", "horizontal", "auto"]]]);
+  assert.deepEqual(skillSettings(decode, [{ name: "format", value: "vertical" }]), {});
   const files = Array.from({ length: 8 }, (_, i) => ({ id: `v${i}`, photo: false, seconds: 12 }));
-  const input = skillFillInput({ skill: decode, name: "Titre qui se décode", n: 16, files, business: {}, request: "en vertical" });
+  const input = skillFillInput({ skill: decode, name: "Titre qui se décode", n: 16, files, business: {}, request: "en horizontal" });
   assert.equal(input.reglages?.[0]?.nom, "format");
   assert.equal(input.cases.length, 16);
-  const plan = skillPlan({ skill: decode, name: "Titre qui se décode", files, fill: { shots: Array.from({ length: 16 }, (_, i) => ({ file: files[i % 8]!.id, at: 0 })), texts: { surtitre: "un matin chez", titre: "Atelier Rose" }, end: null, settings: { format: "vertical" } } });
-  assert.equal(plan.layers![0]!.motion.texts!.format, "vertical");
-  assert.deepEqual(plan.skill, { key: "decode", version: 4, settings: { format: "vertical" } });
+  const plan = skillPlan({ skill: decode, name: "Titre qui se décode", files, fill: { shots: Array.from({ length: 16 }, (_, i) => ({ file: files[i % 8]!.id, at: 0 })), texts: { surtitre: "un matin chez", titre: "Atelier Rose" }, end: null, settings: { format: "horizontal" } } });
+  assert.equal(plan.layers![0]!.motion.texts!.format, "horizontal");
+  assert.deepEqual(plan.skill, { key: "decode", version: 5, settings: { format: "horizontal" } });
   assert.ok(editPlanSchema.safeParse(plan).success);
   assert.equal(plan.sounds?.length, line.sounds!.length);
   const { readMusicShape } = await import("./music-shape.ts");
@@ -3008,7 +3050,7 @@ function cadreAt(code: string, frame: number, props: Record<string, unknown>, do
 test("« Cadre dans le cadre » (v2) cuts where its original does, an eighth note each on its own music (90 BPM), its music cut dead", async () => {
   const { cadre, frameBeats } = await import("./skills/cadre.ts");
   const { skillPlan } = await import("./skills.ts");
-  assert.equal(cadre.version, 2);
+  assert.equal(cadre.version, 3);
   assert.equal(cadre.bpm, 90);
   const line = cadre.timeline(18, { end: false });
   // The original's cuts (images at 30 i/s, docs/fiches/cadre.md): a picture every ten images, from its fifth cut one
@@ -3054,7 +3096,7 @@ test("« Cadre dans le cadre » (v2) cuts where its original does, an eighth not
   assert.equal(plan.sounds, undefined);
 });
 
-test("« Cadre dans le cadre » (v2): a notch larger at each cut, upright or lying as her pictures, all of it in 16:9 on her word", async () => {
+test("« Cadre dans le cadre » (v3): a notch larger at each cut, upright by default, lying as her pictures or all of it in 16:9 on her word", async () => {
   const { cadre } = await import("./skills/cadre.ts");
   const line = cadre.timeline(18, { end: false });
   const shots = (aspect: number) => line.shots.map((s, i) => ({ from: Math.round(s.start * 30), durationInFrames: Math.round((s.end - s.start) * 30), kind: i % 3 ? "video" : "photo", aspect }));
@@ -3093,14 +3135,17 @@ test("« Cadre dans le cadre » (v2): a notch larger at each cut, upright or lyi
   assert.deepEqual([opening[1]!.props.shot, opening[1]!.props.at], [0, undefined]);
   const later = read(draw(45, 9 / 16)).footage[1]!;
   assert.deepEqual([later.props.shot, later.props.at], [4, undefined]);
-  // Her pictures mostly in width (the Budapest bench): its frame lying (3:2), the same notches in width, the Reel full
-  // frame; upright again on her word.
+  // Her pictures mostly in width (the Budapest bench): its frame upright as the original's by default (Tristan, 6
+  // November: « tout vertical please »), a picture in width cropped on its subject; lying (3:2) as her pictures on her
+  // word (« comme mes images »), the same notches in width, the Reel full frame.
   for (const k of [0, 8, 16]) {
     const w = 162 + 54 * k;
-    const lying = read(draw(k * 10 + 2, 16 / 9));
-    assert.deepEqual([lying.frame!.width, lying.frame!.height, lying.box.height], [w, Math.round(w / 1.5), 1920]);
-    const upright = read(draw(k * 10 + 2, 16 / 9, { format: "vertical" })).frame!;
+    const upright = read(draw(k * 10 + 2, 16 / 9)).frame!;
     assert.deepEqual([upright.width, upright.height], [w, Math.round(w * 1.5)]);
+    const lying = read(draw(k * 10 + 2, 16 / 9, { format: "auto" }));
+    assert.deepEqual([lying.frame!.width, lying.frame!.height, lying.box.height], [w, Math.round(w / 1.5), 1920]);
+    const asked = read(draw(k * 10 + 2, 16 / 9, { format: "vertical" })).frame!;
+    assert.deepEqual([asked.width, asked.height], [w, Math.round(w * 1.5)]);
   }
   // All of it in 16:9 on black on her word: her wide shot whole, its frame lying, from 15 % to 95 % of that picture's height.
   for (const k of [0, 8, 16]) {
@@ -3133,7 +3178,7 @@ test("« Cadre dans le cadre » (v2): a notch larger at each cut, upright or lyi
   assert.ok(drawnIn(card.children[0] as Drawn).some((d) => style(d).background === "#000000" && Number(style(d).opacity) > 0.3));
 });
 
-test("« Cadre dans le cadre » (v2): its door named by the filler, its format a setting, nothing cut out, zoomed nor its original's", async () => {
+test("« Cadre dans le cadre » (v3): its door named by the filler, its format a setting, nothing cut out, zoomed nor its original's", async () => {
   const { cadre } = await import("./skills/cadre.ts");
   const { skillCode, skillFillInput, skillPlan, skillSettings } = await import("./skills.ts");
   const { clearsDrawn, drawsSubject, objectsDrawn } = await import("./subject.ts");
@@ -3147,9 +3192,10 @@ test("« Cadre dans le cadre » (v2): its door named by the filler, its format a
   const files = Array.from({ length: 12 }, (_, i) => ({ id: `v${i}`, photo: false, seconds: 12 }));
   const input = skillFillInput({ skill: cadre, name: "Cadre dans le cadre", n: 18, files, business: {}, request: "" });
   assert.deepEqual(input.objets, [{ slot: "porte", case: 1, cherche: cadre.objects![0]!.want }]);
-  // Its format: as her pictures by default (Tristan), the original's upright frame or all in 16:9 on her word.
-  assert.deepEqual(cadre.settings?.map((s) => [s.name, s.choices.map((c) => c.value)]), [["format", ["auto", "horizontal", "vertical"]]]);
-  assert.deepEqual(skillSettings(cadre, [{ name: "format", value: "auto" }]), {});
+  // Its format: the original's upright frame, full frame, by default (Tristan, 6 November: « tout vertical please »),
+  // all in 16:9 or as her pictures on her word.
+  assert.deepEqual(cadre.settings?.map((s) => [s.name, s.choices.map((c) => c.value)]), [["format", ["vertical", "horizontal", "auto"]]]);
+  assert.deepEqual(skillSettings(cadre, [{ name: "format", value: "vertical" }]), {});
   assert.equal(input.reglages?.[0]?.nom, "format");
   const plan = skillPlan({
     skill: cadre,
@@ -3158,7 +3204,7 @@ test("« Cadre dans le cadre » (v2): its door named by the filler, its format a
     fill: { shots: Array.from({ length: 18 }, (_, i) => ({ file: files[i % 12]!.id, at: Math.floor(i / 12) * 4 })), texts: { gauche: "Travaux en cours", droite: "Párisi Udvar" }, end: null, settings: { format: "horizontal" } },
   });
   assert.equal(plan.layers![0]!.motion.texts!.format, "horizontal");
-  assert.deepEqual(plan.skill, { key: "cadre", version: 2, settings: { format: "horizontal" } });
+  assert.deepEqual(plan.skill, { key: "cadre", version: 3, settings: { format: "horizontal" } });
   // Its notches are cuts, never a zoom; no grain nor dark corners; none of its original's words.
   assert.doesNotMatch(cadre.code, /\btransform\b|\bscale\(/);
   assert.deepEqual(cadre.finish, { grain: 0, vignette: 0 });
@@ -3404,7 +3450,7 @@ const TD_FIRST_BEAT = 2.1;
 test("« Titre derrière le décor » (v2) cuts where its original does, on its own music (82,9 BPM), stopped one beat a bar", async () => {
   const { titreDerriere } = await import("./skills/titre-derriere.ts");
   const { skillPlan } = await import("./skills.ts");
-  assert.equal(titreDerriere.version, 2);
+  assert.equal(titreDerriere.version, 3);
   assert.equal(titreDerriere.bpm, 82.9);
   const line = titreDerriere.timeline(23, { end: false });
   // Its 23 shots, each cut within two images of the original's, counted from their music's first beat (the original
@@ -3498,7 +3544,8 @@ test("« Titre derrière le décor » (v2): its scenery named by the filler pass
     { text: "un samedi à", role: "caption", from: line.marks.hit, to: cut, emphasis: [] },
     { text: "Brighton", role: "hook", from: line.marks.hit! - 2, to: cut, emphasis: [] },
   ];
-  const marks = Object.fromEntries(Object.entries(line.marks).map(([k, v]) => [k, String(v)]));
+  // In its original's 4:3 frame on black, on her word (its default is the full frame).
+  const marks: Record<string, string> = { ...Object.fromEntries(Object.entries(line.marks).map(([k, v]) => [k, String(v)])), format: "horizontal" };
   const props = { width: 1080, height: 1920, durationInFrames: Math.round(line.duration * 30), brand: { name: "Brighton Pier", displayFont: "Archivo Black", bodyFont: "Caveat" }, shots, reelTexts, end: null, texts: marks };
   // The rooftops' top at 300 px of its 4:3 frame (1080 × 810): its foot half a capital under it.
   const read = { boxes: { "0#rooftops": { x: 100, y: 250, w: 800, h: 400 } }, parts: { "0#rooftops": [500, 100, 300, 700, 900].map((x) => ({ x, y: 260, w: 90, h: 300 })) } };
@@ -3597,7 +3644,7 @@ test("« Titre derrière le décor » (v2): its sign blinks, the wall's big thin
   assert.deepEqual([0, 1, 2, 3].map((d) => plainWall(shots[9]!.from + d)), [true, true, true, false]);
 });
 
-test("« Titre derrière le décor » (v2): horizontal 4:3 on black as its original when her files are, full frame otherwise or on her word", async () => {
+test("« Titre derrière le décor » (v3): full frame by default, horizontal 4:3 on black as its original on her word or as her files", async () => {
   const { titreDerriere } = await import("./skills/titre-derriere.ts");
   const { skillPlan, skillFillInput, skillSettings } = await import("./skills.ts");
   const line = titreDerriere.timeline(23, { end: false });
@@ -3612,31 +3659,34 @@ test("« Titre derrière le décor » (v2): horizontal 4:3 on black as its origi
   };
   const wide = [16 / 9];
   const tall = [9 / 16];
-  // Her files mostly horizontal: the original's 4:3 picture (1080 × 810) at the middle of the frame, on black.
-  assert.deepEqual(frameOf(draw(wide, 120)), { top: 555, height: 810 });
-  assert.deepEqual(frameOf(draw([16 / 9, 16 / 9, 9 / 16], 120)), { top: 555, height: 810 });
-  // Mostly vertical: full frame; on her word, the other format.
+  // By default (Tristan, 6 November: « tout vertical please »), full frame whatever her files.
+  assert.deepEqual(frameOf(draw(wide, 120)), { top: 0, height: 1920 });
   assert.deepEqual(frameOf(draw(tall, 120)), { top: 0, height: 1920 });
-  assert.equal(frameOf(draw(wide, 120, { format: "vertical" })).height, 1920);
+  // On her word, the original's 4:3 picture (1080 × 810) at the middle of the frame, on black.
+  assert.deepEqual(frameOf(draw(wide, 120, { format: "horizontal" })), { top: 555, height: 810 });
   assert.equal(frameOf(draw(tall, 120, { format: "horizontal" })).top, 555);
+  // As her files: mostly horizontal, its 4:3 picture; mostly vertical, full frame.
+  assert.deepEqual(frameOf(draw([16 / 9, 16 / 9, 9 / 16], 120, { format: "auto" })), { top: 555, height: 810 });
+  assert.deepEqual(frameOf(draw(tall, 120, { format: "auto" })), { top: 0, height: 1920 });
+  assert.equal(frameOf(draw(wide, 120, { format: "vertical" })).height, 1920);
   // Its title across its width, in its upper half, its glyphs above the apps' buttons in both formats.
-  for (const aspects of [wide, tall]) {
-    const tree = draw(aspects, 40);
+  for (const [aspects, extra] of [[wide, { format: "horizontal" }], [wide, {}], [tall, {}]] as const) {
+    const tree = draw(aspects, 40, extra);
     const { top } = frameOf(tree);
     const fit = drawnNodes(tree).find((n) => n.type === "FitText")!.props.style as { left: number; top: number; width: number; height: number };
     assert.ok(Math.abs(fit.left + fit.width / 2 - 540) <= 1 && fit.left >= 40, JSON.stringify(fit));
     assert.ok(Number(top) + fit.top + fit.height < 940, JSON.stringify(fit));
   }
-  // The setting: the filler sees it (the original's first, the default), the plan keeps a choice her words asked for.
-  assert.deepEqual(titreDerriere.settings?.map((s) => [s.name, s.choices.map((c) => c.value)]), [["format", ["auto", "horizontal", "vertical"]]]);
-  assert.deepEqual(skillSettings(titreDerriere, [{ name: "format", value: "auto" }]), {});
+  // The setting: the filler sees it (vertical first, the default), the plan keeps a choice her words asked for.
+  assert.deepEqual(titreDerriere.settings?.map((s) => [s.name, s.choices.map((c) => c.value)]), [["format", ["vertical", "horizontal", "auto"]]]);
+  assert.deepEqual(skillSettings(titreDerriere, [{ name: "format", value: "vertical" }]), {});
   const files = Array.from({ length: 12 }, (_, i) => ({ id: `v${i}`, photo: false, seconds: 12 }));
-  const input = skillFillInput({ skill: titreDerriere, name: "Titre derrière le décor", n: 23, files, business: {}, request: "en vertical" });
+  const input = skillFillInput({ skill: titreDerriere, name: "Titre derrière le décor", n: 23, files, business: {}, request: "en horizontal" });
   assert.equal(input.reglages?.[0]?.nom, "format");
   assert.deepEqual(input.objets?.map((o) => [o.slot, o.case]), [["decor", 1], ["morceaux", 6], ["enseigne", 8], ["cadres", 10]]);
-  const plan = skillPlan({ skill: titreDerriere, name: "Titre derrière le décor", files, fill: { shots: Array.from({ length: 23 }, (_, i) => ({ file: files[i % 12]!.id, at: 1 })), texts: { surtitre: "un samedi à", titre: "Brighton" }, end: null, settings: { format: "vertical" } } });
-  assert.equal(plan.layers![0]!.motion.texts!.format, "vertical");
-  assert.deepEqual(plan.skill, { key: "titre-derriere", version: 2, settings: { format: "vertical" } });
+  const plan = skillPlan({ skill: titreDerriere, name: "Titre derrière le décor", files, fill: { shots: Array.from({ length: 23 }, (_, i) => ({ file: files[i % 12]!.id, at: 1 })), texts: { surtitre: "un samedi à", titre: "Brighton" }, end: null, settings: { format: "horizontal" } } });
+  assert.equal(plan.layers![0]!.motion.texts!.format, "horizontal");
+  assert.deepEqual(plan.skill, { key: "titre-derriere", version: 3, settings: { format: "horizontal" } });
 });
 
 // ——— « Ville en coups de fouet » v2, written again on its original's fiche (docs/fiches/coups-de-fouet.md) ——————————
@@ -3661,7 +3711,7 @@ test("« Ville en coups de fouet » (v2) cuts where its original does, on its ow
   const { coupsDeFouet, fouetRoles } = await import("./skills/coups-de-fouet.ts");
   const { skillPlan } = await import("./skills.ts");
   const { clearsDrawn, objectsDrawn, drawsSubject } = await import("./subject.ts");
-  assert.equal(coupsDeFouet.version, 3);
+  assert.equal(coupsDeFouet.version, 4);
   assert.equal(coupsDeFouet.bpm, 84);
   assert.deepEqual(coupsDeFouet.shots, [12, 23]);
   // The original's 23 shots, cut on its images 20, 55 … 595 (measured image by image at 30 i/s; a whip flash's cut on its
@@ -3778,7 +3828,7 @@ test("« Ville en coups de fouet » (v2): its whip flashes made of her sky, its 
   assert.ok(!drawnNodes(draw(durationInFrames - 10)).some((n) => n.type === "FitText"));
 });
 
-test("« Ville en coups de fouet » (v2): horizontal 4:3 on black as its original when her files are, full frame otherwise or on her word", async () => {
+test("« Ville en coups de fouet » (v4): full frame by default, horizontal 4:3 on black as its original on her word or as her files", async () => {
   const { coupsDeFouet } = await import("./skills/coups-de-fouet.ts");
   const { skillPlan, skillFillInput, skillSettings } = await import("./skills.ts");
   const reelTexts = [{ text: "Belleville", role: "hook", from: 20, to: 54, emphasis: [] }];
@@ -3790,34 +3840,36 @@ test("« Ville en coups de fouet » (v2): horizontal 4:3 on black as its origina
     const name = drawnNodes(box).find((n) => n.type === "FitText")!;
     return { top: styleOf(box).top, height: styleOf(box).height, name: name.props.style as { left: number; top: number; width: number; height: number } };
   };
-  // Her files mostly horizontal: the original's 4:3 picture (1080 × 810) at the middle of the frame, on black; mostly
-  // vertical (half and half too): full frame.
-  const wide = await frameOf(16 / 9);
-  assert.deepEqual([wide.top, wide.height], [555, 810]);
-  assert.equal((await frameOf(16 / 9, undefined, 12)).height, 810);
+  // By default (Tristan, 6 November: « tout vertical please »), full frame whatever her files.
+  assert.deepEqual(await frameOf(16 / 9).then((f) => [f.top, f.height]), [0, 1920]);
   assert.equal((await frameOf(9 / 16)).height, 1920);
-  assert.equal((await frameOf(16 / 9, undefined, 11)).height, 1920);
-  // On her word, the other format.
-  assert.equal((await frameOf(16 / 9, "vertical")).height, 1920);
+  // On her word, the original's 4:3 picture (1080 × 810) at the middle of the frame, on black.
+  const wide = await frameOf(16 / 9, "horizontal");
+  assert.deepEqual([wide.top, wide.height], [555, 810]);
   assert.equal((await frameOf(9 / 16, "horizontal")).top, 555);
+  // As her files: mostly horizontal, its 4:3 picture; mostly vertical (half and half too), full frame.
+  assert.equal((await frameOf(16 / 9, "auto", 12)).height, 810);
+  assert.equal((await frameOf(9 / 16, "auto")).height, 1920);
+  assert.equal((await frameOf(16 / 9, "auto", 11)).height, 1920);
+  assert.equal((await frameOf(16 / 9, "vertical")).height, 1920);
   // Her name at the middle of its picture when her sky has no room (the clear area's fallback), above the middle in the
   // vertical frame, in the safe zone and left of the apps' buttons, 800 px wide at most.
-  for (const f of [wide, await frameOf(9 / 16)]) {
+  for (const f of [wide, await frameOf(16 / 9), await frameOf(9 / 16)]) {
     const n = f.name;
     assert.ok(Math.abs(n.left + n.width / 2 - 540) <= 1 && n.left >= 140 && n.left + n.width <= 940, JSON.stringify(n));
     const middle = Number(f.top) + n.top + n.height / 2;
     assert.ok(middle >= 600 && middle <= 960, `${middle}`);
   }
-  // The setting: the filler sees it (the original's first, the default), the plan keeps a choice her words asked for.
-  assert.deepEqual(coupsDeFouet.settings?.map((s) => [s.name, s.choices.map((c) => c.value)]), [["format", ["auto", "horizontal", "vertical"]]]);
-  assert.deepEqual(skillSettings(coupsDeFouet, [{ name: "format", value: "auto" }]), {});
+  // The setting: the filler sees it (vertical first, the default), the plan keeps a choice her words asked for.
+  assert.deepEqual(coupsDeFouet.settings?.map((s) => [s.name, s.choices.map((c) => c.value)]), [["format", ["vertical", "horizontal", "auto"]]]);
+  assert.deepEqual(skillSettings(coupsDeFouet, [{ name: "format", value: "vertical" }]), {});
   const files = Array.from({ length: 8 }, (_, i) => ({ id: `v${i}`, photo: false, seconds: 20 }));
-  const input = skillFillInput({ skill: coupsDeFouet, name: "Ville en coups de fouet", n: 23, files, business: {}, request: "en vertical" });
+  const input = skillFillInput({ skill: coupsDeFouet, name: "Ville en coups de fouet", n: 23, files, business: {}, request: "en horizontal" });
   assert.equal(input.reglages?.[0]?.nom, "format");
   assert.equal(input.cases.length, 23);
-  const plan = skillPlan({ skill: coupsDeFouet, name: "Ville en coups de fouet", files, fill: { shots: Array.from({ length: 23 }, (_, i) => ({ file: files[i % 8]!.id, at: Math.floor(i / 8) * 6 })), texts: { titre: "Belleville" }, end: null, settings: { format: "vertical" } } });
-  assert.equal(plan.layers![0]!.motion.texts!.format, "vertical");
-  assert.deepEqual(plan.skill, { key: "coups-de-fouet", version: 3, settings: { format: "vertical" } });
+  const plan = skillPlan({ skill: coupsDeFouet, name: "Ville en coups de fouet", files, fill: { shots: Array.from({ length: 23 }, (_, i) => ({ file: files[i % 8]!.id, at: Math.floor(i / 8) * 6 })), texts: { titre: "Belleville" }, end: null, settings: { format: "horizontal" } } });
+  assert.equal(plan.layers![0]!.motion.texts!.format, "horizontal");
+  assert.deepEqual(plan.skill, { key: "coups-de-fouet", version: 4, settings: { format: "horizontal" } });
 });
 
 // ——— « Quart de tour, deux tons » v2 (`tourne`), written again on its original's fiche (docs/fiches/tourne.md) ——————
@@ -4002,7 +4054,7 @@ test("« Écran partagé titré » (v3) cuts where its original does, its two ha
   const { ecranPartage } = await import("./skills/ecran-partage.ts");
   const { skillFit } = await import("./skills.ts");
   const { clearsDrawn, objectsDrawn, subjectsDrawn } = await import("./subject.ts");
-  assert.equal(ecranPartage.version, 3);
+  assert.equal(ecranPartage.version, 4);
   assert.equal(ecranPartage.bpm, 120);
   const line = ecranPartage.timeline(10, { end: false });
   // Its five pairs, two shots each (the person at work, what it gives), cutting together where the original's do, on its
@@ -4051,7 +4103,7 @@ test("« Écran partagé titré » (v3) cuts where its original does, its two ha
   assert.deepEqual(ecranPartage.finish, { grain: 0, vignette: 0 });
 });
 
-test("« Écran partagé titré » (v3): the original's card for vertical files, one half above the other for horizontal ones, each half at its own speed", async () => {
+test("« Écran partagé titré » (v4): over the whole screen, side by side for vertical files, one above the other for horizontal ones, the card on her word, each half at its own speed", async () => {
   const { ecranPartage } = await import("./skills/ecran-partage.ts");
   const line = ecranPartage.timeline(10, { end: false });
   const shotsOf = (aspects: number[], kinds: string[] = []) =>
@@ -4072,20 +4124,27 @@ test("« Écran partagé titré » (v3): the original's card for vertical files,
   };
   const tall = [9 / 16];
   const wide = [16 / 9];
-  // Her files mostly vertical: the original's 4:3 card at the middle of the screen (1080 × 810), on black, its margins
-  // and rounded corners as the original's, its two 2:3 halves side by side, touching.
-  const card = cardOf(draw(tall, 30));
-  assert.deepEqual(card.card, [10, 570, 1060, 783]);
-  assert.equal(card.radius, 30);
-  assert.deepEqual(card.halves, [[0, 0, 530, 783], [530, 0, 530, 783]]);
-  // Mostly horizontal: the card over the whole screen, one half above the other (9:8): a 16:9 video keeps most of its width.
+  /** The original's card, on her word. */
+  const asCard = { texts: { solo: "-1", format: "carte" } };
+  // By default (Tristan, 6 November: « tout vertical please »), the whole screen as her files: mostly vertical (half and
+  // half too), its two halves side by side, tall and narrow (9:32), its margins and rounded corners as the original's.
+  const full = cardOf(draw(tall, 30));
+  assert.deepEqual(full.card, [10, 35, 1060, 1856]);
+  assert.equal(full.radius, 30);
+  assert.deepEqual(full.halves, [[0, 0, 530, 1856], [530, 0, 530, 1856]]);
+  assert.deepEqual(cardOf(draw([16 / 9, 9 / 16], 30)).halves, [[0, 0, 530, 1856], [530, 0, 530, 1856]]);
+  // Mostly horizontal: one half above the other (9:8): a 16:9 video keeps most of its width.
   const stacked = cardOf(draw(wide, 30));
   assert.deepEqual(stacked.card, [10, 35, 1060, 1856]);
   assert.deepEqual(stacked.halves, [[0, 0, 1060, 928], [0, 928, 1060, 928]]);
-  assert.equal(cardOf(draw([16 / 9, 9 / 16], 30)).card[1], 570);
-  // On her word, another layout: the card whatever her files, side by side over the whole screen, one above the other.
-  assert.deepEqual(cardOf(draw(wide, 30, { texts: { solo: "-1", format: "carte" } })).card, [10, 570, 1060, 783]);
-  assert.deepEqual(cardOf(draw(tall, 30, { texts: { solo: "-1", format: "plein-ecran" } })).halves, [[0, 0, 530, 1856], [530, 0, 530, 1856]]);
+  // On her word, the original's 4:3 card at the middle of the screen (1080 × 810), on black, its two 2:3 halves side by
+  // side, touching, whatever her files; or side by side over the whole screen, one above the other.
+  const card = cardOf(draw(tall, 30, asCard));
+  assert.deepEqual(card.card, [10, 570, 1060, 783]);
+  assert.equal(card.radius, 30);
+  assert.deepEqual(card.halves, [[0, 0, 530, 783], [530, 0, 530, 783]]);
+  assert.deepEqual(cardOf(draw(wide, 30, asCard)).card, [10, 570, 1060, 783]);
+  assert.deepEqual(cardOf(draw(wide, 30, { texts: { solo: "-1", format: "plein-ecran" } })).halves, [[0, 0, 530, 1856], [530, 0, 530, 1856]]);
   assert.deepEqual(cardOf(draw(tall, 30, { texts: { solo: "-1", format: "empile" } })).halves, [[0, 0, 1060, 928], [0, 928, 1060, 928]]);
   // Both halves of a pair laid on the same moment (the second pair: its shots 3 and 4, both from image 68 to 173), each
   // its own passage at its own speed, as the original's: laid once, played from its own first image (no `at`, no blend
@@ -4105,7 +4164,7 @@ test("« Écran partagé titré » (v3): the original's card for vertical files,
   const nine = ecranPartage.timeline(9, { end: false });
   const oddShots = nine.shots.map((s, i) => ({ src: `/v${i}.mp4`, aspect: 9 / 16, from: Math.round(s.start * 30), durationInFrames: Math.round((s.end - s.start) * 30), kind: "video", segment: i }));
   const solo = oddShots[4]!;
-  const oddDraw = (list: typeof oddShots) => drawScene(ecranPartage.code, solo.from + 10, { width: 1080, height: 1920, durationInFrames: 341, brand, shots: list, reelTexts, end: null, texts: { solo: "4" } });
+  const oddDraw = (list: typeof oddShots) => drawScene(ecranPartage.code, solo.from + 10, { width: 1080, height: 1920, durationInFrames: 341, brand, shots: list, reelTexts, end: null, texts: { solo: "4", format: "carte" } });
   const alone = cardOf(oddDraw(oddShots));
   assert.deepEqual(alone.footage.map((list) => list.map((p) => p.shot)), [[4], [4]]);
   assert.equal(alone.footage[0]![0]!.at, undefined);
@@ -4125,7 +4184,11 @@ test("« Écran partagé titré » (v3): the original's card for vertical files,
     drawnNodes(tree)
       .filter((n) => n.type === "FitText")
       .map((n) => ({ box: n.props.style as { left: number; top: number; width: number; height: number }, size: (n.props.innerStyle as { fontSize: number }).fontSize, text: heldText(n).replace(/\s+/g, " ").trim() }));
-  const side = titles(draw(tall, 30));
+  // Side by side over the whole screen: in the safe zone, left of the apps' buttons, at one height.
+  const tallTitles = titles(draw(tall, 30));
+  assert.deepEqual(tallTitles.map((t) => t.text), ["Les fleuristes", "Les fleurs"]);
+  assert.ok(tallTitles.every((t) => t.box.top + t.box.height <= 1440 && t.box.left >= 40 && t.box.left + t.box.width <= 940) && tallTitles[0]!.box.top === tallTitles[1]!.box.top, JSON.stringify(tallTitles));
+  const side = titles(draw(tall, 30, asCard));
   assert.deepEqual(side.map((t) => [t.text, t.size]), [["Les fleuristes", 50], ["Les fleurs", 50]]);
   for (const t of side) assert.ok(Math.abs(t.box.top + t.box.height / 2 - (570 + 0.54 * 783)) <= 1, JSON.stringify(t.box));
   const [left, right] = side as [(typeof side)[number], (typeof side)[number]];
@@ -4134,13 +4197,13 @@ test("« Écran partagé titré » (v3): the original's card for vertical files,
   assert.ok(right.box.left >= 560 && right.box.left + right.box.width <= 930, JSON.stringify(right.box));
   assert.ok(Math.abs(right.box.left + right.box.width / 2 - 810) <= 2 || right.box.left + right.box.width === 930, JSON.stringify(right.box));
   assert.ok(Math.abs(right.box.left + right.box.width / 2 - 810) <= 10, JSON.stringify(right.box));
-  assert.deepEqual(titles(draw(tall, 360)).map((t) => t.box), side.map((t) => t.box));
+  assert.deepEqual(titles(draw(tall, 360, asCard)).map((t) => t.box), side.map((t) => t.box));
   const above = titles(draw(wide, 30));
   assert.ok(above.every((t) => Math.abs(t.box.left + t.box.width / 2 - 540) <= 1), JSON.stringify(above));
   const [upper, lower] = above.map((t) => t.box.top + t.box.height / 2) as [number, number];
   assert.ok(Math.abs(963 - upper - (lower - 963)) <= 25 && upper > 480 && above[1]!.box.top + above[1]!.box.height <= 1440, `${upper}, ${lower}`);
   // A long title goes on two lines rather than shrinking, never past the buttons.
-  const long = titles(draw(tall, 30, { reelTexts: [reelTexts[0], { text: "les bouquets du jour", role: "caption", from: 0, to: 383, emphasis: [] }] }))[1]!;
+  const long = titles(draw(tall, 30, { ...asCard, reelTexts: [reelTexts[0], { text: "les bouquets du jour", role: "caption", from: 0, to: 383, emphasis: [] }] }))[1]!;
   assert.ok(long.box.left + long.box.width <= 930 && long.box.height >= 2 * 50 * 1.15, JSON.stringify(long.box));
   // Its ending card when she has one: the last pair darkened under its title, its small titles gone.
   const ending = draw(tall, 370, { end: { title: "Ouvert dimanche", subtitle: "Atelier Rose", from: 335 } });
@@ -4152,8 +4215,10 @@ test("« Écran partagé titré » (v3): the original's card for vertical files,
 test("« Écran partagé titré » (v3): its layout as a setting her words ask, and the filler sees which of her files is wide", async () => {
   const { ecranPartage } = await import("./skills/ecran-partage.ts");
   const { skillPlan, skillFillInput, skillSettings, fileFormat } = await import("./skills.ts");
-  // The setting: the filler sees it (its default first: as her files), the plan keeps a choice her words asked for.
+  // The setting: the filler sees it (its default first: the whole screen as her files; the original's card its band, on
+  // her word), the plan keeps a choice her words asked for.
   assert.deepEqual(ecranPartage.settings?.map((s) => [s.name, s.choices.map((c) => c.value)]), [["format", ["auto", "carte", "plein-ecran", "empile"]]]);
+  assert.equal(ecranPartage.settings?.[0]?.choices.find((c) => c.band)?.value, "carte");
   assert.deepEqual(skillSettings(ecranPartage, [{ name: "format", value: "auto" }]), {});
   // Each file's shape, in the filler's words: a horizontal video in a tall half keeps only its middle.
   assert.deepEqual([16 / 9, 9 / 16, 1, 4 / 3, 3 / 4, undefined, 0].map(fileFormat), ["horizontale", "verticale", "carrée", "horizontale", "verticale", undefined, undefined]);
@@ -4175,7 +4240,7 @@ test("« Écran partagé titré » (v3): its layout as a setting her words ask, 
   assert.ok(editPlanSchema.safeParse(plan).success);
   assert.equal(plan.layers![0]!.motion.texts!.format, "empile");
   assert.equal(plan.layers![0]!.motion.texts!.solo, "-1");
-  assert.deepEqual(plan.skill, { key: "ecran-partage", version: 3, settings: { format: "empile" } });
+  assert.deepEqual(plan.skill, { key: "ecran-partage", version: 4, settings: { format: "empile" } });
   // Its music shaped on the plan: without its bass to the third bar, cut dead at the end.
   assert.deepEqual(plan.music_shape, { filters: [{ kind: "thin", from: 0, to: 4, open: 0.02 }], end: { at: plan.duration, fade: 0.012 } });
   // Each second half is laid beside its first on the plan (its moment kept), and the filler is told which slot it plays
@@ -4582,7 +4647,7 @@ const FACADE_READ = {
 test("« Façade qui se construit » (v2) lays its pieces on its original's images and notes, the rest on its music's first beats (120 BPM)", async () => {
   const { facade } = await import("./skills/facade.ts");
   const { skillPlan, skillFit } = await import("./skills.ts");
-  assert.equal(facade.version, 2);
+  assert.equal(facade.version, 3);
   assert.equal(facade.bpm, 120);
   assert.deepEqual(facade.shots, [1, 3]);
   const line = facade.timeline(1, { end: false });
@@ -4698,7 +4763,7 @@ test("« Façade qui se construit » (v2): her front's own elements, named by th
   assert.doesNotMatch(facade.code, /scale\(|transform/);
 });
 
-test("« Façade qui se construit » (v2): vertical as its original, her horizontal front whole in a band on the black, her name on a piece of it", async () => {
+test("« Façade qui se construit » (v3): vertical as its original, her horizontal front whole in a band on the black on her word, her name on a piece of it", async () => {
   const { facade } = await import("./skills/facade.ts");
   const { skillPlan, skillFillInput, skillSettings } = await import("./skills.ts");
   const code = await facadeNamed();
@@ -4714,19 +4779,23 @@ test("« Façade qui se construit » (v2): vertical as its original, her horizon
   // Her front upright: the whole vertical frame, as the original.
   assert.deepEqual(frameOf(await draw(9 / 16, 100)), [0, 1920]);
   assert.deepEqual(front(await draw(9 / 16, 100)), { left: 0, top: 0, width: 1080, height: 1920 });
-  // In width: its whole picture across the middle of the black, at its own shape (16:9, 4:3), never zoomed to fill.
-  assert.deepEqual(frameOf(await draw(16 / 9, 100)), [656, 608]);
-  assert.deepEqual(front(await draw(16 / 9, 100)), { left: 0, top: 0, width: 1080, height: 608 });
-  assert.deepEqual(frameOf(await draw(4 / 3, 100)), [555, 810]);
-  // On her word, vertical full frame from her front in width: its whole picture at the frame's height, the part around her
-  // sign shown (else around its subject); or a 16:9 band from an upright front.
+  // In width, by default (Tristan, 6 November: « tout vertical please »): vertical full frame, its whole picture at the
+  // frame's height, the part around her sign shown (else around its subject).
   const sign = { boxes: { "0#shop sign": { x: 2200, y: 700, w: 600, h: 150 } } };
-  assert.deepEqual(frameOf(await draw(16 / 9, 100, { format: "vertical" }, sign)), [0, 1920]);
+  assert.deepEqual(frameOf(await draw(16 / 9, 100, undefined, sign)), [0, 1920]);
+  assert.deepEqual(front(await draw(16 / 9, 100, undefined, sign)), { left: -1960, top: 0, width: 3413, height: 1920 });
+  assert.deepEqual(front(await draw(16 / 9, 100)), { left: -1167, top: 0, width: 3413, height: 1920 });
   assert.deepEqual(front(await draw(16 / 9, 100, { format: "vertical" }, sign)), { left: -1960, top: 0, width: 3413, height: 1920 });
-  assert.deepEqual(front(await draw(16 / 9, 100, { format: "vertical" })), { left: -1167, top: 0, width: 3413, height: 1920 });
+  // On her word (or as her front, « comme ma vidéo »): its whole picture across the middle of the black, at its own shape
+  // (16:9, 4:3), never zoomed to fill; a 16:9 band from an upright front too.
+  assert.deepEqual(frameOf(await draw(16 / 9, 100, { format: "horizontal" })), [656, 608]);
+  assert.deepEqual(front(await draw(16 / 9, 100, { format: "horizontal" })), { left: 0, top: 0, width: 1080, height: 608 });
+  assert.deepEqual(frameOf(await draw(16 / 9, 100, { format: "auto" })), [656, 608]);
+  assert.deepEqual(frameOf(await draw(4 / 3, 100, { format: "auto" })), [555, 810]);
+  assert.deepEqual(frameOf(await draw(9 / 16, 100, { format: "auto" })), [0, 1920]);
   assert.deepEqual(frameOf(await draw(9 / 16, 100, { format: "horizontal" })), [656, 608]);
   // Her other files after it in the same frame, as filmed.
-  assert.deepEqual(styleOf(drawnNodes(await draw(16 / 9, 280)).find((n) => n.type === "Footage")!), { left: 0, top: 0, width: 1080, height: 608 });
+  assert.deepEqual(styleOf(drawnNodes(await draw(16 / 9, 280, { format: "horizontal" })).find((n) => n.type === "Footage")!), { left: 0, top: 0, width: 1080, height: 608 });
   // Her optional name and its line on a piece of the black while her front builds, gone with the last piece: over the band
   // on the black; full frame where it hides the fewest of its first pieces. Nothing is ever written on her whole front.
   const reelTexts = [
@@ -4734,7 +4803,8 @@ test("« Façade qui se construit » (v2): vertical as its original, her horizon
     { text: "librairie · londres", role: "caption", from: 25, to: 194, emphasis: [] },
   ];
   const label = (tree: Drawn) => drawnNodes(tree).find((n) => n.type === "div" && styleOf(n).backgroundColor === "#000000" && drawnNodes(n.children).some((m) => m.type === "FitText"));
-  const named = (aspect: number, f: number, read: Parameters<typeof drawCutOuts>[3] = {}) => draw(aspect, f, undefined, read, { reelTexts });
+  // (Her front in width laid in its band, on her word: « comme ma vidéo ».)
+  const named = (aspect: number, f: number, read: Parameters<typeof drawCutOuts>[3] = {}) => draw(aspect, f, { format: "auto" }, read, { reelTexts });
   const box = (n: Drawn) => [styleOf(n).left, styleOf(n).top, styleOf(n).width, styleOf(n).height].map(Number);
   const inBand = label(await named(16 / 9, 60))!;
   assert.deepEqual(box(inBand), [114, 190, 852, 276]);
@@ -4755,16 +4825,16 @@ test("« Façade qui se construit » (v2): vertical as its original, her horizon
   const card = drawCutOuts(code, 400, { ...props, end: { title: "Ouvert dimanche", subtitle: "Brick Lane", from: 395 } });
   assert.equal(drawnNodes(card).filter((n) => n.type === "Footage").length, 0);
   assert.deepEqual(drawnNodes(card).filter((n) => n.type === "FitText").map((n) => heldText(n).trim()), ["Ouvert dimanche", "Brick Lane"]);
-  // The setting: the filler sees it (the default first: as her front), the plan keeps a choice her words asked for.
-  assert.deepEqual(facade.settings?.map((s) => [s.name, s.choices.map((c) => c.value)]), [["format", ["auto", "horizontal", "vertical"]]]);
-  assert.deepEqual(skillSettings(facade, [{ name: "format", value: "auto" }]), {});
+  // The setting: the filler sees it (the default first: vertical), the plan keeps a choice her words asked for.
+  assert.deepEqual(facade.settings?.map((s) => [s.name, s.choices.map((c) => c.value)]), [["format", ["vertical", "horizontal", "auto"]]]);
+  assert.deepEqual(skillSettings(facade, [{ name: "format", value: "vertical" }]), {});
   const files = [{ id: "front", photo: false, seconds: 15, aspect: 16 / 9 }, { id: "inside", photo: false, seconds: 12 }];
-  const input = skillFillInput({ skill: facade, name: "Façade qui se construit", n: 2, files, business: {}, request: "en vertical" });
+  const input = skillFillInput({ skill: facade, name: "Façade qui se construit", n: 2, files, business: {}, request: "garde ma devanture entière" });
   assert.equal(input.reglages?.[0]?.nom, "format");
   assert.deepEqual(input.objets?.map((o) => [o.slot, o.case]), [["morceaux", 1], ["enseigne", 1]]);
-  const plan = skillPlan({ skill: facade, name: "Façade qui se construit", files, fill: { shots: [{ file: "front", at: 0 }, { file: "inside", at: 1 }], texts: {}, end: null, settings: { format: "vertical" } } });
-  assert.equal(plan.layers![0]!.motion.texts!.format, "vertical");
-  assert.deepEqual(plan.skill, { key: "facade", version: 2, settings: { format: "vertical" } });
+  const plan = skillPlan({ skill: facade, name: "Façade qui se construit", files, fill: { shots: [{ file: "front", at: 0 }, { file: "inside", at: 1 }], texts: {}, end: null, settings: { format: "horizontal" } } });
+  assert.equal(plan.layers![0]!.motion.texts!.format, "horizontal");
+  assert.deepEqual(plan.skill, { key: "facade", version: 3, settings: { format: "horizontal" } });
 });
 
 // ——— « Coulisses façon fiche » v2, written again on its original's fiche (docs/fiches/coulisses.md) ——————————————————
@@ -5016,7 +5086,7 @@ const pixelPoses = (node: Drawn) =>
 test("« Recette cosy, typo pixel » (v2) cuts where its original does, gesture by gesture, on its own music (100 BPM)", async () => {
   const { pixel, pixelSections, pixelRest } = await import("./skills/pixel.ts");
   const { skillPlan } = await import("./skills.ts");
-  assert.equal(pixel.version, 2);
+  assert.equal(pixel.version, 3);
   assert.equal(pixel.bpm, 100);
   const line = pixel.timeline(26, { end: false });
   // The original's 26 pieces (images at 30 i/s, docs/fiches/pixel.md: 15 of its 25 cuts in the same frame, a gesture
@@ -5133,7 +5203,7 @@ test("« Recette cosy, typo pixel » (v2): its title in pixels at once on image 
   assert.doesNotMatch(pixel.code, /scale\(|\bSubject\b|Whip|ZoomThrough/);
 });
 
-test("« Recette cosy, typo pixel » (v2): its captions on their steps, its little faces and its stars, its loop, its format, its finish", async () => {
+test("« Recette cosy, typo pixel » (v3): its captions on their steps, its little faces and its stars, its loop, its format, its finish", async () => {
   const { pixel } = await import("./skills/pixel.ts");
   const { skillFillInput, skillPlan, skillSettings } = await import("./skills.ts");
   /** The captions seen at a frame: the words of each one shown, in the page's order. */
@@ -5178,29 +5248,30 @@ test("« Recette cosy, typo pixel » (v2): its captions on their steps, its litt
   assert.ok(drawnNodes(card).some((n) => /rgba\(20,12,6,0\.5/.test(String(styleOf(n).background ?? ""))));
   assert.deepEqual(pixelBoxes(card, "#d4f7e9").map(pixelWords), ["commandepoursamedi"]);
   assert.equal((pixelBoxes(card, "#fff8e8").find((n) => pixelWords(n) === "au0612345678")!.props.innerStyle as Record<string, number>).fontSize, 48);
-  // Its format: as her videos, the whole vertical frame as the original, 16:9 on black when most are in width; her word prevails.
-  const frameBox = async (aspect: number, format?: string) => {
-    const line = pixel.timeline(26, { end: false });
-    const texts = { ...Object.fromEntries(Object.entries(line.marks).map(([k, v]) => [k, String(v)])), ...(format ? { format } : {}) };
-    return styleOf((await pixelAt(60, aspect, { texts })).children[0] as Drawn);
-  };
+  // Its format: the whole vertical frame as the original by default (Tristan, 6 November: « tout vertical please »), her
+  // videos in width cropped on their gesture; 16:9 on black on her word, or as her videos when most are in width.
+  const line26 = pixel.timeline(26, { end: false });
+  const marks26 = Object.fromEntries(Object.entries(line26.marks).map(([k, v]) => [k, String(v)]));
+  const frameBox = async (aspect: number, format?: string) => styleOf((await pixelAt(60, aspect, { texts: { ...marks26, ...(format ? { format } : {}) } })).children[0] as Drawn);
   assert.deepEqual([(await frameBox(9 / 16)).top, (await frameBox(9 / 16)).height], [0, 1920]);
-  assert.deepEqual([(await frameBox(16 / 9)).top, (await frameBox(16 / 9)).height], [656, 608]);
+  assert.deepEqual([(await frameBox(16 / 9)).top, (await frameBox(16 / 9)).height], [0, 1920]);
+  assert.deepEqual([(await frameBox(16 / 9, "auto")).top, (await frameBox(16 / 9, "auto")).height], [656, 608]);
+  assert.equal((await frameBox(9 / 16, "auto")).height, 1920);
   assert.equal((await frameBox(16 / 9, "vertical")).height, 1920);
   assert.equal((await frameBox(9 / 16, "horizontal")).height, 608);
   // In its 16:9 frame its title at 59 px (it reads), its tiny lines at 26 px and her name at 20, all inside it.
-  const wide = await pixelAt(60, 16 / 9);
+  const wide = await pixelAt(60, 16 / 9, { texts: { ...marks26, format: "horizontal" } });
   assert.equal((pixelBoxes(wide, "#d4f7e9")[0]!.props.innerStyle as Record<string, number>).fontSize, 59);
   assert.deepEqual(pixelBoxes(wide, "#fff8e8").map((n) => (n.props.innerStyle as Record<string, number>).fontSize), [20, 26, 26]);
   assert.ok(pixelBoxes(wide, "#fff8e8").every((n) => Number(styleOf(n).top) + Number(styleOf(n).height) <= 608));
-  // The setting: the filler sees it (the default first: as her videos), the plan keeps a choice her words asked for.
-  assert.deepEqual(pixel.settings?.map((s) => [s.name, s.choices.map((c) => c.value)]), [["format", ["auto", "horizontal", "vertical"]]]);
-  assert.deepEqual(skillSettings(pixel, [{ name: "format", value: "auto" }]), {});
+  // The setting: the filler sees it (the default first: vertical), the plan keeps a choice her words asked for.
+  assert.deepEqual(pixel.settings?.map((s) => [s.name, s.choices.map((c) => c.value)]), [["format", ["vertical", "horizontal", "auto"]]]);
+  assert.deepEqual(skillSettings(pixel, [{ name: "format", value: "vertical" }]), {});
   const files = Array.from({ length: 8 }, (_, i) => ({ id: `v${i}`, photo: false, seconds: 16 }));
   assert.equal(skillFillInput({ skill: pixel, name: "Recette cosy", n: 26, files, business: {}, request: "en horizontal" }).reglages?.[0]?.nom, "format");
   const plan = skillPlan({ skill: pixel, name: "Recette cosy", files, fill: { shots: Array.from({ length: 26 }, (_, i) => ({ file: files[i % 8]!.id, at: Math.floor(i / 8) * 4 })), texts: { titre: "fraisier menthe!!", petit_mot: "fait maison, pour le goûter", etapes: "les œufs / farine et sucre / ça sent bon", fin: "à demain" }, end: null, settings: { format: "horizontal" } } });
   assert.equal(plan.layers![0]!.motion.texts!.format, "horizontal");
-  assert.deepEqual(plan.skill, { key: "pixel", version: 2, settings: { format: "horizontal" } });
+  assert.deepEqual(plan.skill, { key: "pixel", version: 3, settings: { format: "horizontal" } });
   assert.deepEqual(plan.layers![0]!.motion.fonts, ["Courier Prime", "Inter"]);
   // Its finish: no grain, no dark corners, no lifted blacks (the catalogue's « Cosy » laid them over everything).
   assert.deepEqual(pixel.finish, { contrast: 0.08, grain: 0, vignette: 0, fade: 0 });
@@ -5225,7 +5296,7 @@ test("« Titre gaufré » (v2) lands its front's pieces and cuts to its paper wh
   const { gaufre } = await import("./skills/gaufre.ts");
   const { skillPlan, skillCode } = await import("./skills.ts");
   const { objectsDrawn, objectPassages, drawsSubject, clearsDrawn } = await import("./subject.ts");
-  assert.equal(gaufre.version, 2);
+  assert.equal(gaufre.version, 3);
   assert.equal(gaufre.bpm, 113.2);
   // Her one video of her front (its original has one), and the same video under the paper, where its things are read.
   assert.deepEqual([gaufre.shots, gaufre.files], [[2, 2], [1, 1]]);
@@ -5289,7 +5360,7 @@ test("« Titre gaufré » (v2) lands its front's pieces and cuts to its paper wh
   assert.equal(objectPassages(withCard, () => true).length, 3);
 });
 
-test("« Titre gaufré » (v2): her front built on the black from what it is made of, her name first, as her video is; its paper, her name pressed then inked", async () => {
+test("« Titre gaufré » (v3): her front built on the black from what it is made of, her name first, full frame or in its band; its paper, her name pressed then inked", async () => {
   const { gaufre } = await import("./skills/gaufre.ts");
   const { skillCode } = await import("./skills.ts");
   const line = gaufre.timeline(2, { end: false });
@@ -5329,15 +5400,18 @@ test("« Titre gaufré » (v2): her front built on the black from what it is mad
   assert.equal(grid.length, 16);
   assert.ok(grid.every(([x, y, w, h]) => x! >= 86 && x! + w! <= 995 && y! >= 288 && y! + h! <= 1384), JSON.stringify(grid));
   assert.deepEqual(rects(draw(132, { shots: shotsOf(9 / 16, ["/v0.mp4", "/v1.mp4"]) })), grid);
-  // Its frame as her video: upright, the whole frame; in width, all of it in a 16:9 band in the middle of the black; her
-  // setting prevails both ways. The paper always full frame.
+  // Its frame: the whole frame by default (Tristan, 6 November: « tout vertical please »), her front in width cropped on
+  // its subject; all of it in a 16:9 band in the middle of the black on her word, or as her video when it is in width.
+  // The paper always full frame.
   const boxAt = (aspect: number, format?: string) => styleOf(frameBox(draw(100, { shots: shotsOf(aspect), texts: { ...marks, ...(format ? { format } : {}) } })));
   assert.deepEqual([boxAt(9 / 16).top, boxAt(9 / 16).height], [0, 1920]);
-  assert.deepEqual([boxAt(16 / 9).top, boxAt(16 / 9).width, boxAt(16 / 9).height], [656, 1080, 608]);
+  assert.deepEqual([boxAt(16 / 9).top, boxAt(16 / 9).height], [0, 1920]);
+  assert.deepEqual([boxAt(16 / 9, "auto").top, boxAt(16 / 9, "auto").width, boxAt(16 / 9, "auto").height], [656, 1080, 608]);
+  assert.deepEqual([boxAt(9 / 16, "auto").top, boxAt(9 / 16, "auto").height], [0, 1920]);
   assert.deepEqual([boxAt(9 / 16, "horizontal").top, boxAt(9 / 16, "horizontal").height], [656, 608]);
   assert.deepEqual([boxAt(16 / 9, "vertical").top, boxAt(16 / 9, "vertical").height], [0, 1920]);
-  assert.deepEqual(gaufre.settings?.map((x) => [x.name, x.choices.map((c) => c.value)]), [["format", ["auto", "horizontal", "vertical"]]]);
-  const banded = draw(270, { shots: shotsOf(16 / 9) });
+  assert.deepEqual(gaufre.settings?.map((x) => [x.name, x.choices.map((c) => c.value)]), [["format", ["vertical", "horizontal", "auto"]]]);
+  const banded = draw(270, { shots: shotsOf(16 / 9), texts: { ...marks, format: "horizontal" } });
   assert.deepEqual([styleOf(banded.children[1] as Drawn).top, styleOf(banded.children[1] as Drawn).height], [0, 1920]);
   // At the cut: no more of her video, the paper full frame in the original's peach, its fibres, no shade at its edges.
   const card = draw(270);
@@ -6487,7 +6561,7 @@ const filmTone = (tree: Drawn) => String(styleOf(drawnNodes(tree).find((n) => n.
 test("« La pièce qui se rallume » (v1): its lights on its beats faster and faster, the whole room on the downbeat, off at the end, at 96 BPM", async () => {
   const { rallume } = await import("./skills/rallume.ts");
   const { skillPlan } = await import("./skills.ts");
-  assert.equal(rallume.version, 2);
+  assert.equal(rallume.version, 3);
   assert.equal(rallume.bpm, 96);
   const beat = 60 / 96;
   const line = rallume.timeline(10, { end: false });
@@ -6544,7 +6618,8 @@ test("« La pièce qui se rallume » (v1): dark, then her things lit one by one 
   const { rallume } = await import("./skills/rallume.ts");
   const { skillCode } = await import("./skills.ts");
   const line = rallume.timeline(10, { end: false });
-  const marks = Object.fromEntries(Object.entries(line.marks).map(([k, v]) => [k, String(v)]));
+  // Its 16:9 picture on black with her name above it, on her word (its default is the full frame).
+  const marks: Record<string, string> = { ...Object.fromEntries(Object.entries(line.marks).map(([k, v]) => [k, String(v)])), format: "horizontal" };
   const reelTexts = [
     { text: "Le Comptoir", role: "hook", from: 75, to: 394, emphasis: [] },
     { text: "bar à vins", role: "caption", from: 75, to: 394, emphasis: [] },
@@ -6610,7 +6685,7 @@ test("« La pièce qui se rallume » (v1): dark, then her things lit one by one 
   assert.equal(filmTone(draw(75, {}, {}, rallume.code)), "brightness(1.3)");
 });
 
-test("« La pièce qui se rallume » (v1): horizontal 16:9 on black when her videos are, full frame otherwise or on her word; her colour; nothing cut out but her things", async () => {
+test("« La pièce qui se rallume » (v3): full frame by default, 16:9 on black on her word or as her videos; her colour; nothing cut out but her things", async () => {
   const { rallume } = await import("./skills/rallume.ts");
   const { skillCode, skillPlan, skillFillInput, skillSettings, readSkillFill } = await import("./skills.ts");
   const { objectsDrawn, drawsSubject, clearsDrawn, objectPassages, OBJECT_MAX } = await import("./subject.ts");
@@ -6625,9 +6700,13 @@ test("« La pièce qui se rallume » (v1): horizontal 16:9 on black when her vid
     return { top: styleOf(box).top, height: styleOf(box).height };
   };
   const nameOf = (tree: Drawn) => drawnNodes(tree).find((n) => n.type === "FitText" && heldText(n).includes("Le Comptoir"));
-  // Her videos in width: its 16:9 frame in the middle; upright ones: the whole frame; her setting both ways.
-  assert.deepEqual(frameOf(draw(16 / 9, 120)), { top: 656, height: 608 });
+  // By default (Tristan, 6 November: « tout vertical please »), the whole frame for any of her videos; its 16:9 frame in
+  // the middle on her word, or as her videos when they are in width.
+  assert.deepEqual(frameOf(draw(16 / 9, 120)), { top: 0, height: 1920 });
   assert.deepEqual(frameOf(draw(9 / 16, 120)), { top: 0, height: 1920 });
+  assert.deepEqual(frameOf(draw(16 / 9, 120, { format: "horizontal" })), { top: 656, height: 608 });
+  assert.deepEqual(frameOf(draw(16 / 9, 120, { format: "auto" })), { top: 656, height: 608 });
+  assert.deepEqual(frameOf(draw(9 / 16, 120, { format: "auto" })), { top: 0, height: 1920 });
   assert.equal(frameOf(draw(16 / 9, 120, { format: "vertical" })).height, 1920);
   assert.equal(frameOf(draw(9 / 16, 120, { format: "horizontal" })).top, 656);
   // Full frame: her name in the calm part of her room shot (here ClearBox's place for it, high in the frame), in the
@@ -6643,8 +6722,8 @@ test("« La pièce qui se rallume » (v1): horizontal 16:9 on black when her vid
   assert.match(hers.textShadow!, /rgba\(122,46,140/);
   assert.equal(style(draw(16 / 9, 120, { couleur: "sienne" }, { accent: "#f4efe6" })).color, "#fff3df");
   assert.equal(style(draw(16 / 9, 120, {}, { accent: "#7a2e8c" })).color, "#fff3df");
-  assert.deepEqual(rallume.settings?.map((s) => [s.name, s.choices.map((c) => c.value)]), [["format", ["auto", "horizontal", "vertical"]], ["couleur", ["chaude", "sienne"]]]);
-  assert.deepEqual(skillSettings(rallume, [{ name: "format", value: "auto" }, { name: "couleur", value: "sienne" }]), { couleur: "sienne" });
+  assert.deepEqual(rallume.settings?.map((s) => [s.name, s.choices.map((c) => c.value)]), [["format", ["vertical", "horizontal", "auto"]], ["couleur", ["chaude", "sienne"]]]);
+  assert.deepEqual(skillSettings(rallume, [{ name: "format", value: "vertical" }, { name: "couleur", value: "sienne" }]), { couleur: "sienne" });
   // Its objects: up to four kinds of her things in her room shot, named by the filler; nothing named, nothing followed.
   assert.deepEqual(checkMotionCode(rallume.code), []);
   assert.deepEqual(objectsDrawn(rallume.code), []);
@@ -6668,7 +6747,7 @@ test("« La pièce qui se rallume » (v1): horizontal 16:9 on black when her vid
   const passages = objectPassages(plan, () => true);
   assert.equal(passages.length, 4);
   assert.ok(passages.every((p) => p.clip_id === "v0" && p.from === 0.5 && p.to === 5.5), JSON.stringify(passages));
-  assert.deepEqual(plan.skill, { key: "rallume", version: 2 });
+  assert.deepEqual(plan.skill, { key: "rallume", version: 3 });
   // Written as a design, without a reference Reel: no original kept, so no sheets of one, whatever its measures.
   const { HOUSE_DESIGNS, houseSheets } = await import("./house-sheets.ts");
   assert.ok(HOUSE_DESIGNS.has("rallume"));
@@ -7445,7 +7524,7 @@ function gridLetters(tree: unknown) {
 test("« Mots mêlés » (v2): one calm shot of 25 beats at 80 BPM as its 18,67 s original, no cut, its sentence held, its card after the hold", async () => {
   const { motsMeles } = await import("./skills/mots-meles.ts");
   const { skillPlan } = await import("./skills.ts");
-  assert.equal(motsMeles.version, 4);
+  assert.equal(motsMeles.version, 5);
   assert.equal(motsMeles.bpm, 80);
   const line = motsMeles.timeline(1, { end: false });
   // One shot, no cut (the original has none, measured image by image): 25 of its beats, the original's 560 images and three.
@@ -7461,19 +7540,21 @@ test("« Mots mêlés » (v2): one calm shot of 25 beats at 80 BPM as its 18,67 
   // Its music calm (70 to 90 BPM): its length follows it, its loops a hand.
   assert.deepEqual(motsMeles.tempo, [70, 90]);
   assert.ok(Math.abs(motsMeles.timeline(1, { end: false, bpm: 70 }).duration - (25 * 60) / 70) < 0.02);
-  // No sound of its own (the original has none) and no shape of its music; a format setting, its default as her video.
+  // No sound of its own (the original has none) and no shape of its music; a format setting, vertical by default.
   const files = [{ id: "v", photo: false, seconds: 25 }];
   const plan = skillPlan({ skill: motsMeles, name: "Mots mêlés", files, fill: { shots: [{ file: "v", at: 2 }], texts: { mots: "Samedi matin café croissant" }, end: null } });
   assert.equal(plan.sounds, undefined);
   assert.equal(plan.music_shape, undefined);
-  assert.deepEqual(motsMeles.settings?.map((s) => [s.name, s.choices.map((c) => c.value)]), [["format", ["auto", "horizontal", "vertical"]]]);
-  assert.deepEqual(plan.skill, { key: "mots-meles", version: 4 });
+  assert.deepEqual(motsMeles.settings?.map((s) => [s.name, s.choices.map((c) => c.value)]), [["format", ["vertical", "horizontal", "auto"]]]);
+  assert.equal(plan.layers![0]!.motion.texts!.format, "vertical");
+  assert.deepEqual(plan.skill, { key: "mots-meles", version: 5 });
 });
 
 test("« Mots mêlés » (v2): its loops at the original's hand, chained 3 to 6 images apart, from just above each first letter, the letters never changing", async () => {
   const { motsMeles } = await import("./skills/mots-meles.ts");
   const line = motsMeles.timeline(1, { end: false });
-  const marks = Object.fromEntries(Object.entries(line.marks).map(([k, v]) => [k, String(v)]));
+  // On her horizontal video in its 16:9 band, on her word (its default is the full frame).
+  const marks: Record<string, string> = { ...Object.fromEntries(Object.entries(line.marks).map(([k, v]) => [k, String(v)])), format: "horizontal" };
   const { draw, Scribble, frames } = await kitScene(motsMeles.code);
   const props = { width: 1080, height: 1920, durationInFrames: 563, brand: { name: "Le Studio", displayFont: "Inter Tight", bodyFont: "Inter Tight" }, shots: rallumeShots(line), reelTexts: MM_WORDS, end: null, texts: marks };
   type Loop = { at: number; speed: number; kind: string; angle?: number; start: string; direction: string; width: number; color: string; box?: { x: number; y: number; w: number; h: number }; rows?: { x: number; y: number; w: number; h: number }[] };
@@ -7517,7 +7598,7 @@ test("« Mots mêlés » (v2): its loops at the original's hand, chained 3 to 6 
   assert.ok(gridLetters(draw(500, props)).every((l) => l.size === 24));
 });
 
-test("« Mots mêlés » (v2): 16 × 10 on her horizontal video in a 16:9 band as the original, 9 × 16 full frame otherwise; her words in order, her other words hidden", async () => {
+test("« Mots mêlés » (v5): 9 × 16 full frame by default, 16 × 10 on her horizontal video in a 16:9 band as the original on her word; her words in order, her other words hidden", async () => {
   const { motsMeles } = await import("./skills/mots-meles.ts");
   const line = motsMeles.timeline(1, { end: false });
   const marks = Object.fromEntries(Object.entries(line.marks).map(([k, v]) => [k, String(v)]));
@@ -7528,8 +7609,14 @@ test("« Mots mêlés » (v2): 16 × 10 on her horizontal video in a 16:9 band a
     const b = drawnNodes(tree).find((n) => n.type === "div" && styleOf(n).overflow === "hidden")!;
     return { top: styleOf(b).top, height: styleOf(b).height };
   };
-  // Her video in width: the original's frame, 1080 × 608 in the middle, its 160 letters on it, the first 0,73 of a step in.
-  const wide = draw(300, props(16 / 9));
+  // By default (Tristan, 6 November: « tout vertical please »), full frame whatever her video.
+  assert.deepEqual(band(draw(300, props(16 / 9))), { top: 0, height: 1920 });
+  assert.equal(new Set(gridLetters(draw(300, props(16 / 9))).map((l) => `${l.left},${l.top}`)).size, 144);
+  // As her video, or on her word, in width: the original's frame, 1080 × 608 in the middle, its 160 letters on it, the
+  // first 0,73 of a step in.
+  assert.deepEqual(band(draw(300, props(16 / 9, { format: "auto" }))), { top: 656, height: 608 });
+  assert.deepEqual(band(draw(300, props(9 / 16, { format: "auto" }))), { top: 0, height: 1920 });
+  const wide = draw(300, props(16 / 9, { format: "horizontal" }));
   assert.deepEqual(band(wide), { top: 656, height: 608 });
   const cells = new Map(gridLetters(wide).map((l) => [`${l.left},${l.top}`, l]));
   assert.equal(cells.size, 160);
@@ -7608,7 +7695,7 @@ test("« Mots mêlés » (v2): its picture darkened to its own light, as filmed,
 test("« Interrupteur » (v2): one shot of 9,1 s on its original's grid (143,7 BPM, one beat in two), its music stopped dead and back as she lands, its beep", async () => {
   const { interrupteur } = await import("./skills/interrupteur.ts");
   const { skillPlan } = await import("./skills.ts");
-  assert.equal(interrupteur.version, 9);
+  assert.equal(interrupteur.version, 10);
   assert.equal(interrupteur.bpm, 71.85);
   const line = interrupteur.timeline(1, { end: false });
   // One fixed shot, no cut (the original has none): its 275 images less its last two, a rest of its edit.
@@ -7729,7 +7816,7 @@ test("« Interrupteur » (v2): its switch where her hand goes highest, flipped i
   assert.deepEqual(drawnNodes(card).filter((n) => n.type === "FitText").map((n) => heldText(n).replace(/\s+/g, " ").trim()), ["Ouvert dimanche", "de 10 h à 18 h"]);
 });
 
-test("« Interrupteur » (v2): upright as her video, a horizontal one cropped on her reach when her gesture fits, else whole in a band; light to render", async () => {
+test("« Interrupteur » (v10): full frame, a horizontal video cropped on her reach when her gesture fits, whole in a band on her word; light to render", async () => {
   const { interrupteur } = await import("./skills/interrupteur.ts");
   const { subjectsDrawn, objectsDrawn, clearsDrawn, readsDrawn } = await import("./subject.ts");
   const { checkMotionCode } = await import("./motion-scene.ts");
@@ -7749,19 +7836,22 @@ test("« Interrupteur » (v2): upright as her video, a horizontal one cropped on
   const { draw } = await kitScene(interrupteur.code, { track });
   const { draw: bare } = await kitScene(interrupteur.code);
   // Upright: full frame. Horizontal with her whole gesture in a window: cropped on her reach, the window fixed (her video
-  // laid at its own shape, her reach in the middle of the frame). Horizontal without anything read: whole in a band.
+  // laid at its own shape, her reach in the middle of the frame). Horizontal without anything read: full frame too, by
+  // default (Tristan, 6 November: « tout vertical please »), whole in a band only as her video (« auto ») or her word.
   assert.deepEqual(wall(draw(130, props(9 / 16))), { left: 0, top: 0, width: 1080, height: 1920 });
   const cropped = wall(draw(130, props(16 / 9)));
   assert.equal(cropped.width, 3413);
   assert.ok(Math.abs(cropped.left + cropped.width * 0.55 - 540) <= 1 && cropped.height === 1920, JSON.stringify(cropped));
   assert.deepEqual(wall(draw(10, props(16 / 9))), cropped);
-  assert.deepEqual(wall(bare(130, props(16 / 9))), { left: 0, top: 656, width: 1080, height: 608 });
+  assert.deepEqual(wall(draw(130, props(16 / 9, { format: "auto" }))), cropped);
+  assert.deepEqual(wall(bare(130, props(16 / 9))), { left: 0, top: 0, width: 1080, height: 1920 });
+  assert.deepEqual(wall(bare(130, props(16 / 9, { format: "auto" }))), { left: 0, top: 656, width: 1080, height: 608 });
   // Her words: whole in the band, or full frame as asked.
   assert.deepEqual(wall(draw(130, props(16 / 9, { format: "horizontal" }))), { left: 0, top: 656, width: 1080, height: 608 });
   assert.deepEqual(wall(bare(130, props(16 / 9, { format: "vertical" }))), { left: 0, top: 0, width: 1080, height: 1920 });
-  assert.deepEqual(interrupteur.settings?.map((s) => [s.name, s.choices.map((c) => c.value)]), [["format", ["auto", "vertical", "horizontal"]]]);
+  assert.deepEqual(interrupteur.settings?.map((s) => [s.name, s.choices.map((c) => c.value)]), [["format", ["vertical", "horizontal", "auto"]]]);
   // In the band, its switch at the band's scale (the original's 16,2 % of its height wide).
-  assert.equal(styleOf(drawnNodes(bare(130, props(16 / 9))).find((n) => n.props.key === "switch")!).width, 98);
+  assert.equal(styleOf(drawnNodes(bare(130, props(16 / 9, { format: "horizontal" }))).find((n) => n.props.key === "switch")!).width, 98);
   // Light to render: her cut-out on her one shot only, nothing followed, no clear area, no reading; no zoom, no push;
   // her cut-out laid only from just before the flip.
   assert.deepEqual(checkMotionCode(interrupteur.code), []);
@@ -7795,7 +7885,8 @@ async function fenetresAt(n: number, options: { end?: boolean; aspect?: number; 
       { text: "50.8164° N, 0.1366° O", role: "caption", from: 0, to: durationInFrames, emphasis: [] },
     ],
     end: options.end ? { title: "Ouvert ce dimanche", subtitle: "de 9 h à 19 h", from: durationInFrames - 48 } : null,
-    texts: { ...Object.fromEntries(Object.entries(line.marks).map(([k, v]) => [k, String(v)])), ...(options.settings ?? {}) },
+    // « Comme ses vidéos » unless said (her words: « comme mes vidéos »): its 16:9 frame for her horizontal videos.
+    texts: { ...Object.fromEntries(Object.entries(line.marks).map(([k, v]) => [k, String(v)])), ...(options.settings ?? { format: "auto" }) },
   };
   const at = (f: number) => drawDecode(fenetres.code, f, props);
   return { fenetres, line, props, at, durationInFrames };
@@ -7814,7 +7905,7 @@ const fenetresLayers = (tree: Drawn) => {
 test("« Fenêtres et étiquettes » (v2) cuts where its original does, on its own music (92,9 BPM), its music stopped in the intro's hole", async () => {
   const { fenetres, line } = await fenetresAt(22);
   const { skillPlan, skillFillInput } = await import("./skills.ts");
-  assert.equal(fenetres.version, 3);
+  assert.equal(fenetres.version, 4);
   assert.equal(fenetres.bpm, 92.9);
   // Its 21 shots one after the other, each where the original's first shows (its first cell, or its cut), within two
   // images; its shot by day laid beside the night from image 216 to the night's end; 13,8 s.
@@ -7964,21 +8055,24 @@ test("« Fenêtres et étiquettes » (v2): cells in a snake, jumping windows, a 
   assert.equal(line.shots.length, 22);
 });
 
-test("« Fenêtres et étiquettes » (v2): horizontal 16:9 on black as its original when her videos are, full frame otherwise or on her word; its labels fixed; cut out only where drawn", async () => {
+test("« Fenêtres et étiquettes » (v4): full frame by default, horizontal 16:9 on black as its original on her word or as her videos; its labels fixed; cut out only where drawn", async () => {
   const { fenetres } = await import("./skills/fenetres.ts");
   const { skillSettings, skillPlan } = await import("./skills.ts");
   const frameOf = (tree: Drawn) => {
     const box = drawnNodes(tree).find((n) => n.type === "div" && styleOf(n).overflow === "hidden")!;
     return { top: styleOf(box).top, height: styleOf(box).height };
   };
+  // By default (Tristan, 6 November: « tout vertical please »), full frame whatever her videos.
+  assert.deepEqual(frameOf((await fenetresAt(22, { settings: {} })).at(60)), { top: 0, height: 1920 });
+  // As her videos, or on her word: horizontal 16:9 on black as its original.
   const wide = await fenetresAt(22);
   const tall = await fenetresAt(22, { aspect: 9 / 16 });
   assert.deepEqual(frameOf(wide.at(60)), { top: 656, height: 608 });
   assert.deepEqual(frameOf(tall.at(60)), { top: 0, height: 1920 });
   assert.equal(frameOf((await fenetresAt(22, { settings: { format: "vertical" } })).at(60)).height, 1920);
   assert.equal(frameOf((await fenetresAt(22, { aspect: 9 / 16, settings: { format: "horizontal" } })).at(60)).top, 656);
-  assert.deepEqual(fenetres.settings?.map((s) => [s.name, s.choices.map((c) => c.value)]), [["format", ["auto", "horizontal", "vertical"]]]);
-  assert.deepEqual(skillSettings(fenetres, [{ name: "format", value: "auto" }]), {});
+  assert.deepEqual(fenetres.settings?.map((s) => [s.name, s.choices.map((c) => c.value)]), [["format", ["vertical", "horizontal", "auto"]]]);
+  assert.deepEqual(skillSettings(fenetres, [{ name: "format", value: "vertical" }]), {});
   // Upright: its cells and windows of the frame's shape (a third of it each), its squares 3 × 5.
   const tallCells = fenetresLayers(tall.at(6)).shots.find((s) => s.shot === 1)!.rects;
   assert.deepEqual(tallCells[0], [720, 0, 360, 640]);
@@ -8017,10 +8111,10 @@ test("« Fenêtres et étiquettes » (v2): horizontal 16:9 on black as its origi
     assert.ok(run.line.cutouts!.length <= 8 && seconds <= 4.5, `${n} shots: ${run.line.cutouts!.length} cut out, ${seconds} s`);
   }
   const files = Array.from({ length: 12 }, (_, i) => ({ id: `v${i}`, photo: false, seconds: 16 }));
-  const plan = skillPlan({ skill: fenetres, name: "Fenêtres et étiquettes", files, fill: { shots: Array.from({ length: 22 }, (_, i) => ({ file: files[i % 12]!.id, at: 1 })), texts: { gauche: "OUVERT DÈS 8 H", droite: "PARIS 9E" }, end: null, settings: { format: "vertical" } } });
+  const plan = skillPlan({ skill: fenetres, name: "Fenêtres et étiquettes", files, fill: { shots: Array.from({ length: 22 }, (_, i) => ({ file: files[i % 12]!.id, at: 1 })), texts: { gauche: "OUVERT DÈS 8 H", droite: "PARIS 9E" }, end: null, settings: { format: "horizontal" } } });
   assert.deepEqual(plan.layers![0]!.motion.drawn, { shots: 22, subjects: [2, 3, 5, 7, 10, 11, 14, 18] });
-  assert.equal(plan.layers![0]!.motion.texts!.format, "vertical");
-  assert.deepEqual(plan.skill, { key: "fenetres", version: 3, settings: { format: "vertical" } });
+  assert.equal(plan.layers![0]!.motion.texts!.format, "horizontal");
+  assert.deepEqual(plan.skill, { key: "fenetres", version: 4, settings: { format: "horizontal" } });
   // Its look is its model's (no grain, no corners on the black); its code within a plan's 24 000 characters; no zoom,
   // nothing of its original's (its altitude, its coordinates, its pass).
   assert.deepEqual(fenetres.finish, { grain: 0, vignette: 0 });
@@ -8500,7 +8594,7 @@ const sceneProps = (layer: { durationInFrames: number; shots?: unknown[]; texts?
 
 test("« Mot clé en grand » (v1) cuts where its original does, between its ideas, its words on its words, within two images", async () => {
   const { motCle, talk, plan } = await motCleOnOriginal();
-  assert.equal(motCle.version, 1);
+  assert.equal(motCle.version, 2);
   assert.equal(motCle.bpm, 108);
   assert.ok(motCle.voice && !motCle.voice.cut && motCle.voice.fonts?.includes("item") && motCle.voice.row === 0.75);
   // Its frame changes only between its ideas, in the breath between them: the original's two cuts, on her video's clock
@@ -8618,16 +8712,19 @@ test("« Mot clé en grand » (v1): its words slide in as the original's, above 
   assert.equal(drawnNodes(bye).filter((n) => n.type === "FitText" || n.type === "span").length, 0);
 });
 
-test("« Mot clé en grand » (v1): full frame for her vertical video, a 16:9 band on black for a horizontal one or on her word; light to render", async () => {
+test("« Mot clé en grand » (v2): full frame by default, a 16:9 band on black for a horizontal one on her word or as her video; light to render", async () => {
   const { motCle, plan, layer } = await motCleOnOriginal();
   const props = sceneProps(layer);
   const footage = (tree: Drawn) => drawnNodes(tree).filter((n) => n.type === "Footage").map((n) => styleOf(n));
-  // Its format: as her video, full frame (the original's) or her horizontal video whole on black, its words above it.
-  assert.deepEqual(motCle.settings?.map((s) => [s.name, s.choices.map((c) => c.value)]), [["format", ["auto", "vertical", "horizontal"]]]);
+  // Its format: full frame (the original's) by default (Tristan, 6 November: « tout vertical please »), her horizontal
+  // video cropped on her face; whole on black, its words above it, on her word or as her video.
+  assert.deepEqual(motCle.settings?.map((s) => [s.name, s.choices.map((c) => c.value)]), [["format", ["vertical", "horizontal", "auto"]]]);
+  assert.equal((props.texts as Record<string, string>).format, "vertical");
   const box = (f: Record<string, number | string>) => [f.left, f.top, f.width, f.height];
   assert.deepEqual(box(footage(await drawVoiced(motCle.code, 100, props))[0]!), [0, 0, 1080, 1920]);
   const wideShots = (props.shots as { aspect: number }[]).map((s) => ({ ...s, aspect: 16 / 9 }));
-  const wide = await drawVoiced(motCle.code, 100, { ...props, shots: wideShots });
+  assert.deepEqual(box(footage(await drawVoiced(motCle.code, 100, { ...props, shots: wideShots }))[0]!), [0, 0, 1080, 1920]);
+  const wide = await drawVoiced(motCle.code, 100, { ...props, shots: wideShots, texts: { ...props.texts, format: "auto" } });
   assert.deepEqual(box(footage(wide)[0]!), [0, 656, 1080, 608]);
   const words = drawnNodes(wide).filter((n) => n.type === "div" && "transform" in styleOf(n));
   assert.ok(words.every((n) => Number(styleOf(n).top) + Number(styleOf(n).height) <= 656), JSON.stringify(words.map((n) => styleOf(n).top)));
@@ -8899,7 +8996,7 @@ const notebookAngle = (tree: Drawn) => Number(/^rotate\((-?[\d.]+)deg\)/.exec(St
 test("« Carte au feutre » (v2) writes its words where its original does, a photo every 3 images, on its music (135 BPM in half time)", async () => {
   const { carteFeutre } = await import("./skills/carte-feutre.ts");
   const { skillPlan } = await import("./skills.ts");
-  assert.equal(carteFeutre.version, 2);
+  assert.equal(carteFeutre.version, 3);
   assert.equal(carteFeutre.bpm, 135);
   const line = carteFeutre.timeline(23, { end: false });
   // Its 23 photos, one a slot, over its 9 s (270 images).
@@ -9015,7 +9112,7 @@ test("« Carte au feutre » (v2): an open notebook laid over her pictures, a new
   assert.doesNotMatch(carteFeutre.code + JSON.stringify(carteFeutre.texts), /PUT|BURGER|PHONE/i);
 });
 
-test("« Carte au feutre » (v2): full frame as the original, two bands when her pictures are in width, a video in stop motion, light to render", async () => {
+test("« Carte au feutre » (v3): full frame as the original, two bands for her pictures in width on her word, a video in stop motion, light to render", async () => {
   const { carteFeutre } = await import("./skills/carte-feutre.ts");
   const { dressSkillPlan, skillPlan, skillSettings } = await import("./skills.ts");
   const { houseStyle } = await import("./house-models.ts");
@@ -9027,16 +9124,20 @@ test("« Carte au feutre » (v2): full frame as the original, two bands when her
     drawnNodes(draw(f, carteProps(line, extra))).filter((n) => n.type === "Footage").map((n) => ({ shot: n.props.shot, at: n.props.at, box: [styleOf(n).top, styleOf(n).height] }));
   // Her pictures upright: each full frame, as the original's.
   assert.deepEqual(pictures(30), [{ shot: 10, at: 30, box: [0, 1920] }]);
-  // Mostly in width: two bands above and under the notebook (a 16:9 picture almost whole in each), changing one after
-  // the other, still a change every 3 images; on her word, either way.
+  // Mostly in width: full frame too by default (Tristan, 6 November: « tout vertical please »), each cropped on its
+  // subject; on her word (or « comme mes images »), two bands above and under the notebook (a 16:9 picture almost whole in
+  // each), changing one after the other, still a change every 3 images.
   const wide = { shots: pileShots(line, 16 / 9, "photo") };
-  assert.deepEqual(pictures(30, wide).map((p) => [p.shot, ...p.box]), [[10, 0, 640], [11, 1280, 640]]);
-  assert.deepEqual(pictures(33, wide).map((p) => p.shot), [12, 11]);
-  assert.deepEqual(pictures(36, wide).map((p) => p.shot), [12, 13]);
+  assert.deepEqual(pictures(30, wide), [{ shot: 10, at: 30, box: [0, 1920] }]);
+  const banded = { ...wide, texts: { ...marksOf(line), format: "auto" } };
+  assert.deepEqual(pictures(30, banded).map((p) => [p.shot, ...p.box]), [[10, 0, 640], [11, 1280, 640]]);
+  assert.deepEqual(pictures(33, banded).map((p) => p.shot), [12, 11]);
+  assert.deepEqual(pictures(36, banded).map((p) => p.shot), [12, 13]);
   assert.equal(pictures(30, { ...wide, texts: { ...marksOf(line), format: "vertical" } }).length, 1);
+  assert.equal(pictures(30, { ...wide, texts: { ...marksOf(line), format: "bandes" } }).length, 2);
   assert.equal(pictures(30, { texts: { ...marksOf(line), format: "bandes" } }).length, 2);
-  assert.deepEqual(carteFeutre.settings?.map((s) => [s.name, s.choices.map((c) => c.value)]), [["format", ["auto", "vertical", "bandes"]], ["encre", ["sienne", "rouge"]]]);
-  assert.deepEqual(skillSettings(carteFeutre, [{ name: "format", value: "auto" }, { name: "encre", value: "rouge" }]), { encre: "rouge" });
+  assert.deepEqual(carteFeutre.settings?.map((s) => [s.name, s.choices.map((c) => c.value)]), [["format", ["vertical", "bandes", "auto"]], ["encre", ["sienne", "rouge"]]]);
+  assert.deepEqual(skillSettings(carteFeutre, [{ name: "format", value: "vertical" }, { name: "encre", value: "rouge" }]), { encre: "rouge" });
   // A photo the same image each round; a video 3 images further on its passage each time it comes back (stop motion).
   const videos = { shots: pileShots(line, 9 / 16, "video") };
   assert.deepEqual([5, 74, 143].map((f) => { const p = pictures(f, videos)[0]!; return [p.shot, f - Number(p.at)]; }), [[1, 0], [1, 3], [1, 6]]);
@@ -9052,13 +9153,13 @@ test("« Carte au feutre » (v2): full frame as the original, two bands when her
   // frame), each mounted once it has letters, nothing cut out, followed, read or in depth; no 3D transform, its hand
   // without its costly bend.
   for (let f = 0; f < 270; f += 3) {
-    const tree = draw(f, carteProps(line, wide));
+    const tree = draw(f, carteProps(line, banded));
     assert.ok(drawnNodes(tree).filter((n) => n.type === "Footage").length <= 2 && handsOf(tree).length <= 2 && handsOf(tree).every((n) => Number(n.props.upTo) > 0), `image ${f}`);
   }
   assert.deepEqual([subjectsDrawn(carteFeutre.code), objectsDrawn(carteFeutre.code), clearsDrawn(carteFeutre.code), depthsDrawn(carteFeutre.code)], [[], [], [], []]);
   assert.deepEqual(checkMotionCode(carteFeutre.code), []);
   assert.equal(plan.layers![0]!.motion.drawn, undefined);
-  assert.deepEqual(plan.skill, { key: "carte-feutre", version: 2 });
+  assert.deepEqual(plan.skill, { key: "carte-feutre", version: 3 });
 });
 
 /** « Photos posées sur la table »: the original's cuts on its main line (its images at 30 i/s, measured), its ten prints' landings. */
@@ -9078,7 +9179,8 @@ const tableProps = (line: { shots: { start: number; end: number }[]; marks: Reco
     { text: "Argile", role: "hook", from: 9, to: 76, emphasis: [] },
   ],
   end: null,
-  texts: marksOf(line),
+  // « Comme ses vidéos » (her words: « comme mes vidéos »): its 4:3 frame for her table filmed in width.
+  texts: { ...marksOf(line), format: "auto" },
   ...extra,
 });
 /** Its prints at a frame: each one's box and angle, and the shot it shows. */
@@ -9095,7 +9197,7 @@ const tableHalves = (tree: Drawn) =>
 test("« Photos posées sur la table » (v2) cuts where its original does, its prints and its halves laid on the same moment, on its music (110 BPM)", async () => {
   const { table, tableParts, printLandings } = await import("./skills/table.ts");
   const { besideOf, skillPlan } = await import("./skills.ts");
-  assert.equal(table.version, 2);
+  assert.equal(table.version, 3);
   assert.equal(table.bpm, 110);
   const line = table.timeline(25, { end: false });
   // The original's 25 shots in its 8,93 s (268 images): its table, ten prints, two quick shots, five pairs, the gesture's
@@ -9217,7 +9319,7 @@ test("« Photos posées sur la table » (v2): its prints at once at the centre a
   assert.doesNotMatch(table.code + JSON.stringify(table.texts), /Joe Taylor|this is/i);
 });
 
-test("« Photos posées sur la table » (v2): horizontal 4:3 on black when her table is in width, full frame otherwise or on her word; its halves; light to render", async () => {
+test("« Photos posées sur la table » (v3): full frame by default, horizontal 4:3 on black on her word or as her table; its halves; light to render", async () => {
   const { table } = await import("./skills/table.ts");
   const { skillFillInput, skillSettings, skillPlan } = await import("./skills.ts");
   const { subjectsDrawn, objectsDrawn, clearsDrawn, depthsDrawn } = await import("./subject.ts");
@@ -9229,13 +9331,17 @@ test("« Photos posées sur la table » (v2): horizontal 4:3 on black when her t
     return [styleOf(b).top, styleOf(b).height];
   };
   const upright = { shots: tableShots(line, 9 / 16) };
-  // Her table in width: the original's 4:3 band in the middle of the screen; upright: the whole frame; her setting either way.
+  // By default (Tristan, 6 November: « tout vertical please »), the whole frame whatever her table.
+  assert.deepEqual(frameOf(draw(100, tableProps(line, { texts: marksOf(line) }))), [0, 1920]);
+  // As her table (« comme ma vidéo »), in width: the original's 4:3 band in the middle of the screen; upright: the whole
+  // frame; her setting either way.
   assert.deepEqual(frameOf(draw(100, tableProps(line))), [555, 810]);
   assert.deepEqual(frameOf(draw(100, tableProps(line, upright))), [0, 1920]);
   assert.deepEqual(frameOf(draw(100, tableProps(line, { texts: { ...marksOf(line), format: "vertical" } }))), [0, 1920]);
   assert.deepEqual(frameOf(draw(100, tableProps(line, { ...upright, texts: { ...marksOf(line), format: "horizontal" } }))), [555, 810]);
-  assert.deepEqual(table.settings?.map((s) => [s.name, s.choices.map((c) => c.value)]), [["format", ["auto", "horizontal", "vertical"]]]);
-  assert.deepEqual(skillSettings(table, [{ name: "format", value: "vertical" }]), { format: "vertical" });
+  assert.deepEqual(table.settings?.map((s) => [s.name, s.choices.map((c) => c.value)]), [["format", ["vertical", "horizontal", "auto"]]]);
+  assert.deepEqual(skillSettings(table, [{ name: "format", value: "horizontal" }]), { format: "horizontal" });
+  assert.deepEqual(skillSettings(table, [{ name: "format", value: "vertical" }]), {});
   // Its halves, each at its own speed (no `at`): side by side, her place on the left and the gesture on the right (2:3
   // each); in vertical the gesture above her place (9:8 each).
   const halves = (f: number, extra: Record<string, unknown> = {}) => tableHalves(draw(f, tableProps(line, extra))).map((h) => [h.shot, ...h.box]);
@@ -9252,12 +9358,16 @@ test("« Photos posées sur la table » (v2): horizontal 4:3 on black when her t
   const through = tableHalves(draw(200, tableProps(line)));
   assert.deepEqual(through.map((h) => [h.shot, h.style.left, h.style.width]), [[22, 0, 540], [24, -540, 1080]]);
   assert.deepEqual(drawnNodes(draw(201, tableProps(line))).filter((n) => n.type === "Footage").map((n) => [n.props.shot, styleOf(n).width]), [[24, 1080]]);
-  // The filler sees which half plays with which, and where each is.
+  // The filler sees which half plays with which, and where each is, as its format lays them: vertical by default; a
+  // correction on its band, side by side.
   const files = Array.from({ length: 16 }, (_, i) => ({ id: `f${i}`, photo: i >= 1 && i <= 8, seconds: i >= 1 && i <= 8 ? 0 : 10, aspect: i >= 1 && i <= 8 ? 0.75 : 9 / 16 }));
   const input = skillFillInput({ skill: table, name: "Photos posées sur la table", n: 25, files, business: {}, request: "" });
   assert.equal(input.cases.filter((c) => "en_meme_temps_que" in c).length, 15);
-  assert.match(input.cases[13]!.veut, /^la moitié de droite \(du haut quand le Reel est vertical\) de l'écran partagé : un geste/);
-  assert.match(input.cases[14]!.veut, /^la moitié de gauche \(du bas quand le Reel est vertical\) de l'écran partagé : son lieu/);
+  assert.match(input.cases[13]!.veut, /^la moitié du haut de l'écran partagé : un geste/);
+  assert.match(input.cases[14]!.veut, /^la moitié du bas de l'écran partagé : son lieu/);
+  const banded = skillFillInput({ skill: table, name: "Photos posées sur la table", n: 25, files, business: {}, request: "", currentSettings: { format: "horizontal" } });
+  assert.match(banded.cases[13]!.veut, /^la moitié de droite de l'écran partagé : un geste/);
+  assert.match(table.timeline(25, { end: false }).shots[13]!.want, /^la moitié de droite \(du haut quand le Reel est vertical\) de l'écran partagé : un geste/);
   assert.match(table.timeline(25, { end: false, settings: { format: "vertical" } }).shots[13]!.want, /^la moitié du haut/);
   // Its grade without vignette nor grain; light to render: her prints mounted only while the pile is seen (inside one
   // light fade), two shots at once in the split screen, nothing cut out, followed, read or in depth.
@@ -9269,14 +9379,14 @@ test("« Photos posées sur la table » (v2): horizontal 4:3 on black when her t
   assert.deepEqual([subjectsDrawn(table.code), objectsDrawn(table.code), clearsDrawn(table.code), depthsDrawn(table.code)], [[], [], [], []]);
   assert.deepEqual(checkMotionCode(table.code), []);
   assert.doesNotMatch(table.code, /scale\(|translate|Whip|Punch|ZoomThrough/);
-  const plan = skillPlan({ skill: table, name: "Photos posées sur la table", files, fill: { shots: Array.from({ length: 25 }, (_, i) => ({ file: files[i % 16]!.id, at: 0 })), texts: { gauche: "voici", droite: "Argile" }, end: null, settings: { format: "vertical" } } });
-  assert.deepEqual(plan.skill, { key: "table", version: 2, settings: { format: "vertical" } });
-  assert.equal(plan.layers![0]!.motion.texts!.format, "vertical");
+  const plan = skillPlan({ skill: table, name: "Photos posées sur la table", files, fill: { shots: Array.from({ length: 25 }, (_, i) => ({ file: files[i % 16]!.id, at: 0 })), texts: { gauche: "voici", droite: "Argile" }, end: null, settings: { format: "horizontal" } } });
+  assert.deepEqual(plan.skill, { key: "table", version: 3, settings: { format: "horizontal" } });
+  assert.equal(plan.layers![0]!.motion.texts!.format, "horizontal");
 });
 
 test("« Interrupteur » (v4): once she has left, her wall held on that image to the end, nothing of hers coming back; never frozen when nothing says she was there", async () => {
   const { interrupteur } = await import("./skills/interrupteur.ts");
-  assert.equal(interrupteur.version, 9);
+  assert.equal(interrupteur.version, 10);
   const line = interrupteur.timeline(1, { end: false });
   const marks = Object.fromEntries(Object.entries(line.marks).map(([k, v]) => [k, String(v)]));
   const brand = { name: "Atelier Rose", displayFont: "Inter Tight", bodyFont: "Inter Tight", accent: "#7a2e3b", palette: { secondary: "#2c4a3e", light: "#f4efe9", dark: "#1d1d1b" } };
@@ -9306,7 +9416,7 @@ test("« Interrupteur » (v4): once she has left, her wall held on that image to
 
 test("« Mots mêlés » (v4): each letter's halo stronger where the picture stays bright under it, the same as v3's on a dark one", async () => {
   const { motsMeles } = await import("./skills/mots-meles.ts");
-  assert.equal(motsMeles.version, 4);
+  assert.equal(motsMeles.version, 5);
   const line = motsMeles.timeline(1, { end: false });
   const marks = Object.fromEntries(Object.entries(line.marks).map(([k, v]) => [k, String(v)]));
   const props = { width: 1080, height: 1920, durationInFrames: 563, brand: { name: "Le Studio", displayFont: "Inter Tight", bodyFont: "Inter Tight" }, shots: rallumeShots(line), reelTexts: MM_WORDS, end: null, texts: marks };
@@ -9372,7 +9482,7 @@ const apKinds = (nodes: Drawn[]) =>
 test("« Toi sur un aplat de couleur » (v2) cuts where its original does, on its own music (123 BPM), its dips, its end on the colour", async () => {
   const { aplat } = await import("./skills/aplat.ts");
   const { skillPlan } = await import("./skills.ts");
-  assert.equal(aplat.version, 2);
+  assert.equal(aplat.version, 3);
   assert.equal(aplat.bpm, 123);
   const line = aplat.timeline(4, { end: false });
   // Its walk, the next shot, the one in front of a background, the same later: each cut within two images of the
@@ -9424,7 +9534,7 @@ test("« Toi sur un aplat de couleur » (v2) cuts where its original does, on it
   const plan = skillPlan({ skill: aplat, name: "Toi sur un aplat de couleur", files, fill: { shots: files.map((f) => ({ file: f.id, at: 1 })), texts: {}, end: null } });
   assert.ok(editPlanSchema.safeParse(plan).success);
   assert.equal(plan.music_shape?.filters?.length, 2);
-  assert.deepEqual(plan.skill, { key: "aplat", version: 2 });
+  assert.deepEqual(plan.skill, { key: "aplat", version: 3 });
   assert.equal(plan.texts.length, 0);
 });
 
@@ -9509,7 +9619,9 @@ test("« Toi sur un aplat de couleur » (v2): its next shot burnt as it lands, a
   assert.equal(insets.at(-1), 150);
   const gaps = insets.slice(1).map((v, i) => v - insets[i]!);
   assert.ok(Math.max(...gaps) - Math.min(...gaps) <= 1, gaps.join(" "));
-  assert.equal(styleOf(await framed(from + 58, { aspect: 16 / 9 })).clipPath, "inset(144px 159px)");
+  assert.equal(styleOf(await framed(from + 58, { aspect: 16 / 9, settings: { format: "horizontal" } })).clipPath, "inset(144px 159px)");
+  // (Her shots in width full frame by default, as her upright ones.)
+  assert.equal(styleOf(await framed(from + 58, { aspect: 16 / 9 })).clipPath, styleOf(await framed(from + 58)).clipPath);
   // Someone in front of a background: as filmed for a beat, then the world behind them frozen on one image (its
   // Footage held on the frame of the first note) in a new look on each note, they cut out in front, moving.
   const photo = Math.round(line.shots[2]!.start * 30);
@@ -9545,7 +9657,7 @@ test("« Toi sur un aplat de couleur » (v2): its next shot burnt as it lands, a
   assert.ok(card.nodes.some((n) => n.type === "div" && styleOf(n).backgroundColor === "#e4572e" && styleOf(n).height === 1920));
 });
 
-test("« Toi sur un aplat de couleur » (v2): horizontal 4:3 on black as its original when her files are, full frame otherwise; her colour, the original's red; light to render", async () => {
+test("« Toi sur un aplat de couleur » (v3): full frame by default, horizontal 4:3 on black as its original on her word or as her files; her colour, the original's red; light to render", async () => {
   const { aplat } = await import("./skills/aplat.ts");
   const { skillCode, skillPlan, skillFillInput, skillSettings } = await import("./skills.ts");
   const { ANY_SHOT, objectsDrawn, nearsDrawn, readsDrawn, subjectsDrawn } = await import("./subject.ts");
@@ -9554,14 +9666,17 @@ test("« Toi sur un aplat de couleur » (v2): horizontal 4:3 on black as its ori
     const box = nodes.find((n) => n.type === "div" && styleOf(n).overflow === "hidden" && styleOf(n).backgroundColor === "#000000")!;
     return { top: styleOf(box).top, height: styleOf(box).height };
   };
-  // Her files mostly horizontal: its 4:3 picture (1080 × 810) at the middle of the frame, on black; upright: the whole
-  // frame; her setting either way.
-  assert.deepEqual(frameOf((await aplatDrawn(120, { aspect: 16 / 9 })).nodes), { top: 555, height: 810 });
+  // By default (Tristan, 6 November: « tout vertical please »), the whole frame whatever her files; as her files (« comme
+  // mes vidéos »), mostly horizontal: its 4:3 picture (1080 × 810) at the middle of the frame, on black; her setting
+  // either way.
+  assert.deepEqual(frameOf((await aplatDrawn(120, { aspect: 16 / 9 })).nodes), { top: 0, height: 1920 });
   assert.deepEqual(frameOf((await aplatDrawn(120)).nodes), { top: 0, height: 1920 });
+  assert.deepEqual(frameOf((await aplatDrawn(120, { aspect: 16 / 9, settings: { format: "auto" } })).nodes), { top: 555, height: 810 });
+  assert.deepEqual(frameOf((await aplatDrawn(120, { settings: { format: "auto" } })).nodes), { top: 0, height: 1920 });
   assert.equal(frameOf((await aplatDrawn(120, { aspect: 16 / 9, settings: { format: "vertical" } })).nodes).height, 1920);
   assert.equal(frameOf((await aplatDrawn(120, { settings: { format: "horizontal" } })).nodes).top, 555);
-  assert.deepEqual(aplat.settings?.map((s) => [s.name, s.choices.map((c) => c.value)]), [["format", ["auto", "horizontal", "vertical"]], ["couleur", ["sienne", "rouge"]]]);
-  assert.deepEqual(skillSettings(aplat, [{ name: "format", value: "auto" }, { name: "couleur", value: "rouge" }]), { couleur: "rouge" });
+  assert.deepEqual(aplat.settings?.map((s) => [s.name, s.choices.map((c) => c.value)]), [["format", ["vertical", "horizontal", "auto"]], ["couleur", ["sienne", "rouge"]]]);
+  assert.deepEqual(skillSettings(aplat, [{ name: "format", value: "vertical" }, { name: "couleur", value: "rouge" }]), { couleur: "rouge" });
   // Its colour: hers when vivid, else the original's pure red (#FF0000 measured), on her word the red whatever hers.
   const colourOf = async (accent: string, settings: Record<string, string> = {}) =>
     styleOf((await aplatDrawn(10, { accent, settings })).nodes.find((n) => n.type === "div" && styleOf(n).height === 1920 && styleOf(n).backgroundColor && styleOf(n).backgroundColor !== "#000000")!).backgroundColor;
@@ -9652,7 +9767,8 @@ const detouragesDrawn = async (frame: number, options: { n?: number; aspect?: nu
       shots: pileShots(line, options.aspect ?? 16 / 9),
       reelTexts: [{ text: name, role: "hook", from: line.marks.name, to: drop, emphasis: [] }],
       end: options.end ? { title: "Ouvert dimanche", subtitle: "de 9 h à 18 h", from: durationInFrames - 48 } : null,
-      texts: { ...Object.fromEntries(Object.entries(line.marks).map(([k, v]) => [k, String(v)])), ...(options.settings ?? {}) },
+      // « Comme ses vidéos » unless said (her words: « comme mes vidéos »): its window for her horizontal videos.
+      texts: { ...Object.fromEntries(Object.entries(line.marks).map(([k, v]) => [k, String(v)])), ...(options.settings ?? { format: "auto" }) },
     },
     options.read ?? DT_READ,
   );
@@ -9663,7 +9779,7 @@ const DT_READ = { skyline: (shot: number | undefined, span: { from?: number; to?
 test("« Ton nom qui clignote » (v2) cuts where its original does, on its own music (140 BPM): its burst on the dotted rhythm, its sweeps, its intro and its bass", async () => {
   const { detourages, burstCuts } = await import("./skills/detourages.ts");
   const { skillPlan } = await import("./skills.ts");
-  assert.equal(detourages.version, 2);
+  assert.equal(detourages.version, 3);
   assert.equal(detourages.bpm, 140);
   const line = detourages.timeline(23, { end: false });
   // Its 23 shots, each cut within two images of the original's (here within one: its cuts measured, just after the
@@ -9726,7 +9842,7 @@ test("« Ton nom qui clignote » (v2) cuts where its original does, on its own m
   assert.equal(plan.sounds?.length, 1);
   assert.equal(plan.sounds![0]!.burst!.times.length, 6);
   assert.equal(plan.music_shape?.downbeat, line.shots[1]!.start);
-  assert.deepEqual(plan.skill, { key: "detourages", version: 2 });
+  assert.deepEqual(plan.skill, { key: "detourages", version: 3 });
 });
 
 test("« Ton nom qui clignote » (v2): its window opens as a slit at a constant speed, her name lights letter by letter as the original's, behind her scenery", async () => {
@@ -9798,7 +9914,7 @@ test("« Ton nom qui clignote » (v2): its window opens as a slit at a constant 
   assert.equal((await detouragesDrawn(drop)).nodes.some((n) => n.type === "FitText" || n.type === "Skyline"), false);
 });
 
-test("« Ton nom qui clignote » (v2): its rounded window on black when her videos are horizontal, full frame otherwise or on her word; its sweeps; light to render", async () => {
+test("« Ton nom qui clignote » (v3): full frame by default, its rounded window on black on her word or as her videos; its sweeps; light to render", async () => {
   const { detourages } = await import("./skills/detourages.ts");
   const { skillPlan, skillFillInput, skillSettings } = await import("./skills.ts");
   const { readsDrawn, subjectsDrawn } = await import("./subject.ts");
@@ -9806,16 +9922,19 @@ test("« Ton nom qui clignote » (v2): its rounded window on black when her vide
     const box = nodes.find((n) => n.type === "div" && styleOf(n).overflow === "hidden" && styleOf(n).backgroundColor === "#000000")!;
     return { top: styleOf(box).top, height: styleOf(box).height };
   };
-  // Her videos horizontal (or square): the original's window, 1,18:1, at the middle of the frame on black; upright: the
-  // whole frame, its corners rounded and its slit kept; her setting either way.
+  // By default (Tristan, 6 November: « tout vertical please »): the whole frame, its corners rounded and its slit kept.
+  assert.deepEqual(frameOf((await detouragesDrawn(300, { settings: {} })).nodes), { top: 0, height: 1920 });
+  // As her videos, horizontal (or square): the original's window, 1,18:1, at the middle of the frame on black; upright: the
+  // whole frame; her setting either way.
   assert.deepEqual(frameOf((await detouragesDrawn(300)).nodes), { top: 503, height: 915 });
   assert.deepEqual(frameOf((await detouragesDrawn(300, { aspect: 1 })).nodes), { top: 503, height: 915 });
   assert.deepEqual(frameOf((await detouragesDrawn(300, { aspect: 9 / 16 })).nodes), { top: 0, height: 1920 });
   assert.equal(frameOf((await detouragesDrawn(300, { settings: { format: "vertical" } })).nodes).height, 1920);
   assert.equal(frameOf((await detouragesDrawn(300, { aspect: 9 / 16, settings: { format: "fenetre" } })).nodes).top, 503);
   assert.match(String(styleOf((await detouragesDrawn(300, { aspect: 9 / 16 })).nodes.find((n) => n.type === "div" && styleOf(n).overflow === "hidden")!).clipPath), /^inset\(0 0px round 32px\)$/);
-  assert.deepEqual(detourages.settings?.map((s) => [s.name, s.choices.map((c) => c.value)]), [["format", ["auto", "fenetre", "vertical"]]]);
-  assert.deepEqual(skillSettings(detourages, [{ name: "format", value: "auto" }, { name: "format", value: "vertical" }]), { format: "vertical" });
+  assert.deepEqual(detourages.settings?.map((s) => [s.name, s.choices.map((c) => c.value)]), [["format", ["vertical", "fenetre", "auto"]]]);
+  assert.deepEqual(skillSettings(detourages, [{ name: "format", value: "vertical" }, { name: "format", value: "fenetre" }]), { format: "fenetre" });
+  assert.equal(detourages.settings?.[0]?.choices.find((c) => c.band)?.value, "fenetre");
   // Its two sweeps streaked along their way and sliding (a vertical one, then a sideways one), its other shots as filmed.
   const { line } = await detouragesDrawn(0);
   const streak = async (f: number) => {
@@ -10069,8 +10188,11 @@ test("« Présente-toi » (v2): vertical by default, the original's 16:9 frame o
   const { skillSettings } = await import("./skills.ts");
   // Vertical full frame by default (drawn on its two flat colours, whatever her videos); on her word, the original's
   // 16:9 frame in the middle on midnight bands, the pale scenes a band, the dark ones the whole frame.
-  assert.deepEqual(silhouette.settings?.map((s) => [s.name, s.choices.map((c) => c.value)]), [["format", ["auto", "horizontal", "vertical"]]]);
+  assert.deepEqual(silhouette.settings?.map((s) => [s.name, s.choices.map((c) => c.value)]), [["format", ["vertical", "horizontal", "auto"]]]);
   assert.deepEqual(skillSettings(silhouette, [{ name: "format", value: "horizontal" }]), { format: "horizontal" });
+  assert.deepEqual(skillSettings(silhouette, [{ name: "format", value: "vertical" }]), {});
+  // « Comme ses vidéos » is vertical too: its Reel the same as before (its version kept).
+  assert.equal(styleOf((await silhouetteAt(40, SIL_READ, { settings: { format: "auto" } })).tree).backgroundColor, "#f3f4f9");
   const tall = (await silhouetteAt(40, SIL_READ)).tree;
   assert.equal(styleOf(tall).backgroundColor, "#f3f4f9");
   const wide = (await silhouetteAt(40, SIL_READ, { settings: { format: "horizontal" } })).tree;
@@ -10233,9 +10355,13 @@ test("« Vision machine » (v1): its machine looks pass by pass, each at its own
 test("« Vision machine » (v1): vertical as its original, her shot in a 16:9 band on her word; her title in option; light to render", async () => {
   const { vision } = await import("./skills/vision.ts");
   // Vertical full frame; on her word her shot in a 16:9 band in the middle on the white of the passes, its blacks full frame.
-  assert.deepEqual(vision.settings?.map((s) => [s.name, s.choices.map((c) => c.value)]), [["format", ["auto", "horizontal", "vertical"]]]);
+  assert.deepEqual(vision.settings?.map((s) => [s.name, s.choices.map((c) => c.value)]), [["format", ["vertical", "horizontal", "auto"]]]);
+  assert.equal(vision.settings?.[0]?.choices.find((c) => c.band)?.value, "horizontal");
   const bandOf = (tree: Drawn) => drawnNodes(tree).find((n) => styleOf(n).background === "#fdfdfd" && styleOf(n).overflow === "hidden")!;
   assert.deepEqual([styleOf(bandOf(await (await visionAt(11)).tree)).top, styleOf(bandOf(await (await visionAt(11)).tree)).height], [0, 1920]);
+  // « Comme ses vidéos » is vertical too: its Reel the same as before (its version kept).
+  const auto = (await visionAt(11, VIS_READ, { settings: { format: "auto" } })).tree;
+  assert.deepEqual([styleOf(bandOf(auto)).top, styleOf(bandOf(auto)).height], [0, 1920]);
   const wide = (await visionAt(11, VIS_READ, { settings: { format: "horizontal" } })).tree;
   assert.deepEqual([styleOf(bandOf(wide)).top, styleOf(bandOf(wide)).height], [656, 608]);
   // A shot in width framed on her still subject, kept in the middle of the vertical frame.

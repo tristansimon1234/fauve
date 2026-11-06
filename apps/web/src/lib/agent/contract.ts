@@ -1,12 +1,13 @@
 import "server-only";
-import { BRIEF_MAX, CHAT_MODEL, CONTRACT_PROMPT, EMPTY_CONTRACT, reelContractSchema, type ReelContract } from "@fauve/agent";
+import { BRIEF_MAX, CHAT_MODEL, CONTRACT_PROMPT, EMPTY_CONTRACT, reelContractSchema, settleFrame, type ReelContract } from "@fauve/agent";
 import { outputFormat, readAnswer } from "@fauve/agent/answer";
 import { anthropic, logClaudeCost } from "./run";
 
 /**
  * What she fixed for this Reel, read once from her request (her words, Edith's brief or
  * « Ce que tu imagines »). Never blocks the montage: unreadable, nothing is fixed and the
- * usual defaults decide.
+ * usual defaults decide. A format she asks for (« en vertical plein écran ») goes to its frame, never to
+ * a layout of hers, which would take a Reel out of its model (settleFrame).
  */
 export async function readContract(studioId: string, brief: string | undefined, currentVoice?: string | null): Promise<ReelContract> {
   if (!brief?.trim()) return EMPTY_CONTRACT;
@@ -22,7 +23,7 @@ export async function readContract(studioId: string, brief: string | undefined, 
       messages: [{ role: "user", content }],
     });
     await logClaudeCost(studioId, response.usage, "contract", CHAT_MODEL);
-    return response.parsed_output ? readAnswer(reelContractSchema, response.parsed_output) : EMPTY_CONTRACT;
+    return response.parsed_output ? settleFrame(readAnswer(reelContractSchema, response.parsed_output)) : EMPTY_CONTRACT;
   } catch (error) {
     console.warn("contract not read, the defaults decide", error);
     return EMPTY_CONTRACT;

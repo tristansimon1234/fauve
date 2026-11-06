@@ -1,4 +1,4 @@
-import type { ReelContract } from "./contract.ts";
+import { formatOnly, type ReelContract } from "./contract.ts";
 import type { MontageSkill } from "./skills.ts";
 import type { FollowedStyle } from "./steal.ts";
 
@@ -24,13 +24,14 @@ export type CopyNearest = { key: string; closeness: number };
 export const laysVoice = (skill: Pick<MontageSkill, "voice"> | null | undefined): boolean => Boolean(skill && !skill.voice);
 
 /**
- * Her request asks for what no montage skill does: a layout of her own; a voice over her Reel or the words of a voice,
- * unless the skill playing it lays one (`laid`: one of Edith's models she or Edith chose, laysVoice), when the voice is
- * there (her words with no voice recorded for them, its reading failed, stay the chain's, as before). A Reel she sent
- * to copy keeps the chain for a voice.
+ * Her request asks for what no montage skill does: a layout of her own (never a format alone, « en vertical plein
+ * écran »: its frame, a model's format setting, formatOnly); a voice over her Reel or the words of a voice, unless the
+ * skill playing it lays one (`laid`: one of Edith's models she or Edith chose, laysVoice), when the voice is there (her
+ * words with no voice recorded for them, its reading failed, stay the chain's, as before). A Reel she sent to copy keeps
+ * the chain for a voice.
  */
 export function beyondSkills(contract: Pick<ReelContract, "layout" | "voice_text" | "voice_text_rest"> | undefined, voice: boolean, laid = false): boolean {
-  if (contract?.layout) return true;
+  if (contract?.layout && !formatOnly(contract.layout)) return true;
   const words = Boolean(contract?.voice_text || contract?.voice_text_rest);
   return laid ? words && !voice : voice || words;
 }

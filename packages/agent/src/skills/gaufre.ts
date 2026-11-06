@@ -73,7 +73,7 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
 
   // Its frame: the whole vertical frame as the original when her video of her front is upright, her video whole in a
   // 16:9 band in the middle of the black when it is in width (or on her word); the paper always full frame.
-  const format = setting("format", "auto");
+  const format = setting("format", "vertical");
   const lying = format === "horizontal" || (format === "auto" && (Number(shots[0] && shots[0].aspect) || 0.5625) > 1.15);
   const W = width;
   const H = lying ? Math.round((width * 9) / 16) : height;
@@ -347,12 +347,14 @@ export const gaufre: MontageSkill = {
   // name first), on its music's notes, a stop and the street on the reprise; its paper, its name pressed then inked
   // along each letter, dark then rust, lifted off the paper, its line inked from left to right; its tempo (113,2), its
   // music thin then whole, cut dead; its format; no grain nor dark corners.
-  version: 2,
+  // 3: vertical full frame by default, her horizontal files cropped on their subject, its band only when she asks for
+  // it (Tristan, 6 November, on seven benches: « vertical please », « tout vertical please »).
+  version: 3,
   bpm: BPM,
   // Her front (the original has one video), and the same video under the paper, where its things are read.
   shots: [2, 2],
   files: [1, 1],
-  how: "Sur un écran noir, sa devanture se construit morceau par morceau, chacun d'un coup à sa place, sa vidéo jouant dedans : d'abord ce qui porte son nom, puis une chose loin de lui et la plus haute, puis une rafale (ce qui traverse sa devanture, ce qui est devant, ses fenêtres, ses murs), un silence, et sur la reprise la rue, le haut à gauche, le reste ; sa devanture vit en entier ; puis une coupe franche sur un papier pêche où son nom est pressé en creux, une ligne en capitales dessous : l'encre entre dans chaque lettre (la première lentement, les autres en montant, le point d'un i en dernier), sèche du brun au rouille, et la lettre se soulève ; la ligne s'encre de gauche à droite. En plein écran comme l'original, sa vidéo entière dans une bande au milieu du noir quand elle est en largeur.",
+  how: "Sur un écran noir, sa devanture se construit morceau par morceau, chacun d'un coup à sa place, sa vidéo jouant dedans : d'abord ce qui porte son nom, puis une chose loin de lui et la plus haute, puis une rafale (ce qui traverse sa devanture, ce qui est devant, ses fenêtres, ses murs), un silence, et sur la reprise la rue, le haut à gauche, le reste ; sa devanture vit en entier ; puis une coupe franche sur un papier pêche où son nom est pressé en creux, une ligne en capitales dessous : l'encre entre dans chaque lettre (la première lentement, les autres en montant, le point d'un i en dernier), sèche du brun au rouille, et la lettre se soulève ; la ligne s'encre de gauche à droite. En plein écran comme l'original, une vidéo en largeur recadrée sur son sujet ; entière dans une bande au milieu du noir à sa demande.",
   end: true,
   texts: [
     {
@@ -395,11 +397,11 @@ export const gaufre: MontageSkill = {
   settings: [
     {
       name: "format",
-      want: "le format : comme sa vidéo de devanture, en plein écran vertical, ou sa vidéo entière dans une bande horizontale",
+      want: "le format : en plein écran vertical, sa vidéo de devanture entière dans une bande horizontale, ou comme elle",
       choices: [
-        { value: "auto", says: "comme sa vidéo de devanture (en bande horizontale si elle est en largeur)" },
-        { value: "horizontal", says: "sa vidéo entière dans une bande 16:9 au milieu du noir, le papier en plein écran" },
         { value: "vertical", says: "en plein écran vertical comme l'original, sa vidéo en largeur recadrée sur son sujet" },
+        { value: "horizontal", says: "sa vidéo entière dans une bande 16:9 au milieu du noir, le papier en plein écran", band: true },
+        { value: "auto", says: "comme sa vidéo de devanture (en bande horizontale si elle est en largeur)" },
       ],
     },
   ],

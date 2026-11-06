@@ -79,7 +79,7 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
 
   // Its frame: a horizontal 4:3 picture on black, as the original, when most of her files are horizontal (or she asks),
   // else the whole vertical frame; every place below is a share of it.
-  const format = setting("format", "auto");
+  const format = setting("format", "vertical");
   const wideShots = shots.filter((s) => (Number(s.aspect) || 0.5625) > 1.15).length;
   const wide = format === "horizontal" || (format === "auto" && wideShots * 2 > n);
   const bw = width;
@@ -282,13 +282,15 @@ export const titreDerriere: MontageSkill = {
   // its 23 cuts, its music stopped one beat a bar, its title rising from below onto a hit behind her scenery, its
   // paper-white pieces, its wave one letter at a time, its blinking sign, its zoom blur, its flashes, the next shot's
   // silhouette, its burst in sixths of a beat, its dead cut; its finish without grain nor corners.
-  version: 2,
+  // 3: vertical full frame by default, her horizontal files cropped on their subject, its band only when she asks for
+  // it (Tristan, 6 November, on seven benches: « vertical please », « tout vertical please »).
+  version: 3,
   bpm: BPM,
   shots: [14, 23],
   // Up to 35 for a length she asks for: about 30 s at its own tempo (bars of a held shot and a calm one before the burst).
   long: LONG,
   files: [5, 14],
-  how: "Un plan large et fixe de sa rue ou de son paysage où, sur un coup, son titre géant monte d'en bas dans le ciel, en capitales noires très grasses d'un rouge sang, derrière le décor (ses toits, ses arbres, ses collines passent devant), trois petits mots au stylo entre deux croix au-dessus ; à la reprise de la musique, le décor devient papier blanc morceau par morceau, puis une vague blanche passe sur les lettres ; un plan calme pendant que la musique s'arrête, trois plans éclair, ce qui se répète dans un plan qui blanchit une pièce après l'autre, son enseigne qui clignote en blanc, un plan qui avance vers sa porte dans un flou de zoom, un mur garni dont les cadres blanchissent pendant que l'objet devant flashe, la silhouette blanche de la personne du plan suivant, elle en contre-jour, une rafale de plans très courts et un dernier plan de près, coupé net. En horizontal 4:3 comme l'original quand ses vidéos le sont.",
+  how: "Un plan large et fixe de sa rue ou de son paysage où, sur un coup, son titre géant monte d'en bas dans le ciel, en capitales noires très grasses d'un rouge sang, derrière le décor (ses toits, ses arbres, ses collines passent devant), trois petits mots au stylo entre deux croix au-dessus ; à la reprise de la musique, le décor devient papier blanc morceau par morceau, puis une vague blanche passe sur les lettres ; un plan calme pendant que la musique s'arrête, trois plans éclair, ce qui se répète dans un plan qui blanchit une pièce après l'autre, son enseigne qui clignote en blanc, un plan qui avance vers sa porte dans un flou de zoom, un mur garni dont les cadres blanchissent pendant que l'objet devant flashe, la silhouette blanche de la personne du plan suivant, elle en contre-jour, une rafale de plans très courts et un dernier plan de près, coupé net. En vertical plein écran, ses vidéos horizontales recadrées sur leur sujet ; en horizontal 4:3 comme l'original à sa demande.",
   end: true,
   texts: [
     {
@@ -327,11 +329,11 @@ export const titreDerriere: MontageSkill = {
   settings: [
     {
       name: "format",
-      want: "le format : horizontal 4:3 comme l'original, ou vertical plein écran",
+      want: "le format : vertical plein écran, ou horizontal 4:3 comme l'original",
       choices: [
+        { value: "vertical", says: "vertical plein écran, ses vidéos horizontales recadrées sur leur sujet" },
+        { value: "horizontal", says: "horizontal 4:3 sur du noir, comme l'original", band: true },
         { value: "auto", says: "comme ses vidéos (horizontal si la plupart le sont)" },
-        { value: "horizontal", says: "horizontal 4:3 sur du noir, comme l'original" },
-        { value: "vertical", says: "vertical plein écran" },
       ],
     },
   ],

@@ -12,7 +12,7 @@ import { bienvenue, burstCuts, landingSlots, welcomeLines } from "./bienvenue.ts
 const ORIGINAL_CUTS = [25, 45, 61, 82, 87, 92, 97, 102, 111, 119, 131, 139, 147, 159, 167, 171, 176, 183, 190, 203, 209, 217, 223];
 
 test("« L'accueil, puis la rafale » (v1): four calm shots, the drop on sixteenth 16,75, twenty shots on the original's cuts (91,7 BPM), 7,73 s", () => {
-  assert.equal(bienvenue.version, 1);
+  assert.equal(bienvenue.version, 2);
   assert.equal(bienvenue.bpm, 91.7);
   const line = bienvenue.timeline(24, { end: false });
   // 232 images, the original's; each cut within an image of the original's, nineteen right on it.
@@ -113,7 +113,7 @@ test("« L'accueil, puis la rafale »: its plan (its sentence, its snaps, its mu
   assert.equal(plan.sounds?.length, 4);
   assert.ok(plan.sounds!.every((s) => s.skill && s.sound === "single finger snap"));
   assert.deepEqual(plan.music_shape?.pauses, [{ from: 0, to: 2.733 }]);
-  assert.deepEqual(plan.skill, { key: "bienvenue", version: 1 });
+  assert.deepEqual(plan.skill, { key: "bienvenue", version: 2 });
   assert.equal(plan.tempo, 91.7);
   assert.deepEqual(plan.layers![0]!.motion.fonts, ["Mynerve"]);
   // Light to render: the light of its four calm shots read under her words, nothing cut out nor followed, no clear area.
@@ -122,7 +122,7 @@ test("« L'accueil, puis la rafale »: its plan (its sentence, its snaps, its mu
   assert.deepEqual([subjectsDrawn(bienvenue.code), objectsDrawn(bienvenue.code), clearsDrawn(bienvenue.code)], [[], [], []]);
   assert.ok(bienvenue.code.length < 24000);
   assert.doesNotMatch(bienvenue.code, /transform|scale\(/);
-  assert.deepEqual(bienvenue.settings?.map((s) => [s.name, s.choices.map((c) => c.value)]), [["format", ["auto", "vertical", "horizontal"]], ["encre", ["sienne", "jaune", "blanc"]]]);
+  assert.deepEqual(bienvenue.settings?.map((s) => [s.name, s.choices.map((c) => c.value)]), [["format", ["vertical", "horizontal", "auto"]], ["encre", ["sienne", "jaune", "blanc"]]]);
 });
 
 // ——— What its code draws, frame by frame ————————————————————————————————————————————————————————————————————————————
@@ -174,8 +174,12 @@ test("« L'accueil, puis la rafale » plays the shot on now, its calm shots dark
   assert.equal(dose({ mean: 0.6, high: 0.9 }), "brightness(0.417) saturate(0.7)");
   assert.equal(dose({ mean: 0.75, high: 1 }), "brightness(0.350) saturate(0.7)");
   assert.equal(dose({ mean: 0.2, high: 0.5 }), "brightness(0.920) saturate(0.7)");
-  // Most of her videos in width (or her word): whole in a 16:9 band in the middle, on black; upright as asked.
-  assert.deepEqual([styleOf(of(drawAt(100, { aspect: 16 / 9 }), "Footage")[0]!).top, styleOf(of(drawAt(100, { aspect: 16 / 9 }), "Footage")[0]!).height], [656, 608]);
+  // Most of her videos in width: full frame too by default (Tristan, 6 November: « tout vertical please »), cropped on
+  // their subject; whole in a 16:9 band in the middle, on black, on her word or as her videos (« auto »); upright as asked.
+  assert.deepEqual([styleOf(of(drawAt(100, { aspect: 16 / 9 }), "Footage")[0]!).top, styleOf(of(drawAt(100, { aspect: 16 / 9 }), "Footage")[0]!).height], [0, 1920]);
+  const asVideos = { aspect: 16 / 9, texts: { format: "auto" } };
+  assert.deepEqual([styleOf(of(drawAt(100, asVideos), "Footage")[0]!).top, styleOf(of(drawAt(100, asVideos), "Footage")[0]!).height], [656, 608]);
+  assert.equal(styleOf(of(drawAt(100, { texts: { format: "auto" } }), "Footage")[0]!).height, 1920);
   assert.equal(styleOf(of(drawAt(100, { texts: { format: "horizontal" } }), "Footage")[0]!).height, 608);
   assert.equal(styleOf(of(drawAt(100, { aspect: 16 / 9, texts: { format: "vertical" } }), "Footage")[0]!).height, 1920);
 });

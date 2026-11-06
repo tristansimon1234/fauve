@@ -82,7 +82,7 @@ function inZone(box: Box, label: string) {
 }
 
 test("« Celui-là » (v2): its original's grid (96,5 BPM), its products one a beat, its cuts within two images of the original's", () => {
-  assert.equal(celuiLa.version, 2);
+  assert.equal(celuiLa.version, 3);
   assert.equal(celuiLa.bpm, 96.5);
   assert.deepEqual(celuiLa.shots, [5, 16]);
   const line = celuiLa.timeline(9, { end: false });
@@ -143,7 +143,7 @@ test("« Celui-là » (v2): its music shaped as its original's voice: thin throu
   assert.ok(plan.music_shape?.pauses?.length === 1 && plan.music_shape.filters?.length === 1);
   assert.equal(plan.sounds, undefined);
   assert.equal(plan.layers![0]!.motion.drawn, undefined);
-  assert.deepEqual(plan.skill, { key: "celui-la", version: 2 });
+  assert.deepEqual(plan.skill, { key: "celui-la", version: 3 });
 });
 
 test("« Celui-là » (v2): her hail typed letter by letter then faded, her stop word on three places, « Regarde » in the middle", () => {
@@ -237,14 +237,17 @@ test("« Celui-là » (v2): its ink, the original's cream where it reads on her 
   assert.equal(ink(0.85, { couleur: "blanc" }).color, "#2b2118");
   assert.equal(ink(0.85, { couleur: "sa-couleur" }).color, "#8a3b2a");
   assert.equal(ink(0.1, { couleur: "sa-couleur" }).color, "#fffcc0");
-  assert.deepEqual(celuiLa.settings?.map((s) => [s.name, s.choices.map((c) => c.value)]), [["format", ["auto", "vertical", "horizontal"]], ["couleur", ["creme", "blanc", "sa-couleur"]]]);
+  assert.deepEqual(celuiLa.settings?.map((s) => [s.name, s.choices.map((c) => c.value)]), [["format", ["vertical", "horizontal", "auto"]], ["couleur", ["creme", "blanc", "sa-couleur"]]]);
 });
 
-test("« Celui-là » (v2): upright as her files, in a 16:9 band on black when most are horizontal or she asks; its ending card", () => {
+test("« Celui-là » (v3): full frame by default, in a 16:9 band on black when she asks or as her files; its ending card", () => {
   const draw = scene();
   const footage = (tree: Drawn) => flatten(tree).find((n) => n.type === "Footage")!.props.style as Box;
   assert.deepEqual(footage(draw(80, propsFor(9).props)), { left: 0, top: 0, width: 1080, height: 1920 });
-  assert.deepEqual(footage(draw(80, propsFor(9, { aspect: 16 / 9 }).props)), { left: 0, top: 656, width: 1080, height: 608 });
+  // By default (Tristan, 6 November: « tout vertical please »), her horizontal files full frame, cropped on their subject.
+  assert.deepEqual(footage(draw(80, propsFor(9, { aspect: 16 / 9 }).props)), { left: 0, top: 0, width: 1080, height: 1920 });
+  assert.deepEqual(footage(draw(80, propsFor(9, { aspect: 16 / 9, settings: { format: "auto" } }).props)), { left: 0, top: 656, width: 1080, height: 608 });
+  assert.deepEqual(footage(draw(80, propsFor(9, { settings: { format: "auto" } }).props)), { left: 0, top: 0, width: 1080, height: 1920 });
   assert.deepEqual(footage(draw(80, propsFor(9, { aspect: 16 / 9, settings: { format: "vertical" } }).props)), { left: 0, top: 0, width: 1080, height: 1920 });
   assert.deepEqual(footage(draw(80, propsFor(9, { settings: { format: "horizontal" } }).props)), { left: 0, top: 656, width: 1080, height: 608 });
   // Only the shot on screen is laid: the one of that frame.

@@ -56,12 +56,13 @@ const props = (extra: Record<string, unknown> = {}, line = LINE) => ({
   shots: shotsOf(line),
   reelTexts: [{ text: "Chez Lou", role: "hook", from: 78, to: 123, emphasis: [] }],
   end: null,
-  texts: marksOf(line),
+  // « Comme ses vidéos » (her words: « comme mes vidéos »): its 16:9 frame for her horizontal videos.
+  texts: { ...marksOf(line), format: "auto" },
   ...extra,
 });
 
 test("« La nuit sous tous les angles » (v1): its 29 shots at 136,8 BPM, its night's cuts on the original's frames, 12 s", () => {
-  assert.equal(nuit.version, 1);
+  assert.equal(nuit.version, 2);
   assert.equal(nuit.bpm, 136.8);
   assert.deepEqual([nuit.shots, nuit.files, nuit.long], [[15, 29], [6, 20], 43]);
   // Its night cut where the original's is, image for image: the burn (74), the white flash (96), 126 … the black (328).
@@ -270,7 +271,7 @@ test("« La nuit sous tous les angles » (v1): its night comes in as the origina
   assert.ok(flatten(card).some((n) => n.type === "FitText" && String(n.props.key).startsWith("card-")));
 });
 
-test("« La nuit sous tous les angles » (v1): her name after the burn, in the safe zone; in 16:9 on black as her videos, or full frame", () => {
+test("« La nuit sous tous les angles » (v2): her name after the burn, in the safe zone; full frame by default, in 16:9 on black as her videos or her word", () => {
   const at = (f: number, extra = {}) => drawAt(nuit.code, f, props(extra));
   const title = (f: number, extra = {}) => flatten(at(f, extra)).find((n) => String(n.props.key).startsWith("title-"));
   assert.equal(title(77), undefined);
@@ -291,7 +292,10 @@ test("« La nuit sous tous les angles » (v1): her name after the burn, in the s
   const upright = { shots: shotsOf(LINE, 9 / 16) };
   assert.deepEqual([frameOf(upright).top, frameOf(upright).height], [0, 1920]);
   assert.deepEqual([frameOf({ texts: { ...marksOf(LINE), format: "vertical" } }).height], [1920]);
-  assert.deepEqual(nuit.settings?.map((s) => [s.name, s.choices.map((c) => c.value)]), [["format", ["auto", "horizontal", "vertical"]]]);
+  // By default (Tristan, 6 November: « tout vertical please »), full frame whatever her files; 16:9 on her word.
+  assert.deepEqual([frameOf({ texts: marksOf(LINE) }).top, frameOf({ texts: marksOf(LINE) }).height], [0, 1920]);
+  assert.deepEqual([frameOf({ ...upright, texts: { ...marksOf(LINE), format: "horizontal" } }).top], [656]);
+  assert.deepEqual(nuit.settings?.map((s) => [s.name, s.choices.map((c) => c.value)]), [["format", ["vertical", "horizontal", "auto"]]]);
 });
 
 test("« La nuit sous tous les angles » (v1): its code holds for every count it takes, its words in place, no zoom of its own on her night", () => {

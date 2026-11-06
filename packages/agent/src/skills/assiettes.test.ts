@@ -12,7 +12,7 @@ import { assiettes, keptCuts, phraseCounts } from "./assiettes.ts";
 const ORIGINAL_CUTS = [14, 31, 46, 64, 74, 85, 97, 108, 129, 140, 154, 169, 188, 191, 277, 291, 313, 329, 348, 358, 368, 383, 392, 418, 426, 437, 446, 463, 472, 490];
 
 test("« Défilé d'assiettes » (v1): its 31 dishes on its original's cuts (91,6 BPM, in sixteenths), its flash, its vedette, 16,9 s", () => {
-  assert.equal(assiettes.version, 1);
+  assert.equal(assiettes.version, 2);
   assert.equal(assiettes.bpm, 91.6);
   const line = assiettes.timeline(31, { end: false });
   // 507 images, the original's; each cut within an image of the original's, eleven right on it.
@@ -100,7 +100,7 @@ test("« Défilé d'assiettes »: its plan (its words by role, its music's shape
   assert.deepEqual(plan.texts.map((t) => [t.style, t.text]), [["hook", "Notre carte d'hiver"], ["caption", "faite maison"]]);
   assert.equal(plan.sounds?.length ?? 0, 0);
   assert.equal(plan.music_shape?.pauses?.length, 1);
-  assert.deepEqual(plan.skill, { key: "assiettes", version: 1 });
+  assert.deepEqual(plan.skill, { key: "assiettes", version: 2 });
   assert.equal(plan.tempo, 91.6);
   // Light to render: nothing cut out nor followed, no clear area, no reading of her shots.
   assert.deepEqual(checkMotionCode(assiettes.code), []);
@@ -150,10 +150,14 @@ test("« Défilé d'assiettes » draws the dish on now full frame, as filmed, on
     assert.equal(dish[0]!.props.shot, k, `image ${f}`);
     assert.deepEqual(styleOf(dish[0]!), { position: "absolute", left: 0, top: 0, width: 1080, height: 1920 });
   }
-  // Most of her videos in width (or her word): whole in a 16:9 band in the middle, on black; upright as asked.
-  assert.deepEqual(styleOf(of(drawAt(20, { aspect: 16 / 9 }), "Footage")[0]!), { position: "absolute", left: 0, top: 656, width: 1080, height: 608 });
+  // Most of her videos in width: full frame too by default (Tristan, 6 November: « tout vertical please »), cropped on
+  // their subject; whole in a 16:9 band in the middle, on black, on her word or as her videos (« auto »); upright as asked.
+  assert.deepEqual(styleOf(of(drawAt(20, { aspect: 16 / 9 }), "Footage")[0]!), { position: "absolute", left: 0, top: 0, width: 1080, height: 1920 });
+  assert.deepEqual(styleOf(of(drawAt(20, { aspect: 16 / 9, texts: { format: "auto" } }), "Footage")[0]!), { position: "absolute", left: 0, top: 656, width: 1080, height: 608 });
+  assert.equal(styleOf(of(drawAt(20, { texts: { format: "auto" } }), "Footage")[0]!).height, 1920);
   assert.equal(styleOf(of(drawAt(20, { texts: { format: "horizontal" } }), "Footage")[0]!).height, 608);
   assert.equal(styleOf(of(drawAt(20, { aspect: 16 / 9, texts: { format: "vertical" } }), "Footage")[0]!).height, 1920);
+  assert.deepEqual(assiettes.settings?.map((s) => [s.name, s.choices.map((c) => c.value)]), [["format", ["vertical", "horizontal", "auto"]]]);
 });
 
 test("« Défilé d'assiettes » types its title and its line together, at an even pace, its caret on the line only, both gone at once", () => {

@@ -72,7 +72,7 @@ export const CONTRACT_PROMPT = `You read a person's request for a Reel and note,
 - voice_text_mode: « polish » when they ask to improve it, to rephrase it, or say « dans l'idée », « genre »; otherwise « verbatim ».
 - person: « je » when they want to speak in their own name or their text is in the first person; « nous » or « il_elle » if they say so; otherwise « libre ».
 - voice_pace: « rapide » or « lente » if they ask for it; otherwise « normale ». voice_gender: if they say a man's or a woman's voice.
-- duration: the length in seconds if they give it. layout: the layout they describe (split screen, half and half, a shot in a frame…), in their words.
+- duration: the length in seconds if they give it. layout: the layout they describe (split screen, half and half, a shot in a frame…), in their words; never the format alone (vertical, full screen, horizontal, in bands, their videos kept whole: that is « frame »), so « en vertical plein écran » leaves layout null.
 - screen_text: an on-screen text they give word for word. ending: the ending they describe.
 - Words they give for the screen (screen_text, call_to_action_text) keep their words and order but are always written right: spelling, accents, apostrophes and hyphens, capitals of names (WhatsApp, Instagram), French punctuation (« Parles en a Edith, ton IA sur whatapps » → « Parles-en à Edith, ton IA sur WhatsApp. »). Never one of their typos on screen.
 - call_to_action: « la_sienne » with its text if they give the invitation; « aucune » if they don't want one; otherwise « libre ».
@@ -80,7 +80,7 @@ export const CONTRACT_PROMPT = `You read a person's request for a Reel and note,
 - A correction of a Reel that already has its voice-over also gets « Texte actuel de la voix ». When the request changes only part of this text (a word, a pronunciation, a sentence, the ending) or quotes only a piece of it, voice_text is the current text IN FULL with only that change made, nothing else cut or rewritten (verbatim): a quoted piece is never the whole text. Only a request that gives a whole new text, or asks for it to be rewritten, replaces it. When they say the voice stops too early, doesn't go to the end or must say more, voice_text is the current text in full and voice_text_rest what it must still say (what their original request describes and is missing). With no change to the voice asked for, voice_text stays null.
 - music: what they ask for the music of this Reel (instruments, genre, mood, pace, what they leave out), written in English for a composer, faithful to their words, nothing added; null when they say nothing about the music.
 - asked_sounds: sound effects they ask to hear each time something appears: on « texts » (each word or text that appears) or on « cuts » (each change of shot), the sound in a few generic English words (« light click », « soft whoosh »); empty when they ask for none.
-- frame: « letterbox » when they want their videos to stay whole and horizontal, with black (or bands) above and below, instead of filling the vertical frame; otherwise « vertical ».
+- frame: « letterbox » when they want their videos to stay whole and horizontal, with black (or bands) above and below, instead of filling the vertical frame (« en horizontal », « en bande », « garde mes vidéos entières »); otherwise « vertical », also when they ask for vertical or full screen (the Reel's default). A format is never a layout nor a must.
 - redraw: for a correction, true only when they ask to change what the layout or its animations draw (the arrangement, the split screen, the interface, an effect, a graphic element, the background, their motion or their style); false when they only touch the voice, the subtitles, the words of a text, the music, the length, the caption, the order or the choice of shots. For a new Reel: true.`;
 
 export const EMPTY_CONTRACT: ReelContract = {
@@ -102,6 +102,89 @@ export const EMPTY_CONTRACT: ReelContract = {
   frame: "vertical",
   asked_sounds: [],
 };
+
+// A format she asks for is never a layout (bench of 6 November: « Défilé d'assiettes » asked « en vertical plein écran »
+// left its model for the chain before its filler, the reader having noted it as a layout, and any layout takes a Reel out
+// of its model, beyondSkills): read in her words, it goes to `frame`, and to a model's format setting (skills.ts,
+// skillFramed). Her words, plain: lower case, no accents, apostrophes as spaces.
+const plainWords = (t: string) =>
+  t
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/[’'`]/g, " ");
+
+/** A band refused: still the vertical frame (« sans bandes noires »). */
+const NO_BAND = /\b(sans|pas de|aucune?|jamais de|plus de|pas)( (les|des|de))? (bandes?( noires?)?|noir|bords? noirs?)\b/g;
+/** Her videos whole in a band, on black. */
+const BAND = /\b(bandes?( noires?)?|letterbox|entier(e|s|es)?|noir (au ?dessus|dessus) et (en dessous|au ?dessous|dessous)|(sur )?(du |fond )?noir|sans (les )?recadrer|ne (les )?recadre pas|sans recadrage|pas de recadrage)\b/g;
+/** The whole vertical frame, said outright. */
+const FULL = /\b(plein(e)? (ecran|cadre)|tout l ecran|full ?screen|9 ?[:/x] ?16)\b/g;
+/** Vertical, horizontal: the frame's way, or her videos'. */
+const UPRIGHT = /\b(verticale?s?(ment)?|verticaux|a la verticale|portrait|debout)\b/g;
+const WIDE = /\b(horizonta(l|le|les|ux)(ment)?|a l horizontale|en largeur|paysage|16 ?[:/x] ?9|4 ?[:/x] ?3)\b/g;
+/** The words around a format, which say nothing else (« garde mes vidéos », « tout en », « please »). */
+const AROUND =
+  /\b(le|la|les|l|un|une|des|de|du|d|en|au|aux|a|et|ou|mais|avec|sans|sur|dans|pour|par|tout|toute|toutes|tous|mes|ses|tes|ma|sa|ta|mon|son|ton|nos|vos|notre|votre|format|formats|cadre|ecran|image|images|video|videos|plan|plans|photo|photos|fichier|fichiers|reel|reels|montage|garde|garder|gardez|laisse|laisser|laissez|mets|mettre|met|mettez|fais|faire|faites|fait|refais|refaire|passe|passer|reste|rester|restent|pas|ne|n|stp|svp|s il te plait|s il vous plait|please|merci|comme|filme|filmee|filmees|filmes|plutot|bien|juste|seulement|uniquement|version|mode|meme|ce|cet|cette|ces|ci|oui|aussi|encore|fois|je|j|veux|voudrais|aimerais|prefere|il|faut|moi|que|qu|qui|est|c|serait|mieux)\b/g;
+
+/**
+ * The frame a text asks for when it says nothing but a format (« en vertical plein écran », « garde mes vidéos
+ * entières », « en horizontal », « sans bandes noires »): « letterbox » for her videos whole in a band (a band, her
+ * videos whole, black above and below, or horizontal without a word of vertical), else « vertical »; null when it says
+ * anything else (a split screen, a text at the top, a frame in the frame: a layout of hers).
+ */
+export function formatAsked(text: string | null | undefined): "vertical" | "letterbox" | null {
+  const plain = plainWords(text ?? "").replace(/[^a-z0-9:/ ]+/g, " ");
+  const noBand = plain.match(NO_BAND)?.length ?? 0;
+  const rest1 = plain.replace(NO_BAND, " ");
+  const band = rest1.match(BAND)?.length ?? 0;
+  const rest2 = rest1.replace(BAND, " ");
+  const full = rest2.match(FULL)?.length ?? 0;
+  const rest3 = rest2.replace(FULL, " ");
+  const upright = rest3.match(UPRIGHT)?.length ?? 0;
+  const rest4 = rest3.replace(UPRIGHT, " ");
+  const wide = rest4.match(WIDE)?.length ?? 0;
+  const left = rest4.replace(WIDE, " ").replace(AROUND, " ").replace(/[^a-z0-9]+/g, "");
+  if (left || !(noBand + band + full + upright + wide)) return null;
+  if (band) return "letterbox";
+  if (noBand || full || upright) return "vertical";
+  return "letterbox";
+}
+
+/** The vertical frame asked outright, somewhere in her request. */
+const FULL_ASKED = /\b(en vertical|format vertical|a la verticale|verticalement|tout vertical|vertical plein|plein(e)? (ecran|cadre)|tout l ecran|full ?screen)\b/;
+
+/**
+ * Her request asks for the whole vertical frame (« remets-le en vertical plein écran », « sans bandes noires »), never for
+ * her videos whole: a correction of a Reel the chain laid on black then fills the frame again (the contract's frame is
+ * « vertical » whether she said it or not).
+ */
+export function fullFrameAsked(text: string | null | undefined): boolean {
+  const plain = plainWords(text ?? "").replace(/[^a-z0-9:/ ]+/g, " ");
+  const refused = NO_BAND.test(plain);
+  NO_BAND.lastIndex = 0;
+  const band = plain.replace(NO_BAND, " ").match(BAND);
+  return (refused || FULL_ASKED.test(plain)) && !band;
+}
+
+/** A text that only says a format (formatAsked): never a layout of hers. */
+export const formatOnly = (text: string | null | undefined): boolean => formatAsked(text) !== null;
+
+/**
+ * The contract with its format where it belongs: a layout or a must that only says a format leaves them for `frame`
+ * (« letterbox » when one of them asks for her videos whole in a band, else « vertical »), so that it never takes a Reel
+ * out of its model (beyondSkills) and the chain still honours it (plan.frame).
+ */
+export function settleFrame(c: ReelContract): ReelContract {
+  const asked = [c.layout, ...c.musts].map(formatAsked).filter((f): f is "vertical" | "letterbox" => f !== null);
+  if (!asked.length) return c;
+  return {
+    ...c,
+    layout: formatOnly(c.layout) ? null : c.layout,
+    musts: c.musts.filter((m) => !formatOnly(m)),
+    frame: asked.includes("letterbox") ? "letterbox" : "vertical",
+  };
+}
 
 /** Nothing fixed: the defaults decide everything. */
 export const contractIsEmpty = (c: ReelContract | null | undefined): boolean =>

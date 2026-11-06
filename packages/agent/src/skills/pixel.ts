@@ -99,7 +99,7 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
 
   // Its frame: the whole vertical frame, as the original; horizontal 16:9 on black when most of her videos are in width
   // (or she asks). Every place below is a share of it, its type a little smaller in the 16:9 one.
-  const format = setting("format", "auto");
+  const format = setting("format", "vertical");
   const wideShots = shots.filter((s) => (Number(s.aspect) || 0.5625) > 1.15).length;
   const wide = format === "horizontal" || (format === "auto" && wideShots * 2 > n);
   const bw = width;
@@ -349,7 +349,9 @@ export const pixel: MontageSkill = {
   // tiny typewriter lines and her name small, its captions in a plain sans step by step, its little faces and its
   // stars, everything trembling every 5 images, its loop instead of a card, its music's rest, its bass that comes in on
   // the cooking and its dead stop, its format, a finish without grain, dark corners nor lifted blacks.
-  version: 2,
+  // 3: vertical full frame by default, her horizontal files cropped on their subject, its band only when she asks for
+  // it (Tristan, 6 November, on seven benches: « vertical please », « tout vertical please »).
+  version: 3,
   bpm: BPM,
   shots: [FEWEST, MOST],
   files: [4, 12],
@@ -390,9 +392,9 @@ export const pixel: MontageSkill = {
       name: "format",
       want: "le format : vertical plein écran comme l'original, ou horizontal",
       choices: [
-        { value: "auto", says: "comme ses vidéos (vertical plein écran ; horizontal 16:9 sur du noir quand la plupart sont en largeur)" },
-        { value: "horizontal", says: "horizontal 16:9 sur du noir, ses vidéos en largeur en entier" },
         { value: "vertical", says: "vertical plein écran comme l'original, ses vidéos en largeur recadrées sur leur geste" },
+        { value: "horizontal", says: "horizontal 16:9 sur du noir, ses vidéos en largeur en entier", band: true },
+        { value: "auto", says: "comme ses vidéos (vertical plein écran ; horizontal 16:9 sur du noir quand la plupart sont en largeur)" },
       ],
     },
   ],

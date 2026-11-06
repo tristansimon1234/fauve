@@ -82,7 +82,7 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
 
   // Its frame: horizontal 16:9 on black as the original when most of her videos are horizontal (or she asks), else the
   // whole vertical frame, its star turned a quarter; every size below is a share of the frame's short side.
-  const format = setting("format", "auto");
+  const format = setting("format", "vertical");
   const wideShots = shots.filter((s) => (Number(s.aspect) || 0.5625) > 1.15).length;
   const wide = format === "horizontal" || (format === "auto" && wideShots * 2 > n);
   const bw = width;
@@ -187,13 +187,15 @@ export const eventail: MontageSkill = {
   // 2: written again on its original's fiche: its format (16:9 when her videos are), its tempo and its cuts, its star of
   // windows onto one shot (a band a beat, its square on her shot's heart), the whole shot on the drop and its music's
   // intro of hits alone, its split screen, its black and white with blue blacks and no grain, its end in a serif.
-  version: 2,
+  // 3: vertical full frame by default, her horizontal files cropped on their subject, its band only when she asks for
+  // it (Tristan, 6 November, on seven benches: « vertical please », « tout vertical please »).
+  version: 3,
   bpm: BPM,
   shots: [FEWEST, ORIGINAL],
   // Up to 23 for a length she asks for: about 30 s at its own tempo (more of her place, two beats each).
   long: MOST,
   files: [5, 12],
-  how: "Sur un fond bordeaux, un petit carré au milieu montre le cœur de son premier plan (un plan avec un centre et des lignes qui en partent) ; puis une bande par temps, posée d'un coup, toutes des fenêtres sur ce même plan, en étoile autour du carré, sur sept petits coups de musique seuls ; au huitième temps le beat entre et le plan entier apparaît d'un coup, dans un fin cadre bordeaux ; puis ses plans en noir et blanc coupés tous les deux temps, dont un écran partagé de deux plans qui se répondent et un second plan aux lignes qui partent du centre ; la fin sur un noir bleuté, son nom en petit serif blanc au milieu comme une signature, et deux temps après une ligne rouge plus petite dessous. En horizontal comme l'original quand ses vidéos le sont.",
+  how: "Sur un fond bordeaux, un petit carré au milieu montre le cœur de son premier plan (un plan avec un centre et des lignes qui en partent) ; puis une bande par temps, posée d'un coup, toutes des fenêtres sur ce même plan, en étoile autour du carré, sur sept petits coups de musique seuls ; au huitième temps le beat entre et le plan entier apparaît d'un coup, dans un fin cadre bordeaux ; puis ses plans en noir et blanc coupés tous les deux temps, dont un écran partagé de deux plans qui se répondent et un second plan aux lignes qui partent du centre ; la fin sur un noir bleuté, son nom en petit serif blanc au milieu comme une signature, et deux temps après une ligne rouge plus petite dessous. En vertical plein écran, ses vidéos horizontales recadrées sur leur sujet ; en horizontal comme l'original à sa demande.",
   end: true,
   texts: [
     {
@@ -221,11 +223,11 @@ export const eventail: MontageSkill = {
   settings: [
     {
       name: "format",
-      want: "le format : horizontal comme l'original, ou vertical plein écran",
+      want: "le format : vertical plein écran, ou horizontal comme l'original",
       choices: [
+        { value: "vertical", says: "vertical plein écran, l'étoile tournée d'un quart, ses vidéos horizontales recadrées sur leur sujet" },
+        { value: "horizontal", says: "horizontal 16:9 sur du noir, comme l'original", band: true },
         { value: "auto", says: "comme ses vidéos (horizontal si la plupart le sont)" },
-        { value: "horizontal", says: "horizontal 16:9 sur du noir, comme l'original" },
-        { value: "vertical", says: "vertical plein écran, l'étoile tournée d'un quart" },
       ],
     },
     {

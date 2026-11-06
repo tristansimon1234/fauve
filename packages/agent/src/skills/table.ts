@@ -100,7 +100,7 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
 
   // Its frame: a horizontal 4:3 band on black, as the original, when her table's video is in width (or she asks), else
   // the whole vertical frame; every place below is in it.
-  const format = setting("format", "auto");
+  const format = setting("format", "vertical");
   const wide = format === "horizontal" || (format === "auto" && (Number(shots[0] && shots[0].aspect) || 0.5625) > 1.15);
   const bw = width;
   const bh = wide ? Math.round((width * 3) / 4) : height;
@@ -225,11 +225,13 @@ export const table: MontageSkill = {
   // its split screen side by side, each half at its own speed (simultaneous shots), its gesture's half cutting alone,
   // its last shot taking the frame from that half; its music up 4 dB on its third pair and cut dead; no ending card,
   // vignette nor grain unless she asks.
-  version: 2,
+  // 3: vertical full frame by default, her horizontal files cropped on their subject, its band only when she asks for
+  // it (Tristan, 6 November, on seven benches: « vertical please », « tout vertical please »).
+  version: 3,
   bpm: BPM,
   shots: [13, 25],
   files: [8, 20],
-  how: "Sa table filmée posée ; deux petits mots écrits à la main en crème apparaissent en fondu de part et d'autre de son milieu (à gauche ce qui amène son nom, à droite son nom) ; ses photos s'y posent d'un coup au centre, l'une sur l'autre, onze par seconde, comme des tirages sans bord ni ombre, chacune tournée comme celles de l'original ; la pile tenue un temps s'efface par la lumière (le sombre d'abord), puis deux plans éclair de son lieu, saccadés, le second brûlé au blanc ; puis un écran partagé, son lieu dans une moitié et un geste sur ce qu'elle fait dans l'autre, chacun à sa vitesse, qui coupent ensemble, puis la moitié du geste coupe seule, de plus près ; enfin sa plus belle pièce vue du dessus prend la moitié du geste puis tout le cadre : une main en prend un morceau et sort du cadre. En horizontal 4:3 sur du noir comme l'original quand sa vidéo de table est en largeur, sinon plein écran (l'écran partagé en deux moitiés l'une sur l'autre).",
+  how: "Sa table filmée posée ; deux petits mots écrits à la main en crème apparaissent en fondu de part et d'autre de son milieu (à gauche ce qui amène son nom, à droite son nom) ; ses photos s'y posent d'un coup au centre, l'une sur l'autre, onze par seconde, comme des tirages sans bord ni ombre, chacune tournée comme celles de l'original ; la pile tenue un temps s'efface par la lumière (le sombre d'abord), puis deux plans éclair de son lieu, saccadés, le second brûlé au blanc ; puis un écran partagé, son lieu dans une moitié et un geste sur ce qu'elle fait dans l'autre, chacun à sa vitesse, qui coupent ensemble, puis la moitié du geste coupe seule, de plus près ; enfin sa plus belle pièce vue du dessus prend la moitié du geste puis tout le cadre : une main en prend un morceau et sort du cadre. En vertical plein écran (l'écran partagé en deux moitiés l'une sur l'autre) ; en horizontal 4:3 sur du noir comme l'original à sa demande.",
   end: true,
   texts: [
     { slot: "gauche", role: "caption", want: "les petits mots écrits à la main à gauche de la pile, qui amènent son nom (une forme comme « voici », « ici c'est », « ce soir chez »)", max: 14, required: true },
@@ -238,11 +240,11 @@ export const table: MontageSkill = {
   settings: [
     {
       name: "format",
-      want: "le format : horizontal 4:3 comme l'original, ou vertical plein écran",
+      want: "le format : vertical plein écran, ou horizontal 4:3 comme l'original",
       choices: [
-        { value: "auto", says: "comme sa vidéo de table (horizontal si elle est en largeur)" },
-        { value: "horizontal", says: "horizontal 4:3 sur du noir, comme l'original, l'écran partagé en deux moitiés côte à côte" },
         { value: "vertical", says: "vertical plein écran, l'écran partagé en deux moitiés l'une sur l'autre (le geste en haut)" },
+        { value: "horizontal", says: "horizontal 4:3 sur du noir, comme l'original, l'écran partagé en deux moitiés côte à côte", band: true },
+        { value: "auto", says: "comme sa vidéo de table (horizontal si elle est en largeur)" },
       ],
     },
   ],
@@ -265,7 +267,7 @@ export const table: MontageSkill = {
     const split = main[3]!;
     const last = main.at(-1)!;
     const shots: SkillShot[] = [
-      shot(main[0]!, "sa table ou son comptoir filmé posé, de trois quarts en plongée, le milieu dégagé (ses photos s'y posent en pile), dans sa lumière : une vidéo de 2 s au moins, en largeur de préférence (le format de l'original)"),
+      shot(main[0]!, "sa table ou son comptoir filmé posé, de trois quarts en plongée, le milieu dégagé (ses photos s'y posent en pile), dans sa lumière : une vidéo de 2 s au moins, en hauteur de préférence (le Reel est vertical)"),
       ...landed.map((b) =>
         shot({ start: at(b), end: at(BARE) }, "une photo de ce qu'elle fait, posée comme un tirage au milieu de sa table : d'une même série que les autres (même lumière, mêmes fonds), en hauteur de préférence, mieux encore ce qu'on verra filmé ensuite ; une vidéo y entre figée sur un instant, jamais deux fois la même image", true),
       ),

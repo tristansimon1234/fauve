@@ -71,7 +71,7 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   // 1. Its frame: vertical full frame as the original when her front is upright (or she asks), else her horizontal
   // front whole in a band across the middle of the black (16:9 when she asks it of an upright one); never zoomed.
   const a = front ? Number(front.aspect) || 0.5625 : 0.5625;
-  const format = setting("format", "auto");
+  const format = setting("format", "vertical");
   const band = format === "horizontal" || (format === "auto" && a > 1.15);
   const bw = width;
   const bh = band ? Math.min(height, Math.round(width / (a > 1.15 ? a : 16 / 9))) : height;
@@ -221,12 +221,14 @@ export const facade: MontageSkill = {
   // 2: written again on its original's fiche: its tempo (120 BPM, none while it builds), its pieces on its images and
   // on its notes (four slow, a burst of twelve, a silence, three big on its music's first beats), her front's own
   // elements named by the filler, its format, nothing written on her front, its music coming in late and cut dead.
-  version: 2,
+  // 3: vertical full frame by default, her horizontal files cropped on their subject, its band only when she asks for
+  // it (Tristan, 6 November, on seven benches: « vertical please », « tout vertical please »).
+  version: 3,
   bpm: BPM,
   shots: [1, 3],
   long: LONG,
   files: [1, 3],
-  how: "Sur un écran noir, sa devanture se construit morceau par morceau, chaque morceau d'un coup à sa place, sa vidéo jouant dedans, chacun sur une note : d'abord son enseigne ou sa porte avec son nom, puis trois éléments loin l'un de l'autre (une fenêtre, une autre, son store), lentement ; puis une rafale de douze morceaux (ses autres fenêtres, sa vitrine, le trottoir, un côté qui monte, le mur au-dessus) ; un silence ; puis la musique entre avec les trois plus grands (la rue, le haut, tout le reste) et sa devanture joue en entier, caméra fixe, sans texte ; ses autres fichiers suivent, une mesure chacun. En vertical plein écran quand sa vidéo est verticale, posée en entier dans une bande au milieu du noir quand elle est horizontale.",
+  how: "Sur un écran noir, sa devanture se construit morceau par morceau, chaque morceau d'un coup à sa place, sa vidéo jouant dedans, chacun sur une note : d'abord son enseigne ou sa porte avec son nom, puis trois éléments loin l'un de l'autre (une fenêtre, une autre, son store), lentement ; puis une rafale de douze morceaux (ses autres fenêtres, sa vitrine, le trottoir, un côté qui monte, le mur au-dessus) ; un silence ; puis la musique entre avec les trois plus grands (la rue, le haut, tout le reste) et sa devanture joue en entier, caméra fixe, sans texte ; ses autres fichiers suivent, une mesure chacun. En vertical plein écran, une vidéo horizontale recadrée autour de son enseigne ; posée en entier dans une bande au milieu du noir à sa demande.",
   end: true,
   texts: [
     {
@@ -259,11 +261,11 @@ export const facade: MontageSkill = {
   settings: [
     {
       name: "format",
-      want: "le format : comme sa vidéo de devanture, ou vertical plein écran, ou horizontal sur du noir",
+      want: "le format : vertical plein écran, sa devanture entière dans une bande 16:9 sur du noir, ou comme sa vidéo de devanture",
       choices: [
-        { value: "auto", says: "comme sa vidéo de devanture : vertical plein écran si elle est verticale, posée en entier dans une bande au milieu du noir si elle est horizontale" },
-        { value: "horizontal", says: "horizontal : sa devanture dans une bande 16:9 au milieu du noir" },
         { value: "vertical", says: "vertical plein écran, comme l'original : une vidéo horizontale coupée autour de son enseigne (on perd la largeur de sa devanture)" },
+        { value: "horizontal", says: "horizontal : sa devanture dans une bande 16:9 au milieu du noir", band: true },
+        { value: "auto", says: "comme sa vidéo de devanture : vertical plein écran si elle est verticale, posée en entier dans une bande au milieu du noir si elle est horizontale" },
       ],
     },
   ],

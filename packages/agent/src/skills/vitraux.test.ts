@@ -15,7 +15,7 @@ const ORIGINAL = { open: 2, full: 47, close: 222, real: 255, end: 270 };
 
 test("« Ta devanture en kaléidoscope » (v1): one still shot on its original's grid (123,4 BPM, its first beat at 0,345 s), its landmarks within an image", () => {
   assert.equal(vitraux.key, "vitraux");
-  assert.equal(vitraux.version, 1);
+  assert.equal(vitraux.version, 2);
   assert.equal(vitraux.bpm, 123.4);
   assert.deepEqual(vitraux.shots, [1, 1]);
   assert.equal(vitraux.long, 3);
@@ -220,18 +220,26 @@ test("« Ta devanture en kaléidoscope »: its rosace, eight wedges one in two m
   assert.ok(Math.abs(radius(onDoor) - 200) < 0.1);
 });
 
-test("« Ta devanture en kaléidoscope »: its frame as her file's, a horizontal one cropped on her door when it fits, else in a band on black", () => {
+test("« Ta devanture en kaléidoscope » (v2): full frame, a horizontal file cropped on her door when it fits; in a band on black on her word or as her file", () => {
   const real = (tree: Drawn) => styleOf(keyed(tree, "real"));
-  assert.deepEqual(real(drawAt(60)), { left: 0, top: 0, width: 1080, height: 1920 });
+  const full = { left: 0, top: 0, width: 1080, height: 1920 };
+  assert.deepEqual(real(drawAt(60)), full);
   // Horizontal, her door found (500 px wide in her 3413 px picture): cropped on it, its middle in the frame's.
-  const wide = real(drawAt(60, { aspect: 16 / 9, reads: { box: { x: 2000, y: 300, w: 500, h: 1300 } } }));
+  const door = { box: { x: 2000, y: 300, w: 500, h: 1300 } };
+  const wide = real(drawAt(60, { aspect: 16 / 9, reads: door }));
   assert.equal(wide.width, 3413);
   assert.equal(Number(wide.left) + 2250, 540);
-  // Too wide for the vertical frame, or nothing found: her whole video in a 16:9 band on black, the mirrors in it.
+  assert.deepEqual(real(drawAt(60, { aspect: 16 / 9, reads: door, settings: { format: "auto" } })), wide);
+  // Too wide for the vertical frame, or nothing found: the whole frame by default (Tristan, 6 November: « tout vertical
+  // please »), cropped on its middle (on her thing when found); as her file (« auto »), her whole video in a 16:9 band on
+  // black, the mirrors in it.
   const band = { left: 0, top: 656, width: 1080, height: 608 };
-  assert.deepEqual(real(drawAt(60, { aspect: 16 / 9, reads: { box: { x: 400, y: 300, w: 2400, h: 1300 } } })), band);
-  assert.deepEqual(real(drawAt(60, { aspect: 16 / 9 })), band);
-  assert.ok(strips(drawAt(60, { aspect: 16 / 9 })).every((s) => s.top === 656 && s.height === 608));
+  assert.deepEqual(real(drawAt(60, { aspect: 16 / 9, reads: { box: { x: 400, y: 300, w: 2400, h: 1300 } } })), { left: 540 - 1600, top: 0, width: 3413, height: 1920 });
+  assert.deepEqual(real(drawAt(60, { aspect: 16 / 9 })), full);
+  assert.deepEqual(real(drawAt(60, { aspect: 16 / 9, reads: { box: { x: 400, y: 300, w: 2400, h: 1300 } }, settings: { format: "auto" } })), band);
+  assert.deepEqual(real(drawAt(60, { aspect: 16 / 9, settings: { format: "auto" } })), band);
+  assert.ok(strips(drawAt(60, { aspect: 16 / 9, settings: { format: "auto" } })).every((s) => s.top === 656 && s.height === 608));
+  assert.deepEqual(vitraux.settings?.find((s) => s.name === "format")?.choices.map((c) => c.value), ["vertical", "horizontal", "auto"]);
   // As her words ask.
   assert.deepEqual(real(drawAt(60, { aspect: 16 / 9, settings: { format: "vertical" } })), { left: 0, top: 0, width: 1080, height: 1920 });
   assert.deepEqual(real(drawAt(60, { settings: { format: "horizontal" } })), band);

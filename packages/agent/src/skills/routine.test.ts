@@ -17,7 +17,7 @@ const PLACE = [44, 37, 45, 38, 43, 40, 34, 46, 54, 76, 77];
 const images = (n: number, end = false, bpm?: number) => routine.timeline(n, { end, ...(bpm ? { bpm } : {}) }).shots.map((s) => Math.round(s.end * 30) - Math.round(s.start * 30));
 
 test("« Rituel du matin » (v1): its tempo, its trailer of 2,07 s, its gestures and its place at the original's lengths, its sections for each count", () => {
-  assert.equal(routine.version, 1);
+  assert.equal(routine.version, 2);
   assert.equal(routine.bpm, 90.73);
   // Its shortest: the trailer, six gestures, what she made from above, four shots of her place; 15,9 s.
   const short = routine.timeline(12, { end: false });
@@ -124,14 +124,14 @@ test("« Rituel du matin »: its plan, her files in its slots, her words at thei
   assert.deepEqual(plan.music_shape, { downbeat: 0.214, end: { at: plan.duration, fade: 0.012 } });
   assert.equal(plan.sounds, undefined);
   assert.equal(plan.layers![0]!.motion.drawn, undefined);
-  assert.deepEqual(plan.skill, { key: "routine", version: 1 });
+  assert.deepEqual(plan.skill, { key: "routine", version: 2 });
   // Nothing cut out, followed, cleared or read: its code draws her shots and its title, nothing else.
   assert.deepEqual(checkMotionCode(routine.code), []);
   assert.deepEqual([subjectsDrawn(routine.code), objectsDrawn(routine.code), clearsDrawn(routine.code), readsDrawn(routine.code)], [[], [], [], []]);
   assert.doesNotMatch(routine.code, /transform|scale\(|filter:/);
   assert.ok(routine.code.length < 24000);
   assert.deepEqual(routine.finish, { grain: 0, vignette: 0 });
-  assert.deepEqual(routine.settings?.map((s) => [s.name, s.choices.map((c) => c.value)]), [["format", ["auto", "vertical", "horizontal"]]]);
+  assert.deepEqual(routine.settings?.map((s) => [s.name, s.choices.map((c) => c.value)]), [["format", ["vertical", "horizontal", "auto"]]]);
 });
 
 // ——— What its code draws, frame by frame ————————————————————————————————————————————————————————————————————————————
@@ -239,7 +239,7 @@ test("« Rituel du matin » types her title on two lines with its cursor, then h
   assert.equal(fine(62), undefined);
 });
 
-test("« Rituel du matin » ends on three black images, or on her ending card typed on the black; its format as her videos", () => {
+test("« Rituel du matin » (v2) ends on three black images, or on her ending card typed on the black; full frame by default, its band on her word", () => {
   const draw = scene();
   const { total, p } = props(16);
   assert.equal(nodes(draw(total - 4, p)).filter((x) => x.type === "Footage").length, 1);
@@ -256,8 +256,10 @@ test("« Rituel du matin » ends on three black images, or on her ending card ty
   assert.ok(Number(card.find((x) => x.type === "TypeOn")!.props.speed) > 30);
   const sub = (f: number) => nodes(draw(f, ended.p)).filter((x) => String(x.props.key).startsWith("sub-")).length;
   assert.deepEqual([sub(at + 15), sub(at + 16), sub(at + 47)], [0, 1, 1]);
-  // Her videos in width: whole in a 16:9 band on black, its title on the band; full frame as she asks.
-  const wide = props(16, { aspect: 16 / 9 });
+  // Her videos in width: full frame by default (Tristan, 6 November: « tout vertical please »), cropped on their subject;
+  // whole in a 16:9 band on black, its title on the band, on her word or as her videos (« auto »); full frame as she asks.
+  assert.deepEqual(styleOf(nodes(draw(100, props(16, { aspect: 16 / 9 }).p)).find((x) => x.type === "Footage")!), { position: "absolute", left: 0, top: 0, width: 1080, height: 1920 });
+  const wide = props(16, { aspect: 16 / 9, settings: { format: "auto" } });
   assert.deepEqual(styleOf(nodes(draw(100, wide.p)).find((x) => x.type === "Footage")!), { position: "absolute", left: 0, top: 656, width: 1080, height: 608 });
   const titleBox = styleOf(nodes(draw(10, wide.p)).find((x) => x.type === "FitText")!);
   assert.ok(titleBox.top > 656 && titleBox.top + titleBox.height < 656 + 608, JSON.stringify(titleBox));
