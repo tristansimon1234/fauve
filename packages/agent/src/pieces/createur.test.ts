@@ -20,7 +20,7 @@ test("« Face caméra et références » (effect v1): its layer over her talk, t
     const plan = pieceTestPlan({ piece: createur, shots: talk(n), span: [1.2, 1.2 + n * 1.5], fill, bpm: 100 });
     assert.ok(editPlanSchema.safeParse(plan).success, `n=${n}`);
     const motion = plan.layers![0]!.motion;
-    assert.deepEqual(motion.piece, { key: "createur", version: 1 });
+    assert.deepEqual(motion.piece, { key: "createur", version: 2 });
     assert.equal(motion.times_spoken, true);
     assert.deepEqual(motion.photos, ["p1", "p2"]);
     assert.deepEqual(motion.texts, { beat: "18", mine: Array.from({ length: n }, (_, i) => i + 1).join(","), nom1: "le croissant", nom2: "les macarons" });

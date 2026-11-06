@@ -8769,7 +8769,7 @@ const createurOnOriginal = async (said: Record<string, unknown> = CR_SAID, files
 
 test("« Face caméra et références » (v1) cuts where its original does: on the first word of an idea, on each name he cites, within two images", async () => {
   const { createur, plan } = await createurOnOriginal();
-  assert.equal(createur.version, 1);
+  assert.equal(createur.version, 2);
   assert.equal(createur.voice?.cut, "attack");
   assert.equal(createur.voice?.subtitles, "own");
   assert.equal(createur.voice?.hook, undefined);
@@ -8850,6 +8850,18 @@ test("« Face caméra et références » (v1): its images where the original put
   assert.ok(Number(styleOf(chest).top) >= 560 + 0.75 * 220 && Number(styleOf(chest).top) + Number(styleOf(chest).height) <= 0.75 * 1920, String(styleOf(chest).top));
   assert.equal(drawnText(drawnNodes(grown).find((n) => n.type === "FitText")!), "Flim");
   assert.equal(subtitle(await draw(nameAt + 14)), undefined);
+});
+
+test("« Face caméra et références » (v2): a name she cites without an image written big on her, and left out of its subtitle (never a word twice)", async () => {
+  const said = { ...CR_SAID, ideas: CR_SAID.ideas.map((idea) => ({ ...idea, items: idea.items.map((item) => (item.text === "Jean-Paul Goude" ? { word: item.word, text: item.text, font: item.font } : item)) })) };
+  const { createur, layer } = await createurOnOriginal(said);
+  assert.equal(createur.version, 2);
+  const props = sceneProps(layer);
+  const goude = layer.reelTexts!.find((t) => t.text === "Jean-Paul Goude")!;
+  const tree = await drawVoiced(createur.code, goude.from + 4, props, { face: { x: 540, y: 1150, width: 220, height: 280 } });
+  assert.ok(drawnNodes(tree).some((n) => n.type === "FitText" && drawnText(n) === "Jean-Paul Goude"));
+  const sub = drawnNodes(tree).find((n) => n.type === "div" && styleOf(n).fontWeight === 600);
+  if (sub) assert.doesNotMatch(drawnText(sub), /Goude|Jean-Paul/);
 });
 
 test("« Face caméra et références » (v1): a wall of her images behind her cut out on those shots only, its format, no music", async () => {

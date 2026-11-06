@@ -590,10 +590,11 @@ export const HOUSE_MODELS: HouseModel[] = [
     // 15: written on its original's fiche (v1 of its skill, timed on her voice): her first two words slide in big from the
     // first image, each idea's keyword slides in under a small line of her words said one by one, a list two names at a
     // time each in its own font, a number and its three words, three frames between her ideas, a music that waits for her
-    // first keyword and loses its bass mid-way.
-    pitch: "Tu parles face caméra devant un fond uni, et le mot important de chaque phrase s'affiche en grand au-dessus de ta tête.",
-    needs: "une vidéo de toi qui parles face caméra (20 à 30 s), assise devant un mur uni, téléphone posé, la tête vers le milieu de l'image ; si tu peux, la même prise d'un second téléphone",
-    files: [1, 3],
+    // first keyword and loses its bass mid-way. v2: what she says written once by its small line (the engine's subtitles
+    // step aside), her photo of each name of a list under that name.
+    pitch: "Tu parles face caméra devant un fond uni, et le mot important de chaque phrase s'affiche en grand au-dessus de ta tête ; quand tu cites tes produits, chacun en grand dans sa police, sur sa photo.",
+    needs: "une vidéo de toi qui parles face caméra (20 à 30 s), assise devant un mur uni, téléphone posé, la tête vers le milieu de l'image, avec ta vraie voix ; si tu peux, la même prise d'un second téléphone, et une photo de chaque chose que tu cites",
+    files: [1, 12],
     // Its hook, keywords and small words in a bold geometric (the original's Poppins-like), its number condensed (Anton,
     // brought by its skill): not the condensed Bebas Neue of « condensee-geometrique », which only fits its number.
     pair: "geometrique",
@@ -606,24 +607,24 @@ export const HOUSE_MODELS: HouseModel[] = [
       hook: { kind: "promesse", what: "ses deux premiers mots en grandes capitales grasses qui glissent de la gauche dès la première image, au-dessus de sa tête" },
       text: {
         amount: "plusieurs",
-        composition: "au-dessus de sa tête : ses premiers mots puis le mot clé de chaque idée en capitales grasses glissant de la gauche, ses mots dits en petit au-dessus ; une liste deux noms à la fois, chacun dans sa police ; ses sous-titres sur sa poitrine",
+        composition: "au-dessus de sa tête : ses premiers mots puis le mot clé de chaque idée en capitales grasses glissant de la gauche, tout ce qu'elle dit d'autre en petit au-dessus, mot à mot, jamais deux fois ; une liste deux noms à la fois, chacun dans sa police, sur sa photo quand elle en a une ; pas d'autres sous-titres",
         case: "upper",
         weight: "bold",
-        subtitles: true,
+        subtitles: false,
       },
       layout: "elle assise face caméra devant un mur uni, plein cadre vertical (sa vidéo horizontale entière dans une bande 16:9 sur du noir), un autre cadre entre deux idées, les mots au-dessus de sa tête",
       moments: [
         { at: 0, what: "ses deux premiers mots glissent de la gauche, flous, rebondissent sur un souffle grave, tenus jusqu'à ce qu'elle dise la suite" },
         { at: 1.07, what: "ses mots s'écrivent un à un sur une petite ligne très espacée ; le mot clé glisse dessous sur son mot (1,73 s) et reste toute l'idée" },
         { at: 5.67, what: "coupe sur un autre cadre entre deux idées, rien au-dessus de sa tête jusqu'à la suivante" },
-        { at: 7.1, what: "une liste deux noms à la fois, chacun dans sa police, le premier petit en haut, le second grand dessous, chacun sur son mot" },
+        { at: 7.1, what: "une liste deux noms à la fois, chacun dans sa police, le premier petit en haut, le second grand dessous, chacun sur son mot, sur sa photo plein écran quand elle en a une" },
         { at: 17.6, what: "un chiffre très condensé et ses trois mots empilés à sa droite, d'un coup, tenus 4 s" },
       ],
       camera: "fixe",
       grade: "natural",
       motion: "energique",
       music: "laid-back hip-hop beat at 108 BPM, deep sub bass, coming in after the hook",
-      ending: "elle dit au revoir, plus rien au-dessus de sa tête, la musique coupée avec l'image",
+      ending: "elle dit au revoir, ses mots en petit au-dessus de sa tête, la musique coupée avec l'image",
       why: "Chaque idée a son mot en grand, chaque nom sa police : on retient ce qui est dit même sans le son, et la personne reste au centre.",
     },
   }),

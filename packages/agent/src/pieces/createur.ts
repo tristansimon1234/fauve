@@ -223,16 +223,20 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   });
   if (ph.length) phrases.push(ph);
   const phrase = phrases.find((x, i) => frame >= x[0].from && frame < Math.min(x[x.length - 1].to + 8, phrases[i + 1] ? phrases[i + 1][0].from : Infinity));
-  const sub = phrase
+  // Never a word twice (v2): a name written big on her right now is left out of its phrase.
+  const plainOf = (x) => String(x || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim();
+  const twice = now && now.form === "name" ? plainOf(now.text).split(" ") : [];
+  const left = phrase ? phrase.filter((w) => !(plainOf(w.w) && plainOf(w.w).split(" ").every((x) => twice.includes(x)))) : [];
+  const sub = left.length
     ? h(FitText, { key: "sub-" + phrase[0].from, style: { position: "absolute", left: 140, width: W - 280, top: Math.round(subY - lineH), height: lineH * 2 }, innerStyle: { fontFamily: body, fontWeight: 600, fontSize: Math.round(H * 0.026), lineHeight: 1.25, color: "#ffffff", textAlign: "center", textWrap: "balance", textShadow: "0 0 2px rgba(0,0,0,0.6), 0 1px 3px rgba(0,0,0,0.5)" } },
-        phrase.map((w) => w.w).join(" "))
+        left.map((w) => w.w).join(" "))
     : null;
   return h(AbsoluteFill, null, layers, sub);
 }`;
 
 export const createur: EffectPiece = {
   key: "createur",
-  version: 1,
+  version: 2,
   name: "Face caméra et références",
   how: "pendant qu'elle parle face caméra, la photo de chaque chose qu'elle nomme surgit d'un coup dans la moitié haute de l'écran à l'instant où elle la nomme, jusqu'à la suivante, elle dans la moitié du bas, son visage entier (la première, un objet détouré, posée sur son mur au-dessus de sa tête quand il y a la place) ; ses mots en petits sous-titres sobres sur la ligne de partage ; une chose nommée sans photo s'écrit en grand sur elle ; puis le montage reprend.",
   needs: "une vidéo d'elle (ou de quelqu'un de l'équipe) qui parle face caméra, avec de la place au-dessus de sa tête, et une photo de chacune des choses qu'elle nomme (ses produits, ses plats, ses réalisations).",
