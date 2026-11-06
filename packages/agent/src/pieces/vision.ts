@@ -21,6 +21,10 @@ import type { EffectPiece, PieceTimeline, PieceTimelineInput } from "../pieces.t
 // (no cut-out of everyone needed). Its people: everyone followed in her shot (« @gens », SubjectParts: their boxes on
 // the image they were found, laid on the box of them all at every image), else the people the tracker follows (two at
 // most, image by image); nobody seen, its boxes give way to the whole picture in blue, its graph to the characters.
+// Version 2 (6 November, with its skill's v2): its characters and dots drawn on the picture's edges and details (Sketch
+// under Ascii, widened: a pass on its light gave a grey photo, the original's a sparse scatter where there is detail);
+// the things that repeat in her place framed too (« @choses », its lamps, chairs, mannequins: two people gave an empty
+// graph).
 
 /** The first strobe: the original's passes from its image 36, each [images, kind, held two images]. */
 export const VISION_STROBE_A: [number, string, boolean?][] = [
@@ -124,7 +128,9 @@ const CODE =
     const w = Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x), hh = Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y);
     return w > 0 && hh > 0 ? (w * hh) / Math.min(a.w * a.h, b.w * b.h) : 0;
   };
-  const boxes = bodies.concat(followed.filter((f) => !bodies.some((b) => overlap(f, b) > 0.5))).map(pad)
+  // The things that repeat in her place (its lamps, chairs, mannequins), framed like the people: still, read once.
+  const things = SubjectParts(place, place.from, laid, "@choses");
+  const boxes = bodies.concat(followed.filter((f) => !bodies.some((b) => overlap(f, b) > 0.5))).concat(things).map(pad)
     .filter((b) => b.w > 8 && b.h > 8 && b.w < W * 0.8 && b.h < H * 0.8 && b.x < W && b.y < H && b.x + b.w > 0 && b.y + b.h > 0).slice(0, 24);
   const seen = boxes.length > 0;
 
@@ -142,7 +148,10 @@ const CODE =
     h("feColorMatrix", { type: "matrix", values: "0.2126 0.7152 0.0722 0 0 0.2126 0.7152 0.0722 0 0 0.2126 0.7152 0.0722 0 0 0 0 0 1 0" }),
     h("feComponentTransfer", null, h("feFuncR", { type: "table", tableValues: "0.078 0.278 0.667 0.784" }), h("feFuncG", { type: "table", tableValues: "0.153 0.361 0.737 0.839" }), h("feFuncB", { type: "table", tableValues: "0.329 0.533 0.867 0.937" }))));
   const blued = (kids, key) => h("div", { key, style: abs({ left: 0, top: 0, width: W, height: H, filter: "url(#" + ID + ")" }) }, kids);
-  const dots = (kid, ink, paper) => h(Ascii, { cell: [4, 8], kind: "dots", ink, paper }, kid);
+  // Its characters and dots drawn on the picture's edges and details (its outlines, the grain of a stone, the folds of a
+  // coat), widened a little so a cell reads them: sparse where it is smooth, dense where it has detail.
+  const edges = (kid, dark, s) => h("div", { style: abs({ left: 0, top: 0, width: W, height: H, filter: "blur(1px) brightness(" + s + ")" + (dark ? " invert(1)" : "") }) }, h(Sketch, { invert: false, strength: 2.4 }, kid));
+  const dots = (kid, ink, paper) => h(Ascii, { cell: [4, 8], kind: "dots", ink, paper }, edges(paper === "none" ? kid : h(React.Fragment, null, h("div", { style: abs({ left: 0, top: 0, width: W, height: H, background: "#ffffff" }) }), kid), paper !== "none", 3));
   const WHITE = "#fdfdfd";
   const fill = (c, ...kids) => h("div", { style: abs({ left: 0, top: 0, width: W, height: H, background: c, overflow: "hidden" }) }, ...kids);
   // Her place's grey pass, a machine's view of it as its depth would be (soft and grey, black far up the frame, white
@@ -156,7 +165,7 @@ const CODE =
     const blue = boxes.filter((b, i) => rnd(frame * 131 + i + "c") < 0.55), dark = boxes.filter((b) => !blue.includes(b));
     return h(React.Fragment, { key: "boxes" }, BLUE,
       blue.length ? h("div", { key: "bl", style: abs({ left: 0, top: 0, width: W, height: H, clipPath: clip(blue) }) }, blued(foot({}), "b")) : null,
-      dark.length ? h("div", { key: "dk", style: abs({ left: 0, top: 0, width: W, height: H, clipPath: clip(dark), background: "#07070e" }) }, dots(foot({ filter: "grayscale(1) contrast(1.2)" }), "#e9ecf2", "none")) : null,
+      dark.length ? h("div", { key: "dk", style: abs({ left: 0, top: 0, width: W, height: H, clipPath: clip(dark), background: "#07070e" }) }, dots(foot({}), "#e9ecf2", "none")) : null,
       onWhite ? stroke("#a0a0a0", 2) : null,
       tags("#243250"));
   };
@@ -176,7 +185,7 @@ const CODE =
     h("svg", { key: "dots", width: W, height: H, style: abs({ left: 0, top: 0 }) }, nodes.map((p, i) => h("circle", { key: i, cx: Math.round(p.x), cy: Math.round(p.y), r: 6, fill: "#2f302e" }))),
     h("div", { key: "bits", "data-fauve-decor": "" }, nodes.slice(0, 6).map((p, i) => (i % 2 ? null : h("div", { key: i, style: abs({ left: Math.round(Math.min(W - 400, p.x + 16)), top: Math.round(p.y - 9), fontFamily: MONO, fontSize: 18, color: "#2f302e", whiteSpace: "nowrap" }) }, bits(i))))));
   // Her place redrawn in small characters by its light, light on black.
-  const chars = () => fill("#000000", h(Ascii, { cell: [4, 8], ink: "#e6e6e6", paper: "#000000" }, foot({})));
+  const chars = () => fill("#000000", h(Ascii, { cell: [4, 8], ink: "#e6e6e6", paper: "#000000" }, edges(h(React.Fragment, null, h("div", { style: abs({ left: 0, top: 0, width: W, height: H, background: "#000000" }) }), foot({})), false, 2.6)));
 
   // The passes. k black; v her place as filmed; c a box on everyone, as filmed around them; b their boxes on white;
   // z the grey pass; n the network; g the graph, G with them in their frames; o them in dots on white; W them on white
@@ -195,7 +204,7 @@ const CODE =
       case "n": return fill("#000000", grey(true), wires("#c8c8c8"), h("div", { key: "them", style: abs({ left: 0, top: 0, width: W, height: H, clipPath: clip(boxes) }) }, foot({})), stroke("#000000", 3), tags("#000000"));
       case "g": return graph(false);
       case "G": return graph(true);
-      case "o": return fill("#fbfdfa", dots(h("div", { style: abs({ left: 0, top: 0, width: W, height: H, clipPath: clip(boxes) }) }, foot({ filter: "grayscale(1) contrast(0.7) brightness(1.5)" })), "#26262a", "#fbfdfa"));
+      case "o": return fill("#fbfdfa", dots(h("div", { style: abs({ left: 0, top: 0, width: W, height: H, clipPath: clip(boxes) }) }, foot({})), "#26262a", "#fbfdfa"));
       case "W": return fill(WHITE, h("div", { key: "them", style: abs({ left: 0, top: 0, width: W, height: H, clipPath: clip(boxes) }) }, foot({})), stroke("#a0a0a0", 2), tags("#243250"));
       default: return chars();
     }
@@ -212,7 +221,7 @@ const CODE =
 
 export const vision: EffectPiece = {
   key: "vision",
-  version: 1,
+  version: 2,
   name: "Vision machine",
   how: "son lieu vu par une machine, en coupes franches qui clignotent : chaque personne dans un cadre qui passe d'un bleu à deux tons au noir à points, une petite étiquette à son mot qui perd ses lettres ; puis son lieu tel quel, les cadres sur blanc, une passe grise, le réseau (chacun dans son cadre, relié aux autres par des fils), les gens en points, des noirs ; sur un temps, le graphe sur blanc (un point par personne, des fils, des codes binaires), puis eux dans leurs cadres ; un second clignotement plus serré, et son lieu redessiné en caractères clairs sur noir avant que le montage reprenne.",
   needs: "un plan fixe de son lieu avec du monde (une salle, sa terrasse, son marché, une rue devant chez elle), filmé de haut de préférence, téléphone posé : des gens qui passent et d'autres qui bougent peu (attablés, qui flânent, qui attendent).",
@@ -239,6 +248,11 @@ export const vision: EffectPiece = {
       slot: "gens",
       shot: 0,
       want: "les personnes qu'on voit dans ce plan, chacune dans son cadre : « every person » (ou « every customer », « every shopper » quand c'est plus juste) ; « none » quand il n'y a personne",
+    },
+    {
+      slot: "choses",
+      shot: 0,
+      want: "ce qui se répète et ne bouge pas dans ce plan, chacun dans son cadre comme les gens (« every pendant lamp », « every chair », « every mannequin », « every plant ») ; « none » quand rien ne se répète",
     },
   ],
   timeline: visionTimeline,

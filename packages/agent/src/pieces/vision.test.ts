@@ -11,7 +11,7 @@ type Box = { x: number; y: number; w: number; h: number };
 type Drawn = { type: unknown; props: Record<string, unknown>; children: unknown[] };
 
 /** Its Scene at one frame with a stand-in scope (each tool a named node), the boxes of everyone as given. */
-function drawAt(frame: number, texts: Record<string, string>, people: Box[] = [], frames = 126): Drawn {
+function drawAt(frame: number, texts: Record<string, string>, people: Box[] = [], frames = 126, things: Box[] = []): Drawn {
   const React = { createElement: (type: unknown, p: Record<string, unknown> | null, ...children: unknown[]): Drawn => ({ type, props: p ?? {}, children: children.flat() }), Fragment: "Fragment", useId: () => ":r0:" };
   // Remotion's random: deterministic by its seed.
   const random = (seed: string) => {
@@ -19,7 +19,7 @@ function drawAt(frame: number, texts: Record<string, string>, people: Box[] = []
     for (const c of String(seed)) x = (x * 31 + c.charCodeAt(0)) % 1000003;
     return (x % 1000) / 1000;
   };
-  const scope: Record<string, unknown> = { AbsoluteFill: "AbsoluteFill", FitText: "FitText", Footage: "Footage", Ascii: "Ascii", useCurrentFrame: () => frame, random, SubjectParts: () => people };
+  const scope: Record<string, unknown> = { AbsoluteFill: "AbsoluteFill", FitText: "FitText", Footage: "Footage", Ascii: "Ascii", Sketch: "Sketch", useCurrentFrame: () => frame, random, SubjectParts: (_s: unknown, _f: unknown, _l: unknown, name: string) => (name === "@choses" ? things : people) };
   const make = new Function("React", ...Object.keys(scope), `"use strict";\n${vision.code}\nreturn Scene;`) as (...args: unknown[]) => (p: Record<string, unknown>) => Drawn;
   const shots = [
     { from: -36, durationInFrames: 36, kind: "video", aspect: 16 / 9 },
@@ -32,7 +32,7 @@ const nodes = (n: unknown): Drawn[] => (n && typeof n === "object" && "children"
 const styleOf = (n: Drawn) => (n.props.style ?? {}) as Record<string, string | number>;
 const textOf = (n: Drawn): string => (n.children.flat(Infinity) as unknown[]).map((c) => (typeof c === "string" ? c : c && typeof c === "object" && "children" in c ? textOf(c as Drawn) : "")).join("");
 
-test("« Vision machine » (effect v1): its layer on her still shot with people, everyone followed there, its labels' word and its marks", () => {
+test("« Vision machine » (effect v2): its layer on her still shot with people, everyone followed there, its labels' word and its marks", () => {
   const shots = [
     { file: "lead", at: 1, seconds: 1.2 },
     { file: "place", at: 2, seconds: 4.2 },
@@ -56,7 +56,7 @@ test("« Vision machine » (effect v1): its layer on her still shot with people,
   assert.doesNotMatch(vision.code, /\b(Depth|Near)\b/);
 });
 
-test("« Vision machine » (effect v1): its marks fit any span, in order; its strobes are the original's passes, one to ten images each", () => {
+test("« Vision machine » (effect v2): its marks fit any span, in order; its strobes are the original's passes, one to ten images each", () => {
   for (const [frames, bpm] of [[48, 100], [60, 140], [90, 100], [150, 100], [150, 60], [120, 77.5]] as const) {
     const m = visionTimeline({ frames, bpm, shots: [{ from: 0, frames }], words: {}, settings: {} }).marks!;
     const order = ["open", "graph", "people", "after", "close"].map((k) => m[k]!);
@@ -70,7 +70,7 @@ test("« Vision machine » (effect v1): its marks fit any span, in order; its st
   }
 });
 
-test("« Vision machine » (effect v1): everyone boxed as filmed first, a strobe at other moments of her shot, the graph on white, her place in characters to finish", () => {
+test("« Vision machine » (effect v2): everyone boxed as filmed first, a strobe at other moments of her shot, the graph on white, her place in characters to finish", () => {
   const people = [
     { x: 300, y: 900, w: 120, h: 340 },
     { x: 520, y: 980, w: 110, h: 320 },
@@ -100,13 +100,19 @@ test("« Vision machine » (effect v1): everyone boxed as filmed first, a strobe
   const close = at(120);
   assert.ok(close.some((n) => n.type === "Ascii" && n.props.kind === undefined));
   assert.ok(close.some((n) => n.type === "Footage" && n.props.at === undefined));
+  // Its characters drawn on the edges and details of her place (Sketch under Ascii, widened), never on its light alone.
+  const inChars = nodes(close.find((n) => n.type === "Ascii" && n.props.kind === undefined));
+  assert.ok(inChars.some((n) => n.type === "Sketch") && inChars.some((n) => /^blur\(1px\) brightness/.test(String(styleOf(n).filter ?? ""))));
+  // The things that repeat in her place framed like the people (« @choses »): more frames, more dots in the graph.
+  const lamps = [{ x: 100, y: 300, w: 40, h: 200 }, { x: 900, y: 320, w: 40, h: 190 }];
+  assert.equal(nodes(drawAt(55, marks, people, 126, lamps)).filter((n) => n.type === "circle").length, 5);
   // Nobody seen: no box, the graph gives way to the characters.
   assert.ok(!at(2, []).some((n) => /^path\(/.test(String(styleOf(n).clipPath ?? ""))));
   assert.ok(at(55, []).some((n) => n.type === "Ascii"));
   assert.equal(at(55, []).filter((n) => n.type === "circle").length, 0);
 });
 
-test("« Vision machine » (effect v1): its optional title, a detection label to read, in the safe zone, steady over the strobe", () => {
+test("« Vision machine » (effect v2): its optional title, a detection label to read, in the safe zone, steady over the strobe", () => {
   const marks = { open: "9", graph: "54", people: "60", after: "72", close: "117" };
   const fits = (frame: number, words: Record<string, string>) => nodes(drawAt(frame, { ...marks, ...words })).filter((n) => n.type === "FitText");
   assert.equal(fits(30, {}).length, 0);
