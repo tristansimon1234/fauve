@@ -607,7 +607,7 @@ export const HOUSE_MODELS: HouseModel[] = [
       hook: { kind: "promesse", what: "ses deux premiers mots en grandes capitales grasses qui glissent de la gauche dès la première image, au-dessus de sa tête" },
       text: {
         amount: "plusieurs",
-        composition: "au-dessus de sa tête : ses premiers mots puis le mot clé de chaque idée en capitales grasses glissant de la gauche, tout ce qu'elle dit d'autre en petit au-dessus, mot à mot, jamais deux fois ; une liste deux noms à la fois, chacun dans sa police, sur sa photo quand elle en a une ; pas d'autres sous-titres",
+        composition: "au-dessus de sa tête : ses premiers mots puis le mot clé de chaque idée en capitales grasses, le reste de ce qu'elle dit en petit au-dessus, mot à mot, jamais deux fois ; une liste deux noms à la fois, chacun dans sa police, sur sa photo",
         case: "upper",
         weight: "bold",
         subtitles: false,
@@ -2091,7 +2091,7 @@ export const HOUSE_MODELS: HouseModel[] = [
         weight: "bold",
         tracking: "wide",
       },
-      layout: "un seul plan fixe plein cadre vertical, de face ; un kaléidoscope de huit miroirs qui remplit sa chose (ou une rosace ronde en son milieu, ou des miroirs verticaux qui glissent), le reste de l'image vrai autour",
+      layout: "un seul plan fixe plein cadre vertical, de face ; un kaléidoscope de huit miroirs qui remplit sa chose (ou une rosace ronde, ou des battants), le reste de l'image vrai autour",
       moments: [
         { at: 0, what: "sa chose vraie, de face, deux images" },
         { at: 0.07, what: "un kaléidoscope de huit miroirs s'ouvre en cercle depuis le milieu de sa chose, vite puis plus doucement, jusqu'à la remplir à 1,56 s" },
