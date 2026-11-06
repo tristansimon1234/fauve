@@ -200,6 +200,10 @@ export const HOUSE_EFFECTS: Record<string, HouseEffect> = {
     effet: "chaque étape coupée geste par geste, ses mots au milieu de l'image comme les sous-titres d'une voix, un petit groupe par geste",
     il_faut: "des gestes filmés téléphone posé, chaque étape d'un seul endroit en plusieurs gestes",
   },
+  affiches: {
+    effet: "chaque image devient une affiche : un aplat vif qui change à chaque coupe, l'image dans un tirage à bord blanc posé chaque fois ailleurs, une sur deux nommée en très grandes capitales",
+    il_faut: "des photos ou de courtes vidéos de ses produits, plats ou créations, une chose seule au milieu de chacune",
+  },
 };
 
 /** The most of Edith's models one Reel borrows from: one charter, one music, never a patchwork. */
