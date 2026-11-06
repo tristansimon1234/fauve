@@ -224,6 +224,10 @@ export const HOUSE_EFFECTS: Record<string, HouseEffect> = {
     effet: "son compteur en capitales étroites, blanches et translucides, posé sur son plan le plus fort quand la basse tombe, qui prend un cran un temps plus tard (« 4 ANS », puis « 5 ANS ») et gonfle",
     il_faut: "un gros plan fort au milieu de l'image (un visage, de la farine, des confettis) et ce qu'elle compte",
   },
+  depart: {
+    effet: "quelqu'un debout devant son lieu, l'image qui recule en trois sauts, puis une masse floue passe tout près devant l'objectif : la personne a disparu, son lieu vide tenu un instant",
+    il_faut: "une vidéo fixe de quelqu'un debout devant son lieu, et si possible le même endroit vide (la fin de la vidéo)",
+  },
 };
 
 /** The most of Edith's models one Reel borrows from: one charter, one music, never a patchwork. */

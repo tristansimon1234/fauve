@@ -96,4 +96,8 @@ export const HOUSE_MEASURES: Record<string, ReelMeasures> = {
   // hidden ones included (the dark passing, the powder, the smoke, the fabric, the whips, the plunge, the rising water,
   // its dissolve by its middle); on its cuts' grid, 134,87 BPM (its music 134,8, its cuts 0,107 s after its beats); ebur128.
   "aventure": { duration: 46.88, cuts: [0.3, 0.77, 1.2, 2.07, 3.2, 3.53, 4.17, 5.87, 7.03, 7.53, 8.8, 9.57, 10.53, 11.07, 11.5, 12.27, 13.27, 13.97, 14.53, 15.03, 15.97, 16.8, 17.67, 18.6, 19.5, 20.33, 20.83, 21.73, 22.6, 23.5, 24.8, 25.7, 26.6, 28.8, 29.4, 30.07, 31.1, 31.93, 32.7, 33.67, 34.5, 35.87, 36.33, 37.87, 38.67, 40, 41.3, 42.97, 43.9, 44.83], bpm: 134.87, lufs: -14.1 },
+  // Its fiche's cuts (docs/fiches/depart.md, image by image): its zoom out's three steps, its place empty under the bus,
+  // its four journey shots, its three crowds (measure.py missed these, each image of an accelerated crowd changes as
+  // much as a cut); its music's backbeat every 1,082 s counted two beats (110,9 BPM); its loudness by ebur128.
+  "depart": { duration: 11.17, cuts: [0.03, 0.1, 0.17, 0.83, 1.07, 1.4, 1.7, 2.73, 3.2, 4.93, 7.27], bpm: 110.9, lufs: -16.5 },
 };
