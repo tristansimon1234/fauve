@@ -83,4 +83,8 @@ export const HOUSE_MEASURES: Record<string, ReelMeasures> = {
   // Its fiche (docs/fiches/vitraux.md): one still shot, no cut; a kick on every beat (123,4 BPM, the first at 0,345 s,
   // on the grid within 5 ms); its sound cut at 9,00 s for the loop; its loudness by ebur128.
   "vitraux": { duration: 9, cuts: [], bpm: 123.4, lufs: -14.1 },
+  // Its fiche's two cuts (the close-up opened on a click, closed on the second click of a double click), read image by
+  // image; no beat in its sound (its street's, cut by its first click and back on its last: its catalogue's tempo, 90,
+  // decides); its loudness by ebur128.
+  "curseur": { duration: 10.2, cuts: [2.27, 5.97], bpm: null, lufs: -17.3 },
 };

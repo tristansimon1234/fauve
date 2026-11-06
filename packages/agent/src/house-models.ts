@@ -2106,6 +2106,63 @@ export const HOUSE_MODELS: HouseModel[] = [
       why: "Sa chose à elle se transforme sous nos yeux sans jamais cesser d'être la sienne : on cherche comment c'est fait, on regarde jusqu'au retour à la vraie image, et la boucle fait revoir.",
     },
   }),
+  model({
+    key: "curseur",
+    name: "Un clic sur tes produits",
+    // Written on its original's fiche (v1 of its skill, docs/fiches/curseur.md): a desktop cursor over her real video, as
+    // on a computer: a click pauses it and the music, a click opens the close-up of her products, a click on each writes
+    // its name with a hand-drawn arrow, a click clears them, a double click goes back, a last click plays it all again.
+    pitch: "Un curseur d'ordinateur met ta vidéo en pause d'un clic, ouvre la photo de près de ce que tient ton équipe, écrit d'un clic le nom de chacun de tes produits, puis relance la vidéo et la musique.",
+    needs: "une vidéo de ton lieu où quelqu'un passe ou s'avance avec ce que tu vends à la main (filmée téléphone posé), et une photo de près de deux de tes produits côte à côte",
+    files: [2, 3],
+    // Its names in a very condensed bold family, as its original's labels (Bebas Neue).
+    pair: "condensee-geometrique",
+    // Its skill's code is its reference.
+    example: null,
+    // Its original has no beat to count (its sound is its street's, cut by its first click and back on its last): its
+    // moments counted at 90 BPM, a beat every 20 images, its first click on beat 2.
+    tempo: 90,
+    finish: { name: "Soleil et sarcelle", hint: "chaud et net, ombres bleu-vert, hautes lumières crème, couleurs franches, sans grain ni coins sombres", contrast: 0.08, saturation: 0.06, warmth: 0.06, shadows: "#0A1A1E", highlights: "#F0D3A8", split: 0.25 },
+    look: {
+      name: "curseur qui clique",
+      format: "autre",
+      hook: { kind: "geste", what: "un curseur d'ordinateur, la flèche blanche en pixels, qui entre dans une vraie vidéo de son lieu et clique à côté de quelqu'un : l'image et le son se mettent en pause" },
+      text: {
+        amount: "plusieurs",
+        composition: "le nom de chaque produit en grandes capitales condensées blanches, posé d'un coup sur son clic dans l'espace libre près de lui, une flèche fine dessinée à la main qui va du produit au mot ; les deux partent d'un coup sur un clic",
+        case: "upper",
+        weight: "bold",
+        tracking: "normal",
+      },
+      layout: "plein cadre vertical : sa vidéo de son lieu, la photo de près de ses produits ouverte d'un clic, puis la vidéo qui reprend ; un curseur blanc en pixels par-dessus tout du long",
+      moments: [
+        { at: 0, what: "sa vidéo de son lieu joue : quelqu'un sort ou s'avance avec ce qu'il porte ; à 0,33 s un curseur d'ordinateur (une flèche blanche en pixels cerclée de noir, grande comme un dixième de l'image) entre par la gauche et file en ligne droite jusqu'à côté de la personne" },
+        { at: 1.33, what: "un clic (la flèche se rétracte une image) : l'image se fige et le son s'arrête net ; dans le silence, la flèche glisse sur ce que la personne tient" },
+        { at: 2.27, what: "un clic sur ce qu'elle tient : coupe sur la photo de près de deux produits, figée" },
+        { at: 2.77, what: "un clic sur le premier produit : son nom en grandes capitales condensées blanches apparaît d'un coup au-dessus de lui, une flèche fine dessinée à la main du produit au mot" },
+        { at: 3.63, what: "un clic sur le second produit : son nom et sa flèche apparaissent de même, dans l'espace libre près de lui" },
+        { at: 5.37, what: "un clic à l'écart : les deux noms et leurs flèches partent d'un coup" },
+        { at: 6.47, what: "la flèche monte en haut de l'image, un double clic : retour sur la vidéo de son lieu, toujours figée là où elle s'était arrêtée" },
+        { at: 7.93, what: "la flèche redescend sur la personne, un clic : la vidéo repart et le son revient ; la personne s'en va, la flèche sort du cadre en bas à gauche" },
+      ],
+      sounds: [
+        { at: 1.33, what: "computer mouse click, the video pauses and the music stops dead" },
+        { at: 2.27, what: "computer mouse click, alone in the silence, on the cut to the close-up" },
+        { at: 2.77, what: "computer mouse click on the first product, its name appears" },
+        { at: 3.63, what: "computer mouse click on the second product" },
+        { at: 5.37, what: "computer mouse click, the names go" },
+        { at: 6.47, what: "computer mouse double click, back to the video" },
+        { at: 7.93, what: "computer mouse click, the video and the music play again" },
+      ],
+      camera: "fixe",
+      transitions: "coupes nettes",
+      grade: "warm",
+      motion: "epure",
+      music: "sunny warm lo-fi groove, soft drums, mellow keys, round bass, 90 BPM",
+      ending: "sa vidéo qui a repris et continue, la personne qui s'en va, le curseur sorti du cadre en bas à gauche",
+      why: "On croit voir quelqu'un jouer avec la vidéo sur son ordinateur : la pause et le silence surprennent, chaque clic fait apparaître le nom d'un produit, et la vidéo qui repart avec le son donne la chute.",
+    },
+  }),
 ];
 
 const BY_KEY = new Map(HOUSE_MODELS.map((m) => [m.key, m]));
@@ -2192,6 +2249,7 @@ export const HOUSE_WHEN: Record<string, { pour: string; pas_pour: string }> = {
   recette: { pour: "montrer un savoir-faire en étapes comme un tuto, pour tout métier qui a des gestes : une recette (cuisine, pâtisserie), un bouquet monté (fleuriste), une coupe (coiffeur, barbier), une pièce tournée (céramiste), un soin ; du résultat fini à la dégustation ou à l'essai", pas_pour: "un lieu ou une ambiance, une offre à lire, quelqu'un qui parle face caméra, des vidéos filmées à la main" },
   affiches: { pour: "montrer ses produits, ses plats, ses créations ou ses services un par un avec leur nom, comme des affiches colorées : une collection, une carte, des nouveautés, une sélection, ses best-sellers", pas_pour: "un lieu qui se raconte, quelqu'un qui parle face caméra, un geste qu'il faut voir en entier (l'image est petite dans son tirage), une offre à lire en détail, moins de quatre images" },
   vitraux: { pour: "montrer sa devanture, sa porte, sa vitrine, ses étagères ou son présentoir comme on ne les a jamais vus (une boutique, un café, une fleuriste, une librairie, une mercerie, un salon) : une boucle hypnotique qui fait s'arrêter, son nom en option", pas_pour: "quelqu'un qui parle, des gens qui passent devant, une vidéo filmée à la main qui bouge, une offre à lire en détail, plusieurs moments à raconter" },
+  curseur: { pour: "montrer deux de ses produits avec humour, comme sur un écran d'ordinateur (un café, une boulangerie, un restaurant, un traiteur, une boutique, un fleuriste) : quelqu'un de son lieu qui les porte ou les montre, puis la photo de près des deux, chacun nommé d'un clic", pas_pour: "sans vidéo de son lieu où quelqu'un bouge, sans photo de près de ses produits, quelqu'un qui parle face caméra, un long message ou une offre à lire, un lieu sans rien à montrer" },
 };
 
 /** The models for Edith: their key, name, what they do, what they want, and what only she can film for one. */

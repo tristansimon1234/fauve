@@ -208,6 +208,10 @@ export const HOUSE_EFFECTS: Record<string, HouseEffect> = {
     effet: "des miroirs posés sur sa chose filmée de face qui glissent sans arrêt : elle se dédouble et se recompose en motifs symétriques, le reste vrai autour, puis redevient elle-même",
     il_faut: "un plan fixe et bien de face de sa porte, sa devanture, sa vitrine ou une étagère, sans personne devant",
   },
+  curseur: {
+    effet: "un curseur d'ordinateur en pixels qui met sa vidéo en pause d'un clic, la musique coupée, écrit d'un clic le nom de chacun de ses produits avec une flèche à la main, puis la relance",
+    il_faut: "une photo ou une vidéo de près de deux de ses produits, et avant elle une vidéo de son lieu où quelqu'un les porte",
+  },
 };
 
 /** The most of Edith's models one Reel borrows from: one charter, one music, never a patchwork. */
