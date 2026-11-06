@@ -1,4 +1,5 @@
-import { beatSpans, toFrame, type MontageSkill } from "../skills.ts";
+import { HEARD_CARD, HEARD_HOLD } from "../own-voice.ts";
+import { beatSpans, toFrame, type MontageSkill, type SkillHeard, type SkillTimeline } from "../skills.ts";
 
 // « Celui-là, celui-là… », version 1, written on its original's fiche (docs/fiches/celui-la.md: a ceramist's Reel and a
 // second one made on the same template by another, measured image by image at 30 i/s: each word's box, size, colour and
@@ -30,6 +31,14 @@ import { beatSpans, toFrame, type MontageSkill } from "../skills.ts";
 // de voix »): by default a voice (Edith's default for her, or the one she chose) says each of its words exactly when it
 // lands on screen, on the beats: her hail, her stop word on each of its pops, « Regarde », her pointing word on each
 // product, her hesitation, her last word (saysWords, its timeline's `says`; model-voice.ts); no subtitles, her music under it.
+// Version 3: her own recorded voice can lead it instead (Tristan: « qq qui parle face cam ou qui enregistre sa propre
+// voix, pourquoi on peut pas jouer celle-là ? »; own-voice.ts): her voice note, or the sound of one of her videos where
+// she speaks, played whole (never cut into words), and the model on what she says (`heard`): its words on screen are
+// hers, each from when she says it (her stop word as many times as she says it, three at most; her pointing word, as
+// she says it, on each product), each product cut two images before she points at it, her series on her hesitation
+// (or her last word), its music thin until her first product, stopped on her series and back on her last word. Her
+// face-cam is heard, never seen here: the original's voice is off screen, a voice that stops you and points, over her
+// empty display where her products will parade, its opening words posed across the middle of the frame (on her face).
 
 const BPM = 96.5;
 /** Where the Reel starts on its original's grid (beats): its beat 0 is 0,11 s before the Reel's first image. */
@@ -53,6 +62,14 @@ const round3 = (n: number) => Math.round(n * 1000) / 1000;
 const comma = (n: number) => String(round(n)).replace(".", ",");
 /** A moment (s) on the frame its code shows it on, as its voice says it there. */
 const onFrame = (s: number) => round3(toFrame(s) / 30);
+/** Under her own voice: each product cut this long before she points at it (s: the original cuts one or two images before its word). */
+const CUT_LEAD = 2 / 30;
+/** Under her own voice: her empty display holds this long at least before her first product (s; her talk starts later when she points at once). */
+const OPEN_MIN = 0.6;
+/** Under her own voice: a product a fifth of a second at least (s); pointed at closer, they are not the model's words. */
+const PRODUCT_MIN = 0.2;
+/** A mark of a word she never says (images): past any Reel, its word never drawn. */
+const ABSENT = 99999;
 
 const CODE = String.raw`function Scene({ width, height, durationInFrames, brand, shots, reelTexts, end, texts }) {
   const h = React.createElement;
@@ -88,7 +105,12 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const near = (role, at) => { const t = nearest(role, at); return t && Math.abs(t.from - at) <= 4 ? t : null; };
   const hail = near("hook", HAIL_FROM), stop = near("band", STOP1), look = near("band", LOOK), point = near("band", FIRST);
   const and = near("caption", AND_FROM), last = near("caption", LAST);
-  const mine = [hail, stop, look, point, and, last];
+  // Each pop of her stop word and each product its own words when they were said so (her own voice: each time she says
+  // it, as she says it), else the one written for all of them.
+  const STOPS = [STOP1, STOP2, STOP3];
+  const stopAt = (k) => near("band", STOPS[k]) || stop;
+  const pointOn = (k) => (k > 1 && shots[k] ? near("band", shots[k].from) : null) || point;
+  const mine = [hail, stop, look, point, and, last, stopAt(1), stopAt(2)].concat(shots.map((s, k) => pointOn(k)));
   const others = reelTexts.filter((t) => mine.indexOf(t) < 0);
   // French spacing: a non-breaking space before « ! ? : ; » and inside « », a number never broken from its digits.
   const keep = (s) => String(s || "").trim().replace(/\s+([!?:;»])/g, " $1").replace(/«\s+/g, "« ").replace(/(\d) (?=\d)/g, "$1 ");
@@ -189,14 +211,14 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   if (hail && frame >= HAIL_FROM && frame < HAIL_GONE) words.push(typed("hail", hail.text, 0.256, 0.5, HAIL_FROM, HAIL_TYPED, HAIL_OUT, HAIL_GONE, 0));
   if (stop && frame >= STOP1 && frame < STOPPED) {
     const k = frame >= STOP3 ? 2 : frame >= STOP2 ? 1 : 0;
-    words.push(pop("stop" + k, stop.text, STOP_SPOTS[k][0], STOP_SPOTS[k][1], k === 2 ? Math.round(S * 1.09) : S, 0));
+    words.push(pop("stop" + k, stopAt(k).text, STOP_SPOTS[k][0], STOP_SPOTS[k][1], k === 2 ? Math.round(S * 1.09) : S, 0));
   }
   if (look && frame >= LOOK && frame < FIRST) words.push(pop("look", look.text, 0.5, 0.493, S, 0));
-  // Her pointing word on each product, from its cut to the next one.
-  if (point && frame >= FIRST && frame < FINALE) {
+  // Her pointing word on each product, from its cut to the next one (to the end when no series follows them).
+  if (point && frame >= FIRST && frame < FINALE && !card) {
     const k = Math.max(0, cur - 1);
     const spot = SPOTS[k % SPOTS.length];
-    words.push(pop("point" + k, point.text, spot[0], spot[1], S, cur));
+    words.push(pop("point" + k, pointOn(cur).text, spot[0], spot[1], S, cur));
   }
   // Her series together: her hesitation typed, held, faded; her last word alone in the middle to the end (or the card).
   if (and && frame >= AND_FROM && frame < AND_GONE && !card) words.push(typed("and", and.text, 0.142, 0.49, AND_FROM, AND_TYPED, AND_OUT, AND_GONE, n - 1));
@@ -224,10 +246,19 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
 
 export const celuiLa: MontageSkill = {
   key: "celui-la",
-  version: 2,
+  version: 3,
   bpm: BPM,
-  // Its original's words are what its voice says: a voice says hers, each at its moments, unless she takes it away.
-  saysWords: { slots: ["appel", "arret", "regarde", "celui", "et", "fin"], default: true },
+  // Its original's words are what its voice says: a voice says hers, each at its moments, unless she takes it away; or her
+  // own recorded voice leads it, its words hers (heard).
+  saysWords: {
+    slots: ["appel", "arret", "regarde", "celui", "et", "fin"],
+    default: true,
+    hers: {
+      counts: { appel: [0, 1], arret: [0, 3], regarde: [0, 1], celui: [3, 14], et: [0, 1], fin: [0, 1] },
+      cases:
+        "case 1 : son présentoir vide (ou sa vitrine), pendant ses premiers mots, jusqu'à ce qu'elle montre son premier produit ; puis une case par produit, dans l'ordre où elle les montre, chacune à partir de son mot pointé (le produit qu'elle nomme là quand elle le décrit) ; puis, quand elle dit une hésitation ou un dernier mot après eux, une dernière case : toute sa série réunie (sinon pas de série, son dernier produit va jusqu'à la fin)",
+    },
+  },
   // Her display, three to fourteen products, her series together.
   shots: [5, 16],
   files: [5, 16],
@@ -379,5 +410,113 @@ export const celuiLa: MontageSkill = {
       },
     };
   },
+  heard: heardLine,
   code: CODE,
 };
+
+/**
+ * Its timeline under her own voice (MontageSkill.heard; own-voice.ts): her opening words before her first product (her
+ * hail, her stop word up to three times, « Regarde »), her pointing word three to fourteen times (each one a product, cut
+ * two images before she says it), her hesitation and her last word after them (her series, cut on the first of them);
+ * a word out of that order is heard, never shown. Each word shows from when she says it, as she says it (a typed one
+ * typed while she says it, faded before her next word), her last word held a second at least, the Reel lasting to just
+ * after her last word (her ending card after it); its music thin until her first product, stopped on her series and back
+ * on her last word. Her talk starts later when she points at once (her display held 0,6 s). Null when she points at
+ * fewer than three things or more than fourteen, or so fast that a product would flash by.
+ */
+function heardLine(said: SkillHeard, { end }: { end: boolean }): SkillTimeline | null {
+  const of = (slot: string) => said.words.filter((w) => w.slot === slot);
+  const points = of("celui");
+  if (points.length < 3 || points.length > 14) return null;
+  const firstPoint = points[0]!;
+  const lastPoint = points.at(-1)!;
+  // Its opening words before her first product, in its order; its closing ones after her last.
+  const before = (w: { end: number }, limit: number) => w.end <= limit + 0.02;
+  const stops = of("arret").filter((w) => before(w, firstPoint.at)).slice(0, 3);
+  const look = of("regarde").filter((w) => before(w, firstPoint.at) && (!stops.length || w.at >= stops.at(-1)!.end - 0.02)).at(-1);
+  const hail = of("appel").find((w) => before(w, stops[0]?.at ?? look?.at ?? firstPoint.at));
+  const and = of("et").find((w) => w.at >= lastPoint.end - 0.02);
+  const last = of("fin").find((w) => w.at >= (and ?? lastPoint).end - 0.02);
+  // Her talk on the Reel: later when she points at once, so her empty display holds OPEN_MIN.
+  const lead = round3(Math.max(0, OPEN_MIN - (firstPoint.at - CUT_LEAD)));
+  const reel = (t: number) => t + lead;
+  const cuts = points.map((p) => onFrame(reel(p.at) - CUT_LEAD));
+  const closing = and ?? last;
+  const series = closing ? onFrame(reel(closing.at) - CUT_LEAD) : null;
+  const edges = [...cuts, ...(series !== null ? [series] : [])];
+  if (edges.some((c, i) => i > 0 && c - edges[i - 1]! < PRODUCT_MIN - 1e-6)) return null;
+  // To just after her last word, her last word on screen held HEARD_HOLD at least; her ending card after it.
+  const shownLast = last ?? (series !== null ? closing! : lastPoint);
+  const close = onFrame(Math.max(reel(said.duration), reel(shownLast.at) + HEARD_HOLD));
+  const duration = end ? onFrame(close + HEARD_CARD) : close;
+  const until = end ? round(duration - END_CARD) : duration;
+  // Every word she says, in order: the next one's moment ends a typed word's fade, and her stop word's pops.
+  const said_ = [hail, ...stops, look, ...points, and, last].filter((w): w is SkillHeard["words"][number] => Boolean(w)).sort((a, b) => a.at - b.at);
+  const nextAt = (w: SkillHeard["words"][number]) => {
+    const next = said_[said_.indexOf(w) + 1];
+    return next ? (next.slot === "celui" ? cuts[points.indexOf(next)]! : reel(next.at)) : duration;
+  };
+  // A stretched word typed while she says it, held a little, faded over four images before her next word lands.
+  const typing = (w: SkillHeard["words"][number] | undefined) => {
+    if (!w) return { from: ABSENT, typed: ABSENT, out: ABSENT, gone: ABSENT };
+    const from = toFrame(reel(w.at));
+    const out = Math.max(from + 1, Math.min(toFrame(reel(w.end)) + 8, toFrame(nextAt(w)) - 4));
+    return { from, typed: Math.max(from + 1, Math.min(toFrame(reel(w.end)), out)), out, gone: out + 3 };
+  };
+  const hailing = typing(hail);
+  const hesitating = typing(and);
+  const stopped = stops.length ? Math.max(toFrame(reel(stops.at(-1)!.at)) + 4, Math.min(toFrame(nextAt(stops.at(-1)!)), toFrame(reel(stops.at(-1)!.end) + 0.25))) : ABSENT;
+  const spans = [0, ...edges, duration].slice(0, -1).map((start, i, all) => ({ start: round(start), end: round(i + 1 < all.length ? all[i + 1]! : duration) }));
+  const shown: NonNullable<SkillTimeline["shown"]> = [
+    ...(hail ? [{ slot: "appel", text: hail.text, from: round(reel(hail.at)), to: round(hailing.gone / 30) }] : []),
+    ...stops.map((w, k) => ({ slot: "arret", text: w.text, from: round(reel(w.at)), to: round(k + 1 < stops.length ? reel(stops[k + 1]!.at) : stopped / 30) })),
+    ...(look ? [{ slot: "regarde", text: look.text, from: round(reel(look.at)), to: round(cuts[0]!) }] : []),
+    ...points.map((w, k) => ({ slot: "celui", text: w.text, from: round(cuts[k]!), to: round(k + 1 < cuts.length ? cuts[k + 1]! : (series ?? until)) })),
+    ...(and ? [{ slot: "et", text: and.text, from: round(reel(and.at)), to: round(hesitating.gone / 30) }] : []),
+    ...(last ? [{ slot: "fin", text: last.text, from: round(reel(last.at)), to: round(until) }] : []),
+  ].filter((w) => w.to > w.from);
+  const texts = Object.fromEntries(shown.flatMap((w) => (shown.find((x) => x.slot === w.slot) === w ? [[w.slot, { from: w.from, to: w.to }]] : [])));
+  const length = (i: number) => comma(spans[i]!.end - spans[i]!.start);
+  const wants = [
+    `l'ouverture, ${length(0)} s, pendant ses premiers mots : son présentoir vide (un tabouret, une table, une étagère, son comptoir) ou sa vitrine, plan fixe et calme, où ses produits vont défiler`,
+    ...points.map((w, i) => `le produit qu'elle montre en disant « ${w.text} » (${length(i + 1)} s), seul et bien en vue, au même endroit et du même angle que les autres si elle les a filmés ainsi${i ? " ; jamais un produit déjà montré" : ""}`),
+    ...(series !== null ? [`toute sa série réunie (ou sa pièce préférée posée en dernier), ${length(spans.length - 1)} s, pendant ${and ? "son hésitation et " : ""}son dernier mot`] : []),
+  ];
+  return {
+    duration,
+    shots: spans.map((s, i) => ({ ...s, want: wants[i]! })),
+    texts,
+    shown,
+    lead,
+    marks: {
+      beat: round3((60 / BPM) * 30),
+      products: points.length,
+      hail_from: hailing.from,
+      hail_typed: hailing.typed,
+      hail_out: hailing.out,
+      hail_gone: hailing.gone,
+      stop1: stops[0] ? toFrame(reel(stops[0].at)) : ABSENT,
+      stop2: stops[1] ? toFrame(reel(stops[1].at)) : ABSENT,
+      stop3: stops[2] ? toFrame(reel(stops[2].at)) : ABSENT,
+      stopped,
+      look: look ? toFrame(reel(look.at)) : ABSENT,
+      first: toFrame(cuts[0]!),
+      finale: series !== null ? toFrame(series) : ABSENT,
+      and_from: hesitating.from,
+      and_typed: hesitating.typed,
+      and_out: hesitating.out,
+      and_gone: hesitating.gone,
+      last: last ? toFrame(reel(last.at)) : ABSENT,
+    },
+    // Its music shaped as with its own voice, on hers: thin until her first product, stopped just after her series' cut
+    // (its hit ringing while she hesitates) and back on her last word, then to the end.
+    music: {
+      downbeat: cuts[0]!,
+      filters: [{ kind: "thin", from: 0, to: cuts[0]! }],
+      ...(series !== null && last && reel(last.at) - series > 0.6
+        ? { pauses: [{ from: round3(series + 0.15), to: round3(reel(last.at)), tail: round3(Math.min(1.2, reel(last.at) - series - 0.35)) }] }
+        : {}),
+      end: { at: duration, fade: 0.12 },
+    },
+  };
+}

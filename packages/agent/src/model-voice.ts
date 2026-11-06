@@ -55,10 +55,11 @@ export function saidCues(skill: Pick<MontageSkill, "saysWords">, line: Pick<Skil
 /**
  * What its voice says on a plan made on it: its timeline for the plan's shots, tempo, ending and settings, with the
  * plan's words (her words changed by hand included), later by the plan's lead. Null when the skill says no words, when
- * another version of it made the plan, or when the plan's length is no longer its timeline's (its cut changed).
+ * another version of it made the plan, when the plan's length is no longer its timeline's (its cut changed), or when
+ * her own voice led it (its cuts on her words, MontageSkill.heard: no voice says its words on its beats there).
  */
 export function skillSaysOn(skill: MontageSkill, plan: Pick<EditPlan, "skill" | "segments" | "texts" | "tempo" | "end_card" | "beat_at" | "duration">): SaidCue[] | null {
-  if (!skill.saysWords || plan.skill?.key !== skill.key || plan.skill.version !== skill.version) return null;
+  if (!skill.saysWords || plan.skill?.key !== skill.key || plan.skill.version !== skill.version || plan.skill.heard) return null;
   const lead = plan.beat_at ?? 0;
   const bpm = plan.tempo && Math.abs(plan.tempo - skill.bpm) > 0.005 ? plan.tempo : undefined;
   const settings = skillSettings(skill, plan.skill.settings);

@@ -92,7 +92,14 @@ export type ReviewData = {
    */
   sound: { link: string; title: string | null; artist: string | null; followed: boolean } | null;
   /** The voice on the Reel: Edith's (which one) or her own voice note. */
-  voice: { who: "simone" | "hers"; name: string | null; /** Edith's voice (or her clone) it was read with. */ id?: string | null } | null;
+  voice: {
+    who: "simone" | "hers";
+    name: string | null;
+    /** Edith's voice (or her clone) it was read with. */
+    id?: string | null;
+    /** Her own voice leads its model (plan.voice_leads): its words on screen are hers, each when she says it. */
+    leads?: boolean;
+  } | null;
   /** Her own voice (a clone made in Style), to pick for this Reel. */
   ownVoice: { id: string; sampleUrl: string | null } | null;
   /** Days to move it to: the next free days at her usual hour. */
@@ -161,7 +168,7 @@ export async function loadReview(db: Db, studioId: string, post: ReviewPost, tim
     locked || !isBaked(plan.data) ? Promise.resolve([]) : runningJobs(studioId, { postId: post.id, kind: "effect_words" }),
     instagramAccount(studioId),
     locked ? Promise.resolve([]) : reviewSlots(studioId, timezone),
-    loadVoice(studioId, post.voice_media_id, ownVoice?.id ?? null, plan.data.says_words),
+    loadVoice(studioId, post.voice_media_id, ownVoice?.id ?? null, plan.data.says_words, Boolean(plan.data.voice_leads)),
     tiktokPanel(studioId, { kind: "reel", platforms: post.platforms, caption: post.caption, hashtags: post.hashtags, tiktok: post.tiktok, external_ids: post.external_ids }, !locked),
     shown?.storage_path ? admin.storage.from("media").createSignedUrl(shown.storage_path as string, 3600, { download: fileName }) : Promise.resolve(null),
     modelState(studioId, post.id).catch(() => null),
@@ -253,12 +260,13 @@ export async function instagramHandle(studioId: string): Promise<string | null> 
  * The voice over the Reel: Edith's (her name) or the manager's own voice note; on a model whose voice says its words, the
  * voice that says them (its plan's `says_words`, its track made or to be made); null: none.
  */
-async function loadVoice(studioId: string, mediaId: string | null, ownId: string | null, says?: EditPlan["says_words"]): Promise<ReviewData["voice"]> {
+async function loadVoice(studioId: string, mediaId: string | null, ownId: string | null, says?: EditPlan["says_words"], leads = false): Promise<ReviewData["voice"]> {
   if (!mediaId && says) return { who: "simone", name: says.voice_id === ownId ? "Ta voix" : (findVoice(says.voice_id)?.name ?? null), id: says.voice_id };
   if (!mediaId) return null;
   const { data } = await supabaseAdmin().from("media_assets").select("source, ai").eq("id", mediaId).eq("studio_id", studioId).maybeSingle();
   if (!data) return null;
-  if (data.source !== "ai") return { who: "hers", name: null };
+  // Her own voice: her voice note, or her voice taken from one of her videos; leading its model when it does.
+  if (data.source !== "ai") return { who: "hers", name: null, ...(leads ? { leads: true } : {}) };
   const id = (data.ai as { voice_id?: string } | null)?.voice_id ?? null;
   // Read by her clone: her voice, as she hears it in Style.
   return { who: "simone", name: id && id === ownId ? "Ta voix" : (findVoice(id)?.name ?? null), id };

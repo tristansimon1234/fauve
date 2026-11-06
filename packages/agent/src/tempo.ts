@@ -32,9 +32,10 @@ export function planBeat(plan: Pick<EditPlan, "template" | "tempo">): number | n
 /**
  * Whether a Reel's cuts sit on its tempo's beats, so its music keeps that tempo exactly and its beats are set on its
  * cuts (lib/render/music.ts): any Reel without a voice, and one of Edith's models with a voice laid over it (its cuts are
- * its beats, the voice runs over them); a Reel the editor cut on a voice follows its phrases, its tempo only an energy.
+ * its beats, the voice runs over them); a Reel the editor cut on a voice follows its phrases, its tempo only an energy,
+ * as does a model her own voice led (its cuts on her words: MontageSkill.heard), with or without that voice.
  */
-export const cutsOnBeats = (plan: Pick<EditPlan, "voice" | "skill">): boolean => !plan.voice || Boolean(plan.skill);
+export const cutsOnBeats = (plan: Pick<EditPlan, "voice" | "skill">): boolean => !plan.skill?.heard && (!plan.voice || Boolean(plan.skill));
 
 const round = (n: number) => Math.round(n * 100) / 100;
 
@@ -52,8 +53,9 @@ const MOTION_MAX = 8;
  */
 export function snapToTempo(plan: EditPlan, clipDurations: Record<string, number>, fixed?: (s: EditPlan["segments"][number]) => boolean): EditPlan {
   const beat = planBeat(plan);
-  // A copied Reel remade by code keeps the model's own cut times (its sound lands on them), as do shots laid side by side (a montage skill's, already on its beats).
-  if (!beat || plan.voice || plan.copy || !plan.segments.length || plan.segments.some((s) => isClipSegment(s) && s.beside)) return plan;
+  // A copied Reel remade by code keeps the model's own cut times (its sound lands on them), as do shots laid side by side (a montage skill's,
+  // already on its beats) and a model her own voice led (its cuts on her words, its words where she said them).
+  if (!beat || plan.voice || plan.copy || plan.skill?.heard || !plan.segments.length || plan.segments.some((s) => isClipSegment(s) && s.beside)) return plan;
   // Worked in frames, as the composition plays it (a crossfade overlaps whole frames).
   const frames = (t: number) => Math.round(t * REEL_FPS);
   // The sound she follows starts its beats `lead` in (beat_at): every cut on lead + k beats, the first shot that much longer.

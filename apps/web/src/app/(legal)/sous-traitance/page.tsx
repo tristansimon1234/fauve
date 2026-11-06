@@ -47,7 +47,8 @@ export default function ProcessingAgreementPage() {
           <strong>Personnes concernées</strong> : les clients, élèves et membres de l’équipe du client, et toute personne visible ou audible dans ce qu’il envoie.
         </li>
         <li>
-          <strong>Durée</strong> : les photos et vidéos envoyées sont supprimées 24 heures après la mise en ligne de la publication qui les utilise, ou 7 jours après leur envoi si
+          <strong>Durée</strong> : les photos, vidéos et messages vocaux envoyés (et le son qu’Edith tire d’une vidéo pour en faire la voix d’un Reel, à la demande du client) sont
+          supprimés 24 heures après la mise en ligne de la publication qui les utilise, ou 7 jours après leur envoi si
           aucune ne les utilise (jusqu’à 6 mois pour ses meilleures vidéos, gardées pour ses prochains Reels). Les contenus montés restent tant que le compte existe.
         </li>
       </ul>

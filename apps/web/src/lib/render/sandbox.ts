@@ -1229,6 +1229,52 @@ export async function sayWordsInSandbox<T>(
   }
 }
 
+/**
+ * Her own voice cut as a creator cuts it, for a model it leads (own-voice.ts in @fauve/agent: her pieces one after the
+ * other, her « euh », false starts and long pauses out, `filter` from ownTrackFilter), from her recording's signed link,
+ * as MP3 mono 44,1 kHz of the Reel's length (the mix brings it to a voice's level). Also how long it took (s).
+ */
+export async function cutVoiceInSandbox(id: string, url: string, filter: string): Promise<{ mp3: Buffer; seconds: number }> {
+  const started = Date.now();
+  const sandbox = await jobSandbox();
+  const dir = `${ROOT}/jobs/${id}-own`;
+  try {
+    await bash(sandbox, 'rm -rf "$1" && mkdir -p "$1"', [dir]);
+    await bash(sandbox, `cd "$1" && ${FETCH.replace('"$1"', "in.src")}`, [dir, url]);
+    await bash(sandbox, `cd "$1" && timeout 120 ${ROOT}/ffmpeg -loglevel error -y -i in.src -filter_complex "$2" -map "[out]" -ac 1 -ar 44100 -c:a libmp3lame -b:a 160k out.mp3`, [dir, filter]);
+    const out = await sandbox.readFileToBuffer({ path: `${dir}/out.mp3` });
+    if (!out?.length) throw new Error("her voice's track produced no file");
+    return { mp3: out, seconds: Math.round((Date.now() - started) / 100) / 10 };
+  } finally {
+    await bash(sandbox, 'rm -rf "$1"', [dir]).catch(() => {});
+  }
+}
+
+/**
+ * Her voice taken from one of her videos where she speaks (« prends ma voix de la vidéo où je parle »; videoVoice in
+ * @fauve/agent): its sound from `from` to `to` (s of the video: just before her first word to just after her last), from
+ * its signed link (its cleaned copy when it has one), as AAC mono 44,1 kHz in an M4A, the picture left out. Once per video.
+ */
+export async function videoVoiceInSandbox(id: string, url: string, span: { from: number; to: number }): Promise<{ m4a: Buffer; seconds: number }> {
+  const started = Date.now();
+  const sandbox = await jobSandbox();
+  const dir = `${ROOT}/jobs/${id}-video-voice`;
+  try {
+    await bash(sandbox, 'rm -rf "$1" && mkdir -p "$1"', [dir]);
+    await bash(sandbox, `cd "$1" && ${FETCH.replace('"$1"', "in.src")}`, [dir, url]);
+    await bash(
+      sandbox,
+      `cd "$1" && timeout 120 ${ROOT}/ffmpeg -loglevel error -y -i in.src -vn -map 0:a:0 -af "atrim=start=$2:end=$3,asetpts=PTS-STARTPTS" -ac 1 -ar 44100 -c:a aac -b:a 128k -movflags +faststart out.m4a`,
+      [dir, span.from.toFixed(3), span.to.toFixed(3)],
+    );
+    const out = await sandbox.readFileToBuffer({ path: `${dir}/out.m4a` });
+    if (!out?.length) throw new Error("her video's voice produced no file");
+    return { m4a: out, seconds: Math.round((Date.now() - started) / 100) / 10 };
+  } finally {
+    await bash(sandbox, 'rm -rf "$1"', [dir]).catch(() => {});
+  }
+}
+
 /** RNNoise's model in the render sandbox, fetched once and checked by its checksum (speech.ts). */
 const SPEECH_DIR = `${ROOT}/speech`;
 const SPEECH_SETUP = [
