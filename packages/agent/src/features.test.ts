@@ -1275,7 +1275,7 @@ test("each of Edith's models shows its original's frames as a Reel she sends: sh
   assert.equal(houseOriginalPath("facade"), "house/originals/facade.mp4");
   // A 31 s original: twelve sheets of 2.583 s; a 9.4 s one: five of 2 s; as many as the workshop made for each model.
   assert.equal(sheetSpan(31), 2.583);
-  const made: Record<string, number> = { decode: 12, "quatre-coins": 11, mosaique: 3, "carte-feutre": 5, pile: 5, "photo-dump": 6, table: 5, "ecran-partage": 7, cadre: 4, fenetres: 7, facade: 5, gaufre: 7, "mot-cle": 12, frappe: 7, "titre-derriere": 6, journee: 8, "plans-fixes": 7, "coups-de-fouet": 12, tourne: 7, nike: 6, eventail: 10, coulisses: 6, interrupteur: 5, interface: 7, pixel: 8, "mots-meles": 10, aplat: 5, detourages: 9, createur: 12, silhouette: 6, vision: 5, "mon-travail": 5, rallume: 0, "court-metrage": 12, "titre-cinema": 11, routine: 12, nuit: 6, bientot: 4, "nom-de-ville": 8, carnet: 12, "petites-lumieres": 5, "vlog-ville": 12, assiettes: 9, "chef-face": 12, recette: 12, affiches: 5, curseur: 6, bienvenue: 4, raccords: 4, aventure: 12, depart: 6 };
+  const made: Record<string, number> = { decode: 12, "quatre-coins": 11, mosaique: 3, "carte-feutre": 5, pile: 5, "photo-dump": 6, table: 5, "ecran-partage": 7, cadre: 4, fenetres: 7, facade: 5, gaufre: 7, "mot-cle": 12, frappe: 7, "titre-derriere": 6, journee: 8, "plans-fixes": 7, "coups-de-fouet": 12, tourne: 7, nike: 6, eventail: 10, coulisses: 6, interrupteur: 5, interface: 7, pixel: 8, "mots-meles": 10, aplat: 5, detourages: 9, createur: 12, silhouette: 6, vision: 5, "mon-travail": 5, rallume: 0, "court-metrage": 12, "titre-cinema": 11, routine: 12, nuit: 6, bientot: 4, "nom-de-ville": 8, carnet: 12, "petites-lumieres": 5, "vlog-ville": 12, assiettes: 9, "chef-face": 12, recette: 12, affiches: 5, curseur: 6, bienvenue: 4, raccords: 4, aventure: 12, depart: 6, "en-boutique": 12 };
   // « Celui-là, celui-là… » (8,66 s): five sheets of 2 s.
   made["celui-la"] = 5;
   // « Ta devanture en kaléidoscope » (9 s): five sheets of 2 s.
@@ -5800,7 +5800,7 @@ test("a font per word: a library of Google Fonts families by what they evoke, on
   assert.equal(wordFont(""), undefined);
   assert.match(wordFontsBrief().find((l) => l.startsWith("Anton"))!, /^Anton : condensée très grasse, en capitales ; évoque sport, force/);
   // The pairs of the font library, the new models' added as they come (November 5 and after).
-  assert.equal(FONT_PAIRS.length, 25);
+  assert.equal(FONT_PAIRS.length, 26);
   // A slot that asks for one: the filler's family when it is one of the library; none otherwise, nor on a slot that does not ask.
   const skill = {
     key: "test",
@@ -8337,6 +8337,52 @@ test("a skill timed on her voice: an idea's own images one after the other when 
     ["bouchee", 0, 3.68, 1, 0],
     ["goute", 0, 2.58, 1, 3.68],
   ]);
+});
+
+test("a skill that writes what is said in her shots (spoken): its plan subtitled, its code given the words said there, the engine's subtitles stepping aside", async () => {
+  const { skillPlan, skillFillInput, withoutVoice, SKILL_FILL_PROMPT } = await import("./skills.ts");
+  type Skill = Parameters<typeof skillPlan>[0]["skill"];
+  const base: Skill = {
+    key: "test-spoken",
+    version: 1,
+    bpm: 120,
+    shots: [2, 2],
+    files: [1, 2],
+    how: "",
+    end: false,
+    texts: [{ slot: "ligne", role: "caption", want: "", max: 40, required: true }],
+    timeline: () => ({ duration: 4, shots: [{ start: 0, end: 2, want: "" }, { start: 2, end: 4, want: "" }], texts: { ligne: { from: 0, to: 4 } }, marks: {} }),
+    code: String.raw`function Scene({ durationInFrames, spoken }) { const h = React.createElement; return h(AbsoluteFill, null, (spoken || []).map((w, i) => h("span", { key: i }, w.w))); }`,
+  };
+  const own: Skill = { ...base, spoken: "own" };
+  const files = [
+    { id: "talk", photo: false, seconds: 10 },
+    { id: "b", photo: false, seconds: 10 },
+  ];
+  const fill = { shots: [{ file: "talk", at: 1 }, { file: "b", at: 0 }], texts: { ligne: "Bonjour" }, end: null };
+  const plan = skillPlan({ skill: own, name: "Test", files, fill });
+  assert.equal(plan.subtitles, true);
+  assert.equal(plan.layers![0]!.motion.writes_spoken, true);
+  assert.equal(plan.layers![0]!.motion.times_spoken, undefined);
+  // The words said in her talking shot (its 1 to 3 s play from the Reel's start): given to its code on the Reel's clock,
+  // those of the passage that plays only; the engine's subtitles step aside under it.
+  const inputs = { template: "libre" as const, clipUrls: { talk: "/talk.mp4", b: "/b.mp4" }, photoIds: [], brand: { name: "Test" }, words: { talk: [word("on", 1.2, 1.4), word("goûte", 1.5, 1.9), word("après", 3.5, 3.8)], b: [] } };
+  const layer = buildReelProps(plan, inputs).layers!.find((l) => l.compose)!;
+  assert.deepEqual(layer.spoken?.map((w) => [w.w, w.from]), [["on", 6], ["goûte", 15]]);
+  assert.equal(layer.captionsStay, undefined);
+  // « engine »: the engine writes them under it, its code given them to time its own words around them.
+  const engine = skillPlan({ skill: { ...base, spoken: "engine" }, name: "Test", files, fill });
+  assert.deepEqual([engine.subtitles, engine.layers![0]!.motion.times_spoken, engine.layers![0]!.motion.writes_spoken], [true, true, false]);
+  assert.equal(buildReelProps(engine, inputs).layers!.find((l) => l.compose)!.captionsStay, true);
+  // Without it, nothing of what is said is written on a skill's Reel (heard only), as before.
+  assert.equal(skillPlan({ skill: base, name: "Test", files, fill }).subtitles, false);
+  // A voice laid over it, then taken away: still subtitled for her shots' speech; a plain skill loses its subtitles.
+  assert.equal(withoutVoice(skillPlan({ skill: own, name: "Test", files, fill, voice: { media_id: "v", at: 0 } })).subtitles, true);
+  assert.equal(withoutVoice(skillPlan({ skill: base, name: "Test", files, fill, voice: { media_id: "v", at: 0 } })).subtitles, false);
+  // Its filler is told that the subtitles of what she says are this model's own, its own lines where nobody speaks.
+  assert.match(String(skillFillInput({ skill: own, name: "Test", n: 2, files, business: {}, request: "" }).ses_paroles), /sous-titres/);
+  assert.equal(skillFillInput({ skill: base, name: "Test", n: 2, files, business: {}, request: "" }).ses_paroles, undefined);
+  assert.match(SKILL_FILL_PROMPT, /With « ses_paroles »/);
 });
 
 test("a skill timed on her voice: the frame changes on the next idea's first word when it says so, on a cut of her pauses when one is near", async () => {

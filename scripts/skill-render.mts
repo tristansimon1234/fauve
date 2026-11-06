@@ -43,7 +43,9 @@
 // "ideas": [{ from, to, key, text, font, items: [{ word, text, font }] }] }, word numbers). Her other clips are her other
 // angles of the same take: --takes '{"f1": 1.25}' gives each one's offset (s: its time = the first's + offset), or
 // --takes sync measures them on their sound as the sandbox does (ffmpeg decodes them, takeOffset correlates them). Her
-// sound is kept in the render, and the engine's subtitles of what she says are drawn. Her other clips that are not her
+// sound is kept in the render, and the engine's subtitles of what she says are drawn. A skill that writes what is said in
+// her shots (its `spoken`) takes the words of its first clip by --talk the same way, given to its code where that clip
+// plays. Her other clips that are not her
 // takes (her photos, her videos of what she names) are what a skill that lays her images on what she says casts (--said:
 // an idea's « files » and a name's « file », by their ids f1, f2…), and --said's « name » marks her business's name.
 // --tracks '{"0": "her-tracks.json"}' gives a clip's tracks (track.py's file: her face, hands and body at every image),
@@ -289,6 +291,13 @@ const laidShots = piece
     : files.map((f) => ({ file: f.id, at: f.photo ? 0 : Math.max(0, Math.min(f.seconds - Number(values.each ?? 1.2), f.seconds / 3)), seconds: Number(values.each ?? 1.2), photo: f.photo }))
   : [];
 const span = (values.span ?? "").split(",").map(Number);
+// A skill that writes what is said in her shots (MontageSkill.spoken): her words in its first clip (--talk, as Scribe or
+// Gemini times them), heard and given to its code (`spoken`) as the engine gives them on the shots that play them.
+if (!piece && !skill.voice && skill.spoken && values.talk) {
+  const given = json<{ words: Timed[] }>(values.talk);
+  if (!given?.words?.length) throw new Error("--talk: her words in her first clip, as Scribe times them");
+  spoken[files[0]!.id] = given.words;
+}
 // An effect timed on what she says: her words in its first clip (--talk), heard and subtitled as the engine does.
 if (piece?.spoken) {
   const given = json<{ words: Timed[] }>(values.talk);

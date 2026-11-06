@@ -2405,6 +2405,63 @@ export const HOUSE_MODELS: HouseModel[] = [
       why: "Chaque image annonce la suivante par un morceau d'elle, cinq fois par seconde : l'œil ne décroche pas, on cherche ce qui arrive, et la boucle fait revoir le Reel sans qu'on s'en rende compte.",
     },
   }),
+  model({
+    key: "en-boutique",
+    name: "Création à quatre mains",
+    // Written on its original's fiche (v1 of its skill, docs/fiches/en-boutique.md): someone comes into the shop with an
+    // idea and what it takes, the one behind the counter makes it with them in front of the camera, every line of theirs
+    // subtitled (the artisan's in yellow), its name popping over the artisan as a comic-strip sticker, a tasting to end.
+    pitch: "Quelqu'un vient te lancer un défi en boutique et vous le faites à deux : son idée en plans rapides, toi derrière ton comptoir avec le nom de la création qui surgit en autocollant de BD, vos gestes, le résultat et la dégustation, toutes vos répliques en sous-titres.",
+    needs: "6 à 12 vidéos : quelqu'un avec ce qu'il apporte face caméra, des gros plans de ses ingrédients ou produits, toi (ou ton équipe) derrière ton comptoir, vos gestes un à un, le résultat montré et vous deux qui goûtez ou essayez ; filmées en parlant de préférence",
+    files: [4, 16],
+    pair: "autocollant",
+    // Its skill's code is its reference.
+    example: null,
+    // Its music's sections, measured on its original (docs/fiches/en-boutique.md: a beat every 0,449 s where it plays).
+    tempo: 133.75,
+    finish: { name: "Vlog chaud", hint: "lumineux, chaud et saturé, contraste soutenu, sans grain ni coins sombres", warmth: 0.06, contrast: 0.08, saturation: 0.1 },
+    look: {
+      name: "création à deux en boutique",
+      format: "autre",
+      voice: "quelqu'un parle",
+      hook: { kind: "promesse", what: "quelqu'un face caméra avec ce qu'il apporte, ses ingrédients en gros plans rapides, qui lance le défi en sous-titres dès la première image" },
+      text: {
+        amount: "plusieurs",
+        composition: "tout ce qui est dit en sous-titres, deux ou trois mots à la fois, grotesque très grasse blanche à l'ombre douce aux deux tiers de la hauteur, l'artisan en jaune ; un titre en autocollant de BD penché, bordé de noir, en capitales jaunes",
+        case: "upper",
+        weight: "black",
+        subtitles: true,
+        stroke: "thick",
+        tilt: -5.5,
+        shadow: "soft",
+      },
+      colors: ["#fcc83b", "#141414"],
+      layout: "plein cadre vertical filmé à la main comme un vlog : les deux au comptoir, leurs gestes de près, leurs visages à la dégustation ; un autocollant de titre posé sur l'artisan qui sourit",
+      moments: [
+        { at: 0, what: "celui qui vient, face caméra, avec ce qu'il apporte, ses ingrédients en gros plans de 0,5 à 0,9 s, le défi lancé en sous-titres blancs" },
+        { at: 4.43, what: "l'artisan derrière son comptoir, impassible, un boum grave quand il paraît" },
+        { at: 7.53, what: "il sourit enfin : le nom de la création surgit sur lui en autocollant de BD avec un pop, penché, qui le fait dessous ; il repart deux secondes après" },
+        { at: 10.37, what: "leur échange au comptoir, en sous-titres" },
+        { at: 20.67, what: "les gestes un à un, de près, les explications de l'artisan en sous-titres jaunes" },
+        { at: 58.5, what: "le résultat montré face caméra à deux" },
+        { at: 61.93, what: "ils goûtent, chacun son visage, une basse qui tombe sur sa réaction, le verdict" },
+        { at: 69.4, what: "un logo qui surgit sur le dernier plan large des deux" },
+      ],
+      sounds: [
+        { at: 4.43, what: "un boum grave quand l'artisan paraît" },
+        { at: 7.45, what: "un pop et une petite note de cuivres avec l'autocollant" },
+        { at: 9.45, what: "un souffle quand il repart" },
+        { at: 64.25, what: "une grosse basse qui glisse vers le grave sur sa réaction" },
+      ],
+      camera: "à la main",
+      transitions: "coupes nettes",
+      grade: "warm",
+      motion: "energique",
+      music: "playful Italian comedy groove, plucked guitar, light percussion, 134 BPM",
+      ending: "le dernier plan large des deux qui ont goûté, un logo qui surgit dessus, la musique coupée avec lui",
+      why: "On assiste à une vraie rencontre : le défi d'abord, l'artisan qu'on fait sourire, puis tout se fait sous nos yeux et on goûte avec eux ; les sous-titres tiennent l'attention et l'autocollant du titre donne le ton.",
+    },
+  }),
 ];
 
 const BY_KEY = new Map(HOUSE_MODELS.map((m) => [m.key, m]));
@@ -2497,6 +2554,7 @@ export const HOUSE_WHEN: Record<string, { pour: string; pas_pour: string }> = {
   aventure: { pour: "fêter ses années (un anniversaire, un an d'ouverture), le bilan de son année ou de sa saison, une rétrospective, un merci à ses clients et à son équipe, avec beaucoup de moments différents", pas_pour: "peu de vidéos (moins de huit), un produit seul, une offre à lire en détail, quelqu'un qui parle face caméra, un Reel court" },
   depart: { pour: "un départ et une arrivée : une sortie, un voyage, un déplacement (le marché, un salon, un fournisseur, les vacances), un déménagement ou une nouvelle adresse, un événement ailleurs", pas_pour: "sans vidéo de quelqu'un debout devant son lieu filmée téléphone posé, sans plans du trajet ni de l'endroit où l'on arrive, un produit seul, quelqu'un qui parle, une offre à lire en détail" },
   collage: { pour: "présenter son lieu, son équipe et ses clients avec de l'élan et du style (un café, une boutique, un salon, un studio, un bar), une ambiance de quartier, une saison, un événement en vrac, beaucoup de photos", pas_pour: "moins de huit photos ou vidéos, un message à lire en détail, quelqu'un qui parle face caméra, un geste qu'il faut voir bouger longtemps" },
+  "en-boutique": { pour: "une création faite à deux devant la caméra (avec une cliente, un créateur, un commerçant voisin, quelqu'un de l'équipe) ou un défi relevé derrière le comptoir : un plat, une boisson, un bouquet, une coupe, une pièce, de l'idée à la dégustation ou à l'essai", pas_pour: "sans personne filmée face caméra derrière son comptoir ou à son poste, un lieu ou une ambiance sans personne, un produit seul, une offre à lire en détail, moins de quatre vidéos" },
 };
 
 /** The models for Edith: their key, name, what they do, what they want, and what only she can film for one. */

@@ -232,6 +232,10 @@ export const HOUSE_EFFECTS: Record<string, HouseEffect> = {
     effet: "ses images cinq fois par seconde, chacune arrivant d'abord en morceau sur la précédente (sa personne détourée à sa place, ses toits sans leur ciel, ou vue dans une vitrine, une silhouette), puis entière",
     il_faut: "des photos ou courtes vidéos au sujet net (des personnes debout, ses produits), un plan de dehors avec du ciel",
   },
+  "en-boutique": {
+    effet: "le nom de la création qui surgit en autocollant de BD sur la personne à son comptoir (carte blanche penchée bordée de noir, capitales jaunes à l'ombre noire, qui le fait dessous) avec un pop, puis repart",
+    il_faut: "quelqu'un derrière son comptoir ou à son poste, face caméra, son visage en haut de l'image",
+  },
 };
 
 /** The most of Edith's models one Reel borrows from: one charter, one music, never a patchwork. */

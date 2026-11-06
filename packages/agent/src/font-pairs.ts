@@ -245,6 +245,17 @@ export const FONT_PAIRS: FontPair[] = [
     how: "des capitales dessinées à la main d'un trait fin et égal, espacées, un mot par ligne empilé au milieu de l'image, rien d'autre",
     fits: "une phrase d'accueil mot à mot, un message court écrit sur des plans sombres, un ton de créateur",
   },
+  {
+    // « Création à quatre mains » (docs/fiches/en-boutique.md, effects 2 and 3): its subtitles in a heavy geometric sans of
+    // compact letters (Proxima Nova Extrabold to the eye; Figtree 800 on Google Fonts, compared on « On est des hommes, »),
+    // its sticker's name in a heavy rounded display face (Paytone One, brought by its skill whatever the charter).
+    key: "autocollant",
+    name: "Sous-titres de vlog et autocollant",
+    display: { family: "Paytone One", weight: 400, case: "upper", tracking: "normal" },
+    body: { family: "Figtree", weight: 800 },
+    how: "des sous-titres en grotesque très grasse aux lettres compactes, deux ou trois mots à la fois, et un nom en capitales rondes très grasses dans un autocollant de bande dessinée",
+    fits: "une visite en boutique filmée comme un vlog, un défi, une création à deux, des répliques en sous-titres",
+  },
 ];
 
 const BY_KEY = new Map(FONT_PAIRS.map((p) => [p.key, p]));

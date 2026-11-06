@@ -402,6 +402,15 @@ export type MontageSkill = {
    * it (her voice note, the words she gives a voice to say): one voice at a time.
    */
   saysWords?: SkillSaysWords;
+  /**
+   * What is said in her shots, as filmed (« Création à quatre mains »: a visit to the counter, two people talking all
+   * along, every line of theirs subtitled): the plan is subtitled and its code gets the words said, each at its frame
+   * (`spoken`: from her videos' own words, those of the shots that play, or a voice laid over it). « own »: its code
+   * writes them itself, in its lettering, and the engine's subtitles step aside under it; « engine »: the engine writes
+   * them as subtitles under it, its code timing its own words around them. Where nobody speaks (stock videos without a
+   * voice, an ambiance), `spoken` is empty and its own words show. Never on a skill timed on her voice (its own).
+   */
+  spoken?: "own" | "engine";
   /** The tempos it plays at (default: from 0,7 to 1,2 times its own, within 60 to 140). */
   tempo?: [number, number];
   /** What her words can change in it, as a template's variants (its grid, its pace, its order, its colour). */
@@ -826,6 +835,8 @@ export function skillPlan(input: { skill: MontageSkill; name: string; files: Ski
   if (!voice && !fill.shots.length) throw new Error("Aucun plan pour ce modèle");
   // A voice laid over it: never over a skill timed on her filmed talk (her words are its Reel).
   const laid = !voice && input.voice ? input.voice : undefined;
+  // What is said in her shots, subtitled (MontageSkill.spoken): written by its code, or by the engine under it.
+  const shotsSpoken = voice ? undefined : skill.spoken;
   const bpm = input.bpm && input.bpm !== skill.bpm && !voice ? input.bpm : undefined;
   const settings = skillSettings(skill, fill.settings);
   const chosen = Object.keys(settings).length ? settings : undefined;
@@ -872,8 +883,8 @@ export function skillPlan(input: { skill: MontageSkill; name: string; files: Ski
     images: [],
     transitions: "cut",
     // On her voice, what she says is subtitled (the engine's, unless its code writes them: SkillVoice.subtitles); a voice
-    // laid over it too, by the engine, over its composition.
-    subtitles: Boolean(said) || Boolean(laid),
+    // laid over it too, by the engine, over its composition; what is said in her shots, for a skill that writes it.
+    subtitles: Boolean(said) || Boolean(laid) || Boolean(shotsSpoken),
     music: null,
     ...(laid ? { voice: { media_id: laid.media_id, at: laid.at } } : {}),
     ...(fill.end ? { end_card: { title: fill.end.title, ...(fill.end.subtitle ? { subtitle: fill.end.subtitle } : {}) } } : {}),
@@ -896,6 +907,8 @@ export function skillPlan(input: { skill: MontageSkill; name: string; files: Ski
           ...(drawn ? { drawn } : {}),
           // On her voice: its code gets her words said, each at its frame (`spoken`), whether or not it writes them all.
           ...(voice ? { times_spoken: true, writes_spoken: voice.subtitles === "own" } : {}),
+          // What is said in her shots: its code writes it (the engine's subtitles step aside), or times its words on it.
+          ...(shotsSpoken === "own" ? { writes_spoken: true } : shotsSpoken === "engine" ? { times_spoken: true, writes_spoken: false } : {}),
           ...(voice?.row ? { subtitle_y: Math.min(0.8, Math.max(0.1, voice.row)) } : {}),
           // A voice laid over it: its subtitles on the row its author gave it (else the one its check finds: skillSubtitleRow).
           ...(laid && skill.voiceOver?.row !== undefined ? { subtitle_y: voiceOverRow(skill.voiceOver.row) } : {}),
@@ -1077,8 +1090,9 @@ export function paleSpans(ground: SceneGround | undefined, row: number, frames: 
 /**
  * Her Reel without its voice (« Sans voix », set_voice off: removeVoice): the same plan, its voice left out; a Reel made
  * on a skill loses the subtitles it had for it (never one timed on her filmed talk, whose words are its own), their row
- * and where they were written dark; a model whose voice says its words (`says_words`) loses that voice too, its words
- * staying on screen.
+ * and where they were written dark, unless its code writes or times what is said in her shots (MontageSkill.spoken:
+ * those stay subtitled); a model whose voice says its words (`says_words`) loses that voice too, its words staying on
+ * screen.
  */
 export function withoutVoice(plan: EditPlan): EditPlan {
   const { voice: _voice, says_words: _says, ...rest } = plan;
@@ -1089,7 +1103,9 @@ export function withoutVoice(plan: EditPlan): EditPlan {
     const { subtitle_y: _row, subtitle_pale: _pale, ...motion } = l.motion;
     return { ...l, motion };
   });
-  return { ...rest, subtitles: false, ...(layers ? { layers } : {}) };
+  // A skill that writes (or times its words on) what is said in her shots: its plan stays subtitled for them.
+  const shots = Boolean(rest.layers?.some((l) => l.compose && (l.motion.writes_spoken === true || l.motion.times_spoken === true)));
+  return { ...rest, subtitles: shots, ...(layers ? { layers } : {}) };
 }
 
 /** The most sounds a skill gives one Reel (the plan keeps 40). */
@@ -1571,6 +1587,7 @@ First decide "fits": true when the model, filled with her files and her words, g
 With « voix_off », a voice is laid over this Reel (her own voice note, or the voice Edith wrote for it from her request): the engine plays it over the model's music and writes its subtitles, so a voice-over, its words and its subtitles fit.
 With « mots_dits », a voice says this model's own words, each at its moments, as its original's voice does: a voice-over, another voice (a man's, hers) or no voice fit (the engine sets the voice), and a change of what the voice says is a change of those words.
 With « recopie », she sent a Reel to copy and this model does its form: what her request describes of that Reel (its opening, its texts, its rhythm, its ending) the model does its own way, never a reason for false; only what she asks beyond that Reel is.
+With « ses_paroles », what is said in her videos is heard and written on screen by the model itself, as subtitles: subtitles of what she says fit; its own lines (its slots) show only where nobody speaks.
 
 Then cast her files on its slots (« cases », in order: each with its length and what it wants), as a good editor would:
 - each slot gets the file and the passage that suits what it wants; the first slot opens the Reel: the strongest, most beautiful image;
@@ -1623,6 +1640,10 @@ export function saidTimes(says: SkillSaysWords, line: Pick<SkillTimeline, "says"
   }
   return times;
 }
+
+/** What the filler is told of a model that writes what is said in her videos (« ses_paroles », MontageSkill.spoken), in French. */
+export const SHOTS_SPOKEN =
+  "Ce qu'on dit dans ses vidéos s'entend et ce modèle l'écrit lui-même en sous-titres ; ses textes à lui ne se montrent que là où personne ne parle.";
 
 /** What the filler is told of a Reel she sent to copy that the model plays (« recopie »), in French like the rest of its input. */
 export const COPIED_REEL =
@@ -1691,6 +1712,8 @@ export function skillFillInput(input: {
     ...(input.contract?.length ? { contrat: input.contract } : {}),
     ...(input.copied ? { recopie: COPIED_REEL } : {}),
     ...(said ? { mots_dits: SAID_WORDS } : {}),
+    // A model that writes what is said in her videos: subtitles of what she says are its own.
+    ...(input.skill.spoken && !voice ? { ses_paroles: SHOTS_SPOKEN } : {}),
     ...(laid
       ? {
           voix_off: {
