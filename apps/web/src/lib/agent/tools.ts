@@ -71,8 +71,6 @@ import {
   reelFinishSchema,
   type ReelFinish,
   HOUSE_SOURCE,
-  houseModelsForEdith,
-  settingWords,
 } from "@fauve/agent";
 import { createLoginLink } from "@/lib/auth/login-link";
 import { supabaseAdmin } from "@/lib/supabase/admin";
@@ -85,8 +83,6 @@ import { skillTooShort, skillWantsMore } from "@/lib/agent/skill-design";
 import { keepModelSound } from "@/lib/model-sound";
 import { followSound } from "@/lib/sound-follow";
 import { searchSounds, soundExample, trendSounds } from "@/lib/trend-sounds";
-import { skillGate } from "@/lib/skill-reviews";
-import { MONTAGE_SKILLS } from "@fauve/agent/skills";
 import { queueRerender } from "@/lib/rerender";
 import { startEffectWords } from "@/lib/effect-words";
 import { montageStatus, stoppedMontages, unseenReel } from "@/lib/montage-status";
@@ -119,7 +115,6 @@ import { charterFromImages, rereadBrand } from "@/lib/brand-read";
 import { socialConnect } from "@/lib/social/connect";
 import { addToMoodboard } from "@/lib/moodboard-add";
 import { completeFirstPost, isFirstReel } from "@/lib/onboarding";
-import { houseInspiration } from "@/lib/house-models";
 import { listInspirations } from "@/lib/inspirations";
 import { freeSlots } from "@/lib/slots";
 import { studioAccess } from "@/lib/billing/access";
@@ -671,7 +666,7 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
       });
     },
 
-    async montage({ post_id, media_ids, brief, correction, max_new_scenes, variant, plan, effort, inspiration_id, modele_edith, son, son_lien, anciens_fichiers, remplacer_fichiers, avec_ceux_la, duree, garde_la_duree }) {
+    async montage({ post_id, media_ids, brief, correction, max_new_scenes, variant, plan, effort, inspiration_id, son, son_lien, anciens_fichiers, remplacer_fichiers, avec_ceux_la, duree, garde_la_duree }) {
       const post = unwrap(await db.from("posts").select("id, title, edit_plan_id, media_ids").eq("id", post_id).eq("studio_id", studioId).single());
       // A correction's new files join the Reel's own, unless Edith read that she wants to start again from them alone:
       // given alone, Promo Edith 2's five new photos replaced its twenty files and it came back as 3 s.
@@ -702,12 +697,6 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
           });
         }
       }
-      // One of Edith's models: the studio's row for it (made the first time), followed like a Reel she sends.
-      if (modele_edith && !inspiration_id) {
-        const house = await houseInspiration(studioId, modele_edith);
-        if (!house) return json({ error: "Ce modèle n'existe pas : reprends une clé de list_inspirations (modeles_edith)." });
-        check(await db.from("posts").update({ inspiration_id: house.id }).eq("id", post_id).eq("studio_id", studioId));
-      }
       if (inspiration_id) {
         const known = await db.from("inspirations").select("id").eq("id", inspiration_id).eq("studio_id", studioId).maybeSingle();
         if (!known.data) return "Inspiration introuvable : reprends un inspiration_id de list_inspirations.";
@@ -722,6 +711,7 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
       if ((correction || variant) && !post.edit_plan_id) return "Pas encore de montage pour cette publication : lance d'abord un montage (correction: false).";
       // A model coded as a montage skill takes a few files at least: with fewer, she is asked first whether she has others
       // (Tristan: « tu n'as que 3 plans, en as-tu d'autres pour moi ? », else she makes it with those), nothing launched meanwhile.
+      // The model is never named to her (Tristan, 6 November: « je préfère ne pas divulguer nos modèles »).
       if (!correction && !variant && !avec_ceux_la) {
         const short = await skillWantsMore(studioId, post_id, media_ids ?? []).catch(() => null);
         if (short) {
@@ -729,7 +719,7 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
             possible: false,
             peu_de_fichiers: short.files,
             il_en_faut: short.least,
-            note: `Le modèle « ${short.name} » prend au moins ${short.least} photos ou vidéos, et elle en a donné ${short.files}. Demande-lui en une phrase si elle en a d'autres pour toi, avec les boutons « J'en envoie d'autres » et « Fais avec ceux-là » (reply_with). Sur « Fais avec ceux-là », relance montage avec avec_ceux_la true : tu coupes plusieurs passages dans ses vidéos. Rien n'est lancé d'ici là.`,
+            note: `Ce Reel prend au moins ${short.least} photos ou vidéos, et elle en a donné ${short.files}. Demande-lui en une phrase si elle en a d'autres pour toi (sans nommer la forme du Reel ni parler de modèle), avec les boutons « J'en envoie d'autres » et « Fais avec ceux-là » (reply_with). Sur « Fais avec ceux-là », relance montage avec avec_ceux_la true : tu coupes plusieurs passages dans ses vidéos. Rien n'est lancé d'ici là.`,
           });
         }
       }
@@ -747,16 +737,15 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
           });
         }
       }
-      // A length past what her model does: she is told first, and offered its longest or a model made to last.
+      // A length past what her model does: she is told first, and offered its longest (the model never named).
       if (!correction && !variant && duree && !garde_la_duree) {
         const long = await skillTooShort(studioId, post_id, duree).catch(() => null);
         if (long) {
-          const others = long.others.length ? ` ; ${long.others.map((n) => `« ${n} »`).join(" et ")} ${long.others.length > 1 ? "vont" : "va"} jusque-là` : "";
           return json({
             possible: false,
             trop_long: duree,
             au_plus: long.max,
-            note: `Le modèle « ${long.name} » va jusqu'à ${long.max} s : au-delà, il perd ce qui le rend bon${others}. Dis-le-lui en une phrase, sans la décourager, avec les boutons « Fais-le à ${long.max} s » et « Garde ${duree} s » (reply_with). Sur « Fais-le à ${long.max} s », relance montage avec duree ${long.max} et cette durée dans brief à la place de la sienne ; sur « Garde ${duree} s », avec garde_la_duree true (le monteur l'étire). Rien n'est lancé d'ici là.`,
+            note: `Ce Reel est fait pour durer ${long.max} s au plus : au-delà, il perd ce qui le rend bon. Dis-le-lui en une phrase, sans la décourager, sans nommer sa forme ni parler de modèle, avec les boutons « Fais-le à ${long.max} s » et « Garde ${duree} s » (reply_with). Sur « Fais-le à ${long.max} s », relance montage avec duree ${long.max} et cette durée dans brief à la place de la sienne ; sur « Garde ${duree} s », avec garde_la_duree true (le monteur l'étire). Rien n'est lancé d'ici là.`,
           });
         }
       }
@@ -1219,7 +1208,7 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
           ctx.afterReply.push(() => queueRerender({ studioId, postId: post_id, waId: ctx.waId, replyTo: ctx.replyToMessageId, conversationId: ctx.conversationId }));
           return json({
             status: "started",
-            note: `Sur ce modèle, la voix dit ses mots : la vidéo se refait avec ${revoiced.name === "ta voix" ? "sa propre voix" : `la voix de ${revoiced.name ?? "Edith"}`} (1 à 2 min), gratuitement, et le lien part tout seul. Dis-le en une phrase.`,
+            note: `Sur ce Reel, la voix dit les mots écrits à l'écran : la vidéo se refait avec ${revoiced.name === "ta voix" ? "sa propre voix" : `la voix de ${revoiced.name ?? "Edith"}`} (1 à 2 min), gratuitement, et le lien part tout seul. Dis-le en une phrase.`,
           });
         }
       }
@@ -1457,16 +1446,12 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
     },
 
     async list_inspirations() {
-      const [items, gate] = await Promise.all([listInspirations(studioId, 10), skillGate(studioId)]);
+      // Hers only: Edith's own models are an internal tool, picked while the Reel is made and never offered (Tristan,
+      // 6 November: « je préfère ne pas divulguer nos modèles »).
+      const items = await listInspirations(studioId, 10);
       return json({
         inspirations: items.map((i) => ({ inspiration_id: i.id, titre: i.title, a_reprendre: i.summary ?? (i.reading ? "en cours de lecture" : undefined), source: i.source })),
-        // Edith's own models: a Reel made like one of them (montage modele_edith), shown with their preview in Créer; a model
-        // coded with settings says what her words can change in it (« plus de cases », « plus lent »).
-        modeles_edith: houseModelsForEdith().map((m) => {
-          const skill = gate(MONTAGE_SKILLS[m.key]);
-          return skill?.settings?.length ? { ...m, reglages: skill.settings.map(settingWords).join(" ; ") } : m;
-        }),
-        note: `${items.length ? "Propose-en 2 au plus, par leur titre." : "Aucune inspiration à elle : elle peut envoyer le lien d'un Reel qu'elle aime."} Les modèles d'Edith : propose-en 2 ou 3 qui vont avec ses fichiers et son idée (par leur nom, en une phrase chacun), jamais toute la liste ; elle les voit en vidéo dans Créer › « Un modèle d'Edith ». Quand elle en choisit un qui a a_lui_dire (ce qu'elle seule peut filmer), dis-le-lui avec ses fichiers à envoyer, tel quel, avant de lancer. Un modèle qui a reglages se règle avec ses mots (« plus de cases », « plus lent », « avec ma couleur ») : mets-les dans brief, tu peux les lui proposer une fois quand ça sert son idée.`,
+        note: items.length ? "Propose-en 2 au plus, par leur titre." : "Aucune inspiration à elle : elle peut envoyer le lien d'un Reel qu'elle aime.",
       });
     },
 

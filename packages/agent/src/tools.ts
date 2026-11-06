@@ -107,7 +107,7 @@ export const toolSpecs = {
   },
   list_inspirations: {
     description:
-      "Les inspirations de la gérante : des Reels qu'elle aime, partagés sur Instagram ou ajoutés dans l'app, avec ce qu'on peut en reprendre (accroche, rythme, textes). Avec elles, « modeles_edith » : les modèles d'Edith (des Reels de référence que le monteur sait refaire, chacun avec sa forme, sa typo et sa finition), à proposer quand elle veut un Reel stylé sans avoir de modèle, puis à passer à montage par modele_edith. Source « model » : un de ses Reels qu'elle a gardé comme modèle (« Garder comme modèle ») : quand elle veut un Reel « comme celui de … », passe son inspiration_id à montage. À regarder avant de proposer un nouveau Reel, pour lui demander s'il doit suivre l'une d'elles.",
+      "Les inspirations de la gérante : des Reels qu'elle aime, partagés sur Instagram ou ajoutés dans l'app, avec ce qu'on peut en reprendre (accroche, rythme, textes). Source « model » : un de ses Reels qu'elle a gardé comme modèle (« Garder comme modèle ») : quand elle veut un Reel « comme celui de … », passe son inspiration_id à montage. À regarder avant de proposer un nouveau Reel, pour lui demander s'il doit suivre l'une d'elles.",
     input: z.object({}),
   },
   find_sound: {
@@ -174,7 +174,7 @@ export const toolSpecs = {
         .nullable()
         .optional()
         .describe(
-          "Reel : le media_id du message vocal de la gérante à poser sur le Reel (sa voix, sous-titres mot à mot, coupes sur ses phrases, musique baissée dessous ; sur « Celui-là, celui-là… », sa voix mène le modèle, ses mots à l'écran quand elle les dit) ; ou, seulement quand elle demande la voix d'une de ses vidéos où elle parle (« prends ma voix de la vidéo »), le media_id de cette vidéo : sa voix en est tirée une fois et posée comme son vocal, la vidéo ne se voit pas dessous. Jamais la voix de quelqu'un d'autre sans qu'elle le demande. null retire sa voix. Prend effet au prochain montage ou à la prochaine correction (montage)",
+          "Reel : le media_id du message vocal de la gérante à poser sur le Reel (sa voix, sous-titres mot à mot, coupes sur ses phrases, musique baissée dessous ; sur un Reel où le même petit mot tombe sur chacun de ses produits (« Celui-là »), sa voix le mène, ses mots à l'écran quand elle les dit) ; ou, seulement quand elle demande la voix d'une de ses vidéos où elle parle (« prends ma voix de la vidéo »), le media_id de cette vidéo : sa voix en est tirée une fois et posée comme son vocal, la vidéo ne se voit pas dessous. Jamais la voix de quelqu'un d'autre sans qu'elle le demande. null retire sa voix. Prend effet au prochain montage ou à la prochaine correction (montage)",
         ),
       publish_by_hand: z.boolean().optional().describe("Reel : true = à l'heure prévue, elle reçoit la vidéo et la légende sur WhatsApp et publie elle-même dans Instagram (pour mettre la musique de son choix). Story : true = elle reçoit la story et son lien de réservation sur WhatsApp et la partage elle-même en story avec le sticker Lien (aucune appli ne peut poser de sticker). Je retrouve ensuite la publication sur son compte"),
     }),
@@ -207,11 +207,6 @@ export const toolSpecs = {
         .uuid()
         .optional()
         .describe("Le Reel qu'elle t'a envoyé à recopier pour celui-ci (steal_style, ou la ligne « Reel à recopier » du contexte), ou l'inspiration qu'elle a choisie (list_inspirations) : le monteur le suit en priorité. Inutile si elle l'a déjà choisie en créant la publication."),
-      modele_edith: z
-        .string()
-        .max(40)
-        .optional()
-        .describe("La clé d'un modèle d'Edith qu'elle a choisi (list_inspirations, modeles_edith) : ce Reel est fait comme lui (sa forme, ses moments, sa typo, sa finition), avec ses images et ses mots. À la place d'inspiration_id."),
       anciens_fichiers: z
         .boolean()
         .optional()
@@ -223,12 +218,12 @@ export const toolSpecs = {
       avec_ceux_la: z
         .boolean()
         .optional()
-        .describe("true seulement quand elle t'a répondu de faire avec les fichiers qu'elle a donnés, après que montage t'a dit que ce modèle en prend plus (peu_de_fichiers) : tu coupes plusieurs passages dans ses vidéos"),
+        .describe("true seulement quand elle t'a répondu de faire avec les fichiers qu'elle a donnés, après que montage t'a dit que ce Reel en prend plus (peu_de_fichiers) : tu coupes plusieurs passages dans ses vidéos"),
       duree: z.number().min(3).max(90).optional().describe("La durée qu'elle a demandée pour ce Reel, en secondes, quand elle en a dit une (« 30 s », « une minute ») ; sinon rien"),
       garde_la_duree: z
         .boolean()
         .optional()
-        .describe("true seulement quand, prévenue que son modèle ne va pas jusqu'à cette durée (trop_long), elle la garde : le monteur l'étire"),
+        .describe("true seulement quand, prévenue que ce Reel ne va pas jusqu'à cette durée (trop_long), elle la garde : le monteur l'étire"),
       son_lien: z
         .string()
         .max(600)

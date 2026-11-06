@@ -772,7 +772,7 @@ function VoiceView({ data, onDone }: Props) {
     <div className="flex flex-col gap-2.5">
       <p className="text-[13.5px] leading-snug text-muted">
         {hers && data.voice?.leads
-          ? "Ce Reel suit ta propre voix : chaque mot du modèle s’affiche quand tu le dis. Tu peux la retirer, ou la remplacer par une voix d’Edith (le modèle reprend alors son rythme à lui)."
+          ? "Ce Reel suit ta propre voix : chaque mot s’affiche quand tu le dis. Tu peux la retirer, ou la remplacer par une voix d’Edith (le Reel reprend alors son rythme à lui)."
           : hers
             ? "Ce Reel porte ta propre voix. Tu peux la retirer, ou la remplacer par une voix d’Edith."
             : "Une voix raconte ton Reel, la musique passe dessous. Écoute et choisis."}

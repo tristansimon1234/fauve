@@ -28,7 +28,7 @@ import { fromEditorPlan, normalizeEditPlan } from "./editor.ts";
 import { depthPhotoIds, reliefFiles, reliefJobs, reliefOf, RELIEF_VERSION } from "./depth.ts";
 import { dayIn, LOOK_PRESETS, lookChoice, lookFromDesign, lookMatrix, lookStamp, planLook, reelLookSchema, withLook, type LookDesign } from "./looks.ts";
 import { clampLook, filmWords, followedFilter, followedForEditor, followedFrom, followedLine, stolenStyleLines, stolenStyleMessage, type StolenLookReading } from "./steal.ts";
-import { houseLines, houseModel, houseModelsForEdith } from "./house-models.ts";
+import { HOUSE_MODELS, houseLines, houseModel } from "./house-models.ts";
 import { editorLook } from "./editor.ts";
 import { snapToTempo } from "./tempo.ts";
 
@@ -648,7 +648,7 @@ test("steal: what only she can film for her copy, said as soon as a model is cho
   // notebook itself: nothing of hers to film any more).
   const card = houseModel("carte-feutre")!;
   assert.ok(!houseLines(card).some((l) => /Il faut que tu me filmes/.test(l)));
-  const told = houseModelsForEdith().filter((m) => m.a_lui_dire).map((m) => m.key);
+  const told = HOUSE_MODELS.filter((m) => filmWords(m.look)).map((m) => m.key);
   assert.deepEqual(told.sort(), ["nike"]);
 });
 
@@ -11121,12 +11121,15 @@ test("a Reel sent to copy that a model plays has its words when it has some, non
 });
 
 test("a Reel sent to copy that a model plays: its filler knows, and Edith says it in one sentence on the post, nothing in the delivery", async () => {
-  const { copyByModelWords } = await import("./copy-model.ts");
+  const { COPY_BY_MODEL_WORDS } = await import("./copy-model.ts");
   const { deliveryWords } = await import("./editor.ts");
   const { COPIED_REEL, SKILL_FILL_PROMPT, skillFillInput } = await import("./skills.ts");
   const { MONTAGE_SKILLS } = await import("./skill-library.ts");
-  const said = copyByModelWords("Mosaïque qui change");
-  assert.equal(said, "Je l'ai refait avec mon modèle « Mosaïque qui change », qui fait la même chose.");
+  const said = COPY_BY_MODEL_WORDS;
+  // What the Reel does, never the model that played it (Tristan, 6 November: « je préfère ne pas divulguer nos modèles »).
+  assert.equal(said, "J'ai repris sa forme et son rythme, avec tes images et tes mots.");
+  assert.doesNotMatch(said, /mod[eè]le/i);
+  for (const m of HOUSE_MODELS) assert.ok(!said.includes(m.name), m.name);
   // The delivery keeps only what she must know after its first sentence: here, nothing more.
   assert.equal(deliveryWords(said), "");
   // Its filler is told the request may describe the Reel she sent, which the model does its own way.
@@ -11136,6 +11139,52 @@ test("a Reel sent to copy that a model plays: its filler knows, and Edith says i
   assert.equal(input(true).recopie, COPIED_REEL);
   assert.equal("recopie" in input(), false);
   assert.match(SKILL_FILL_PROMPT, /With « recopie », she sent a Reel to copy/);
+});
+
+test("Edith's models stay hers: nothing she reads lists, offers or names one", async () => {
+  // Tristan, 6 November: « je préfère ne pas divulguer nos modèles ». Edith still picks one while the Reel is made.
+  const { toolSpecs } = await import("./tools.ts");
+  const { APP_GUIDES } = await import("./app-guide.ts");
+  const { FAUVE_SYSTEM_PROMPT } = await import("./prompts.ts");
+  const { deliveryWords } = await import("./editor.ts");
+  const { houseStyle } = await import("./house-models.ts");
+  const { stolenStyleSchema } = await import("./steal.ts");
+  const { MONTAGE_CRITIC_PROMPT } = await import("./critic.ts");
+  const { SKILL_FILL_PROMPT, SKILL_HEARD_WORDS, skillFillSchema, skillNote } = await import("./skills.ts");
+  const quoted = (text: string) => HOUSE_MODELS.filter((m) => text.includes(`« ${m.name} »`)).map((m) => m.name);
+  // No catalogue to offer, no key to pass: the montage tool has no model of Edith's to choose any more.
+  assert.equal("modele_edith" in toolSpecs.montage.input.shape, false);
+  const tools = JSON.stringify(Object.values(toolSpecs).map((t) => [t.description, Object.values((t.input as { shape?: Record<string, { description?: string }> }).shape ?? {}).map((f) => f.description)]));
+  assert.doesNotMatch(tools, /modeles_edith|modèles? d'Edith/);
+  assert.deepEqual(quoted(tools), []);
+  // Her mode d'emploi says what a Reel does, never which model made it.
+  for (const [topic, text] of Object.entries(APP_GUIDES)) {
+    assert.doesNotMatch(text, /modèles? d'Edith|« Un modèle d'Edith »/, topic);
+    assert.deepEqual(quoted(text), [], topic);
+  }
+  // Edith herself, and those whose words reach her (the editor's rationale, the critic's summary, the filler's « why »).
+  assert.match(FAUVE_SYSTEM_PROMPT, /never list, offer or name one, never say a Reel was made on a model; say what it does, in her words/);
+  assert.deepEqual(quoted(FAUVE_SYSTEM_PROMPT), []);
+  for (const dressed of [true, false]) {
+    const followed = followedFrom("00000000-0000-4000-8000-000000000000", stolenStyleSchema.parse(houseStyle(houseModel("decode")!)), false, dressed);
+    assert.match(followedForEditor(followed).origine ?? "", /Un outil interne qu'elle ne voit jamais : ni son nom ni « modèle d'Edith » dans « rationale »$/);
+  }
+  assert.match(MONTAGE_CRITIC_PROMPT, /never the name of a model of Edith's it follows/);
+  assert.match(SKILL_FILL_PROMPT, /never its name, never « modèle », « template » or « skill »/);
+  assert.match(skillFillSchema.shape.why.description ?? "", /never the model's name nor the word « modèle »/);
+  // The note on her post: the filler's sentence on what it chose, a sentence naming the model or speaking of one left out.
+  for (const m of HOUSE_MODELS) {
+    const note = skillNote(`Je l'ai monté sur le modèle « ${m.name} ». J'ouvre sur ta devanture, puis tes plats un par un.`, m.name);
+    assert.equal(note, "J'ouvre sur ta devanture, puis tes plats un par un.", m.key);
+    assert.equal(skillNote(`${m.name} : j'ouvre sur ta devanture.`, m.name), "", m.key);
+  }
+  assert.equal(skillNote("Ce template va bien avec ta carte. Tes plats d'abord.", "Défilé d'assiettes"), "Tes plats d'abord.");
+  // Her voice leading it: what it does, said in the delivery; the filler's choice never is (deliveryWords).
+  const heard = skillNote("J'ouvre sur ta vitrine.", "Celui-là, celui-là…", true);
+  assert.equal(heard, `J'ouvre sur ta vitrine. ${SKILL_HEARD_WORDS}`);
+  assert.equal(deliveryWords(heard), SKILL_HEARD_WORDS);
+  assert.equal(deliveryWords(skillNote("J'ouvre sur ta vitrine.", "Celui-là, celui-là…")), "");
+  assert.doesNotMatch(SKILL_HEARD_WORDS, /mod[eè]le/i);
 });
 
 test("a Reel sent to copy that a model plays, its sound kept for Instagram: the model plays at that Reel's tempo, else at its own", async () => {
