@@ -203,7 +203,8 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
       h("path", { d: runs.B, fill: "#000000" }));
   })();
 
-  return h(AbsoluteFill, null, picture, labels, pointer);
+  // Its layer, the montage playing under it until its pause (nothing of its own on screen before the cursor comes in).
+  return h(AbsoluteFill, { style: { pointerEvents: "none" } }, picture, labels, pointer);
 }`;
 
 /**
