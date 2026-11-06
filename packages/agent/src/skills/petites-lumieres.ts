@@ -168,56 +168,63 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
     else if (lampOn) layers.push(bloom(0, 0.85));
   }
 
-  // 5. Its second shot: a sun in her sky behind her roofs, shrinking slowly (its radius from 20 to 15,7 % of the width), cut
+  // 5. Its sun: a flat disc in her sky behind her roofs, shrinking slowly (its radius from 20 to 15,7 % of the width), cut
   // to the sky above her skyline as read on her shot, her shot without its sky laid over it; set where her sky goes
   // deepest across a sun's width (the nearest the middle when two places are as good, as the original's), its centre a
-  // little above her roofline there, the whole disc inside the frame (smaller under a low sky, none under too little);
-  // her windows filled with her colour in six waves from the bottom, lit to the cut. Only where her shot shows sky (Tristan,
-  // 6 November, on the Procope: « l'effet soleil … que sur un ciel »; it had fallen on a café's front at night, which the
-  // skyline read as sky): the sky named by the filler and found in her frame (« @ciel »), the sun inside it, under its
-  // skyline. A front, a wall, an interior: no sun, her windows alone (as its second example, the same song without one).
+  // little above her roofline there, the whole disc inside the frame (smaller under a low sky, none under too little).
+  // Only where her shot shows sky (Tristan, 6 November, on the Procope: « l'effet soleil … que sur un ciel »; it had
+  // fallen on a café's front at night, which the skyline read as sky): the sky named by the filler and found in her frame
+  // (« @ciel »…), the sun inside it, under its skyline. On her second shot as the original; when it shows none, on the
+  // next of her shots that does (« toujours mettre de l'intelligence »), never her lamp's; no sky anywhere: no sun, her
+  // lights alone (as its second example, the same song without one).
+  const heavenOf = (k, f) => (k === 1 ? SubjectBox(shots[1], f, laid, "@ciel") : k === last ? SubjectBox(shots[last], f, laid, "@ciel_fin") : SubjectBox(shots[2], f, laid, "@ciel_suite"));
+  const skylineOf = (k, f, x) => (k === 1 ? SkylineAt(shots[1], f, laid, x) : k === 2 ? SkylineAt(shots[2], f, laid, x) : SkylineAt(shots[3], f, laid, x));
+  const sunOf = (k, f) => {
+    const heaven = heavenOf(k, f);
+    if (!heaven || !(heaven.y < bh * 0.12 && heaven.h > bh * 0.12)) return null;
+    const COLS = 64;
+    const cw = bw / COLS;
+    const read = Array.from({ length: COLS }, (_, c) => skylineOf(k, f, { from: c * cw, to: (c + 1) * cw }));
+    const known = read.map((y, c) => (y !== null ? c : -1)).filter((c) => c >= 0);
+    if (!known.length) return null;
+    const prof = read.map((y, c) => (y !== null ? y : read[known.reduce((a, j) => (Math.abs(j - c) < Math.abs(a - c) ? j : a), known[0])]));
+    const t = Math.max(0, Math.min(1, (f - shots[k].from) / Math.max(1, shots[k].durationInFrames)));
+    const R0 = Math.round(Math.min(bw * 0.2, bh * 0.24));
+    const span = Math.max(1, Math.round(R0 / cw));
+    // Its whole disc inside the frame (only the columns a sun's width from both edges), its middle in her sky, never
+    // lower than the sky found there.
+    const cols = [];
+    const floor = heaven.y + heaven.h;
+    for (let c = 0; c < COLS; c++) {
+      const x = (c + 0.5) * cw;
+      if (x < R0 + bw * 0.06 || x > bw - R0 - bw * 0.06 || x < heaven.x + R0 * 0.5 || x > heaven.x + heaven.w - R0 * 0.5) continue;
+      cols.push({ depth: Math.min(floor, ...prof.slice(Math.max(0, c - Math.floor(span / 2)), Math.min(COLS, c + Math.ceil(span / 2)))), x });
+    }
+    const deepest = Math.max(-1, ...cols.map((q) => q.depth));
+    const best = cols.filter((q) => q.depth >= deepest - 0.25 * R0).sort((p, q) => Math.abs(p.x - bw / 2) - Math.abs(q.x - bw / 2))[0];
+    // Its top a little below the frame's: the disc made smaller to fit (half its size at least).
+    const m = bh * 0.04;
+    const fit = best ? Math.min(1, (best.depth - m) / (1.45 * R0), (bh * 0.5 - m) / R0) : 0;
+    if (!best || fit < 0.5) return null;
+    const r = Math.round(R0 * fit * (1 - 0.215 * t));
+    // Her sky: above a line through her skyline's points (a roof's slope stays a slope, never a staircase), never below
+    // the sky found.
+    const yk = (c) => Math.round(Math.min(floor, prof[c]));
+    let d = "M0 0H" + bw + "V" + yk(COLS - 1);
+    for (let c = COLS - 1; c >= 0; c--) d += "L" + Math.round((c + 0.5) * cw) + " " + yk(c);
+    d += "L0 " + yk(0) + "Z";
+    return { d, r, cx: Math.round(best.x), cy: Math.round(Math.min(best.depth - 0.45 * r, bh * 0.5)) };
+  };
+  const sunShot = setting("soleil", "oui") === "non" ? -1 : [1, 2, 3].filter((k) => k < n).find((k) => sunOf(k, shots[k].from)) ?? -1;
+  const sun = cur === sunShot ? sunOf(cur, frame) : null;
+  if (sun) layers.push(
+    h("div", { key: "sky", style: { ...full, clipPath: "path('" + sun.d + "')" } },
+      h("div", { style: { position: "absolute", left: sun.cx - sun.r, top: sun.cy - sun.r, width: 2 * sun.r, height: 2 * sun.r, borderRadius: "50%", backgroundColor: SUN } })),
+    cur === 1 ? h(Skyline, { key: "ground", shot: 1, style: full }) : cur === 2 ? h(Skyline, { key: "ground", shot: 2, style: full }) : h(Skyline, { key: "ground", shot: 3, style: full }));
+
+  // 6. Its second shot: her windows filled with her colour in six waves from the bottom, lit to the cut.
   if (n > 1 && cur === 1) {
     const s1 = shots[1];
-    const heaven = SubjectBox(shots[1], frame, laid, "@ciel");
-    if (setting("soleil", "oui") !== "non" && heaven && heaven.y < bh * 0.12 && heaven.h > bh * 0.12) {
-      const COLS = 64;
-      const cw = bw / COLS;
-      const read = Array.from({ length: COLS }, (_, k) => SkylineAt(shots[1], frame, laid, { from: k * cw, to: (k + 1) * cw }));
-      const known = read.map((y, k) => (y !== null ? k : -1)).filter((k) => k >= 0);
-      const prof = known.length ? read.map((y, k) => (y !== null ? y : read[known.reduce((a, j) => (Math.abs(j - k) < Math.abs(a - k) ? j : a), known[0])])) : [];
-      const t = Math.max(0, Math.min(1, rel / Math.max(1, s1.durationInFrames)));
-      const R0 = Math.round(Math.min(bw * 0.2, bh * 0.24));
-      const span = Math.max(1, Math.round(R0 / cw));
-      // Its whole disc inside the frame (only the columns a sun's width from both edges), its middle in her sky, never
-      // lower than the sky found there.
-      const cols = [];
-      const floor = heaven.y + heaven.h;
-      for (let c = 0; c < prof.length; c++) {
-        const x = (c + 0.5) * cw;
-        if (x < R0 + bw * 0.06 || x > bw - R0 - bw * 0.06 || x < heaven.x + R0 * 0.5 || x > heaven.x + heaven.w - R0 * 0.5) continue;
-        cols.push({ depth: Math.min(floor, ...prof.slice(Math.max(0, c - Math.floor(span / 2)), Math.min(COLS, c + Math.ceil(span / 2)))), x });
-      }
-      const deepest = Math.max(-1, ...cols.map((q) => q.depth));
-      const best = cols.filter((q) => q.depth >= deepest - 0.25 * R0).sort((a, b) => Math.abs(a.x - bw / 2) - Math.abs(b.x - bw / 2))[0];
-      // Its top a little below the frame's: the disc made smaller to fit (half its size at least).
-      const m = bh * 0.04;
-      const fit = best ? Math.min(1, (best.depth - m) / (1.45 * R0), (bh * 0.5 - m) / R0) : 0;
-      if (best && fit >= 0.5) {
-        const r = Math.round(R0 * fit * (1 - 0.215 * t));
-        const cy = Math.round(Math.min(best.depth - 0.45 * r, bh * 0.5));
-        const cx = Math.round(best.x);
-        // Her sky: above a line through her skyline's points (a roof's slope stays a slope, never a staircase), never
-        // below the sky found.
-        const yk = (k) => Math.round(Math.min(floor, prof[k]));
-        let d = "M0 0H" + bw + "V" + yk(COLS - 1);
-        for (let k = COLS - 1; k >= 0; k--) d += "L" + Math.round((k + 0.5) * cw) + " " + yk(k);
-        d += "L0 " + yk(0) + "Z";
-        layers.push(
-          h("div", { key: "sky", style: { ...full, clipPath: "path('" + d + "')" } },
-            h("div", { style: { position: "absolute", left: cx - r, top: cy - r, width: 2 * r, height: 2 * r, borderRadius: "50%", backgroundColor: SUN } })),
-          h(Skyline, { key: "ground", shot: 1, style: full }));
-      }
-    }
     const WAVES = [0, 1, 2, 3, 4, 5].map((k) => mark("wave_" + k, NaN)).filter(Number.isFinite);
     const order = climb(SubjectParts(shots[1], s1.from, laid, "@fenetres", 6), SubjectParts(shots[1], frame, laid, "@fenetres", 6));
     const lit = order.map((q, g) => ({ box: q.box, at: WAVES[Math.min(WAVES.length - 1, rankOf(order.length, WAVES.length, g))] })).filter((q) => frame >= q.at);
@@ -228,7 +235,7 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
     }
   }
 
-  // 6. Its later shots: a column lit from the bottom in four steps after its cut; in the last one everything goes off at
+  // 7. Its later shots: a column lit from the bottom in four steps after its cut; in the last one everything goes off at
   // once, then the picture holds. A verse (a fourth shot, for a longer Reel) keeps its column on to its cut.
   if (cur >= 2 && n > 2) {
     const STEPS = [0, 1, 2, 3].map((k) => mark("step_" + k, NaN)).filter(Number.isFinite);
@@ -245,7 +252,7 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
 
   const frameBox = h("div", { style: { position: "absolute", left: 0, top: by, width: bw, height: bh, overflow: "hidden", backgroundColor: "#000000" } }, film, ...layers);
 
-  // 7. Her name lit like a neon (a tube catching: off, on, almost off, on, half, on) in the calm part of her last shot (its
+  // 8. Her name lit like a neon (a tube catching: off, on, almost off, on, half, on) in the calm part of her last shot (its
   // sky first), with its column's first step, left on once everything else is off: the last light. Horizontal: above
   // the band, on the black. Her ending card in its place after the held picture, lit the same way.
   const hook = reelTexts.find((t) => t.role === "hook");
@@ -289,7 +296,8 @@ export const petitesLumieres: MontageSkill = {
   // 3: its sun only in a sky (Tristan, 6 November, on the Procope bench, where it sat on a café's front at night: « l'effet
   // soleil … que sur un ciel ») — the sky named by the filler and found in her frame, the sun inside it, under her
   // skyline; none on a front, a wall, an interior. Her windows already lit in her picture (her shop windows at night)
-  // never covered with a flat colour: flashed and brightened, as its second example lights what already shines.
+  // never covered with a flat colour: flashed and brightened, as its second example lights what already shines. When her
+  // second shot shows no sky, the sun on the next of her shots that does (« toujours mettre de l'intelligence »).
   version: 3,
   bpm: BPM,
   // Three shots, as the original (three videos giving several passages each still make three); a verse for a longer Reel she asks for.
@@ -332,6 +340,16 @@ export const petitesLumieres: MontageSkill = {
       slot: "ciel",
       shot: 1,
       want: "« sky » seulement si le ciel se voit dans ce plan au-dessus de ses toits, en haut de l'image (le soleil s'y pose) ; vide pour une façade de près, un mur, une vitrine, un intérieur, ou un ciel qui ne tient qu'au coin d'une vidéo horizontale : pas de soleil alors",
+    },
+    {
+      slot: "ciel_suite",
+      shot: 2,
+      want: "« sky » seulement si le ciel se voit dans ce plan au-dessus de ses toits, en haut de l'image (le soleil s'y pose quand le deuxième plan n'en montre pas) ; vide pour une façade de près, un mur, une vitrine, un intérieur",
+    },
+    {
+      slot: "ciel_fin",
+      shot: -1,
+      want: "« sky » seulement si le ciel se voit dans ce plan au-dessus de ses toits, en haut de l'image (le soleil s'y pose quand les plans d'avant n'en montrent pas) ; vide pour une façade de près, un mur, une vitrine, un intérieur",
     },
   ],
   settings: [
@@ -405,7 +423,7 @@ export const petitesLumieres: MontageSkill = {
         end: { at: round3(at(MUSIC_END + verse) + card * beat), fade: 0.012 },
       },
       // Its verse's column on its third shot, only with four of them.
-      objects: { suite: verse ? 2 : 99 },
+      objects: { suite: verse ? 2 : 99, ciel_suite: verse ? 2 : 99 },
     };
   },
   code: CODE,

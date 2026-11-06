@@ -65,8 +65,8 @@ test("« Petites lumières »: its music stopped dead three times for a beat, it
   assert.equal(four.music!.pauses!.length, 4);
   assert.equal(four.sounds!.length, 2);
   assert.ok(Math.abs(four.music!.end!.at - music.end!.at - 4 * (60 / 83)) < 0.02);
-  assert.deepEqual(four.objects, { suite: 2 });
-  assert.deepEqual(line.objects, { suite: 99 });
+  assert.deepEqual(four.objects, { suite: 2, ciel_suite: 2 });
+  assert.deepEqual(line.objects, { suite: 99, ciel_suite: 99 });
   const ended = petitesLumieres.timeline(3, { end: true });
   assert.ok(ended.duration - line.duration >= 1.6 && ended.texts.nom!.to <= ended.duration - 1.6 + 0.01);
   // At another tempo, every landmark follows it.
@@ -97,9 +97,9 @@ test("« Petites lumières »: on the plan, its objects named for her shots, fol
   assert.deepEqual(subjectsDrawn(code), []);
   // Unnamed (nothing to light in her shot), « @suite » is no object.
   assert.deepEqual(objectsDrawn(code).map((o) => `${o.shot}#${o.name}`).sort(), ["-1#every window", "0#street lamp head", "1#every window", "1#sky"]);
-  // It reads her second shot's skyline and ground (its sun), her first shot's light (her lamp), the light of each shot it
-  // lights pieces on (a window already lit), the clear area of her last.
-  assert.deepEqual(readsDrawn(code).sort((a, b) => a.shot - b.shot), [{ shot: -1, kinds: ["light"] }, { shot: 0, kinds: ["light"] }, { shot: 1, kinds: ["ground", "sky"] }]);
+  // It reads the skyline and ground of every shot its sun may go on (never her lamp's), her first shot's light (her
+  // lamp), the light of each shot it lights pieces on (a window already lit), the clear area of her last.
+  assert.deepEqual(readsDrawn(code).sort((a, b) => a.shot - b.shot), [{ shot: -1, kinds: ["light"] }, { shot: 0, kinds: ["light"] }, { shot: 1, kinds: ["ground", "sky"] }, { shot: 2, kinds: ["ground", "sky"] }, { shot: 3, kinds: ["ground", "sky"] }]);
   assert.deepEqual(clearsDrawn(code).sort(), [2, 3]);
   assert.doesNotMatch(petitesLumieres.code, /transform|scale\(/);
 });
@@ -260,6 +260,46 @@ test("« Petites lumières »: her windows filled with her colour in six waves f
   assert.ok([...String(styleOf(shallow).clipPath).matchAll(/L\d+ (\d+)/g)].every((m) => Number(m[1]) <= 900));
   assert.equal(keyed(drawAt(150, { reads: reads({ skyline: () => 120 }) }), "sky"), null);
   assert.equal(keyed(drawAt(150, { reads: reads({ skyline }), texts: { soleil: "non" } }), "sky"), null);
+});
+
+test("« Petites lumières »: no sky on her second shot, the sun on the next of her shots that shows one; no sky anywhere, no sun", () => {
+  // « toujours mettre de l'intelligence »: the sun on the real sky of her Reel, wherever it is (never her lamp's shot).
+  const line = petitesLumieres.timeline(3, { end: false });
+  const cut1 = Math.round(line.shots[1]!.start * 30);
+  const cut2 = Math.round(line.shots[2]!.start * 30);
+  const named = { lumiere: "street lamp head", fenetres: "every window", colonne: "every window", ciel: "facade sky", ciel_fin: "sky" };
+  const code = skillCode(petitesLumieres, named);
+  const skyline = () => 1000;
+  // Her second shot a front (its sky named, none found), her last shot with a sky: the sun there only, cut to its sky.
+  const lastOnly = (name: string) => (name === "street lamp head" ? LAMP_BOX : name === "sky" ? SKY_BOX : null);
+  const at = (f: number, box: (name: string) => Box | null) => drawAt(f, { code, reads: reads({ skyline, box }) });
+  assert.equal(keyed(at(cut1 + 20, lastOnly), "sky"), null);
+  const late = keyed(at(cut2 + 20, lastOnly), "sky");
+  assert.ok(late && styleOf(late.children[0] as Drawn).backgroundColor === "#fe0000");
+  assert.ok(flatten(at(cut2 + 20, lastOnly)).some((d) => d.type === "Skyline" && d.props.shot === 2));
+  // It shrinks over its own shot, as on her second.
+  const w = (f: number) => Number(styleOf(keyed(at(f, lastOnly), "sky")!.children[0] as Drawn).width);
+  assert.ok(w(Math.round(line.duration * 30) - 2) < w(cut2));
+  // Her column still lit over it.
+  const order = flatten(at(cut2 + 60, lastOnly)).map((d) => (d.props.key === "sky" ? "sun" : d.props.key === "column" ? "column" : "")).filter(Boolean);
+  assert.deepEqual(order, ["sun", "column"]);
+  // Her sky on both: the sun on her second shot only, as the original.
+  const both = (name: string) => (name === "street lamp head" ? LAMP_BOX : name === "sky" || name === "facade sky" ? SKY_BOX : null);
+  assert.ok(keyed(at(cut1 + 20, both), "sky"));
+  assert.equal(keyed(at(cut2 + 20, both), "sky"), null);
+  // No sky on any of her shots: no sun at all; never on her lamp's shot.
+  const none = (name: string) => (name === "street lamp head" ? LAMP_BOX : null);
+  for (const f of [20, cut1 + 20, cut2 + 20]) assert.equal(keyed(at(f, none), "sky"), null);
+  assert.equal(keyed(at(20, both), "sky"), null);
+  // A verse: its own sky (« ciel_suite ») before the last shot's.
+  const four = petitesLumieres.timeline(4, { end: false });
+  const v2 = Math.round(four.shots[2]!.start * 30);
+  const v3 = Math.round(four.shots[3]!.start * 30);
+  const verseCode = skillCode(petitesLumieres, { ...named, suite: "every window", ciel_suite: "verse sky" });
+  const verseSky = (name: string) => (name === "street lamp head" ? LAMP_BOX : name === "verse sky" || name === "sky" ? SKY_BOX : null);
+  const at4 = (f: number) => drawAt(f, { shots: 4, code: verseCode, reads: reads({ skyline, box: verseSky }) });
+  assert.ok(keyed(at4(v2 + 20), "sky"));
+  assert.equal(keyed(at4(v3 + 20), "sky"), null);
 });
 
 test("« Petites lumières »: her windows already lit in her picture (her shop windows at night) never covered, flashed then brightened", () => {
