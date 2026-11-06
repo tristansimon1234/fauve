@@ -2017,6 +2017,52 @@ export const HOUSE_MODELS: HouseModel[] = [
       why: "On voit le résultat d'abord, puis comment c'est fait, geste par geste, les mots qui racontent au rythme des mains ; la réaction à la fin donne envie d'y goûter.",
     },
   }),
+  model({
+    key: "depart",
+    name: "Le grand départ",
+    // Written on its original's fiche (v1 of its skill, docs/fiches/depart.md): someone at the place they leave, a bus
+    // passing right before the lens and they are gone; the journey in flashes heard with their own sound and no music;
+    // the music with the arrival, a crowd rushing, two small gold lines in the middle; in black and white.
+    pitch: "Quelque chose passe devant toi et tu as disparu : ton trajet en éclairs, chacun avec son propre son, puis la musique arrive avec l'endroit où tu vas, plein de vie en accéléré, et deux petites lignes au milieu.",
+    needs: "une vidéo de toi debout devant ton lieu, le téléphone posé (le mieux : une voiture ou quelqu'un passe tout près devant, puis tu sors du cadre), 2 à 4 courtes vidéos de ton trajet qui bougent (une vitre de train, la route, un métro, un escalier) et 1 à 3 vidéos de l'endroit où tu arrives, plein de vie",
+    files: [4, 10],
+    // A neo-grotesque, regular, as its two small lines.
+    pair: "grotesque",
+    // Its skill's code is its reference.
+    example: null,
+    // Its music's backbeat every 1,082 s, two beats (docs/fiches/depart.md; Gemini heard 82, measure.py 79).
+    tempo: 110.9,
+    finish: { name: "Noir et blanc argentique", hint: "noir et blanc contrasté, noirs profonds, grain fin, coins à peine sombres", saturation: -1, contrast: 0.12, grain: 0.18, grain_size: "fine", vignette: 0.15 },
+    look: {
+      name: "départ, trajet, arrivée",
+      format: "autre",
+      hook: { kind: "mystère", what: "quelqu'un debout devant chez lui, l'image qui recule en trois sauts, puis un bus qui passe tout près devant l'objectif : il a disparu" },
+      text: {
+        amount: "une ligne",
+        composition: "deux petites lignes au milieu de l'image vers la fin, une courte invitation puis le lieu où l'on arrive, dans une grotesque fine d'un or éteint, une ombre douce, en fondu",
+        weight: "regular",
+        shadow: "soft",
+      },
+      colors: ["#cdb672"],
+      effect: "bw",
+      filter: "noir et blanc contrasté aux noirs profonds, un grain fin, l'arrivée d'un gris à peine chaud",
+      layout: "le départ en un plan fixe à 15 images par seconde, une masse qui passe devant l'objectif cachant la coupe, le trajet en plans éclairs, l'arrivée en plans de foule accélérés, ses deux lignes au milieu",
+      moments: [
+        { at: 0, what: "quelqu'un debout sur un trottoir devant chez lui, l'image qui part de près et recule en trois sauts en un sixième de seconde, saccadée à 15 images par seconde" },
+        { at: 0.3, what: "un bus traverse tout près de l'objectif de la droite vers la gauche, flou, et cache toute l'image ; quand il est passé, la personne a disparu : le trottoir vide, tenu un quart de seconde" },
+        { at: 1.07, what: "le trajet en éclairs, chacun avec son propre son et sans musique : l'avant d'un métro dans un tunnel, une aile d'avion sur la piste, la vitre d'un train, un escalator" },
+        { at: 2.93, what: "la fin de l'escalator fonce d'un coup sur le panneau d'arrivée, 3,6 fois plus près en huit images" },
+        { at: 3.2, what: "la musique arrive avec l'arrivée : une foule au téléobjectif en accéléré, en trois plans" },
+        { at: 7.8, what: "deux petites lignes dorées en fondu au milieu de l'image, jusqu'à la fin" },
+      ],
+      camera: "mixte",
+      transitions: "effets",
+      motion: "epure",
+      music: "calm lo-fi hip-hop, soft guitar and keys, light backbeat, no sub-bass, 111 BPM",
+      ending: "la foule de l'arrivée qui court, ses deux lignes dorées au milieu, la musique coupée avec la dernière image",
+      why: "Le départ tient en une seconde : un bus passe et la personne a disparu ; le trajet en éclairs, au son de chaque plan, fait le voyage, et la musique qui arrive avec la destination fait l'arrivée.",
+    },
+  }),
 ];
 
 const BY_KEY = new Map(HOUSE_MODELS.map((m) => [m.key, m]));
@@ -2101,6 +2147,7 @@ export const HOUSE_WHEN: Record<string, { pour: string; pas_pour: string }> = {
   assiettes: { pour: "montrer sa carte, ses plats du jour, des idées de recettes ou une sélection de produits, un par un, filmés d'en haut au même endroit (un restaurant, un traiteur, une cantine, une boulangerie, des box)", pas_pour: "un seul plat, les gestes d'une recette, quelqu'un qui parle, un lieu, moins de six plats" },
   "chef-face": { pour: "un plat, une recette ou une spécialité racontée face caméra et goûtée (un restaurant, un traiteur, une pâtisserie, un café) : le résultat d'abord, puis la dégustation", pas_pour: "sans vidéo où elle parle, des images sans parole, un lieu ou une ambiance sans rien à goûter" },
   recette: { pour: "montrer un savoir-faire en étapes comme un tuto, pour tout métier qui a des gestes : une recette (cuisine, pâtisserie), un bouquet monté (fleuriste), une coupe (coiffeur, barbier), une pièce tournée (céramiste), un soin ; du résultat fini à la dégustation ou à l'essai", pas_pour: "un lieu ou une ambiance, une offre à lire, quelqu'un qui parle face caméra, des vidéos filmées à la main" },
+  depart: { pour: "un départ et une arrivée : une sortie, un voyage, un déplacement (le marché, un salon, un fournisseur, les vacances), un déménagement ou une nouvelle adresse, un événement ailleurs", pas_pour: "sans vidéo de quelqu'un debout devant son lieu filmée téléphone posé, sans plans du trajet ni de l'endroit où l'on arrive, un produit seul, quelqu'un qui parle, une offre à lire en détail" },
 };
 
 /** The models for Edith: their key, name, what they do, what they want, and what only she can film for one. */
