@@ -89,12 +89,13 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
       const hh = Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y);
       return w > 0 && hh > 0 && (w * hh) / Math.min(a.w * a.h, b.w * b.h) > 0.6;
     };
-    // What of it the frame shows (her horizontal close-up cropped upright shows its middle only): half of it at least,
+    // What of it the frame shows (her horizontal close-up cropped upright shows its middle only): half of it at least, or a
+    // quarter of the frame (a cup that fills it),
     // else it is not on her picture.
     const seen = (b) => {
       const w = Math.min(b.x + b.w, W) - Math.max(b.x, 0);
       const hh = Math.min(b.y + b.h, H) - Math.max(b.y, 0);
-      return w > 0 && hh > 0 && (w * hh) / (b.w * b.h) >= 0.5 ? { x: Math.max(b.x, 0), y: Math.max(b.y, 0), w, h: hh } : null;
+      return w > 0 && hh > 0 && ((w * hh) / (b.w * b.h) >= 0.5 || (w * hh) / (W * H) >= 0.25) ? { x: Math.max(b.x, 0), y: Math.max(b.y, 0), w, h: hh } : null;
     };
     const shown = raw.map((b) => (b ? seen(b) : null));
     const products = shown.map((b, i) => (b && !shown.slice(0, i).some((o) => o && same(o, b)) ? b : null));
