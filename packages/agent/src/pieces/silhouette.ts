@@ -18,8 +18,8 @@ import type { EffectPiece } from "../pieces.ts";
 // name 40 letters a second). Its own: when her picture leaves no room above her head (a close-up, a head cut by the
 // top of her picture: her picture then covers the frame), her name in her head where its word was, moving with her
 // head, centred in her silhouette across its line (never astride her edge), her first name gliding to the middle once
-// her last name has gone; its two colours her charter's dark and pale when she has them (the original's midnight and
-// cold pale otherwise), its cursor her accent when it reads on both (else the original's peach).
+// her last name has gone; its two colours her charter's dark and pale when she has them (else its skill's v4 own:
+// a warm ink and a warm paper, its v2), its cursor her accent when it reads on both (else a vermilion).
 // Left out: the opening as a layout program and its negative, the round letter that becomes an eye, the almond, her
 // trades, her logo, the 16:9 frame, and its sounds (its clicks are its opening's, and a click on her name could not
 // follow her head when it is measured: the timeline knows nothing of her tracks).
@@ -61,8 +61,9 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const mine = all.map((s, i) => i).filter((i) => all[i].from < durationInFrames && all[i].from + all[i].durationInFrames > 0);
   if (!mine.length) return null;
 
-  // Its colours: one dark tone and one pale, her charter's when she has them, else the original's midnight and cold
-  // pale; its cursor in her accent when it reads on both, else the original's peach.
+  // Its colours: one dark tone and one pale, her charter's when she has them, else its skill's own warm ink and warm
+  // paper (v2: never the original's midnight and cold pale); its cursor in her accent when it reads on both, else its
+  // skill's vermilion (never the original's peach).
   const hex = (c) => (typeof c === "string" && /^#[0-9a-f]{6}$/i.test(c.trim()) ? c.trim().toLowerCase() : null);
   const lum = (c) => {
     const n = parseInt(c.slice(1), 16);
@@ -74,9 +75,9 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const light = hex(pal.light);
   const dark = hex(pal.dark);
   const accent = hex(brand && brand.accent);
-  const PALE = light && light !== "#ffffff" && lum(light) >= 0.75 ? light : "#f3f4f9";
-  const TONE = dark && dark !== "#141414" && lum(dark) <= 0.05 ? dark : "#0f0f1c";
-  const CARET = accent && ratio(accent, PALE) >= 1.8 && ratio(accent, TONE) >= 3 ? accent : "#d99868";
+  const PALE = light && light !== "#ffffff" && lum(light) >= 0.75 ? light : "#efe9de";
+  const TONE = dark && dark !== "#141414" && lum(dark) <= 0.05 ? dark : "#1b1714";
+  const CARET = accent && ratio(accent, PALE) >= 1.8 && ratio(accent, TONE) >= 3 ? accent : "#e0512f";
   const font = "'" + ((brand && brand.displayFont) || "Inter") + "', 'Inter', 'Helvetica Neue', Arial, sans-serif";
   // A white word's tight edge in her tone: unseen on her silhouette, read anywhere off it.
   const edge = "0 0 1px " + TONE + ", 0 0 2px " + TONE + ", 0 1px 1px " + TONE;
@@ -309,7 +310,9 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
 
 export const silhouette: EffectPiece = {
   key: "silhouette",
-  version: 1,
+  // 2: its skill's v4 colours when her charter has none (a warm ink, a warm paper, a vermilion: Tristan, of the model,
+  // « trop similaire à la vidéo originale »), never the original's midnight, cold pale and peach.
+  version: 2,
   name: "La silhouette",
   how: "elle, de profil, devient sa silhouette d'un seul ton sombre sur un aplat clair, un mot blanc dans sa tête (« Je suis ») ; quand elle baisse la tête, le mot s'efface et son nom se tape derrière sa tête, posé sur ses cheveux ; son nom de famille s'envole, son prénom reste, et sa tête le soulève quand elle la relève ; puis le montage reprend.",
   needs: "une vidéo fixe d'elle (ou de quelqu'un de son équipe) de profil, tête et épaules, devant un fond clair et uni, avec de la place au-dessus de sa tête, qui baisse la tête (penchée sur son travail) puis la relève.",

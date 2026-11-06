@@ -23,7 +23,7 @@ test("« Générique de court métrage » (effect v1): its layer over her four s
   const layer = plan.layers![0]!;
   assert.deepEqual(layerShots(plan, layer), [1, 2, 3, 4]);
   const motion = layer.motion;
-  assert.deepEqual(motion.piece, { key: "court-metrage", version: 1 });
+  assert.deepEqual(motion.piece, { key: "court-metrage", version: 2 });
   // Its first cut at 4,4 s (the burn), its last at 10 s (the roll); the slit open over 71 images; its title on the first
   // beat once it is open that leaves it 1,4 s on screen (image 90, beat 5 at 100 BPM).
   assert.deepEqual(motion.texts, { beat: "18", cut: "132", open: "71", title: "90", roll: "300", mine: "1,2,3,4", ...words });

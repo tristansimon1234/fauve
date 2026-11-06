@@ -97,12 +97,12 @@ test("« Plans fixes de cinéma » (effect v1): each word shown on the frame its
   const shortProps = layerProps(short);
   const end = shortProps.durationInFrames - 1;
   assert.ok(nodes(drawAt(plansFixes.code, end, shortProps)).some((n) => n.type === "span" && styleOf(n).opacity === 1 && textOf(n) === "fixe"));
-  // Its small words are a label beside its title, its serif title at the original's 88 px.
+  // Its small words are a label beside its title, its serif title at 91 px (v2: EB Garamond, its capitals the original's 60 px).
   const tree = drawAt(plansFixes.code, 50, props);
   const boxes = nodes(tree).filter((n) => n.type === "FitText");
   assert.equal(boxes.length, 2);
   assert.ok(nodes(boxes[0]!).some((n) => "data-fauve-accent" in n.props));
-  assert.equal((boxes[1]!.props.innerStyle as { fontSize: number }).fontSize, 88);
+  assert.equal((boxes[1]!.props.innerStyle as { fontSize: number }).fontSize, 91);
   for (const b of boxes) {
     const s = styleOf(b) as { left: number; width: number };
     assert.ok(s.left >= 140 && s.left + s.width <= 940, JSON.stringify(s));

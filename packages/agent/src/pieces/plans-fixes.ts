@@ -131,9 +131,9 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const cuts = mine.slice(1).map((i) => Math.round(shots[i].from)).filter((f) => f >= last + HOLD && f >= start + READ && f < durationInFrames);
   const off = cuts.length ? cuts[0] : durationInFrames;
   const on = (sw.length || tw.length) && frame >= start && frame < off;
-  // Its sizes, the original's at 1080 px wide (its serif's capitals 60 px, its small words' 19 px).
+  // Its sizes, the original's at 1080 px wide (its serif's capitals 60 px, EB Garamond's 0,66 of its size; its small words' 19 px).
   const SMALL = 28;
-  const SERIF = 88;
+  const SERIF = 91;
   const TOP_H = 40;
   const GAP = 10;
   const SERIF_H = 100;
@@ -151,11 +151,11 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const fit = Math.min(1, spot.h / H);
   // White, with the original's tight dark halo and a thin dark edge (her shots are not all as dark as its river).
   const halo = "0 0 1px rgba(0,0,0,0.7), 0 0 3px rgba(0,0,0,0.45), 0 1px 10px rgba(0,0,0,0.25)";
-  const display = "'" + brand.displayFont + "', 'Lora', Georgia, serif";
+  const display = "'" + brand.displayFont + "', 'EB Garamond', Georgia, serif";
   const body = "'" + brand.bodyFont + "', 'Poppins', 'Inter Tight', sans-serif";
   const shown = (w, i, at) => [i ? " " : null, h("span", { key: i, style: { whiteSpace: "nowrap", opacity: frame >= at ? 1 : 0 } }, w)];
   const smallStyle = { fontFamily: body, fontWeight: 600, fontSize: Math.round(SMALL * fit), lineHeight: 1.2, wordSpacing: "0.5em", color: "#ffffff", whiteSpace: "nowrap", textShadow: halo, justifyContent: "flex-end" };
-  const serifStyle = { fontFamily: display, fontWeight: 700, fontSize: Math.round(SERIF * fit), lineHeight: 1.0, letterSpacing: "-0.03em", color: "#ffffff", whiteSpace: "nowrap", textShadow: halo, justifyContent: "flex-start" };
+  const serifStyle = { fontFamily: display, fontWeight: 700, fontSize: Math.round(SERIF * fit), lineHeight: 1.0, letterSpacing: "-0.04em", color: "#ffffff", whiteSpace: "nowrap", textShadow: halo, justifyContent: "flex-start" };
   const kicker = on && sw.length
     ? h(FitText, { key: "k", style: { position: "absolute", left: Math.round(spot.x), top: Math.round(spot.y), width: Math.round(spot.w), height: Math.round(TOP_H * fit) }, innerStyle: smallStyle },
         h("span", { "data-fauve-accent": "" }, sw.flatMap((w, i) => shown(w, i, lands(smallBeat(i))))))
@@ -171,7 +171,8 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
 
 export const plansFixes: EffectPiece = {
   key: "plans-fixes",
-  version: 1,
+  // 2: its skill's v4 serif (EB Garamond 700, set tight, its capitals 60 px: the original's eye, 0,65 of them).
+  version: 2,
   name: "Plans fixes de cinéma",
   how: "ses plans fixes passent en horizontal 4:3 sur du noir, comme au cinéma, chacun tel que filmé (ni zoom ni mouvement) ; sur le premier, un petit titre blanc en deux niveaux se pose mot à mot avec un clic sec, ses petits mots sans serif au-dessus, ses mots en serif gras dessous, puis part avec une coupe ; le montage reprend ensuite en plein écran.",
   needs: "des vidéos filmées téléphone posé où le monde bouge dedans (passants, clients, vapeur, une porte qui s'ouvre), à l'horizontale de préférence (en vertical, seule une bande du milieu se voit), la première large et calme au milieu.",

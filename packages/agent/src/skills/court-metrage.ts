@@ -1,6 +1,6 @@
 import { beatSpans, toFrame, type MontageSkill } from "../skills.ts";
 
-// « Court métrage », version 1, written on its original's fiche (docs/fiches/court-metrage.md: measured image by image
+// « Court métrage », version 2, written on its original's fiche (docs/fiches/court-metrage.md: measured image by image
 // at 30 i/s, its picture's box, its slit, its title, its burns and its film roll read on the pixels, its sound by
 // bands). A short travel film projected as on an old projector: its picture 1,94:1 with its corners rounded, on a soft
 // black, one shot a bar of its music, cut on each new chord. Its cuts fit 85,5 BPM within an image (a beat every
@@ -8,8 +8,8 @@ import { beatSpans, toFrame, type MontageSkill } from "../skills.ts";
 //   0 – 5,7     its first four images are its title card (the cover a feed shows), then black with a click; its first
 //               shot opens from a slit in the middle (two black bars parting at an even pace) to beat 3 (2,6 s), a
 //               projector running under it, no music yet; on beat 3 its title cuts in whole with a click: one small word
-//               in spaced capitals near the top, two lines of big serif capitals in the middle, a small italic credit
-//               near the bottom, all of them lemon yellow; from beat 4,9 a film burn floods in from the left (red-orange,
+//               in a little spaced serif capitals near the top, two lines of big capitals of a high-contrast display
+//               serif in the middle, a small roman credit near the bottom, all of them lemon yellow; from beat 4,9 a film burn floods in from the left (red-orange,
 //               orange, amber, then pale yellow at its height, the title washed under it), the cut on beat 5,7 under it,
 //               and the music comes in there, its bass a bar later;
 //   5,7 – 29,7  one shot a bar (4 beats, 2,8 s), cut on the chord; on its fifth cut (beat 21,7) the film slips in the
@@ -21,6 +21,8 @@ import { beatSpans, toFrame, type MontageSkill } from "../skills.ts";
 // when they are upright; her title in her words (the original's « MOMENTS / SHORT CINEMA / Archived by : your name »
 // are its template's, never copied), in its lemon yellow (or her colour, or white), her first shot dimmed under it when
 // it is bright; the film roll on the cut after four of her shots, or onto her last one when she has fewer.
+// Its light is drawn by its code on her shots only (the original's golden print: warm and rich, amber mids, its blacks a
+// little lifted, its highlights held), so its words, its soft black and its burns keep their measured colours.
 
 const BPM = 85.5;
 /** Its grid's first beat from the Reel's start (0,49 s), the first cut five beats later (4,0 s, its image 120). */
@@ -78,8 +80,9 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const full = { position: "absolute", left: 0, top: 0, width: GW, height: GH };
   const box = (x, y, w, t) => ({ position: "absolute", left: Math.round(x), top: Math.round(y), width: Math.round(w), height: Math.round(t) });
 
-  // 2. Her words: one small word in spaced capitals near the top of the picture, her title in big serif capitals on
-  // two lines at its middle, her credit in small italic near its bottom (upright: within the safe zone), all at once.
+  // 2. Her words: one small word in a little spaced capitals near the top of the picture, her title in big capitals of
+  // a high-contrast display serif on two lines at its middle, her credit in small roman near its bottom (upright:
+  // within the safe zone), all at once.
   const band = reelTexts.find((t) => t.role === "band");
   const hook = reelTexts.find((t) => t.role === "hook");
   const credit = reelTexts.find((t) => t.role === "caption");
@@ -99,10 +102,12 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
     }
     return best;
   };
+  // Its sizes, the original's (its title's capitals 9,4 % of its picture's height, its small word's 2,4 %), in a serif
+  // whose capitals are 0,72 of its size; a third larger upright.
   const S = wide ? 1 : 1.3;
-  const TPX = Math.round(84 * S);
-  const LPX = Math.round(26 * S);
-  const CPX = Math.round(28 * S);
+  const TPX = Math.round(73 * S);
+  const LPX = Math.round(22 * S);
+  const CPX = Math.round(25 * S);
   const yLabel = GH * (wide ? 0.1 : 0.12);
   const yTitle = GH * (wide ? 0.485 : 0.47);
   const yCredit = GH * (wide ? 0.902 : 0.72);
@@ -118,9 +123,12 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const tone = setting("couleur", "jaune");
   const hers = [brand.accent, brand.palette && brand.palette.light].find((c) => luma(c) >= 0.45);
   const COLOR = tone === "blanc" ? "#f4f1e8" : tone === "sienne" && hers ? hers : "#f2ea4a";
-  const display = "'" + brand.displayFont + "', 'Cormorant Garamond', Georgia, serif";
-  const body = "'" + brand.bodyFont + "', 'Cormorant Garamond', Georgia, serif";
+  const display = "'" + brand.displayFont + "', 'Noto Serif Display', Georgia, serif";
+  const body = "'" + brand.bodyFont + "', 'Noto Serif Display', Georgia, serif";
   const shade = "0 0 1px rgba(0,0,0,0.35), 0 2px 12px rgba(0,0,0,0.38)";
+  // Its light, on her shots only (setting « lumière »): the original's golden print, warm amber mids, rich colours, its
+  // blacks a little lifted and its highlights held; or her shots as filmed.
+  const LIGHT = setting("lumiere", "doree") === "naturelle" ? "" : "sepia(0.45) saturate(1.7) contrast(1.05) brightness(0.93)";
 
   // Her first shot dimmed under her title when it is bright there (the original's is a dim room): from its first
   // image, so nothing changes when the title comes; the burn takes it away.
@@ -134,13 +142,13 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const card = titled
     ? h(React.Fragment, { key: "card" },
         band
-          ? h(FitText, { key: "b-" + band.text, style: box((GW - 800) / 2, yLabel - LPX * 0.8, 800, LPX * 1.6), innerStyle: { fontFamily: body, fontWeight: 500, fontSize: LPX, lineHeight: 1, letterSpacing: "0.22em", textTransform: "uppercase", whiteSpace: "nowrap", color: COLOR, textShadow: shade } },
+          ? h(FitText, { key: "b-" + band.text, style: box((GW - 800) / 2, yLabel - LPX * 0.8, 800, LPX * 1.6), innerStyle: { fontFamily: body, fontWeight: 500, fontSize: LPX, lineHeight: 1, letterSpacing: "0.1em", textTransform: "uppercase", whiteSpace: "nowrap", color: COLOR, textShadow: shade } },
               h("span", { "data-fauve-accent": "" }, keep(band.text)))
           : null,
-        h(FitText, { key: "t-" + hook.text, style: TB, innerStyle: { fontFamily: display, fontWeight: 600, fontSize: TPX, lineHeight: 0.86, letterSpacing: "-0.005em", whiteSpace: "nowrap", color: COLOR, textShadow: shade } },
+        h(FitText, { key: "t-" + hook.text, style: TB, innerStyle: { fontFamily: display, fontWeight: 500, fontSize: TPX, lineHeight: 0.84, letterSpacing: "0.01em", whiteSpace: "nowrap", color: COLOR, textShadow: shade } },
           lines(hook.text).map((l, i) => h("div", { key: i }, l))),
         credit
-          ? h(FitText, { key: "c-" + credit.text, style: box((GW - 800) / 2, yCredit - CPX * 0.85, 800, CPX * 1.7), innerStyle: { fontFamily: display, fontWeight: 500, fontStyle: "italic", fontSize: words(credit.text) > 4 ? Math.max(48, CPX) : CPX, lineHeight: 1, whiteSpace: "nowrap", color: COLOR, textShadow: shade } },
+          ? h(FitText, { key: "c-" + credit.text, style: box((GW - 800) / 2, yCredit - CPX * 0.85, 800, CPX * 1.7), innerStyle: { fontFamily: body, fontWeight: 500, fontSize: words(credit.text) > 4 ? Math.max(48, CPX) : CPX, lineHeight: 1, whiteSpace: "nowrap", color: COLOR, textShadow: shade } },
               words(credit.text) > 4 ? keep(credit.text) : h("span", { "data-fauve-accent": "" }, keep(credit.text)))
           : null)
     : null;
@@ -150,7 +158,8 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const open = frame < COVER ? 1 : clamp01((frame - COVER) / (OPEN - COVER));
   const slit = Math.round(((1 - open) * GH) / 2);
   const film = n ? h(Footage, { key: "f" + cur, shot: cur, style: full }) : null;
-  const shown = h("div", { key: "shown", style: { ...full, clipPath: slit > 0 ? "inset(" + slit + "px 0px " + slit + "px 0px)" : undefined, filter: cur === 0 && dim < 1 ? "brightness(" + dim.toFixed(3) + ")" : undefined } }, film);
+  const lit = [LIGHT, cur === 0 && dim < 1 ? "brightness(" + dim.toFixed(3) + ")" : ""].filter(Boolean).join(" ");
+  const shown = h("div", { key: "shown", style: { ...full, clipPath: slit > 0 ? "inset(" + slit + "px 0px " + slit + "px 0px)" : undefined, filter: lit || undefined } }, film);
 
   // 4. The film slipping in the projector, onto its roll shot: six images of the strip rolling up in jerks, each
   // frame line where the original's was (its top, a share of the picture's height), the shot going until the cut and
@@ -172,7 +181,7 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
         if (y + HOLE.h > top && y < top + GH) holes.push(h("div", { key: key + "h" + j, style: { ...box(-HOLE.w * 0.3, y, HOLE.w, HOLE.h), borderRadius: Math.round(HOLE.w * 0.3), backgroundColor: "#aea87b" } }));
       }
       return [
-        h("div", { key, style: { ...box(IN, top, GW - 2 * IN, GH), overflow: "hidden", borderRadius: RAD } }, h(Footage, { shot: k, style: box(-IN, 0, GW, GH) })),
+        h("div", { key, style: { ...box(IN, top, GW - 2 * IN, GH), overflow: "hidden", borderRadius: RAD, filter: LIGHT || undefined } }, h(Footage, { shot: k, style: box(-IN, 0, GW, GH) })),
         ...holes,
       ];
     };
@@ -209,13 +218,13 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const fade = frame >= FADE ? h("div", { key: "fade", style: { ...full, backgroundColor: INK, opacity: clamp01((frame - FADE) / (BLACK - FADE)) } }) : null;
 
   // 7. Its ending card, only when the Reel has one: on the black after the fade, her words in its serif capitals and
-  // its italic, in its colour, fading in.
+  // its small roman, in its colour, fading in.
   const cardIn = (a) => clamp01((frame - a) / 10);
   const ending = end && frame >= endAt
     ? h(React.Fragment, { key: "end" },
-        h(FitText, { key: "e-" + end.title, style: box(140, GH * 0.46 - TPX * 0.9, GW - 280, TPX * 1.8), innerStyle: { fontFamily: display, fontWeight: 600, fontSize: Math.round(TPX * 0.8), lineHeight: 0.95, whiteSpace: "normal", textWrap: "balance", color: COLOR, opacity: cardIn(endAt), justifyContent: end.subtitle ? "flex-end" : "center" } }, caps(end.title)),
+        h(FitText, { key: "e-" + end.title, style: box(140, GH * 0.46 - TPX * 0.9, GW - 280, TPX * 1.8), innerStyle: { fontFamily: display, fontWeight: 500, fontSize: Math.max(58, Math.round(TPX * 0.8)), lineHeight: 0.95, whiteSpace: "normal", textWrap: "balance", color: COLOR, opacity: cardIn(endAt), justifyContent: end.subtitle ? "flex-end" : "center" } }, caps(end.title)),
         end.subtitle
-          ? h(FitText, { key: "s-" + end.subtitle, style: box(140, GH * 0.46 + TPX * 0.95, GW - 280, Math.max(70, TPX)), innerStyle: { fontFamily: display, fontWeight: 500, fontStyle: "italic", fontSize: 48, lineHeight: 1.15, whiteSpace: "normal", textWrap: "balance", color: COLOR, opacity: cardIn(endAt + 5), justifyContent: "flex-start" } }, keep(end.subtitle))
+          ? h(FitText, { key: "s-" + end.subtitle, style: box(140, GH * 0.46 + TPX * 0.95, GW - 280, Math.max(70, TPX)), innerStyle: { fontFamily: body, fontWeight: 500, fontSize: 48, lineHeight: 1.15, whiteSpace: "normal", textWrap: "balance", color: COLOR, opacity: cardIn(endAt + 5), justifyContent: "flex-start" } }, keep(end.subtitle))
           : null)
     : null;
 
@@ -231,14 +240,17 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
 
 export const courtMetrage: MontageSkill = {
   key: "court-metrage",
-  version: 1,
+  // 2: its light drawn on her shots (the original's golden print; « lumière ne va pas »: the catalogue's « film » grade
+  // and its lifted blacks made them grey and flat), its title in a high-contrast display serif (« la police au début
+  // pareil »: Cormorant Garamond was narrower and paler), its small word a little spaced, its credit roman, not italic.
+  version: 2,
   bpm: BPM,
   shots: [FEWEST, 8],
   long: LONGEST,
   files: [4, 10],
   // A calm film: slower makes it longer and gentler, never past 45 s with its twelve shots and an ending card.
   tempo: [72, 100],
-  how: "Un court métrage projeté : ses plans dans une image de pellicule aux coins arrondis sur un noir doux, en horizontal comme l'original quand ses vidéos le sont (sinon plein écran) ; le premier s'ouvre depuis une fente au milieu, et sur un temps le titre de son film s'y pose d'un coup en jaune (un petit mot en capitales espacées en haut, son titre en grandes capitales serif sur deux lignes au milieu, sa signature en petit italique en bas) ; une brûlure de pellicule blanchit l'image sur la première coupe et la musique entre ; puis un plan par mesure, coupé sur l'accord ; après quatre plans, la pellicule saute dans le projecteur (l'image remonte par à-coups, ses perforations passent, une image blanche brûlée) ; le dernier plan, calme, finit en fondu au noir avec la musique.",
+  how: "Un court métrage projeté, dans la lumière dorée d'une vieille pellicule (chaude et riche, les noirs à peine relevés) : ses plans dans une image aux coins arrondis sur un noir doux, en horizontal comme l'original quand ses vidéos le sont (sinon plein écran) ; le premier s'ouvre depuis une fente au milieu, et sur un temps le titre de son film s'y pose d'un coup en jaune (un petit mot en capitales un peu espacées en haut, son titre en grandes capitales d'un serif à fort contraste sur deux lignes au milieu, sa signature en petit romain en bas) ; une brûlure de pellicule blanchit l'image sur la première coupe et la musique entre ; puis un plan par mesure, coupé sur l'accord ; après quatre plans, la pellicule saute dans le projecteur (l'image remonte par à-coups, ses perforations passent, une image blanche brûlée) ; le dernier plan, calme, finit en fondu au noir avec la musique.",
   end: true,
   texts: [
     {
@@ -258,7 +270,7 @@ export const courtMetrage: MontageSkill = {
     {
       slot: "signature",
       role: "caption",
-      want: "facultatif : sa signature en petit italique en bas de l'image, comme le nom de qui a filmé (une forme comme « par Maison Farine », « filmé par Rose ») ; 3 mots au plus (le titre ne reste que deux temps)",
+      want: "facultatif : sa signature en petit en bas de l'image, comme le nom de qui a filmé (une forme comme « par Maison Farine », « filmé par Rose ») ; 3 mots au plus (le titre ne reste que deux temps)",
       max: 24,
       required: false,
     },
@@ -282,7 +294,18 @@ export const courtMetrage: MontageSkill = {
         { value: "blanc", says: "un blanc chaud" },
       ],
     },
+    {
+      name: "lumiere",
+      want: "la lumière de ses plans",
+      choices: [
+        { value: "doree", says: "la lumière dorée d'une vieille pellicule, chaude et riche, comme l'original" },
+        { value: "naturelle", says: "ses plans tels qu'elle les a filmés" },
+      ],
+    },
   ],
+  // Its code draws its light on her shots (the setting « lumiere »): nothing of its model's finish is laid over it (it
+  // would tint its lemon title, its soft black and its burns too).
+  finish: { exposure: 0, contrast: 0, saturation: 0, warmth: 0, split: 0, fade: 0, grain: 0, vignette: 0 },
   timeline(n, { end, bpm: tempo }) {
     // At another tempo (a longer Reel, a music's own): every landmark counted in beats follows it.
     const bpm = tempo ?? BPM;

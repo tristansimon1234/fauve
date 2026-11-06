@@ -83,7 +83,7 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const laid = { left: 0, top: 0, width: bw, height: bh };
 
   // Its two faces: a bold serif for its title, a geometric sans for its small words and its closing line.
-  const display = "'" + brand.displayFont + "', 'Lora', Georgia, serif";
+  const display = "'" + brand.displayFont + "', 'EB Garamond', Georgia, serif";
   const body = "'" + brand.bodyFont + "', 'Poppins', 'Inter Tight', sans-serif";
   // White, with the original's tight dark halo, and a thin dark edge of its own (her shots are not all as dark as its
   // river: on pale roses or a white shirt, a halo alone did not hold the letters).
@@ -141,9 +141,9 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const lands = (b) => Math.round(start + b * BEAT);
   const smallOn = small && frame >= start && frame < small.to;
   const hookOn = hook && frame >= start && frame < hook.to;
-  // Its sizes, the original's at 1080 px wide (its serif's capitals 60 px, its small words' 19 px), in both formats.
+  // Its sizes, the original's at 1080 px wide (its serif's capitals 60 px, EB Garamond's 0,66 of its size; its small words' 19 px), in both formats.
   const SMALL = 28;
-  const SERIF = 88;
+  const SERIF = 91;
   const TOP_H = 40;
   const GAP = 10;
   const SERIF_H = 100;
@@ -160,7 +160,7 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const fit = Math.min(1, spot.h / H);
   const word = (w, i, at) => [i ? " " : null, h("span", { key: i, style: { whiteSpace: "nowrap", opacity: frame >= at ? 1 : 0 } }, w)];
   const smallStyle = { fontFamily: body, fontWeight: 600, fontSize: Math.round(SMALL * fit), lineHeight: 1.2, wordSpacing: "0.5em", color: "#ffffff", whiteSpace: "nowrap", textShadow: halo, justifyContent: "flex-end" };
-  const serifStyle = { fontFamily: display, fontWeight: 700, fontSize: Math.round(SERIF * fit), lineHeight: 1.0, letterSpacing: "-0.03em", color: "#ffffff", whiteSpace: "nowrap", textShadow: halo, justifyContent: "flex-start" };
+  const serifStyle = { fontFamily: display, fontWeight: 700, fontSize: Math.round(SERIF * fit), lineHeight: 1.0, letterSpacing: "-0.04em", color: "#ffffff", whiteSpace: "nowrap", textShadow: halo, justifyContent: "flex-start" };
   const kicker = smallOn
     ? h(FitText, { key: "k", style: { position: "absolute", left: Math.round(spot.x), top: Math.round(spot.y), width: Math.round(spot.w), height: Math.round(TOP_H * fit) }, innerStyle: smallStyle },
         h("span", { "data-fauve-accent": "" }, sw.flatMap((w, i) => word(w, i, lands(smallBeat(i))))))
@@ -206,7 +206,10 @@ export const plansFixes: MontageSkill = {
   // 3: written again on its original's fiche: its format (horizontal 4:3 when her files are), its tempo (64,6 BPM) and
   // its cuts, its title's words on its beats, set on a calm area in a bold serif, its closing line that fades in, its
   // music dying away with the picture, no move on any shot, its finish without warmth, grain nor vignette.
-  version: 3,
+  // 4: its title's serif measured on its original's letters (Tristan: « la police est slightly différente »): its
+  // x-height 0,65 of its capitals and « Static shot » 5,5 capitals wide, letters almost touching; EB Garamond 700 at
+  // -0,04 em sets 0,65 and 5,5, Lora 700 set 0,72 and 6,3 (rounder, a larger eye, looser).
+  version: 4,
   bpm: BPM,
   shots: [5, 12],
   // Up to 20 for a length she asks for: about 30 s at its own tempo.
