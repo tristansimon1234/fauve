@@ -57,7 +57,7 @@ export const TRADES: Trade[] = [
       ["Pensé pour le rush", "Pas de planning à tenir. Tu envoies quand tu as une minute, Edith te fait signe au bon moment pour publier."],
       ["Des tables, pas des vues", "Edith suit d’abord les visites de ton profil et les clics vers ta réservation, et te dit chaque semaine ce qui a marché."],
     ],
-    show: { reels: ["bar", "cafe", "patisserie"], note: "Commerces d’exemple, vidéos libres de droits, musique d’Edith." },
+    show: { reels: ["restaurant", "cave", "coffee-shop"], note: "Commerces d’exemple, vidéos libres de droits, montage et musique d’Edith." },
     faq: [
       ["Je n’ai pas le temps de filmer pendant le service.", "Dix secondes suffisent : un plat qui sort, un geste, la salle avant d’ouvrir. Edith te dit quoi filmer et monte avec ce que tu as."],
       ["Il peut parler de ma carte et de mes prix ?", "De ce que tu lui as dit ou de ce qui est sur ton site, oui. Il n’invente jamais un plat, un prix ni un horaire."],
@@ -103,7 +103,7 @@ export const TRADES: Trade[] = [
       ["Tes profs à l’honneur", "Un prof, son cours, le mouvement qu’il préfère. Avec une voix off si personne n’a envie de parler face caméra."],
       ["Des réservations, pas des vues", "Edith suit d’abord les clics vers ta page de réservation et les visites de ton profil, et te dit ce qui a marché."],
     ],
-    show: { reels: ["yoga"], note: "Studio d’exemple, vidéos libres de droits, musique d’Edith." },
+    show: { reels: ["yoga", "boxe"], note: "Studios d’exemple, vidéos libres de droits, musique d’Edith." },
     faq: [
       ["Je n’ose pas me filmer.", "Pas besoin de parler face caméra : un mouvement de côté, le studio avant le cours, les mains sur la barre. Edith peut poser une voix off dessus."],
       ["Ça se connecte à mon logiciel de réservation ?", "Pas directement. Edith met ton lien de réservation dans les légendes et te prépare des stories avec un lien à partager."],
@@ -126,7 +126,7 @@ export const TRADES: Trade[] = [
       ["Un conseil plutôt qu’une promo", "Comment bien choisir, quoi offrir à qui : des posts qu’on garde et qu’on envoie à une amie."],
       ["Des visites, en ligne et en vrai", "Edith suit d’abord les visites de ton profil et les clics sur ton lien, et te dit ce qui marche."],
     ],
-    show: { reels: ["fleuriste", "ceramique"], note: "Commerces d’exemple, vidéos libres de droits, musique d’Edith." },
+    show: { reels: ["concept-store", "joaillier", "parfumeur"], note: "Maisons d’exemple, vidéos libres de droits, montage et musique d’Edith." },
     faq: [
       ["Je n’ai surtout que des photos.", "Edith en fait des carrousels composés comme par un graphiste, ou un Reel de photos. Pour un Reel vivant, dix secondes de vidéo font déjà beaucoup."],
       ["Je vends aussi en ligne.", "Edith met le lien de ta boutique en ligne dans les légendes et te prépare des stories avec un lien à partager."],
@@ -149,7 +149,7 @@ export const TRADES: Trade[] = [
       ["Avec ou sans site", "Pas de site ? Tu lui dis ce que tu fais en deux mots, et ton style vient d’images que tu aimes."],
       ["Des clients, pas une audience", "Edith cherche des visites de ton profil et des clics vers ton lien, pas des vues pour des vues."],
     ],
-    show: { reels: ["tatoueur", "ceramique", "fleuriste"], note: "Indépendants d’exemple, vidéos libres de droits, musique d’Edith." },
+    show: { reels: ["ceramiste", "photographe", "styliste"], note: "Créateurs d’exemple, vidéos libres de droits, montage et musique d’Edith." },
     faq: [
       ["Je n’ai pas de site.", "Aucun problème : tu dis à Edith ce que tu fais en deux mots, tu lui montres quelques images que tu aimes, et il en tire ton style."],
       ["Je travaille seul, personne ne me filme.", "Pose ton téléphone et filme tes mains, ton travail, ton lieu. Une voix off peut raconter à ta place."],

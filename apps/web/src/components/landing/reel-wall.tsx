@@ -1,26 +1,26 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { VolumeIcon, VolumeOffIcon } from "@/components/icons";
 import { fr } from "./fr";
-import { WORK, workMedia, type WorkId } from "./work";
+import { WORK, workById, workMedia, type WorkId } from "./work";
 
 // The site's Reels, side by side like a contact sheet (Tristan: « les reels présentés trop pub
-// oriented »): three Reels as accounts people follow for pleasure post them, never an offer nor a
+// oriented »): Reels as accounts people follow for pleasure post them, never an offer nor a
 // « réserve ta table » card. Each with what it was made from: the brief, and the raw videos sent.
-// Demo businesses, from free stock videos (Mixkit), drawn by Edith's Reel composition; the music
-// is Edith's, and two of them are told by a voice of Edith's gallery (Victoria, Jules: ElevenLabs).
-// Files in public/landing. Each plays muted while on screen; a tap gives it the sound.
-
-
+// Demo businesses and creators (work.ts). Files in public/landing/reels. Each plays muted while on
+// screen; a tap gives it the sound.
 
 /** The wall's columns on a computer, by how many Reels it shows. */
-const COLUMNS = ["", "md:grid-cols-1 md:max-w-[360px]", "md:grid-cols-2 md:max-w-[780px]", "md:grid-cols-3"];
+const COLUMNS = ["", "md:grid-cols-1 md:max-w-[360px]", "md:grid-cols-2 md:max-w-[780px]", "md:grid-cols-3", "md:grid-cols-3 lg:grid-cols-4"];
 
-/** The landing's three Reels, or only some of them (a trade's page shows those of its trade). */
-export function ReelWall({ only }: { only?: readonly WorkId[] } = {}) {
-  const work = only ? WORK.filter((w) => only.includes(w.id)) : WORK;
-  const columns = COLUMNS[Math.min(3, work.length)];
+/**
+ * The landing's Reels, or only some of them, in that order (a trade's page shows those of its trade). `after`: a last
+ * cell of the grid on a computer (the landing's call to start), left out of the phone's row.
+ */
+export function ReelWall({ only, after }: { only?: readonly WorkId[]; after?: ReactNode } = {}) {
+  const work = only ? only.map(workById) : WORK;
+  const columns = COLUMNS[Math.min(4, work.length)];
   const root = useRef<HTMLDivElement>(null);
   const videos = useRef<(HTMLVideoElement | null)[]>([]);
   const [seen, setSeen] = useState<boolean[]>(work.map(() => false));
@@ -120,6 +120,7 @@ export function ReelWall({ only }: { only?: readonly WorkId[] } = {}) {
           </div>
         </article>
       ))}
+      {after}
     </div>
   );
 }

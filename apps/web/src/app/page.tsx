@@ -11,7 +11,7 @@ import { Techniques, type Technique } from "@/components/landing/techniques";
 import { Play } from "@/components/landing/play";
 import { ReelBelt, type StripReel } from "@/components/landing/reel-strip";
 import { ReelWall } from "@/components/landing/reel-wall";
-import { WORK, workMedia, type WorkId } from "@/components/landing/work";
+import { WORK, workById, workMedia, type WorkId } from "@/components/landing/work";
 import { landingFonts } from "./landing-fonts";
 import { fr, frNodes } from "@/components/landing/fr";
 import { faqPage, JsonLd, LastCall, SectionTitle, SiteFooter, SiteHeader, Start } from "@/components/landing/site";
@@ -133,7 +133,7 @@ const structuredData = () => ({
 const vars = (values: Record<string, string | number>) => values as CSSProperties;
 
 const reel = (id: WorkId, small = true): StripReel => {
-  const w = WORK.find((x) => x.id === id)!;
+  const w = workById(id);
   const m = workMedia(id);
   return { key: id, src: small ? m.small : m.video, poster: m.poster, label: `${w.trade} · ${w.brand}` };
 };
@@ -144,14 +144,14 @@ const BELT: StripReel[] = WORK.map((w) => reel(w.id));
 const PAREILS: MorphItem[] = [
   { text: "pareils.", face: "serif" },
   { text: "pareils.", face: "anton" },
-  { text: "pareils.", face: "pixel", image: workMedia("bar").poster },
+  { text: "pareils.", face: "pixel", image: workMedia("concept-store").poster },
   { text: "pareils.", face: "bodoni" },
   { text: "pareils.", face: "marker" },
-  { text: "pareils.", face: "unbounded", image: workMedia("fleuriste").poster },
+  { text: "pareils.", face: "unbounded", image: workMedia("styliste").poster },
   { text: "pareils.", face: "fraunces" },
   { text: "pareils.", face: "dela" },
   { text: "pareils.", face: "mono" },
-  { text: "pareils.", face: "caveat", image: workMedia("cafe").poster },
+  { text: "pareils.", face: "caveat", image: workMedia("patissier").poster },
   { text: "pareils.", face: "syne" },
   { text: "pareils.", face: "archivo" },
 ];
@@ -159,10 +159,10 @@ const PAREILS: MorphItem[] = [
 const AUCUN: MorphItem[] = [
   { text: "aucun autre.", face: "serif" },
   { text: "aucun autre.", face: "archivo" },
-  { text: "aucun autre.", face: "fraunces", image: workMedia("patisserie").poster },
+  { text: "aucun autre.", face: "fraunces", image: workMedia("hotel").poster },
   { text: "aucun autre.", face: "pixel" },
   { text: "aucun autre.", face: "bodoni" },
-  { text: "aucun autre.", face: "marker", image: workMedia("barbier").poster },
+  { text: "aucun autre.", face: "marker", image: workMedia("coffee-shop").poster },
   { text: "aucun autre.", face: "unbounded" },
 ];
 
@@ -170,18 +170,18 @@ const mini = (id: WorkId, alt: string): Token => ({ video: workMedia(id).mini, p
 
 /** The principle, written as the page scrolls: never twice the same, her images, her Reel. */
 const PRINCIPLE: Token[] = [
-  { text: "Une coiffeuse", face: "serif" },
-  mini("coiffure", "Reel d’un salon de coiffure"),
-  { text: "ne raconte pas son métier" },
-  { text: "comme un tatoueur", face: "archivo" },
-  mini("tatoueur", "Reel d’un tatoueur"),
-  { text: "ni comme" },
-  { text: "une fleuriste.", face: "caveat" },
+  { text: "Une fleuriste", face: "caveat" },
   mini("fleuriste", "Reel d’une fleuriste"),
+  { text: "ne raconte pas son métier" },
+  { text: "comme un caviste", face: "serif" },
+  mini("cave", "Reel d’un bar à vins"),
+  { text: "ni comme" },
+  { text: "un studio de yoga.", face: "archivo" },
+  mini("yoga", "Reel d’un studio de yoga"),
   { text: "Alors Edith ne fait" },
   { text: "jamais deux fois le même.", face: "anton" },
   { text: "Il regarde tes images," },
-  mini("cafe", "Reel d’un café"),
+  mini("patissier", "Reel d’une pâtisserie"),
   { text: "ton style, ta demande,", face: "fraunces" },
   { text: "et il invente", face: "pixel" },
   { text: "ton Reel.", face: "bodoni" },
@@ -189,18 +189,22 @@ const PRINCIPLE: Token[] = [
 
 /** What it knows how to do, each technique shown by the Reel that uses it. */
 const TECHNIQUES: Technique[] = [
-  { name: "Une typo par mot", face: "anton", line: "Chaque plan a son mot, chaque mot sa police : la coupe prend du rythme.", ...pick("coiffure") },
-  { name: "Des tirages sur la table", face: "caveat", line: "Tes photos tombent une à une comme des tirages, puis une fenêtre s’ouvre sur la vidéo.", ...pick("fleuriste") },
-  { name: "Un mot qu’on traverse", face: "bricolage", line: "La vidéo suivante apparaît dans les lettres, puis on plonge dedans.", ...pick("cafe") },
-  { name: "Une mosaïque qui ne s’arrête jamais", face: "dela", line: "Une case change à chaque temps de la musique.", ...pick("patisserie") },
-  { name: "Une fenêtre qui voyage", face: "unbounded", line: "Un cadre se déplace et change de forme à chaque coupe, des étiquettes se tapent à côté.", ...pick("tatoueur") },
-  { name: "Une lettre par coupe", face: "syne", line: "Un mot lent qui s’écrit à chaque plan.", ...pick("ceramique") },
-  { name: "Noir et blanc, un trait de rouge", face: "marker", line: "Un mot qui claque à chaque coupe, sur le temps.", ...pick("bar") },
-  { name: "Quatre coins, deux écrans", face: "archivo", line: "Une phrase posée aux quatre coins, puis deux plans côte à côte.", ...pick("barbier") },
-  { name: "Une respiration", face: "fraunces", line: "Des plans fixes de cinéma et un seul mot qui respire.", ...pick("yoga") },
+  { name: "Détourée sur un aplat", face: "anton", line: "Elle se détache sur un rouge franc, puis le décor de la boutique passe en trame.", ...pick("concept-store") },
+  { name: "Ça s’allume dans le noir", face: "serif", line: "Le Reel s’ouvre sur un seul verre éclairé, puis la salle apparaît.", ...pick("cave") },
+  { name: "Par sa silhouette", face: "archivo", line: "Sa silhouette s’ouvre sur la rue suivante, puis sur l’atelier.", ...pick("styliste") },
+  { name: "Un verbe par geste", face: "dela", line: "Saisir, napper, dresser : un mot à chaque coupe, en noir, blanc et rouge.", ...pick("restaurant") },
+  { name: "Une étoile qui s’ouvre", face: "bodoni", line: "Des bandes d’image partent du flacon et dessinent une étoile avant le premier plan.", ...pick("parfumeur") },
+  { name: "Une grille, case par case", face: "mono", line: "Chaque case change à son tour : on passe d’un geste à l’autre sans couper.", ...pick("joaillier") },
+  { name: "Une couleur par coupe", face: "unbounded", line: "Chaque création dans son cadre, avec son nom, sur un aplat qui change de couleur.", ...pick("patissier") },
+  { name: "De la pose à l’écran", face: "syne", line: "La pose, puis la photo sur l’écran de l’appareil, puis une grille de fenêtres.", ...pick("photographe") },
+  { name: "Une carte au feutre", face: "marker", line: "Un mot de plus à chaque coupe, écrit à la main, pendant que le service passe derrière.", ...pick("hotel") },
+  { name: "La couleur par éclats", face: "pixel", line: "Le set en noir et blanc, et la couleur des lumières qui revient par moments.", ...pick("dj") },
+  { name: "Deux mots par plan", face: "fraunces", line: "Une phrase lente qui avance au rythme des mains.", ...pick("ceramiste") },
+  { name: "Du calme au rush", face: "caveat", line: "Des fondus lents avant l’ouverture, puis des coupes vives quand ça se remplit.", ...pick("coffee-shop") },
+  { name: "Des passages filés", face: "bricolage", line: "D’un plan à l’autre, l’image file comme un coup.", ...pick("boxe") },
 ];
 function pick(id: WorkId) {
-  const w = WORK.find((x) => x.id === id)!;
+  const w = workById(id);
   return { video: workMedia(id).small, poster: workMedia(id).poster, trade: `${w.trade} · ${w.brand}` };
 }
 
@@ -299,14 +303,26 @@ export default function LandingPage() {
       <section id="travail" className="mx-auto flex max-w-[1360px] scroll-mt-6 flex-col gap-12 px-4 pb-28 sm:px-8">
         <div className="land-reveal">
           <SectionTitle n={2} kicker="Le travail">
-            Neuf commerces, <span className="accent">neuf Reels qui ne se ressemblent pas.</span>
+            Neuf maisons, quatre créateurs, <span className="accent">treize Reels qui ne se ressemblent pas.</span>
           </SectionTitle>
         </div>
         <p className="land-reveal -mt-4 max-w-[560px] text-[17px] leading-relaxed text-muted">
           Ce qu’ils ont envoyé, ce qu’ils ont demandé, ce qu’Edith en a fait.
-          <span className="mono-label mt-2 block text-muted/80">Commerces d’exemple · vidéos libres de droits · musique d’Edith</span>
+          <span className="mono-label mt-2 block text-muted/80">Commerces et créateurs d’exemple · vidéos libres de droits · montage et musique d’Edith</span>
         </p>
-        <ReelWall />
+        <ReelWall
+          after={
+            // The cell left after the thirteenth on a computer (3 or 4 columns): hers, never an empty space.
+            <div className="hidden flex-col justify-end gap-6 border-t border-ink pt-6 md:col-span-2 md:flex lg:col-span-3">
+              <p className="max-w-[620px] text-[clamp(36px,4vw,60px)] leading-[0.95] font-semibold tracking-[-0.05em]">
+                Et le prochain, <span className="font-[family-name:var(--font-serif)] font-normal italic">avec tes vidéos.</span>
+              </p>
+              <div>
+                <Start waUrl={waUrl} size="lg" />
+              </div>
+            </div>
+          }
+        />
       </section>
 
       {/* N° 03, the techniques: each name in the face of its Reel, the Reel playing beside it. */}
