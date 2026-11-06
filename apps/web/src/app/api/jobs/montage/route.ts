@@ -20,12 +20,10 @@ import {
   MAX_FREE_SCENES,
   montageIssueSchema,
   MAX_MONTAGE_FILES,
-  motionTemplateSchema,
   ownRequestWords,
   reelContractSchema,
   reelFormatSchema,
   usdToEur,
-  variantPlan,
   VOICE_AT,
 } from "@fauve/agent";
 import { reviewMontage } from "@/lib/agent/critic";
@@ -92,7 +90,7 @@ const versionSchema = z.object({
 type Version = z.infer<typeof versionSchema>;
 
 const bodySchema = z.object({
-  step: z.enum(["design", "look", "effects", "effects_wait", "alternative", "variant", "render", "review", "fix"]),
+  step: z.enum(["design", "look", "effects", "effects_wait", "alternative", "render", "review", "fix"]),
   studioId: z.uuid(),
   postId: z.uuid(),
   mediaIds: z.array(z.uuid()).max(MAX_MONTAGE_FILES).optional(),
@@ -112,8 +110,6 @@ const bodySchema = z.object({
   maxNewScenes: z.number().int().min(0).max(MAX_FREE_SCENES).optional(),
   newScenes: z.number().int().min(0).max(10).optional(),
   title: words(200).optional(),
-  /** Variant step: the hook to change (an older quote may still name a template: no longer switched). */
-  variant: z.object({ template: motionTemplateSchema.optional(), hook: z.string().max(120).optional() }).optional(),
   /** Level of care; absent: one version, no review (older quotes). */
   effort: effortSchema.optional(),
   correction: z.boolean().optional(),
@@ -181,30 +177,6 @@ const bodySchema = z.object({
     .optional(),
 });
 type Job = z.infer<typeof bodySchema>;
-
-/** A new version of the post's plan: same cut and rhythm, another hook (no editor call). */
-async function createVariant(studioId: string, postId: string, change: { hook?: string }) {
-  const db = supabaseAdmin();
-  const [post, latest] = await Promise.all([
-    db.from("posts").select("edit_plan_id").eq("id", postId).eq("studio_id", studioId).single(),
-    db.from("edit_plans").select("plan, version").eq("post_id", postId).order("version", { ascending: false }).limit(1).maybeSingle(),
-  ]);
-  // The version the manager has (after a review, often not the highest number).
-  const base = post.data?.edit_plan_id
-    ? (await db.from("edit_plans").select("plan").eq("id", post.data.edit_plan_id as string).maybeSingle()).data
-    : latest.data;
-  const current = editPlanSchema.safeParse(base?.plan);
-  if (!current.success || !latest.data) throw new Error("Pas de montage à décliner pour cette publication");
-  const plan = variantPlan(current.data, change);
-  const row = await db
-    .from("edit_plans")
-    .insert({ studio_id: studioId, post_id: postId, version: (latest.data.version as number) + 1, plan })
-    .select("id")
-    .single();
-  if (row.error) throw new Error(row.error.message);
-  await db.from("posts").update({ edit_plan_id: row.data.id }).eq("id", postId);
-  return plan;
-}
 
 function authorized(request: Request): boolean {
   const given = Buffer.from(request.headers.get("authorization") ?? "");
@@ -287,20 +259,7 @@ async function runStep(job: Job) {
   }
   if (job.step === "design" && (await effectsFirst(job))) return;
   // Rapide and older quotes: one version, delivered as soon as it is rendered.
-  const reviewed = Boolean(level?.review && job.step !== "variant");
-
-  if (job.step === "variant") {
-    try {
-      await createVariant(job.studioId, job.postId, job.variant ?? {});
-      const what = job.variant?.hook ? "Variante avec une autre accroche" : "Variante";
-      await queueJob("montage", { ...target, step: "render", rationale: `${what} : dis-moi laquelle tu préfères.`, note: `${what}.`, quoteId: job.quoteId, newScenes: 0 });
-    } catch (error) {
-      console.error("variant failed", job.postId, error);
-      await reopenQuote(job.quoteId);
-      await notifyFailure(target, "Je n’ai pas réussi à préparer la variante. Aucun crédit n’a été débité. Tu veux que je réessaie ?", error);
-    }
-    return;
-  }
+  const reviewed = Boolean(level?.review);
 
   if (!reviewed) {
     if (job.step === "render") {
@@ -314,7 +273,6 @@ async function runStep(job: Job) {
           ...target,
           rationale: job.rationale,
           note: job.note ?? job.rationale,
-          offerVariant: true,
           voice: job.voice,
           spokenKept: job.spokenKept,
           voiceOffer: job.voiceOffer,
@@ -949,8 +907,6 @@ async function deliver(job: Job, best: Version, outcome: Care | null): Promise<b
         // Kept on the post within 600 characters, cut after a whole sentence (shortSentence in deliver.ts), never mid-word:
         // a slice here left Edith's note ending on « Si tu veux, je peux encore ».
         note: [best.rationale, care].filter(Boolean).join(" ") || undefined,
-        // Two versions were already compared: no variant offered on top; an effect has no hook of the engine's to change.
-        offerVariant: !job.compared && !outcome?.effect,
         voice,
         spokenKept: job.spokenKept,
         voiceOffer: job.voiceOffer,

@@ -260,6 +260,12 @@ const COSTLY_TOOLS = [
   "story_express",
 ] as const satisfies readonly ToolName[];
 
+/**
+ * The free ones among them (no credit is charged): possible with no credits left, as long as she is subscribed (Tristan:
+ * « ok » to « gratuit veut dire possible même à 0 crédit »: Edith called the blur free, then it was refused).
+ */
+const FREE_TOOLS: ReadonlySet<ToolName> = new Set<ToolName>(["carousel_texts", "effect_words", "write_on_photos", "retouch_photos", "blur_video", "copy_text_style", "style_texts", "render", "analyze_performance"]);
+
 /** Reels she likes read before she subscribes: what she shows during her getting started (Tristan: « logos / images / reels ? »). */
 const EARLY_STEALS = 2;
 
@@ -684,7 +690,7 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
       });
     },
 
-    async montage({ post_id, media_ids, brief, correction, max_new_scenes, variant, plan, effort, inspiration_id, son, son_lien, anciens_fichiers, remplacer_fichiers, avec_ceux_la, duree, garde_la_duree }) {
+    async montage({ post_id, media_ids, brief, correction, max_new_scenes, plan, effort, inspiration_id, son, son_lien, anciens_fichiers, remplacer_fichiers, avec_ceux_la, duree, garde_la_duree }) {
       const post = unwrap(await db.from("posts").select("id, title, edit_plan_id, media_ids").eq("id", post_id).eq("studio_id", studioId).single());
       // A correction's new files join the Reel's own, unless Edith read that she wants to start again from them alone:
       // given alone, Promo Edith 2's five new photos replaced its twenty files and it came back as 3 s.
@@ -698,7 +704,7 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
       }
       // A Reel she has not seen yet, checked before anything is spent: her go, and only the files of this exchange (or
       // the post's own). A stopped montage's plan does not make it a correction; one under way, or a delivered video, does.
-      if (!variant && ctx.exchange?.length && (await unseenReel(studioId, post_id))) {
+      if (ctx.exchange?.length && (await unseenReel(studioId, post_id))) {
         if (!planShown(ctx.exchange)) {
           return json({
             possible: false,
@@ -724,13 +730,13 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
       // « mets ta musique » in her words). Otherwise its sound is settled once the montage starts, its voice known
       // (settleReelSound): kept when nobody speaks on it and no voice goes on hers.
       const askedMusic = (ctx.exchange ?? []).some((r) => r.direction === "inbound" && EDITH_MUSIC.test(r.body?.trim() ?? ""));
-      const choice = son ?? (askedMusic && !correction && !variant ? "edith" : undefined);
+      const choice = son ?? (askedMusic && !correction ? "edith" : undefined);
       const sound = choice ? await keepModelSound(studioId, post_id, choice === "modele").catch(() => null) : null;
-      if ((correction || variant) && !post.edit_plan_id) return "Pas encore de montage pour cette publication : lance d'abord un montage (correction: false).";
+      if (correction && !post.edit_plan_id) return "Pas encore de montage pour cette publication : lance d'abord un montage (correction: false).";
       // A model coded as a montage skill takes a few files at least: with fewer, she is asked first whether she has others
       // (Tristan: « tu n'as que 3 plans, en as-tu d'autres pour moi ? », else she makes it with those), nothing launched meanwhile.
       // The model is never named to her (Tristan, 6 November: « je préfère ne pas divulguer nos modèles »).
-      if (!correction && !variant && !avec_ceux_la) {
+      if (!correction && !avec_ceux_la) {
         const short = await skillWantsMore(studioId, post_id, media_ids ?? []).catch(() => null);
         if (short) {
           return json({
@@ -756,7 +762,7 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
         }
       }
       // A length past what her model does: she is told first, and offered its longest (the model never named).
-      if (!correction && !variant && duree && !garde_la_duree) {
+      if (!correction && duree && !garde_la_duree) {
         const long = await skillTooShort(studioId, post_id, duree).catch(() => null);
         if (long) {
           return json({
@@ -767,24 +773,20 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
           });
         }
       }
-      // A variant of a Reel the effects agent drew: the agent makes another version of its effect (a correction).
-      if (variant && (await bakedReel(studioId, post_id))) {
-        brief = [variant.hook ? `Une variante de ce Reel, avec une autre accroche : « ${variant.hook} ».` : "Une variante de ce Reel.", brief].filter(Boolean).join(" ");
-        correction = true;
-        variant = undefined;
-      }
       // The level asked for, else the studio's default (Réglages).
       const studio = await db.from("studios").select("montage_effort").eq("id", studioId).single();
       const wanted = effort ?? effortSchema.catch(DEFAULT_EFFORT).parse(studio.data?.montage_effort);
       // Her first Reel is her first impression: it always gets its made-to-measure animations.
-      const firstReel = !correction && !variant && (await isFirstReel(studioId, post_id));
+      const firstReel = !correction && (await isFirstReel(studioId, post_id));
       // Made-to-measure animations: as many as asked in the plan (charged only if made: her library
-      // goes first). Without a plan, one on a new montage and none on a correction. Her first Reel gets at least two.
+      // goes first). Without a plan, one on a new montage and none on a correction. Her first Reel gets at least two. A Reel
+      // all in motion design (no file) is its animations: three, as the editor plans them (with one, the rest came out as fixed cards).
       const animations = plan?.scenes.filter((s) => s.kind === "animation").length ?? 0;
-      const planned = plan ? animations : correction || variant ? 0 : 1;
+      const motionOnly = !correction && !media_ids?.length;
+      const planned = plan ? animations : correction ? 0 : motionOnly ? 3 : 1;
       const scenes = Math.min(MAX_FREE_SCENES, max_new_scenes ?? (firstReel ? Math.max(2, planned) : planned));
       // No quote to show: the work is priced, started at once (her request is the go) and charged on delivery for what was made.
-      const job = await createMontageQuote({ studioId, postId: post_id, mediaIds: media_ids ?? [], brief, correction, maxNewScenes: scenes, variant, plan, effort: wanted });
+      const job = await createMontageQuote({ studioId, postId: post_id, mediaIds: media_ids ?? [], brief, correction, maxNewScenes: scenes, plan, effort: wanted });
       if ("error" in job) {
         return json({
           possible: false,
@@ -797,7 +799,7 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
       const accepted = await acceptQuote(studioId, job.id, turnStartedAt, { immediate: true });
       if ("error" in accepted) return json({ error: accepted.error });
       // Who makes it, decided now so she hears the right time (the job keeps it): an effect drawn image by image takes longer.
-      const route = accepted.kind === "variant" ? "chain" : await effectRoute(studioId, { postId: post_id, correction: accepted.kind === "correction", brief: accepted.brief, mediaIds: accepted.mediaIds }).catch(() => undefined);
+      const route = await effectRoute(studioId, { postId: post_id, correction: accepted.kind === "correction", brief: accepted.brief, mediaIds: accepted.mediaIds }).catch(() => undefined);
       ctx.afterReply.push(() => startMontage(studioId, accepted, { waId: ctx.waId, replyTo: ctx.replyToMessageId, route, conversationId: ctx.conversationId, request: chatRequest(post_id) }));
       // In the app, the card follows the montage step by step; on WhatsApp, cards become links, so the post's link stays.
       ctx.extras.quote = job.id;
@@ -1259,9 +1261,14 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
     },
 
     async design_carousel({ post_id, request, media_ids, fresh, example_media_ids }) {
-      const post = unwrap(await db.from("posts").select("id, kind, status, media_ids").eq("id", post_id).eq("studio_id", studioId).single());
+      const post = unwrap(await db.from("posts").select("id, kind, status, media_ids, slides").eq("id", post_id).eq("studio_id", studioId).single());
       if (post.kind !== "carousel" && post.kind !== "post") return json({ error: "Un carrousel composé est pour un carrousel ou un post photo (create_post kind carousel). Pour un Reel, c'est un montage." });
       if (post.status === "published" || post.status === "measured") return json({ error: "Cette publication est déjà en ligne." });
+      // A new carousel shows its plan first, as a Reel does (it went at once, 9 credits, nothing shown): her go launches it.
+      const composed = slidesPlanSchema.safeParse(post.slides).data?.design;
+      if ((!composed || fresh) && ctx.exchange?.length && !planShown(ctx.exchange)) {
+        return json({ possible: false, note: "Pas encore de plan pour ce carrousel : propose-le-lui (reply_with plan), et lance sur son accord." });
+      }
       if (media_ids?.length) await assertOwnMedia(media_ids);
       if (example_media_ids?.length) {
         const { data: examples } = await db.from("media_assets").select("id, kind").eq("studio_id", studioId).in("id", example_media_ids);
@@ -2029,7 +2036,8 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
     const run = handlers[name] as (input: unknown) => Promise<string>;
     (handlers as Record<string, (input: unknown) => Promise<string>>)[name] = async (input) => {
       const access = await studioAccess(studioId);
-      if (!access.create && !(name === "steal_style" && (await earlySteal(access)))) return json({ refused: true, message: accessMessage(access.reason) });
+      const free = FREE_TOOLS.has(name) && access.subscribed && access.reason === "credits";
+      if (!access.create && !free && !(name === "steal_style" && (await earlySteal(access)))) return json({ refused: true, message: accessMessage(access.reason) });
       return run(input);
     };
   }

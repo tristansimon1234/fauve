@@ -48,9 +48,7 @@ export async function startMontage(
     return simone;
   });
   const job = {
-    // A variant skips the editor: same cut, another style and hook, then the render.
-    step: quote.kind === "variant" ? "variant" : "design",
-    variant: quote.variant ?? undefined,
+    step: "design",
     studioId,
     postId: quote.postId,
     mediaIds: quote.mediaIds.length ? quote.mediaIds : undefined,

@@ -87,6 +87,6 @@ export async function prepareStoryExpress(params: {
 }
 
 /** Renders a story express prepared above and delivers it (its link on WhatsApp, its card in the app). */
-export async function deliverStoryExpress(target: Omit<DeliveryTarget, "offerVariant">): Promise<void> {
-  await renderAndDeliver({ ...target, offerVariant: false });
+export async function deliverStoryExpress(target: DeliveryTarget): Promise<void> {
+  await renderAndDeliver(target);
 }

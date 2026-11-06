@@ -71,9 +71,9 @@ export function copyByModel<S extends Pick<MontageSkill, "files">>(nearest: Copy
  * (`dressed`); a Reel she sent that a model plays (`copied`) has words when that Reel has some, none when it has none
  * (what it does not have, her Reel does not have), whatever dresses it.
  */
-export function skillWordsWanted(skill: Pick<MontageSkill, "texts">, followed: Pick<FollowedStyle, "dressed" | "look">, copied = false): boolean {
+export function skillWordsWanted(skill: Pick<MontageSkill, "texts">, followed: Pick<FollowedStyle, "dressed" | "picked" | "look">, copied = false): boolean {
   if (!skill.texts.length || skill.texts.some((t) => t.required)) return false;
-  return copied ? followed.look.text.amount !== "aucun" : Boolean(followed.dressed);
+  return copied ? followed.look.text.amount !== "aucun" : Boolean(followed.picked ?? followed.dressed);
 }
 
 /**

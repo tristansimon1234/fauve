@@ -781,7 +781,7 @@ export async function designEdit(params: {
   const writeSpoken = captionStyle({ finish }) && (Boolean(spoken) || clips.some((c) => c.analysis.words?.length));
   const toPlan = (answer: EditorOutput | EditorOutputLegacy) => {
     // A model Edith picked as this Reel's form is always composed: its director draws the whole Reel, then looks at it.
-    const fromEditor = fromEditorPlan(followed?.dressed && !correction ? ({ ...answer.plan, form: "composition" } as typeof answer.plan) : answer.plan, profile.text_looks ?? []);
+    const fromEditor = fromEditorPlan(followed?.picked && !correction ? ({ ...answer.plan, form: "composition" } as typeof answer.plan) : answer.plan, profile.text_looks ?? []);
     // The sound she follows sets the tempo (its own, halved or doubled, nearest the editor's) and its first beat the grid's.
     const soundBpm = sound ? soundTempo(sound.bpm, fromEditor.tempo ?? 100) : undefined;
     const lead = sound && soundBpm ? soundLead(sound.offset, soundBpm) : 0;
@@ -853,7 +853,7 @@ export async function designEdit(params: {
   // A model Edith picked holds her floor (dressedFloorNote): a plan without one word, or too long for an ambiance,
   // reads what was measured and answers once more; the retry is kept when it holds (or holds better).
   const floorContext = { voice: Boolean(voice), speech: clips.some((c) => Boolean(c.analysis.words?.length)), request: params.brief, duration: params.contract?.duration };
-  const floor = followed?.dressed && !correction ? dressedFloorNote(plan, floorContext) : null;
+  const floor = followed?.picked && !correction ? dressedFloorNote(plan, floorContext) : null;
   if (floor && directed) directorNotes.push(floor);
   else if (floor) {
     const again = await ask(legacy, { answer: output, note: floor }).catch((error: unknown) => {
@@ -903,7 +903,7 @@ export async function designEdit(params: {
   const hook = planHook(plan);
   const opener = plan.segments[0];
   // Never on a Reel she copies: its hook is the model's form, made with her words (« plus de règles en cas de recopiage »).
-  const faithfulCopy = Boolean(followed && !followed.dressed);
+  const faithfulCopy = Boolean(followed && !followed.picked);
   if (hook && !hook.text.items?.length && opener && isClipSegment(opener) && !correction && !params.contract?.screen_text && !faithfulCopy) {
     const clip = clips.find((c) => c.media_id === opener.clip_id);
     const firstImage = clip
@@ -1113,7 +1113,7 @@ export async function designEdit(params: {
     if (sheets.length) {
       const modelLength = sheets.at(-1)!.to || 1;
       const spans = planTimeline(plan).segments;
-      const modelOf = followed?.dressed ? "dressed" : followed?.house ? "house" : "copy";
+      const modelOf = followed?.picked ? "dressed" : followed?.house ? "house" : "copy";
       const label = (s: { from: number; to: number }) => `${modelOf === "copy" ? "Le Reel qu'elle recopie" : "L'original du modèle"}, de ${s.from.toFixed(1).replace(".", ",")} s à ${s.to.toFixed(1).replace(".", ",")} s :`;
       for (const request of requests) {
         const layer = request.id.startsWith("l") ? layers[Number(request.id.slice(1))] : null;

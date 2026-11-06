@@ -159,7 +159,7 @@ export async function reviewMontage(input: {
       : "",
     input.request ? `Demande de la gérante : ${input.request.slice(0, BRIEF_MAX)}` : "",
     contractLines(input.contract).length
-      ? `Ce qu'elle a fixé (un point non tenu, ou une voix qui ne dit pas son texte, est un défaut bloquant) :\n${contractLines(input.contract).map((l) => `- ${l}`).join("\n")}`
+      ? `Ce qu'elle a fixé (un point non tenu qui se voit ou s'entend, son texte absent ou changé, une autre durée, une autre fin, une voix qui ne dit pas son texte, est un défaut bloquant ; le reste est un avis) :\n${contractLines(input.contract).map((l) => `- ${l}`).join("\n")}`
       : "",
     ambianceLine(post.data?.template as string | null | undefined) ?? "",
     formatLine(format) ?? "",

@@ -24,8 +24,6 @@ export const CREDIT_PRICES = {
   render: 1,
   /** Fauve reading the moodboard. */
   moodboard: 1,
-  /** A variant of a delivered montage: same cut, another style and hook (render only). */
-  variant: 1,
   /** A new text layer for photos, designed as code from an example (Opus, checks and a critic). Reusing one is free. */
   textLayer: 4,
   /** A change to one component of the studio's bank (a new version): a round of Opus. */
@@ -78,12 +76,6 @@ export function quoteMontage(input: { correction: boolean; maxNewScenes?: number
   const base = input.correction ? MONTAGE_FLOOR.correction : MONTAGE_FLOOR.montage;
   const lines: QuoteLine[] = [{ label: input.correction ? "Correction, selon ce qu’elle demande vraiment" : "Montage, selon ce qu’il demande vraiment", credits: base }];
   return { lines, base, max: MONTAGE_CEILING[input.correction ? "correction" : (input.effort ?? "rapide")], maxNewScenes, fixRounds: level.fixRounds };
-}
-
-/** Price of a variant: no AI work, only the render. */
-export function quoteVariant(): MontageQuote {
-  const lines = [{ label: "Variante (autre style, autre accroche)", credits: CREDIT_PRICES.variant }];
-  return { lines, base: CREDIT_PRICES.variant, max: CREDIT_PRICES.variant, maxNewScenes: 0, fixRounds: 0 };
 }
 
 /** The quote's line for its made-to-measure animations. */

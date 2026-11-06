@@ -41,10 +41,9 @@ export const JOB_STEPS: Record<JobKind, { stage: string; label: string }[]> = {
 /**
  * A montage's steps as its level runs them (Tristan, the pill still read « Relecture » on a
  * Rapide Reel): a 2nd version only in Max, the review and its correction only when the level
- * reviews, the effect only for an effect, a variant is only a render.
+ * reviews, the effect only for an effect.
  */
-export function montageJobSteps(o: { effort: Effort | null; kind: "montage" | "correction" | "variant"; effect: boolean }): { stage: string; label: string }[] {
-  if (o.kind === "variant") return [{ stage: "render", label: "Rendu" }];
+export function montageJobSteps(o: { effort: Effort | null; kind: "montage" | "correction"; effect: boolean }): { stage: string; label: string }[] {
   const level = EFFORTS[o.effort ?? DEFAULT_EFFORT];
   return JOB_STEPS.montage
     .filter((s) => s.stage !== "effects" || o.effect)

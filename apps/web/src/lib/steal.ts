@@ -379,7 +379,9 @@ export async function postStyle(
   if (!kept) return undefined;
   // Dressed in her charter: one of Edith's models Edith picked as this Reel's form (house-pick.ts), or a Reel she copies
   // when she asked for her own look on it (« avec mes couleurs »); otherwise the copy is faithful, its look its model's.
-  const dressed = kept === ((post?.edith_pick as string | null) ?? null) || post?.copy_charter === true;
+  // Picked by Edith, the model's form is directed (picked); « avec mes couleurs » on a Reel she copies only dresses it.
+  const picked = kept === ((post?.edith_pick as string | null) ?? null);
+  const dressed = picked || post?.copy_charter === true;
   // A new montage takes the latest reading of its link (`latest`); a correction or a render keeps the one its Reel was made with.
   const id = latest
     ? await currentReadingOf(studioId, postId, kept).catch((error: unknown) => {
@@ -392,7 +394,7 @@ export async function postStyle(
     const { data: row } = await db.from("inspirations").select("source, style, analysis, created_at").eq("id", id).maybeSingle();
     if (!row) return undefined;
     const style = stolenStyleSchema.safeParse(row.style);
-    if (style.success) return followedFrom(id, style.data, row.source === MODEL_SOURCE, dressed);
+    if (style.success) return followedFrom(id, style.data, row.source === MODEL_SOURCE, dressed, picked);
     // Not read yet: no style, or only a model's structure waiting for its reading (never one that missed).
     const kept = row.style as { miss?: unknown } | null;
     const reading = (!kept || !kept.miss) && !row.analysis && Date.now() - Date.parse(row.created_at as string) < READING_MS;

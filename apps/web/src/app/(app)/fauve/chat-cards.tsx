@@ -115,11 +115,11 @@ const LEVELS: Effort[] = ["rapide", "soigne", "max"];
 
 /** The card's eyebrow, by state and by what is quoted. */
 const eyebrows: Record<CardQuote["state"], Record<CardQuote["kind"], string>> = {
-  open: { montage: "À lancer", correction: "À lancer", variant: "À lancer" },
-  launched: { montage: "Montage en cours", correction: "Correction en cours", variant: "Variante en cours" },
-  delivered: { montage: "Montage livré", correction: "Correction livrée", variant: "Variante livrée" },
-  expired: { montage: "Pas lancé", correction: "Pas lancé", variant: "Pas lancé" },
-  replaced: { montage: "Remplacé", correction: "Remplacée", variant: "Remplacée" },
+  open: { montage: "À lancer", correction: "À lancer" },
+  launched: { montage: "Montage en cours", correction: "Correction en cours" },
+  delivered: { montage: "Montage livré", correction: "Correction livrée" },
+  expired: { montage: "Pas lancé", correction: "Pas lancé" },
+  replaced: { montage: "Remplacé", correction: "Remplacée" },
 };
 
 /**
@@ -364,7 +364,7 @@ function QuoteCard({
                     <CheckIcon size={16} strokeWidth={2.4} />
                   </span>
                   <p role="status" className="text-[15px] leading-snug font-bold">
-                    {opening === quote.postId ? "Ta vidéo est prête, je l’ouvre…" : quote.kind === "variant" ? "Ta variante est prête" : "Ta vidéo est prête"}
+                    {opening === quote.postId ? "Ta vidéo est prête, je l’ouvre…" : "Ta vidéo est prête"}
                   </p>
                 </div>
                 <Link href={`/publications/${quote.postId}`} className="btn btn-primary h-11 text-[15px]">
@@ -401,16 +401,10 @@ function QuoteCard({
 type StepKey = "design" | "alternative" | "render" | "review" | "delivered";
 
 /**
- * The steps of a launched montage, as its level runs them (a correction never has a 2nd version, a variant is only a render);
+ * The steps of a launched montage, as its level runs them (a correction never has a 2nd version);
  * an effect made by the effects agent: the effect (its own checks), then the music.
  */
 function stepsFor(kind: CardQuote["kind"], effort: Effort | null, effect = false): { key: StepKey; label: string }[] {
-  if (kind === "variant") {
-    return [
-      { key: "render", label: "Rendu" },
-      { key: "delivered", label: "Livrée" },
-    ];
-  }
   if (effect) {
     return [
       { key: "design", label: "Effet" },
@@ -477,11 +471,9 @@ function MontageProgress({ quote, live, focus, onAsk }: { quote: CardQuote; live
       : quote.stage === "alternative"
       ? "Une 2e version, pour comparer"
       : quote.stage === "render"
-        ? quote.kind === "variant"
-          ? "La variante se fabrique"
-          : quote.effect
-            ? "Edith pose la musique"
-            : reviewed
+        ? quote.effect
+          ? "Edith pose la musique"
+          : reviewed
             ? "La version corrigée se fabrique"
             : max
               ? "Les deux versions se fabriquent"

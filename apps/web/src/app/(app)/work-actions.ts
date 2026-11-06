@@ -47,7 +47,7 @@ export async function workNow(): Promise<{ studioId: string; items: WorkItem[] }
       const steps = quote
         ? montageJobSteps({
             effort: effortSchema.nullable().catch(null).parse(quote.effort ?? null),
-            kind: quote.kind === "correction" || quote.kind === "variant" ? quote.kind : "montage",
+            kind: quote.kind === "correction" ? "correction" : "montage",
             effect: pricedAsEffect(quote.params) || j.stage === "effects",
           })
         : JOB_STEPS[j.kind];

@@ -359,20 +359,12 @@ test("credits: a montage is charged on what it really cost, between its floor an
   assert.equal(montageCharge({ base: 7, max: 13, lines: [{ label: "Montage", credits: 7 }] }, 1), 10);
 });
 
-test("variants: same cut and rhythm with a new hook, priced as a render", async () => {
-  const { variantPlan } = await import("./editor.ts");
-  const { quoteVariant, CREDIT_PRICES } = await import("./credits.ts");
-  const plan = editPlanSchema.parse({ ...validPlan, template: "libre", tempo: 92 });
-  const variant = variantPlan(plan, { hook: "Respire. Tout part de là." });
-  assert.equal(variant.template, "libre"); // no ambiance to switch any more
-  assert.equal(variant.tempo, 92);
-  assert.deepEqual(variant.segments, plan.segments); // same cut
-  assert.equal(variant.texts[0]!.text, "Respire. Tout part de là.");
-  // An older quote asking for another template: the cut, the rhythm and the form stay.
-  const old = variantPlan(editPlanSchema.parse({ ...validPlan, template: "collage" }), { template: "doux" } as { hook?: string });
-  assert.equal(old.template, "collage");
-  assert.equal(old.texts[0]!.text, validPlan.texts[0]!.text); // hook kept when not given
-  assert.equal(quoteVariant().max, CREDIT_PRICES.variant);
+test("another hook is a correction: no separate variant", async () => {
+  const { toolSpecs } = await import("./tools.ts");
+  const montage = toolSpecs.montage.input.shape as Record<string, unknown>;
+  assert.equal("variant" in montage, false);
+  const { CREDIT_PRICES } = await import("./credits.ts");
+  assert.equal("variant" in CREDIT_PRICES, false);
 });
 
 test("the editor chooses each Reel's tempo and the collage form, no ambiance", async () => {
@@ -3002,10 +2994,11 @@ test("hooks: the strongest shot opens, the hook is read from the first image, th
   assert.equal(checks.find((c) => c.key === "opening")!.ok, false);
   assert.equal(qualityChecks({ ...late, segments: [{ clip_id: "a", in: 0, out: 1.2, zoom: "none" }, late.segments[1]!] }).find((c) => c.key === "opening")!.ok, true);
 
-  // A weak hook never lets the Reel go while there is something to correct.
+  // A weak hook is an opinion, told to her: it never forces a correction (it remade an opening she had imposed).
   const review = (hook: number, issues: { scene: number | null; problem: string; fix: string; blocking?: boolean }[]) =>
     normalizeReview({ best: 1, why: "", score: 8, hook, ok: true, issues: issues.map((i) => ({ blocking: false, ...i })), summary: "" }, 1);
-  assert.equal(review(5, [{ scene: 1, problem: "1re image : une salle vide", fix: "ouvrir sur le fromage qui file" }]).ok, false);
+  assert.equal(review(5, [{ scene: 1, problem: "1re image : une salle vide", fix: "ouvrir sur le fromage qui file" }]).ok, true);
+  assert.equal(review(5, [{ scene: 1, problem: "1re image : une salle vide", fix: "ouvrir sur le fromage qui file" }]).issues[0]!.problem, "1re image : une salle vide");
   assert.equal(review(5, []).ok, true);
   assert.equal(review(8, [{ scene: 2, problem: "x", fix: "y" }]).ok, true);
   // Only a defect is corrected; an opinion (a gesture hiding the face on purpose, a length) is told to her, defects first.

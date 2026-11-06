@@ -18,11 +18,9 @@ import {
   planBrief,
   quoteEffect,
   quoteMontage,
-  quoteVariant,
   type Effort,
   type MontagePlan,
   type MontageQuote,
-  type MotionTemplate,
   type PlanId,
   type QuoteLine,
 } from "@fauve/agent";
@@ -38,8 +36,7 @@ import { withSlot } from "@/lib/work-slots";
 
 const QUOTE_TTL_MS = 24 * 3600_000;
 
-export type Reason = "montage" | "correction" | "variant" | "moodboard" | "text_layer" | "image" | "carousel" | "trends" | "adjustment";
-export type VariantChange = { template?: MotionTemplate; hook?: string };
+export type Reason = "montage" | "correction" | "moodboard" | "text_layer" | "image" | "carousel" | "trends" | "adjustment";
 
 /**
  * The studio's balance, after its top-up: subscribed, once per paid period of her subscription (her
@@ -112,7 +109,7 @@ export type Quote = {
   max: number;
   maxNewScenes: number;
   balance: number;
-  /** Level of care (null for a variant). */
+  /** Level of care (null when the balance allows none). */
   effort: Effort | null;
   /** The price at each level the balance allows, for the manager to choose. */
   efforts: Partial<Record<Effort, MontageQuote>>;
@@ -206,11 +203,9 @@ export async function createMontageQuote(input: {
   brief?: string;
   correction: boolean;
   maxNewScenes?: number;
-  /** A variant of the delivered montage (render only) instead of a montage. */
-  variant?: VariantChange;
   /** Fauve's proposed plan: shown on the quote, its animations set the new scenes allowed. */
   plan?: MontagePlan;
-  /** Level of care (a variant has none); a lower one is quoted when the balance is short. */
+  /** Level of care; a lower one is quoted when the balance is short. */
   effort?: Effort;
 }): Promise<Quote | { error: string; balance: number; needed: number }> {
   const balance = await availableCredits(input.studioId);
@@ -219,20 +214,18 @@ export async function createMontageQuote(input: {
   }
   const work = { correction: input.correction, maxNewScenes: input.maxNewScenes };
   const efforts: Partial<Record<Effort, MontageQuote>> = {};
-  if (!input.variant) {
-    for (const level of LEVELS) {
-      const price = priceAt(work, level, balance);
-      if (price) efforts[level] = price;
-    }
+  for (const level of LEVELS) {
+    const price = priceAt(work, level, balance);
+    if (price) efforts[level] = price;
   }
   const wanted = input.effort ?? "rapide";
   // The level asked for, or the best one below it that the balance allows.
-  const effort = input.variant ? null : (LEVELS.slice(LEVELS.indexOf(wanted)).find((l) => efforts[l]) ?? null);
-  const quote = input.variant ? quoteVariant() : effort ? efforts[effort]! : null;
+  const effort = LEVELS.slice(LEVELS.indexOf(wanted)).find((l) => efforts[l]) ?? null;
+  const quote = effort ? efforts[effort]! : null;
   // Another level is offered only if it keeps the quoted level's new animations (it would silently drop them).
   for (const level of LEVELS) if (level !== effort && efforts[level] && quote && efforts[level]!.maxNewScenes < quote.maxNewScenes) delete efforts[level];
   if (!quote || balance < quote.base) {
-    const needed = input.variant ? quoteVariant().base : quoteMontage({ ...work, effort: "rapide", maxNewScenes: 0 }).base;
+    const needed = quoteMontage({ ...work, effort: "rapide", maxNewScenes: 0 }).base;
     return { error: "solde insuffisant", balance, needed };
   }
   const { data, error } = await supabaseAdmin()
@@ -240,7 +233,7 @@ export async function createMontageQuote(input: {
     .insert({
       studio_id: input.studioId,
       post_id: input.postId,
-      kind: input.variant ? "variant" : input.correction ? "correction" : "montage",
+      kind: input.correction ? "correction" : "montage",
       base: quote.base,
       max: quote.max,
       lines: quote.lines,
@@ -249,11 +242,10 @@ export async function createMontageQuote(input: {
         media_ids: input.mediaIds,
         brief: input.brief ?? null,
         max_new_scenes: quote.maxNewScenes,
-        variant: input.variant ?? null,
         plan: input.plan ?? null,
         efforts,
-        // Charged on what it really costs (a variant keeps its fixed price).
-        ...(input.variant ? {} : { metered: true }),
+        // Charged on what it really costs.
+        metered: true,
       },
       expires_at: new Date(Date.now() + QUOTE_TTL_MS).toISOString(),
     })
@@ -266,12 +258,11 @@ export async function createMontageQuote(input: {
 export type AcceptedQuote = {
   id: string;
   postId: string;
-  kind: "montage" | "correction" | "variant";
+  kind: "montage" | "correction";
   mediaIds: string[];
   brief: string | null;
   maxNewScenes: number;
-  variant: VariantChange | null;
-  /** Level of care; null for a variant or an older quote (one version, no review). */
+  /** Level of care; null for an older quote (one version, no review). */
   effort: Effort | null;
 };
 
@@ -326,11 +317,11 @@ export async function acceptQuote(
   }
   // Another level than quoted: its own price, kept on the quote when it was made.
   const current = effortSchema.nullable().catch(null).parse(q.effort);
-  const level = effort && effort !== current && q.kind !== "variant" ? quoteEfforts(q.params)[effort] : undefined;
-  if (effort && effort !== current && q.kind !== "variant" && !level) {
+  const level = effort && effort !== current ? quoteEfforts(q.params)[effort] : undefined;
+  if (effort && effort !== current && !level) {
     return { error: `Le niveau ${EFFORTS[effort].label} n'est pas possible avec le solde : garde le niveau prévu.` };
   }
-  const params = (q.params ?? {}) as { media_ids?: string[]; brief?: string | null; max_new_scenes?: number; variant?: VariantChange | null; plan?: unknown };
+  const params = (q.params ?? {}) as { media_ids?: string[]; brief?: string | null; max_new_scenes?: number; plan?: unknown };
   // Checked and claimed under the studio's lock: two launches at the same moment never count on the same credits.
   const claim = await withSlot({ kind: `credits:${studioId}`, slots: 1, perSlot: 1, leaseMs: 30_000, waitMs: 20_000 }, async (): Promise<{ error: string } | { maxNewScenes: number }> => {
     const available = await availableCredits(studioId, quoteId);
@@ -338,7 +329,7 @@ export async function acceptQuote(
     // The level's price again, against what can be spent now (other montages may have run since the quote):
     // its corrections must fit, and fewer new scenes are allowed when they no longer all fit.
     const price =
-      q.kind === "variant" || !chosen
+      !chosen
         ? { base: q.base as number, max: q.max as number, lines: q.lines as QuoteLine[], maxNewScenes: params.max_new_scenes ?? 0 }
         : priceAt(
             { correction: q.kind === "correction", maxNewScenes: level ? level.maxNewScenes : (params.max_new_scenes ?? 0) },
@@ -348,7 +339,7 @@ export async function acceptQuote(
     if (!price || available < price.base) {
       return { error: "Pas assez de crédits pour ce montage, même dans sa version la plus simple : dis-le simplement, sans rien lancer ni proposer une version plus simple." };
     }
-    const repriced = q.kind !== "variant" && chosen && (level || price.max !== q.max);
+    const repriced = chosen && (level || price.max !== q.max);
     const claimed = await db
       .from("credit_quotes")
       .update({
@@ -364,7 +355,7 @@ export async function acceptQuote(
   if ("error" in claim) return claim;
   // A new request on this Reel replaces the work still running on it: that one stops, never delivered nor charged
   // (Tristan's Edith Reel: three corrections ran side by side, each about to deliver and charge).
-  if (q.post_id && q.kind !== "variant") await supersedeRunning(q.post_id as string, q.id as string);
+  if (q.post_id) await supersedeRunning(q.post_id as string, q.id as string);
   // Edith's outline goes to the editor with the brief, as her proposal (planBrief): her request comes first.
   const plan = montagePlanSchema.safeParse(params.plan);
   const brief = [params.brief, plan.success ? planBrief(plan.data) : null].filter(Boolean).join("\n\n") || null;
@@ -375,8 +366,7 @@ export async function acceptQuote(
     mediaIds: params.media_ids ?? [],
     brief,
     maxNewScenes: claim.maxNewScenes,
-    variant: params.variant ?? null,
-    effort: q.kind === "variant" ? null : level ? effort! : current,
+    effort: level ? effort! : current,
   };
 }
 
@@ -509,7 +499,7 @@ export async function chargeQuote(quoteId: string, newScenes: number, title: str
     ? kind === "correction"
       ? "Correction de l’effet"
       : "Effet image par image"
-    : `${{ montage: "Montage", correction: "Correction", variant: "Variante" }[kind]}${level && level !== "rapide" ? ` ${EFFORTS[level].label}` : ""}`;
+    : `${{ montage: "Montage", correction: "Correction" }[kind]}${level && level !== "rapide" ? ` ${EFFORTS[level].label}` : ""}`;
   await chargeCredits(q.studio_id as string, credits, kind, `${label} « ${title} »`, {
     quote_id: quoteId,
     post_id: q.post_id,

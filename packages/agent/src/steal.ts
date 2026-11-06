@@ -391,6 +391,12 @@ export const followedStyleSchema = z.object({
    */
   dressed: z.boolean().optional(),
   pairing: z.object({ display: z.string(), body: z.string() }).optional(),
+  /**
+   * The model was picked by Edith as this Reel's form (house-pick.ts): its form, its moments and her floor (a written hook,
+   * a short length) are directed. A Reel she copies « avec mes couleurs » is dressed too (her fonts and colours) but stays a
+   * faithful copy: its form, its length, its texts and its hook are the copied Reel's (Tristan: only its look changes).
+   */
+  picked: z.boolean().optional(),
 });
 export type FollowedStyle = z.infer<typeof followedStyleSchema>;
 
@@ -398,7 +404,7 @@ export type FollowedStyle = z.infer<typeof followedStyleSchema>;
  * The style a Reel copies, from a kept stolen style (a single shot of minutes counts as 30 s). `own`: one of her Reels,
  * kept as a model; `dressed`: a model of Edith's she did not choose, picked as this Reel's form and dressed in her charter.
  */
-export function followedFrom(inspirationId: string, style: StolenStyle, own = false, dressed = false): FollowedStyle {
+export function followedFrom(inspirationId: string, style: StolenStyle, own = false, dressed = false, picked = dressed): FollowedStyle {
   return {
     inspiration_id: inspirationId,
     look: style.look,
@@ -412,6 +418,7 @@ export function followedFrom(inspirationId: string, style: StolenStyle, own = fa
     // Dressed in her charter: the model's pairing is only offered, her fonts set the Reel.
     ...(style.fonts && !dressed ? { fonts: style.fonts } : {}),
     ...(dressed ? { dressed: true, ...(style.fonts ? { pairing: style.fonts } : {}) } : {}),
+    ...(dressed && picked ? { picked: true } : {}),
   };
 }
 
@@ -616,9 +623,9 @@ export function signatureOf(profile: { signature?: BrandSignature; followed?: Fo
 /**
  * The copied Reel's font, when it makes its style: this Reel takes it over her charter's (its titles
  * in that font), set on the plan so the render, the live preview and the animations agree. A font
- * this request chose stays. Its colours are only offered to the editor (followedForEditor): set on
- * every copy, the blue of a tutorial's interface had gone onto the hook of a studio whose charter
- * says « never a cold blue », next to its orange animations.
+ * this request chose stays. Its colours too, when the editor writes none (« Recopie fidèle par défaut »,
+ * Tristan: « la DA s'applique s'il demande »): a copy is faithful unless she asks for her own look on it
+ * (« avec mes couleurs »: dressed, nothing set here, her charter's fonts and colours).
  */
 export function followedLook(
   plan: { fonts?: { display?: string; body?: string }; colors?: string[] },
@@ -796,11 +803,11 @@ export function momentsLine(look: Pick<StolenLook, "moments">): string | null {
 export function followedLine(followed: FollowedStyle): string {
   const { look } = followed;
   return [
-    `Reel à recopier (${followed.own ? "un de ses Reels, gardé comme modèle" : followed.dressed ? "un modèle habillé de sa charte : ses polices et ses couleurs à elle ne sont jamais un défaut" : followed.house ? "un modèle d'Edith qu'elle a choisi" : "un Reel qu'elle a envoyé"}, « ${look.name} ») : ${FORMAT_WORDS[look.format]}, ${paceWords(followed.average_shot, followed.bpm)}`,
+    `Reel à recopier (${followed.own ? "un de ses Reels, gardé comme modèle" : followed.picked ? "un modèle habillé de sa charte : ses polices et ses couleurs à elle ne sont jamais un défaut" : followed.dressed ? "un Reel qu'elle a envoyé, recopié avec ses polices et ses couleurs à elle, jamais un défaut" : followed.house ? "un modèle d'Edith qu'elle a choisi" : "un Reel qu'elle a envoyé"}, « ${look.name} ») : ${FORMAT_WORDS[look.format]}, ${paceWords(followed.average_shot, followed.bpm)}`,
     // A faithful copy: the model's style decides, never the usual habits (Tristan: « plus de règles en cas de recopiage »).
-    ...(followed.dressed
+    ...(followed.picked
       ? []
-      : ["le style du modèle décide : ses polices et leur nombre, sa mise en page, ses fonds (cartes, aplats, plein cadre ou non), ses couleurs, son nombre de textes, sa longueur, sa voix et sa fin ne sont jamais un défaut ; seuls le sont un écart au modèle, un texte illisible sur ses images, hors de la zone de sécurité ou sur un visage que le modèle ne couvre pas, et un fait inventé"]),
+      : ["le style du modèle décide : ses polices et leur nombre (ou les siennes à elle quand elle les a demandées), sa mise en page, ses fonds (cartes, aplats, plein cadre ou non), ses couleurs, son nombre de textes, sa longueur, sa voix et sa fin ne sont jamais un défaut ; seuls le sont un écart au modèle, un texte illisible sur ses images, hors de la zone de sécurité ou sur un visage que le modèle ne couvre pas, et un fait inventé"]),
     ...(composedLayout(look) ? [`mise en page : ${composedLayout(look)}`] : []),
     `accroche ${look.hook.kind}`,
     ...(momentsLine(look) ? [`ses moments, chacun à refaire avec ses images : ${momentsLine(look)}`] : []),
@@ -828,7 +835,7 @@ export function followedChecks(followed: FollowedStyle | undefined): QualityOpti
   return {
     paceCeiling: paceCeiling(MAX_AVERAGE_SHOT, followed),
     // A model Edith picked keeps her floor: its hook is written whatever the model does.
-    wordlessHook: !followed.dressed && (text.amount === "aucun" || hook.kind === "geste" || hook.kind === "aucun"),
+    wordlessHook: !followed.picked && (text.amount === "aucun" || hook.kind === "geste" || hook.kind === "aucun"),
     manyTexts: text.amount === "plusieurs",
   };
 }

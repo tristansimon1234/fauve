@@ -95,7 +95,6 @@ export const TYPICAL_COST_EUR: Record<keyof typeof CREDIT_PRICES, number> = {
   reusedScene: 0,
   render: 0.1, // Vercel Sandbox in Paris (~€0.05 a render), and the music composed for the cut (ElevenLabs, ~€0.05; kept when the cuts do not move)
   moodboard: 0.06, // Opus reading a few images
-  variant: 0.05, // a render (same cut: the music is kept)
   textLayer: 0.4, // the component designer (one or two rounds) and its critic (retired, measured in October)
   elementEdit: 0.2, // one round of the component designer on one component (retired, measured in October)
   carousel: 1.0, // the carousel designer twice (its photos seen, the correction sees its render), the critic, two test renders

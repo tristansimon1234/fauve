@@ -140,7 +140,7 @@ async function done(job: Job, effect: NonNullable<Job["effect"]>, state: Effects
   await finishJob(job.jobId);
   if (job.tell) {
     await deliverMontage(
-      { studioId: job.studioId, postId: job.postId, waId: job.waId, replyTo: job.replyTo, conversationId: job.conversationId, rationale: "J’ai posé tes nouveaux mots sur l’effet.", offerVariant: false },
+      { studioId: job.studioId, postId: job.postId, waId: job.waId, replyTo: job.replyTo, conversationId: job.conversationId, rationale: "J’ai posé tes nouveaux mots sur l’effet." },
       rendered,
     );
   }

@@ -27,8 +27,6 @@ export type DeliveryTarget = {
   care?: string;
   /** What Fauve says about this version, kept on the post for the Publication page and /v. */
   note?: string;
-  /** Offers a variant at the end (not after Max, which already compared two versions). */
-  offerVariant?: boolean;
   /** A new piece of music rather than the one kept for this cut. */
   freshMusic?: boolean;
   /** Edith recorded a voice over this Reel (its name): said, with how to change it. */

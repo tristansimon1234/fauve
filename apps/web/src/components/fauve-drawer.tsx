@@ -95,7 +95,7 @@ export function AskFauveButton({
 
 function suggestionsFor(topic: DrawerTopic): string[] {
   if (topic.scene !== undefined) return ["Refais cette scène", "Change le texte de cette scène", "Raccourcis cette scène", "Enlève cette scène"];
-  return ["Change l’accroche", "Réécris la légende", "Fais une variante", "Décale-la à demain"];
+  return ["Change l’accroche", "Réécris la légende", "Plus rythmé", "Décale-la à demain"];
 }
 
 function FauveDrawer({ topic, onClose }: { topic: DrawerTopic; onClose: () => void }) {

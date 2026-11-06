@@ -23,8 +23,8 @@ export type QuoteState = "open" | "launched" | "delivered" | "expired" | "replac
 export type CardQuote = {
   id: string;
   title: string;
-  /** What is quoted: a new montage, a correction of one, or a variant (render only). */
-  kind: "montage" | "correction" | "variant";
+  /** What is quoted: a new montage, or a correction of one. */
+  kind: "montage" | "correction";
   postId: string;
   lines: { label: string; credits: number }[];
   base: number;
@@ -34,7 +34,7 @@ export type CardQuote = {
   balance: number;
   /** What Fauve will make: duration, style, scenes in order. */
   plan: MontagePlan | null;
-  /** Level of care (null: a variant, or an older quote). */
+  /** Level of care (null: an older quote). */
   effort: Effort | null;
   /** The price at each level the balance allows, for the manager to pick another one. */
   efforts: Partial<Record<Effort, { base: number; max: number; lines: { label: string; credits: number }[] }>>;
@@ -188,7 +188,7 @@ async function quoteCards(studioId: string, payloads: unknown[]): Promise<(ChatC
         {
           id: q.id as string,
           title,
-          kind: (q.kind as CardQuote["kind"] | null) ?? "montage",
+          kind: q.kind === "correction" ? "correction" : "montage",
           postId: q.post_id as string,
           lines: (q.lines as CardQuote["lines"]) ?? [],
           base: q.base as number,

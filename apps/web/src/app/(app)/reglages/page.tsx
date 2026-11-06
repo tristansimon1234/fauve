@@ -33,7 +33,6 @@ const CREDIT_LINES: [string, string][] = [
   ["Montage (Rapide)", `${MONTAGE_FLOOR.montage} à ${MONTAGE_CEILING.rapide}, selon ce qu’il demande`],
   ["Montage Soigné / Max", `jusqu’à ${MONTAGE_CEILING.soigne} / ${MONTAGE_CEILING.max}`],
   ["Correction d’un montage", `${MONTAGE_FLOOR.correction} à ${MONTAGE_CEILING.correction}`],
-  ["Variante d’un montage", `${CREDIT_PRICES.variant}`],
   ["Lecture du moodboard", `${CREDIT_PRICES.moodboard}`],
   ["Messages à Edith", "gratuit"],
 ];

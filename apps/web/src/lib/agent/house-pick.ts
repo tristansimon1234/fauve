@@ -167,10 +167,19 @@ async function recentHouseKeys(studioId: string, postId: string): Promise<string
  * A Reel she copies is faithful to its model (Tristan: « la DA s'applique s'il demande »): her charter dresses it only
  * when her request asks for it (« avec mes couleurs », « à ma charte »), read once when a new montage starts.
  */
+/**
+ * Her own words in a launch's brief (her messages of the exchange, « Elle : … »), else the whole brief when no exchange
+ * was kept: Edith's replies, her plan or her brief (« aux couleurs de chez … ») never ask for her look in her place.
+ */
+export function herWords(brief: string): string {
+  const said = [...brief.matchAll(/(?:^|\n)Elle : ([\s\S]*?)(?=\nEdith : |\nElle : |\n\[|\n\n|$)/g)].map((m) => m[1]!.trim());
+  return said.length ? said.join("\n") : brief;
+}
+
 export async function ensureCopyCharter(input: { studioId: string; postId: string; brief?: string }): Promise<void> {
   const db = supabaseAdmin();
   const { data: post } = await db.from("posts").select("inspiration_id, edith_pick, copy_charter").eq("id", input.postId).eq("studio_id", input.studioId).maybeSingle();
   if (!post?.inspiration_id || post.inspiration_id === post.edith_pick) return;
-  const asked = OWN_LOOK_WORDS.test(input.brief ?? "");
+  const asked = OWN_LOOK_WORDS.test(herWords(input.brief ?? ""));
   if (asked !== post.copy_charter) await db.from("posts").update({ copy_charter: asked }).eq("id", input.postId).eq("studio_id", input.studioId);
 }
