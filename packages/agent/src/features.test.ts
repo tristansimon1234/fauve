@@ -4658,7 +4658,7 @@ const FACADE_READ = {
 test("« Façade qui se construit » (v2) lays its pieces on its original's images and notes, the rest on its music's first beats (120 BPM)", async () => {
   const { facade } = await import("./skills/facade.ts");
   const { skillPlan, skillFit } = await import("./skills.ts");
-  assert.equal(facade.version, 4);
+  assert.equal(facade.version, 5);
   assert.equal(facade.bpm, 120);
   assert.deepEqual(facade.shots, [1, 3]);
   const line = facade.timeline(1, { end: false });
@@ -4746,25 +4746,23 @@ test("« Façade qui se construit » (v2): her front's own elements, named by th
   const { line, props } = await facadeProps(1);
   const at = Array.from({ length: 19 }, (_, i) => line.marks[`piece_${i}`]!);
   const clipAt = (f: number, read: Parameters<typeof drawCutOuts>[3] = FACADE_READ) => facadeClip(drawCutOuts(code, f, props, read));
-  // On pure black at first; each piece at once on one of its images, never moving again; whole on the last one (no clip).
+  // On pure black at first; a piece at once on each of its images, never moving again: never a stall on one piece
+  // (v5); whole on the last one (no clip).
   assert.deepEqual(clipAt(0), []);
+  for (let i = 0; i < 18; i++) assert.ok(clipAt(at[i]!)!.length > clipAt(at[i]! - 1)!.length, `a piece on image ${at[i]}`);
   const counts = Array.from({ length: at[18]! }, (_, f) => clipAt(f)!.length);
-  for (let f = 1; f < counts.length; f++) {
-    assert.ok(counts[f]! >= counts[f - 1]!, `image ${f}`);
-    if (counts[f] !== counts[f - 1]) assert.ok(at.includes(f), `a piece lands on image ${f}, one of its notes`);
-  }
+  for (let f = 1; f < counts.length; f++) if (counts[f] !== counts[f - 1]) assert.ok(at.includes(f), `a piece lands on image ${f}, one of its notes`);
   assert.equal(clipAt(at[18]!), null);
-  // Only what her picture has, nothing invented (Tristan: « toujours mettre de l'intelligence »): her sign along its
-  // outline first, then three far from it and from each other (her door, a pane, an upper window), the larger first;
-  // then her other windows, the lower first and right to left, spread over the burst's notes; no band along her
-  // front's lines (v2 laid some): the rest of it comes whole with the last piece.
-  assert.deepEqual(clipAt(at[18]! - 1), [
+  // Her regions not read here: her elements first, as they are (her sign along its outline, then three far from it and
+  // from each other, her door, a pane, an upper window, the larger first, then her other windows, the lower first and
+  // right to left), then the rest of her picture cut at its rhythm.
+  const built = clipAt(at[18]! - 1)!;
+  assert.deepEqual(built.slice(0, 8), [
     FACADE_OUTLINE,
     [700, 740, 160, 480], [560, 260, 200, 240], [40, 760, 200, 400],
     [480, 760, 200, 400], [260, 760, 200, 400], [360, 280, 160, 200], [120, 260, 200, 240],
   ]);
-  assert.deepEqual(clipAt(at[4]!)!.length, 5);
-  assert.deepEqual(clipAt(at[15]!)!.length, 8);
+  assert.equal(built.length, 18);
   // Its video plays in them: her front's shot laid over the whole frame, seen through the clip until it is whole.
   const film = (f: number) => drawnNodes(drawCutOuts(code, f, props, FACADE_READ)).find((n) => n.type === "div" && n.children.some((c) => Boolean(c) && typeof c === "object" && (c as Drawn).type === "Footage"))!;
   assert.match(String(styleOf(film(100)).clipPath), /^url\(#fc/);
@@ -4815,6 +4813,22 @@ test("an object read once on a still (its elements listed), and her picture's re
   assert.equal(wall!.d, "M 10.0 0.0 L 1010.0 0.0 L 1010.0 1000.0 L 10.0 1000.0 Z M 210.0 200.0 L 410.0 200.0 L 410.0 600.0 Z");
   assert.deepEqual([wall!.x, wall!.y, wall!.w, wall!.h], [10, 0, 1000, 1000]);
   assert.deepEqual(regionsIn(undefined, { a: 1, b: 0, c: 0, d: 0, e: 1, f: 0 }), []);
+  // A passage read before its regions were asked (the boutique's painted door, read before « Façade » v4: her door alone
+  // on black at its bench) is read again for them; one that noted them is not; a failed one waits for its retry.
+  const { readingLacks, stillLacking } = await import("./subject.ts");
+  const before = { path: "s/x.read.json", still: true, at: "2026-11-05T10:00:00Z", frames: 1, read: true };
+  assert.deepEqual(readingLacks(before, ["regions"]), ["regions"]);
+  assert.deepEqual(readingLacks(before, ["light", "vanish"]), []);
+  assert.deepEqual(readingLacks({ ...before, kinds: ["regions"] }, ["regions", "ground"]), []);
+  assert.deepEqual(readingLacks({ ...before, kinds: ["regions"] }, ["light"]), ["light"]);
+  assert.deepEqual(readingLacks(undefined, ["regions"]), ["regions"]);
+  assert.deepEqual(readingLacks({ failed_at: "2026-11-06T10:00:00Z", error: "x" }, ["regions"]), []);
+  // An object followed through its passage before its skill read it once on a still: read again, every piece outlined.
+  const followed = { path: "s/x.webm", still: false, at: "2026-11-05T10:00:00Z", object: "painted door" };
+  assert.equal(stillLacking(followed, true), true);
+  assert.equal(stillLacking({ ...followed, still: true }, true), false);
+  assert.equal(stillLacking(followed, undefined), false);
+  assert.equal(stillLacking(undefined, true), false);
 });
 
 /** A path around a box (as an outline or a region reads), for the tests. */
@@ -4861,6 +4875,17 @@ test("« Façade qui se construit » (v4): each piece a shape of her picture, he
   assert.ok(!clipAt(at[16]! - 1).includes(pavement.d));
   assert.ok(clipAt(at[16]!).includes(pavement.d));
   assert.equal(facadeClip(drawCutOuts(code, at[18]!, props, read)), null);
+  // One element found (her door, at its production bench): her regions build the rest at its rhythm, a piece on each note;
+  // without her regions, the rest of her picture cut at its rhythm after it, never her door held alone on black.
+  const one = { boxes: read.boxes, outlines: read.outlines, parts: { "0#door, every window, every plant pot": [door] } };
+  for (const given of [{ ...one, regions: read.regions }, { ...one, regions: undefined }]) {
+    // (Its pieces spread over its notes when there are fewer: never longer without one than its own silence, 30 images.)
+    const drawnAt = (f: number) => facadeClip(drawCutOuts(code, f, props, given))!.length;
+    const lands = Array.from({ length: at[18]! - 1 }, (_, f) => f + 1).filter((f) => drawnAt(f) > drawnAt(f - 1));
+    const gaps = [...lands, at[18]!].map((f, i, l) => f - (i ? l[i - 1]! : 0));
+    assert.ok(lands.length >= 8 && Math.max(...gaps) <= 30, `${given.regions ? "regions" : "no regions"}: lands on ${lands.join(",")}`);
+  }
+  assert.ok(clipAt(at[18]! - 1).length > 2);
   // Her regions without her elements (none named, or none found): her front still built in its own shapes.
   const bare = facadeClip(drawCutOuts(SEEDED + facade.code, at[18]! - 1, props, { regions: { "0": regions } }))!;
   assert.ok(bare.length >= 6 && bare.every((p) => typeof p === "string" && !/A/.test(p)), JSON.stringify(bare));
@@ -4937,7 +4962,7 @@ test("« Façade qui se construit » (v3): vertical as its original, her horizon
   assert.deepEqual(input.objets?.map((o) => [o.slot, o.case]), [["morceaux", 1], ["enseigne", 1]]);
   const plan = skillPlan({ skill: facade, name: "Façade qui se construit", files, fill: { shots: [{ file: "front", at: 0 }, { file: "inside", at: 1 }], texts: {}, end: null, settings: { format: "horizontal" } } });
   assert.equal(plan.layers![0]!.motion.texts!.format, "horizontal");
-  assert.deepEqual(plan.skill, { key: "facade", version: 4, settings: { format: "horizontal" } });
+  assert.deepEqual(plan.skill, { key: "facade", version: 5, settings: { format: "horizontal" } });
 });
 
 // ——— « Coulisses façon fiche » v2, written again on its original's fiche (docs/fiches/coulisses.md) ——————————————————
