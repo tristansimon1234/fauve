@@ -26,7 +26,7 @@ test("« Façade qui se construit » (effect v2): its layer over her front, her 
   assert.ok(motion.code!.includes('SubjectParts(shot, f0, laid, "every window", 0)'));
   assert.ok(motion.code!.includes('SubjectBox(shot, f0, laid, "shop sign")'));
   assert.equal(motion.texts!.format, "horizontal");
-  // Nothing named: its code reads nothing and cuts her front in regular rectangles.
+  // Nothing named: its code reads nothing and cuts her front in pieces of every shape (v3).
   assert.equal(frontPlan(6, 100).layers![0]!.motion.drawn, undefined);
   assert.deepEqual(checkMotionCode(facade.code), []);
   // A piece lands at once and never moves: nothing is animated between two landings, never a zoom.

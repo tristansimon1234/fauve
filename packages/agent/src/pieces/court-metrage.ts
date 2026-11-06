@@ -6,7 +6,7 @@ import type { EffectPiece, PieceTimelineInput } from "../pieces.ts";
 // most of them are in width, else the whole frame but its margins. Her first one opens from a slit at its middle (black,
 // then two black bars parting at an even pace, as the original's 71 images over its 4 s first shot), and once it is open
 // her film's title card cuts in whole on a beat: one small word in spaced capitals near the top, her title in big serif
-// capitals on two tight lines at the middle, her credit in small italic near the bottom, lemon yellow (or her colour, or
+// capitals on two tight lines at the middle, her credit in small roman near the bottom, lemon yellow (or her colour, or
 // a warm white), her first shot dimmed under it when it is bright; it stays until the first cut, which a film burn
 // whitens (red-orange from the left, orange, amber, pale yellow at its height, the cut under it, then out to the right).
 // On its last cut (three shots or more), the film slips in the projector: a burn, six images of the strip rolling up in
@@ -79,7 +79,7 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const box = (x, y, w, t) => ({ position: "absolute", left: Math.round(x), top: Math.round(y), width: Math.round(w), height: Math.round(t) });
 
   // 2. Her title card: one small word in spaced capitals near the top, her title in big serif capitals on two lines at
-  // the middle, her credit in small italic near the bottom (upright: within the safe zone), all at once on its beat.
+  // the middle, her credit in small roman near the bottom (upright: within the safe zone), all at once on its beat.
   const keep = (s) => String(s || "").replace(/(\d) (?=\d)/g, "$1 ");
   // In capitals, an hour keeps its small h (« 7 h », never « 7 H »).
   const caps = (s) => keep(s).toUpperCase().replace(/(\d)(\s?)H\b/g, "$1$2h");
@@ -112,8 +112,8 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const tone = word("couleur") || "jaune";
   const hers = [brand.accent, brand.palette && brand.palette.light].find((c) => luma(c) >= 0.45);
   const COLOR = tone === "blanc" ? "#f4f1e8" : tone === "sienne" && hers ? hers : "#f2ea4a";
-  const display = "'" + brand.displayFont + "', 'Cormorant Garamond', Georgia, serif";
-  const body = "'" + brand.bodyFont + "', 'Cormorant Garamond', Georgia, serif";
+  const display = "'" + brand.displayFont + "', 'Noto Serif Display', Georgia, serif";
+  const body = "'" + brand.bodyFont + "', 'Noto Serif Display', Georgia, serif";
   const shade = "0 0 1px rgba(0,0,0,0.35), 0 2px 12px rgba(0,0,0,0.38)";
   const small = word("surtitre");
   const title = word("titre");
@@ -127,13 +127,13 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const card = title && frame >= TITLE && frame < CUT
     ? h(React.Fragment, { key: "card" },
         small
-          ? h(FitText, { key: "b-" + small, style: box((GW - 800) / 2, yLabel - LPX * 0.8, 800, LPX * 1.6), innerStyle: { fontFamily: body, fontWeight: 500, fontSize: LPX, lineHeight: 1, letterSpacing: "0.22em", textTransform: "uppercase", whiteSpace: "nowrap", color: COLOR, textShadow: shade } },
+          ? h(FitText, { key: "b-" + small, style: box((GW - 800) / 2, yLabel - LPX * 0.8, 800, LPX * 1.6), innerStyle: { fontFamily: body, fontWeight: 500, fontSize: LPX, lineHeight: 1, letterSpacing: "0.1em", textTransform: "uppercase", whiteSpace: "nowrap", color: COLOR, textShadow: shade } },
               h("span", { "data-fauve-accent": "" }, keep(small)))
           : null,
-        h(FitText, { key: "t-" + title, style: TB, innerStyle: { fontFamily: display, fontWeight: 600, fontSize: TPX, lineHeight: 0.86, letterSpacing: "-0.005em", whiteSpace: "nowrap", color: COLOR, textShadow: shade } },
+        h(FitText, { key: "t-" + title, style: TB, innerStyle: { fontFamily: display, fontWeight: 500, fontSize: TPX, lineHeight: 0.84, letterSpacing: "0.01em", whiteSpace: "nowrap", color: COLOR, textShadow: shade } },
           lines(title).map((l, i) => h("div", { key: i }, l))),
         credit
-          ? h(FitText, { key: "c-" + credit, style: box((GW - 800) / 2, yCredit - CPX * 0.85, 800, CPX * 1.7), innerStyle: { fontFamily: display, fontWeight: 500, fontStyle: "italic", fontSize: count(credit) > 4 ? Math.max(48, CPX) : CPX, lineHeight: 1, whiteSpace: "nowrap", color: COLOR, textShadow: shade } },
+          ? h(FitText, { key: "c-" + credit, style: box((GW - 800) / 2, yCredit - CPX * 0.85, 800, CPX * 1.7), innerStyle: { fontFamily: body, fontWeight: 500, fontSize: count(credit) > 4 ? Math.max(48, CPX) : CPX, lineHeight: 1, whiteSpace: "nowrap", color: COLOR, textShadow: shade } },
               count(credit) > 4 ? keep(credit) : h("span", { "data-fauve-accent": "" }, keep(credit)))
           : null)
     : null;
@@ -197,9 +197,11 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
 
 export const courtMetrage: EffectPiece = {
   key: "court-metrage",
-  version: 1,
+  // 2: its skill's v2 lettering (Tristan: « la police au début pareil »): its title in a display serif of strong
+  // contrast at its regular weight, its small word a little spaced (0,1 em, not 0,22), its credit roman, not italic.
+  version: 2,
   name: "Générique de court métrage",
-  how: "le Reel devient un court métrage projeté le temps de quelques plans : ses plans dans une pellicule aux coins arrondis sur un noir doux ; le premier s'ouvre depuis une fente au milieu, puis le titre de son film s'y pose d'un coup sur un temps, en jaune (un petit mot espacé en haut, son titre en grandes capitales serif sur deux lignes, sa signature en petit italique en bas) ; une brûlure de pellicule blanchit la première coupe ; sur la dernière, la pellicule saute dans le projecteur (l'image remonte par à-coups, ses perforations passent, une image blanche brûlée) ; puis le montage reprend en plein écran.",
+  how: "le Reel devient un court métrage projeté le temps de quelques plans : ses plans dans une pellicule aux coins arrondis sur un noir doux ; le premier s'ouvre depuis une fente au milieu, puis le titre de son film s'y pose d'un coup sur un temps, en jaune (un petit mot un peu espacé en haut, son titre en grandes capitales d'un serif à fort contraste sur deux lignes, sa signature en petit romain en bas) ; une brûlure de pellicule blanchit la première coupe ; sur la dernière, la pellicule saute dans le projecteur (l'image remonte par à-coups, ses perforations passent, une image blanche brûlée) ; puis le montage reprend en plein écran.",
   needs: "des vidéos dans une belle lumière (le matin, l'heure dorée, un contre-jour), à l'horizontale de préférence (sinon en plein écran aux coins arrondis), la première calme et plutôt sombre, le milieu dégagé pour le titre.",
   lays: "au début du Reel de préférence, sur 3 à 6 de ses plans : le premier calme, tenu 3 à 4 s (la fente s'ouvre, le titre s'y pose), les suivants d'une mesure environ ; la pellicule saute sur la coupe du dernier",
   shots: [2, 6],
@@ -220,7 +222,7 @@ export const courtMetrage: EffectPiece = {
     },
     {
       slot: "signature",
-      want: "sa signature en petit italique en bas de l'image, comme le nom de qui a filmé (une forme comme « par Maison Farine », « filmé par Rose ») ; 3 mots au plus",
+      want: "sa signature en petit en bas de l'image, comme le nom de qui a filmé (une forme comme « par Maison Farine », « filmé par Rose ») ; 3 mots au plus",
       max: 24,
       required: false,
     },

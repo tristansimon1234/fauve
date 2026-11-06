@@ -6,13 +6,16 @@ import { skillLengths, skillPlan } from "../skills.ts";
 import { clearsDrawn, objectsDrawn, readsDrawn, subjectsDrawn } from "../subject.ts";
 import { courtMetrage, rollShot } from "./court-metrage.ts";
 
-// « Court métrage », the model (court-metrage.ts, version 1), on its original's fiche (docs/fiches/court-metrage.md).
+// « Court métrage », the model (court-metrage.ts, version 2), on its original's fiche (docs/fiches/court-metrage.md).
+
+/** Its light, drawn on her shots (v2: the original's golden print). */
+const GOLDEN = "sepia(0.45) saturate(1.7) contrast(1.05) brightness(0.93)";
 
 /** The original's cuts, the first image of each new picture (its burn's cut, then a bar each, its roll on the fifth). */
 const ORIGINAL_CUTS = [120, 205, 288, 372, 456, 541, 626];
 
-test("« Court métrage » (v1): its eight shots on its original's cuts (85,5 BPM), its title on beat 3, its fade, 24,4 s", () => {
-  assert.equal(courtMetrage.version, 1);
+test("« Court métrage » (v1, v2): its eight shots on its original's cuts (85,5 BPM), its title on beat 3, its fade, 24,4 s", () => {
+  assert.equal(courtMetrage.version, 2);
   assert.equal(courtMetrage.bpm, 85.5);
   const line = courtMetrage.timeline(8, { end: false });
   // 732 images, the original's; each cut within an image of the original's.
@@ -78,7 +81,7 @@ test("« Court métrage »: its plan (its words by role, its sounds, its music's
   assert.deepEqual(plan.texts.map((t) => [t.style, t.text]), [["band", "un matin"], ["hook", "Café Lumière"], ["caption", "un film de Léa"]]);
   assert.equal(plan.sounds?.length, 4);
   assert.deepEqual(plan.music_shape?.pauses, [{ from: 0, to: 4 }]);
-  assert.deepEqual(plan.skill, { key: "court-metrage", version: 1 });
+  assert.deepEqual(plan.skill, { key: "court-metrage", version: 2 });
   // Light to render: nothing cut out nor followed, no clear area; its first shot's light read under its title.
   assert.deepEqual(checkMotionCode(courtMetrage.code), []);
   assert.deepEqual([subjectsDrawn(courtMetrage.code), objectsDrawn(courtMetrage.code), clearsDrawn(courtMetrage.code)], [[], [], []]);
@@ -225,13 +228,40 @@ test("« Court métrage »: its gate as her videos (1,94:1 in width, else the fr
   assert.equal(color({ couleur: "sienne" }), "#e8b4a0");
   assert.equal(color({ couleur: "sienne" }, { accent: "#1d3b2a" }), "#f6efe4");
   assert.equal(color({ couleur: "blanc" }), "#f4f1e8");
-  // Her first shot dimmed under her title when it is bright there, from its first image to the cut; not when it is dark.
-  assert.equal(styleOf(keyed(drawAt(10, { light: 0.7 }), "shown")!).filter, "brightness(0.600)");
-  assert.equal(styleOf(keyed(drawAt(10, { light: 0.3 }), "shown")!).filter, undefined);
-  assert.equal(styleOf(keyed(drawAt(130, { light: 0.7 }), "shown")!).filter, undefined);
+  // Her first shot dimmed under her title when it is bright there, from its first image to the cut; not when it is
+  // dark; always in its golden light (v2), or as filmed when she asks.
+  assert.equal(styleOf(keyed(drawAt(10, { light: 0.7 }), "shown")!).filter, `${GOLDEN} brightness(0.600)`);
+  assert.equal(styleOf(keyed(drawAt(10, { light: 0.3 }), "shown")!).filter, GOLDEN);
+  assert.equal(styleOf(keyed(drawAt(130, { light: 0.7 }), "shown")!).filter, GOLDEN);
+  assert.equal(styleOf(keyed(drawAt(10, { light: 0.7, texts: { lumiere: "naturelle" } }), "shown")!).filter, "brightness(0.600)");
+  assert.equal(styleOf(keyed(drawAt(130, { texts: { lumiere: "naturelle" } }), "shown")!).filter, undefined);
+  // The film roll's two frames in its light too; its soft black, its words and its burns never under it.
+  const roll = keyed(drawAt(455), "strip")!;
+  assert.ok(nodes(roll).filter((n) => n.props.key === "up" || n.props.key === "down").every((n) => styleOf(n).filter === GOLDEN));
+  assert.equal(styleOf(gateOf(drawAt(90))).filter, undefined);
+  assert.ok(fits(drawAt(90)).every((t) => !("filter" in styleOf(t))));
+  // Its model's finish laid over nothing of its own: its code draws its light.
+  assert.deepEqual(courtMetrage.finish, { exposure: 0, contrast: 0, saturation: 0, warmth: 0, split: 0, fade: 0, grain: 0, vignette: 0 });
+  assert.deepEqual(courtMetrage.settings?.map((s) => [s.name, s.choices[0]!.value]), [["format", "auto"], ["couleur", "jaune"], ["lumiere", "doree"]]);
 });
 
-test("« Court métrage »: its ending card on the black after the fade, in its serif and its italic, readable", () => {
+test("« Court métrage » (v2): its title card in a display serif of strong contrast, its small word a little spaced, its credit roman", () => {
+  // Measured on its original's letters (docs/fiches/court-metrage.md, effect 2): no italic anywhere, its title at its
+  // regular weight (its stems 0,17 of its capitals), its small word spaced 0,1 em (not 0,22), Noto Serif Display when her
+  // charter has no font.
+  const [label, title, credit] = fits(drawAt(90)).map((t) => t.props.innerStyle as Record<string, string | number>);
+  assert.equal(label!.letterSpacing, "0.1em");
+  assert.deepEqual([title!.fontWeight, title!.fontSize, title!.lineHeight], [500, 73, 0.84]);
+  assert.equal(credit!.fontStyle, undefined);
+  assert.match(String(title!.fontFamily), /'Cormorant Garamond', 'Noto Serif Display'/);
+  assert.match(String(credit!.fontFamily), /'Noto Serif Display'/);
+  // A third larger upright.
+  const up = fits(drawAt(90, { aspect: 9 / 16 }))[1]!.props.innerStyle as { fontSize: number };
+  assert.equal(up.fontSize, 95);
+  assert.doesNotMatch(courtMetrage.code, /italic/);
+});
+
+test("« Court métrage »: its ending card on the black after the fade, in its serif and its small roman, readable", () => {
   const line = courtMetrage.timeline(8, { end: true });
   const from = Math.round((line.duration - 1.6) * 30);
   const end = { title: "Ouvert dès 8 h", subtitle: "12 rue des Martyrs", from };

@@ -23,7 +23,7 @@ test("« La silhouette » (effect v1): its layer over her profile, her cut-out o
     assert.deepEqual(motion.drawn, { shots: n + 2, subjects: Array.from({ length: n }, (_, i) => i + 1) });
     // No sound of its own: its model's clicks are its opening's, and none could follow her head when it is measured.
     assert.equal(motion.sounds, undefined);
-    assert.deepEqual(motion.piece, { key: "silhouette", version: 1 });
+    assert.deepEqual(motion.piece, { key: "silhouette", version: 2 });
   }
   // Its marks on the Reel's beat, as the skill's after its cut on her (0,61, 0,845 and 1,92 beat), the word read first
   // (half a second at least), her name typed six images after the word starts going, her full name held 12 images.
@@ -121,12 +121,12 @@ function drawAt(frame: number, read: Read = { profile: true }, brand: Record<str
 }
 
 test("« La silhouette » (effect v1): her silhouette of one tone, « Je suis » in her head, her name typed behind her, lifted when she raises her head", () => {
-  // On the pale, her profile cut out and filled with one tone (the original's midnight and cold pale: her charter has
+  // On the pale, her profile cut out and filled with one tone (its own warm ink and warm paper since v2: her charter has
   // neither), her picture laid whole at its shape, her head a third of the frame's width, her body down to the bottom.
   const open = drawAt(0);
-  assert.equal(styleOf(open).backgroundColor, "#f3f4f9");
+  assert.equal(styleOf(open).backgroundColor, "#efe9de");
   const her = nodes(open).find((n) => n.type === "Subject")!;
-  assert.deepEqual([her.props.shot, her.props.fill], [1, "#0f0f1c"]);
+  assert.deepEqual([her.props.shot, her.props.fill], [1, "#1b1714"]);
   const laid = styleOf(her) as Record<string, number>;
   assert.ok(Math.abs(laid.width! / laid.height! - 16 / 9) < 0.01 && laid.top! + laid.height! >= 1920, JSON.stringify(laid));
   assert.ok(!nodes(open).some((n) => n.type === "Footage"));
@@ -140,11 +140,11 @@ test("« La silhouette » (effect v1): her silhouette of one tone, « Je suis »
   assert.ok(Number(inner.fontSize) >= 48);
   const left = (f: number) => Number(styleOf(nodes(byKey(drawAt(f), "je")!).find((n) => n.type === "FitText")).left);
   assert.equal(left(0) - left(8), 13);
-  // As her head starts down (on the beat: 15 images at 100 BPM), its first letter in the cursor's colour (the original's
-  // peach: her violet would not read on the midnight), its others going from its end, its last gone two images in;
+  // As her head starts down (on the beat: 15 images at 100 BPM), its first letter in the cursor's colour (its own
+  // vermilion: her violet would not read on its ink), its others going from its end, its last gone two images in;
   // the word gone six images in.
   const going = nodes(byKey(drawAt(17), "je")!).filter((n) => n.type === "span");
-  assert.equal(styleOf(going[0]).color, "#d99868");
+  assert.equal(styleOf(going[0]).color, "#e0512f");
   assert.equal(styleOf(going.at(-1)).opacity, 0);
   assert.equal(byKey(drawAt(21), "je"), undefined);
   // Her name typed from image 21, 40 letters a second, laid before her (she passes in front of it), its cursor after her.
@@ -153,12 +153,12 @@ test("« La silhouette » (effect v1): her silhouette of one tone, « Je suis »
   assert.equal(seen(byKey(typing, "name")), "Hélo");
   assert.ok(order(typing).indexOf("name") < order(typing).indexOf("her") && order(typing).indexOf("her") < order(typing).indexOf("caret"));
   assert.equal(seen(byKey(typing, "caret")), "");
-  assert.ok(nodes(byKey(typing, "caret")).some((n) => styleOf(n).background === "#d99868"));
+  assert.ok(nodes(byKey(typing, "caret")).some((n) => styleOf(n).background === "#e0512f"));
   assert.equal(seen(byKey(drawAt(32), "name")), "Héloïse Martin");
   // In ink of her tone on the pale, on her hair: above her lowered head, within the frame's safe zone.
   const name = byKey(drawAt(40), "name")!;
   const box = styleOf(name) as Record<string, number>;
-  assert.equal((name.props.innerStyle as Record<string, unknown>).color, "#0f0f1c");
+  assert.equal((name.props.innerStyle as Record<string, unknown>).color, "#1b1714");
   assert.ok(box.left! >= 140 && box.left! + box.width! <= 925 && box.top! >= 110 && box.top! + box.height! <= 1920 * 0.72, JSON.stringify(box));
   // (Her head's top at that image: a tenth of her picture lower than at the start, where it was at 42 % of the frame.)
   assert.ok(Math.abs(laid.top! + 0.2 * laid.height! - 1920 * 0.42) < 1, `${laid.top! + 0.2 * laid.height!}`);
@@ -195,11 +195,11 @@ test("« La silhouette » (effect v1): timed on her head when it is measured, in
   assert.equal(nodes(bare).find((n) => n.type === "Subject"), undefined);
   const ink = (tree: Node, key: string) => {
     const inner = nodes(byKey(tree, key)!).find((n) => n.type === "FitText")!.props.innerStyle as Record<string, unknown>;
-    return [inner.color, /#f3f4f9/.test(String(inner.textShadow)) ? "pale edge" : /#0f0f1c/.test(String(inner.textShadow)) ? "tone edge" : "none"];
+    return [inner.color, /#efe9de/.test(String(inner.textShadow)) ? "pale edge" : /#1b1714/.test(String(inner.textShadow)) ? "tone edge" : "none"];
   };
-  assert.deepEqual(ink(bare, "je"), ["#0f0f1c", "pale edge"]);
-  assert.deepEqual(ink(drawAt(40, {}), "name"), ["#0f0f1c", "pale edge"]);
-  assert.deepEqual(ink(drawAt(40, { light: { mean: 0.5, high: 0.9 } }), "name"), ["#0f0f1c", "pale edge"]);
+  assert.deepEqual(ink(bare, "je"), ["#1b1714", "pale edge"]);
+  assert.deepEqual(ink(drawAt(40, {}), "name"), ["#1b1714", "pale edge"]);
+  assert.deepEqual(ink(drawAt(40, { light: { mean: 0.5, high: 0.9 } }), "name"), ["#1b1714", "pale edge"]);
   assert.deepEqual(ink(drawAt(40, { light: { mean: 0.1, high: 0.3 } }), "name"), ["#ffffff", "tone edge"]);
   assert.match(String(styleOf(nodes(drawAt(0, { light: { mean: 0.25, high: 0.6 } })).find((n) => n.type === "Footage")).filter), /brightness\(2\.00\)/);
   // On her silhouette, white with an edge of her tone (unseen on her, read off her).

@@ -17,8 +17,8 @@ import type { z } from "zod";
 
 /** The source of the inspiration row a house model is kept on, per studio (one per model, made when first used). */
 export const HOUSE_SOURCE = "house";
-/** The catalogue's version: a studio's row written by an older one is rewritten when the model is used again (3: its original's sheets; 4: no brand in a model's name; 5: Mots aux quatre coins as its original; 6: Plans fixes at 65 BPM; 7: four renamed; 8: Lieu tapé without its original's orange; 9: Plans fixes on its fiche; 10: Une journée chez toi on its fiche; 11: ten models on their fiches; 12: Façade qui se construit and Coulisses façon fiche on their fiches; 13: Recette cosy on its fiche; 14: Titre gaufré on its fiche; 15: Mots mêlés and Interrupteur on their fiches; 16: Interface minimaliste and Fenêtres et étiquettes on theirs; 17: Mot clé en grand and Face caméra et références on theirs; 18: Photos posées sur la table and Carte au feutre on theirs; 19: « S'abonner » in Interface minimaliste; 20: the last four on their fiches, Aplat, Détourages, Silhouette and Vision machine). */
-export const HOUSE_VERSION = 20;
+/** The catalogue's version: a studio's row written by an older one is rewritten when the model is used again (3: its original's sheets; 4: no brand in a model's name; 5: Mots aux quatre coins as its original; 6: Plans fixes at 65 BPM; 7: four renamed; 8: Lieu tapé without its original's orange; 9: Plans fixes on its fiche; 10: Une journée chez toi on its fiche; 11: ten models on their fiches; 12: Façade qui se construit and Coulisses façon fiche on their fiches; 13: Recette cosy on its fiche; 14: Titre gaufré on its fiche; 15: Mots mêlés and Interrupteur on their fiches; 16: Interface minimaliste and Fenêtres et étiquettes on theirs; 17: Mot clé en grand and Face caméra et références on theirs; 18: Photos posées sur la table and Carte au feutre on theirs; 19: « S'abonner » in Interface minimaliste; 20: the last four on their fiches, Aplat, Détourages, Silhouette and Vision machine; 21: Tristan's review of 6 November, Court métrage's light and lettering, Plans fixes' lettering, Façade's first pieces, Présente-toi in its own design). */
+export const HOUSE_VERSION = 21;
 
 export type HouseModel = {
   key: string;
@@ -798,7 +798,8 @@ export const HOUSE_MODELS: HouseModel[] = [
     key: "plans-fixes",
     name: "Plans fixes de cinéma",
     // 9: written again on its original's fiche (v3 of its skill): horizontal 4:3 on black when her videos are, its tempo, its
-    // bold serif under spaced small words, no warmth, grain nor vignette its original does not have.
+    // bold serif under spaced small words, no warmth, grain nor vignette its original does not have. Its pair's serif is
+    // EB Garamond 700 since its v4 (HOUSE_VERSION 21: measured on its original's letters, Lora's eye was too large).
     pitch: "Des plans fixes, la caméra posée, coupés sur la musique, en horizontal comme au cinéma, et un petit titre qui arrive mot par mot au centre.",
     needs: "5 à 10 vidéos fixes (posées, sans bouger) de ton lieu et de ta rue, idéalement en fin de journée",
     files: [4, 10],
@@ -1314,49 +1315,48 @@ export const HOUSE_MODELS: HouseModel[] = [
   model({
     key: "silhouette",
     // Renamed on its original's fiche (Tristan: « ok »): a presentation, a word inside her head, her name behind her.
-    // Written again on its fiche (v2 of its skill): its opening as a layout program and its negative, her profile in one
-    // midnight tone with « Je suis » in it, her name typed behind her head, the letter that becomes an eye, the almond on
-    // the drop, her trades on the hits, her name receding, her logo on the blue; 84,5 BPM, its break, its last hit.
+    // v4 of its skill (HOUSE_VERSION 21, Tristan: « trop similaire à la vidéo originale »): its idea and its signature in a
+    // design of its own, on her charter's colours (else a warm ink, a warm paper and a vermilion): her greeting stamped
+    // over an accent rule, her profile in one tone with « Je suis » in it and her name typed behind her head, her paper
+    // turning to her accent on the break, her trade on her dark on the drop with what she does in accent blocks, her
+    // name on two lines, her logo on her accent; 84,5 BPM, its break and its last hit kept.
     name: "Présente-toi",
-    pitch: "Ton profil en silhouette d'un seul ton, un mot dans ta tête, puis ton nom qui s'écrit derrière toi et ce que tu fais qui défile.",
+    pitch: "Ton profil en silhouette d'un seul ton, un mot dans ta tête, ton nom qui s'écrit derrière toi, puis ton métier et ce que tu fais sur les coups, dans tes couleurs.",
     needs: "une vidéo de toi de profil devant un fond clair, téléphone posé (5 s : tu baisses la tête puis tu la relèves), ton nom, ton métier en un mot et 3 à 5 choses que tu fais",
     files: [1, 4],
     pair: "grotesque",
-    // Its old reference composition flickered a word letter by letter (nothing flickers in the original): the skill's
-    // code is its reference now.
+    // Its skill's code is its reference.
     example: null,
     // Its fiche's tempo (84,5 BPM, its bars on 1,06 · 3,90 · 6,74 · 9,58 s; house-measures.ts has no bpm for it).
     tempo: 84.5,
-    finish: { name: "Aplats", hint: "deux aplats exacts, sans grain ni coins sombres", contrast: 0 },
+    finish: { name: "Aplats", hint: "des aplats exacts, sans grain ni coins sombres", contrast: 0 },
     look: {
       name: "présente-toi",
       format: "autre",
-      hook: { kind: "geste", what: "sur un bleu nuit, une boîte de texte de logiciel de mise en page où son premier mot se tape, puis tout passe en négatif d'un coup" },
+      hook: { kind: "geste", what: "sur son papier, son salut posé en grand lettre par lettre, un trait de sa couleur qui se tire dessous" },
       text: {
         amount: "plusieurs",
-        composition: "une grotesque demi-grasse au milieu : son premier mot tapé qui grandit, un mot blanc dans sa silhouette, son nom tapé derrière sa tête (prénom en romain, nom en gras), ce qu'elle fait en gras qui change sur les coups",
+        composition: "une grotesque grasse et serrée : son salut en grand, un mot pâle dans sa silhouette, son nom tapé derrière sa tête, son métier en grand sur le foncé, ce qu'elle fait dans des blocs de sa couleur, son nom sur deux lignes",
         case: "normal",
         weight: "bold",
-        tracking: "normal",
+        tracking: "tight",
       },
-      colors: ["#0d0d1b", "#f3f4f9", "#d99868"],
-      layout: "deux aplats, un bleu nuit et un pâle froid ; sa silhouette de profil d'un seul bleu nuit en bas du cadre, coupée par le bas ; les mots au milieu ; un œil dessiné qui s'ouvre sur le pâle",
+      colors: ["#1b1714", "#efe9de", "#e0512f"],
+      layout: "des aplats à ses couleurs (un foncé, un papier, sa couleur) ; sa silhouette de profil d'un seul ton foncé en bas du cadre, coupée par le bas ; les mots au milieu",
       moments: [
-        { at: 0, what: "sur un bleu nuit, une boîte de texte de logiciel (repères en tirets à travers le cadre, cotes en px qui défilent) ; son premier mot se tape, une lettre seule puis une rafale, un clic par lettre, et grandit de moitié avec une traîne pêche ; une main en points salue à côté" },
-        { at: 0.47, what: "tout passe en négatif en une image : fond pâle, mot à l'encre, repères gris clair" },
-        { at: 1.07, what: "coupe sur le premier temps : sa silhouette de profil d'un seul bleu nuit sur le pâle, « Je suis » en blanc dans sa tête, qui s'efface quand elle baisse la tête ; son nom se tape derrière sa tête, posé sur ses cheveux, son nom de famille s'en va" },
-        { at: 2.67, what: "son prénom se réduit à une lettre ronde qui grossit avec sa traîne et devient l'o de « Votre » ; ses lettres rebondissent autour ; l'o se remplit de pêche, une pupille y grandit, et l'œil monte pendant le break de la musique" },
-        { at: 3.9, what: "sur le drop, des paupières bleu nuit se ferment sur l'image en amande ; l'œil se plisse, sa pupille devient une fente de chat, il s'ouvre grand, son métier n'apparaît que dans l'iris, puis l'œil ouvert devient le fond pâle" },
-        { at: 5.47, what: "son métier fixe, ce qu'elle fait en gras à côté qui change sur les coups de plus en plus vite, un trait ondulé tracé dessous puis repris, une pastille pêche puis le pictogramme de son métier au bout du mot" },
-        { at: 7.8, what: "son nom seul, petit, au milieu du pâle, qui recule" },
-        { at: 9.57, what: "coupe sur la dernière mesure : son logo blanc, petit, sur le bleu nuit, puis le bleu seul pendant que la musique s'éteint" },
+        { at: 0, what: "sur son papier, son salut se pose en grand lettre par lettre, un clic par lettre, un trait de sa couleur se tirant dessous" },
+        { at: 1.07, what: "coupe sur le premier temps : sa silhouette de profil d'un seul ton foncé, « Je suis » en pâle dans sa tête, qui s'efface quand elle baisse la tête ; son nom se tape derrière sa tête, son nom de famille s'en va" },
+        { at: 3.2, what: "la musique s'arrête : le fond passe à sa couleur, sa silhouette et son prénom restent" },
+        { at: 3.9, what: "sur le drop, le foncé : « Votre » en petit et son métier en grand, en pâle, un bloc de sa couleur qui se tire dessous ; ce qu'elle fait passe sur les coups, chaque mot dans un bloc de sa couleur" },
+        { at: 7.8, what: "son papier : son nom sur deux lignes, le nom en gras, un trait de sa couleur dessous" },
+        { at: 9.57, what: "coupe sur la dernière mesure : sa couleur, son logo dans son foncé (sinon le nom de son lieu en capitales), la musique arrêtée sur son dernier coup" },
       ],
       camera: "fixe",
       transitions: "coupes nettes",
       motion: "epure",
       music: "slow half-time electronic beat, deep held bass, a short break then the drop",
-      ending: "son logo blanc sur le bleu nuit, la musique arrêtée sur son dernier coup qui résonne",
-      why: "Une présentation en motion design : en onze secondes on retient son profil, son nom et son métier, et l'œil qui s'ouvre sur la suite surprend.",
+      ending: "son logo sur sa couleur, la musique arrêtée sur son dernier coup qui résonne",
+      why: "Une présentation graphique : en onze secondes on retient son profil, son nom et son métier, et le passage à sa couleur sur le break relance avant le drop.",
     },
   }),
   model({
@@ -1408,10 +1408,11 @@ export const HOUSE_MODELS: HouseModel[] = [
   model({
     key: "court-metrage",
     name: "Court métrage",
-    // Written on its original's fiche (v1 of its skill, docs/fiches/court-metrage.md): a short travel film projected as on
+    // Written on its original's fiche (v1 of its skill, docs/fiches/court-metrage.md; its light, its title's serif and its
+    // roman credit corrected in its v2, HOUSE_VERSION 21): a short travel film projected as on
     // an old projector, its picture with rounded corners on a soft black, opened from a slit, its title card in lemon
     // yellow, its film burns, the film slipping in the gate in its middle, a shot a bar, its fade to black.
-    pitch: "Ta journée en court métrage projeté : l'image s'ouvre depuis une fente, le titre de ton film en jaune, une brûlure de pellicule, un plan par mesure, la pellicule qui saute au milieu, puis un fondu au noir.",
+    pitch: "Ta journée en court métrage projeté, dans la lumière dorée d'une vieille pellicule : l'image s'ouvre depuis une fente, le titre de ton film en jaune, une brûlure de pellicule, un plan par mesure, la pellicule qui saute au milieu, puis un fondu au noir.",
     needs: "5 à 10 vidéos de ta journée à l'horizontale, dans une belle lumière (le matin, l'heure dorée, un contre-jour) : un intérieur calme pour ouvrir, ta rue, ton trajet, tes gestes, une vue calme pour finir",
     files: [4, 10],
     pair: "generique",
@@ -1419,14 +1420,17 @@ export const HOUSE_MODELS: HouseModel[] = [
     example: null,
     // Its cuts' grid (docs/fiches/court-metrage.md): seven cuts within an image at 85,5 (its music's onsets say 85,3).
     tempo: 85.5,
-    finish: { name: "Pellicule dorée", hint: "chaud et doux, noirs relevés, hautes lumières retenues, sans grain ni coins sombres", warmth: 0.05, fade: 0.08, contrast: -0.03 },
+    // 21 (v2 of its skill, Tristan: « lumière ne va pas »): the original's golden print, measured on its shots (amber mids,
+    // saturation 0,4 to 0,6, its blacks a little lifted, its highlights held), not « film »'s grey; its skill draws it on
+    // her shots itself (this finish serves the chain when it makes the Reel without the skill).
+    finish: { name: "Pellicule dorée", hint: "doré, chaud et riche, noirs à peine relevés, hautes lumières retenues, sans grain ni coins sombres", exposure: -0.06, contrast: 0.12, saturation: 0.18, warmth: 0.6, shadows: "#C8A070", highlights: "#E8C890", split: 0.6, fade: 0.15 },
     look: {
       name: "court métrage projeté",
       format: "pov",
       hook: { kind: "promesse", what: "l'image qui s'ouvre depuis une fente au milieu, dans une pellicule aux coins arrondis, et le titre du film en jaune qui s'y pose d'un coup" },
       text: {
         amount: "une ligne",
-        composition: "un générique sur le premier plan : un petit mot en capitales très espacées en haut, le titre en grandes capitales serif sur deux lignes serrées au milieu, une signature en petit italique en bas, en jaune citron",
+        composition: "un générique sur le premier plan : un petit mot en capitales serif un peu espacées en haut, le titre en grandes capitales d'un serif à fort contraste sur deux lignes serrées au milieu, une signature en petit romain en bas, en jaune citron",
         case: "upper",
         weight: "bold",
         tracking: "tight",
@@ -1435,7 +1439,7 @@ export const HOUSE_MODELS: HouseModel[] = [
       layout: "chaque plan dans une image de pellicule 1,94:1 aux coins arrondis sur un noir doux, au milieu du cadre quand ses vidéos sont horizontales",
       moments: [
         { at: 0, what: "le noir avec un déclic, puis l'image qui s'ouvre depuis une fente au milieu, deux bandes noires qui s'écartent à vitesse égale en 2,3 s, le bruit d'un projecteur" },
-        { at: 2.57, what: "sur le temps, le titre du film posé d'un coup en jaune : un petit mot espacé en haut, le titre en grandes capitales serif au milieu, une signature en italique en bas, avec un déclic" },
+        { at: 2.57, what: "sur le temps, le titre du film posé d'un coup en jaune : un petit mot un peu espacé en haut, le titre en grandes capitales d'un serif à fort contraste au milieu, une signature en petit romain en bas, avec un déclic" },
         { at: 3.83, what: "une brûlure de pellicule entre par la gauche (rouge-orangé, orange, ambre, puis jaune pâle) et blanchit l'image sur la coupe ; la musique entre" },
         { at: 4, what: "un plan par mesure, coupé sur chaque accord, dans une lumière dorée : la rue, le trajet, les gestes" },
         { at: 15.03, what: "la pellicule saute dans le projecteur : une brûlure, l'image qui remonte par à-coups pendant six images, ses lignes noires et ses perforations qui passent, une image crème brûlée, une dernière brûlure" },
@@ -1449,7 +1453,8 @@ export const HOUSE_MODELS: HouseModel[] = [
       ],
       camera: "mixte",
       transitions: "effets",
-      grade: "film",
+      // Its skill draws its own light (« film » desaturated her shots and lowered their contrast).
+      grade: "natural",
       motion: "epure",
       music: "lo-fi felt piano and pads, soft kick, round bass, off-beat shaker, 85 BPM",
       ending: "un dernier plan calme et large qui s'éteint en fondu au noir avec la musique",

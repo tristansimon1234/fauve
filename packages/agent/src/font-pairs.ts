@@ -45,9 +45,11 @@ export const FONT_PAIRS: FontPair[] = [
     fits: "des plans fixes de cinéma, une signature en petit serif sur le noir, une table, un restaurant",
   },
   {
+    // « Plans fixes de cinéma » v4 (docs/fiches/plans-fixes.md, effect 3): its serif measured on its original's letters,
+    // its eye 0,65 of its capitals, set tight (Lora 700, before: 0,72, rounder and looser).
     key: "serif-grasse",
     name: "Serif grasse et petits mots espacés",
-    display: { family: "Lora", weight: 700, case: "normal", tracking: "tight" },
+    display: { family: "EB Garamond", weight: 700, case: "normal", tracking: "tight" },
     body: { family: "Poppins", weight: 600, case: "normal", tracking: "wide" },
     how: "un ou deux mots en serif gras serrés sous trois petits mots sans serif très espacés, tout petit au centre",
     fits: "des plans fixes de cinéma, un titre court posé au milieu d'un plan calme",
@@ -173,12 +175,15 @@ export const FONT_PAIRS: FontPair[] = [
   },
   {
     // « Court métrage » (docs/fiches/court-metrage.md, effect 2): its film's title card in one serif family, its title in
-    // big capitals on two tight lines, one small word in spaced capitals over it, its credit in small italic under it.
+    // big capitals on two tight lines, one small word in a little spaced capitals over it, its credit in small roman under
+    // it. Measured on its original's letters (v2, Tristan: « la police au début pareil »): a display serif of strong
+    // contrast, its stems 0,17 of its capitals, « CINEMA » 5,4 capitals wide; Noto Serif Display 500 sets them 0,16 and
+    // 5,5 (Cormorant Garamond 600, before: 0,15 and 5,85, narrower letters and paler hairlines, its small x-height).
     key: "generique",
     name: "Générique de film",
-    display: { family: "Cormorant Garamond", weight: 600, case: "upper", tracking: "tight" },
-    body: { family: "Cormorant Garamond", weight: 500, case: "upper", tracking: "wide" },
-    how: "un titre de film en grandes capitales serif sur deux lignes serrées, un petit mot en capitales très espacées au-dessus, une signature en petit italique dessous, dans la même famille",
+    display: { family: "Noto Serif Display", weight: 500, case: "upper", tracking: "normal" },
+    body: { family: "Noto Serif Display", weight: 500, case: "upper", tracking: "wide" },
+    how: "un titre de film en grandes capitales d'un serif à fort contraste sur deux lignes serrées, un petit mot en capitales un peu espacées au-dessus, une signature en petit romain dessous, dans la même famille",
     fits: "un court métrage, une journée racontée comme un film, un générique d'ouverture",
   },
   {

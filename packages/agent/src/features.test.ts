@@ -1248,7 +1248,7 @@ test("each of Edith's models shows its original's frames as a Reel she sends: sh
   const { HOUSE_MEASURES } = await import("./house-measures.ts");
   const { stolenStyleSchema } = await import("./steal.ts");
   // A studio's row written before the sheets is rewritten (11: ten models written again on their originals' fiches).
-  assert.equal(HOUSE_VERSION, 20);
+  assert.equal(HOUSE_VERSION, 21);
   for (const m of HOUSE_MODELS) {
     const sheets = houseSheets(m.key);
     // A model written as a design has no original, so no sheets (its row names none).
@@ -2041,7 +2041,7 @@ const composeShots = (aspects: number[]) => aspects.map((aspect, i) => ({ src: `
 test("« Plans fixes de cinéma » (v3) cuts where its original does, on its own music (64,6 BPM), its words on its beats", async () => {
   const { plansFixes, wordFrames } = await import("./skills/plans-fixes.ts");
   const { clearsDrawn, objectsDrawn } = await import("./subject.ts");
-  assert.equal(plansFixes.version, 3);
+  assert.equal(plansFixes.version, 4);
   assert.equal(plansFixes.bpm, 64.6);
   const line = plansFixes.timeline(9, { end: false, words: { accroche: "The power of", titre: "Static shot" } });
   // The original's nine shots, cut on its images 125, 155, 183, 210, 236, 265, 293 and 319 (measured image by image at
@@ -2084,6 +2084,15 @@ test("« Plans fixes de cinéma » (v3) cuts where its original does, on its own
     for (const n of drawnNodes(tree)) if (n.type === "span" && styleOf(n).opacity === 1 && !shown.has(drawnText(n))) shown.set(drawnText(n), f);
   }
   assert.deepEqual(["The", "power", "of", "Static", "shot"].map((w) => shown.get(w)), clicks);
+  // v4 (Tristan: « la police est slightly différente »): its serif measured on its original's letters, its eye 0,65 of
+  // its capitals and set tight, EB Garamond 700 (Lora 700's eye is 0,72), its capitals 60 px.
+  const { fontPair } = await import("./font-pairs.ts");
+  assert.deepEqual(fontPair("serif-grasse")?.display, { family: "EB Garamond", weight: 700, case: "normal", tracking: "tight" });
+  const serif = drawnNodes(drawScene(plansFixes.code, 100, { width: 1080, height: 1920, durationInFrames: 376, brand: { name: "Atelier Rose", displayFont: "EB Garamond", bodyFont: "Poppins" }, shots: composeShots(Array(9).fill(16 / 9)), reelTexts, end: null, texts: marks })).find((n) => n.type === "FitText" && /Garamond/.test(String((n.props.innerStyle as { fontFamily?: string }).fontFamily)));
+  const set = serif!.props.innerStyle as { fontFamily: string; fontWeight: number; letterSpacing: string; fontSize: number };
+  assert.deepEqual([set.fontWeight, set.letterSpacing], [700, "-0.04em"]);
+  assert.match(set.fontFamily, /'EB Garamond', Georgia/);
+  assert.ok(set.fontSize <= 91 && set.fontSize >= 80, String(set.fontSize));
 });
 
 test("« Plans fixes de cinéma » (v3): horizontal 4:3 on black as its original when her files are, full frame otherwise or on her word", async () => {
@@ -2145,7 +2154,7 @@ test("« Plans fixes de cinéma » (v3): horizontal 4:3 on black as its original
   assert.equal(input.reglages?.[0]?.nom, "format");
   const plan = skillPlan({ skill: plansFixes, name: "Plans fixes", files, fill: { shots: Array.from({ length: 9 }, (_, i) => ({ file: files[i % 6]!.id, at: 1 })), texts: { accroche: "un soir à", titre: "Belleville" }, end: null, settings: { format: "vertical" } } });
   assert.equal(plan.layers![0]!.motion.texts!.format, "vertical");
-  assert.deepEqual(plan.skill, { key: "plans-fixes", version: 3, settings: { format: "vertical" } });
+  assert.deepEqual(plan.skill, { key: "plans-fixes", version: 4, settings: { format: "vertical" } });
 });
 
 // ——— « Une journée chez toi » v2, written again on its original's fiche (docs/fiches/journee.md) ———————————————————
@@ -4582,7 +4591,7 @@ const FACADE_READ = {
 test("« Façade qui se construit » (v2) lays its pieces on its original's images and notes, the rest on its music's first beats (120 BPM)", async () => {
   const { facade } = await import("./skills/facade.ts");
   const { skillPlan, skillFit } = await import("./skills.ts");
-  assert.equal(facade.version, 2);
+  assert.equal(facade.version, 3);
   assert.equal(facade.bpm, 120);
   assert.deepEqual(facade.shots, [1, 3]);
   const line = facade.timeline(1, { end: false });
@@ -4674,7 +4683,7 @@ test("« Façade qui se construit » (v2): her front's own elements, named by th
   // right to left, the side of her front going up, the wall above it; then the street, the top's left third, the rest.
   assert.deepEqual(clipAt(at[18]! - 1), [
     FACADE_OUTLINE,
-    [700, 740, 160, 480], [40, 760, 200, 400], [560, 260, 200, 240],
+    [700, 740, 160, 480], [560, 260, 200, 240], [40, 760, 200, 400],
     [480, 760, 200, 400], [260, 760, 200, 400], [360, 280, 160, 200], [120, 260, 200, 240],
     [810, 1220, 270, 96], [540, 1220, 270, 96], [270, 1220, 270, 96], [0, 1220, 270, 96],
     [860, 900, 220, 320], [860, 580, 220, 320], [860, 260, 220, 320],
@@ -4686,14 +4695,25 @@ test("« Façade qui se construit » (v2): her front's own elements, named by th
   assert.match(String(styleOf(film(100)).clipPath), /^url\(#fc/);
   assert.equal(styleOf(film(200)).clipPath, undefined);
   assert.deepEqual(styleOf(drawnNodes(film(100)).find((n) => n.type === "Footage")!), { left: 0, top: 0, width: 1080, height: 1920 });
-  // Fewer than six elements found (nothing named here): her picture in regular rectangles, five a row above the street's
-  // two rows, laid at random on the same times; the street, the top's left third, then the rest.
+  // Fewer than six elements found (nothing named here): never a grid of near squares (v3, Tristan: « les formes au
+  // départ ne sont pas toutes carrées »): her picture above the street cut as a front is built, in pieces of every shape
+  // (tall ones, wide ones, flat bands), laid at random on the same times; its first four far apart and unlike one
+  // another, the tallest topped by an arch, the flattest a band wider at its foot; the street, the top's left third,
+  // then the rest.
   const grid = clipAt(at[18]! - 1, {})!;
   assert.equal(grid.length, 18);
-  const cells = grid.slice(0, 16) as number[][];
-  assert.equal(new Set(cells.map((c) => c.join())).size, 16);
-  for (const [x, y, w, h] of cells) assert.ok(x! % 216 === 0 && w === 216 && [0, 274, 549, 823, 1097].includes(y!) && h! >= 274 && h! <= 275, JSON.stringify([x, y, w, h]));
-  assert.deepEqual(grid.slice(16), [[0, 1371, 1080, 549], [0, 0, 366, 960]]);
+  const paths = grid.slice(0, 4).filter((p): p is string => typeof p === "string");
+  assert.ok(paths.some((d) => /A/.test(d)), "an arch among its first four");
+  assert.ok(paths.some((d) => !/A/.test(d) && (d.match(/L/g) ?? []).length === 3), "a band wider at its foot among its first four");
+  const rects = grid.slice(0, 16).filter((p): p is number[] => Array.isArray(p));
+  assert.equal(new Set(rects.map((c) => c.join())).size, rects.length);
+  const shapes = rects.map(([, , w, h]) => h! / w!);
+  assert.ok(Math.max(...shapes) / Math.min(...shapes) > 3, `its shapes: ${shapes.map((r) => r.toFixed(2)).join(" ")}`);
+  assert.ok(shapes.filter((r) => r > 0.8 && r < 1.25).length <= rects.length / 2, "not mostly squares");
+  for (const [x, y, w, h] of rects) assert.ok(x! >= 0 && y! >= 0 && x! + w! <= 1080 && y! + h! <= 1363 && w! >= 75 && h! >= 76, JSON.stringify([x, y, w, h]));
+  assert.deepEqual(grid.slice(16), [[0, 1363, 1080, 557], [0, 0, 366, 682]]);
+  // The same cut on every frame and every render (seeded), and a whole partition of the part above the street.
+  assert.deepEqual(clipAt(at[18]! - 1, {}), grid);
   // The camera never moves: no zoom nor push, even to fill the screen.
   assert.doesNotMatch(facade.code, /scale\(|transform/);
 });
@@ -4764,7 +4784,7 @@ test("« Façade qui se construit » (v2): vertical as its original, her horizon
   assert.deepEqual(input.objets?.map((o) => [o.slot, o.case]), [["morceaux", 1], ["enseigne", 1]]);
   const plan = skillPlan({ skill: facade, name: "Façade qui se construit", files, fill: { shots: [{ file: "front", at: 0 }, { file: "inside", at: 1 }], texts: {}, end: null, settings: { format: "vertical" } } });
   assert.equal(plan.layers![0]!.motion.texts!.format, "vertical");
-  assert.deepEqual(plan.skill, { key: "facade", version: 2, settings: { format: "vertical" } });
+  assert.deepEqual(plan.skill, { key: "facade", version: 3, settings: { format: "vertical" } });
 });
 
 // ——— « Coulisses façon fiche » v2, written again on its original's fiche (docs/fiches/coulisses.md) ——————————————————
@@ -9868,7 +9888,7 @@ test("« Ton nom qui clignote » (v2): its rounded window on black when her vide
   assert.deepEqual(plan.layers![0]!.motion.drawn, { shots: 23, subjects: [0] });
 });
 
-// ——— « Présente-toi » v2 and « Vision machine » v1, written on their originals' fiches (docs/fiches/silhouette.md, vision.md) ———
+// ——— « Présente-toi » v4 (its own design on its original's idea) and « Vision machine » v1 (docs/fiches/silhouette.md, vision.md) ———
 
 type KitRead = { boxes?: Record<string, TdBox>; outlines?: Record<string, string>; parts?: Record<string, TdBox[]>; heads?: { from: number; to: number; what: string }[]; light?: { mean: number; high: number } };
 /**
@@ -9933,43 +9953,43 @@ async function silhouetteAt(frame: number, read: KitRead = {}, options: { settin
 /** Her profile cut out (its box and outline, the top of her head at 700 px), as the engine reads it on her first shot. */
 const SIL_READ: KitRead = { boxes: { "0": { x: 300, y: 700, w: 560, h: 1220 } }, outlines: { "0": "M 470 700 C 560 690 640 720 660 800 C 700 820 760 900 860 1000 L 860 1920 L 300 1920 C 300 1500 330 1200 380 1000 C 400 900 410 760 470 700 Z" } };
 
-test("« Présente-toi » (v2) changes where its original does, on its own music (84,5 BPM), with its clicks, its break and its last hit", async () => {
+test("« Présente-toi » (v4) changes on its original's bars (84,5 BPM), with its clicks, its break and its last hit", async () => {
   const { silhouette, letterFrames } = await import("./skills/silhouette.ts");
   const { skillPlan } = await import("./skills.ts");
-  assert.equal(silhouette.version, 3);
+  assert.equal(silhouette.version, 4);
   assert.equal(silhouette.bpm, 84.5);
   assert.deepEqual([silhouette.shots, silhouette.files], [[2, 2], [1, 4]]);
   const line = silhouette.timeline(2, { end: false, words: { bonjour: "Hello" } });
-  // The original's five changes (its images at 30 i/s: the negative, the cut on him, the lids on the drop, the eye open
-  // onto the pale, the cut on the logo), each within two images, on its beats from its first bar (1,5 beats in).
-  const original = [14, 32, 117, 161, 287];
-  const ours = [line.marks.negative!, line.marks.cut!, line.marks.eye!, line.marks.open! + 1, line.marks.logo!];
+  // Its four bars where its original's fall (its images at 30 i/s: the cut on him, the drop, the cut on the logo), each
+  // within two images, and its break on beat 3 of the first bar (the original's 3,20 s).
+  const original = [32, 117, 287, 96];
+  const ours = [line.marks.cut!, line.marks.drop!, line.marks.logo!, line.marks.flip!];
   ours.forEach((f, i) => assert.ok(Math.abs(f - original[i]!) <= 2, `change ${i + 1}: image ${f}, the original's ${original[i]}`));
   assert.ok(Math.abs(line.duration - 11.07) < 0.02, `${line.duration} s`);
-  // Its two shots: her profile, played from the cut on her to the lids (its first 1,5 beats under the opening), then a
-  // shot never seen under the eye, her trades and her logo; her cut-out made on her profile only.
+  // Its two shots: her profile, played from the cut on her to the drop, then a shot never seen under her trade, her name
+  // and her logo; her cut-out made on her profile only.
   assert.deepEqual(line.shots.map((s) => [s.start, s.end]), [[0, 3.9], [3.9, 11.07]]);
   assert.deepEqual(line.cutouts, [0]);
   assert.deepEqual(silhouette.reads, ["gestures"]);
-  // A key click on each letter of her first word as its code types it (« Hello »: the original's 0,16 · 0,60 · 0,71 ·
-  // 0,83 · 0,97 s, within an image), a click as the letters of « Votre » pop (2,93 s), a breath rising into the drop.
-  const keys = line.sounds!.filter((s) => s.sound === "keyboard key click").map((s) => s.at * 30);
-  [4.8, 18, 21.3, 24.9, 29.1, 87.9].forEach((f, i) => assert.ok(Math.abs(keys[i]! - f) <= 1, `click ${i + 1}: image ${keys[i]}, the original's ${f}`));
-  assert.equal(keys.length, 6);
-  assert.deepEqual(letterFrames(7, 5, 18, 29), [5, 18, 20, 22, 25, 27, 29]);
+  // A light click on each letter of her greeting as its code stamps it (evenly from image 4 to 26), a breath rising
+  // into the drop; nothing of the original's keyboard.
+  const clicks = line.sounds!.filter((s) => s.sound === "light click").map((s) => Math.round(s.at * 30));
+  assert.deepEqual(clicks, letterFrames(5, 4, 26));
+  assert.deepEqual(letterFrames(5, 4, 26), [4, 10, 15, 21, 26]);
+  assert.ok(!line.sounds!.some((s) => /keyboard/.test(s.sound)));
   assert.deepEqual(line.sounds!.at(-1), { at: 3.9, sound: "short rising whoosh", seconds: 0.5, gain: -4 });
-  assert.equal(silhouette.timeline(2, { end: false }).sounds!.length, 2);
-  // Its music's first strong beat on its first bar; on beat 3 of that bar it breaks (its last hit ringing) until the drop
-  // on the lids, a little softer before; it stops on its last hit (her logo's cut) and rings 1,4 s, as the original's.
+  assert.equal(silhouette.timeline(2, { end: false }).sounds!.length, 1);
+  // Its music's first strong beat on its first bar; on beat 3 of that bar it breaks (its last hit ringing) until the
+  // drop, a little softer before; it stops on its last hit (her logo's cut) and rings 1,4 s, as the original's.
   assert.deepEqual(line.music, { downbeat: 1.067, pauses: [{ from: 3.2, to: 3.9, tail: 0.6 }], filters: [{ kind: "soft", from: 0, to: 3.2, db: -2 }], end: { at: 9.7, tail: 1.4 } });
-  // Her texts at their moments: her first word in the opening, « Je suis » in her head, her name from its typing to her
-  // logo, « Votre » as its letters pop, her trade from the iris, what she does on its hits.
+  // Her texts at their moments: her greeting in the opening, « Je suis » in her head, her name from its typing to her
+  // logo, « Votre » and her trade from the drop, what she does on its hits.
   assert.deepEqual(Object.fromEntries(Object.entries(line.texts).map(([k, t]) => [k, [Math.round(t.from * 30), Math.round(t.to * 30)]])), {
-    bonjour: [5, 32],
+    bonjour: [4, 32],
     je: [32, 50],
     nom: [50, 288],
-    ton: [88, 117],
-    metier: [146, 234],
+    ton: [117, 234],
+    metier: [117, 234],
     choses: [165, 234],
   });
   // With an ending card: after her logo, the card's 1,6 s at least, the music faded under it; at another tempo, all of it
@@ -9978,7 +9998,7 @@ test("« Présente-toi » (v2) changes where its original does, on its own music
   assert.ok(ended.duration * 30 - ended.marks.logo_out! >= 48, `${ended.duration} s`);
   assert.deepEqual(ended.music!.end, { at: ended.duration, fade: 0.6 });
   const slower = silhouette.timeline(2, { end: false, bpm: 70 });
-  assert.ok(Math.abs(slower.marks.eye! - 117 * (84.5 / 70)) <= 1 && Math.abs(slower.duration - line.duration * (84.5 / 70)) < 0.05);
+  assert.ok(Math.abs(slower.marks.drop! - 117 * (84.5 / 70)) <= 1 && Math.abs(slower.duration - line.duration * (84.5 / 70)) < 0.05);
   // On the plan, with or without its card: valid, her words in its six slots, her cut-out on her profile only.
   for (const end of [false, true]) {
     const files = [{ id: "v0", photo: false, seconds: 12 }];
@@ -9986,111 +10006,131 @@ test("« Présente-toi » (v2) changes where its original does, on its own music
     assert.ok(editPlanSchema.safeParse(plan).success);
     assert.equal(plan.texts.length, 6);
     assert.deepEqual(plan.layers![0]!.motion.drawn, { shots: 2, subjects: [0] });
-    assert.deepEqual(plan.skill, { key: "silhouette", version: 3 });
-    assert.equal(plan.sounds?.length, 7);
+    assert.deepEqual(plan.skill, { key: "silhouette", version: 4 });
+    assert.equal(plan.sounds?.length, 6);
   }
 });
 
-test("« Présente-toi » (v2): its layout program, her silhouette with « Je suis » in it, her name behind her, the eye, her trades, her logo", async () => {
+test("« Présente-toi » (v4): its own design, her greeting stamped, her silhouette with « Je suis » in it, her name behind her, her trade, her logo", async () => {
+  const { silhouette } = await import("./skills/silhouette.ts");
   const at = async (f: number, read = SIL_READ, options = {}) => (await silhouetteAt(f, read, options)).tree;
   const bg = (tree: Drawn) => styleOf(tree).backgroundColor;
-  // Midnight blue, her first letter alone, white; the whole picture negative on image 14 (the pale, the ink); her word
-  // typed whole by image 29 with its peach echo while it grows; its guides and px counts a decor; a pixel hand from 17.
-  const five = await at(5);
-  assert.equal(bg(five), "#0d0d1b");
-  assert.equal(textIn(byKey(five, "word")), "H");
-  assert.equal(bg(await at(14)), "#f3f4f9");
-  const echo = byKey(await at(29), "word")!;
-  assert.equal(echo.type, "Echo");
-  assert.equal(echo.props.color, "#d99868");
-  const typed = (echo.props.draw as (f: number) => Drawn)(29);
-  assert.equal(textIn(typed), "Hello");
-  assert.equal(styleOf(drawnNodes(typed)[0]!).color, "#0a0a10");
-  assert.ok(drawnNodes(byKey(five, "guides")!).some((n) => "data-fauve-decor" in n.props));
-  const hand = byKey(await at(20), "hand")!;
-  assert.deepEqual([hand.type, hand.props.at, hand.props.frames, hand.props.build], ["DotGrid", 17, 4, "rise"]);
-  assert.match(String(hand.props.shape), /^M\d/);
-  assert.equal(byKey(await at(32), "hand"), undefined);
-  // Her profile from the cut: her cut-out filled with one midnight tone, played from the cut, on the pale; « Je suis » in
-  // white in her head, kept inside her outline; no cut-out: her shot as a hard black and white print on the pale.
+  const PAPER = "#efe9de", INK = "#1b1714", VERMILION = "#e0512f";
+  // Nothing of the original's own design (Tristan: « trop similaire à la vidéo originale »): no layout program and its px
+  // counts, no negative, no hand of dots, no letter turned into an eye, no almond, no wavy line, no clap, no echo; never
+  // its midnight blue, its cold pale nor its peach.
+  assert.doesNotMatch(silhouette.code, /#0d0d1b|#0f0f1c|#f3f4f9|#d99868|#d69665|DotGrid|Window|Picto|Echo|reveal: "eye"|"px"/);
+  // Her paper; her greeting stamped letter by letter in her dark, each at once; an accent rule drawing itself under it.
+  const ten = await at(10);
+  assert.equal(bg(ten), PAPER);
+  const greeting = byKey(ten, "word")!;
+  const spans = drawnNodes(greeting).filter((n) => n.type === "span");
+  assert.equal(spans.map(drawnText).join(""), "Hello");
+  assert.deepEqual(spans.map((s) => styleOf(s).opacity), [1, 1, 0, 0, 0]);
+  const ruleAt = async (f: number) => styleOf(byKey((await at(f)), "rule")!);
+  assert.equal((await ruleAt(10)).background, VERMILION);
+  assert.ok(Number((await ruleAt(10)).width) > 0 && Number((await ruleAt(10)).width) < Number((await ruleAt(30)).width));
+  // Her profile from the cut: her cut-out filled with her one dark tone, played from the cut, on the paper; « Je suis »
+  // in pale in her head, kept inside her outline; no cut-out: her shot as a hard black and white print.
   const sil = await at(40);
+  assert.equal(bg(sil), PAPER);
   const her = drawnNodes(sil).find((n) => n.type === "Subject")!;
-  assert.deepEqual([her.props.shot, her.props.at, her.props.fill], [0, 32, "#0f0f1c"]);
+  assert.deepEqual([her.props.shot, her.props.at, her.props.fill], [0, 32, INK]);
   assert.ok(!drawnNodes(sil).some((n) => n.type === "Footage"));
-  // Her picture laid whole, in its own shape (a horizontal video is not cropped round her head), down to the frame's bottom.
   const laidHer = styleOf(her);
   assert.ok(Math.abs(Number(laidHer.width) / Number(laidHer.height) - 16 / 9) < 0.01, `${laidHer.width} × ${laidHer.height}`);
   assert.ok(Number(laidHer.top) + Number(laidHer.height) >= 1920);
   const im = byKey(sil, "im")!;
   assert.equal(textIn(im), "Je suis");
   assert.match(String(styleOf(im).clipPath), /^path\('M 470 700/);
-  // Her outline in pieces where her picture cuts her (the kit leaves it open there): joined into one shape for the clip.
+  assert.ok(drawnNodes(im).some((n) => styleOf(n).color === PAPER));
   const open = { ...SIL_READ, outlines: { "0": "M 300 1910 C 300 1500 330 1200 380 1000 C 400 900 410 760 470 700 C 560 690 640 720 660 800 M 700 820 C 760 900 860 1000 860 1910" } };
   assert.match(String(styleOf(byKey(await at(40, open), "im")!).clipPath), /^path\('M 300 1910 C .* L 700 820 C [^M]* Z'\)$/);
-  assert.ok(drawnNodes(im).some((n) => styleOf(n).color === "#ffffff"));
   const bare = await at(40, {});
   assert.match(String(styleOf(drawnNodes(bare).find((n) => n.type === "Footage")!).filter), /grayscale\(1\)/);
-  // Its first letter peach, the rest gone from its end as she lowers her head (on the beat here: nothing measured).
-  const peach = drawnNodes(byKey(await at(47), "im")!).filter((n) => n.type === "span");
-  assert.deepEqual([styleOf(peach[0]!).color, styleOf(peach[6]!).opacity], ["#d99868", 0]);
-  // Her name typed behind her head (painted before her), 40 letters a second, a peach cursor; its last name rising away.
+  // Its letters gone from its end as she lowers her head (on the beat here: nothing measured).
+  const going = drawnNodes(byKey(await at(48), "im")!).filter((n) => n.type === "span");
+  assert.deepEqual([styleOf(going[0]!).opacity, styleOf(going[6]!).opacity], [1, 0]);
+  // Her name typed behind her head (painted before her), 40 letters a second, a cursor in her accent; its last name
+  // rising away, her first name held.
   const typing = await at(57);
   const name = byKey(typing, "name")!;
   assert.match(textIn(name), /^Héloïse Ma/);
+  assert.ok(drawnNodes(name).some((n) => styleOf(n).background === VERMILION));
   const order = (tree: Drawn) => (tree.children as unknown[]).flat().filter(Boolean).map((c) => String((c as Drawn).props.key));
   assert.ok(order(typing).indexOf("name") < order(typing).indexOf("her"));
   const leaving = drawnNodes(byKey(await at(75), "name")!).find((n) => textIn(n) === " Marchand")!;
   assert.ok(Number(styleOf(leaving).opacity) < 1 && /translateY\(-/.test(String(styleOf(leaving).transform)));
-  // « Votre » in front of her, its round letter higher; it fills with peach, a pupil grows: an eye.
-  assert.equal(textIn(byKey(await at(92), "ton")), "Votre");
-  assert.ok(drawnNodes(byKey(await at(104), "seye")!).filter((n) => n.type === "circle").length === 2);
-  // On the drop: lids closing into an almond on the midnight blue (a window that opens as an eye, moved four times, to
-  // a box past the whole frame when it opens onto the pale); her trade white only inside the iris.
-  const eye = byKey(await at(117), "eye")!;
-  assert.deepEqual([eye.type, eye.props.reveal, eye.props.at, eye.props.open, (eye.props.moves as unknown[]).length], ["Window", "eye", 117, 0, 4]);
-  assert.equal(bg(await at(117)), "#0d0d1b");
-  const iris = drawnNodes(byKey(await at(150), "eye")!).find((n) => /^circle\(/.test(String(styleOf(n).clipPath)));
-  assert.ok(iris && textIn(iris) === "Fleuriste");
-  // Her trade held, what she does on the hits (faster, then settling), the peach dot then her trade's pictogram.
-  const jobs = async (f: number) => textIn(byKey(await at(f), "jobs"));
-  assert.deepEqual(await Promise.all([165, 181, 197, 213, 230].map(jobs)), ["Fleuristebouquets", "Fleuristemariages", "Fleuristedeuil", "Fleuristeplantes", "Fleuristeplantes"]);
-  assert.equal(drawnNodes(byKey(await at(190), "jobs")!).find((n) => n.type === "Picto")?.props.name, "Fleuriste");
-  // Her name alone, receding; on the last bar, the blue and her place's name in white capitals (or her logo, whitened).
-  assert.equal(textIn(byKey(await at(240), "alone")), "Héloïse Marchand");
+  // On the break (beat 3 of its first bar), her paper turns to her accent, her silhouette and her first name held on it.
+  const flip = await at(100);
+  assert.equal(bg(flip), VERMILION);
+  assert.ok(drawnNodes(flip).some((n) => n.type === "Subject"));
+  assert.match(textIn(byKey(flip, "name")), /^Héloïse/);
+  // On the drop, her dark ground, « Votre » and her trade in pale, an accent block wiping in under it.
+  const drop = await at(120);
+  assert.equal(bg(drop), INK);
+  assert.ok(!drawnNodes(drop).some((n) => n.type === "Subject"));
+  assert.equal(textIn(byKey(drop, "trade")), "VotreFleuriste");
+  assert.equal(styleOf(byKey(drop, "bar")!).background, VERMILION);
+  // What she does on the hits (faster, then settling), each word in its own accent block, in her dark.
+  const job = async (f: number) => {
+    const node = drawnNodes((await at(f)) as Drawn).find((n) => String(n.props.key ?? "").startsWith("job-"));
+    return node ? [textIn(node), styleOf(node).background, styleOf(node).color] : null;
+  };
+  assert.deepEqual(await Promise.all([165, 181, 197, 213, 230].map(async (f) => (await job(f))?.[0])), ["bouquets", "mariages", "deuil", "plantes", "plantes"]);
+  assert.deepEqual((await job(170))!.slice(1), [VERMILION, INK]);
+  // Her name on two lines on her paper, an accent rule under it; on the last bar, her accent and her place's name in
+  // her dark capitals (or her logo, darkened).
+  const alone = await at(240);
+  assert.equal(bg(alone), PAPER);
+  assert.equal(textIn(byKey(alone, "alone")), "HéloïseMarchand");
   const last = await at(290);
-  assert.equal(bg(last), "#0d0d1b");
+  assert.equal(bg(last), VERMILION);
   assert.equal(textIn(byKey(last, "logo")), "ATELIER ROSE");
-  assert.equal(byKey(await at(290, SIL_READ, { brand: { logoUrl: "/logo.png" } }), "logo")?.type, "Img");
+  const img = byKey(await at(290, SIL_READ, { brand: { logoUrl: "/logo.png" } }), "logo")!;
+  assert.deepEqual([img.type, styleOf(img).filter], ["Img", "brightness(0)"]);
   assert.equal(textIn(byKey(await at(345, SIL_READ, { end: true }), "end")), "Ouvert dimanchede 10 h à 18 h");
+  // Her charter's colours when they read together: her pale for the paper, her dark for her silhouette, her accent.
+  const charter = { accent: "#c8553d", palette: { dark: "#14211c", light: "#f4efe6", secondary: "#888888" } } as unknown as Record<string, string>;
+  assert.equal(bg(await at(10, SIL_READ, { brand: charter })), "#f4efe6");
+  assert.equal(drawnNodes(await at(40, SIL_READ, { brand: charter })).find((n) => n.type === "Subject")!.props.fill, "#14211c");
+  assert.equal(bg(await at(100, SIL_READ, { brand: charter })), "#c8553d");
 });
 
-test("« Présente-toi » (v2): vertical by default, the original's 16:9 frame on her word; light to render; timed on her head when it is measured", async () => {
+test("« Présente-toi » (v4): vertical by default, a 16:9 frame on her word; light to render; timed on her head when it is measured", async () => {
   const { silhouette } = await import("./skills/silhouette.ts");
   const { skillSettings } = await import("./skills.ts");
-  // Vertical full frame by default (drawn on its two flat colours, whatever her videos); on her word, the original's
-  // 16:9 frame in the middle on midnight bands, the pale scenes a band, the dark ones the whole frame.
   assert.deepEqual(silhouette.settings?.map((s) => [s.name, s.choices.map((c) => c.value)]), [["format", ["auto", "horizontal", "vertical"]]]);
   assert.deepEqual(skillSettings(silhouette, [{ name: "format", value: "horizontal" }]), { format: "horizontal" });
   const tall = (await silhouetteAt(40, SIL_READ)).tree;
-  assert.equal(styleOf(tall).backgroundColor, "#f3f4f9");
+  assert.equal(styleOf(tall).backgroundColor, "#efe9de");
   const wide = (await silhouetteAt(40, SIL_READ, { settings: { format: "horizontal" } })).tree;
-  assert.equal(styleOf(wide).backgroundColor, "#0d0d1b");
-  const band = drawnNodes(wide).find((n) => styleOf(n).background === "#f3f4f9" && styleOf(n).top === 656)!;
+  assert.equal(styleOf(wide).backgroundColor, "#1b1714");
+  const band = drawnNodes(wide).find((n) => styleOf(n).background === "#efe9de" && styleOf(n).top === 656)!;
   assert.deepEqual([styleOf(band).left, styleOf(band).width, styleOf(band).height], [0, 1080, 608]);
-  // Light to render: her shot and her cut-out are drawn only while they are seen (the cut to the lids), and only her
-  // profile is cut out; the pieces of each moment mounted only during it.
+  // Light to render: her shot and her cut-out are drawn only while they are seen (the cut to the drop), and only her
+  // profile is cut out.
   const { props } = await silhouetteAt(0, SIL_READ);
   assert.deepEqual([...(await cutoutsDrawn(silhouette.code, props, Array.from({ length: props.durationInFrames }, (_, f) => f)))], [0]);
   const seen: number[] = [];
   for (let f = 0; f < props.durationInFrames; f++) if (drawnNodes((await silhouetteAt(f, SIL_READ)).tree).some((n) => n.type === "Subject" || n.type === "Footage")) seen.push(f);
-  assert.deepEqual([seen[0], seen.at(-1), seen.length], [32, 118, 87]);
+  assert.deepEqual([seen[0], seen.at(-1), seen.length], [32, 116, 85]);
   // Her head lowered as her tracks measure it (frames of her shot at its own moment): « Je suis » goes as it starts, her
   // name types five images in.
   const heads = { ...SIL_READ, heads: [{ from: 20, to: 28, what: "down" }] };
-  const measured = drawnNodes(byKey((await silhouetteAt(52, heads)).tree, "im")!).filter((n) => n.type === "span");
-  assert.equal(styleOf(measured[0]!).color, "#d99868");
+  const measured = drawnNodes(byKey((await silhouetteAt(53, heads)).tree, "im")!).filter((n) => n.type === "span");
+  assert.deepEqual([styleOf(measured[0]!).opacity, styleOf(measured[6]!).opacity], [1, 0.5]);
   assert.equal(byKey((await silhouetteAt(56, heads)).tree, "name"), undefined);
   assert.ok(byKey((await silhouetteAt(57, heads)).tree, "name"));
+  // Every word to read inside the safe zone: at its moments, below the middle within x 140 to 940, nothing in the
+  // bottom quarter.
+  for (const f of [20, 120, 170, 240, 290]) {
+    for (const n of drawnNodes((await silhouetteAt(f, SIL_READ)).tree)) {
+      const s = styleOf(n) as Record<string, number | string>;
+      if (n.type !== "div" || typeof s.top !== "number" || typeof s.fontSize !== "number" || !drawnText(n)) continue;
+      assert.ok(Number(s.top) + Number(s.fontSize) <= 1440, `image ${f}: « ${drawnText(n)} » at ${s.top}`);
+    }
+  }
 });
 
 const VIS_NAMED = { sujet: "woman standing at the tram stop", support: "tram shelter" };
@@ -10260,7 +10300,7 @@ test("« Vision machine » (v1): vertical as its original, her shot in a 16:9 ba
   assert.ok(most <= 4, `${most} layers`);
 });
 
-test("« Présente-toi » (v3): nobody in profile, what the filler named there takes her place; the print's threshold from her shot's light", async () => {
+test("« Présente-toi » (v3, v4): nobody in profile, what the filler named there takes her place; the print's threshold from her shot's light", async () => {
   const { silhouette } = await import("./skills/silhouette.ts");
   const { skillCode, skillDrawn } = await import("./skills.ts");
   // The filler names what stands in her place only when nobody is in profile there; the engine follows it on her first shot.
@@ -10274,26 +10314,26 @@ test("« Présente-toi » (v3): nobody in profile, what the filler named there t
     boxes: { "0#bouquet of roses": { x: 280, y: 820, w: 520, h: 1100 } },
     outlines: { "0#bouquet of roses": "M 540 820 C 700 830 800 1000 780 1200 L 760 1920 L 320 1920 L 300 1200 C 290 1000 380 830 540 820 Z" },
   };
-  // Its shape cut out in her place, one midnight tone, « Je suis » kept inside it.
+  // Its shape cut out in her place, one dark tone (its own warm ink since v4), « Je suis » kept inside it.
   const named = await drawKit(code, 40, props, bouquet);
   const cut = drawnNodes(named).find((n) => n.type === "Subject")!;
-  assert.deepEqual([cut.props.shot, cut.props.at, cut.props.fill, cut.props.object], [0, 32, "#0f0f1c", "bouquet of roses"]);
+  assert.deepEqual([cut.props.shot, cut.props.at, cut.props.fill, cut.props.object], [0, 32, "#1b1714", "bouquet of roses"]);
   assert.match(String(styleOf(byKey(named, "im")!).clipPath), /^path\('M 540 820/);
-  // Under the lids too, on the drop.
-  assert.equal(drawnNodes(byKey(await drawKit(code, 117, props, bouquet), "eye")!).find((n) => n.type === "Subject")?.props.object, "bouquet of roses");
+  // Held on her accent through the break, to the drop.
+  assert.equal(drawnNodes(await drawKit(code, 110, props, bouquet)).find((n) => n.type === "Subject")?.props.object, "bouquet of roses");
   // Her own cut-out first when she is in it: the object is left.
   const both = await drawKit(code, 40, props, { boxes: { ...SIL_READ.boxes, ...bouquet.boxes }, outlines: { ...SIL_READ.outlines, ...bouquet.outlines } });
   assert.equal(drawnNodes(both).find((n) => n.type === "Subject")!.props.object, undefined);
   // Nothing named (its code as written): no object, her print.
   assert.equal(drawnNodes(await drawKit(silhouette.code, 40, props, bouquet)).find((n) => n.type === "Subject"), undefined);
   // No cut-out at all: her shot as a print whose threshold is her shot's light (a bright window stays half dark), its
-  // darks midnight and its lights the pale; unmeasured, as before.
+  // darks her dark tone and its lights the ground; unmeasured, as before.
   const print = async (light?: { mean: number; high: number }) => drawnNodes(await drawKit(silhouette.code, 40, props, light ? { light } : {})).find((n) => n.type === "Footage")!;
   assert.match(String(styleOf(await print({ mean: 0.8, high: 0.95 })).filter), new RegExp("^grayscale\\(1\\) brightness\\(" + (0.5 / 0.8).toFixed(2) + "\\) contrast\\(3\\.2\\)$"));
   assert.match(String(styleOf(await print({ mean: 0.1, high: 0.3 })).filter), /brightness\(2\.40\)/);
   assert.match(String(styleOf(await print()).filter), /brightness\(1\.35\)/);
   const blends = drawnNodes(await drawKit(silhouette.code, 40, props, {})).filter((n) => styleOf(n).mixBlendMode);
-  assert.deepEqual(blends.map((n) => [styleOf(n).background, styleOf(n).mixBlendMode]), [["#f3f4f9", "darken"], ["#0f0f1c", "lighten"]]);
+  assert.deepEqual(blends.map((n) => [styleOf(n).background, styleOf(n).mixBlendMode]), [["#efe9de", "darken"], ["#1b1714", "lighten"]]);
 });
 
 test("« Interrupteur » (v6): held only once nothing of her is left in her cut-out; her hands still at the edge play on to the end", async () => {
