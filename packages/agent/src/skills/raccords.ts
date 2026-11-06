@@ -11,9 +11,10 @@ import { beatSpans, toFrame, type MontageSkill } from "../skills.ts";
 // 114, 124, 142, 146, 154, 162, 176, 188, 217, each within one):
 //   −2,1 – 6     her first shot (someone close who smiles and turns): her word in very bold round capitals across the
 //                frame, blinking image by image (on at images 0, 2, 4 to 10, 12, 14: the original's « OK », its own, never
-//                copied); from 2,75 the next shot shows in its lights (a « darken » blend rising), its darks in front;
-//   6 – 14,25    the next shot; on 9, 10, 12 and 13 the shot after it arrives in nine square cells in the middle (one, the
-//                column, the cross, all nine), dimmed, exactly where it will be;
+//                copied); from 2,75 the next shot shows in its lights, its darks in front (a « darken » blend rising; in
+//                its shadows on a dark shot);
+//   6 – 14,25    the next shot; on 9, 10, 12 and 13 the shot after it arrives in nine square cells about its subject (one,
+//                the column, the cross, all nine), dimmed, exactly where it will be;
 //   14,25 – 24   that shot, dimmed, lighting up in three images onto the bar's first beat (16), where the bass comes back;
 //                on 19,25, 20,25 and 22 the next one's subject arrives cut out in three pieces (its two outer thirds, then
 //                its middle);
@@ -132,14 +133,24 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const pops = nx > 0 ? popsOf(cur) : [];
   const hit = pops.filter((p) => frame >= p).length;
 
-  // 3. The nine cells: square, 27 % of the grid each, the grid 0,7 of the width (0,62 of a band's height) about the
-  // middle of the frame, as the original's (its cells 11,5 % of the width, its grid centred at 49 % and 54 %); laid in
-  // the original's order: the middle, its column, the cross, the corners.
+  // 3. The nine cells: square, 27 % of the grid each, the grid 0,7 of the width (0,62 of a band's height), about the
+  // subject of the shot they show, where Footage frames it (its focus, the original's lamp in the middle of its cells),
+  // else the middle at 53 % of the height (the original's grid centred at 49 % and 54 %); laid in the original's order:
+  // the middle, its column, the cross, the corners.
   const G = Math.round(Math.min(bw * 0.7, bh * 0.62));
   const C = Math.round(G * 0.27);
   const GAP = Math.round((G - 3 * C) / 2);
-  const gx = Math.round(bw / 2 - G / 2);
-  const gy = Math.round(Math.min(bh - G - 20, Math.max(20, bh * 0.53 - G / 2)));
+  const focusOf = (s) => {
+    const f = s && s.focus;
+    if (!f || !Number.isFinite(f.x) || !Number.isFinite(f.y)) return { x: bw / 2, y: bh * 0.53 };
+    const A = Number(s.aspect) || bw / bh;
+    const dw = A > bw / bh ? bh * A : bw;
+    const dh = A > bw / bh ? bh : bw / A;
+    return { x: f.x * dw - Math.max(0, Math.min(dw - bw, f.x * dw - bw / 2)), y: f.y * dh - Math.max(0, Math.min(dh - bh, f.y * dh - bh / 2)) };
+  };
+  const centre = focusOf(nx > 0 ? shots[nx] : null);
+  const gx = Math.round(Math.min(bw - G - 20, Math.max(20, centre.x - G / 2)));
+  const gy = Math.round(Math.min(bh - G - 20, Math.max(20, centre.y - G / 2)));
   const ORDER = [[1, 1], [0, 1], [2, 1], [1, 0], [1, 2], [0, 0], [0, 2], [2, 0], [2, 2]];
   const rect = (x, y, w, hh) => "M" + Math.round(x) + " " + Math.round(y) + "h" + Math.round(w) + "v" + Math.round(hh) + "h" + -Math.round(w) + "Z";
   const cellsPath = (count) => ORDER.slice(0, count).map(([r, c]) => rect(gx + c * (C + GAP), gy + r * (C + GAP), C, C)).join("");
@@ -152,9 +163,13 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   if (litAt > 0 && frame < litAt) layers.push(h("div", { key: "dim", style: { ...box, backgroundColor: "#000000", opacity: interpolate(frame, [litAt - 3, litAt], [DIM, 0], clamp) } }));
 
   if (nx > 0 && kind === 0) {
-    // The double exposure: the next shot's first image in her shot's lights, her darks in front, more and more to the cut.
+    // The double exposure: the next shot's first image where her shot is empty, her subject in front, more and more to
+    // the cut: in her lights, her darks in front (« darken », the original's sky), or in her shadows when her shot is a
+    // dark one, her lights in front (« lighten »: her face, not the next place, would hold the darken).
     const from = mark("blend_" + cur, shots[nx].from - 16);
-    if (frame >= from) layers.push(h(Footage, { key: "x" + nx, shot: nx, style: { ...box, mixBlendMode: "darken", opacity: interpolate(frame, [from, from + 6], [0.6, 1], clamp) } }));
+    const lit0 = LightUnder(shots[0], 0, laid);
+    const blend = !lit0 || lit0.mean >= 0.45 ? "darken" : "lighten";
+    if (frame >= from) layers.push(h(Footage, { key: "x" + nx, shot: nx, style: { ...box, mixBlendMode: blend, opacity: interpolate(frame, [from, from + 6], [0.6, 1], clamp) } }));
   } else if (nx > 0 && hit > 0) {
     // Its subject cut out on its first image, where it will be: in three pieces (its two outer thirds, then its middle;
     // the side first changes from one raccord to the next) or whole; without a cut-out worth it, its picture in cells.

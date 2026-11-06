@@ -9,9 +9,9 @@ import type { EffectPiece, PieceTimelineInput } from "../pieces.ts";
 // light, the shot arriving dimmed and lit in three images onto 1¾ sixteenths after it (the original's lamp on its bar's
 // first beat); then the pieces; then that subject whole, 2½ sixteenths before the cut, the cut keeping it in place (the
 // match). Without a cut-out worth it (none made, a subject under 4 % of the frame), its picture in cells on the same
-// hits. The music loses its bass while each one builds, and gets it back where it lands (the cut, or the light). Kept
+// hits. Its cells about the subject of the shot they show, where the montage frames it (its focus). The music loses its bass while each one builds, and gets it back where it lands (the cut, or the light). Kept
 // from the model: the cells' grid (0,7 of the width, each cell 0,27 of it, square, about the middle at 53 % of the
-// height), their order, the thirds, the dim and its light, their sixteenths at the Reel's tempo (pressed into a short
+// height without a focus), their order, the thirds, the dim and its light, their sixteenths at the Reel's tempo (pressed into a short
 // shot, the earliest left out when it is too short). Left out: its word blinking over the first shot, its double
 // exposure, its format setting (the montage frames her shots), its ending card.
 
@@ -76,16 +76,27 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
     cuts.push({ at, next: i, kind: mark("kind_" + k, 2), pops, lit: mark("lit_" + k, -1) });
   });
 
-  // The nine cells: square, 27 % of the grid each, the grid 0,7 of the width about the middle, at 53 % of the height;
-  // laid in the model's order: the middle, its column, the cross, the corners.
+  // The nine cells: square, 27 % of the grid each, the grid 0,7 of the width, about the subject of the shot they show
+  // where the montage frames it (its focus), else the middle at 53 % of the height; laid in the model's order: the
+  // middle, its column, the cross, the corners.
   const G = Math.round(width * 0.7);
   const C = Math.round(G * 0.27);
   const GAP = Math.round((G - 3 * C) / 2);
-  const gx = Math.round(width / 2 - G / 2);
-  const gy = Math.round(Math.min(height - G - 20, Math.max(20, height * 0.53 - G / 2)));
+  const focusOf = (s) => {
+    const f = s && s.focus;
+    if (!f || !Number.isFinite(f.x) || !Number.isFinite(f.y)) return { x: width / 2, y: height * 0.53 };
+    const A = Number(s.aspect) || width / height;
+    const dw = A > width / height ? height * A : width;
+    const dh = A > width / height ? height : width / A;
+    return { x: f.x * dw - Math.max(0, Math.min(dw - width, f.x * dw - width / 2)), y: f.y * dh - Math.max(0, Math.min(dh - height, f.y * dh - height / 2)) };
+  };
   const ORDER = [[1, 1], [0, 1], [2, 1], [1, 0], [1, 2], [0, 0], [0, 2], [2, 0], [2, 2]];
   const rect = (x, y, w, hh) => "M" + Math.round(x) + " " + Math.round(y) + "h" + Math.round(w) + "v" + Math.round(hh) + "h" + -Math.round(w) + "Z";
-  const cellsPath = (count) => ORDER.slice(0, count).map(([r, c]) => rect(gx + c * (C + GAP), gy + r * (C + GAP), C, C)).join("");
+  const cellsPath = (count, centre) => {
+    const gx = Math.round(Math.min(width - G - 20, Math.max(20, centre.x - G / 2)));
+    const gy = Math.round(Math.min(height - G - 20, Math.max(20, centre.y - G / 2)));
+    return ORDER.slice(0, count).map(([r, c]) => rect(gx + c * (C + GAP), gy + r * (C + GAP), C, C)).join("");
+  };
   const STEPS = { 1: [1, 3, 5, 9], 2: [1, 5, 9], 3: [9] };
   const DIM = 0.59;
 
@@ -121,7 +132,7 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
       // Its picture in the cells, dimmed for the first raccord (its shot then lights up).
       const steps = STEPS[cut.kind] || STEPS[1];
       const count = steps[Math.min(steps.length, hit) - 1];
-      drawn.push(h("div", { key: "c" + nx, style: { ...box, clipPath: "path('" + cellsPath(count) + "')" } },
+      drawn.push(h("div", { key: "c" + nx, style: { ...box, clipPath: "path('" + cellsPath(count, focusOf(list[nx])) + "')" } },
         h(Footage, { shot: nx, style: box }),
         cut.kind === 1 ? h("div", { style: { ...box, backgroundColor: "#000000", opacity: DIM } }) : null));
     }

@@ -74,7 +74,7 @@ type Drawn = { type: unknown; props: Record<string, unknown>; children: unknown[
 type Box = { x: number; y: number; w: number; h: number };
 
 /** Its layer at a frame over four shots (a lead, then its three), the montage under it. */
-function drawAt(frame: number, subject?: (shot: number) => Box | null): Drawn {
+function drawAt(frame: number, subject?: (shot: number) => Box | null, focus?: { x: number; y: number }): Drawn {
   const React = { createElement: (type: unknown, p: Record<string, unknown> | null, ...children: unknown[]): Drawn => ({ type, props: p ?? {}, children }), Fragment: "Fragment", useMemo: (f: () => unknown) => f() };
   const scope: Record<string, unknown> = {
     AbsoluteFill: "AbsoluteFill",
@@ -90,7 +90,7 @@ function drawAt(frame: number, subject?: (shot: number) => Box | null): Drawn {
     { from: 40, durationInFrames: 46 },
     { from: 86, durationInFrames: 38 },
     { from: 124, durationInFrames: 26 },
-  ].map((s, i) => ({ ...s, src: `/v${i}.mp4`, aspect: 9 / 16, kind: "video", segment: i }));
+  ].map((s, i) => ({ ...s, src: `/v${i}.mp4`, aspect: 9 / 16, kind: "video", segment: i, ...(focus ? { focus } : {}) }));
   const line = raccords.timeline!({ frames: 150, bpm: 95, shots: shots.map((s) => ({ from: s.from, frames: s.durationInFrames })), words: {}, settings: {} });
   const texts = { ...Object.fromEntries(Object.entries(line.marks!).map(([k, v]) => [k, String(v)])), mine: "0,1,2,3", beat: "18.947" };
   return make(React, ...Object.values(scope))({ width: 1080, height: 1920, durationInFrames: 150, brand: { name: "Café Lou", displayFont: "Montserrat", bodyFont: "Montserrat" }, shots, texts });
@@ -113,6 +113,9 @@ test("« Raccords en morceaux » (effect v1): the next shot in nine cells, dimme
   const cells = rects(styleOf(keyed(drawAt(34), "c1")).clipPath);
   assert.ok(cells.every((c) => c.w === 204 && c.h === 204));
   assert.equal(cells[0]!.x + 102, 540);
+  // About its subject where the montage frames it (its focus), inside the frame.
+  const moved = rects(styleOf(keyed(drawAt(34, undefined, { x: 0.62, y: 0.3 }), "c1")).clipPath);
+  assert.deepEqual([moved[0]!.x + 102, moved[0]!.y + 102], [670, 576]);
   assert.deepEqual(nodes(keyed(drawAt(34), "c1")).filter((n) => n.type === "Footage").map((n) => n.props.shot), [1]);
   // Its cut: nothing over the montage but the dim, gone in three images onto image 48.
   assert.equal(keyed(drawAt(40), "c1"), null);

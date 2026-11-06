@@ -118,7 +118,7 @@ type Box = { x: number; y: number; w: number; h: number };
 /** Its Scene at a frame, run with a plain tree for React (no renderer): the kit's pieces as named nodes. */
 function drawAt(
   frame: number,
-  options: { aspect?: number; texts?: Record<string, string>; reel?: { text: string; role: string }[]; end?: unknown; end_card?: boolean; n?: number; subject?: (shot: number) => Box | null; light?: number | null; brand?: Record<string, unknown> } = {},
+  options: { aspect?: number; texts?: Record<string, string>; reel?: { text: string; role: string }[]; end?: unknown; end_card?: boolean; n?: number; subject?: (shot: number) => Box | null; light?: number | null; brand?: Record<string, unknown>; focus?: Record<number, { x: number; y: number }> } = {},
 ): Drawn {
   const React = { createElement: (type: unknown, p: Record<string, unknown> | null, ...children: unknown[]): Drawn => ({ type, props: p ?? {}, children }), Fragment: "Fragment", useMemo: (f: () => unknown) => f() };
   const scope: Record<string, unknown> = {
@@ -135,7 +135,7 @@ function drawAt(
   const line = raccords.timeline(options.n ?? 6, { end: Boolean(options.end_card) });
   const marks = Object.fromEntries(Object.entries(line.marks).map(([k, v]) => [k, String(v)]));
   const durationInFrames = Math.round(line.duration * 30);
-  const shots = line.shots.map((s, i) => ({ src: `/v${i}.mp4`, aspect: options.aspect ?? 9 / 16, from: Math.round(s.start * 30), durationInFrames: Math.round((s.end - s.start) * 30), kind: "video", segment: i }));
+  const shots = line.shots.map((s, i) => ({ src: `/v${i}.mp4`, aspect: options.aspect ?? 9 / 16, from: Math.round(s.start * 30), durationInFrames: Math.round((s.end - s.start) * 30), kind: "video", segment: i, ...(options.focus?.[i] ? { focus: options.focus[i] } : {}) }));
   const reelTexts = (options.reel ?? [{ text: "Farine", role: "hook" }]).map((t) => ({ ...t, from: 0, to: 15, emphasis: [] }));
   const brand = { name: "Maison Farine", displayFont: "Montserrat", bodyFont: "Montserrat", accent: "#b5543a", palette: { light: "#f6efe4", dark: "#1d1b19" }, ...options.brand };
   return make(React, ...Object.values(scope))({ width: 1080, height: 1920, durationInFrames, brand, shots, reelTexts, end: options.end ?? null, texts: { ...marks, ...options.texts } });
@@ -181,6 +181,8 @@ test("« Plans qui s'emboîtent »: the next shot in her first one's lights, the
   assert.deepEqual(blend.map((f) => f.props.shot), [0, 1]);
   assert.equal(styleOf(blend[1]!).mixBlendMode, "darken");
   assert.equal(styleOf(blend[1]!).opacity, 0.6);
+  // Her shot a dark one (her face lit, her room dark): the next shot in her shadows, her lights in front.
+  assert.equal(styleOf(of(drawAt(23, { light: 0.2 }), "Footage")[1]!).mixBlendMode, "lighten");
   assert.equal(styleOf(of(drawAt(30), "Footage")[1]!).opacity, 1);
   // The cut: the next shot alone, full frame.
   const line = raccords.timeline(6, { end: false });
@@ -196,6 +198,12 @@ test("« Plans qui s'emboîtent »: the shot after next in nine cells, one, thre
   assert.ok(cells.every((c) => c.w === c.h && c.w === 204), JSON.stringify(cells));
   assert.equal(cells[0]!.x + cells[0]!.w / 2, 540);
   assert.deepEqual(cells.map((c) => c.x), [438, 438, 438]);
+  // About its subject where Footage frames it (its focus), inside the frame: an upright shot as it is, a wide one cropped
+  // about its subject.
+  const moved = rects(styleOf(keyed(drawAt(57, { focus: { 2: { x: 0.62, y: 0.3 } } }), "c2")!).clipPath);
+  assert.deepEqual([moved[0]!.x + 102, moved[0]!.y + 102], [670, 576]);
+  assert.equal(rects(styleOf(keyed(drawAt(57, { focus: { 2: { x: 0.05, y: 0.3 } } }), "c2")!).clipPath)[0]!.x, 296);
+  assert.equal(rects(styleOf(keyed(drawAt(57, { aspect: 16 / 9, texts: { format: "vertical" }, focus: { 2: { x: 0.3, y: 0.5 } } }), "c2")!).clipPath)[0]!.x, 438);
   // The shot after next in them, dimmed (41 % of its light), on its first image (no `at`: before its own start).
   const inside = keyed(drawAt(60), "c2")!;
   assert.deepEqual(of(inside, "Footage").map((f) => [f.props.shot, f.props.at]), [[2, undefined]]);
