@@ -4810,7 +4810,7 @@ test("contract: a request that describes the Reel is never read as words to say 
     [heloise, "Je me présente : Héloïse, la fleuriste de l'Atelier Rose."],
     [imaginedBrief("Le nouvel arrivage de la semaine, des pièces vintage : ça doit donner envie de venir chiner.")!, "Le nouvel arrivage de la semaine, des pièces vintage."],
     [imaginedBrief("Des lis et des roses pour la fête des mères.")!, "Des lis et des roses pour la fête des mères."],
-  ]) {
+  ] as [string, string][]) {
     assert.equal(asksSpokenText(request, text), false, request);
     const read = keepAskedVoice({ ...EMPTY_CONTRACT, voice_text: text, person: "nous" }, request);
     assert.equal(read.voice_text, null);
@@ -4826,7 +4826,7 @@ test("contract: a request that describes the Reel is never read as words to say 
     ["Fais-lui dire que les nouveautés arrivent samedi", "Les nouveautés arrivent samedi."],
     ["Un Reel sur le marché, « Ce week-end, on part au marché aux puces »", "Ce week-end, on part au marché aux puces."],
     ["le voix off dis je vous présente Pauline… et là tu parles d'Edith", "Je vous présente Pauline…"],
-  ]) {
+  ] as [string, string][]) {
     assert.equal(asksSpokenText(request, text), true, request);
     assert.equal(keepAskedVoice({ ...EMPTY_CONTRACT, voice_text: text }, request).voice_text, text);
   }
