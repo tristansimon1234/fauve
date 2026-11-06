@@ -2017,6 +2017,50 @@ export const HOUSE_MODELS: HouseModel[] = [
       why: "On voit le résultat d'abord, puis comment c'est fait, geste par geste, les mots qui racontent au rythme des mains ; la réaction à la fin donne envie d'y goûter.",
     },
   }),
+  model({
+    key: "affiches",
+    name: "Tes produits en affiches",
+    // Written on its original's fiche (v1 of its skill, docs/fiches/affiches.md): a slit of her picture under her title
+    // dropping word by word, then her products one a second, each in a white-bordered print on a vivid flat colour at
+    // its own place, the first, the last and one in two named in very big letters, her call on black.
+    pitch: "Tes produits un par un en affiches de couleur : chacun dans un tirage à bord blanc sur un aplat vif qui change chaque seconde, son nom en très grand dessous, après ton titre qui tombe mot à mot autour d'une fente.",
+    needs: "5 à 12 photos ou courtes vidéos de tes produits (plats, créations, services), une chose seule et bien en vue au milieu de chacune, un gros plan pour l'ouverture (un regard, un détail), et le nom de chacun",
+    files: [4, 12],
+    pair: "affiche",
+    // Its skill's code is its reference.
+    example: null,
+    // Its cuts' grid: a poster every second, two beats at 120 (its original's music, a trap beat at 134 BPM, leads none of its cuts).
+    tempo: 120,
+    finish: { name: "Imprimé", hint: "aplats francs et vifs, images imprimées un peu contrastées, un grain de papier fixe, sans coins sombres", contrast: 0.05, grain: 0.12 },
+    look: {
+      name: "affiches de couleur",
+      format: "collage",
+      hook: { kind: "promesse", what: "une fente horizontale qui ne montre qu'un regard ou un détail sur un aplat rouge, et les mots du titre qui tombent un à un à ses quatre coins" },
+      text: {
+        amount: "plusieurs",
+        composition: "le titre en capitales condensées noires, un mot à la fois aux quatre coins d'une fente d'image ; sur une affiche sur deux, son nom en très grandes capitales sur le papier du tirage ; un appel en capitales blanches sur le noir",
+        case: "upper",
+        weight: "black",
+        tracking: "tight",
+      },
+      colors: ["#fc1f10", "#0052b9", "#ffc91b"],
+      layout: "une affiche par seconde : un aplat de couleur vive plein cadre et une seule image dans un tirage à bord blanc, posé chaque fois ailleurs et à une autre taille, deux qui sortent du cadre",
+      moments: [
+        { at: 0, what: "sur un aplat rouge, une fente horizontale de son image (un regard, un détail) ; les mots du titre tombent un à un toutes les 0,2 s, collés à ses quatre coins, un cinquième plus bas" },
+        { at: 1, what: "une affiche par seconde, coupe sèche, sur le même rouge d'abord : une seule image dans un tirage à bord blanc, au milieu et grande, son nom en très grandes capitales noires sur le papier dessous" },
+        { at: 2, what: "puis bleu roi, orange, rose, gris, noir, bleu ciel, jaune : chaque tirage à une autre place et une autre taille, au milieu, en haut, en bas ; le premier, le dernier et un sur deux portent leur nom" },
+        { at: 3, what: "un tirage coupé par le bord gauche du cadre, puis un autre coupé par le haut, comme une page de magazine" },
+        { at: 9, what: "sur du noir, son appel en deux lignes de capitales blanches, un mot en gras italique" },
+      ],
+      camera: "fixe",
+      transitions: "coupes nettes",
+      grade: "natural",
+      motion: "energique",
+      music: "minimal trap beat, dotted 808 bass, crisp eighth hi-hats, dry snare, 120 BPM",
+      ending: "son appel en capitales blanches sur du noir, la musique coupée net à la fin",
+      why: "Chaque seconde une nouvelle couleur et un nouveau produit : l'œil reste pour voir le suivant ; le nom en très grand fait de chaque produit une affiche qu'on retient, et le titre posé mot à mot dit tout de suite ce qu'on va voir.",
+    },
+  }),
 ];
 
 const BY_KEY = new Map(HOUSE_MODELS.map((m) => [m.key, m]));
@@ -2101,6 +2145,7 @@ export const HOUSE_WHEN: Record<string, { pour: string; pas_pour: string }> = {
   assiettes: { pour: "montrer sa carte, ses plats du jour, des idées de recettes ou une sélection de produits, un par un, filmés d'en haut au même endroit (un restaurant, un traiteur, une cantine, une boulangerie, des box)", pas_pour: "un seul plat, les gestes d'une recette, quelqu'un qui parle, un lieu, moins de six plats" },
   "chef-face": { pour: "un plat, une recette ou une spécialité racontée face caméra et goûtée (un restaurant, un traiteur, une pâtisserie, un café) : le résultat d'abord, puis la dégustation", pas_pour: "sans vidéo où elle parle, des images sans parole, un lieu ou une ambiance sans rien à goûter" },
   recette: { pour: "montrer un savoir-faire en étapes comme un tuto, pour tout métier qui a des gestes : une recette (cuisine, pâtisserie), un bouquet monté (fleuriste), une coupe (coiffeur, barbier), une pièce tournée (céramiste), un soin ; du résultat fini à la dégustation ou à l'essai", pas_pour: "un lieu ou une ambiance, une offre à lire, quelqu'un qui parle face caméra, des vidéos filmées à la main" },
+  affiches: { pour: "montrer ses produits, ses plats, ses créations ou ses services un par un avec leur nom, comme des affiches colorées : une collection, une carte, des nouveautés, une sélection, ses best-sellers", pas_pour: "un lieu qui se raconte, quelqu'un qui parle face caméra, un geste qu'il faut voir en entier (l'image est petite dans son tirage), une offre à lire en détail, moins de quatre images" },
 };
 
 /** The models for Edith: their key, name, what they do, what they want, and what only she can film for one. */
