@@ -21,8 +21,11 @@ import { nominalSaid, type MontageSkill, type SkillSaid, type SkillSound } from 
 //   her goodbye    nothing above her head.
 // Everything is set in the one place above her head, centred (her face followed: the block moves up, then shrinks, and
 // goes before her chest only when nothing is left above her head; never on her face), white on a dark or coloured wall,
-// in ink on a light one (the light of her wall read under it, LightUnder). The engine's subtitles of what she says stay
-// under it on her chest (row 0.75), as the original keeps both. Its music (108 BPM, the original's) waits for her first
+// in ink on a light one (the light of her wall read under it, LightUnder). Version 2 (Tristan on v1's bench, 6 November:
+// « là les sous-titres ne sont plus utiles, et le choix des vidéos + la voix off sont sous quali »): its code writes all
+// she says itself, on its small line (never a word written big at that moment), and the engine's subtitles step aside
+// (v1 kept them on her chest, as the original keeps both: each keyword was read three times); her photo or video of each
+// name of a list she says (cast by its filler, `refs`) shows full frame under that name. Its music (108 BPM, the original's) waits for her first
 // keyword, comes in on a beat after it, loses its bass for 16 beats from the middle and is cut with the picture; a low
 // whoosh under each word that slides. Her video full frame when vertical (as the original), whole in a 16:9 band on
 // black when horizontal, its words in the black above it (the `format` setting). Nothing of the original's own words is
@@ -122,6 +125,20 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const INK = inkOn ? "#161616" : "#ffffff";
   const EDGE = inkOn ? "0 0 2px rgba(255,255,255,0.4)" : "0 1px 2px rgba(0,0,0,0.32), 0 0 1px rgba(0,0,0,0.25)";
 
+  // Her photo or video of a name of her list (cast by its filler on what she says, after her talk's shots): full frame
+  // from the instant she says that name to the next one, under its name, white with a deeper shadow there.
+  const refsN = Math.max(0, Math.min(shots.length - talkN, Math.round(mark("said_refs", 0))));
+  const refs = Array.from({ length: refsN }, (_, i) => {
+    const s = shots[talkN + i];
+    const from = mark("said_ref" + (i + 1) + "_from", s.from);
+    return { i: talkN + i, item: mark("said_ref" + (i + 1) + "_item", 0), from, to: mark("said_ref" + (i + 1) + "_to", from + s.durationInFrames), shot: s };
+  });
+  // (Only while its own name is the last one said: a next name without an image of hers gives her talk back.)
+  const picture = refs.find((r) => r.item > 0 && frame >= r.from && frame < r.to && !names.some((t) => t.from > r.from + 1 && t.from <= frame)) || null;
+  const PIC_EDGE = "0 2px 6px rgba(0,0,0,0.55), 0 0 28px rgba(0,0,0,0.45)";
+  const shown_ = picture ? h(Footage, { key: "ref" + picture.i, shot: picture.i, at: picture.shot.from, style: { position: "absolute", left: 0, top: 0, width, height } }) : film;
+  const tone = picture ? { color: "#ffffff", textShadow: PIC_EDGE } : { color: INK, textShadow: EDGE };
+
   // 4. A word that slides in from the left as the original's (three images fast and blurred, past its place, back, set).
   const SLIDE = [-0.54, -0.35, -0.16, 0.035, -0.04];
   const BLUR = [22, 16, 9];
@@ -147,30 +164,6 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
     if (idea.kind === 0) {
       const key = bands.find((t) => inIdea(t, idea) && frame >= t.from && frame < t.to);
       if (key) laid.push(slid("key" + idea.k, key.from, Y(place, 0.266), px(0.094 * height * place.s, 120), px(0.073 * height * place.s, 96), key.text, own(key, display)));
-      // Her words said, one by one, on a small line above it: very spaced small words, each on the image it is said, the
-      // line laid out whole from its first word (it never moves), emptied at the end of its phrase.
-      // (Only the idea's own words, once her hook has gone: what she says after its last word, her goodbye, is not written.)
-      const keyF = Math.round(idea.key);
-      const ws = (spoken || []).filter((w) => w && w.from >= idea.from - 1 && w.from <= idea.to && (!hook || w.from >= hook.to) && Math.abs(w.from - keyF) > 1 && String(w.w).replace(/[^\p{L}\p{N}]/gu, "").length > 1);
-      const lines = [];
-      let line = [];
-      const widthOf = (l) => l.reduce((a, w) => a + String(w.w).length * 27, 0) + Math.max(0, l.length - 1) * 0.06 * width;
-      ws.forEach((w, i) => {
-        const prev = ws[i - 1];
-        if (prev && line.length && (w.from - prev.to >= 10 || /[.!?…,;:]$/.test(String(prev.w)) || line.length >= 5 || widthOf(line.concat([w])) > width - 120)) { lines.push(line); line = []; }
-        line.push(w);
-      });
-      if (line.length) lines.push(line);
-      const shown = lines.find((l, i) => {
-        const next = lines[i + 1];
-        const until = Math.min(l[l.length - 1].to + 15, next ? next[0].from - 4 : Infinity, key ? key.to : idea.to + 15);
-        return frame >= l[0].from && frame < until;
-      });
-      if (shown) {
-        const size = px(0.026 * height * place.s, 40);
-        laid.push(h("div", { key: "line" + idea.k, style: { position: "absolute", left: 60, width: width - 120, top: Y(place, 0.196), height: px(0.036 * height * place.s, 50), display: "flex", justifyContent: "center", alignItems: "flex-end", gap: Math.round(0.06 * width * Math.min(1, place.s + 0.2)) } },
-          shown.map((w, j) => h("span", { key: j, style: { fontFamily: body, fontWeight: 400, fontSize: size, lineHeight: 1.2, color: INK, textShadow: EDGE, whiteSpace: "nowrap", opacity: frame >= w.from ? 1 : 0 } }, String(w.w).replace(/[.!?…,;:]+$/, "")))));
-      }
     } else if (idea.kind === 1) {
       // Two names at a time, each in its own font on the instant she says it: the first small on top (a label beside the
       // big one, 40 px at least), the second big under it (a last one alone big), from 20 to 34 % of the height; its keyword
@@ -182,8 +175,8 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
         if (frame < t.from || frame >= t.to) return;
         const big = j % 2 === 1 || j === list.length - 1;
         laid.push(big
-          ? h(FitText, { key: "n" + idea.k + "_" + j, style: { position: "absolute", left: Math.round(0.125 * width), width: Math.round(0.75 * width), top: Y(place, 0.252), height: px(0.088 * height * place.s, 110) }, innerStyle: { fontFamily: own(t, display), fontWeight: 700, fontSynthesis: "none", fontSize: px(0.078 * height * place.s, 96), lineHeight: 1.05, color: INK, textShadow: EDGE, whiteSpace: "nowrap" } }, t.text)
-          : h("div", { key: "n" + idea.k + "_" + j, "data-fauve-accent": true }, h(FitText, { style: { position: "absolute", left: Math.round(0.25 * width), width: Math.round(0.5 * width), top: Y(place, 0.2), height: Math.max(48, Math.round(0.042 * height * place.s)) }, innerStyle: { fontFamily: own(t, body), fontWeight: 400, fontSynthesis: "none", fontSize: Math.max(40, Math.round(0.031 * height * place.s)), lineHeight: 1.1, color: INK, textShadow: EDGE, whiteSpace: "nowrap" } }, t.text)));
+          ? h(FitText, { key: "n" + idea.k + "_" + j, style: { position: "absolute", left: Math.round(0.125 * width), width: Math.round(0.75 * width), top: Y(place, 0.252), height: px(0.088 * height * place.s, 110) }, innerStyle: { fontFamily: own(t, display), fontWeight: 700, fontSynthesis: "none", fontSize: px(0.078 * height * place.s, 96), lineHeight: 1.05, ...tone, whiteSpace: "nowrap" } }, t.text)
+          : h("div", { key: "n" + idea.k + "_" + j, "data-fauve-accent": true }, h(FitText, { style: { position: "absolute", left: Math.round(0.25 * width), width: Math.round(0.5 * width), top: Y(place, 0.2), height: Math.max(48, Math.round(0.042 * height * place.s)) }, innerStyle: { fontFamily: own(t, body), fontWeight: 400, fontSynthesis: "none", fontSize: Math.max(40, Math.round(0.031 * height * place.s)), lineHeight: 1.1, ...tone, whiteSpace: "nowrap" } }, t.text)));
       });
     } else {
       // Her number very condensed and very bold, its words stacked at its right as tall as it, all at once (25 to 33 %).
@@ -197,18 +190,56 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
     }
   }
 
-  return h(AbsoluteFill, { style: { backgroundColor: "#000000" } }, blurs, film, hookNode, laid);
+  // 7. Everything else she says, written by it (the engine's subtitles step aside: v1 kept them on her chest under its
+  // words, and they said them a third time; Tristan: « les sous-titres ne sont plus utiles »): her words one by one on a
+  // small line of very spaced small words above the big one, each on the image it is said, a line laid out whole from
+  // its first word (it never moves), five words at most, emptied at the end of its phrase or when the next begins; never
+  // a word written big at that moment (her keyword, a name of her list, her number and its words), nothing under her hook.
+  const plain = (s) => String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim();
+  const bigs = bands.concat(names);
+  const isBig = (w) => bigs.some((t) => w.from >= t.from - 2 && w.from < t.to && plain(t.text).split(" ").includes(plain(w.w)));
+  const busy = ideas.flatMap((i) => {
+    if (i.kind === 0) return [];
+    const its = names.filter((t) => inIdea(t, i));
+    const keys = bands.filter((t) => inIdea(t, i));
+    const from = (i.kind === 2 ? keys.concat(its) : its).map((t) => t.from);
+    return from.length ? [[Math.min(...from), Math.max(...keys.concat(its).map((t) => t.to))]] : [];
+  });
+  // (Its one-letter words left out, as the original's « a » and « to ».)
+  const ws = (spoken || []).filter((w) => w && plain(w.w).length > 1 && (!hook || w.from >= hook.to) && !isBig(w) && !busy.some(([a, b]) => w.from >= a && w.from < b));
+  const lines = [];
+  let line = [];
+  const widthOf = (l) => l.reduce((a, w) => a + String(w.w).length * 29, 0) + Math.max(0, l.length - 1) * 0.05 * width;
+  ws.forEach((w, i) => {
+    const prev = ws[i - 1];
+    // (A short word after four that runs on into the next starts the next line: a line never ends on one seen a tenth of
+    // a second.)
+    const next = ws[i + 1];
+    const runs = next && next.from - w.to < 10 && !/[.!?…,;:]$/.test(String(w.w));
+    if (prev && line.length && (w.from - prev.to >= 10 || /[.!?…,;:]$/.test(String(prev.w)) || line.length >= 5 || (line.length >= 4 && runs && plain(w.w).length <= 3) || widthOf(line.concat([w])) > width - 120)) { lines.push(line); line = []; }
+    line.push(w);
+  });
+  if (line.length) lines.push(line);
+  const shown = lines.find((l, i) => frame >= l[0].from && frame < Math.min(l[l.length - 1].to + 15, lines[i + 1] ? lines[i + 1][0].from - 2 : Infinity));
+  if (shown) {
+    const at = placeOf(shown[0].from);
+    laid.push(h("div", { key: "line" + shown[0].from, style: { position: "absolute", left: 60, width: width - 120, top: Y(at, 0.196), height: px(0.036 * height * at.s, 62), display: "flex", justifyContent: "center", alignItems: "flex-end", gap: Math.round(0.05 * width * Math.min(1, at.s + 0.2)) } },
+      shown.map((w, j) => h("span", { key: j, style: { fontFamily: body, fontWeight: 400, fontSize: px(0.027 * height * at.s, 48), lineHeight: 1.2, ...tone, whiteSpace: "nowrap", opacity: frame >= w.from ? 1 : 0 } }, String(w.w).replace(/[.!?…,;:]+$/, "")))));
+  }
+
+  return h(AbsoluteFill, { style: { backgroundColor: "#000000" } }, blurs, shown_, hookNode, laid);
 }`;
 
 export const motCle: MontageSkill = {
   key: "mot-cle",
-  version: 1,
+  version: 2,
   bpm: BPM,
   // Her talk's pieces (the engine cuts them): as many as her pauses and ideas make.
   shots: [1, 40],
-  // Her talking video, and up to two other takes of it (two phones filming her at once).
-  files: [1, 3],
-  how: "Elle parle face caméra devant un fond uni, assise, la tête vers le milieu de l'image ; ses deux ou trois premiers mots glissent en grandes capitales de la gauche dès la première image ; puis, au-dessus de sa tête, ses mots s'écrivent un à un sur une petite ligne pendant que le mot clé de chaque idée glisse en grand dessous, à l'instant où elle le dit, et reste toute l'idée ; une liste qu'elle dit s'écrit deux noms à la fois, chacun dans la police qu'il évoque, à l'instant où elle le dit ; un chiffre qu'elle dit s'écrit très serré, ses deux ou trois mots empilés à côté ; le cadre ne change qu'entre deux idées ; ce qu'elle dit en sous-titres sur sa poitrine.",
+  // Her talking video, up to two other takes of it (two phones filming her at once), and a photo or video of each name
+  // of a list she says.
+  files: [1, 12],
+  how: "Elle parle face caméra devant un fond uni, assise, la tête vers le milieu de l'image ; ses deux ou trois premiers mots glissent en grandes capitales de la gauche dès la première image ; puis, au-dessus de sa tête, ses mots s'écrivent un à un sur une petite ligne pendant que le mot clé de chaque idée glisse en grand dessous, à l'instant où elle le dit, et reste toute l'idée ; une liste qu'elle dit s'écrit deux noms à la fois, chacun dans la police qu'il évoque, à l'instant où elle le dit ; un chiffre qu'elle dit s'écrit très serré, ses deux ou trois mots empilés à côté ; la photo ou la vidéo qu'elle a de chaque nom de sa liste plein écran sous son nom, à l'instant où elle le dit ; le cadre ne change qu'entre deux idées ; tout ce qu'elle dit d'autre s'écrit sur la petite ligne, sans sous-titres en double.",
   end: false,
   texts: [],
   voice: {
@@ -218,7 +249,10 @@ export const motCle: MontageSkill = {
     items: "une liste qu'elle dit dans une idée (ses produits, ses prestations, des étapes, des ingrédients : « le gommage, le masque, l'huile »), chaque nom au moment où elle le dit ; pour l'idée d'un chiffre, les deux ou trois mots qui disent ce qu'il compte, tels qu'elle les dit (« ans », « de », « métier »)",
     max: { hook: 18, key: 12, item: 16 },
     fonts: ["item"],
-    row: 0.75,
+    // Its code writes what she says itself (the small line), never twice: the engine's subtitles step aside (v1 kept them
+    // on her chest, under its words that already said it).
+    subtitles: "own",
+    refs: "une photo ou une vidéo de chaque nom d'une liste qu'elle dit (son produit, son plat, sa prestation, l'étape qu'elle nomme), plein écran sous son nom à l'instant où elle le dit, la plus nette et la plus belle de ses fichiers pour ce nom ; jamais pour une idée entière (ses idées restent elle qui parle), jamais une image qui ne montre pas ce nom",
   },
   settings: [
     {
