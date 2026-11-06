@@ -95,26 +95,32 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
       h(Footage, { shot: i, style: { position: "absolute", left: Math.round(left), top: Math.round(top), width: Math.round(w), height: Math.round(ht), filter: filter || GREY }, ...(extra || {}) }));
   };
 
-  // 2. Her at her place: the original's zoom out in three steps about her middle (2,88, 2,04, 1,56 times on its images
-  // 0, 1–2 and 3–4), then her whole place; each image held two frames (15 a second), as the original's first second.
+  // 2. Her at her place: the original's zoom out in three steps (2,88, 2,04, 1,56 times on its images 0, 1–2 and 3–4)
+  // about where someone standing has her face and her chest (44 % down: closer, the original's frame 0 shows him whole),
+  // then her whole place; each image held two frames (15 a second), as the original's first second.
   const STEPS = [2.88, 2.04, 2.04, 1.56, 1.56];
-  const stand = n > 0 ? pic(0, frame < 5 ? STEPS[frame] : 1, 0.5, 0.53, { hold: 2 }, GREY, "stand") : null;
+  const stand = n > 0 ? pic(0, frame < 5 ? STEPS[frame] : 1, 0.5, 0.44, { hold: 2 }, GREY, "stand") : null;
   // Her place empty, held still on its first image (the original's seven images).
   const empty = n > 1 ? pic(1, 1, 0.5, 0.5, { hold: Math.max(2, shots[1].durationInFrames) }, GREY, "empty") : null;
 
-  // 3. What passes before her lens, as the original's bus: a dark blurred mass from the right that covers her whole
-  // picture from six images before the cut to one after (the cut under it, unseen), then leaves to the left, its edge
-  // sweeping over her place empty; at 15 images a second like the shot. The same mass over her own passer-by.
+  // 3. What passes before her lens, as the original's bus: a dark mass streaked by its speed (her picture held on its
+  // image before the cut, enlarged, blurred along the way it goes, darkened) from the right, covering her whole picture
+  // from six images before the cut to one after (the cut under it, unseen), then leaving to the left, its edge sweeping
+  // over her place empty; at 15 images a second like the shot. The same mass over her own passer-by.
   const E = BOX.width * 0.22;
   const v0 = CUT - 12;
   const step = v0 + Math.floor((frame - v0) / 2) * 2;
   const L = interpolate(step, [v0, CUT - 6], [BOX.width, -E], clamp);
   const R = interpolate(step, [CUT + 1, CUT + 6], [BOX.width + E, 0], clamp);
   const mask = "linear-gradient(to right, transparent " + Math.round(L) + "px, #000 " + Math.round(L + E) + "px, #000 " + Math.round(R - E) + "px, transparent " + Math.round(R) + "px)";
+  const vid = "dp-veil-" + frame;
+  const big = { position: "absolute", left: Math.round(-BOX.width * 0.3), top: Math.round(-BOX.height * 0.3), width: Math.round(BOX.width * 1.6), height: Math.round(BOX.height * 1.6) };
   const veil = n > 1 && frame >= v0 && frame < CUT + 6
     ? h("div", { key: "veil", style: { ...boxed, WebkitMaskImage: mask, maskImage: mask } },
-        h("div", { style: { position: "absolute", left: Math.round(BOX.width * 0.375), top: Math.round(BOX.height * 0.375), width: Math.round(BOX.width / 4), height: Math.round(BOX.height / 4), transform: "scale(9.6)", filter: "blur(7px) brightness(0.45) grayscale(1)" } },
-          h(Footage, { shot: 0, at: frame - Math.max(0, CUT - 1 - at(0, 0)), style: { position: "absolute", left: 0, top: 0, width: Math.round(BOX.width / 4), height: Math.round(BOX.height / 4) } })))
+        h("svg", { width: 0, height: 0, style: { position: "absolute" } },
+          h("filter", { id: vid, x: "-15%", y: "-5%", width: "130%", height: "110%", colorInterpolationFilters: "sRGB" }, h("feGaussianBlur", { stdDeviation: "54 4" }))),
+        h("div", { style: { ...big, filter: "url(#" + vid + ") brightness(0.4) grayscale(1)" } },
+          h(Footage, { shot: 0, at: frame - Math.max(0, CUT - 1 - at(0, 0)), style: { ...big, left: 0, top: 0 } })))
     : null;
 
   // 4. Her journey, each shot as filmed (its sound heard: no music yet); the last one rushes onto where she arrives on its

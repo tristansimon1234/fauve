@@ -2032,7 +2032,8 @@ export const HOUSE_MODELS: HouseModel[] = [
     example: null,
     // Its music's backbeat every 1,082 s, two beats (docs/fiches/depart.md; Gemini heard 82, measure.py 79).
     tempo: 110.9,
-    finish: { name: "Noir et blanc argentique", hint: "noir et blanc contrasté, noirs profonds, grain fin, coins à peine sombres", saturation: -1, contrast: 0.12, grain: 0.18, grain_size: "fine", vignette: 0.15 },
+    // Its blacks deep but never crushed (its darkest at 9 to 18 levels).
+    finish: { name: "Noir et blanc argentique", hint: "noir et blanc contrasté, noirs profonds, grain fin, coins à peine sombres", saturation: -1, contrast: 0.12, fade: 0.04, grain: 0.18, grain_size: "fine", vignette: 0.15 },
     look: {
       name: "départ, trajet, arrivée",
       format: "autre",
