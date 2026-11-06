@@ -85,12 +85,12 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const BEAT = mark("beat", 18);
   const cur = mine.reduce((k, i) => (shots[i].from <= frame ? i : k), first);
 
-  // Its frame: a horizontal 4:3 picture (1080 × 810) at the middle of the frame, on black, as the original shows in a
-  // vertical feed, when most of her shots under it are in width (« format » auto, as her videos: Tristan's rule for a
-  // model's format); else the whole frame; either on her word (« format » horizontal or vertical). Every place below is in it.
+  // Its frame: the whole frame by default (Tristan, 6 November: « tout vertical please »); a horizontal 4:3 picture
+  // (1080 × 810) at the middle of the frame, on black, as the original shows in a vertical feed, on her word (« format »
+  // horizontal), or when most of her shots under it are in width as she asks it (« auto »). Every place below is in it.
   const fmt = word("format");
   const inWidth = mine.filter((i) => (Number(shots[i].aspect) || 0.5625) > 1.15).length;
-  const wide = fmt === "horizontal" || (fmt !== "vertical" && inWidth * 2 > mine.length);
+  const wide = fmt === "horizontal" || (fmt === "auto" && inWidth * 2 > mine.length);
   const bw = width;
   const bh = wide ? Math.round((width * 3) / 4) : height;
   const by = wide ? Math.round((height - bh) / 2) : 0;
@@ -171,9 +171,11 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
 
 export const plansFixes: EffectPiece = {
   key: "plans-fixes",
-  version: 1,
+  // 2: vertical full frame by default, as the models, her horizontal shots cropped on their subject; its band only
+  // when she asks for it (Tristan, 6 November, on seven benches: « vertical please », « tout vertical please »).
+  version: 2,
   name: "Plans fixes de cinéma",
-  how: "ses plans fixes passent en horizontal 4:3 sur du noir, comme au cinéma, chacun tel que filmé (ni zoom ni mouvement) ; sur le premier, un petit titre blanc en deux niveaux se pose mot à mot avec un clic sec, ses petits mots sans serif au-dessus, ses mots en serif gras dessous, puis part avec une coupe ; le montage reprend ensuite en plein écran.",
+  how: "ses plans fixes passent en plein écran (en horizontal 4:3 sur du noir comme au cinéma, à sa demande), chacun tel que filmé (ni zoom ni mouvement) ; sur le premier, un petit titre blanc en deux niveaux se pose mot à mot avec un clic sec, ses petits mots sans serif au-dessus, ses mots en serif gras dessous, puis part avec une coupe ; le montage reprend ensuite en plein écran.",
   needs: "des vidéos filmées téléphone posé où le monde bouge dedans (passants, clients, vapeur, une porte qui s'ouvre), à l'horizontale de préférence (en vertical, seule une bande du milieu se voit), la première large et calme au milieu.",
   lays: "sur 3 à 8 de ses plans fixes coupés d'un temps chacun, le premier tenu 4 temps environ (le titre s'y pose)",
   shots: [1, 8],
@@ -196,11 +198,11 @@ export const plansFixes: EffectPiece = {
   settings: [
     {
       name: "format",
-      want: "le format de ce moment : horizontal sur du noir comme au cinéma, ou plein écran",
+      want: "le format de ce moment : plein écran, ou horizontal sur du noir comme au cinéma",
       choices: [
-        { value: "auto", says: "comme ses vidéos : en horizontal 4:3 sur du noir quand la plupart sont horizontales, sinon en plein écran" },
-        { value: "horizontal", says: "ses plans en horizontal 4:3 au milieu de l'écran, sur du noir, comme au cinéma" },
         { value: "vertical", says: "ses plans en plein écran, tels quels, le titre au milieu" },
+        { value: "horizontal", says: "ses plans en horizontal 4:3 au milieu de l'écran, sur du noir, comme au cinéma", band: true },
+        { value: "auto", says: "comme ses vidéos : en horizontal 4:3 sur du noir quand la plupart sont horizontales, sinon en plein écran" },
       ],
     },
   ],

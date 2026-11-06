@@ -34,7 +34,7 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const format = word("format") || "auto";
   const wideShots = mine.filter((i) => (Number(shots[i].aspect) || 0.5625) > 1.15).length;
   const stacked = format === "empile" || (format === "auto" && wideShots * 2 > n);
-  const boxed = format === "carte" || (format === "auto" && !stacked);
+  const boxed = format === "carte";
   const fh = boxed ? Math.round((width * 3) / 4) : height;
   const fy = boxed ? Math.round((height - fh) / 2) : 0;
 
@@ -148,9 +148,11 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
 
 export const ecranPartage: EffectPiece = {
   key: "ecran-partage",
-  version: 1,
+  // 2: vertical full frame by default, as the models, her horizontal shots cropped on their subject; its band only
+  // when she asks for it (Tristan, 6 November, on seven benches: « vertical please », « tout vertical please »).
+  version: 2,
   name: "Écran partagé titré",
-  how: "une carte aux coins arrondis sur du noir, coupée en deux moitiés qui se touchent : dans l'une le geste (elle ou son équipe au travail), dans l'autre, au même moment, ce qu'il donne ; ses plans y passent deux par deux, chaque moitié jouant le sien en même temps, les deux coupées ensemble ; deux petits titres en serif blanc, un sur chaque moitié, qui se répondent (« Les artistes » / « L'art »), tenus tout du long ; côte à côte quand ses vidéos sont verticales, l'une sur l'autre quand elles sont horizontales ; puis le montage reprend en plein écran.",
+  how: "l'écran coupé en deux moitiés qui se touchent (la carte 4:3 aux coins arrondis de l'original, sur du noir, à sa demande) : dans l'une le geste (elle ou son équipe au travail), dans l'autre, au même moment, ce qu'il donne ; ses plans y passent deux par deux, chaque moitié jouant le sien en même temps, les deux coupées ensemble ; deux petits titres en serif blanc, un sur chaque moitié, qui se répondent (« Les artistes » / « L'art »), tenus tout du long ; côte à côte quand ses vidéos sont verticales, l'une sur l'autre quand elles sont horizontales ; puis le montage reprend en plein écran.",
   needs: "des vidéos deux par deux : quelqu'un au travail (ses mains, son geste, la caméra posée), puis ce que ce geste donne, posé devant la caméra ou qui reçoit sa dernière touche (le plat, la coupe, le bouquet).",
   lays: "sur 2 à 8 de ses plans, par paires (le geste, puis ce qu'il donne), chacun d'un ou deux temps : les deux plans d'une paire se jouent ensemble, chacun ralenti jusqu'à la moitié de sa vitesse pour tenir toute la paire",
   shots: [2, 8],
@@ -173,10 +175,10 @@ export const ecranPartage: EffectPiece = {
   settings: [
     {
       name: "format",
-      want: "la mise en page : la carte de l'original, ses deux moitiés côte à côte sur tout l'écran, ou l'une sur l'autre",
+      want: "la mise en page : sur tout l'écran comme ses vidéos, la carte de l'original sur du noir, ses deux moitiés côte à côte sur tout l'écran, ou l'une sur l'autre",
       choices: [
-        { value: "auto", says: "comme ses vidéos : la carte de l'original quand elles sont verticales, les deux moitiés l'une sur l'autre quand elles sont horizontales" },
-        { value: "carte", says: "la carte 4:3 de l'original au milieu de l'écran, sur du noir, ses deux moitiés côte à côte" },
+        { value: "auto", says: "sur tout l'écran, comme ses vidéos : les deux moitiés côte à côte quand elles sont verticales, l'une sur l'autre quand elles sont horizontales" },
+        { value: "carte", says: "la carte 4:3 de l'original au milieu de l'écran, sur du noir, ses deux moitiés côte à côte", band: true },
         { value: "plein-ecran", says: "deux moitiés côte à côte, hautes et étroites, sur tout l'écran" },
         { value: "empile", says: "deux moitiés l'une sur l'autre sur tout l'écran : la personne en haut, le résultat en bas" },
       ],

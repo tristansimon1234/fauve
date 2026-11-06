@@ -61,8 +61,12 @@ test("« Carte au feutre » (effect v2): her pictures in stop motion, a new one 
   assert.deepEqual(rounds.map((f) => footage(draw(f, props))[0]!.props.shot), [video, video, video]);
   assert.deepEqual(rounds.map((f) => f - (footage(draw(f, props))[0]!.props.at as number)), [0, 3, 6]);
   assert.ok((footage(draw(0, props))[0]!.props.at as number) > 180 * 4);
-  // Mostly in width: two bands above and under the notebook, changing one after the other.
-  const wide = { ...props, shots: under(10, (i) => (i < 7 ? 16 / 9 : 0.5625)) };
+  // Mostly in width: full frame by default (Tristan, 6 November: « tout vertical please »), as the original; two bands
+  // above and under the notebook on her word (or as her pictures, « auto »), changing one after the other.
+  const inWidth = { ...props, shots: under(10, (i) => (i < 7 ? 16 / 9 : 0.5625)) };
+  assert.equal(footage(draw(0, inWidth)).length, 1);
+  assert.equal(footage(draw(0, { ...inWidth, texts: { ...inWidth.texts, format: "bandes" } })).length, 2);
+  const wide = { ...inWidth, texts: { ...inWidth.texts, format: "auto" } };
   const bands = [0, 3, 6, 9].map((f) => footage(draw(f, wide)).map((n) => n.props.shot as number));
   assert.ok(bands.every((b) => b.length === 2));
   assert.deepEqual(bands, [[1, 2], [3, 2], [3, 4], [5, 4]]);

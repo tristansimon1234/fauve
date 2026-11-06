@@ -99,7 +99,7 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   // back, a video 3 images further on its passage each time (stop motion: each of its images held while it shows).
   // Full frame, as the original's; or, when most of hers are in width (or on her word), two bands of them above and
   // under the notebook (a horizontal picture whole in each), changing one after the other.
-  const format = setting("format", "auto");
+  const format = setting("format", "vertical");
   const wide = mine.filter((i) => (Number(shots[i].aspect) || 0.5625) > 1.15).length;
   const bands = format === "bandes" || (format === "auto" && wide * 2 > n);
   const picture = (k, style) => {
@@ -224,9 +224,11 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
 
 export const carteFeutre: EffectPiece = {
   key: "carte-feutre",
-  version: 2,
+  // 3: vertical full frame by default, as the models, her horizontal shots cropped on their subject; its band only
+  // when she asks for it (Tristan, 6 November, on seven benches: « vertical please », « tout vertical please »).
+  version: 3,
   name: "Carte au feutre",
-  how: "un carnet ouvert gris clair est posé au milieu de l'écran par-dessus ses photos qui défilent en stop motion, une nouvelle toutes les 3 images (un dixième de seconde), dans son ordre, tour après tour (en deux bandes au-dessus et au-dessous du carnet quand la plupart sont horizontales) ; le carnet reste vide un temps, puis son message s'y écrit à la main au feutre (rouge, ou de sa couleur quand elle est foncée) en capitales, un mot à la fois, le carnet changeant de pose à chaque mot ; le nom de ce qu'elle annonce arrive en dernier, la plus grande ligne, le carnet droit, et la phrase entière reste le temps de la lire, les photos défilant toujours ; puis le montage reprend, le plan suivant en plein écran.",
+  how: "un carnet ouvert gris clair est posé au milieu de l'écran par-dessus ses photos qui défilent en stop motion, une nouvelle toutes les 3 images (un dixième de seconde), dans son ordre, tour après tour (en deux bandes au-dessus et au-dessous du carnet, ses images horizontales entières, à sa demande) ; le carnet reste vide un temps, puis son message s'y écrit à la main au feutre (rouge, ou de sa couleur quand elle est foncée) en capitales, un mot à la fois, le carnet changeant de pose à chaque mot ; le nom de ce qu'elle annonce arrive en dernier, la plus grande ligne, le carnet droit, et la phrase entière reste le temps de la lire, les photos défilant toujours ; puis le montage reprend, le plan suivant en plein écran.",
   needs: "une dizaine de photos ou d'images de ses vidéos ou plus (ses plats ou ses produits vus de dessus, des gens à table, son équipe, ses imprimés), où ce qui compte est en haut ou en bas de l'image (le carnet cache le milieu), et un message de 6 à 9 mots qui finit sur le nom de ce qu'elle annonce.",
   lays: "sur 6 à 20 de ses plans coupés d'un temps chacun, d'une autre lumière l'un de l'autre, d'autant plus long que son message a de mots",
   shots: [6, 20],
@@ -249,11 +251,11 @@ export const carteFeutre: EffectPiece = {
   settings: [
     {
       name: "format",
-      want: "la place de ses images sous le carnet : plein écran comme l'original, ou en deux bandes au-dessus et au-dessous du carnet (pour des images horizontales)",
+      want: "la place de ses images sous le carnet : plein écran comme l'original, ou en deux bandes au-dessus et au-dessous du carnet, ses images horizontales entières",
       choices: [
-        { value: "auto", says: "comme ses images : plein écran, ou deux bandes quand la plupart sont horizontales" },
         { value: "vertical", says: "chaque image plein écran, comme l'original (une image horizontale y est recadrée)" },
-        { value: "bandes", says: "deux bandes d'images horizontales entières au-dessus et au-dessous du carnet, qui changent l'une après l'autre" },
+        { value: "bandes", says: "deux bandes d'images horizontales entières au-dessus et au-dessous du carnet, qui changent l'une après l'autre", band: true },
+        { value: "auto", says: "comme ses images : plein écran, ou deux bandes quand la plupart sont horizontales" },
       ],
     },
     {

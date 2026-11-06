@@ -50,6 +50,20 @@ test("every model is vertical full frame by default, its code told so, its band 
   for (const key of Object.keys(KEEPS)) assert.ok(MONTAGE_SKILLS[key]?.settings?.some((s) => s.name === SKILL_FORMAT), key);
 });
 
+test("the bank's effects too: a moment of a vertical Reel full frame by default, its band on her word", async () => {
+  const { EFFECT_PIECES } = await import("./piece-library.ts");
+  // Their format kept apart: the film's band, the card, the screen split, her prints' shapes.
+  const kept = new Set(["court-metrage", "coulisses", "createur", "pile", "mon-travail", "photo-dump", "ecran-partage"]);
+  for (const piece of Object.values(EFFECT_PIECES)) {
+    const format = piece.settings?.find((s) => s.name === SKILL_FORMAT);
+    if (!format) continue;
+    if (!kept.has(piece.key)) assert.equal(format.choices[0]!.value, "vertical", `${piece.key}: its format's default`);
+    const fallback = /setting\("format", "([^"]+)"\)/.exec(piece.code)?.[1];
+    if (fallback) assert.equal(fallback, format.choices[0]!.value, `${piece.key}: its code's fallback`);
+    assert.ok(format.choices.filter((c) => c.band).length <= 1 && !format.choices[0]!.band, piece.key);
+  }
+});
+
 /** A toy model: its format told to its code and its timeline, its slots' words saying where her file goes. */
 const TOY: MontageSkill = {
   key: "toy",

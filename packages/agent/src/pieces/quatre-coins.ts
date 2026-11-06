@@ -72,7 +72,7 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   // 1. Its frame: her shot in width whole in a 16:9 band on black as the original (or when she asks), playing as
   // filmed; upright, her shot full frame, the montage's own under it (nothing drawn but the words).
   const a = shot ? Number(shot.aspect) || 0.5625 : 0.5625;
-  const format = setting("format", "auto");
+  const format = setting("format", "vertical");
   const wide = format === "horizontal" || (format === "auto" && a > 1.15);
   const bw = width;
   const bh = wide ? Math.round((width * 9) / 16) : height;
@@ -196,7 +196,9 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
 
 export const quatreCoins: EffectPiece = {
   key: "quatre-coins",
-  version: 2,
+  // 3: vertical full frame by default, as the models, her horizontal shots cropped on their subject; its band only
+  // when she asks for it (Tristan, 6 November, on seven benches: « vertical please », « tout vertical please »).
+  version: 3,
   name: "Mots aux quatre coins",
   how: "sur un plan fixe et vivant de son lieu, une phrase se pose mot à mot sur les bords du cadre, un mot tous les trois quarts de temps, en petites minuscules crème toutes à la même taille, sans ombre : ses premiers mots en haut (à gauche, au tiers, à droite), son nom au milieu à gauche et son quartier au milieu à droite, une ligne en bas (son adresse) ; toute la phrase reste, puis part d'un coup sur la coupe ; posée en 16:9 sur du noir quand sa vidéo est horizontale.",
   needs: "un plan fixe et vivant de son lieu, téléphone posé, assez large (quelqu'un au travail un peu à gauche du centre), aux bords calmes et plutôt sombres (un mur, une étagère, une vitre) où les mots se posent, 4 s au moins ; pas un grand ciel clair.",
@@ -213,11 +215,11 @@ export const quatreCoins: EffectPiece = {
   settings: [
     {
       name: "format",
-      want: "le format : comme sa vidéo, horizontal comme l'original, ou vertical plein écran",
+      want: "le format : vertical plein écran, horizontal comme l'original, ou comme sa vidéo",
       choices: [
-        { value: "auto", says: "comme sa vidéo (horizontale : en 16:9 sur du noir ; verticale : plein écran)" },
-        { value: "horizontal", says: "horizontal 16:9 sur du noir, comme l'original, les mots sur les bords de l'image" },
         { value: "vertical", says: "vertical plein écran, les mots en haut, au milieu et en bas du cadre" },
+        { value: "horizontal", says: "horizontal 16:9 sur du noir, comme l'original, les mots sur les bords de l'image", band: true },
+        { value: "auto", says: "comme sa vidéo (horizontale : en 16:9 sur du noir ; verticale : plein écran)" },
       ],
     },
   ],
