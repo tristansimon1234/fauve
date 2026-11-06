@@ -106,56 +106,36 @@ const wholeLight = (info: ComposeShot): { mean: number; high: number } | null =>
 };
 
 /**
- * Her picture darkened under a model's words (Tristan, 6 November: « plutôt assombrir l'image »), drawn over the shot
- * only, under everything the composition draws after it, never a box: under each of its words over this shot whose
- * letters do not hold on its light there (veilFor on LightUnder), a soft dark glow the size of the word, fading at its
- * edges and in and out with it; a veil she asked for (`scrim`) at least that dark under each word. A plan measured before
- * the words were (no `ink`): the veil she asked for over the whole shot while its words show, darker at the edges.
+ * Her picture darkened while a model's words hold on it badly (Tristan, 6 November: « plutôt assombrir l'image », then of
+ * soft glows under each word: « c'est horrible, c'est toute l'image, pas que les textes »): the whole shot, evenly, never a
+ * glow, a box or a vignette, drawn over the shot only, under everything the composition draws after it. As dark as its
+ * least readable word over this shot needs (veilFor on the light under it), a veil she asked for (`scrim`) at least that
+ * dark, from its first word to its last, fading in and out with them. A plan measured before the words were (no `ink`):
+ * the veil she asked for over the whole shot while its words show.
  */
 function Scrim({ source, info, shot, frame, laid }: { source: FootageSource; info: ComposeShot; shot: number; frame: number; laid: { left: number; top: number; width: number; height: number } }) {
   const asked = source.scrim?.strength ?? 0;
+  const flat = (dark: number) => (
+    <div data-fauve-decor="" aria-hidden="true" style={{ position: "absolute", inset: 0, pointerEvents: "none", background: `rgba(0,0,0,${Math.min(0.85, dark).toFixed(3)})` }} />
+  );
   if (source.ink?.length) {
-    const glows = source.ink.flatMap((zone, i) => {
-      const amount = zone.shot === shot ? fadeIn(zone.from, zone.to, frame) : 0;
-      if (amount <= 0) return [];
-      // Its light under the word; where its reading has no cell there (a camera move read off the picture), the shot's own.
-      const under = LightUnder(info, frame, laid, { x: zone.box[0], y: zone.box[1], w: zone.box[2] - zone.box[0], h: zone.box[3] - zone.box[1] }) ?? LightUnder(info, frame, laid) ?? wholeLight(info);
-      const dark = veilFor(zone.ink, under, asked) * amount;
-      if (dark < 0.02) return [];
-      const [x0, y0, x1, y1] = zone.box;
-      // Wide and soft, like light falling off around the word: never a shape of its own (a pill, a box).
-      const padX = (x1 - x0) * 0.45 + 120;
-      const padY = (y1 - y0) * 1.1 + 120;
-      return [
-        <div
-          key={i}
-          data-fauve-decor=""
-          aria-hidden="true"
-          style={{
-            position: "absolute",
-            left: x0 - padX - laid.left,
-            top: y0 - padY - laid.top,
-            width: x1 - x0 + 2 * padX,
-            height: y1 - y0 + 2 * padY,
-            pointerEvents: "none",
-            background: `radial-gradient(closest-side, rgba(0,0,0,${dark.toFixed(3)}) 0%, rgba(0,0,0,${(dark * 0.8).toFixed(3)}) 30%, rgba(0,0,0,${(dark * 0.4).toFixed(3)}) 60%, rgba(0,0,0,${(dark * 0.12).toFixed(3)}) 82%, rgba(0,0,0,0) 100%)`,
-          }}
-        />,
-      ];
-    });
-    return glows.length ? <>{glows}</> : null;
+    const zones = source.ink.filter((zone) => zone.shot === shot);
+    if (!zones.length) return null;
+    const amount = fadeIn(Math.min(...zones.map((z) => z.from)), Math.max(...zones.map((z) => z.to)), frame);
+    if (amount <= 0) return null;
+    const need = Math.max(
+      ...zones.map((zone) => {
+        // Its light under the word; where its reading has no cell there (a camera move read off the picture), the shot's own.
+        const under = LightUnder(info, frame, laid, { x: zone.box[0], y: zone.box[1], w: zone.box[2] - zone.box[0], h: zone.box[3] - zone.box[1] }) ?? LightUnder(info, frame, laid) ?? wholeLight(info);
+        return veilFor(zone.ink, under, asked);
+      }),
+    );
+    const dark = need * amount;
+    return dark < 0.02 ? null : flat(dark);
   }
   const amount = scrimAt(source.scrim, frame);
   if (!source.scrim || amount <= 0) return null;
-  const s = asked * amount;
-  const a = (k: number) => Math.min(0.85, s * k).toFixed(3);
-  return (
-    <div
-      data-fauve-decor=""
-      aria-hidden="true"
-      style={{ position: "absolute", inset: 0, pointerEvents: "none", background: `radial-gradient(ellipse 75% 60% at 50% 50%, rgba(0,0,0,${a(0.7)}) 0%, rgba(0,0,0,${a(1)}) 65%, rgba(0,0,0,${a(1.3)}) 100%)` }}
-    />
-  );
+  return flat(asked * amount);
 }
 
 /** Given by the Reel to a collage's composition only; none in the scene check (a grey card stands in for each shot). */
