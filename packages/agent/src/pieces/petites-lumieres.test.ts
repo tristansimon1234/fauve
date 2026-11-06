@@ -19,7 +19,7 @@ test("« Petites lumières » (effect v1): its light's spans on its first shot, 
   assert.ok(editPlanSchema.safeParse(plan).success);
   const layer = plan.layers![0]!;
   assert.deepEqual(layerShots(plan, layer), [1, 2]);
-  assert.deepEqual(layer.motion.piece, { key: "petites-lumieres", version: 1 });
+  assert.deepEqual(layer.motion.piece, { key: "petites-lumieres", version: 2 });
   // Its objects on its two shots (the second and third of the plan); nothing of her cut out.
   assert.deepEqual(layer.motion.drawn, { shots: 4, objects: [{ shot: 1, name: "street lamp head" }, { shot: 2, name: "every window" }] });
   const t = layer.motion.texts!;
@@ -79,7 +79,7 @@ type Drawn = { type: unknown; props: Record<string, unknown>; children: unknown[
 type Box = { x: number; y: number; w: number; h: number };
 
 /** What its Scene draws at a frame (its marks as its layer gets them), run with a plain tree for React. */
-function drawAt(frame: number, props: { box?: Box | null; parts?: Box[]; light?: number; around?: number; texts?: Record<string, string>; brand?: Record<string, unknown> }): Drawn {
+function drawAt(frame: number, props: { box?: Box | null; parts?: Box[]; light?: number; around?: number; windowLight?: (b: Box) => number | undefined; texts?: Record<string, string>; brand?: Record<string, unknown> }): Drawn {
   const React = { createElement: (type: unknown, p: Record<string, unknown> | null, ...children: unknown[]): Drawn => ({ type, props: p ?? {}, children }) };
   const scope: Record<string, unknown> = {
     AbsoluteFill: "AbsoluteFill",
@@ -91,7 +91,9 @@ function drawAt(frame: number, props: { box?: Box | null; parts?: Box[]; light?:
     SubjectParts: () => props.parts ?? [],
     // Its light under her lamp's box; round it, what is around (a dark street by default).
     LightUnder: (_s: unknown, _f: number, _l: unknown, b: Box) => {
-      if (props.light === undefined) return null;
+      const w = props.windowLight && b ? props.windowLight(b) : undefined;
+      if (w !== undefined) return { mean: w, high: w };
+      if (props.light === undefined) return props.windowLight ? { mean: 0.2, high: 0.4 } : null;
       const v = b && props.box && b.w === props.box.w && b.h === props.box.h ? props.light : (props.around ?? 0.3);
       return { mean: v, high: v };
     },
@@ -131,6 +133,8 @@ test("« Petites lumières » draws her light dimmed off and lit on its spans, t
   assert.ok(keyed(drawAt(60, { box: LAMP, light: 0.9, around: 0.85 }), "fill") && !keyed(drawAt(60, { box: LAMP, light: 0.9, around: 0.85 }), "shine"));
   // Nothing named: her highlights bloom on the same spans.
   assert.ok(keyed(drawAt(60, {}), "bloom") && !keyed(drawAt(20, {}), "bloom"));
+  // Read and nothing shining in it (its brightest tenth near its mean): nothing at all.
+  assert.equal(keyed(drawAt(60, { light: 0.3, around: 0.3 }), "bloom"), null);
   // Her shot always under its lights, as the montage plays it: never an empty layer (the scene check refused one at its
   // first image, nothing found to light).
   assert.equal(keyed(drawAt(0, {}), "film")!.props.shot, 1);
@@ -144,6 +148,13 @@ test("« Petites lumières » draws her light dimmed off and lit on its spans, t
   assert.equal(String((windows(136)!.props.style as Record<string, string>).clipPath).match(/M/g)!.length, 12);
   assert.equal(flatten(windows(136)).find((d) => d.type === "Subject")!.props.fill, "#b4201a");
   assert.equal(flatten(windows(136, { couleur: "sienne" })).find((d) => d.type === "Subject")!.props.fill, "rgb(47,111,214)");
+  // Her windows already lit in her picture (her shop windows at night) never covered: a warm white flash on their first
+  // image, then her own picture brighter, tinted with its colour; the dark ones filled as the original's.
+  const litRow = (f: number) => drawAt(f, { parts: GRID, windowLight: (b) => (b.y >= 1500 ? 0.8 : undefined) });
+  assert.equal(keyed(litRow(92), "windows"), null);
+  assert.ok(keyed(litRow(92), "windows-own") && keyed(litRow(92), "windows-flash") && !keyed(litRow(105), "windows-flash"));
+  assert.equal(String((keyed(litRow(136), "windows")!.props.style as Record<string, string>).clipPath).match(/M/g)!.length, 9);
+  assert.ok(flatten(keyed(litRow(136), "windows-own")).some((d) => d.type === "Subject" && d.props.fill === undefined));
   // Her name: a tube catching with its first wave, then lit to the end, in the safe zone.
   const name = (f: number) => flatten(drawAt(f, { parts: GRID, texts: { nom: "Café Lune" } })).find((d) => String(d.props.key).startsWith("name-")) ?? null;
   assert.equal(name(91), null);
