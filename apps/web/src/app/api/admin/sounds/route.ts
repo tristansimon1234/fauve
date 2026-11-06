@@ -66,6 +66,8 @@ export async function POST(request: Request) {
   if (action === "refresh") return Response.json(await refreshTrendSounds({ force: true }));
   // The covers the removed trend videos kept (media/trends/{list}/{video}.webp), deleted once.
   if (action === "drop_trend_covers") return Response.json(await dropTrendCovers());
+  // The sounds of the top Reels of a few hashtags (Tristan: « les sons tendances insta […] aesthetic videos editing »).
+  if (action === "bench_tags") return Response.json(await benchTags((new URL(request.url).searchParams.get("tags") ?? "").split(",")));
   if (action !== "bench") return Response.json({ error: "action=bench|refresh" }, { status: 400 });
   let costUsd = 0;
   let calls = 0;
@@ -160,4 +162,72 @@ async function dropTrendCovers(): Promise<{ removed: number }> {
     removed += data?.length ?? 0;
   }
   return { removed };
+}
+
+/** Every scalar under a key that names a sound (sound, audio, music), at any depth: what the provider tells of it. */
+function soundFields(value: Json, path = "", depth = 0, out: Record<string, string> = {}): Record<string, string> {
+  if (!value || typeof value !== "object" || depth > 6) return out;
+  for (const [k, v] of Object.entries(value as Record<string, Json>)) {
+    const at = path ? `${path}.${k}` : k;
+    if ((typeof v === "string" || typeof v === "number" || typeof v === "boolean") && /sound|audio|music|song|artist/i.test(at)) out[at] = String(v).slice(0, 160);
+    else if (v && typeof v === "object" && !Array.isArray(v)) soundFields(v, at, depth + 1, out);
+    else if (Array.isArray(v) && v[0] && typeof v[0] === "object" && /sound|audio|music/i.test(k)) soundFields(v[0], `${at}[0]`, depth + 1, out);
+  }
+  return out;
+}
+
+/**
+ * The bench of the hashtags' sounds: the top Reels of each hashtag (anyapi.instagram.hashtag_top_posts, one page),
+ * their sounds counted (how many top Reels use each one, their views, on which hashtags), and the fields the provider
+ * gives of a sound (is its audio id there?). About $0.002 a hashtag, logged (kind trends, purpose sounds_tags_bench).
+ */
+async function benchTags(asked: string[]) {
+  const tags = asked.map((t) => t.trim().replace(/^#/, "").toLowerCase()).filter((t) => /^[\p{L}\p{N}_]{2,40}$/u.test(t)).slice(0, 10);
+  let costUsd = 0;
+  const read = await Promise.all(
+    tags.map(async (hashtag) => {
+      const done = await tregCall("anyapi.instagram.hashtag_top_posts", { hashtag }, 0.02).catch(() => null);
+      costUsd += done?.costUsd ?? 0;
+      return { hashtag, posts: listUnder(done?.answer ?? null, ["posts", "items", "data"]) };
+    }),
+  );
+  const sounds = new Map<string, { title: string; author: string | null; reels: number; views: number; tags: Set<string>; example: string | null; fields: Record<string, string> }>();
+  const keys = new Map<string, number>();
+  let reels = 0;
+  let named = 0;
+  for (const { hashtag, posts } of read) {
+    for (const post of posts) {
+      reels += 1;
+      const fields = soundFields(post);
+      for (const k of Object.keys(fields)) keys.set(k, (keys.get(k) ?? 0) + 1);
+      const last = (k: string) => k.split(".").pop() ?? k;
+      const title = fields.soundTitle ?? fields.audioTitle ?? Object.entries(fields).find(([k]) => /title|name/i.test(last(k)) && !/artist|author|owner|user/i.test(last(k)))?.[1];
+      if (!title) continue;
+      named += 1;
+      const author = fields.soundAuthor ?? fields.audioAuthor ?? Object.entries(fields).find(([k]) => /artist|author|owner|username/i.test(last(k)))?.[1] ?? null;
+      const key = `${title.toLowerCase()}|${(author ?? "").toLowerCase()}`;
+      const views = Number(pick(post, ["views", "play_count", "video_view_count", "playCount"]) ?? 0) || 0;
+      const kept = sounds.get(key) ?? { title, author, reels: 0, views: 0, tags: new Set<string>(), example: null, fields };
+      kept.reels += 1;
+      kept.views += views;
+      kept.tags.add(hashtag);
+      kept.example ??= pick(post, ["shortcode", "code"]);
+      sounds.set(key, kept);
+    }
+  }
+  await supabaseAdmin()
+    .from("cost_events")
+    .insert({ studio_id: null, kind: "trends", provider: "treg", units: tags.length, cost_eur: usdToEur(costUsd, env("USD_TO_EUR")), meta: { purpose: "sounds_tags_bench", cost_usd: costUsd, tags } });
+  return {
+    cost_usd: costUsd,
+    tags: read.map((r) => ({ hashtag: r.hashtag, reels: r.posts.length })),
+    reels,
+    named,
+    sound_keys: Object.fromEntries([...keys.entries()].sort((a, b) => b[1] - a[1]).slice(0, 30)),
+    ranking: [...sounds.values()]
+      .sort((a, b) => b.reels - a.reels || b.views - a.views)
+      .slice(0, 60)
+      .map((s) => ({ title: s.title, author: s.author, reels: s.reels, views: s.views, tags: [...s.tags], example: s.example, fields: s.fields })),
+    sample: trimmed(read.find((r) => r.posts.length)?.posts[0] ?? null),
+  };
 }
