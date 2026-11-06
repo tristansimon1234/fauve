@@ -123,8 +123,9 @@ function Scrim({ source, info, shot, frame, laid }: { source: FootageSource; inf
       const dark = veilFor(zone.ink, under, asked) * amount;
       if (dark < 0.02) return [];
       const [x0, y0, x1, y1] = zone.box;
-      const padX = (x1 - x0) * 0.3 + 70;
-      const padY = (y1 - y0) * 0.6 + 60;
+      // Wide and soft, like light falling off around the word: never a shape of its own (a pill, a box).
+      const padX = (x1 - x0) * 0.45 + 120;
+      const padY = (y1 - y0) * 1.1 + 120;
       return [
         <div
           key={i}
@@ -137,7 +138,7 @@ function Scrim({ source, info, shot, frame, laid }: { source: FootageSource; inf
             width: x1 - x0 + 2 * padX,
             height: y1 - y0 + 2 * padY,
             pointerEvents: "none",
-            background: `radial-gradient(closest-side, rgba(0,0,0,${dark.toFixed(3)}) 0%, rgba(0,0,0,${(dark * 0.85).toFixed(3)}) 55%, rgba(0,0,0,0) 100%)`,
+            background: `radial-gradient(closest-side, rgba(0,0,0,${dark.toFixed(3)}) 0%, rgba(0,0,0,${(dark * 0.8).toFixed(3)}) 30%, rgba(0,0,0,${(dark * 0.4).toFixed(3)}) 60%, rgba(0,0,0,${(dark * 0.12).toFixed(3)}) 82%, rgba(0,0,0,0) 100%)`,
           }}
         />,
       ];
