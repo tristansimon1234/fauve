@@ -157,8 +157,13 @@ const soundRow = (s: InstagramSound) => ({
   cover_url: s.cover,
   seconds: s.seconds,
   explicit: s.explicit,
+  ...trackOf(s),
   fetched_at: new Date().toISOString(),
 });
+
+/** Its whole song to listen to, until its link expires. */
+const trackOf = (s: InstagramSound) =>
+  s.track ? { track_url: s.track, track_start: s.highlight, track_until: (linkExpiry(s.track) ?? new Date(Date.now() + 12 * 3_600_000)).toISOString() } : {};
 
 /** The searches of a sound this studio made today (UTC). */
 async function searchesToday(studioId: string): Promise<number> {
@@ -231,4 +236,29 @@ export async function soundExample(audioId: string, studioId: string | null): Pr
   const until = new Date(ends.length ? Math.min(...ends) : Date.now() + 12 * 3_600_000).toISOString();
   await db.from("trend_sounds").update({ reels, reels_until: until }).eq("audio_id", audioId);
   return reels[0] ?? null;
+}
+
+/**
+ * What the page plays to listen to a sound (Tristan: « pq l'aperçu est si court ? »): its whole song from its highlight,
+ * as Instagram's music search serves it (read again by its title when the link expired, about 0.2 cent, shared by
+ * everyone), else the video of a Reel that uses it, from the start (a sound original to one account has no song).
+ */
+export async function soundListen(audioId: string, studioId: string | null): Promise<{ url: string; start: number } | null> {
+  if (!/^\d{5,25}$/.test(audioId)) return null;
+  const db = supabaseAdmin();
+  const { data: row } = await db.from("trend_sounds").select("title, artist, track_url, track_start, track_until").eq("audio_id", audioId).maybeSingle();
+  if (!row) return null;
+  if (row.track_url && row.track_until && Date.parse(row.track_until as string) > Date.now() + 15 * 60_000) return { url: row.track_url as string, start: Number(row.track_start ?? 0) };
+  const spent = { usd: 0, calls: 0 };
+  const answer = await called(SOUND_TOOLS.search, { keyword: [row.title, row.artist].filter(Boolean).join(" ").slice(0, 80) }, spent);
+  await logCost(studioId, spent, "sound_track", { audio_id: audioId });
+  const found = instagramSounds(answer).filter((s) => s.track);
+  const same = found.find((s) => s.audioId === audioId) ?? sameSound({ title: row.title as string, artist: (row.artist as string | null) ?? null }, found);
+  if (same?.track) {
+    // Its cover with it, for a sound added by hand without one.
+    await db.from("trend_sounds").update({ ...trackOf(same), ...(same.cover ? { cover_url: same.cover } : {}) }).eq("audio_id", audioId);
+    return { url: same.track!, start: same.highlight ?? 0 };
+  }
+  const example = await soundExample(audioId, studioId);
+  return example?.video ? { url: example.video, start: 0 } : null;
 }

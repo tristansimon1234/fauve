@@ -6,7 +6,7 @@ import { MusicIcon, PauseIcon, PlayIcon } from "@/components/icons";
 import { Mascot } from "@/components/mascot";
 import { NewPostSheet, type PickedSound } from "@/components/new-post-sheet";
 import type { TrendSound } from "@/lib/trend-sounds";
-import { findSounds, soundToPlay } from "./actions";
+import { findSounds, soundToHear, soundToPlay } from "./actions";
 
 // « Les sons du moment » (Tristan: « une bibliothèque de sons tendances », « plutôt 30 sons et des sons à la demande »):
 // TikTok's charts found on Instagram, and any sound she looks for by name. Listened to here from a Reel that uses it
@@ -49,12 +49,15 @@ export function SoundsSection({ sounds, timezone }: { sounds: TrendSound[]; time
       return;
     }
     setBusy(sound.audioId);
-    const example = await soundToPlay(sound.audioId);
+    const heard = await soundToHear(sound.audioId);
     setBusy(null);
-    if (!example?.video) return setError(`Aucun Reel n’utilise encore « ${sound.title} » sur Instagram.`);
+    if (!heard) return setError(`Je n’arrive pas à faire écouter « ${sound.title} » pour l’instant.`);
     setError(null);
-    el.src = example.video;
-    el.currentTime = 0;
+    el.src = heard.url;
+    // From its highlight, once its length is known (the passage Instagram offers first).
+    el.onloadedmetadata = () => {
+      if (heard.start > 0 && heard.start < el.duration) el.currentTime = heard.start;
+    };
     el.play().then(
       () => setPlaying(sound.audioId),
       () => setPlaying(null),

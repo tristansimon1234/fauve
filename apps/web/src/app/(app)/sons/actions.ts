@@ -1,7 +1,7 @@
 "use server";
 
 import { getStudioContext } from "@/lib/studio";
-import { searchSounds, soundExample, type SoundExample, type TrendSound } from "@/lib/trend-sounds";
+import { searchSounds, soundExample, soundListen, type SoundExample, type TrendSound } from "@/lib/trend-sounds";
 
 /** « Chercher »: a title or an artist among Instagram's music (SOUND_SEARCHES_PER_DAY a day). */
 export async function findSounds(words: string): Promise<{ ok: true; sounds: TrendSound[] } | { ok: false; error: string }> {
@@ -15,4 +15,11 @@ export async function soundToPlay(audioId: string): Promise<SoundExample | null>
   const { member } = await getStudioContext();
   if (!member) return null;
   return soundExample(audioId, member.studio.id).catch(() => null);
+}
+
+/** Its song to listen to here, from its highlight (Instagram's link, played from there). */
+export async function soundToHear(audioId: string): Promise<{ url: string; start: number } | null> {
+  const { member } = await getStudioContext();
+  if (!member) return null;
+  return soundListen(audioId, member.studio.id).catch(() => null);
 }

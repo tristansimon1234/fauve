@@ -28,7 +28,7 @@ test("trend sounds: an Instagram music search, the id of its page and its cover"
       data: {
         count: 10,
         items: [
-          { id: "1258821776191042", audio_id: "1969670177763370", title: "Coming Up Roses", display_artist: "Harry Styles", duration_in_ms: 248866, is_explicit: false, cover_artwork_thumbnail_uri: "https://scontent.cdninstagram.com/v/a.jpg" },
+          { id: "1258821776191042", audio_id: "1969670177763370", title: "Coming Up Roses", display_artist: "Harry Styles", duration_in_ms: 248866, is_explicit: false, cover_artwork_thumbnail_uri: "https://scontent.cdninstagram.com/v/a.jpg", progressive_download_url: "https://scontent.cdninstagram.com/o1/a.mp4?oe=6AEEE0E2", highlight_start_times_in_ms: [39000, 146500] },
           { id: "847727728401625", title: "Coming Up Roses (Ana’s Bridgerton Violin Version)", display_artist: "Ana Done" },
           { id: "x", title: "Not an id" },
         ],
@@ -36,11 +36,11 @@ test("trend sounds: an Instagram music search, the id of its page and its cover"
     },
   });
   assert.equal(found.length, 2);
-  assert.deepEqual(found[0], { audioId: "1258821776191042", title: "Coming Up Roses", artist: "Harry Styles", cover: "https://scontent.cdninstagram.com/v/a.jpg", seconds: 249, explicit: false });
+  assert.deepEqual(found[0], { audioId: "1258821776191042", title: "Coming Up Roses", artist: "Harry Styles", cover: "https://scontent.cdninstagram.com/v/a.jpg", seconds: 249, explicit: false, track: "https://scontent.cdninstagram.com/o1/a.mp4?oe=6AEEE0E2", highlight: 39 });
   // The song itself, not its cover version.
   assert.equal(sameSound({ title: "Coming Up Roses", artist: "Harry Styles" }, found)?.audioId, "1258821776191042");
   assert.equal(sameSound({ title: "Coming Up Roses", artist: "Someone Else" }, found), null);
-  assert.equal(sameSound({ title: "Can I Ride", artist: "SIDEPIECE & 95 South" }, [{ audioId: "1686149526042093", title: "Can I Ride", artist: "SIDEPIECE, 95 South", cover: null, seconds: null, explicit: false }])?.audioId, "1686149526042093");
+  assert.equal(sameSound({ title: "Can I Ride", artist: "SIDEPIECE & 95 South" }, [{ audioId: "1686149526042093", title: "Can I Ride", artist: "SIDEPIECE, 95 South", cover: null, seconds: null, explicit: false, track: null, highlight: null }])?.audioId, "1686149526042093");
 });
 
 test("trend sounds: the Reels that use a sound, their plays and their video", () => {

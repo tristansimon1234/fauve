@@ -61,7 +61,17 @@ export function chartSongs(answer: unknown): ChartSong[] {
   });
 }
 
-export type InstagramSound = { audioId: string; title: string; artist: string | null; cover: string | null; seconds: number | null; explicit: boolean };
+export type InstagramSound = {
+  audioId: string;
+  title: string;
+  artist: string | null;
+  cover: string | null;
+  seconds: number | null;
+  explicit: boolean;
+  /** The whole song on Instagram's CDN (its link expires: linkExpiry), and where its highlight starts (s): what the page plays. */
+  track: string | null;
+  highlight: number | null;
+};
 
 const searchItem = z.object({
   id: z.union([z.string(), z.number()]).transform(String).pipe(z.string().regex(/^\d{5,25}$/)),
@@ -71,6 +81,9 @@ const searchItem = z.object({
   cover_artwork_uri: z.string().url().max(2000).nullable().optional().catch(null),
   duration_in_ms: count.optional(),
   is_explicit: z.boolean().optional().catch(false),
+  fast_start_progressive_download_url: z.string().url().max(4000).nullable().optional().catch(null),
+  progressive_download_url: z.string().url().max(4000).nullable().optional().catch(null),
+  highlight_start_times_in_ms: z.array(z.coerce.number().nonnegative()).nullable().optional().catch(null),
 });
 
 /** The sounds an Instagram music search found, in its order (the id is its page's: instagram.com/reels/audio/{id}/). */
@@ -89,6 +102,8 @@ export function instagramSounds(answer: unknown): InstagramSound[] {
         cover: v.cover_artwork_thumbnail_uri ?? v.cover_artwork_uri ?? null,
         seconds: v.duration_in_ms ? Math.round(v.duration_in_ms / 1000) : null,
         explicit: Boolean(v.is_explicit),
+        track: v.fast_start_progressive_download_url ?? v.progressive_download_url ?? null,
+        highlight: v.highlight_start_times_in_ms?.[0] !== undefined ? Math.round(v.highlight_start_times_in_ms[0]) / 1000 : null,
       },
     ];
   });

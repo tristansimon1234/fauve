@@ -3,7 +3,7 @@ import { cronAuthorized } from "@/lib/cron-auth";
 import { env } from "@/lib/env";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { tregCall } from "@/lib/treg";
-import { refreshTrendSounds } from "@/lib/trend-sounds";
+import { refreshTrendSounds, soundListen } from "@/lib/trend-sounds";
 
 // The bench of the trending sounds (Tristan: « une bibliothèque de sons tendances », as Mojo or Muse do: the video
 // comes out silent, the sound is added in Instagram). One run (CRON_SECRET, from the database by net.http_post):
@@ -68,6 +68,8 @@ export async function POST(request: Request) {
   if (action === "drop_trend_covers") return Response.json(await dropTrendCovers());
   // The sounds of the top Reels of a few hashtags (Tristan: « les sons tendances insta […] aesthetic videos editing »).
   if (action === "bench_links") return Response.json(await benchLinks(await request.json().catch(() => ({}))));
+  // Edith's favourite sounds made ready: each one's song and cover read once (about 0.2 cent each).
+  if (action === "prime_house") return Response.json(await primeHouse());
   if (action === "bench_trending") return Response.json(await benchTrending());
   if (action === "bench_tags") return Response.json(await benchTags((new URL(request.url).searchParams.get("tags") ?? "").split(",")));
   if (action !== "bench") return Response.json({ error: "action=bench|refresh" }, { status: 400 });
@@ -295,4 +297,11 @@ async function benchTrending() {
     })),
     sample: trimmed(reels[0] ?? done?.answer ?? null),
   };
+}
+
+/** Each of Edith's favourite sounds (chart house): its song and its cover, read now rather than at its first listen. */
+async function primeHouse() {
+  const { data } = await supabaseAdmin().from("trend_sounds").select("audio_id, title").eq("chart", "house");
+  const done = await Promise.all((data ?? []).map(async (r) => ({ title: r.title as string, heard: Boolean(await soundListen(r.audio_id as string, null).catch(() => null)) })));
+  return { sounds: done };
 }
