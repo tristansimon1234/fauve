@@ -200,6 +200,10 @@ export const HOUSE_EFFECTS: Record<string, HouseEffect> = {
     effet: "chaque étape coupée geste par geste, ses mots au milieu de l'image comme les sous-titres d'une voix, un petit groupe par geste",
     il_faut: "des gestes filmés téléphone posé, chaque étape d'un seul endroit en plusieurs gestes",
   },
+  vitraux: {
+    effet: "des miroirs posés sur sa chose filmée de face, qui glissent sans arrêt : elle se dédouble et se recompose en motifs symétriques, le reste de l'image vrai, puis redevient elle-même",
+    il_faut: "un plan fixe et bien de face de sa porte, sa devanture, sa vitrine, une étagère ou un présentoir, sans personne devant",
+  },
 };
 
 /** The most of Edith's models one Reel borrows from: one charter, one music, never a patchwork. */
