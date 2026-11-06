@@ -346,11 +346,14 @@ async function benchAccount(handle: string, pages: number) {
   let costUsd = 0;
   let cursor: string | null = null;
   let reels = 0;
+  let first: Json = null;
   const songs = new Map<string, { title: string; artist: string | null; audio_id: string | null; reels: number; plays: number; codes: string[]; trending: boolean }>();
   for (let page = 0; page < Math.min(Math.max(pages, 1), 10); page += 1) {
-    const done = await tregCall("anyapi.instagram.user.reels", { handle: name, ...(cursor ? { cursor } : {}) }, 0.02).catch(() => null);
+    // ScrapeCreators gives each Reel whole (its clips_metadata carries its music); anyapi's Reels have no sound.
+    const done = await tregCall("scrapecreators.x.v1-instagram-user-reels", { handle: name, ...(cursor ? { max_id: cursor } : {}) }, 0.02, "GET").catch(() => null);
     costUsd += done?.costUsd ?? 0;
     const posts = listUnder(done?.answer ?? null, ["reels", "posts", "items"]);
+    first ??= posts[0] ?? done?.answer ?? null;
     for (const post of posts) {
       reels += 1;
       const f = soundFields(post);
@@ -369,12 +372,12 @@ async function benchAccount(handle: string, pages: number) {
       kept.trending ||= /true/i.test(value(/is_trending_in_clips/i) ?? "");
       songs.set(key, kept);
     }
-    const next = pick(done?.answer ?? null, ["nextCursor", "next_cursor", "end_cursor"]);
+    const next = pick(done?.answer ?? null, ["max_id", "next_max_id", "nextCursor", "end_cursor"]);
     if (!next || next === cursor || !posts.length) break;
     cursor = next;
   }
   await supabaseAdmin()
     .from("cost_events")
     .insert({ studio_id: null, kind: "trends", provider: "treg", units: 1, cost_eur: usdToEur(costUsd, env("USD_TO_EUR")), meta: { purpose: "sounds_account_bench", cost_usd: costUsd, handle: name } });
-  return { handle: name, cost_usd: costUsd, reels, songs: [...songs.values()].sort((a, b) => b.reels - a.reels || b.plays - a.plays) };
+  return { handle: name, cost_usd: costUsd, reels, songs: [...songs.values()].sort((a, b) => b.reels - a.reels || b.plays - a.plays), ...(songs.size ? {} : { sample: trimmed(first) }) };
 }
