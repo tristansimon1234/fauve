@@ -387,7 +387,7 @@ export type MontageSkill = {
   /** How it goes, in a sentence for the filler (French). */
   how: string;
   texts: SkillText[];
-  /** Whether its code draws an ending card (an offer, an announcement) when the Reel has one. */
+  /** Whether its code draws an ending card (what her request announces: an offer, an opening, a date) when the Reel has one. */
   end: boolean;
   /**
    * For n shots: its length, each shot's span and want (two on the same moment: SkillShot.beside), its texts' moments
@@ -779,17 +779,41 @@ export function fitWords(text: string, max: number): string {
 }
 
 /**
+ * The words of an offer or a promotion (French, a few English): a discount (« -20 % », « 20 % de remise »), a price
+ * (« 15 € »), a sale, something free or offered, a promo code. « 100 % fait main » is no offer.
+ */
+const OFFER_WORDS =
+  /(?<![\p{L}\d])(?:-\s?\d+(?:[.,]\d+)?\s?%|\d+(?:[.,]\d+)?\s?%\s?(?:de\s)?(?:réduc\w*|remise|rabais|off|discount)|\d+(?:[.,]\d+)?\s?(?:€|euros?)|promos?|promotions?|soldes?|réduc\w*|remises?|rabais|offerte?s?|offres?|gratuite?s?|gratos|bons? plans?|codes? promo|ventes? privées?|déstockage|black friday|happy hour|[12]\s?(?:\+|pour)\s?[12]|deux pour un|sale|discount)(?![\p{L}\d])/iu;
+
+/**
+ * Whether her words speak of an offer, a promotion or a price. On the request side (what she asked, `asksOffer`), a
+ * price or a percentage named at all is enough.
+ */
+export const speaksOffer = (text: string | null | undefined): boolean => OFFER_WORDS.test(String(text ?? "").normalize("NFC"));
+export const asksOffer = (asked: string | null | undefined): boolean => speaksOffer(asked) || /[%€]|\bprix\b|\btarifs?\b/iu.test(String(asked ?? ""));
+
+/**
+ * An offer nobody asked for in this Reel: words that speak of one when her request (and what she fixed) never does.
+ * The filler had ended « Collage qui s'emboîte » on « -20 % CE WEEK-END / SUR TOUTE LA BOUTIQUE, À LILLE », taken from
+ * what we know of the shop, for « Les nouveautés de la boutique cette semaine. » (Tristan: « enlève le bandeau à la fin
+ * -20 % »). Unknown request: never.
+ */
+export const unaskedOffer = (words: string | null | undefined, asked: string | undefined): boolean =>
+  asked !== undefined && speaksOffer(words) && !asksOffer(asked);
+
+/**
  * The filler's answer read against the skill and her files: exactly n shots, each on one of her files (an unknown one
  * replaced by her files in turn), a video's start inside it; each text cut to its place; the ending only when the
- * skill draws one. Null when a required text is missing (the filler failed: the editor makes the Reel). Her own voice
- * leading it (`heard`): its texts are her words (each slot the first time she says it), none of them required.
+ * skill draws one, and never an offer she did not ask for (`asked`: her request and what she fixed; its ending card
+ * left out, an optional text left empty). Null when a required text is missing (the filler failed: the editor makes the
+ * Reel). Her own voice leading it (`heard`): its texts are her words (each slot the first time she says it), none of them required.
  */
 export function readSkillFill(
   skill: Pick<MontageSkill, "texts" | "end" | "settings" | "objects" | "voice">,
   files: SkillFile[],
   n: number,
   answer: SkillFillAnswer,
-  options: { wordsWanted?: boolean; talk?: SkillTalk; facts?: SkillFacts; heard?: SkillHeard } = {},
+  options: { wordsWanted?: boolean; talk?: SkillTalk; facts?: SkillFacts; heard?: SkillHeard; asked?: string } = {},
 ): SkillFill | null {
   if (!files.length) return null;
   // Timed on her voice: her talk is its shots (cut by the engine), and her words its texts; without her talk, nothing to play.
@@ -815,7 +839,10 @@ export function readSkillFill(
     // A fact the engine knows (her coordinates) is written by it, whatever the filler wrote.
     const fact = t.fact ? skillFact(t, options.facts) : undefined;
     const asked = answer.texts.find((w) => w.slot === t.slot);
-    const fitted = fact ?? fitWords(asked?.text ?? "", t.max);
+    // An optional text that brings an offer she did not ask for stays empty (a required one keeps its words: the prompt's rule).
+    const optional = !t.required && !options.wordsWanted;
+    const words = optional && unaskedOffer(asked?.text, options.asked) ? "" : (asked?.text ?? "");
+    const fitted = fact ?? fitWords(words, t.max);
     if (fitted) texts[t.slot] = fitted;
     else if (t.required || options.wordsWanted) return null;
     const font = t.font ? wordFont(asked?.font)?.family : undefined;
@@ -826,7 +853,10 @@ export function readSkillFill(
   const said = skill.voice ? readSaid(skill.voice, options.talk!, answer.voice, files.filter((f) => !talking.has(f.id)).map((f) => f.id)) : undefined;
   if (skill.voice && !said) return null;
   const title = fitWords(answer.end?.title ?? "", 40);
-  const end = skill.end && title ? { title, ...(answer.end?.subtitle?.trim() ? { subtitle: fitWords(answer.end.subtitle, 60) } : {}) } : null;
+  const subtitle = answer.end?.subtitle?.trim() ? fitWords(answer.end.subtitle, 60) : "";
+  // Its ending card stays optional: one that brings an offer she did not ask for is left out, never written.
+  const offered = unaskedOffer(`${title} ${subtitle}`, options.asked);
+  const end = skill.end && title && !offered ? { title, ...(subtitle ? { subtitle } : {}) } : null;
   const settings = skillSettings(skill, answer.settings);
   const objects: Record<string, string> = {};
   for (const o of skill.objects ?? []) {
@@ -1641,7 +1671,7 @@ export const skillFillSchema = z.object({
   end: z
     .object({ title: z.string().describe("The ending card's line, 40 characters at most"), subtitle: z.string().describe("A second line, 60 characters at most, or empty") })
     .nullable()
-    .describe("Only when the model has an ending (« fin ») and she has an offer or an announcement to end on; null otherwise"),
+    .describe("Only when the model has an ending (« fin ») and her request is about something to end on (an offer, an opening, a date she speaks of); never an offer or a promotion her request is not about; null otherwise"),
   settings: z
     .array(z.object({ name: z.string().describe("The setting's name (« reglages »)"), value: z.string().describe("The value of the choice her request asks for") }))
     .optional()
@@ -1669,7 +1699,7 @@ With « ses_paroles », what is said in her videos is heard and written on scree
 With « sa_voix », her own recorded voice (her voice note, or the sound of one of her videos where she speaks) leads this model: it plays whole under the model's music, the model's words on screen are hers, each shown when she says it, and its shots are cut on her words; there are no texts to write ("texts" empty). Read what she says (« ce_qu_elle_dit », her words numbered, phrase by phrase, her « euh » already cut) and answer "sa_voix": "suit" true when she says the model's words in its order (« mots_du_modele »: what each one is and how many times it comes, its word pointed at each thing she shows once per thing); then "mots", each time she says one of them, in the order she says them: its slot, the numbers of her first and last word for it, and its text as written on screen, her words as she says them, spelled right (a word the transcript misheard set right), within its most characters (when she says more, her strongest words for it, never a word she does not say). Her other words are heard, never written: leave them out. "suit" false when what she says is not this model's words (she shows nothing one by one, she says something else): her voice is then laid over the model with subtitles, and nothing else of your answer is used. Cast her files on its cases as « sa_voix.cases » says, in that order: their number follows what she says (one shot for each thing she points at), each one the file that shows what she names there (« celle-là, la bleue »: her blue one).
 
 Then cast her files on its slots (« cases », in order: each with its length and what it wants), as a good editor would:
-- each slot gets the file and the passage that suits what it wants; the first slot opens the Reel: the strongest, most beautiful image;
+- each slot gets the file and the passage that suits what it wants and what her request is about: where it names a place, a thing, a moment or a person, the slots that show one show that one, as it is (« le marché aux puces »: its stalls, its objects, people browsing; never a food market, another place or a file that only fills the slot), the closest of her files when none shows it exactly; the first slot opens the Reel: the strongest, most beautiful image;
 - a video's passage starts at "at" (seconds) and lasts the slot's length: choose it inside one of its good moments (« moments »), never a blurry or dark one when another exists;
 - never the same passage twice; a video may fill several slots only with moments that look different; her files all used before one comes back, never the same file on two slots in a row when another fits;
 - a file's format (« format »: verticale, horizontale, carrée) matters where the model lays a slot in a box of another shape (its « veut » or « deroule » says: a tall half, a wide band): there a file of that shape when one fits, else a passage whose subject is in the middle of its picture (only its middle shows);
@@ -1679,7 +1709,7 @@ Then cast her files on its slots (« cases », in order: each with its length an
 
 Then write its texts, in French (what her customers read), each in its slot (« textes »: what it says and its most characters):
 - words she gives (« contrat », her request) are kept as she wrote them, only spelled right (accents, apostrophes, hyphens, « WhatsApp »), never one of her typos, never rewritten;
-- otherwise words a good creator would write for this business: concrete, specific to it, never an ad slogan, a promise or a formula; nothing invented (no price, hour, place, offer or review that is not given);
+- otherwise words a good creator would write for this business: concrete, specific to it, never an ad slogan, a promise or a formula; nothing invented (no price, hour, place, offer or review that is not given); and never an offer, a promotion, a discount or a price her request is not about, even one that is known (« ce_qu_on_sait »): a Reel on what is new in the shop never adds its « -20 % ce week-end »;
 - each within its most characters (count them), in normal case: the code sets the capitals when the model has them; a name longer than its place is never cut, write the word that sets it apart instead (« Farine » for « Maison Farine »: never « Maison »);
 - an optional slot (obligatoire false) is left empty unless her request or the Reel needs those words; a required one is always written;
 - a slot the engine writes itself (« ecrit_par_le_moteur », her place's coordinates) is never written by you: leave its text empty, and never repeat those words elsewhere;
@@ -1696,7 +1726,7 @@ A model timed on her voice (« voix »): her talking video is the Reel, cut by t
 
 "settings": its settings (« reglages », when it has some), like the variants of a template: one only when her request asks for what it does (« plus de cases », « plus lent », « dans le désordre », « avec ma couleur »), with the value that does it; never to vary for its own sake; otherwise none, each one plays the original's. A request a setting answers fits.
 "objets": its objects (« objets », when it has some): what in the file you cast on that slot carries its effect (a sign whose letters light up one by one, windows that light up one after the other, lamps that flash), from what the file shows (« montre », « moments »): name it in plain English as the eye sees it, two to four words (« shop sign », « neon sign », « bakery sign », « every window », « string lights », « pendant lamps »); « every » before it when there are several to take one after the other (each window, each lamp); empty when nothing in that file fits (the model does without). Cast on that slot the file that has it, when one does.
-"end": only when the model has an ending (« fin ») and she has something to end on (an offer, an opening, a date, in her request or what we know): its title (40 characters at most) and a subtitle or empty; otherwise null.
+"end": optional, null unless the model has an ending (« fin ») and her request (or « contrat ») is about something to end on: an offer, an opening, a date, an event she speaks of; what we know (« ce_qu_on_sait ») may complete it (its date, its place), never bring a subject of its own: an offer, a promotion, a discount or a price only when her request is about it (« Les nouveautés de la boutique cette semaine », with « -20 % sur toute la boutique ce week-end » known: null). Its title (40 characters at most) and a subtitle or empty; when in doubt, null.
 "why": one sentence for her in French (tu), what you chose and why, in plain words.`;
 
 /** What the filler is told when a voice says the model's words (« mots_dits »), in French like the rest of its input. */
@@ -1836,7 +1866,7 @@ export function skillFillInput(input: {
     modele: {
       nom: input.name,
       deroule: input.skill.how,
-      fin: input.skill.end ? "le modèle peut finir sur une carte (une offre, une annonce)" : "aucune",
+      fin: input.skill.end ? "le modèle peut finir sur une carte, facultative : seulement ce que sa demande annonce (une offre, une ouverture, une date dont elle parle), jamais une offre dont elle ne parle pas" : "aucune",
       longueurs: (() => {
         if (voice) return `la longueur de ce qu'elle dit, ${TALK_MAX_SECONDS} s au plus (ce Reel : ${round(input.talk?.duration ?? 0)} s)`;
         if (hers) return `la longueur de ce qu'elle dit, ${TALK_MAX_SECONDS} s au plus (sa voix : ${round(hers.talk.duration)} s)`;

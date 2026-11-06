@@ -4798,6 +4798,47 @@ test("contract: only what she fixed, in plain lines", () => {
   assert.equal(ownTextKey({ ...started, voice_text_rest: null }), "Je vous présente Pauline.");
 });
 
+test("contract: a request that describes the Reel is never read as words to say (Le grand départ, Présente-toi)", async () => {
+  const { asksSpokenText, keepAskedVoice, CONTRACT_PROMPT } = await import("./contract.ts");
+  const { imaginedBrief } = await import("./creation.ts");
+  // Its bench of 6 November: the idea « Ce week-end, on part au marché aux puces. » came back as her text, said by a
+  // voice-over over « Le grand départ », subtitled word for word; on 5 November « Je me présente : Héloïse… » the same.
+  const depart = imaginedBrief("Ce week-end, on part au marché aux puces.")!;
+  const heloise = imaginedBrief("Je me présente : Héloïse, la fleuriste de l'Atelier Rose.")!;
+  for (const [request, text] of [
+    [depart, "Ce week-end, on part au marché aux puces."],
+    [heloise, "Je me présente : Héloïse, la fleuriste de l'Atelier Rose."],
+    [imaginedBrief("Le nouvel arrivage de la semaine, des pièces vintage : ça doit donner envie de venir chiner.")!, "Le nouvel arrivage de la semaine, des pièces vintage."],
+    [imaginedBrief("Des lis et des roses pour la fête des mères.")!, "Des lis et des roses pour la fête des mères."],
+  ] as [string, string][]) {
+    assert.equal(asksSpokenText(request, text), false, request);
+    const read = keepAskedVoice({ ...EMPTY_CONTRACT, voice_text: text, person: "nous" }, request);
+    assert.equal(read.voice_text, null);
+    assert.equal(read.voice_text_rest, null);
+    // What else she fixed stays.
+    assert.equal(read.person, "nous");
+  }
+  // She says the voice says it: « la voix dit », « voix off : », « texte : », « fais-lui dire », her words between quotes.
+  for (const [request, text] of [
+    ["La voix dit : ce week-end, on part au marché aux puces.", "Ce week-end, on part au marché aux puces."],
+    ["Voix off : Je me présente, Héloïse, fleuriste.", "Je me présente, Héloïse, fleuriste."],
+    ["Texte : Je lis tranquille pendant qu'elle bosse", "Je lis tranquille pendant qu'elle bosse"],
+    ["Fais-lui dire que les nouveautés arrivent samedi", "Les nouveautés arrivent samedi."],
+    ["Un Reel sur le marché, « Ce week-end, on part au marché aux puces »", "Ce week-end, on part au marché aux puces."],
+    ["le voix off dis je vous présente Pauline… et là tu parles d'Edith", "Je vous présente Pauline…"],
+  ] as [string, string][]) {
+    assert.equal(asksSpokenText(request, text), true, request);
+    assert.equal(keepAskedVoice({ ...EMPTY_CONTRACT, voice_text: text }, request).voice_text, text);
+  }
+  // Quotes of another text (a name on screen) are not her words to say.
+  assert.equal(asksSpokenText("Le nom « Au Procope » en très grand dans le décor", "Le nom Au Procope en très grand dans le décor."), false);
+  // A correction of the voice on the Reel keeps the reader's text (her change to it, which she may not quote).
+  const fixing = { ...EMPTY_CONTRACT, voice_text: "Ce week-end, on part aux puces de Saint-Ouen." };
+  assert.equal(keepAskedVoice(fixing, "Remplace marché par Saint-Ouen", "Ce week-end, on part au marché aux puces.").voice_text, fixing.voice_text);
+  assert.equal(keepAskedVoice(EMPTY_CONTRACT, depart), EMPTY_CONTRACT);
+  assert.match(CONTRACT_PROMPT, /A request that describes the Reel is never a text to say, even a whole sentence in the first person \(« Ce week-end, on part au marché aux puces\. »/);
+});
+
 test("the voice says as much as the length she asked for", async () => {
   const { voiceWordsFor } = await import("./voice-over.ts");
   const { VOICE_MAX_SECONDS } = await import("./voice.ts");

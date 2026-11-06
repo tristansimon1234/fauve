@@ -6,14 +6,14 @@ import { skillFit, skillLengths, skillPlan, type MontageSkill } from "../skills.
 import { clearsDrawn, depthsDrawn, objectsDrawn, readsDrawn, subjectsDrawn } from "../subject.ts";
 import { depart, departCounts } from "./depart.ts";
 
-// « Le grand départ », the model (depart.ts, version 1), on its original's fiche (docs/fiches/depart.md); and the tool it
+// « Le grand départ », the model (depart.ts, version 2), on its original's fiche (docs/fiches/depart.md); and the tool it
 // added to the engine: a slot played faster than filmed (SkillShot.speed).
 
 /** The original's cuts, the first image of each new shot (measured image by image): its empty place, its four journey shots, its three crowds. */
 const ORIGINAL_CUTS = [25, 32, 42, 51, 82, 96, 148, 218];
 
-test("« Le grand départ » (v1): its nine shots on its original's cuts (110,9 BPM from the first image), 11,17 s, its music coming in with the arrival", () => {
-  assert.equal(depart.version, 1);
+test("« Le grand départ » (v2): its nine shots on its original's cuts (110,9 BPM from the first image), 11,17 s, its music coming in with the arrival", () => {
+  assert.equal(depart.version, 2);
   assert.equal(depart.bpm, 110.9);
   const line = depart.timeline(9, { end: false });
   // 335 images (the original's, its last black one aside); each cut within an image of the original's.
@@ -37,6 +37,27 @@ test("« Le grand départ » (v1): its nine shots on its original's cuts (110,9 
   assert.match(line.shots[5]!.want, /fonce d'un coup/);
   assert.match(line.shots[8]!.want, /il prend 7,74 s de sa vidéo/);
   assert.deepEqual(depart.reads, ["covered"]);
+});
+
+test("« Le grand départ » (v2): its slots follow her request (Tristan of its bench: « pas trop de rapport »)", () => {
+  // Its bench of 6 November (friperie, « Ce week-end, on part au marché aux puces. »): a woman at a house's door, a food
+  // market's tomatoes under « au marché aux puces ». Now: her own place, a journey towards where she goes, that place.
+  const line = depart.timeline(9, { end: false });
+  assert.match(line.shots[0]!.want, /son lieu à elle, celui qu'elle quitte \(sa boutique/);
+  for (const i of [2, 3, 4]) assert.match(line.shots[i]!.want, /un plan du trajet vers l'endroit que sa demande nomme/);
+  assert.match(line.shots[5]!.want, /l'entrée de l'endroit que sa demande nomme/);
+  // Its three arrival shots: that very place as it is (a flea market's stalls, never a food market), the middle one
+  // closer on what one does there, the last wide under its two lines.
+  for (const i of [6, 7, 8]) {
+    assert.match(line.shots[i]!.want, /l'endroit que sa demande nomme, tel qu'il est \(le marché aux puces : ses stands/);
+    assert.match(line.shots[i]!.want, /jamais un autre endroit qui ne fait que remplir la case \(un marché de fruits pour un marché aux puces\)/);
+  }
+  assert.match(line.shots[7]!.want, /^l'arrivée de plus près, .*des mains qui fouillent un bac ou un portant/);
+  assert.match(line.shots[8]!.want, /^le dernier plan de l'arrivée, .*en large/);
+  // Two arrival shots (six in all): none closer, both the place.
+  const six = depart.timeline(6, { end: false });
+  assert.ok(six.shots.slice(4).every((s) => /l'endroit que sa demande nomme/.test(s.want) && !/de plus près/.test(s.want)));
+  assert.match(depart.how, /l'arrivée à l'endroit que sa demande nomme/);
 });
 
 test("« Le grand départ »: 6 to 9 shots from her files (her journey and her arrival shorter), up to 16 for a length she asks for", () => {
@@ -99,7 +120,7 @@ test("« Le grand départ »: its plan (her arrival played faster, her journey h
   assert.deepEqual(plan.music_shape?.pauses, [{ from: 0, to: 3.23 }]);
   assert.equal(plan.music_shape?.end?.at, 11.17);
   assert.equal(plan.sounds?.length ?? 0, 0);
-  assert.deepEqual(plan.skill, { key: "depart", version: 1 });
+  assert.deepEqual(plan.skill, { key: "depart", version: 2 });
   assert.equal(plan.tempo, 110.9);
   // Light to render: nothing cut out nor followed, no clear area, no reading, no depth.
   assert.deepEqual(checkMotionCode(depart.code), []);

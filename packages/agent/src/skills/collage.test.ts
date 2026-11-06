@@ -325,3 +325,50 @@ test("« Collage qui s'emboîte » (v1): its plan cuts out what its chain draws,
   assert.deepEqual(set.skill?.settings, { couleur: "toutes", format: "vertical" });
   assert.equal(set.layers![0]!.motion.texts!.g6, undefined);
 });
+
+test("Collage qui s'emboîte: never an offer nobody asked for (its bench of 6 November, the boutique case)", async () => {
+  const { readSkillFill, skillFillInput, SKILL_FILL_PROMPT } = await import("../skills.ts");
+  const files = Array.from({ length: 8 }, (_, i) => ({ id: `f${i}`, photo: false, seconds: 6 }));
+  // Its bench: « Les nouveautés de la boutique cette semaine. », the shop's facts saying « -20 % sur toute la boutique ce
+  // week-end »; its filler ended the Reel on an orange band « -20 % CE WEEK-END / SUR TOUTE LA BOUTIQUE, À LILLE ».
+  const answer = {
+    fits: true,
+    missing: "",
+    shots: files.map((f) => ({ file: f.id, at: 0 })),
+    texts: [{ slot: "titre", text: "Nouveautés" }],
+    end: { title: "-20 % ce week-end", subtitle: "Sur toute la boutique, à Lille" },
+    why: "",
+  };
+  const request = "Ce que la gérante imagine : Les nouveautés de la boutique cette semaine.";
+  const read = readSkillFill(collage, files, 13, answer, { asked: request })!;
+  assert.equal(read.end, null);
+  assert.equal(read.texts.titre, "Nouveautés");
+  // An optional title that brings it is left empty too; the Reel is still made.
+  const titled = readSkillFill(collage, files, 13, { ...answer, texts: [{ slot: "titre", text: "-20 % ce week-end" }] }, { asked: request })!;
+  assert.equal(titled.texts.titre, undefined);
+  // Her request about it: the offer ends the Reel.
+  const sale = readSkillFill(collage, files, 13, answer, { asked: "Ce que la gérante imagine : Le -20 % de ce week-end sur toute la boutique." })!;
+  assert.deepEqual(sale.end, { title: "-20 % ce week-end", subtitle: "Sur toute la boutique, à Lille" });
+  assert.ok(readSkillFill(collage, files, 13, answer, { asked: "Les soldes commencent samedi." })!.end);
+  // An ending card that is no offer stays (it is optional, the filler's choice), « 100 % » being no discount.
+  const opening = { ...answer, end: { title: "Ouvert dimanche", subtitle: "100 % pièces choisies" } };
+  assert.ok(readSkillFill(collage, files, 13, opening, { asked: request })!.end);
+  // What the filler is told: its card is optional and only what her request announces; never an offer from what we know.
+  const input = skillFillInput({ skill: collage, name: "Collage qui s'emboîte", n: 13, files, business: { name: "Maison Lou", facts: ["-20 % sur toute la boutique ce week-end"] }, request });
+  assert.match(input.modele.fin, /facultative : seulement ce que sa demande annonce/);
+  assert.match(SKILL_FILL_PROMPT, /never bring a subject of its own: an offer, a promotion, a discount or a price only when her request is about it/);
+  assert.match(SKILL_FILL_PROMPT, /never an offer, a promotion, a discount or a price her request is not about, even one that is known/);
+});
+
+test("the offer words: what speaks of an offer, what her request asks", async () => {
+  const { speaksOffer, asksOffer, unaskedOffer } = await import("../skills.ts");
+  for (const s of ["-20 % ce week-end", "-20% sur tout", "15 € le bouquet", "Café offert", "Promo de rentrée", "Les soldes", "Diagnostic offert", "2 pour 1 le jeudi", "Code promo LOU", "Entrée gratuite"])
+    assert.equal(speaksOffer(s), true, s);
+  for (const s of ["Nouveautés", "100 % fait main", "Ouvert dimanche", "Au marché aux puces", "Maison Lou", "Offrir des fleurs", ""])
+    assert.equal(speaksOffer(s), false, s);
+  assert.equal(asksOffer("Les nouveautés de la boutique cette semaine."), false);
+  assert.equal(asksOffer("Le prix du menu du midi"), true);
+  assert.equal(asksOffer("Mets l'offre de la semaine"), true);
+  // Without her request (a script, an old caller), nothing is taken out.
+  assert.equal(unaskedOffer("-20 % ce week-end", undefined), false);
+});

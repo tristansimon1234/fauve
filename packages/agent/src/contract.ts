@@ -67,7 +67,7 @@ export const reelContractSchema = z.object({
 export type ReelContract = z.infer<typeof reelContractSchema>;
 
 export const CONTRACT_PROMPT = `You read a person's request for a Reel and note, adding nothing, what they fixed themselves. Nothing they did not say: a field they did not fix stays empty (null, « libre », an empty list). What you note stays in their own words, in French. When the request holds their exchange with Edith, only their own messages fix something: Edith's replies, plan and brief are context, never a fixed point, even when they answered « oui » or « c'est parti » to them.
-- voice_text: the words they want to hear in the voice-over, as they wrote them (often between quotes, after « texte : », « la voix dit : »); null if they gave no text. Loose ideas (« parle du prix ») are not a text.
+- voice_text: the words they want to hear in the voice-over, as they wrote them (often between quotes, after « texte : », « la voix dit : »); null if they gave no text. Loose ideas (« parle du prix ») are not a text. A request that describes the Reel is never a text to say, even a whole sentence in the first person (« Ce week-end, on part au marché aux puces. », « Je me présente : Héloïse, la fleuriste de l'Atelier Rose. »: what the Reel is about, voice_text null): only words they say the voice says (« la voix dit », « voix off : », « texte : », « fais-lui dire », their words between quotes for the voice).
 - voice_text_rest: when they write only the beginning of the voice and describe the rest instead of writing it (« … et là tu parles d'Edith », « puis la voix présente l'offre », « et tu expliques que… »), what the rest must say, in their words; null when their text is the whole voice. Their beginning stays in voice_text; the rest described never goes into it.
 - voice_text_mode: « polish » when they ask to improve it, to rephrase it, or say « dans l'idée », « genre »; otherwise « verbatim ».
 - person: « je » when they want to speak in their own name or their text is in the first person; « nous » or « il_elle » if they say so; otherwise « libre ».
@@ -143,6 +143,44 @@ export function contractLines(c: ReelContract | null | undefined): string[] {
     c.music ? `Musique demandée : ${c.music}` : null,
     c.redraw === false ? "La mise en page et ses animations restent telles quelles (leur code est gardé) : ne change ni la forme du Reel ni le brief de sa composition" : null,
   ].filter((l): l is string => Boolean(l));
+}
+
+/**
+ * What says that words are to be heard: a voice named (« la voix dit », « voix off : », « en off », « narration »), words
+ * to say or to read (« dis », « fais-lui dire », « à lire », « qu'on entende »), a text given (« texte : », « script »,
+ * « mot pour mot »). Never « lis » nor « lit » (a florist's lilies, a bed).
+ */
+const SPOKEN_ASKED =
+  /(?<![\p{L}])(?:voix|voice(?:-?over)?|vo|off|narrat\w*|raconte\w*|dis|dit|dise|disent|dites|dire|disant|lire|lise|lisez|prononce\w*|entend\w*|script|texte\s*:|mot pour mot|mot à mot)(?![\p{L}])/iu;
+
+/** Letters and digits only, lower case, for comparing her quotes with a text. */
+const bare = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "");
+
+/**
+ * Whether her request asks for this text to be said: it speaks of a voice, of words to say or read, of a text, or it
+ * holds the words between quotes. A request that only describes the Reel, even a first-person sentence (« Ce week-end,
+ * on part au marché aux puces. », « Je me présente : Héloïse… »), asks for none: the contract reader had taken both
+ * for her words to say, and a voice-over nobody asked for was laid on « Le grand départ » and « Présente-toi ».
+ */
+export function asksSpokenText(request: string, text: string): boolean {
+  if (SPOKEN_ASKED.test(request.normalize("NFC"))) return true;
+  const said = bare(text);
+  if (said.length < 4) return false;
+  const quotes = [...request.matchAll(/«\s*([^»]+?)\s*»|“([^”]+)”|"([^"]+)"/g)].map((m) => bare(m[1] ?? m[2] ?? m[3] ?? ""));
+  // Her quotes hold the text (or most of it): a name quoted inside a description (« Au Procope ») is no text to say.
+  return quotes.some((q) => q.length >= 4 && (q.includes(said.slice(0, 40)) || (said.includes(q) && q.length * 2 >= said.length)));
+}
+
+/**
+ * Her contract with a text to say only when her request asks for one (asksSpokenText); otherwise its text and its
+ * continuation are taken out, the rest kept. A correction of a voice on the Reel keeps what the reader made of it (her
+ * change to the current text, which her request may not quote).
+ */
+export function keepAskedVoice(contract: ReelContract, request: string, currentVoice?: string | null): ReelContract {
+  if (!contract.voice_text && !contract.voice_text_rest) return contract;
+  if (currentVoice?.trim()) return contract;
+  if (asksSpokenText(request, `${contract.voice_text ?? ""} ${contract.voice_text_rest ?? ""}`)) return contract;
+  return { ...contract, voice_text: null, voice_text_rest: null, voice_text_mode: "verbatim" };
 }
 
 /** Her text as it was asked for, to tell whether the voice on the Reel already says it (its continuation included). */

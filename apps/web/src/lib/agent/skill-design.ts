@@ -391,7 +391,9 @@ export async function designSkill(params: {
   const made = async (answer: SkillFillAnswer): Promise<{ plan: EditPlan; error?: string } | null> => {
     const n = heard?.n ?? fit.n;
     const bpm = !heard && fit.bpm !== skill.bpm ? fit.bpm : undefined;
-    const read = readSkillFill(skill, files, n, answer, { wordsWanted, ...(talk ? { talk } : {}), ...(known ? { facts: known } : {}), ...(heard ? { heard: heard.said } : {}) });
+    // What she asked (her request and what she fixed): an offer she never spoke of is not written (unaskedOffer).
+    const asked = [input.demande, ...(input.contrat ?? [])].join("\n");
+    const read = readSkillFill(skill, files, n, answer, { wordsWanted, asked, ...(talk ? { talk } : {}), ...(known ? { facts: known } : {}), ...(heard ? { heard: heard.said } : {}) });
     if (!read) return null;
     // A correction keeps the settings it had but what her request changes (a new Reel: only those she asks).
     const settings = mergeSkillSettings(skill, previousSettings, answer.settings);
