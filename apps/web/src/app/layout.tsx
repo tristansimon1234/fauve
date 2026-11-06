@@ -27,7 +27,7 @@ export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: { default: "Edith · ton community manager IA, sur WhatsApp", template: "%s · Edith" },
   description:
-    "En 5 minutes, sans app, directement sur WhatsApp : Edith monte tes vidéos en Reels, écrit tes légendes et te fait signe pour poster. Pour les commerces de quartier et les indépendants.",
+    "En 5 minutes, sans app, directement sur WhatsApp : Edith monte tes vidéos en Reels, écrit tes légendes et te fait signe pour poster. Pour les commerces qui soignent leur image et les créateurs.",
   applicationName: "Edith",
   appleWebApp: { capable: true, title: "Edith", statusBarStyle: "default" },
   openGraph: { type: "website", siteName: "Edith", locale: "fr_FR" },

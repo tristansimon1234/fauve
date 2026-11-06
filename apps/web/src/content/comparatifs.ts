@@ -70,7 +70,7 @@ export const COMPARISONS: Comparison[] = [
     slug: "canva-capcut",
     menu: "Edith ou Canva et CapCut",
     title: "Edith ou Canva et CapCut pour les Reels d’un commerce ?",
-    description: "Faire ses Reels soi-même avec Canva ou CapCut, ou les confier à Edith ? Temps passé, rendu, modèles, légendes, publication : la comparaison.",
+    description: "Faire ses Reels soi-même avec Canva ou CapCut, ou les confier à Edith ? Temps passé, rendu, légendes, publication : la comparaison.",
     h1: "Edith ou Canva et CapCut ?",
     accent: "Faire soi-même, ou faire faire.",
     intro:
@@ -79,8 +79,8 @@ export const COMPARISONS: Comparison[] = [
     rows: [
       ["Qui monte", "Toi", "Edith"],
       ["Temps passé", "Le temps de choisir les plans, couper, caler la musique et les textes", "Le temps d’envoyer tes vidéos sur WhatsApp"],
-      ["Rendu", "Libre, au pixel près, si tu sais faire", "Monté comme un créateur, à ta charte, sans modèle tout fait"],
-      ["Modèles", "Des milliers, partagés par des milliers de comptes", "Aucun : chaque Reel part de tes images"],
+      ["Rendu", "Libre, au pixel près, si tu sais faire", "Monté comme un créateur, à ta charte"],
+      ["Ressemblance", "Des modèles partagés par des milliers de comptes", "Chaque Reel part de tes images et de ta charte"],
       ["Musique", "Leur bibliothèque", "Composée pour chaque Reel, calée sur ses coupes"],
       ["Légende et hashtags", "À écrire toi-même", "Écrits dans ton ton, cinq hashtags au plus"],
       ["Publication", "Tu exportes, puis tu publies", "Prêt à poster : la vidéo et sa légende, à télécharger"],
@@ -94,7 +94,7 @@ export const COMPARISONS: Comparison[] = [
     ],
     edithWins: [
       "Tu n’as ni le temps ni l’envie d’apprendre le montage.",
-      "Tu veux des Reels qui ne ressemblent pas au modèle que tout le monde utilise.",
+      "Tu veux des Reels qui ne ressemblent pas à ceux de tout le monde.",
       "Tu veux que la légende, les hashtags et la publication soient faits aussi.",
     ],
     together: "Rien n’empêche de garder Canva pour tes affiches et ton menu, et de laisser les Reels à Edith.",

@@ -136,13 +136,13 @@ export const TRADES: Trade[] = [
   },
   {
     slug: "independant",
-    menu: "Indépendants",
-    title: "Community manager pour indépendants : coach, prof, artisan",
-    description: "Coach, prof, photographe, artisan : Edith monte tes vidéos en Reels, écrit tes légendes et te fait signe au bon moment pour poster. Avec ou sans site.",
-    kicker: "Indépendants",
-    h1: "Le community manager des indépendants.",
+    menu: "Indépendants et créateurs",
+    title: "Community manager pour indépendants et créateurs",
+    description: "Photographe, styliste, créateur, coach, artisan : Edith monte tes vidéos en Reels, écrit tes légendes et te fait signe au bon moment pour poster. Avec ou sans site.",
+    kicker: "Indépendants et créateurs",
+    h1: "Le community manager des indépendants et des créateurs.",
     accent: "Toi, tu fais ton métier.",
-    intro: "Prof de yoga, coach, photographe, céramiste, coiffure à domicile… Tu vis de tes clients, pas de ton temps sur Instagram. Envoie tes vidéos sur WhatsApp, Edith fait le reste et te le donne prêt à poster.",
+    intro: "Photographe, styliste, créateur de contenu, céramiste, prof de yoga, coach… Tu vis de ton travail, pas de ton temps sur Instagram. Envoie tes vidéos sur WhatsApp, Edith fait le reste et te le donne prêt à poster.",
     business: "indépendant",
     points: [
       ["Toi au centre, sans te forcer", "Tes mains, ton travail, ton lieu. Pas besoin de parler face caméra : Edith peut poser une voix off."],
@@ -153,7 +153,7 @@ export const TRADES: Trade[] = [
     faq: [
       ["Je n’ai pas de site.", "Aucun problème : tu dis à Edith ce que tu fais en deux mots, tu lui montres quelques images que tu aimes, et il en tire ton style."],
       ["Je travaille seul, personne ne me filme.", "Pose ton téléphone et filme tes mains, ton travail, ton lieu. Une voix off peut raconter à ta place."],
-      ["Je suis créateur de contenu, c’est pour moi ?", "Edith est fait pour ceux qui vivent de leurs clients : il cherche des réservations et des visites, pas une audience. Si ton métier, c’est l’audience, d’autres outils te serviront mieux."],
+      ["Je suis créateur de contenu, c’est pour moi ?", "Oui. Edith monte tes vidéos à ton style, sans jamais deux fois le même Reel, et écrit tes légendes. Il suit ce qui fait grandir ton compte pour de bon : abonnés, visites du profil, clics sur ton lien, plutôt que des vues pour des vues."],
     ],
     guides: ["legende-instagram-commerce", "idees-reels-restaurant"],
   },

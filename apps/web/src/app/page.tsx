@@ -1,4 +1,4 @@
-import { HOUSE_MODELS, PLAN_ORDER, PLANS, reelsPerMonth, weeklyPosts } from "@fauve/agent";
+import { PLAN_ORDER, PLANS, reelsPerMonth, weeklyPosts } from "@fauve/agent";
 import { priceTax } from "@/lib/legal";
 import type { Metadata } from "next";
 import type { ComponentType, CSSProperties, ReactNode } from "react";
@@ -23,7 +23,7 @@ import "./landing.css";
 const description = `En 5 minutes, sans app, directement sur WhatsApp : Edith invente pour chacune de tes vidéos sa forme, sa typo et son rythme, et écrit la légende. Pas d’IA slop. Dès ${PLANS.decouverte.priceEur} € par mois.`;
 
 export const metadata: Metadata = {
-  title: { absolute: "Edith · community manager IA pour commerces et indépendants" },
+  title: { absolute: "Edith · community manager IA pour commerces et créateurs" },
   description,
   alternates: { canonical: "/" },
   openGraph: { type: "website", siteName: "Edith", locale: "fr_FR", url: "/", title: "Tes Reels, jamais pareils.", description },
@@ -42,7 +42,7 @@ const steps: [string, string][] = [
 const cringe: [string, string][] = [
   ["« Découvrez notre offre exceptionnelle ! »", "Des mots de créateur, jamais de pub."],
   ["Une voix de synthèse qui récite", "De vraies voix, ou la tienne."],
-  ["Le même modèle que tout le monde", "Ta typo, tes couleurs, ta lumière."],
+  ["Le même Reel que tout le monde", "Ta typo, tes couleurs, ta lumière."],
   ["Des glitchs, des flashs, des transitions qui tournent", "Des coupes nettes, sur le temps."],
   ["Un texte collé sur ton visage", "Les textes à côté des visages."],
   ["La musique de banque de sons", "Une musique composée pour chaque Reel."],
@@ -80,8 +80,8 @@ const offers = [
 
 const faq: [string, string][] = [
   ["Ça ne va pas faire « IA slop » ?", "C’est tout le travail d’Edith : ta meilleure image en premier, des coupes sur le temps, des mots de créateur, ta charte. Et si quelque chose ne te ressemble pas, tu le lui dis d’un mot."],
-  ["Tous mes Reels vont se ressembler ?", "Non. Edith n’a pas de modèle tout fait : il part de tes images, de ton style et de ce que tu demandes, et invente la forme de chaque Reel. Tu peux aussi lui montrer un Reel que tu aimes, il le refait avec tes images."],
-  ["C’est pour qui ?", "Les commerces de quartier comme les indépendants : studio, salon, resto, boutique, prof de yoga, coach, photographe, céramiste… Tous ceux qui vivent de leurs clients, avec ou sans site."],
+  ["Tous mes Reels vont se ressembler ?", "Non. Il part de tes images, de ton style et de ce que tu demandes, et donne à chaque Reel sa propre forme. Tu peux aussi lui montrer un Reel que tu aimes : il le refait avec tes images."],
+  ["C’est pour qui ?", "Les maisons qui soignent leur image, et les créateurs : studio de Pilates, restaurant, cave, boutique de créateur, joaillier, salon, fleuriste, photographe, styliste, céramiste… Tous ceux qui vivent de leur travail, avec ou sans site."],
   ["Il faut télécharger une app ?", "Non. Tout se passe sur WhatsApp, en 5 minutes pour commencer. Une app web existe pour voir tes Reels en grand sur ordinateur, si tu veux, sans rien installer."],
   ["Edith, c’est une vraie personne ?", "Non, c’est un assistant IA, et il le dit. Tu gardes toujours la main."],
   ["Qui publie sur Instagram ?", "Toi. Edith te prépare la vidéo et sa légende, et te fait signe au bon moment : tu la télécharges, tu la postes, et tu peux y ajouter un son tendance. Il suit ensuite ses chiffres depuis ton @."],
@@ -103,7 +103,7 @@ const ideas: [string, string][] = [
 ];
 
 /** The manifesto passing under the hero. */
-const NOT = ["pas d’IA slop", "pas d’app à installer", "pas de modèle tout fait", "pas de voix de robot", "pas deux Reels pareils", "une infinité de façons"];
+const NOT = ["pas d’IA slop", "pas d’app à installer", "pas de Reel générique", "pas de voix de robot", "pas deux Reels pareils", "une infinité de façons"];
 
 /** What search engines and AI assistants read about Edith: the product, its offers and the FAQ. */
 const structuredData = () => ({
@@ -137,13 +137,8 @@ const reel = (id: WorkId, small = true): StripReel => {
   const m = workMedia(id);
   return { key: id, src: small ? m.small : m.video, poster: m.poster, label: `${w.trade} · ${w.brand}` };
 };
-const model = (key: string): StripReel => ({ key, src: `/modeles/${key}.mp4`, poster: `/modeles/${key}.jpg`, label: HOUSE_MODELS.find((h) => h.key === key)?.name ?? key });
-
-/** The belt under the hero: the site's Reels, then some of Edith's models, endlessly. */
-const BELT: StripReel[] = [
-  reel("coiffure"), model("aplat"), reel("bar"), reel("fleuriste"), model("titre-derriere"), reel("cafe"), reel("tatoueur"), model("pile"),
-  reel("patisserie"), reel("ceramique"), model("carte-feutre"), reel("barbier"), reel("yoga"), model("mot-cle"),
-];
+/** The belt under the hero: the site's Reels, endlessly (Edith's models never shown: « je préfère ne pas divulguer nos modèles »). */
+const BELT: StripReel[] = WORK.map((w) => reel(w.id));
 
 /** « Tes Reels, jamais pareils. »: the last word changes face, and now and then fills with one of the Reels. */
 const PAREILS: MorphItem[] = [
@@ -173,7 +168,7 @@ const AUCUN: MorphItem[] = [
 
 const mini = (id: WorkId, alt: string): Token => ({ video: workMedia(id).mini, poster: workMedia(id).miniPoster, alt });
 
-/** The principle, written as the page scrolls: no model, her images, her Reel. */
+/** The principle, written as the page scrolls: never twice the same, her images, her Reel. */
 const PRINCIPLE: Token[] = [
   { text: "Une coiffeuse", face: "serif" },
   mini("coiffure", "Reel d’un salon de coiffure"),
@@ -183,8 +178,8 @@ const PRINCIPLE: Token[] = [
   { text: "ni comme" },
   { text: "une fleuriste.", face: "caveat" },
   mini("fleuriste", "Reel d’une fleuriste"),
-  { text: "Alors Edith n’a" },
-  { text: "aucun modèle.", face: "anton" },
+  { text: "Alors Edith ne fait" },
+  { text: "jamais deux fois le même.", face: "anton" },
   { text: "Il regarde tes images," },
   mini("cafe", "Reel d’un café"),
   { text: "ton style, ta demande,", face: "fraunces" },
@@ -198,7 +193,6 @@ const TECHNIQUES: Technique[] = [
   { name: "Des tirages sur la table", face: "caveat", line: "Tes photos tombent une à une comme des tirages, puis une fenêtre s’ouvre sur la vidéo.", ...pick("fleuriste") },
   { name: "Un mot qu’on traverse", face: "bricolage", line: "La vidéo suivante apparaît dans les lettres, puis on plonge dedans.", ...pick("cafe") },
   { name: "Une mosaïque qui ne s’arrête jamais", face: "dela", line: "Une case change à chaque temps de la musique.", ...pick("patisserie") },
-  { name: "Le titre derrière toi", face: "bodoni", line: "Tu passes devant les lettres : ta silhouette est détourée à chaque image.", video: "/modeles/titre-derriere.mp4", poster: "/modeles/titre-derriere.jpg", trade: "Modèle d’Edith" },
   { name: "Une fenêtre qui voyage", face: "unbounded", line: "Un cadre se déplace et change de forme à chaque coupe, des étiquettes se tapent à côté.", ...pick("tatoueur") },
   { name: "Une lettre par coupe", face: "syne", line: "Un mot lent qui s’écrit à chaque plan.", ...pick("ceramique") },
   { name: "Noir et blanc, un trait de rouge", face: "marker", line: "Un mot qui claque à chaque coupe, sur le temps.", ...pick("bar") },
@@ -232,7 +226,7 @@ export default function LandingPage() {
       <section className="flex flex-col gap-10 pt-8 pb-14 sm:pt-12">
         <div className="mx-auto flex w-full max-w-[1360px] flex-col gap-8 px-4 sm:px-8">
           <span className="land-intro mono-label flex items-center justify-between gap-4 text-ink" style={vars({ "--i": 0 })}>
-            <span>Edith · community manager IA</span>
+            <span>Edith · community manager IA · commerces et créateurs</span>
             <span className="hidden sm:inline">Sans app · directement sur WhatsApp</span>
           </span>
           <h1 className="land-intro text-[clamp(60px,11.5vw,184px)] leading-[0.86] font-semibold tracking-[-0.065em]" style={vars({ "--i": 1 })}>
@@ -248,7 +242,7 @@ export default function LandingPage() {
                 En 5 minutes, <span className="font-[family-name:var(--font-serif)] font-normal italic">sans app</span>, directement sur WhatsApp.
               </p>
               <p className="text-[18px] leading-[1.5] text-muted sm:text-[20px]">
-                Tu lui envoies tes vidéos. Edith invente pour chacune sa forme, sa typo et son rythme, écrit la légende et te fait signe au bon moment pour poster. Pas d’IA slop.
+                Pour les maisons qui soignent leur image, et les créateurs. Tu lui envoies tes vidéos : Edith invente pour chacune sa forme, sa typo et son rythme, écrit la légende et te fait signe au bon moment pour poster. Pas d’IA slop.
               </p>
             </div>
             <div className="flex flex-col gap-3 lg:items-end">

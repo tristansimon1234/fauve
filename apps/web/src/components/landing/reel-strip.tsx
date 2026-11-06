@@ -75,26 +75,6 @@ export function ReelStrip({ reels }: { reels: StripReel[] }) {
   );
 }
 
-/** Edith's models in a grid: the first ones, then all of them on a tap. */
-export function ModelWall({ reels, first = 12 }: { reels: StripReel[]; first?: number }) {
-  const [all, setAll] = useState(false);
-  const shown = all ? reels : reels.slice(0, first);
-  return (
-    <div className="flex flex-col gap-8">
-      <div className="grid grid-cols-2 gap-x-3 gap-y-7 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
-        {shown.map((r, i) => (
-          <Tile key={r.key} reel={r} index={i} size="wall" />
-        ))}
-      </div>
-      {!all && reels.length > first && (
-        <button type="button" onClick={() => setAll(true)} className="btn btn-secondary self-center">
-          Voir les {reels.length} modèles
-        </button>
-      )}
-    </div>
-  );
-}
-
 /** An endless belt of Reels across the page (each one playing while on screen): « une infinité de façons ». */
 export function ReelBelt({ reels, seconds = 60, reverse = false, caption = true }: { reels: StripReel[]; seconds?: number; reverse?: boolean; caption?: boolean }) {
   return (
