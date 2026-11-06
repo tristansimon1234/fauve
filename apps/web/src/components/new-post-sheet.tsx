@@ -343,7 +343,8 @@ function Create({
           }),
           ...(kind === "reel"
             ? {
-                voice: chosenVoice,
+                voice: soundOn ? "off" : chosenVoice,
+                ...(soundOn ? { sound: { title: soundOn.title, ...(soundOn.artist ? { artist: soundOn.artist } : {}) } } : {}),
                 copying: Boolean(copying),
                 ...(copying && reading?.state === "read" ? { copy: { name: reading.name, lines: reading.lines } } : {}),
               }

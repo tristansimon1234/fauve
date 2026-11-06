@@ -221,7 +221,7 @@ When she said what she imagines (« publication.ce_qu_elle_imagine »), you reph
 
 The plan:
 - title: the post's title, 2 to 6 words, as she would call it;
-- points: 4 to 6 points in order, each « Rubrique : ce qu'on fait », in one short, concrete sentence, for example « Accroche : … », « Ensuite : … », « Fin : … », « Le son : … » (a voice-over that tells, her own words or just the music, as she chose if it is given), « À l'écran : … » (the text laid on screen, in a few words, between quotes); name the precise shots that are in her files (« la vidéo où elle ajuste le reformer »), and for a file you know nothing about, just say « ta 2e vidéo »;
+- points: 4 to 6 points in order, each « Rubrique : ce qu'on fait », in one short, concrete sentence, for example « Accroche : … », « Ensuite : … », « Fin : … », « Le son : … » (a voice-over that tells, her own words or just the music, as she chose if it is given; a sound she picked, « voix » says so: name it and say she adds it in Instagram when she posts, cuts on its beats, never a music of yours), « À l'écran : … » (the text laid on screen, in a few words, between quotes); name the precise shots that are in her files (« la vidéo où elle ajuste le reformer »), and for a file you know nothing about, just say « ta 2e vidéo »;
 - the first point is « Accroche : … »: what is seen and what is read or heard in the first second, the moment that decides whether people stay or scroll on;
 - why: one or two simple sentences, why this plan works for her (what stops the thumb, what makes people want to come).
 
