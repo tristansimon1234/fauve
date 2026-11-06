@@ -4658,7 +4658,7 @@ const FACADE_READ = {
 test("« Façade qui se construit » (v2) lays its pieces on its original's images and notes, the rest on its music's first beats (120 BPM)", async () => {
   const { facade } = await import("./skills/facade.ts");
   const { skillPlan, skillFit } = await import("./skills.ts");
-  assert.equal(facade.version, 5);
+  assert.equal(facade.version, 6);
   assert.equal(facade.bpm, 120);
   assert.deepEqual(facade.shots, [1, 3]);
   const line = facade.timeline(1, { end: false });
@@ -4863,10 +4863,11 @@ test("« Façade qui se construit » (v4): each piece a shape of her picture, he
   // Every piece is one of her picture's shapes: a path, never a box nor a cut of its own (no arch, no slanted band).
   assert.ok(all.every((p) => typeof p === "string"), JSON.stringify(all));
   assert.ok(all.every((d) => !/A/.test(String(d))));
-  // Her sign first, along its outline; her elements among the first four; the painting inside her door lands with it.
-  assert.equal(all[0], FACADE_OUTLINE);
+  // Her largest opening on the ground floor first, her door (v6: the original's door with its name), the painting inside
+  // it with it; her sign along its outline and her windows among the first four.
+  assert.equal(all[0], door.d);
   const first = clipAt(at[3]!);
-  assert.ok(first.includes(door.d) && windows.every((w) => first.includes(w.d)), JSON.stringify(first));
+  assert.ok(first.includes(FACADE_OUTLINE) && windows.every((w) => first.includes(w.d)), JSON.stringify(first));
   assert.equal(first[first.indexOf(door.d) + 1], painting.d);
   // Never a sliver at the frame's edge nor her ground among them; what stands before her door in the burst, first.
   assert.ok(!first.includes(sliver.d) && !first.includes(pavement.d));
@@ -4886,6 +4887,28 @@ test("« Façade qui se construit » (v4): each piece a shape of her picture, he
     assert.ok(lands.length >= 8 && Math.max(...gaps) <= 30, `${given.regions ? "regions" : "no regions"}: lands on ${lands.join(",")}`);
   }
   assert.ok(clipAt(at[18]! - 1).length > 2);
+  // Built coherently (v6, Tristan: « une règle de construire de manière cohérente »): a small sign is never left alone
+  // on black first (the librairie's, 4 s at its bench): her largest opening is; every piece of the burst lands against
+  // what is already there, the street and what lies outside her front after it.
+  const smallSign = facadeShape(420, 830, 200, 60);
+  const coherent = { ...read, boxes: { "0#shop sign": { x: 420, y: 830, w: 200, h: 60 } }, outlines: { "0#shop sign": smallSign.d } };
+  const order = (f: number) => facadeClip(drawCutOuts(code, f, props, coherent))!.map(String);
+  assert.notEqual(order(at[0]!)[0], smallSign.d);
+  assert.equal(order(at[0]!)[0], door.d);
+  assert.ok(order(at[15]!).includes(smallSign.d), "her sign lands in the burst, next to her door");
+  const boxOf = (d: string) => {
+    const v = (d.match(/-?\d+(?:\.\d+)?/g) ?? []).map(Number);
+    const xs = v.filter((_, i) => i % 2 === 0);
+    const ys = v.filter((_, i) => i % 2 === 1);
+    return { x: Math.min(...xs), y: Math.min(...ys), w: Math.max(...xs) - Math.min(...xs), h: Math.max(...ys) - Math.min(...ys) };
+  };
+  const touches = (a: TdBox, b: TdBox) => Math.max(a.x, b.x) - Math.min(a.x + a.w, b.x + b.w) <= 40 && Math.max(a.y, b.y) - Math.min(a.y + a.h, b.y + b.h) <= 40;
+  for (let i = 4; i < 16; i++) {
+    const before = order(at[i]! - 1);
+    const now = order(at[i]!).filter((d) => !before.includes(d));
+    for (const d of now) assert.ok(before.some((q) => touches(boxOf(d), boxOf(q))), `piece on image ${at[i]} against what is there`);
+    assert.ok(!now.includes(pavement.d), "the street after her front");
+  }
   // Her regions without her elements (none named, or none found): her front still built in its own shapes.
   const bare = facadeClip(drawCutOuts(SEEDED + facade.code, at[18]! - 1, props, { regions: { "0": regions } }))!;
   assert.ok(bare.length >= 6 && bare.every((p) => typeof p === "string" && !/A/.test(p)), JSON.stringify(bare));
@@ -4962,7 +4985,7 @@ test("« Façade qui se construit » (v3): vertical as its original, her horizon
   assert.deepEqual(input.objets?.map((o) => [o.slot, o.case]), [["morceaux", 1], ["enseigne", 1]]);
   const plan = skillPlan({ skill: facade, name: "Façade qui se construit", files, fill: { shots: [{ file: "front", at: 0 }, { file: "inside", at: 1 }], texts: {}, end: null, settings: { format: "horizontal" } } });
   assert.equal(plan.layers![0]!.motion.texts!.format, "horizontal");
-  assert.deepEqual(plan.skill, { key: "facade", version: 5, settings: { format: "horizontal" } });
+  assert.deepEqual(plan.skill, { key: "facade", version: 6, settings: { format: "horizontal" } });
 });
 
 // ——— « Coulisses façon fiche » v2, written again on its original's fiche (docs/fiches/coulisses.md) ——————————————————
