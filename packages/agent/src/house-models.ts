@@ -2217,6 +2217,53 @@ export const HOUSE_MODELS: HouseModel[] = [
       why: "Le calme avant l'ouverture et une phrase qui s'écrit mot à mot font attendre ; le drop libère tout d'un coup : la vie du lieu en vingt plans, ses gestes, ses résultats, son équipe. On a envie d'entrer.",
     },
   }),
+  model({
+    key: "raccords",
+    name: "Plans qui s'emboîtent",
+    // Written on its original's fiche (v1 of its skill, docs/fiches/raccords.md): six shots chained by raccords, each one
+    // arriving first over the one before, exactly where it will be, in pieces on the music's hits (a double exposure, nine
+    // cells that light up on the beat, its subject cut out in three pieces, then whole: the match), a word blinking big
+    // over the first.
+    pitch: "Tes plans qui s'emboîtent : chaque image arrive en avance sur la précédente, à sa place exacte, en morceaux sur les coups de la musique (en neuf cases, puis détourée), et la coupe la fait jouer ; ton mot en très grand clignote sur la première.",
+    needs: "4 à 9 vidéos ou photos avec quelque chose de net au milieu : toi ou quelqu'un de près qui bouge, un plan large de ta rue ou de ta salle, un plan graphique de près (une lampe, ton enseigne, une vitrine), ton intérieur avec quelqu'un devant, un objet vu d'en haut, un produit tenu devant l'objectif",
+    files: [4, 9],
+    // Its word in very bold, round and wide capitals across the frame (Montserrat).
+    pair: "ronde-large",
+    // Its skill's code is its reference.
+    example: null,
+    // Its music's grid (docs/fiches/raccords.md): 95,0 BPM on its sixteenths.
+    tempo: 95,
+    finish: { name: "Naturel contrasté", hint: "ses images telles quelles, un peu de contraste, à peine chaudes, un grain fin, sans coins sombres", contrast: 0.06, warmth: 0.05, grain: 0.12, grain_size: "fine" },
+    look: {
+      name: "plans qui s'emboîtent",
+      format: "collage",
+      hook: { kind: "geste", what: "quelqu'un de près qui sourit et tourne la tête, et un seul mot géant de sa couleur qui clignote image par image sur elle pendant une demi-seconde" },
+      text: {
+        amount: "une ligne",
+        composition: "un seul mot en capitales très grasses, rondes et larges, plein, sans contour ni ombre, sur toute la largeur du premier plan, qui clignote image par image une demi-seconde ; rien d'autre",
+        case: "upper",
+        weight: "black",
+        tracking: "normal",
+      },
+      layout: "plein cadre, chaque plan suivant posé en avance sur le plan en cours, à sa place exacte : son image en neuf cases carrées au milieu, ou son sujet détouré par morceaux, avant la coupe",
+      moments: [
+        { at: 0, what: "quelqu'un de près qui sourit et tourne la tête ; son mot géant clignote image par image (allumé, éteint, allumé, éteint, tenu sept images, deux éclairs), plus rien à 0,5 s" },
+        { at: 0.77, what: "le plan suivant apparaît dans les clairs du premier (son ciel), ses sombres (les cheveux) devant, de plus en plus, jusqu'à la coupe à 1,3 s" },
+        { at: 1.77, what: "sur le plan large, l'image suivante se pose en neuf cases carrées au milieu, sombres : une, la colonne, la croix, les neuf, sur quatre coups en 0,6 s" },
+        { at: 2.6, what: "coupe sur ce plan, ses cases à leur place, éteint ; il s'allume en trois images sur le temps fort, la basse revient" },
+        { at: 3.37, what: "ce qui se détache dans le plan suivant arrive détouré en trois morceaux, à sa place (les bords, puis le milieu) ; coupe à 4,13 s" },
+        { at: 4.73, what: "encore en trois morceaux, la coupe sur le temps fort de la mesure suivante à 5,4 s" },
+        { at: 5.87, what: "une main qui tient un objet arrive détourée d'un seul morceau ; la coupe la garde à la même place, et le Reel finit sur elle" },
+      ],
+      camera: "mixte",
+      transitions: "effets",
+      grade: "natural",
+      motion: "energique",
+      music: "lo-fi boom bap, warm held bass, chopped breaks without the bass, 95 BPM",
+      ending: "le dernier plan, l'objet tenu devant son lieu, arrivé détouré avant la coupe et gardé à sa place, jusqu'au bout de la cassure de la musique",
+      why: "L'œil ne saute jamais : ce qu'on va regarder est déjà là avant la coupe, à sa place, et se construit en morceaux sur les coups ; on reste pour voir l'image suivante arriver.",
+    },
+  }),
 ];
 
 const BY_KEY = new Map(HOUSE_MODELS.map((m) => [m.key, m]));
@@ -2305,6 +2352,7 @@ export const HOUSE_WHEN: Record<string, { pour: string; pas_pour: string }> = {
   vitraux: { pour: "montrer sa devanture, sa porte, sa vitrine, ses étagères ou son présentoir comme on ne les a jamais vus (une boutique, un café, une fleuriste, une librairie, une mercerie, un salon) : une boucle hypnotique qui fait s'arrêter, son nom en option", pas_pour: "quelqu'un qui parle, des gens qui passent devant, une vidéo filmée à la main qui bouge, une offre à lire en détail, plusieurs moments à raconter" },
   curseur: { pour: "montrer deux de ses produits avec humour, comme sur un écran d'ordinateur (un café, une boulangerie, un restaurant, un traiteur, une boutique, un fleuriste) : quelqu'un de son lieu qui les porte ou les montre, puis la photo de près des deux, chacun nommé d'un clic", pas_pour: "sans vidéo de son lieu où quelqu'un bouge, sans photo de près de ses produits, quelqu'un qui parle face caméra, un long message ou une offre à lire, un lieu sans rien à montrer" },
   bienvenue: { pour: "présenter son lieu et ce qu'on y fait (un salon, un café, un restaurant, une boutique, un studio, un atelier) : une phrase d'accueil mot à mot sur son lieu au calme, puis sa vie en rafale ; une ouverture, une réouverture, une rentrée, un nouveau lieu", pas_pour: "un seul produit, quelqu'un qui parle face caméra (ses mots s'écrivent, aucune voix), un long message à lire, moins de six vidéos (la rafale en veut une dizaine)" },
+  raccords: { pour: "présenter son lieu, sa journée ou ses produits en quelques images qui s'enchaînent avec style, pour tout commerce (un café, une boutique, un salon, un atelier, un studio) : chaque plan a quelque chose de net au milieu qui arrive en avance sur le précédent", pas_pour: "un message à lire, quelqu'un qui parle face caméra, des plans flous ou sans rien de net au milieu, moins de quatre images" },
 };
 
 /** The models for Edith: their key, name, what they do, what they want, and what only she can film for one. */

@@ -216,6 +216,10 @@ export const HOUSE_EFFECTS: Record<string, HouseEffect> = {
     effet: "sa phrase d'accueil écrite à la main, un mot de plus à chaque plan, empilés au milieu de ses plans calmes assombris, sans musique ; puis le drop, et la vie de son lieu en rafale",
     il_faut: "trois à cinq plans calmes et fixes de son lieu (sa salle vide, un coin, un détail), puis des plans de son lieu au travail",
   },
+  raccords: {
+    effet: "le plan suivant arrive en avance sur celui-ci, à sa place exacte, en morceaux sur les coups (son image en neuf cases qui s'allume sur le temps fort, ou son sujet détouré en trois morceaux), puis la coupe le fait jouer",
+    il_faut: "des plans avec quelque chose de net au milieu (quelqu'un, un produit, une lampe)",
+  },
 };
 
 /** The most of Edith's models one Reel borrows from: one charter, one music, never a patchwork. */
