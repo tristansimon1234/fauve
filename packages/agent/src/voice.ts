@@ -19,6 +19,13 @@ export const voiceTranscriptSchema = z.object({
    * nothing to do) and the noise floor it had. The note itself stays as recorded.
    */
   clean: z.object({ path: z.string().max(300).nullable(), floor: z.number().nullable(), isolated: z.boolean().optional() }).optional(),
+  /**
+   * Her voice taken from one of her videos where she speaks (« prends ma voix de la vidéo où je parle »; own-voice.ts):
+   * that video, and where in it this recording starts (s): its sound from just before her first word to just after her
+   * last, extracted once in the workshop. Her lips in that video would not follow her voice elsewhere: a montage that lays
+   * this voice never shows it.
+   */
+  video: z.object({ media_id: z.string().min(1).max(80), from: z.number().min(0) }).optional(),
 });
 export type VoiceTranscript = z.infer<typeof voiceTranscriptSchema>;
 

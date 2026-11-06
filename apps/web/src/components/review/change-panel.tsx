@@ -771,7 +771,11 @@ function VoiceView({ data, onDone }: Props) {
   return (
     <div className="flex flex-col gap-2.5">
       <p className="text-[13.5px] leading-snug text-muted">
-        {hers ? "Ce Reel porte ta propre voix. Tu peux la retirer, ou la remplacer par une voix d’Edith." : "Une voix raconte ton Reel, la musique passe dessous. Écoute et choisis."}
+        {hers && data.voice?.leads
+          ? "Ce Reel suit ta propre voix : chaque mot du modèle s’affiche quand tu le dis. Tu peux la retirer, ou la remplacer par une voix d’Edith (le modèle reprend alors son rythme à lui)."
+          : hers
+            ? "Ce Reel porte ta propre voix. Tu peux la retirer, ou la remplacer par une voix d’Edith."
+            : "Une voix raconte ton Reel, la musique passe dessous. Écoute et choisis."}
       </p>
       <div role="radiogroup" aria-label="La voix" className="grid grid-cols-1 gap-1.5 min-[420px]:grid-cols-2">
         {[
@@ -803,7 +807,7 @@ function VoiceView({ data, onDone }: Props) {
       {picked !== null && (
         <NoteField label="Ce que la voix doit dire ?"placeholder="Ex. parle du cours offert pour une première venue" value={note} onChange={setNote} />
       )}
-      <p className="text-[13px] leading-snug text-muted">Ou ta propre voix : envoie un vocal à Edith sur WhatsApp, il le pose dessus.</p>
+      <p className="text-[13px] leading-snug text-muted">Ou ta propre voix : envoie un vocal à Edith sur WhatsApp, ou demande-lui de prendre celle d’une de tes vidéos où tu parles. Il la pose dessus.</p>
       {error && (
         <p role="alert" className="text-[13.5px] font-semibold text-danger">
           {error}

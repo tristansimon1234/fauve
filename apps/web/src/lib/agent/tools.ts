@@ -111,6 +111,7 @@ import { instagramAccount, publishIfDue } from "@/lib/social/publish";
 import { defaultPlatforms, tiktokAccount } from "@/lib/social/tiktok-account";
 import { ensureClipAnalysis } from "@/lib/video/analyze";
 import { ensureTranscript } from "@/lib/voice";
+import { voiceFromVideo } from "@/lib/own-voice";
 import { blockFor, keepTextLooks, loadTextLooks, lookDefaults, readTextExample, restyleTexts } from "@/lib/text-looks";
 import { startCarousel } from "@/lib/carousels";
 import { charterFromImages, rereadBrand } from "@/lib/brand-read";
@@ -597,10 +598,17 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
 
     async update_post({ post_id, status, ...fields }) {
       if (fields.media_ids?.length) await assertOwnMedia(fields.media_ids);
-      // Her voice note: one of hers, read once (her words with their timings) before the montage uses it.
+      // Her voice note: one of hers, read once (her words with their timings) before the montage uses it. One of her
+      // videos where she speaks, when she asks for its voice (« prends ma voix de la vidéo où je parle »): its sound taken
+      // once in the workshop, kept as an audio of hers, then exactly her voice note (never shown under it).
+      let fromVideo: number | null = null;
       if (fields.voice_media_id) {
         const { data: note } = await db.from("media_assets").select("kind").eq("id", fields.voice_media_id).eq("studio_id", studioId).maybeSingle();
-        if (note?.kind !== "audio") throw new Error("Ce media_id n'est pas un message vocal de ce studio.");
+        if (note?.kind === "video") {
+          const taken = await voiceFromVideo(studioId, fields.voice_media_id);
+          fields.voice_media_id = taken.mediaId;
+          fromVideo = Math.round(taken.transcript.duration);
+        } else if (note?.kind !== "audio") throw new Error("Ce media_id n'est ni un message vocal ni une vidéo de ce studio.");
         const transcript = await ensureTranscript(studioId, fields.voice_media_id);
         if (!transcript?.words.length) throw new Error("Je n'arrive pas à lire ce vocal : demande-lui de le renvoyer.");
         if (transcript.duration > VOICE_MAX_SECONDS) throw new Error(`Ce vocal dure ${Math.round(transcript.duration)} s : ${VOICE_MAX_SECONDS} s au plus pour un Reel. Demande-lui une version plus courte.`);
@@ -627,7 +635,12 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
           await db.from("posts").update({ status: "media_received" }).eq("id", post_id).eq("studio_id", studioId);
         }
       }
-      return json({ post });
+      return json({
+        post,
+        ...(fromVideo !== null
+          ? { voix: `sa voix tirée de sa vidéo (${fromVideo} s, de son premier à son dernier mot), posée comme son vocal ; cette vidéo ne se voit pas sous sa voix. Lance le montage (une correction pour un Reel déjà monté).` }
+          : {}),
+      });
     },
 
     async analyze_clips({ media_ids }) {

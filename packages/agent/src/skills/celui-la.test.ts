@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { editPlanSchema } from "../schemas.ts";
-import { readSkillFill, skillFillInput, skillPlan } from "../skills.ts";
+import { readSkillFill, skillFillInput, skillPlan, type SkillHeard, type SkillTimeline } from "../skills.ts";
 import { checkMotionCode } from "../motion-scene.ts";
 import { ANY_SHOT, clearsDrawn, objectsDrawn, readsDrawn, subjectsDrawn } from "../subject.ts";
 import { celuiLa } from "./celui-la.ts";
@@ -81,8 +81,8 @@ function inZone(box: Box, label: string) {
   else assert.ok(box.left >= 40 && box.left + box.width <= 1040, `${label}: ${JSON.stringify(box)}`);
 }
 
-test("« Celui-là » (v2): its original's grid (96,5 BPM), its products one a beat, its cuts within two images of the original's", () => {
-  assert.equal(celuiLa.version, 2);
+test("« Celui-là » (v3): its original's grid (96,5 BPM), its products one a beat, its cuts within two images of the original's", () => {
+  assert.equal(celuiLa.version, 3);
   assert.equal(celuiLa.bpm, 96.5);
   assert.deepEqual(celuiLa.shots, [5, 16]);
   const line = celuiLa.timeline(9, { end: false });
@@ -119,7 +119,7 @@ test("« Celui-là » (v2): its original's grid (96,5 BPM), its products one a b
   assert.ok(Math.abs(slower.marks.last! / line.marks.last! - 96.5 / 80) < 0.01);
 });
 
-test("« Celui-là » (v2): its music shaped as its original's voice: thin through her hail, its bass on the first product, stopped on her series, back on her last word", () => {
+test("« Celui-là » (v3): its music shaped as its original's voice: thin through her hail, its bass on the first product, stopped on her series, back on her last word", () => {
   const line = celuiLa.timeline(9, { end: false });
   const music = line.music!;
   // Its first strong beat on the grid's beat 1 (0,51 s).
@@ -143,10 +143,10 @@ test("« Celui-là » (v2): its music shaped as its original's voice: thin throu
   assert.ok(plan.music_shape?.pauses?.length === 1 && plan.music_shape.filters?.length === 1);
   assert.equal(plan.sounds, undefined);
   assert.equal(plan.layers![0]!.motion.drawn, undefined);
-  assert.deepEqual(plan.skill, { key: "celui-la", version: 2 });
+  assert.deepEqual(plan.skill, { key: "celui-la", version: 3 });
 });
 
-test("« Celui-là » (v2): her hail typed letter by letter then faded, her stop word on three places, « Regarde » in the middle", () => {
+test("« Celui-là » (v3): her hail typed letter by letter then faded, her stop word on three places, « Regarde » in the middle", () => {
   const { props } = propsFor(9);
   const draw = scene();
   // Its hail typed from its left edge (25,6 % of the width): its letters to come in place but unseen, then faded out.
@@ -179,7 +179,7 @@ test("« Celui-là » (v2): her hail typed letter by letter then faded, her stop
   for (const f of [6, 22, 28, 36, 60]) for (const w of wordsAt(draw(f, props))) inZone(w.box, `${w.text} at ${f}`);
 });
 
-test("« Celui-là » (v2): her pointing word on each product at once, each time elsewhere, then her hesitation typed and her last word", () => {
+test("« Celui-là » (v3): her pointing word on each product at once, each time elsewhere, then her hesitation typed and her last word", () => {
   const { line, props } = propsFor(16);
   const draw = scene();
   // On each of her fourteen products from its cut to the next, never twice in a row in the same place, all in the zone:
@@ -213,7 +213,7 @@ test("« Celui-là » (v2): her pointing word on each product at once, each time
   assert.equal(wordsAt(draw(270, bare))[0]!.text, "Celle-là !");
 });
 
-test("« Celui-là » (v2): its ink, the original's cream where it reads on her picture, a deep ink where it is too bright; her colours as asked", () => {
+test("« Celui-là » (v3): its ink, the original's cream where it reads on her picture, a deep ink where it is too bright; her colours as asked", () => {
   const { props } = propsFor(9);
   const ink = (light: number | null, settings: Record<string, string> = {}, f = 80) => {
     const draw = scene(() => (light === null ? null : { mean: light, high: light }));
@@ -240,7 +240,7 @@ test("« Celui-là » (v2): its ink, the original's cream where it reads on her 
   assert.deepEqual(celuiLa.settings?.map((s) => [s.name, s.choices.map((c) => c.value)]), [["format", ["auto", "vertical", "horizontal"]], ["couleur", ["creme", "blanc", "sa-couleur"]]]);
 });
 
-test("« Celui-là » (v2): upright as her files, in a 16:9 band on black when most are horizontal or she asks; its ending card", () => {
+test("« Celui-là » (v3): upright as her files, in a 16:9 band on black when most are horizontal or she asks; its ending card", () => {
   const draw = scene();
   const footage = (tree: Drawn) => flatten(tree).find((n) => n.type === "Footage")!.props.style as Box;
   assert.deepEqual(footage(draw(80, propsFor(9).props)), { left: 0, top: 0, width: 1080, height: 1920 });
@@ -258,7 +258,7 @@ test("« Celui-là » (v2): upright as her files, in a 16:9 band on black when m
   assert.equal(wordsAt(draw(props.durationInFrames - 60, props))[0]!.text, "Tout ça !");
 });
 
-test("« Celui-là » (v2): its filler's words, its code light to render: her light read on her shots, nothing cut out", () => {
+test("« Celui-là » (v3): its filler's words, its code light to render: her light read on her shots, nothing cut out", () => {
   // Its words: all but its last one required, each cut to its place.
   const files = [{ id: "a", photo: true, seconds: 0 }, { id: "b", photo: false, seconds: 6 }];
   const answer = (texts: { slot: string; text: string }[]) => ({ fits: true, missing: "", shots: [], texts, end: null, why: "" });
@@ -284,9 +284,12 @@ test("« Celui-là » (v2): its filler's words, its code light to render: her li
   for (const t of celuiLa.texts) assert.doesNotMatch(t.want, /« (Stop|This|Look at|Hey)/i);
 });
 
-test("« Celui-là » (v2): its voice says each of its words exactly when it lands on screen, on the beats; its filler told how long each one has", () => {
-  // Its words are what its voice says, by default (Tristan: « par défaut voix off et le user peut changer de voix »).
-  assert.deepEqual(celuiLa.saysWords, { slots: ["appel", "arret", "regarde", "celui", "et", "fin"], default: true });
+test("« Celui-là » (v3): its voice says each of its words exactly when it lands on screen, on the beats; its filler told how long each one has", () => {
+  // Its words are what its voice says, by default (Tristan: « par défaut voix off et le user peut changer de voix »), or
+  // her own voice leads it (v3: « Sa voix mène le modèle », its own tests below).
+  const { hers, ...says } = celuiLa.saysWords!;
+  assert.deepEqual(says, { slots: ["appel", "arret", "regarde", "celui", "et", "fin"], default: true });
+  assert.deepEqual(Object.keys(hers!.counts), says.slots);
   const { line, props } = propsFor(9);
   const m = line.marks;
   // Each moment on the frame its code shows its word (the original's to an image): her hail on 1, her stop word on its
@@ -344,4 +347,139 @@ test("« Celui-là » (v2): its voice says each of its words exactly when it lan
   const plan = skillPlan({ skill: celuiLa, name: "Celui-là, celui-là…", files, fill: { shots: files.map((f) => ({ file: f.id, at: 0 })), texts: words, end: null } });
   assert.equal(plan.voice, undefined);
   assert.equal(plan.subtitles, false);
+});
+
+/**
+ * Her own voice leading it (v3; own-voice.ts): « Coucou… Attends ! Regarde : celle-là… celle-là… et celle-là… et…
+ * toute la série ! », as her filler finds the model's words in her recording cut (s on her talk's clock).
+ */
+const HEARD: SkillHeard = {
+  duration: 6.73,
+  words: [
+    { slot: "appel", text: "Coucou…", at: 0.35, end: 0.83 },
+    { slot: "arret", text: "Attends !", at: 1.47, end: 1.87 },
+    { slot: "regarde", text: "Regarde :", at: 2.22, end: 2.57 },
+    { slot: "celui", text: "Celle-là…", at: 2.81, end: 3.26 },
+    { slot: "celui", text: "Celle-là…", at: 3.5, end: 3.95 },
+    { slot: "celui", text: "Et celle-là…", at: 4.19, end: 4.79 },
+    { slot: "et", text: "Et…", at: 5.03, end: 5.18 },
+    { slot: "fin", text: "Toute la série !", at: 5.58, end: 6.23 },
+  ],
+};
+
+/** The props its composition gets on her voice's timeline: its marks, her words in frames, as the engine gives them. */
+function heardProps(line: SkillTimeline, end: { title: string } | null = null) {
+  const marks = Object.fromEntries(Object.entries(line.marks).map(([k, v]) => [k, String(v)]));
+  const role = Object.fromEntries(celuiLa.texts.map((t) => [t.slot, t.role]));
+  const reelTexts = (line.shown ?? []).map((w) => ({ text: w.text, role: role[w.slot], from: Math.round(w.from * 30), to: Math.round(w.to * 30), emphasis: [] }));
+  const durationInFrames = Math.round(line.duration * 30);
+  const shots = line.shots.map((s) => ({ from: Math.round(s.start * 30), durationInFrames: Math.round((s.end - s.start) * 30), kind: "video", aspect: 0.5625 }));
+  return {
+    width: 1080,
+    height: 1920,
+    durationInFrames,
+    brand: { name: "Atelier Terre", displayFont: "Instrument Serif", bodyFont: "Inter Tight", accent: "#8a3b2a", palette: { dark: "#1d1b18" } },
+    shots,
+    reelTexts,
+    end: end ? { ...end, from: durationInFrames - 48 } : null,
+    texts: marks,
+  };
+}
+
+test("« Celui-là » (v3): her own voice leads it: each of her words lands on screen the frame she says it, each product cut two images before she points at it", () => {
+  const line = celuiLa.heard!(HEARD, { end: false })!;
+  // Her display, her three products, her series: each product two images before she points at it, her series on her hesitation.
+  assert.equal(line.lead, 0);
+  assert.deepEqual(line.shots.map((s) => Math.round(s.start * 30)), [0, 82, 103, 124, 149]);
+  assert.deepEqual(HEARD.words.filter((w) => w.slot === "celui").map((w) => Math.round(w.at * 30) - 2), [82, 103, 124]);
+  // To just after her last word (her talk's end), her last word held a second at least.
+  assert.equal(line.duration, 6.733);
+  assert.ok(line.duration - 5.58 >= 1);
+  const props = heardProps(line);
+  const draw = scene();
+  const keyAt = (f: number, text: string) => wordsAt(draw(f, props)).find((w) => w.text === text)?.key;
+  // Each word drawn from the frame she says it (a product's from its cut), never the frame before.
+  for (const w of line.shown!) {
+    const f = Math.round(w.from * 30);
+    assert.ok(keyAt(f, w.text), `« ${w.text} » drawn on ${f}`);
+    assert.notEqual(keyAt(f - 1, w.text), keyAt(f, w.text), `« ${w.text} » lands on ${f}`);
+  }
+  // Her own words on each product, as she says them (« et celle-là » on the third), each time elsewhere.
+  assert.deepEqual([90, 110, 130].map((f) => wordsAt(draw(f, props)).map((w) => w.text)), [["Celle-là…"], ["Celle-là…"], ["Et celle-là…"]]);
+  // Her stop word said once: one pop, at its first place, gone before « Regarde ».
+  assert.deepEqual([45, 55, 62].map((f) => wordsAt(draw(f, props)).map((w) => w.key.replace(/\s/g, " "))), [["stop0-Attends !"], ["stop0-Attends !"], ["stop0-Attends !"]]);
+  assert.equal(wordsAt(draw(65, props)).length, 0);
+  // Her hail typed while she says it (« Coucou… » from 0,35 to 0,83 s), faded before her stop word.
+  const seen = (f: number) => flatten(draw(f, props)).filter((n) => n.type === "span" && (n.props.style as { opacity?: number } | undefined)?.opacity === 1).length;
+  assert.ok(seen(11) >= 1 && seen(18) < 7 && seen(25) === 7, `${seen(11)} ${seen(18)} ${seen(25)}`);
+  assert.equal(wordsAt(draw(40, props)).length, 0);
+  // Her hesitation typed, then her last word alone in the middle to the end; never a word she does not say.
+  assert.equal(wordsAt(draw(152, props))[0]!.text, "Et…");
+  assert.equal(wordsAt(draw(200, props))[0]!.text, "Toute la série !");
+  for (let f = 0; f < props.durationInFrames; f += 3) {
+    for (const w of wordsAt(draw(f, props))) {
+      assert.ok(HEARD.words.some((h) => h.text.replace(/\s/g, "") === w.text.replace(/\s/g, "")), `« ${w.text} » at ${f} is hers`);
+      inZone(w.box, `${w.text} at ${f}`);
+    }
+  }
+  // Its music on her words: thin until her first product, stopped on her series, back on her last word, to the end.
+  assert.deepEqual(line.music!.filters, [{ kind: "thin", from: 0, to: line.shots[1]!.start + 0.003 }]);
+  assert.deepEqual(line.music!.pauses, [{ from: 5.117, to: 5.58, tail: 0.263 }]);
+  assert.deepEqual(line.music!.end, { at: 6.733, fade: 0.12 });
+  assert.equal(line.says, undefined);
+});
+
+test("« Celui-là » (v3): under her voice, a word she does not say never shows; no series without her closing words; her ending card", () => {
+  const draw = scene();
+  // No hesitation nor last word after her products: no series, her last product to the end with her word on it, never
+  // her pointing word with « ! » in place of a last word she did not say.
+  const open = celuiLa.heard!({ duration: 5.4, words: HEARD.words.filter((w) => w.slot !== "et" && w.slot !== "fin") }, { end: false })!;
+  assert.equal(open.shots.length, 4);
+  assert.equal(open.marks.finale, 99999);
+  assert.equal(open.marks.last, 99999);
+  const props = heardProps(open);
+  assert.equal(wordsAt(draw(props.durationInFrames - 1, props))[0]!.text, "Et celle-là…");
+  assert.ok(open.duration - 4.19 >= 1);
+  // Pointing at once, nothing said before: her talk starts later, her empty display held 0,6 s.
+  const sudden = celuiLa.heard!({ duration: 3.5, words: HEARD.words.filter((w) => w.slot === "celui").map((w) => ({ ...w, at: w.at - 2.5, end: w.end - 2.5 })) }, { end: false })!;
+  assert.equal(sudden.lead, 0.357);
+  assert.ok(Math.abs(sudden.shots[1]!.start - 0.6) <= 1 / 30, JSON.stringify(sudden.shots));
+  assert.deepEqual(wordsAt(draw(5, heardProps(sudden))), []);
+  // A word out of the model's order (« Regarde » after her first product) is heard, never shown.
+  const late = celuiLa.heard!({ ...HEARD, words: HEARD.words.map((w) => (w.slot === "regarde" ? { ...w, at: 3.3, end: 3.45 } : w)).sort((a, b) => a.at - b.at) }, { end: false })!;
+  assert.equal(late.shown!.some((w) => w.slot === "regarde"), false);
+  assert.equal(late.marks.look, 99999);
+  // Her ending card after her last word's hold: her last word until it, no word of hers over it.
+  const ended = celuiLa.heard!(HEARD, { end: true })!;
+  assert.ok(Math.abs(ended.duration - 6.733 - 1.65) <= 1 / 30, String(ended.duration));
+  assert.equal(ended.shown!.at(-1)!.to, Math.round((ended.duration - 1.6) * 100) / 100);
+  const card = heardProps(ended, { title: "Nouvelle série samedi" });
+  assert.deepEqual(wordsAt(draw(card.durationInFrames - 10, card)).map((w) => w.text), ["Nouvelle série samedi"]);
+  const openCard = heardProps(celuiLa.heard!({ duration: 5.4, words: HEARD.words.filter((w) => w.slot !== "et" && w.slot !== "fin") }, { end: true })!, { title: "Nouvelle série samedi" });
+  assert.deepEqual(wordsAt(draw(openCard.durationInFrames - 10, openCard)).map((w) => w.text), ["Nouvelle série samedi"]);
+});
+
+test("« Celui-là » (v3): what she says does not make it when she points at fewer than three things, more than fourteen, or faster than a fifth of a second", () => {
+  const points = (k: number, gap = 0.7) => Array.from({ length: k }, (_, i) => ({ slot: "celui", text: "Celle-là", at: 1 + i * gap, end: 1.4 + i * gap }));
+  assert.equal(celuiLa.heard!({ duration: 4, words: points(2) }, { end: false }), null);
+  assert.ok(celuiLa.heard!({ duration: 4, words: points(3) }, { end: false }));
+  assert.ok(celuiLa.heard!({ duration: 12, words: points(14) }, { end: false }));
+  assert.equal(celuiLa.heard!({ duration: 13, words: points(15) }, { end: false }), null);
+  assert.equal(celuiLa.heard!({ duration: 3, words: points(3, 0.15) }, { end: false }), null);
+  // Its plan on her words holds as any plan of it (its marks numbers, its texts hers), with or without its card.
+  for (const end of [false, true]) {
+    const line = celuiLa.heard!(HEARD, { end })!;
+    const files = line.shots.map((_, i) => ({ id: `f${i}`, photo: true, seconds: 0 }));
+    const plan = skillPlan({
+      skill: celuiLa,
+      name: "Celui-là, celui-là…",
+      files,
+      fill: { shots: files.map((f) => ({ file: f.id, at: 0 })), texts: {}, end: end ? { title: "Nouvelle série samedi" } : null },
+      voice: { media_id: "track", at: 0 },
+      heard: { line, leads: { media_id: "note", key: "0123456789abcdef" } },
+    });
+    assert.ok(editPlanSchema.safeParse(plan).success);
+    assert.equal(plan.texts.length, HEARD.words.length);
+    for (const v of Object.values(plan.layers![0]!.motion.texts!)) assert.ok(Number.isFinite(Number(v)));
+  }
 });

@@ -566,6 +566,14 @@ export const editPlanObjectSchema = z.object({
    */
   says_words: z.object({ voice_id: z.string().regex(/^[A-Za-z0-9]{10,40}$/), key: z.string().max(40).optional() }).optional(),
   /**
+   * Her own recorded voice leads a model whose words are what its voice says (MontageSkill.heard, « Celui-là, celui-là… »;
+   * own-voice.ts): her recording (`media_id`: her voice note, or the voice taken from one of her videos), played whole as
+   * the plan's voice (`voice`: her recording itself, or its track with her « euh » and long pauses cut), subtitles off,
+   * the model's cuts and its words on her words; `key`, what that voice plays (her recording, its cuts, where it starts).
+   * Set by the engine, never the browser.
+   */
+  voice_leads: z.object({ media_id: z.string().min(1).max(80), key: z.string().regex(/^[0-9a-f]{8,40}$/) }).optional(),
+  /**
    * A look over the whole video, under the texts (looks.ts: its grade and its texture, as settings written from her
    * words, the Reel she copies, or a preset), on her request, the Reel she copies, or her default for all her Reels.
    */
@@ -603,6 +611,8 @@ export const editPlanObjectSchema = z.object({
       version: z.number().int().min(1),
       /** The settings her words chose (skills.ts, SkillSetting): kept by a correction unless it asks another. */
       settings: z.record(z.string().max(40), z.string().max(40)).optional(),
+      /** Its timeline was her own voice's (MontageSkill.heard): its cuts and its words on her words, never on its beats. */
+      heard: z.boolean().optional(),
     })
     .optional(),
   /** What she added on it (planOverlaySchema), over everything. */

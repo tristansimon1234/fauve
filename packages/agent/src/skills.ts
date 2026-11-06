@@ -237,9 +237,19 @@ export type SkillSound = {
  * de voix »): a voice says the words of its `slots` (as the filler wrote them), each at its moments (SkillTimeline.says),
  * exactly when the word lands on screen, without subtitles (its words are on screen), her music under it. `default`: a
  * Reel made on it gets the voice unless she or her business said no voice (model-voice.ts, modelVoiceChoice); else only
- * when she asks for one.
+ * when she asks for one. `hers`: her own recorded voice can lead it instead (MontageSkill.heard: her voice note, or the
+ * voice of one of her videos where she speaks, played whole, its words on screen hers): how many times she may say each
+ * of its slots' words (at least, at most), and its shots under her voice, in French for its filler.
  */
-export type SkillSaysWords = { slots: string[]; default: boolean };
+export type SkillSaysWords = { slots: string[]; default: boolean; hers?: { counts: Record<string, [number, number]>; cases: string } };
+
+/**
+ * Her own recorded voice leading a model whose words are what its voice says (MontageSkill.heard; own-voice.ts): each
+ * time she says one of its said slots' words, in order (its slot, those words as written on screen, when she starts and
+ * stops saying them, s on her talk's clock: her recording cut as a creator cuts it, from just before her first word),
+ * and her talk's length (to just after her last word).
+ */
+export type SkillHeard = { words: { slot: string; text: string; at: number; end: number }[]; duration: number };
 
 /**
  * One moment its voice says a word (MontageSkill.saysWords): its slot, when (s on the Reel's clock, the frame its code
@@ -267,6 +277,13 @@ export type SkillTimeline = {
    * Reel's clock (her words by slot in `words` when they are written, for a text said in place of a slot left empty).
    */
   says?: SkillSays[];
+  /**
+   * Her own voice leading it (MontageSkill.heard): where her talk starts on the Reel (s: its first image held that long
+   * before her first word's breath), and each of her words on screen, in order (its slot, written as she says it, from
+   * when to when, s on the Reel's clock): the plan's texts, one for each time she says it.
+   */
+  lead?: number;
+  shown?: { slot: string; text: string; from: number; to: number }[];
   /**
    * How its music is shaped, on the Reel's clock from its beats (music-shape.ts), applied by the mix to whatever music
    * the Reel gets (plan.music_shape):
@@ -402,6 +419,14 @@ export type MontageSkill = {
    * it (her voice note, the words she gives a voice to say): one voice at a time.
    */
   saysWords?: SkillSaysWords;
+  /**
+   * Her own recorded voice leads it (SkillSaysWords.hers; « Celui-là, celui-là… » v3: Tristan, « qq qui parle face cam
+   * ou qui enregistre sa propre voix, pourquoi on peut pas jouer celle-là ? »): its timeline on what she says (SkillHeard)
+   * instead of its beats: its shots cut on her words, each of its words shown when she says it (`shown`), its marks and its
+   * music on them, `lead` where her talk starts on the Reel. Null when what she says does not make this model (too few
+   * things pointed at, too many, a word out of its place): her voice is then laid over the model as any voice is.
+   */
+  heard?: (said: SkillHeard, options: { end: boolean; settings?: Record<string, string> }) => SkillTimeline | null;
   /**
    * What is said in her shots, as filmed (« Création à quatre mains »: a visit to the counter, two people talking all
    * along, every line of theirs subtitled): the plan is subtitled and its code gets the words said, each at its frame
@@ -756,14 +781,15 @@ export function fitWords(text: string, max: number): string {
 /**
  * The filler's answer read against the skill and her files: exactly n shots, each on one of her files (an unknown one
  * replaced by her files in turn), a video's start inside it; each text cut to its place; the ending only when the
- * skill draws one. Null when a required text is missing (the filler failed: the editor makes the Reel).
+ * skill draws one. Null when a required text is missing (the filler failed: the editor makes the Reel). Her own voice
+ * leading it (`heard`): its texts are her words (each slot the first time she says it), none of them required.
  */
 export function readSkillFill(
   skill: Pick<MontageSkill, "texts" | "end" | "settings" | "objects" | "voice">,
   files: SkillFile[],
   n: number,
   answer: SkillFillAnswer,
-  options: { wordsWanted?: boolean; talk?: SkillTalk; facts?: SkillFacts } = {},
+  options: { wordsWanted?: boolean; talk?: SkillTalk; facts?: SkillFacts; heard?: SkillHeard } = {},
 ): SkillFill | null {
   if (!files.length) return null;
   // Timed on her voice: her talk is its shots (cut by the engine), and her words its texts; without her talk, nothing to play.
@@ -780,6 +806,12 @@ export function readSkillFill(
   const texts: Record<string, string> = {};
   const fonts: Record<string, string> = {};
   for (const t of skill.texts) {
+    // Her voice leading it: her words are its texts, where she says them (a slot she never says stays empty).
+    if (options.heard) {
+      const said = options.heard.words.find((w) => w.slot === t.slot)?.text;
+      if (said) texts[t.slot] = said;
+      continue;
+    }
     // A fact the engine knows (her coordinates) is written by it, whatever the filler wrote.
     const fact = t.fact ? skillFact(t, options.facts) : undefined;
     const asked = answer.texts.find((w) => w.slot === t.slot);
@@ -827,14 +859,29 @@ export const skillBrief = (name: string) => `Le modèle « ${name} » joué tel 
  * its composition over the whole Reel drawing everything (shots, texts, ending), its tempo for the music. `voice`: a
  * voice laid over it (her voice note, Edith's voice; laysVoice), from `at` on the Reel's clock: heard over its music,
  * its words subtitled by the engine at the skill's row (MontageSkill.voiceOver; else set once its composition is checked).
+ * `heard`: her own voice leading it (MontageSkill.heard): its timeline on her words (`line`), its texts hers, each the time
+ * she says it, `voice` her recording as it plays on the Reel, never subtitled (her words are its words on screen), and
+ * `leads` what it was made from (plan.voice_leads: her recording, the key of its cuts).
  */
-export function skillPlan(input: { skill: MontageSkill; name: string; files: SkillFile[]; fill: SkillFill; bpm?: number; talk?: SkillTalk; voice?: { media_id: string; at: number } }): EditPlan {
+export function skillPlan(input: {
+  skill: MontageSkill;
+  name: string;
+  files: SkillFile[];
+  fill: SkillFill;
+  bpm?: number;
+  talk?: SkillTalk;
+  voice?: { media_id: string; at: number };
+  heard?: { line: SkillTimeline; leads: { media_id: string; key: string } };
+}): EditPlan {
   const { skill, fill } = input;
   const voice = skill.voice;
   if (voice && (!input.talk || !fill.said)) throw new Error("Ce modèle se cale sur sa voix : il lui faut une vidéo où elle parle");
   if (!voice && !fill.shots.length) throw new Error("Aucun plan pour ce modèle");
+  if (input.heard && (voice || !input.voice || !input.heard.line.shown)) throw new Error("Sa voix mène ce modèle : il lui faut son enregistrement et ses mots");
   // A voice laid over it: never over a skill timed on her filmed talk (her words are its Reel).
   const laid = !voice && input.voice ? input.voice : undefined;
+  // Her own voice leading it: its timeline on her words, its texts hers.
+  const heard = input.heard;
   // What is said in her shots, subtitled (MontageSkill.spoken): written by its code, or by the engine under it.
   const shotsSpoken = voice ? undefined : skill.spoken;
   const bpm = input.bpm && input.bpm !== skill.bpm && !voice ? input.bpm : undefined;
@@ -843,13 +890,15 @@ export function skillPlan(input: { skill: MontageSkill; name: string; files: Ski
   // Timed on her voice: her talk cut and what the filler chose in it, on the Reel's clock.
   const said = voice ? skillSaid(input.talk!, fill.said!, voice) : undefined;
   // Her words too: its sounds may follow them (a key click on each letter its code types).
-  const line = skill.timeline(said ? said.shots.length : fill.shots.length, {
-    end: Boolean(fill.end),
-    ...(bpm ? { bpm } : {}),
-    ...(chosen ? { settings: chosen } : {}),
-    words: said ? { ...fill.texts, ...saidWords(said) } : fill.texts,
-    ...(said ? { said } : {}),
-  });
+  const line =
+    heard?.line ??
+    skill.timeline(said ? said.shots.length : fill.shots.length, {
+      end: Boolean(fill.end),
+      ...(bpm ? { bpm } : {}),
+      ...(chosen ? { settings: chosen } : {}),
+      words: said ? { ...fill.texts, ...saidWords(said) } : fill.texts,
+      ...(said ? { said } : {}),
+    });
   const talked = said ? talkSegments(input.talk!, said, line) : null;
   // Its length: its timeline's; on her voice, her shots' (her last one running on for an ending, as far as her video goes).
   const duration = talked ? round(talked.reduce((sum, s) => sum + (s.out - s.in), 0)) : round(line.duration);
@@ -857,19 +906,28 @@ export function skillPlan(input: { skill: MontageSkill; name: string; files: Ski
   const segments: PlanSegment[] = talked ? [...talked, ...refSegments(input.files, said!, duration)] : castSegments(input.files, fill, line);
   // What its code draws of her shots for this count (her cut-out, its objects): only those are made before the render.
   const drawn = skillDrawn(skill, line, fill.objects, segments.length);
-  const texts = [
-    ...skill.texts.flatMap((t) => {
-      const words = fill.texts[t.slot];
-      const at = line.texts[t.slot];
-      const font = fill.fonts?.[t.slot];
-      return words && at && at.to > at.from ? [{ text: words, from: round(at.from), to: round(Math.min(duration, at.to)), style: t.role, ...(font ? { font } : {}) }] : [];
-    }),
-    // Her own words, in the order she says them: her hook, each idea's keyword, the names of its list.
-    ...(said ? saidTexts(said, line, duration) : []),
-  ];
+  // Her voice leading it: each of her words on screen, the time she says it, in its slot's role.
+  const role = (slot: string) => skill.texts.find((t) => t.slot === slot)?.role;
+  const texts = heard
+    ? (line.shown ?? []).flatMap((w) => {
+        const style = role(w.slot);
+        const from = round(Math.max(0, w.from));
+        const to = round(Math.min(duration, w.to));
+        return style && w.text.trim() && to > from ? [{ text: w.text, from, to, style }] : [];
+      })
+    : [
+        ...skill.texts.flatMap((t) => {
+          const words = fill.texts[t.slot];
+          const at = line.texts[t.slot];
+          const font = fill.fonts?.[t.slot];
+          return words && at && at.to > at.from ? [{ text: words, from: round(at.from), to: round(Math.min(duration, at.to)), style: t.role, ...(font ? { font } : {}) }] : [];
+        }),
+        // Her own words, in the order she says them: her hook, each idea's keyword, the names of its list.
+        ...(said ? saidTexts(said, line, duration) : []),
+      ];
   // On her voice, every text in the order it shows: its code finds each one by its role and its moment, in the scene check
   // (which sorts them so) as in the render.
-  if (said) texts.sort((a, b) => a.from - b.from);
+  if (said || heard) texts.sort((a, b) => a.from - b.from);
   // To the hundredth: a sound she follows keeps its own tempo (a beat rounded off drifts off its beats over 30 s).
   const tempo = Math.round(Math.min(140, Math.max(60, bpm ?? skill.bpm)) * 100) / 100;
   const marks = { ...line.marks, ...(said ? saidMarks(said) : {}) };
@@ -883,10 +941,12 @@ export function skillPlan(input: { skill: MontageSkill; name: string; files: Ski
     images: [],
     transitions: "cut",
     // On her voice, what she says is subtitled (the engine's, unless its code writes them: SkillVoice.subtitles); a voice
-    // laid over it too, by the engine, over its composition; what is said in her shots, for a skill that writes it.
-    subtitles: Boolean(said) || Boolean(laid) || Boolean(shotsSpoken),
+    // laid over it too, by the engine, over its composition; what is said in her shots, for a skill that writes it. Her
+    // own voice leading it never is: her words are its words on screen.
+    subtitles: !heard && (Boolean(said) || Boolean(laid) || Boolean(shotsSpoken)),
     music: null,
     ...(laid ? { voice: { media_id: laid.media_id, at: laid.at } } : {}),
+    ...(heard ? { voice_leads: { media_id: heard.leads.media_id, key: heard.leads.key } } : {}),
     ...(fill.end ? { end_card: { title: fill.end.title, ...(fill.end.subtitle ? { subtitle: fill.end.subtitle } : {}) } } : {}),
     layers: [
       {
@@ -911,13 +971,14 @@ export function skillPlan(input: { skill: MontageSkill; name: string; files: Ski
           ...(shotsSpoken === "own" ? { writes_spoken: true } : shotsSpoken === "engine" ? { times_spoken: true, writes_spoken: false } : {}),
           ...(voice?.row ? { subtitle_y: Math.min(0.8, Math.max(0.1, voice.row)) } : {}),
           // A voice laid over it: its subtitles on the row its author gave it (else the one its check finds: skillSubtitleRow).
-          ...(laid && skill.voiceOver?.row !== undefined ? { subtitle_y: voiceOverRow(skill.voiceOver.row) } : {}),
+          ...(laid && !heard && skill.voiceOver?.row !== undefined ? { subtitle_y: voiceOverRow(skill.voiceOver.row) } : {}),
         },
       },
     ],
-    // Its sounds and its music's shape, as its original plays them.
+    // Its sounds and its music's shape, as its original plays them (on her words when her voice leads it).
     ...skillAudio({ ...line, duration }),
-    skill: { key: skill.key, version: skill.version, ...(chosen ? { settings: chosen } : {}) },
+    // Made on her voice's timeline: its cuts are hers, never its beats (no said words again, no beat grid for its music).
+    skill: { key: skill.key, version: skill.version, ...(chosen ? { settings: chosen } : {}), ...(heard ? { heard: true } : {}) },
   };
 }
 
@@ -1092,11 +1153,11 @@ export function paleSpans(ground: SceneGround | undefined, row: number, frames: 
  * on a skill loses the subtitles it had for it (never one timed on her filmed talk, whose words are its own), their row
  * and where they were written dark, unless its code writes or times what is said in her shots (MontageSkill.spoken:
  * those stay subtitled); a model whose voice says its words (`says_words`) loses that voice too, its words staying on
- * screen.
+ * screen, as does one her own voice led (`voice_leads`: its cuts and its words stay where she said them).
  */
 export function withoutVoice(plan: EditPlan): EditPlan {
-  const { voice: _voice, says_words: _says, ...rest } = plan;
-  if (plan.says_words) return { ...rest, subtitles: false };
+  const { voice: _voice, says_words: _says, voice_leads: _leads, ...rest } = plan;
+  if (plan.says_words || plan.voice_leads) return { ...rest, subtitles: false };
   if (!plan.skill || !plan.voice) return rest;
   const layers = rest.layers?.map((l) => {
     if (!l.compose || l.motion.times_spoken || (l.motion.subtitle_y === undefined && !l.motion.subtitle_pale)) return l;
@@ -1156,10 +1217,11 @@ export function skillWordsOf(skill: Pick<MontageSkill, "texts">, texts: { text: 
  * Its sounds and its music's shape again for a plan made on it whose words were changed by hand (her name typed again:
  * a key click on each of its new letters): its timeline for the same shots, tempo, ending and settings, with the plan's
  * words, later by the plan's lead. Null when another version of it made the plan, or when its length is no longer the
- * timeline's (its cut changed: its marks, and its sounds with them, stay those it was made with).
+ * timeline's (its cut changed: its marks, and its sounds with them, stay those it was made with), or made on her voice
+ * (its timeline hers, MontageSkill.heard: what it was made with stays).
  */
 export function replaySkillAudio(skill: MontageSkill, plan: EditPlan): Pick<EditPlan, "sounds" | "music_shape"> | null {
-  if (plan.skill?.key !== skill.key || plan.skill.version !== skill.version) return null;
+  if (plan.skill?.key !== skill.key || plan.skill.version !== skill.version || plan.skill.heard) return null;
   const lead = plan.beat_at ?? 0;
   const bpm = plan.tempo && Math.abs(plan.tempo - skill.bpm) > 0.005 ? plan.tempo : undefined;
   const settings = plan.skill.settings && Object.keys(plan.skill.settings).length ? plan.skill.settings : undefined;
@@ -1560,6 +1622,22 @@ export const skillFillSchema = z.object({
     })
     .optional()
     .describe("Only for a model timed on her voice (« voix »): what you choose in what she says (« ce_qu_elle_dit »)"),
+  sa_voix: z
+    .object({
+      suit: z.boolean().describe("true when what she says is this model's words, in its order, as « sa_voix.mots_du_modele » says; false when it is not (she shows nothing one by one, she says something else)"),
+      mots: z
+        .array(
+          z.object({
+            slot: z.string().describe("The model's word she says there (a slot of « mots_du_modele »)"),
+            from: z.number().describe("The number of her first word for it"),
+            to: z.number().describe("The number of her last word for it"),
+            text: z.string().describe("Those words as written on screen, as she says them, spelled right"),
+          }),
+        )
+        .describe("Each time she says one of the model's words, in the order she says them; empty when « suit » is false"),
+    })
+    .optional()
+    .describe("Only with « sa_voix » (her own voice leads this model): where she says each of its words"),
   end: z
     .object({ title: z.string().describe("The ending card's line, 40 characters at most"), subtitle: z.string().describe("A second line, 60 characters at most, or empty") })
     .nullable()
@@ -1588,6 +1666,7 @@ With « voix_off », a voice is laid over this Reel (her own voice note, or the 
 With « mots_dits », a voice says this model's own words, each at its moments, as its original's voice does: a voice-over, another voice (a man's, hers) or no voice fit (the engine sets the voice), and a change of what the voice says is a change of those words.
 With « recopie », she sent a Reel to copy and this model does its form: what her request describes of that Reel (its opening, its texts, its rhythm, its ending) the model does its own way, never a reason for false; only what she asks beyond that Reel is.
 With « ses_paroles », what is said in her videos is heard and written on screen by the model itself, as subtitles: subtitles of what she says fit; its own lines (its slots) show only where nobody speaks.
+With « sa_voix », her own recorded voice (her voice note, or the sound of one of her videos where she speaks) leads this model: it plays whole under the model's music, the model's words on screen are hers, each shown when she says it, and its shots are cut on her words; there are no texts to write ("texts" empty). Read what she says (« ce_qu_elle_dit », her words numbered, phrase by phrase, her « euh » already cut) and answer "sa_voix": "suit" true when she says the model's words in its order (« mots_du_modele »: what each one is and how many times it comes, its word pointed at each thing she shows once per thing); then "mots", each time she says one of them, in the order she says them: its slot, the numbers of her first and last word for it, and its text as written on screen, her words as she says them, spelled right (a word the transcript misheard set right), within its most characters (when she says more, her strongest words for it, never a word she does not say). Her other words are heard, never written: leave them out. "suit" false when what she says is not this model's words (she shows nothing one by one, she says something else): her voice is then laid over the model with subtitles, and nothing else of your answer is used. Cast her files on its cases as « sa_voix.cases » says, in that order: their number follows what she says (one shot for each thing she points at), each one the file that shows what she names there (« celle-là, la bleue »: her blue one).
 
 Then cast her files on its slots (« cases », in order: each with its length and what it wants), as a good editor would:
 - each slot gets the file and the passage that suits what it wants; the first slot opens the Reel: the strongest, most beautiful image;
@@ -1645,6 +1724,16 @@ export function saidTimes(says: SkillSaysWords, line: Pick<SkillTimeline, "says"
 export const SHOTS_SPOKEN =
   "Ce qu'on dit dans ses vidéos s'entend et ce modèle l'écrit lui-même en sous-titres ; ses textes à lui ne se montrent que là où personne ne parle.";
 
+/** What the filler is told when her own voice leads the model (« sa_voix », MontageSkill.heard), in French like the rest of its input. */
+export const HERS_LEADS =
+  "Sa propre voix (son vocal, ou le son d'une de ses vidéos où elle parle) mène ce modèle : elle est jouée entière, sous sa musique, et ses mots à l'écran sont les siens, chacun quand elle le dit ; ses plans tombent sur ses mots.";
+
+/** How many times she may say a word of the model (SkillSaysWords.hers), in the filler's words. */
+export function heardCount([least, most]: [number, number]): string {
+  if (most <= 1) return least ? "une fois" : "une fois, ou pas du tout";
+  return least ? `de ${least} à ${most} fois` : `jusqu'à ${most} fois, ou pas du tout`;
+}
+
 /** What the filler is told of a Reel she sent to copy that the model plays (« recopie »), in French like the rest of its input. */
 export const COPIED_REEL =
   "Elle a envoyé un Reel à recopier, et ce modèle fait la même forme : sa demande peut décrire ce Reel (son ouverture, ses textes, son rythme, sa fin), que le modèle fait à sa façon.";
@@ -1690,14 +1779,22 @@ export function skillFillInput(input: {
    * told how many times and in how long the voice says it, so its words are short enough to be said in time.
    */
   says?: boolean;
+  /**
+   * Her own recorded voice leading it (MontageSkill.heard): her recording as the engine cut it (her words numbered, on
+   * her talk's clock), and, for a correction, her words it showed (heardCurrent), kept but what her request changes.
+   */
+  hers?: { talk: SkillTalk; current?: string[] };
 }) {
   const voice = input.skill.voice;
   // On her voice, no slot to cast: her talk is its shots.
   const line = voice ? null : input.skill.timeline(input.n, { end: input.skill.end, ...(input.bpm ? { bpm: input.bpm } : {}) });
+  // Her own voice leading it: its cases and its words follow what she says (never with another voice laid over it).
+  const heard = input.skill.saysWords?.hers;
+  const hers = !voice && input.hers && heard && input.skill.heard ? input.hers : undefined;
   // A voice laid over it (never on a skill timed on her filmed talk): its words and when each of its texts shows.
-  const laid = !voice && input.voiceOver?.text.trim() ? input.voiceOver : undefined;
+  const laid = !voice && !hers && input.voiceOver?.text.trim() ? input.voiceOver : undefined;
   // Its words said by a voice (never with a voice laid over it): how many times and in how long each one is said.
-  const said = !laid && input.says && input.skill.saysWords && line ? saidTimes(input.skill.saysWords, line) : undefined;
+  const said = !laid && !hers && input.says && input.skill.saysWords && line ? saidTimes(input.skill.saysWords, line) : undefined;
   const besides = line ? besideOf(line) : [];
   const fonts = input.skill.texts.some((t) => t.font) || Boolean(voice?.fonts?.length);
   return {
@@ -1722,18 +1819,34 @@ export function skillFillInput(input: {
           },
         }
       : {}),
+    // Her own voice leading it: what it says (numbered), the model's words to find in it, and its cases under her voice.
+    ...(hers && heard
+      ? {
+          sa_voix: {
+            dit: HERS_LEADS,
+            cases: heard.cases,
+            mots_du_modele: input.skill.texts
+              .filter((t) => input.skill.saysWords!.slots.includes(t.slot) && heard.counts[t.slot])
+              .map((t) => ({ slot: t.slot, dit: t.want, max_caracteres: t.max, combien: heardCount(heard.counts[t.slot]!) })),
+            ce_qu_elle_dit: saidLines(hers.talk.words),
+            ...(hers.current?.length ? { voix_actuelle: hers.current } : {}),
+          },
+        }
+      : {}),
     modele: {
       nom: input.name,
       deroule: input.skill.how,
       fin: input.skill.end ? "le modèle peut finir sur une carte (une offre, une annonce)" : "aucune",
       longueurs: (() => {
         if (voice) return `la longueur de ce qu'elle dit, ${TALK_MAX_SECONDS} s au plus (ce Reel : ${round(input.talk?.duration ?? 0)} s)`;
+        if (hers) return `la longueur de ce qu'elle dit, ${TALK_MAX_SECONDS} s au plus (sa voix : ${round(hers.talk.duration)} s)`;
         const l = skillLengths(input.skill);
         return `de ${round(l.min)} à ${round(l.max)} s selon le nombre de cases et son tempo (ce Reel : ${round(line!.duration)} s, ${input.n} cases)`;
       })(),
     },
-    // A slot that plays at the same time as another (a split screen's other half) says which one.
-    cases: line
+    // A slot that plays at the same time as another (a split screen's other half) says which one. Under her own voice,
+    // its cases are what she says (sa_voix.cases).
+    cases: line && !hers
       ? line.shots.map((s, i) => {
           const beside = besides[i];
           return { case: i + 1, duree: `${round(s.end - s.start)} s`, veut: s.want, ...(beside !== null && beside !== undefined ? { en_meme_temps_que: beside + 1 } : {}) };
@@ -1753,7 +1866,8 @@ export function skillFillInput(input: {
           ...(input.currentSaid?.length ? { voix_actuelle: input.currentSaid } : {}),
         }
       : {}),
-    textes: input.skill.texts.map((t) => {
+    // Under her own voice, its words are hers (sa_voix.mots_du_modele): none to write.
+    textes: (hers ? [] : input.skill.texts).map((t) => {
       const fact = t.fact ? skillFact(t, input.facts) : undefined;
       // Under a voice laid over it, when it shows (what the voice says then is in voix_off.phrases).
       const at = laid ? line?.texts[t.slot] : undefined;

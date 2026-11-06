@@ -49,6 +49,12 @@ import {
   skillVoiceFit,
   voiceEnd,
   voicePhrases,
+  heardCurrent,
+  ownLeadMiss,
+  ownTalk,
+  readHeard,
+  withoutVoiceVideo,
+  type SkillHeard,
   type BrandProfile,
   type ClipAnalysis,
   type EditPlan,
@@ -69,6 +75,7 @@ import { outputFormat, readAnswer } from "@fauve/agent/answer";
 import { MONTAGE_SKILLS, skillFor } from "@fauve/agent/skills";
 import { insertPlanVersion } from "@/lib/edit-plans";
 import { modelVoiceFor, sayModelWords } from "@/lib/model-voice";
+import { ownVoiceOnReel } from "@/lib/own-voice";
 import { usableFonts } from "@/lib/fonts";
 import { ensureFileReadings } from "@/lib/render/readings";
 import { ensureTracks, loadTracks } from "@/lib/render/tracks";
@@ -91,6 +98,8 @@ import { anthropic, logClaudeCost } from "./run";
 // (another layout, more than its slots), the editor, whose motion designer starts from the skill's code.
 
 export type SkillDesign = { plan: EditPlan; editPlanId: string; version: number; rationale: string };
+
+const round2 = (n: number) => Math.round(n * 100) / 100;
 
 /**
  * The skill a Reel can be made on before anything is asked: one of Edith's models with a skill, without a layout of
@@ -251,7 +260,9 @@ export async function designSkill(params: {
   copied?: boolean;
   /**
    * A voice laid over it (docs/voix.md, « Une voix sur un modèle »): her voice note, or Edith's voice written to its
-   * length, from `at` on the Reel's clock (its words, `transcript`); `own`, her note (a fixed length the model fits to).
+   * length, from `at` on the Reel's clock (its words, `transcript`); `own`, her note (a fixed length the model fits to),
+   * or her voice taken from one of her videos (`transcript.video`). Hers on a model whose words are what its voice says
+   * leads it instead, when what she says makes it (« Sa voix mène le modèle »).
    */
   voice?: { media_id: string; at: number; transcript: VoiceTranscript; own: boolean };
 }): Promise<SkillDesign | null> {
@@ -259,7 +270,10 @@ export async function designSkill(params: {
   const name = houseModel(skill.key)?.name ?? skill.key;
   // A voice over a model timed on her filmed talk is the chain's (skillCandidate never sends one here).
   if (params.voice && !laysVoice(skill)) return null;
-  const files = measuredFiles(skillFiles(params.mediaIds, params.clips, params.photos), ...(await measuredOf(params.studioId, params.postId, skill, params.mediaIds, params.clips)));
+  // Her voice taken from one of her videos: that video is never shown under it (her lips would not follow it), unless it
+  // is her only file.
+  const mediaIds = withoutVoiceVideo(params.mediaIds, params.voice?.transcript.video?.media_id);
+  const files = measuredFiles(skillFiles(mediaIds, params.clips, params.photos), ...(await measuredOf(params.studioId, params.postId, skill, mediaIds, params.clips)));
   if (!files.length) return null;
   // Timed on her voice: her talking video cut as a creator cuts it, her other angles of the same take synced on their sound.
   const talk = skill.voice ? await talkOf(params.studioId, params.clips) : undefined;
@@ -284,13 +298,22 @@ export async function designSkill(params: {
   // length, has the model fit to it (its shots, then its tempo); Edith's, written to its length, moves it only when it
   // came out longer. Longer than the model can play: the chain makes the Reel on it.
   const laid = params.voice;
-  if (laid) {
-    const needed = voiceEnd(laid.transcript, laid.at) + SKILL_VOICE_TAIL;
-    const reach = needed <= MAX_REEL_SECONDS ? skillVoiceFit(skill, needed, fit, { follow: laid.own && !params.contract?.duration, fixed: Boolean(soundBpm) }) : null;
-    if (!reach) {
-      console.log("skill: her voice is longer than this model plays, the editor makes the Reel", params.postId, skill.key, `${needed} s`);
-      return null;
-    }
+  const laidFit = (from: { n: number; bpm: number }) => {
+    const needed = voiceEnd(laid!.transcript, laid!.at) + SKILL_VOICE_TAIL;
+    const reach = needed <= MAX_REEL_SECONDS ? skillVoiceFit(skill, needed, from, { follow: laid!.own && !params.contract?.duration, fixed: Boolean(soundBpm) }) : null;
+    if (!reach) console.log("skill: her voice is longer than this model plays, the editor makes the Reel", params.postId, skill.key, `${needed} s`);
+    return reach;
+  };
+  // Her own voice on a model whose words are what its voice says (« Celui-là, celui-là… »): it leads the model, played
+  // whole (her « euh » and long pauses cut), the model's words hers and its cuts on them, when what she says makes it;
+  // else (no such model, too few words, longer than a Reel, or her words not the model's once read) laid over it as any.
+  const miss = laid?.own ? ownLeadMiss(skill, ownTalk(laid.media_id, laid.transcript, Infinity)) : "model";
+  let hers = laid && !miss ? ownTalk(laid.media_id, laid.transcript) : null;
+  if (laid?.own && skill.saysWords?.hers && miss) console.log("own voice: laid over the model, it cannot lead it", params.postId, skill.key, miss);
+  const nominal = fit;
+  if (laid && !hers) {
+    const reach = laidFit(fit);
+    if (!reach) return null;
     fit = reach;
   }
   // A model whose words are what its voice says (« Celui-là, celui-là… »): the voice chosen for this Reel (none under a
@@ -303,38 +326,43 @@ export async function designSkill(params: {
     : null;
   // Its first beat: the Reel's first image held that long, then every cut on the sound's beats.
   const lead = params.sound && soundBpm ? soundLead(params.sound.offset, soundBpm) : 0;
-  const n = fit.n;
-  const bpm = fit.bpm !== skill.bpm ? fit.bpm : undefined;
   // A model Edith picked gives the form, never the silence: its optional title is written (dressedFloorNote's floor). A Reel
   // she copies has the words of the Reel she sent, or none.
   const wordsWanted = skillWordsWanted(skill, params.followed, params.copied);
   // A correction keeps its words but what her request changes: the words of its texts, by slot.
   // A correction keeps the settings it had (« plus de cases » once asked) but what her request changes.
   const previousSettings = params.previous?.skill?.key === skill.key ? params.previous.skill.settings : undefined;
-  const current = params.previous?.skill?.key === skill.key ? skillWordsOf(skill, params.previous.texts) : undefined;
+  const current = params.previous?.skill?.key === skill.key && !params.previous.skill.heard ? skillWordsOf(skill, params.previous.texts) : undefined;
   // On her voice, a correction keeps what it chose in what she says (her hook, her keywords, her lists) but what she changes.
   const currentSaid = skill.voice && params.previous?.skill?.key === skill.key ? saidCurrent(params.previous.texts) : undefined;
-  const input = skillFillInput({
-    skill,
-    name,
-    n,
-    files,
-    business: { name: params.studio.name, activity: params.studio.business, facts: memoryLines(params.studio.memory), booking: params.studio.booking, tone: params.profile.tone },
-    request: params.brief?.slice(0, BRIEF_MAX) || "Un Reel fait sur ce modèle, avec ses fichiers.",
-    contract: contractLines(params.contract),
-    ...(current && Object.keys(current).length ? { current } : {}),
-    ...(currentSaid?.length ? { currentSaid } : {}),
-    ...(wordsWanted ? { wordsWanted } : {}),
-    ...(bpm ? { bpm } : {}),
-    ...(previousSettings && Object.keys(previousSettings).length ? { currentSettings: previousSettings } : {}),
-    ...(talk ? { talk } : {}),
-    ...(known ? { facts: known } : {}),
-    ...(params.copied ? { copied: true } : {}),
-    // The voice laid over it, written before it: its words on screen go with what it says, when it says it.
-    ...(laid ? { voiceOver: { text: laid.transcript.text, phrases: voicePhrases(laid.transcript, laid.at) } } : {}),
-    // Its own words said by a voice: each one told how many times and in how long, to be said in time.
-    ...(saying ? { says: true } : {}),
-  });
+  // Her voice leading it, a correction keeps her words it showed but what her request changes.
+  const currentHeard = params.previous?.skill?.key === skill.key ? heardCurrent(params.previous) : undefined;
+  // Its input for a count and a tempo: her voice leading it (its cases what she says), else laid over it, else none.
+  const inputFor = (count: { n: number; bpm: number }) =>
+    skillFillInput({
+      skill,
+      name,
+      n: count.n,
+      files,
+      business: { name: params.studio.name, activity: params.studio.business, facts: memoryLines(params.studio.memory), booking: params.studio.booking, tone: params.profile.tone },
+      request: params.brief?.slice(0, BRIEF_MAX) || "Un Reel fait sur ce modèle, avec ses fichiers.",
+      contract: contractLines(params.contract),
+      ...(current && Object.keys(current).length ? { current } : {}),
+      ...(currentSaid?.length ? { currentSaid } : {}),
+      ...(wordsWanted ? { wordsWanted } : {}),
+      ...(count.bpm !== skill.bpm ? { bpm: count.bpm } : {}),
+      ...(previousSettings && Object.keys(previousSettings).length ? { currentSettings: previousSettings } : {}),
+      ...(talk ? { talk } : {}),
+      ...(known ? { facts: known } : {}),
+      ...(params.copied ? { copied: true } : {}),
+      // Her own voice leading it: what she says, numbered, where its filler finds the model's words.
+      ...(hers ? { hers: { talk: hers, ...(currentHeard?.length ? { current: currentHeard } : {}) } } : {}),
+      // The voice laid over it, written before it: its words on screen go with what it says, when it says it.
+      ...(laid && !hers ? { voiceOver: { text: laid.transcript.text, phrases: voicePhrases(laid.transcript, laid.at) } } : {}),
+      // Its own words said by a voice: each one told how many times and in how long, to be said in time.
+      ...(saying ? { says: true } : {}),
+    });
+  let input = inputFor(fit);
   // One small call fills it; `again`: its answer and what the check said of it, for a second try.
   const fillIt = async (again?: { answer: SkillFillAnswer; note: string }): Promise<SkillFillAnswer | null> => {
     try {
@@ -356,17 +384,26 @@ export async function designSkill(params: {
     }
   };
   const facts: MediaFacts = { clips: Object.fromEntries(params.clips.map((c) => [c.media_id, c.analysis])), photos: params.photos, tracks: {} };
+  // Her voice leading it, once its filler found the model's words in what she says: her words, the count of its shots,
+  // and her recording as the Reel plays it (whole, or its track with her « euh » and long pauses cut).
+  let heard: { said: SkillHeard; n: number; voice: { media_id: string; at: number }; key: string } | null = null;
   // Her Reel from an answer: the plan by code, dressed as a model followed and finished as any montage, then checked.
   const made = async (answer: SkillFillAnswer): Promise<{ plan: EditPlan; error?: string } | null> => {
-    const read = readSkillFill(skill, files, n, answer, { wordsWanted, ...(talk ? { talk } : {}), ...(known ? { facts: known } : {}) });
+    const n = heard?.n ?? fit.n;
+    const bpm = !heard && fit.bpm !== skill.bpm ? fit.bpm : undefined;
+    const read = readSkillFill(skill, files, n, answer, { wordsWanted, ...(talk ? { talk } : {}), ...(known ? { facts: known } : {}), ...(heard ? { heard: heard.said } : {}) });
     if (!read) return null;
     // A correction keeps the settings it had but what her request changes (a new Reel: only those she asks).
     const settings = mergeSkillSettings(skill, previousSettings, answer.settings);
     const fill = { ...read, settings };
+    // Her voice leading it: its timeline on her words, with its ending card when she has one (45 s at most).
+    const line = heard ? skill.heard!(heard.said, { end: Boolean(fill.end), settings }) : null;
+    if (heard && (!line || line.shots.length !== n || line.duration > MAX_REEL_SECONDS)) return null;
+    const leads = heard && line ? { heard: { line, leads: { media_id: laid!.media_id, key: heard.key } }, voice: heard.voice } : null;
     // The model's lettering when she chose it (her charter's when Edith picked it), and its finish (its grade, its grain)
     // without what its code does itself (its own black and white, with its red over it); else her own look. On her voice,
     // her talk cut is its shots.
-    const voiced = laid ? { voice: { media_id: laid.media_id, at: laid.at } } : {};
+    const voiced = leads ?? (laid ? { voice: { media_id: laid.media_id, at: laid.at } } : {});
     const plan = dressSkillPlan(leadPlan(skillPlan({ skill, name, files, fill, ...(bpm ? { bpm } : {}), ...(talk ? { talk } : {}), ...voiced }), lead), skill, params.followed, params.profile.look);
     // Each shot framed on its subject and its light corrected, as any montage.
     const durations = Object.fromEntries(files.map((f) => [f.id, f.photo ? plan.duration : f.seconds]));
@@ -379,21 +416,57 @@ export async function designSkill(params: {
     const layer = plan.layers![0]!;
     // A voice laid over it: its subtitles for the whole Reel on the skill's row, else off what its composition writes
     // and draws of its own on her Reel (the check measured it; the render keeps a composition's row as it is), written
-    // dark where its composition paints a pale ground under them.
-    const subtitleY = laid ? skillSubtitleRow(skill, checked.own, plan.duration) : undefined;
+    // dark where its composition paints a pale ground under them. None under her voice leading it: her words are its own.
+    const subtitleY = laid && !heard ? skillSubtitleRow(skill, checked.own, plan.duration) : undefined;
     const pale = subtitleY !== undefined ? paleSpans(checked.ground, subtitleY, Math.round((layer.to - layer.from) * 30)) : [];
     const row = subtitleY !== undefined ? { subtitle_y: subtitleY, ...(pale.length ? { subtitle_pale: pale } : {}) } : {};
     plan.layers = [{ ...layer, motion: { ...layer.motion, js: checked.js, ...(checked.fonts.length ? { fonts: checked.fonts } : {}), ...row } }];
     return { plan };
   };
 
+  // Her request beyond the model: noted (a gap that comes back becomes a tool, toolkit), the editor makes the Reel.
+  const beyond = async (answer: SkillFillAnswer) => {
+    console.log("skill: her request needs the editor", params.postId, skill.key, answer.missing);
+    await noteGap({ studioId: params.studioId, postId: params.postId, source: "skill", label: answer.missing.trim().slice(0, 200) || `une demande hors du modèle « ${name} »`, request: params.brief });
+  };
   let answer = await fillIt();
   if (!answer) return null;
   if (!answer.fits) {
-    console.log("skill: her request needs the editor", params.postId, skill.key, answer.missing);
-    // What the skill could not do, noted: a gap that comes back becomes a tool (toolkit).
-    await noteGap({ studioId: params.studioId, postId: params.postId, source: "skill", label: answer.missing.trim().slice(0, 200) || `une demande hors du modèle « ${name} »`, request: params.brief });
+    await beyond(answer);
     return null;
+  }
+  // Her voice leading it: the model's words where she says them, its timeline on them (her ending card in it, 45 s at
+  // most), her recording as the Reel will play it. What she says that does not make it (« suit » false, too few things
+  // pointed at, a Reel too long), or her voice's track not made: laid over the model as any voice, filled again so (a
+  // cent); longer than the model plays, the chain.
+  if (hers && laid) {
+    const said = readHeard(skill, hers, answer.sa_voix);
+    const ending = skill.end && Boolean(answer.end?.title.trim());
+    const line = said ? skill.heard!(said, { end: ending }) : null;
+    const placed =
+      line && line.duration <= MAX_REEL_SECONDS
+        ? await ownVoiceOnReel({ studioId: params.studioId, postId: params.postId, source: laid.media_id, talk: hers, lead: line.lead ?? 0, duration: round2(hers.duration + (line.lead ?? 0)), previous: params.previous }).catch((error: unknown) => {
+            console.warn("own voice: her track not made, laid over the model", params.postId, error instanceof Error ? error.message.slice(0, 300) : error);
+            return null;
+          })
+        : null;
+    if (said && line && placed) {
+      heard = { said, n: line.shots.length, ...placed };
+      console.log("own voice: leads the model", params.postId, skill.key, said.words.map((w) => `${w.slot} « ${w.text} » ${w.at} s`).join(", "));
+    } else {
+      console.log("own voice: her words do not make this model, laid over it", params.postId, skill.key, !answer.sa_voix?.suit ? "not its words" : !said ? "too few of its words" : !line ? "out of its order" : `${line.duration} s`);
+      hers = null;
+      const reach = laidFit(nominal);
+      if (!reach) return null;
+      fit = reach;
+      input = inputFor(fit);
+      answer = await fillIt();
+      if (!answer) return null;
+      if (!answer.fits) {
+        await beyond(answer);
+        return null;
+      }
+    }
   }
   let result = await made(answer);
   // Refused by the check (her words too long for their place, most often): filled once more with what it said, for a
@@ -431,7 +504,9 @@ export async function designSkill(params: {
     editPlanId: row.id,
     version: row.version,
     // A Reel she sent, played by one of Edith's models: one sentence on the post, nothing more (the delivery says none of it).
-    rationale: params.copied ? copyByModelWords(name) : [`Je l'ai monté sur le modèle « ${name} ».`, answer.why.trim().slice(0, 300)].filter(Boolean).join(" "),
+    rationale: params.copied
+      ? copyByModelWords(name)
+      : [heard ? `Je l'ai monté sur le modèle « ${name} », sur ta voix : chaque mot s'affiche quand tu le dis.` : `Je l'ai monté sur le modèle « ${name} ».`, answer.why.trim().slice(0, 300)].filter(Boolean).join(" "),
   };
 }
 

@@ -91,6 +91,7 @@ import {
   soundLead,
   soundTempo,
   laysVoice,
+  withoutVoiceVideo,
   type MontageSkill,
 } from "@fauve/agent";
 import { outputFormat } from "@fauve/agent/answer";
@@ -523,6 +524,12 @@ export async function designEdit(params: {
     const read = await Promise.race([earlySpeech, new Promise<null>((resolve) => setTimeout(() => resolve(null), SPEECH_WAIT_MS))]);
     if (read) clips = read;
   }
+  // Her voice taken from one of her videos (« prends ma voix de la vidéo où je parle »): the editor cuts on it as on her
+  // voice note, and never shows that video (her lips would not follow her voice laid over other shots), unless it is her
+  // only file.
+  const voiceVideo = voice?.video?.media_id;
+  const seen = withoutVoiceVideo([...clips.map((c) => c.media_id), ...photoIds], voiceVideo);
+  if (voiceVideo && !seen.includes(voiceVideo)) clips = clips.filter((c) => c.media_id !== voiceVideo);
   const tracks: TracksByClip = clips.length ? await loadTracks(params.studioId, clips.map((c) => c.media_id)).catch(() => ({})) : {};
   // The version to correct as the editor wrote it: its ramps and its cuts of the « euh » undone (the engine makes them again).
   const asWritten = previousPlan.success ? undoSpeechCuts({ ...previousPlan.data, segments: previousPlan.data.segments.map(asAsked) }) : null;

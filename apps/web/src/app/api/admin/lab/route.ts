@@ -17,6 +17,7 @@ import {
   isMotionSegment,
   MAX_MONTAGE_FILES,
   motionTemplateSchema,
+  planTimeline,
   reelLink,
   slidesPlanSchema,
   type Effort,
@@ -37,6 +38,7 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 import { ensureClipAnalysis } from "@/lib/video/analyze";
 import { speak, writeVoiceScript } from "@/lib/voice-over";
 import { ensureTranscript } from "@/lib/voice";
+import { voiceFromVideo } from "@/lib/own-voice";
 import { startCarousel } from "@/lib/carousels";
 import { renderPost } from "@/lib/render/render-post";
 import { voiceNoteInSandbox } from "@/lib/render/sandbox";
@@ -70,7 +72,12 @@ import { photoRegions } from "@/lib/video/regions";
 //                        own_voice=1 (or own_voice=<her words>) a voice note of hers instead, as one
 //                        comes from WhatsApp: words for the images (or hers) read by a voice of the
 //                        gallery, made a phone's OGG Opus note (16 kHz mono, quieter, band-limited),
-//                        kept as a WhatsApp audio and read by Scribe, then put on the Reel;
+//                        kept as a WhatsApp audio and read by Scribe, then put on the Reel; on a model
+//                        whose words are what its voice says (model=celui-la), her voice leads it (its words
+//                        on screen hers, its cuts on them: step=result's voice_leads), or is laid over it;
+//                        voice_video=<file> her voice taken from one of her videos instead (one of own=: its
+//                        speech read, its sound from her first word to her last taken once in the workshop),
+//                        as Edith takes it when she asks « prends ma voix de la vidéo où je parle »;
 //                        steal=<url> (« Steal ») first has the style of a Reel read, from its link
 //                        (Instagram, TikTok, a Short) or a video file's URL, and the lab Reel copies it
 //                        (one shot, as when she sends Edith a Reel to copy); steal=lab:<file> a video
@@ -678,8 +685,8 @@ async function labMedia(studioId: string, c: LabCase): Promise<{ videos: string[
   return { videos, photos };
 }
 
-/** The voice over a lab Reel: Edith's (voice=), or a voice note of hers (own_voice=). */
-type LabVoice = { simone: string | null; hers: string | null };
+/** The voice over a lab Reel: Edith's (voice=), a voice note of hers (own_voice=), or her voice taken from one of her videos (voice_video=). */
+type LabVoice = { simone: string | null; hers: string | null; video: string | null };
 
 async function start(name: string, c: LabCase, reset: boolean, voice: LabVoice, idea: string | null, steal: { url: string | null; only: boolean }, asCarousel = false, motion?: Motion) {
   const studioId = await labStudio(name, c);
@@ -843,6 +850,13 @@ async function montage(name: string, studioId: string, c: Pick<LabCase, "title" 
   if (voice.hers) {
     const note = await labVoiceNote(studioId, post.data.id, voice.hers === "1" ? undefined : voice.hers, brief);
     console.log("lab: her voice note", name, note.seconds, note.text);
+  } else if (voice.video) {
+    // As Edith does when she asks « prends ma voix de la vidéo où je parle » (update_post with that video): its voice taken once.
+    const { data: video } = await db.from("media_assets").select("id").eq("studio_id", studioId).eq("storage_path", `${studioId}/lab/${voice.video}`).maybeSingle();
+    if (!video) throw new Error(`lab: voice_video=${voice.video} is none of her videos (upload it, then own=${voice.video})`);
+    const taken = await voiceFromVideo(studioId, video.id as string);
+    await db.from("posts").update({ voice_media_id: taken.mediaId }).eq("id", post.data.id);
+    console.log("lab: her voice from her video", name, voice.video, taken.transcript.duration, taken.transcript.text);
   }
   // The same chain as her first Reel at the default care, without a quote: two scenes of her own.
   await queueJob("montage", {
@@ -886,7 +900,10 @@ async function labVoiceNote(studioId: string, postId: string, words?: string, br
   return { mediaId: asset.data.id as string, text: transcript.text, seconds: transcript.duration };
 }
 
-const voiceOf = (params: URLSearchParams): LabVoice => ({ simone: params.get("voice"), hers: params.get("own_voice") });
+const voiceOf = (params: URLSearchParams): LabVoice => {
+  const video = params.get("voice_video");
+  return { simone: params.get("voice"), hers: params.get("own_voice"), video: video && LAB_FILE.test(video) && !LAB_PHOTO.test(video) ? video : null };
+};
 
 /** A file of hers uploaded to the lab studio: a plain name, a video. */
 const LAB_FILE = /^[\w-][\w.-]{0,79}\.(mp4|mov|m4v|webm|jpe?g|png|webp)$/i;
@@ -1021,6 +1038,19 @@ async function result(key: string) {
     voice: (voice.data?.transcript as { text?: string; duration?: number } | null) ?? null,
     ...(plan.success && plan.data.says_words
       ? { said_words: { voice_id: plan.data.says_words.voice_id, track: plan.data.voice?.media_id ?? null, words: (saidTrack?.transcript as { words?: unknown } | null)?.words ?? null, ai: saidTrack?.ai ?? null } }
+      : {}),
+    // Her own voice leading its model (« Celui-là, celui-là… »): her recording, how it plays, each word of the model on
+    // screen when she says it, and each cut (the shots' starts on the Reel's clock).
+    ...(plan.success && plan.data.voice_leads
+      ? {
+          voice_leads: {
+            from: plan.data.voice_leads.media_id,
+            voice: plan.data.voice ?? null,
+            cut: plan.data.voice?.media_id !== plan.data.voice_leads.media_id,
+            words: plan.data.texts.map((t) => ({ text: t.text, from: t.from, to: t.to })),
+            cuts: planTimeline(plan.data).segments.map((s) => Math.round(s.start * 100) / 100),
+          },
+        }
       : {}),
     costs: byKind(post.data.created_at as string),
     studio_costs: byKind(),
