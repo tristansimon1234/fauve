@@ -14,13 +14,13 @@ const shots = [
   { file: "after", at: 2, seconds: 1.8 },
 ];
 
-test("« Le kaléidoscope » (effect v1): its layer over her shot, her door named there, never her cut-out; its marks on the Reel's beat", () => {
+test("« Le kaléidoscope » (effect v2): its layer over her shot, her door named there, never her cut-out; its marks on the Reel's beat", () => {
   const plan = pieceTestPlan({ piece: vitraux, shots, span: [1.2, 7.2], fill: { texts: { nom: "Maison Farine" }, objects: { devanture: "front door" }, settings: {} }, bpm: 100 });
   assert.ok(editPlanSchema.safeParse(plan).success);
   const layer = plan.layers![0]!;
   assert.deepEqual(layerShots(plan, layer), [1]);
   const motion = layer.motion;
-  assert.deepEqual(motion.piece, { key: "vitraux", version: 1 });
+  assert.deepEqual(motion.piece, { key: "vitraux", version: 2 });
   // Open from its third image, whole after 2,5 beats (45 images at 100 BPM), closed over 2,3 beats, her real picture its
   // last half beat; her name 2,2 s before its end.
   assert.deepEqual(motion.texts, { beat: "18", open_from: "2", full: "45", close: "130", real: "171", name: "114", turn: "11.25", mine: "1", nom: "Maison Farine" });
@@ -101,40 +101,65 @@ const keyed = (tree: Drawn, key: string) => flatten(tree).find((d) => d.props.ke
 const styleOf = (d: Drawn | null) => (d?.props.style ?? {}) as Record<string, string | number>;
 const strips = (tree: Drawn) => (keyed(tree, "battants")?.children.flat() ?? []) as Drawn[];
 
-test("« Le kaléidoscope » draws her shot, mirrors that open from it, slide, and close back on it at its end", () => {
+test("« Le kaléidoscope » (v2) draws her shot and, by default, a kaleidoscope that opens from it, turns, and closes back on it at its end", () => {
   // Her shot always under it; no mirror on its first images nor its last ones: the montage resumes on her real picture.
   for (const f of [0, 1, 172, 179]) {
-    assert.equal(keyed(drawAt(f), "battants"), null, `frame ${f}`);
+    assert.equal(keyed(drawAt(f), "kaleidoscope"), null, `frame ${f}`);
     assert.ok(keyed(drawAt(f), "real"));
   }
+  // Eight wedges, one in two mirrored, in a circle that grows to her whole picture's corners, turning.
+  const iris = (f: number) => keyed(drawAt(f), "iris")!;
+  const radius = (f: number) => Number(/circle\(([\d.]+)px/.exec(String(styleOf(iris(f)).clipPath))![1]);
+  assert.ok(radius(4) < radius(20) && Math.abs(radius(90) - Math.hypot(540, 960) - 2) < 1);
+  const wedges = iris(90).children.flat() as Drawn[];
+  assert.equal(wedges.length, 8);
+  const turns = (f: number) => (iris(f).children.flat() as Drawn[]).map((w) => String(styleOf(w.children[0] as Drawn).transform));
+  turns(90).forEach((t, j) => assert.equal(/scaleX\(-1\)/.test(t), j % 2 === 1));
+  assert.notEqual(turns(90)[0], turns(110)[0]);
+  assert.equal(styleOf(keyed(drawAt(90), "kaleidoscope")).clipPath, "inset(0px 0px 0px 0px)");
+});
+
+test("« Le kaléidoscope »: its battants (a setting), mirrors that open from her shot, slide, and close back on it at its end", () => {
+  const B = { figure: "battants" };
+  for (const f of [0, 1, 172, 179]) assert.equal(keyed(drawAt(f, { texts: B }), "battants"), null, `frame ${f}`);
   // In the middle, three to seven strips over her whole picture, edge to edge, one in two mirrored, moving.
-  const mid = strips(drawAt(90));
+  const mid = strips(drawAt(90, { texts: B }));
   assert.ok(mid.length >= 3 && mid.length <= 7, String(mid.length));
   assert.equal(styleOf(mid[0]!).left, 0);
   assert.equal(Number(styleOf(mid.at(-1)!).left) + Number(styleOf(mid.at(-1)!).width), 1080);
   const moves = (tree: Drawn) => strips(tree).map((s) => String(styleOf(((s.children[0] as Drawn).children[0] as Drawn)).transform));
-  assert.ok(moves(drawAt(90)).some((t) => /scaleX\(-1\)/.test(t)) && moves(drawAt(90)).some((t) => !/scaleX/.test(t)));
-  assert.notEqual(moves(drawAt(90)).join(), moves(drawAt(110)).join());
+  assert.ok(moves(drawAt(90, { texts: B })).some((t) => /scaleX\(-1\)/.test(t)) && moves(drawAt(90, { texts: B })).some((t) => !/scaleX/.test(t)));
+  assert.notEqual(moves(drawAt(90, { texts: B })).join(), moves(drawAt(110, { texts: B })).join());
   // Over her next shot the mirrors go on, on that shot.
-  const two = drawAt(120, { shots: [{ from: -15, durationInFrames: 115 }, { from: 100, durationInFrames: 80 }] });
+  const two = drawAt(120, { texts: B, shots: [{ from: -15, durationInFrames: 115 }, { from: 100, durationInFrames: 80 }] });
   assert.equal((keyed(two, "real")!.props as { shot: number }).shot, 1);
   assert.ok(strips(two).length >= 3);
 });
 
 test("« Le kaléidoscope »: inside her door when it is found, her picture real around it; its rosace when asked; her name above her door", () => {
   const door = { x: 200, y: 500, w: 680, h: 1100 };
-  const s = strips(drawAt(90, { door }));
+  const B = { figure: "battants" };
+  const s = strips(drawAt(90, { door, texts: B }));
   assert.ok(s.every((x) => Number(styleOf(x).left) >= 200 && Number(styleOf(x).left) + Number(styleOf(x).width) <= 880 && styleOf(x).top === 500), JSON.stringify(s.map((x) => styleOf(x))));
   const closed = "M 200 500 C 500 490 800 490 880 500 C 890 900 890 1500 880 1600 C 600 1610 300 1610 200 1600 C 190 900 190 600 200 500 Z";
-  assert.equal(styleOf(keyed(drawAt(90, { door, outline: closed }), "battants")).clipPath, `path('${closed}')`);
+  assert.equal(styleOf(keyed(drawAt(90, { door, outline: closed, texts: B }), "battants")).clipPath, `path('${closed}')`);
+  // Its kaleidoscope in her door, clipped to it (to its outline when whole).
+  assert.equal(styleOf(keyed(drawAt(90, { door }), "kaleidoscope")).clipPath, "inset(500px 200px 320px 200px)");
+  assert.equal(styleOf(keyed(drawAt(90, { door, outline: closed }), "kaleidoscope")).clipPath, `path('${closed}')`);
   // Its rosace: eight wedges in a circle inscribed in her door, on its middle.
   const rose = keyed(drawAt(90, { door, texts: { figure: "rosace" } }), "rosace")!;
-  assert.equal(rose.children.flat().length, 8);
-  assert.match(String(styleOf(rose).clipPath), /^circle\(340\.0px at 540\.0px 1050\.0px\)$/);
-  // Her name over the closing, above her door, white on her picture, an ink where it is bright.
+  const roseIris = rose.children.flat()[0] as Drawn;
+  assert.equal(roseIris.children.flat().length, 8);
+  assert.match(String(styleOf(roseIris).clipPath), /^circle\(340\.0px at 540\.0px 1050\.0px\)$/);
+  // Her name over the closing: above the rosace her kaleidoscope draws back to (its middle 1050, 340 px round), above
+  // her door for its battants; white on her picture, an ink where it is bright.
   const marks = vitrauxTimeline({ frames: 180, bpm: 100, shots: [], words: {}, settings: {} }).marks!;
   assert.equal(flatten(drawAt(marks.name! - 1, { door, texts: { nom: "Maison Farine" } })).filter((d) => d.type === "FitText").length, 0);
-  const name = flatten(drawAt(marks.name! + 20, { door, texts: { nom: "Maison Farine" } })).find((d) => d.type === "FitText")!;
+  const above = styleOf(flatten(drawAt(marks.name! + 20, { door, texts: { nom: "Maison Farine" } })).find((d) => d.type === "FitText")!);
+  assert.ok(Number(above.top) + Number(above.height) <= 710 - 10 && Number(above.top) + Number(above.height) >= 710 - 40, JSON.stringify(above));
+  const drawn = Number(/circle\(([\d.]+)px/.exec(String(styleOf(keyed(drawAt(marks.name! + 20, { door, texts: { nom: "Maison Farine" } }), "iris")).clipPath))![1]);
+  assert.ok(drawn <= 341, String(drawn));
+  const name = flatten(drawAt(marks.name! + 20, { door, texts: { nom: "Maison Farine", ...B } })).find((d) => d.type === "FitText")!;
   const b = styleOf(name);
   assert.ok(Number(b.top) >= 100 && Number(b.top) + Number(b.height) <= 500 - 10 && Number(b.top) + Number(b.height) >= 500 - 40, JSON.stringify(b));
   assert.ok(Number(b.left) >= 140 && Number(b.left) + Number(b.width) <= 940);

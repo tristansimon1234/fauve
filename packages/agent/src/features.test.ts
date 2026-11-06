@@ -1248,7 +1248,7 @@ test("each of Edith's models shows its original's frames as a Reel she sends: sh
   const { HOUSE_MEASURES } = await import("./house-measures.ts");
   const { stolenStyleSchema } = await import("./steal.ts");
   // A studio's row written before the sheets is rewritten (11: ten models written again on their originals' fiches).
-  assert.equal(HOUSE_VERSION, 20);
+  assert.equal(HOUSE_VERSION, 21);
   for (const m of HOUSE_MODELS) {
     const sheets = houseSheets(m.key);
     // A model written as a design has no original, so no sheets (its row names none).
@@ -8498,11 +8498,11 @@ async function drawVoiced(code: string, frame: number, props: Record<string, unk
 /** A drawn layer's props from a Reel's composition layer. */
 const sceneProps = (layer: { durationInFrames: number; shots?: unknown[]; texts?: Record<string, string>; reelTexts?: unknown[]; spoken?: unknown[] }) => ({ durationInFrames: layer.durationInFrames, shots: layer.shots ?? [], texts: layer.texts ?? {}, reelTexts: layer.reelTexts ?? [], spoken: layer.spoken ?? [] });
 
-test("« Mot clé en grand » (v1) cuts where its original does, between its ideas, its words on its words, within two images", async () => {
+test("« Mot clé en grand » (v2) cuts where its original does, between its ideas, its words on its words, within two images", async () => {
   const { motCle, talk, plan } = await motCleOnOriginal();
-  assert.equal(motCle.version, 1);
+  assert.equal(motCle.version, 2);
   assert.equal(motCle.bpm, 108);
-  assert.ok(motCle.voice && !motCle.voice.cut && motCle.voice.fonts?.includes("item") && motCle.voice.row === 0.75);
+  assert.ok(motCle.voice && !motCle.voice.cut && motCle.voice.fonts?.includes("item") && motCle.voice.subtitles === "own" && motCle.voice.refs);
   // Its frame changes only between its ideas, in the breath between them: the original's two cuts, on her video's clock
   // (her pause of 0,46 s shortened as everywhere), within two images; one take, every other idea framed tighter.
   const shots = plan.segments.filter((s): s is ClipSegment => "clip_id" in s);
@@ -8551,13 +8551,12 @@ test("« Mot clé en grand » (v1) cuts where its original does, between its ide
   assert.deepEqual(plan.sounds!.map((s) => s.sound), ["low whoosh", "low whoosh"]);
   within2(plan.sounds![0]!.at, 0.16, "its hook's whoosh");
   within2(plan.sounds![1]!.at, 1.8, "« FONTS »'s whoosh");
-  // The engine's subtitles of what is said stay under it, on her chest.
-  assert.equal(plan.subtitles, true);
-  assert.equal(plan.layers![0]!.motion.writes_spoken, false);
-  assert.equal(plan.layers![0]!.motion.subtitle_y, 0.75);
+  // Its code writes what she says (v2): the engine's subtitles step aside (v1 kept them on her chest, its keywords read
+  // three times: « les sous-titres ne sont plus utiles »).
+  assert.equal(plan.layers![0]!.motion.writes_spoken, true);
 });
 
-test("« Mot clé en grand » (v1): its words slide in as the original's, above her head, her words one by one, a list two by two, a number and its words", async () => {
+test("« Mot clé en grand » (v2): its words slide in as the original's, above her head, her words one by one, a list two by two, a number and its words", async () => {
   const { SLIDE } = await import("./skills/mot-cle.ts");
   const { motCle, layer } = await motCleOnOriginal();
   const props = sceneProps(layer);
@@ -8613,9 +8612,26 @@ test("« Mot clé en grand » (v1): its words slide in as the original's, above 
   assert.equal(drawnText(drawnNodes(block)[1]!), "41");
   assert.deepEqual(drawnNodes(block).filter((n) => n.type === "div" && !n.children.some((c) => typeof c !== "string")).slice(1).map(drawnText), ["consistent", "creative", "copycat"]);
   assert.deepEqual(motCle.fonts, ["Anton"]);
-  // Nothing above her head while she says goodbye.
+  // Her goodbye on its small line (v2: everything she says is written once), nothing big.
   const bye = await draw(layer.durationInFrames - 10);
-  assert.equal(drawnNodes(bye).filter((n) => n.type === "FitText" || n.type === "span").length, 0);
+  assert.equal(drawnNodes(bye).filter((n) => n.type === "FitText").length, 0);
+  assert.deepEqual(words(bye).filter((w) => w[1] === 1).map((w) => w[0]), ["and", "see", "you", "soon"]);
+  // Never a word written twice: no « fonts » on the line while FONTS is up, no name of her list, nothing under « 41 ».
+  for (const f of [60, 120, 150]) assert.ok(!words(await draw(f)).some((w) => String(w[0]).toLowerCase() === "fonts"), `image ${f}`);
+  assert.equal(line(await draw(tempting.from + 3)), undefined);
+  assert.equal(line(await draw(number.from + 20)), undefined);
+  // Every word of hers at least two letters long is written, big or small, somewhere in the Reel, but what she says under
+  // her hook and under her number (« day 41 of my sixty days challenge of being… », as the original) and inside its names.
+  const seen = new Set<string>();
+  for (let f = 0; f < layer.durationInFrames; f += 3) {
+    const tree = await draw(f);
+    for (const n of drawnNodes(tree)) if ((n.type === "span" && styleOf(n).opacity === 1) || n.type === "FitText") drawnText(n).toLowerCase().split(/\s+/).forEach((w) => seen.add(w.replace(/[^\p{L}\p{N}-]/gu, "")));
+    const block = drawnNodes(tree).find((n) => n.type === "div" && styleOf(n).alignItems === "center");
+    if (block) drawnNodes(block).forEach((n) => typeof n.children[0] === "string" && seen.add(String(n.children[0]).toLowerCase()));
+  }
+  const said = MC_WORDS.map((w) => w.w.toLowerCase().replace(/[^\p{L}\p{N}-]/gu, "")).filter((w) => w.length > 1);
+  const missed = said.filter((w) => !seen.has(w) && !["forty-one", "neue", "avant", "garde", "courier", "new", "bebas", "with", "im", "going", "my", "sixty", "days", "challenge", "being"].includes(w));
+  assert.deepEqual(missed, []);
 });
 
 test("« Mot clé en grand » (v1): full frame for her vertical video, a 16:9 band on black for a horizontal one or on her word; light to render", async () => {
@@ -8643,6 +8659,40 @@ test("« Mot clé en grand » (v1): full frame for her vertical video, a 16:9 ba
   assert.doesNotMatch(motCle.code, /\bSubject\b|SubjectBox|Depth|Skyline/);
   // Its lengths are hers (45 s at most); its finish is its model's (« Studio »).
   assert.equal(motCle.finish, undefined);
+});
+
+test("« Mot clé en grand » (v2): her photo of a name of her list full frame under that name, from the instant she says it, white over it", async () => {
+  const { motCle } = await import("./skills/mot-cle.ts");
+  const { skillTalk, readSkillFill, skillPlan } = await import("./skills.ts");
+  const talk = skillTalk(MC_TALK)!;
+  const files = [
+    { id: "orig", photo: false, seconds: 23.43, aspect: 9 / 16 },
+    { id: "tempting", photo: true, seconds: 0, aspect: 4 / 5 },
+    { id: "cooper", photo: true, seconds: 0, aspect: 4 / 5 },
+  ];
+  const said = { ...MC_SAID, ideas: MC_SAID.ideas.map((idea, k) => (k === 1 ? { ...idea, items: idea.items.map((item) => (item.text === "Tempting" ? { ...item, file: "tempting" } : item.text === "cooper" ? { ...item, file: "cooper" } : item)) } : idea)) };
+  const fill = readSkillFill(motCle, files, talk.pieces.length, voiceAnswer(said), { talk })!;
+  const plan = editPlanSchema.parse(skillPlan({ skill: motCle, name: "Mot clé en grand", files, fill, talk }));
+  const props = buildReelProps(plan, { template: "libre", clipUrls: Object.fromEntries(files.map((f) => [f.id, `https://x/${f.id}`])), photoIds: ["tempting", "cooper"], aspects: Object.fromEntries(files.map((f) => [f.id, f.aspect])), photoAspects: { tempting: 0.8, cooper: 0.8 }, brand: { name: "Fonts" }, words: { orig: MC_WORDS } });
+  const layer = props.layers![0]!;
+  const scene = sceneProps(layer);
+  const low = { x: 540, y: 1000, width: 160, height: 200 };
+  const tempting = layer.reelTexts!.find((t) => t.text === "Tempting")!;
+  const avant = layer.reelTexts!.find((t) => t.text === "avant garde")!;
+  const shotsOf = (tree: Drawn) => drawnNodes(tree).filter((n) => n.type === "Footage").map((n) => (n.props as { shot: number }).shot);
+  const talkN = Number(scene.texts.said_shots);
+  // Her talk before she says « Tempting »; its photo full frame from then to her next name, the pair over it, white.
+  assert.ok(shotsOf(await drawVoiced(motCle.code, tempting.from - 2, scene, { face: low }))[0]! < talkN);
+  const over = await drawVoiced(motCle.code, tempting.from + 3, scene, { face: low, light: { mean: 0.8, high: 0.9 } });
+  assert.deepEqual(shotsOf(over), [talkN]);
+  assert.deepEqual(styleOf(drawnNodes(over).find((n) => n.type === "Footage")!), { position: "absolute", left: 0, top: 0, width: 1080, height: 1920 });
+  const fits = drawnNodes(over).filter((n) => n.type === "FitText");
+  assert.deepEqual(fits.map(drawnText), ["inter", "Tempting"]);
+  assert.ok(fits.every((n) => (n.props.innerStyle as Record<string, unknown>).color === "#ffffff"));
+  // Her talk again on a name with no image of hers (« avant garde »), then « cooper »'s photo.
+  assert.ok(shotsOf(await drawVoiced(motCle.code, avant.from + 3, scene, { face: low }))[0]! < talkN);
+  const cooper = layer.reelTexts!.find((t) => t.text === "cooper")!;
+  assert.deepEqual(shotsOf(await drawVoiced(motCle.code, cooper.from + 3, scene, { face: low })), [talkN + 1]);
 });
 
 // ——— « Face caméra et références » v1, written on its original's fiche (docs/fiches/createur.md) ————————————————————

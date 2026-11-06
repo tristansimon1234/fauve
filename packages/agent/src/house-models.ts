@@ -18,7 +18,7 @@ import type { z } from "zod";
 /** The source of the inspiration row a house model is kept on, per studio (one per model, made when first used). */
 export const HOUSE_SOURCE = "house";
 /** The catalogue's version: a studio's row written by an older one is rewritten when the model is used again (3: its original's sheets; 4: no brand in a model's name; 5: Mots aux quatre coins as its original; 6: Plans fixes at 65 BPM; 7: four renamed; 8: Lieu tapé without its original's orange; 9: Plans fixes on its fiche; 10: Une journée chez toi on its fiche; 11: ten models on their fiches; 12: Façade qui se construit and Coulisses façon fiche on their fiches; 13: Recette cosy on its fiche; 14: Titre gaufré on its fiche; 15: Mots mêlés and Interrupteur on their fiches; 16: Interface minimaliste and Fenêtres et étiquettes on theirs; 17: Mot clé en grand and Face caméra et références on theirs; 18: Photos posées sur la table and Carte au feutre on theirs; 19: « S'abonner » in Interface minimaliste; 20: the last four on their fiches, Aplat, Détourages, Silhouette and Vision machine). */
-export const HOUSE_VERSION = 20;
+export const HOUSE_VERSION = 21;
 
 export type HouseModel = {
   key: string;
@@ -2067,8 +2067,9 @@ export const HOUSE_MODELS: HouseModel[] = [
     // Written on its original's fiche (v1 of its skill, docs/fiches/vitraux.md): an old building's door straight on, re-made
     // at every image by an AI (its leaves doubling, its panes in symmetric patterns, its fanlight turning half a turn), the
     // stone around it still, then back to the real door for the loop, over a soft house loop at 123,4 BPM (Gemini heard 95
-    // and a slit-scan); here mirrors laid on her own picture, which invent nothing. No text in the original (her name in option).
-    pitch: "Ta devanture, ta porte ou ta vitrine filmée bien droite, qui se démultiplie dans des miroirs et se recompose sans arrêt, puis redevient elle-même : une boucle qu'on regarde deux fois.",
+    // and a slit-scan); here mirrors laid on her own picture, which invent nothing: since v2 a true kaleidoscope (v1's
+    // sliding strips were « très moyen » for Tristan on a bookshop's front). No text in the original (her name in option).
+    pitch: "Ta devanture, ta porte ou ta vitrine filmée bien droite devient un kaléidoscope : huit miroirs s'ouvrent en cercle depuis son milieu, tournent et la recomposent en rosaces de ses propres couleurs, puis elle redevient elle-même : une boucle qu'on regarde deux fois.",
     needs: "une vidéo fixe et bien de face (ou une photo bien droite) de ta porte, ta devanture, ta vitrine, une étagère ou ton présentoir, sans personne qui passe devant",
     files: [1, 3],
     // Its name, in option, in big capitals of a high-contrast serif, a thin spaced line under it (font-pairs.ts, « didone »).
@@ -2081,21 +2082,21 @@ export const HOUSE_MODELS: HouseModel[] = [
     look: {
       name: "devanture en kaléidoscope",
       format: "autre",
-      hook: { kind: "mystère", what: "sa devanture ou sa vitrine filmée bien droite, de face, qui se met à se dédoubler dans des miroirs dès la première seconde" },
+      hook: { kind: "mystère", what: "sa devanture ou sa vitrine filmée bien droite, de face, où un kaléidoscope s'ouvre en cercle depuis son milieu dès la première seconde" },
       text: {
         amount: "aucun",
-        composition: "aucun texte dans l'original ; son nom en option, en grandes capitales centrées au-dessus de sa chose quand les miroirs se referment, une petite ligne en capitales espacées dessous",
+        composition: "aucun texte dans l'original ; son nom en option, en grandes capitales centrées au-dessus de la rosace où le kaléidoscope se retire, sur sa vraie image, une petite ligne en capitales espacées dessous",
         case: "upper",
         weight: "bold",
         tracking: "wide",
       },
-      layout: "un seul plan fixe plein cadre, de face ; des miroirs verticaux qui glissent sur sa chose (ou une rosace qui tourne en son milieu), le reste de l'image vrai autour",
+      layout: "un seul plan fixe plein cadre vertical, de face ; un kaléidoscope de huit miroirs qui remplit sa chose (ou une rosace ronde en son milieu, ou des miroirs verticaux qui glissent), le reste de l'image vrai autour",
       moments: [
         { at: 0, what: "sa chose vraie, de face, deux images" },
-        { at: 0.07, what: "des miroirs verticaux se posent sur elle et s'écartent : elle se dédouble en copies plus étroites, vite puis plus doucement, entière à 1,56 s" },
-        { at: 1.56, what: "les miroirs glissent sans arrêt, jamais sur le temps : sa chose se recompose en continu, ses motifs se referment en losanges et en étoiles aux lignes des miroirs, le reste de l'image vrai autour" },
-        { at: 6.18, what: "son nom en option, en grandes capitales centrées au-dessus de sa chose, sa petite ligne dessous" },
-        { at: 7.4, what: "les miroirs se referment, lentement puis plus vite ; sa vraie image revient à 8,5 s" },
+        { at: 0.07, what: "un kaléidoscope de huit miroirs s'ouvre en cercle depuis le milieu de sa chose, vite puis plus doucement, jusqu'à la remplir à 1,56 s" },
+        { at: 1.56, what: "il tourne et se recompose à chaque image, jamais sur le temps : des rosaces de ses propres couleurs, ses lettres devenues des motifs, le reste de l'image vrai autour" },
+        { at: 6.18, what: "son nom en option : le kaléidoscope se retire dans une rosace ronde au milieu, son nom en grandes capitales au-dessus, sur sa vraie image, sa petite ligne dessous" },
+        { at: 7.4, what: "la rosace se referme, lentement puis plus vite ; sa vraie image revient à 8,5 s" },
         { at: 8.5, what: "sa chose vraie, comme à la première image : la boucle" },
       ],
       camera: "fixe",

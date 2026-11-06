@@ -15,17 +15,25 @@ import { beatSpans, toFrame, type MontageSkill } from "../skills.ts";
 //   17,51 – 18,51 the real picture, its last image like its first: the loop.
 // Here on her thing, filmed straight on (her door, her front, her window, a shelf, a display: named by the filler, else
 // her whole picture), with mirrors laid on her real image, which invent nothing (the original's door re-made by an AI is
-// not done: docs/outils-video.md): its « battants » (the default), parallel vertical mirrors whose spacing and place
-// slide all along, so her thing stays upright and doubles into narrower copies, its patterns closing into diamonds and
-// stars at the mirror lines, as the original's leaves and panes; or its « rosace », a round kaleidoscope of eight mirrored
-// wedges on its middle that turns 11,25 degrees a beat as the original's fanlight (her flowers, her fabrics, her cakes
-// seen from above make mandalas). The mirrors stay inside her thing's outline when it was found, the rest of her picture
-// real around it, as the original's stone. Its words: none in the original; her name (optional) when the mirrors start
-// to close, a small line under it, set in the calm part of her picture; her ending card in their place after. A longer
-// Reel she asks for adds a verse: one more of her things, in its mirrors, eight beats. Her photo stays still (only the
-// mirrors move), her video plays. Vertical full frame as the original when her file is upright; a horizontal one
-// cropped on her thing when it fits, else whole in a 16:9 band on black (Tristan: « format par défaut [comme ses
-// vidéos], et changement à la demande du user »).
+// not done: docs/outils-video.md). Its « kaléidoscope » (the default since v2): eight mirrored wedges round her thing's
+// middle, each the same cone of her picture taken along her thing (one in two mirrored: no seam), in a circle that opens
+// from its middle until it fills her thing (fast then slower), the whole figure turning 11,25 degrees a beat as the
+// original's fanlight while its cone slides along her thing and comes closer and farther on slow swells, so it re-forms
+// at every image and never comes back the same; then it closes back to her real picture for the loop. Its « rosace »: the
+// same, held in a round window in her thing's middle, the rest real around it. Its « battants » (v1's default): parallel
+// vertical mirrors whose spacing and place slide all along, her thing upright, doubling into narrower copies, as the
+// original's leaves. v1's battants on a bookshop's front seen from across the street, at the production bench (6
+// November), were « très moyen » (Tristan): two or three wide strips of the same front, its name reversed on its sign,
+// the bicycles and a passer-by doubled, barely an effect, and nothing else for 9 s; a kaleidoscope's wedges are small
+// enough that her sign's letters become ornament, its cone takes only her thing, and it changes at every image. The
+// mirrors stay inside her thing's outline when it was found, the rest of her picture real around it, as the original's
+// stone. Its words: none in the original; her name (optional) when the mirrors start to close, a small line under it,
+// set above her thing when there is room, else in the calm part of her picture, its colour from the light of what is
+// under it (her cone, while the mirrors are there); her ending card in their place after. A longer Reel she asks for
+// adds a verse: one more of her things, in its mirrors, eight beats. Her photo stays still (only the mirrors move), her
+// video plays. Vertical full frame as the original, a horizontal file cropped on her thing (Tristan, 6 November:
+// vertical Reels by default; v1 laid a horizontal one whole in a band when her thing did not fit), whole in a 16:9 band
+// on black only on her word.
 
 const BPM = 123.4;
 /** Its first beat (the first kick), 0,345 s in, in beats from the Reel's start. */
@@ -65,7 +73,7 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const CLOSE = Math.max(FULL, mark("close", 222));
   const REAL = Math.max(CLOSE + 1, mark("real", 255));
   const TURN = mark("turn", 11.25);
-  const figure = setting("figure", "battants");
+  const figure = setting("figure", "kaleidoscope");
   const format = setting("format", "auto");
   const display = "'" + brand.displayFont + "', 'Inter Tight', sans-serif";
   const body = "'" + brand.bodyFont + "', 'Inter Tight', sans-serif";
@@ -95,36 +103,35 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
     return c ? { x: x / c, y: y / c, w: w / c, h: hh / c } : null;
   };
 
-  // 3. Its frame: her upright file full frame; a horizontal one cropped on her thing when it fits in the vertical frame,
-  // else whole on black in a 16:9 band (or as her words ask).
+  // 3. Its frame: vertical full frame (Tristan, 6 November: vertical Reels by default), her horizontal file cropped on her
+  // thing (else on its own middle); whole on black in a 16:9 band only on her word.
   const FRAME = { left: 0, top: 0, width, height };
   const BAND = { left: 0, top: Math.round((height - (width * 9) / 16) / 2), width, height: Math.round((width * 9) / 16) };
   const boxes = React.useMemo(() => shots.map((s, i) => {
     const aspect = Number(s.aspect) || 0.5625;
-    if (aspect <= 1.15) return format === "horizontal" ? BAND : FRAME;
     if (format === "horizontal") return BAND;
+    if (aspect <= 1.15) return FRAME;
     const wide = { left: 0, top: 0, width: Math.round(height * aspect), height };
     const seen = i === 0 ? thingIn(s.from + Math.round(s.durationInFrames / 2), wide) : null;
-    if (seen && (format === "vertical" || seen.w <= width * 0.92)) {
-      return { ...wide, left: Math.round(within(width / 2 - (seen.x + seen.w / 2), width - wide.width, 0)) };
-    }
-    return format === "vertical" ? FRAME : BAND;
+    if (seen) return { ...wide, left: Math.round(within(width / 2 - (seen.x + seen.w / 2), width - wide.width, 0)) };
+    return FRAME;
   }), [n, format, width, height]);
 
   // Where the mirrors are at a frame of a shot: her thing (its box; its outline to clip them to when it is whole in
   // the picture, a closed path) or her whole picture.
   const zoneOf = (i, f, box) => {
+    const L = Math.max(0, box.left), T = Math.max(0, box.top), R = Math.min(width, box.left + box.width), B = Math.min(height, box.top + box.height);
     if (i === 0) {
       const o = thingIn(f, box);
-      if (o && o.w >= box.width * 0.3 && o.h >= box.height * 0.2 && (o.w < box.width * 0.97 || o.h < box.height * 0.97)) {
-        const x0 = Math.max(box.left, o.x), x1 = Math.min(box.left + box.width, o.x + o.w);
-        const y0 = Math.max(box.top, o.y), y1 = Math.min(box.top + box.height, o.y + o.h);
+      if (o && o.w >= (R - L) * 0.3 && o.h >= (B - T) * 0.2 && (o.w < (R - L) * 0.97 || o.h < (B - T) * 0.97)) {
+        const x0 = Math.max(L, o.x), x1 = Math.min(R, o.x + o.w);
+        const y0 = Math.max(T, o.y), y1 = Math.min(B, o.y + o.h);
         const path = SubjectOutline(shots[0], f, box, "@devanture");
         const closed = typeof path === "string" && / Z\s*$/.test(path) && path.split("M").length === 2;
         if (x1 - x0 > 60 && y1 - y0 > 60) return { x: x0, y: y0, w: x1 - x0, h: y1 - y0, path: closed ? path : null };
       }
     }
-    return { x: box.left, y: box.top, w: box.width, h: box.height, path: null };
+    return { x: L, y: T, w: R - L, h: B - T, path: null };
   };
   const copy = (i, box, transform, origin) => h("div", { style: { position: "absolute", left: 0, top: 0, width, height, transform, transformOrigin: origin } }, h(Footage, { shot: i, style: box }));
 
@@ -156,39 +163,62 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
     return h("div", { key: "battants", style: { position: "absolute", left: 0, top: 0, width, height, ...(z.path ? { clipPath: "path('" + z.path + "')" } : {}) } }, strips);
   };
 
-  // 4b. Its rosace (the original's fanlight): eight wedges of 45 degrees around her thing's middle, each the same wedge of
-  // her picture (a little closer, x 1,15), mirrored one in two, turning 11,25 degrees a beat; a circle that opens from
-  // its middle as its force grows, inscribed in her thing (half the frame's width at most), and closes back the same way.
-  const rosace = (i, f, box, z, s) => {
+  // 4b. Its kaleidoscope (the default) and its rosace: eight wedges of 45 degrees round her thing's middle, each the same
+  // cone of her picture, one in two mirrored (so they join without a seam). The cone starts on her thing's long axis
+  // (below its middle for an upright thing, pointing up; left of it for a wide one, pointing right) and never leaves her
+  // thing: as close as it must be for that (x 1,1 for her whole upright picture), and closer on a slow swell of 16 beats,
+  // sliding along her thing (12 beats) and a little across it (18); the whole figure turns 11,25 degrees a beat, as the
+  // original's fanlight. So it re-forms at every image and never comes back the same. In a circle that opens from its
+  // middle with its force until it fills her thing (the rosace: inscribed in it, the rest real around), and closes back.
+  const cone = (f, z, round) => {
     const b = (f - FIRST) / BEAT;
-    const S = 1.15;
-    const cx = z.x + z.w / 2;
-    const cy = z.y + z.h / 2;
-    const cover = S * Math.min(cx - box.left, box.left + box.width - cx, cy - box.top, box.top + box.height - cy);
-    const R = Math.max(1, Math.min(cover, width / 2, Math.min(z.w, z.h) / 2) * s);
-    const t0 = TURN * b - 22.5;
-    const at = (a) => (cx + 1.6 * R * Math.sin((a * Math.PI) / 180)).toFixed(1) + "px " + (cy - 1.6 * R * Math.cos((a * Math.PI) / 180)).toFixed(1) + "px";
+    const tall = z.h >= z.w;
+    const cx = z.x + z.w / 2, cy = z.y + z.h / 2;
+    const L0 = (tall ? z.h : z.w) / 2, Q0 = (tall ? z.w : z.h) / 2;
+    const back = 0.3 - 0.2 * Math.sin((2 * Math.PI * b) / 12);
+    const side = 0.12 * Math.sin((2 * Math.PI * b) / 18 + 0.8);
+    const sx = tall ? cx + side * Q0 : cx - back * L0;
+    const sy = tall ? cy + back * L0 : cy + side * Q0;
+    const need = round ? Math.min(z.w, z.h) / 2 : Math.hypot(z.w / 2, z.h / 2) + 2;
+    const reach = Math.min(L0 * (1 + back) - 4, (Q0 * (1 - Math.abs(side)) - 4) / Math.sin(Math.PI / 8));
+    const M = (need / Math.max(40, reach)) * (1.25 + 0.25 * Math.sin((2 * Math.PI * b) / 16 - Math.PI / 2));
+    return { cx, cy, sx, sy, M, need, beta: tall ? 0 : 90, turn: TURN * b, reach: need / M, tall };
+  };
+  // When her name comes in, the kaleidoscope draws back into its rosace in half a beat (her picture real again round it,
+  // her name on it), then closes as before.
+  const named = reelTexts.find((t) => t.role === "hook");
+  const rose = (f, z) => {
+    if (!named || f < named.from) return 0;
+    const p = within((f - named.from) / (BEAT / 2), 0, 1);
+    return p * p * (3 - 2 * p);
+  };
+  const kaleido = (i, f, box, z, s, round) => {
+    const c = cone(f, z, round);
+    const inscribed = Math.min(z.w, z.h) / 2;
+    const R = Math.max(1, (round ? c.need : c.need + (inscribed - c.need) * rose(f, z)) * s);
+    const far = 1.6 * c.need;
+    const at = (a) => (c.cx + far * Math.sin((a * Math.PI) / 180)).toFixed(1) + "px " + (c.cy - far * Math.cos((a * Math.PI) / 180)).toFixed(1) + "px";
     const wedges = [];
     for (let j = 0; j < 8; j++) {
-      const a0 = j * 45 - 0.6;
-      const a1 = (j + 1) * 45 + 0.6;
-      const m = ((j + 1) * 45 + t0) / 2;
-      const turn = j % 2 ? "rotate(" + m.toFixed(2) + "deg) scaleX(-1) rotate(" + (-m).toFixed(2) + "deg) scale(" + S + ")" : "rotate(" + (j * 45 - t0).toFixed(2) + "deg) scale(" + S + ")";
-      wedges.push(h("div", { key: "r" + j, style: { position: "absolute", left: 0, top: 0, width, height, clipPath: "polygon(" + cx.toFixed(1) + "px " + cy.toFixed(1) + "px, " + at(a0) + ", " + at((a0 + a1) / 2) + ", " + at(a1) + ")" } },
-        copy(i, box, turn, cx.toFixed(1) + "px " + cy.toFixed(1) + "px")));
+      const a = c.turn + j * 45 + 22.5;
+      const move = "translate(" + c.cx.toFixed(1) + "px, " + c.cy.toFixed(1) + "px) rotate(" + a.toFixed(2) + "deg)" + (j % 2 ? " scaleX(-1)" : "") + " scale(" + c.M.toFixed(4) + ") rotate(" + -c.beta + "deg) translate(" + (-c.sx).toFixed(1) + "px, " + (-c.sy).toFixed(1) + "px)";
+      wedges.push(h("div", { key: "k" + j, style: { position: "absolute", left: 0, top: 0, width, height, clipPath: "polygon(" + c.cx.toFixed(1) + "px " + c.cy.toFixed(1) + "px, " + at(a - 23.1) + ", " + at(a) + ", " + at(a + 23.1) + ")" } }, copy(i, box, move, "0 0")));
     }
-    return h("div", { key: "rosace", style: { position: "absolute", left: 0, top: 0, width, height, clipPath: "circle(" + R.toFixed(1) + "px at " + cx.toFixed(1) + "px " + cy.toFixed(1) + "px)" } }, wedges);
+    const iris = h("div", { key: "iris", style: { position: "absolute", left: 0, top: 0, width, height, clipPath: "circle(" + R.toFixed(1) + "px at " + c.cx.toFixed(1) + "px " + c.cy.toFixed(1) + "px)" } }, wedges);
+    const clip = z.path ? "path('" + z.path + "')" : "inset(" + Math.round(z.y) + "px " + Math.round(width - z.x - z.w) + "px " + Math.round(height - z.y - z.h) + "px " + Math.round(z.x) + "px)";
+    return h("div", { key: round ? "rosace" : "kaleidoscope", style: { position: "absolute", left: 0, top: 0, width, height, clipPath: clip } }, iris);
   };
 
   const box = cur >= 0 ? boxes[cur] : FRAME;
   const real = cur >= 0 ? h(Footage, { key: "real", shot: cur, style: box }) : null;
   const zone = cur >= 0 ? zoneOf(cur, frame, box) : null;
-  const mirrors = cur >= 0 && k > 0.002 ? (figure === "rosace" ? rosace(cur, frame, box, zone, k) : battants(cur, frame, box, zone, k)) : null;
+  const mirrors = cur >= 0 && k > 0.002 ? (figure === "battants" ? battants(cur, frame, box, zone, k) : kaleido(cur, frame, box, zone, k, figure === "rosace")) : null;
 
   // 5. Her words (none in the original): her name from beat 12, the mirrors closing under it, a small line in spaced
   // capitals under it, both centred on the frame; her ending card in their place after. Over her picture left real
   // above her thing when there is room (a sign over a door), else in the calm part of her last picture (its sky first,
-  // else a plain wall), else in its upper part; each white with a soft shadow, an ink where her picture is bright.
+  // else a plain wall), else in its upper part; each white with a soft shadow, an ink where what is under it is bright:
+  // her picture, or, over her kaleidoscope, the cone of her picture it is made of, read when her name comes in.
   const hook = reelTexts.find((t) => t.role === "hook");
   const line = reelTexts.find((t) => t.role === "caption");
   const card = end && frame >= endAt;
@@ -203,10 +233,12 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const place = React.useMemo(() => {
     const thing = n ? zoneOf(last, from, lastBox) : null;
     // Right above it, like a sign on its lintel: its line just over it, her name over its line.
-    const room = thing && thing.h < lastBox.height ? thing.y - 16 - top0 : 0;
+    // (Above its rosace for a kaleidoscope: it draws back into it when her name comes in.)
+    const roof = thing && figure !== "battants" ? thing.y + thing.h / 2 - Math.min(thing.w, thing.h) / 2 : thing ? thing.y : 0;
+    const room = thing && (thing.h < lastBox.height || figure !== "battants") ? roof - 16 - top0 : 0;
     if (room >= 220) {
-      const tall = Math.min(170, room - 90);
-      return { x: 140, y: Math.round(thing.y - 16 - 90 - tall), w: 800, h: Math.round(tall) };
+      const tall = Math.min(230, room - 90);
+      return { x: 140, y: Math.round(roof - 16 - 90 - tall), w: 800, h: Math.round(tall) };
     }
     const c = n ? ClearBox(shots[last], from, lastBox, { aspect: 3.6, min: 420, max: 900, prefer: "top", pad: 24, fallback }) : null;
     const p = c || fallback;
@@ -215,10 +247,18 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
     return { x: Math.round(width / 2 - w / 2), y: Math.round(y), w: Math.round(w), h: Math.round(Math.min(220, Math.max(150, p.h))) };
   }, [n, from, last]);
   const lineTop = place.y + place.h + 14;
+  const lastZone = React.useMemo(() => (n ? zoneOf(last, from, lastBox) : null), [n, from, last]);
   const inkOn = (b) => {
-    const light = n ? LightUnder(shots[last], frame, lastBox, b) : null;
+    const z = lastZone;
+    // Over its rosace (where it draws back to once her name is in): the light of the cone it is made of.
+    const r = z ? Math.min(z.w, z.h) / 2 : 0;
+    const over = figure !== "battants" && z && force(from) > 0.3 && b.x < z.x + z.w / 2 + r && b.x + b.w > z.x + z.w / 2 - r && b.y < z.y + z.h / 2 + r && b.y + b.h > z.y + z.h / 2 - r;
+    const c = over ? cone(from, z, figure === "rosace") : null;
+    const q = c ? c.reach * Math.sin(Math.PI / 8) : 0;
+    const under = c ? (c.tall ? { x: c.sx - q, y: c.sy - c.reach, w: 2 * q, h: c.reach } : { x: c.sx, y: c.sy - q, w: c.reach, h: 2 * q }) : b;
+    const light = n ? LightUnder(shots[last], c ? from : frame, lastBox, under) : null;
     const bright = light && light.mean > 0.6;
-    return { color: bright ? "#1c1a17" : "#ffffff", textShadow: bright ? "0 2px 18px rgba(255,255,255,0.55)" : "0 3px 22px rgba(0,0,0,0.55), 0 1px 3px rgba(0,0,0,0.5)" };
+    return { color: bright ? "#1c1a17" : "#ffffff", textShadow: bright ? "0 2px 18px rgba(255,255,255,0.55)" : "0 2px 5px rgba(0,0,0,0.55), 0 4px 34px rgba(0,0,0,0.6)" };
   };
   const shownAt = card ? endAt : hook ? hook.from : endAt;
   const appear = (delay) => within((frame - shownAt - delay) / 9, 0, 1);
@@ -231,7 +271,7 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   if (sub) {
     const a = appear(6);
     words.push(h(FitText, { key: "s-" + sub, style: { position: "absolute", left: 140, top: lineTop, width: 800, height: 76, opacity: a },
-      innerStyle: { fontFamily: body, fontWeight: 500, fontSize: 48, lineHeight: 1.1, letterSpacing: "0.28em", textTransform: "uppercase", ...inkOn({ x: 140, y: lineTop, w: 800, h: 76 }), textAlign: "center", whiteSpace: "nowrap" } },
+      innerStyle: { fontFamily: body, fontWeight: 500, fontSize: 48, lineHeight: 1.1, letterSpacing: "0.12em", textTransform: "uppercase", ...inkOn({ x: 140, y: lineTop, w: 800, h: 76 }), textAlign: "center", whiteSpace: "nowrap" } },
       h("span", { "data-fauve-accent": "" }, sub)));
   }
   // Any other text of the Reel (none in its slots): a plain line under hers, so nothing she wrote is lost.
@@ -243,13 +283,13 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
 
 export const vitraux: MontageSkill = {
   key: "vitraux",
-  version: 1,
+  version: 2,
   bpm: BPM,
   shots: [1, 1],
   files: [1, 3],
   // A verse a shot: one more of her things in its mirrors, eight beats each, for a longer Reel she asks for.
   long: 3,
-  how: "Un seul plan fixe de sa chose la plus graphique, filmée bien droite et de face (sa porte, sa devanture, sa vitrine, une étagère, son présentoir) : sa vraie image deux images, puis des miroirs posés sur elle qui glissent sans arrêt, sa chose qui se dédouble en copies plus étroites et se recompose en motifs symétriques, le reste de l'image vrai autour (ou, en rosace, un kaléidoscope rond qui tourne en son milieu) ; puis tout se referme et sa vraie image revient pour boucler. Son nom facultatif pendant que les miroirs se referment. En vertical plein écran ; sa vidéo horizontale recadrée sur sa chose, ou entière dans une bande 16:9 sur du noir.",
+  how: "Un seul plan fixe de sa chose la plus graphique, filmée bien droite et de face (sa porte, sa devanture, sa vitrine, une étagère, son présentoir) : sa vraie image deux images, puis un vrai kaléidoscope de huit miroirs posé sur elle, qui s'ouvre en cercle depuis son milieu jusqu'à la remplir, tourne lentement et se recompose à chaque image (des rosaces de ses propres couleurs, ses lettres devenues des motifs), le reste de l'image vrai autour ; puis il se referme et sa vraie image revient pour boucler. Son nom facultatif pendant qu'il se referme. En vertical plein écran, sa vidéo horizontale recadrée sur sa chose.",
   end: true,
   texts: [
     {
@@ -270,18 +310,18 @@ export const vitraux: MontageSkill = {
   settings: [
     {
       name: "figure",
-      want: "la figure des miroirs : des battants qui glissent comme l'original (sa chose reste debout et se dédouble), ou une rosace ronde qui tourne au milieu, comme un vitrail",
+      want: "la figure des miroirs : un kaléidoscope qui remplit sa chose, une rosace ronde au milieu, le reste vrai autour, ou des battants qui glissent (sa chose reste debout et se dédouble)",
       choices: [
+        { value: "kaleidoscope", says: "un kaléidoscope de huit miroirs qui s'ouvre en cercle depuis le milieu de sa chose jusqu'à la remplir, tourne et se recompose à chaque image, puis se referme" },
+        { value: "rosace", says: "le même kaléidoscope dans une rosace ronde au milieu de sa chose, le reste de sa chose vrai autour : un vitrail de ses couleurs (fleurs, tissus, gâteaux, assiettes vues d'en haut)" },
         { value: "battants", says: "des miroirs verticaux qui glissent : sa chose reste debout, se dédouble en copies plus étroites et se recompose, comme les battants de l'original" },
-        { value: "rosace", says: "une rosace de huit miroirs au milieu de sa chose, qui s'ouvre, tourne lentement et se referme : un vitrail de ses couleurs (fleurs, tissus, gâteaux, assiettes vues d'en haut)" },
       ],
     },
     {
       name: "format",
-      want: "le format : vertical plein écran comme l'original, ou sa vidéo horizontale entière dans une bande 16:9 sur du noir",
+      want: "le format : vertical plein écran, ou sa vidéo horizontale entière dans une bande 16:9 sur du noir",
       choices: [
-        { value: "auto", says: "comme son fichier (une vidéo horizontale recadrée sur sa chose si elle tient dans le cadre, sinon entière sur du noir)" },
-        { value: "vertical", says: "vertical plein écran, sa vidéo horizontale recadrée sur sa chose" },
+        { value: "auto", says: "vertical plein écran comme l'original, sa vidéo horizontale recadrée sur sa chose" },
         { value: "horizontal", says: "sa vidéo entière dans une bande 16:9 sur du noir, les miroirs dans la bande" },
       ],
     },
@@ -290,7 +330,7 @@ export const vitraux: MontageSkill = {
     {
       slot: "devanture",
       shot: 0,
-      want: "la chose graphique de son plan où se posent les miroirs, en deux à quatre mots : sa porte, sa devanture, sa vitrine, une étagère, son présentoir, son comptoir (« front door », « shop front », « shop window », « bookshelf », « display case », « flower display ») ; vide quand elle remplit déjà presque toute l'image (les miroirs la prennent toute)",
+      want: "la chose graphique de son plan où se posent les miroirs, en deux à quatre mots : sa porte, sa devanture, sa vitrine, une étagère, son présentoir, son comptoir (« front door », « shop front », « shop window », « bookshelf », « display case », « flower display ») ; la partie la plus riche quand son plan la montre de loin (« shop window » plutôt que « shop front » quand la rue est devant) ; vide quand elle remplit déjà presque toute l'image (les miroirs la prennent toute)",
     },
   ],
   timeline(n, { end, bpm: tempo }) {
@@ -315,7 +355,7 @@ export const vitraux: MontageSkill = {
         ...s,
         want:
           i === 0
-            ? `sa chose la plus graphique, filmée bien droite et de face, téléphone posé, sans personne qui passe devant (sa porte ou sa devanture dans son encadrement, sa vitrine, une étagère bien rangée, son présentoir, ses tissus, ses livres, un bouquet de face) ; sinon son plan le plus fixe et le plus droit de son lieu ou de ses produits, ou une photo bien droite ; ${length(s)} s de vidéo, ou une photo (des miroirs glissent dessus, elle reste immobile)`
+            ? `sa chose la plus graphique, filmée bien droite et de face, téléphone posé, sans personne qui passe devant (sa porte ou sa devanture dans son encadrement, sa vitrine, une étagère bien rangée, son présentoir, ses tissus, ses livres, un bouquet de face), plutôt de près et pleine de détails et de couleurs (une vitrine pleine, des rangées, des motifs) que de loin avec la rue, des voitures ou des vélos devant ; sinon son plan le plus fixe et le plus droit de son lieu ou de ses produits, ou une photo bien droite ; ${length(s)} s de vidéo, ou une photo (un kaléidoscope de ses miroirs se pose dessus, elle reste immobile)`
             : `une autre de ses choses graphiques, filmée de face et fixe (une autre vitrine, une étagère, un présentoir, un détail plein de lignes), ${length(s)} s, ou une photo : elle arrive coupée sur le temps, déjà dans les miroirs`,
       })),
       // Her name from beat 12 (the mirrors still turning, then closing under it), her line with it, to the end or the card.
