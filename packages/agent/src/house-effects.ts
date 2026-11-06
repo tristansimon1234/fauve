@@ -37,7 +37,7 @@ export const HOUSE_EFFECTS: Record<string, HouseEffect> = {
     il_faut: "beaucoup de photos de son travail en série (une vingtaine), et une phrase de 2 à 4 mots courts",
   },
   "mon-travail": {
-    effet: "la personne détourée debout dans son lieu, ses mots en très grand derrière elle (elle passe devant leurs lettres), les photos de son travail posées en rafale derrière",
+    effet: "la personne détourée debout dans son lieu, ses mots en très grand derrière elle quand ils s'y lisent, sinon à côté d'elle, les photos de son travail en rafale autour d'elle",
     il_faut: "une photo ou une vidéo de quelqu'un debout face à l'objectif, téléphone posé, et une quinzaine de photos de son travail",
   },
   "photo-dump": {

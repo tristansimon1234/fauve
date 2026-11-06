@@ -15,9 +15,11 @@ import type { EffectPiece, PieceTimeline } from "../pieces.ts";
 // pale tint of it, its clicks and its knock (on the landings, as they slow down). What it leaves: the Reel's own length
 // (its stays of 8 beats become what the span holds), its ending card. Its music (v2): without its bass after the hit, to
 // the cut, as its skill's; its clicks one burst, however many. Its words' colour
-// is dosed on the light of her shot under them (LightUnder): a deep one on a light place, a pale tint on a dark one;
-// unread, hers as the skill draws it. A work behind her that her silhouette would hide for the most part moves toward
-// the nearer side (a wide figure hid most of them); without her cut-out, her works keep off her face, or off the middle.
+// is chosen against the light of her shot under each line (LightUnder): hers when it reads, else a pale or deep tint of
+// it, else white or ink with a firm edge (v4); unread, hers as the skill draws it, white over her body. Her words behind
+// her only when every line still reads there, else beside or above her where her shot is calm (ClearBox), else over her
+// under her face. A work behind her that her silhouette would hide for the most part moves toward the nearer side, else
+// comes in front of her below her chin; without her cut-out, her works keep off her face, or off the middle.
 
 /** The first work lands at the original's image 3 (beats); the burst after it at its cadence (beats a landing). */
 const FIRST = 0.2;
@@ -116,14 +118,25 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const herShot = h(Footage, { key: "her", shot: her, at: HOLD, style: full });
   const cutOut = h(Subject, { key: "cut", shot: her, at: HOLD, style: full });
 
-  // 2. Where she is, read once on her first image: her outline (her cut-out's), and her face as tracked, else her head
-  // at the top of that outline (as wide as it within 7 % of the frame under its top, 1,3 times as tall), else at the top
-  // of its box.
+  // 2. Where she is, read once on her first image: her outline (her cut-out's), where it crosses a row, and her face as
+  // tracked, else her head from her outline's top, four fifths as wide as she is 6 % under it, down to her shoulders (1,8
+  // times as wide) or 1,35 times its width (v4: a florist's curls, her chin was under her words), else her cut-out's box.
   const cutBox = SubjectBox(herInfo, still, laid);
   const outline = cutBox ? SubjectOutline(herInfo, still, laid) : null;
   const nums = outline ? String(outline).match(/-?\d+(?:\.\d+)?/g) : null;
   const pts = [];
   if (nums && nums.length >= 12) for (let i = 0; i + 1 < nums.length; i += 2) pts.push([Number(nums[i]), Number(nums[i + 1])]);
+  const crossings = (y) => {
+    const xs = [];
+    for (let i = 0; i < pts.length; i++) {
+      const p = pts[i];
+      const q = pts[(i + 1) % pts.length];
+      if ((p[1] <= y) !== (q[1] <= y)) xs.push(p[0] + ((y - p[1]) * (q[0] - p[0])) / (q[1] - p[1]));
+    }
+    return xs.sort((u, v) => u - v);
+  };
+  const extent = (y) => { const xs = pts.length >= 6 ? crossings(y) : []; return xs.length >= 2 ? [xs[0], xs[xs.length - 1]] : null; };
+  const headTop = pts.length >= 6 ? Math.min.apply(null, pts.map((p) => p[1])) : cutBox ? cutBox.y : 0;
   const face = (() => {
     if (typeof track === "function") {
       const got = track(still, { shot: her, left: 0, top: 0, width, height }) || {};
@@ -133,13 +146,16 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
         return { x: f.x - f.width / 2, y: f.y - f.height / 2, w: f.width, h: f.height };
       }
     }
-    if (pts.length >= 6) {
-      const top = Math.min.apply(null, pts.map((p) => p[1]));
-      const xs = pts.filter((p) => p[1] <= top + height * 0.07).map((p) => p[0]);
-      const lo = Math.min.apply(null, xs);
-      const hi = Math.max.apply(null, xs);
-      const w = Math.max(height * 0.05, Math.min(height * 0.16, hi - lo));
-      return { x: (lo + hi) / 2 - w / 2, y: top, w, h: Math.min(height * 0.2, w * 1.3) };
+    const e0 = extent(headTop + height * 0.06) || extent(headTop + height * 0.02);
+    if (e0) {
+      const w0 = Math.max(1, e0[1] - e0[0]);
+      let chin = headTop + Math.min(height * 0.28, 1.35 * w0);
+      for (let y = headTop + height * 0.08; y < chin; y += height * 0.01) {
+        const e = extent(y);
+        if (e && e[1] - e[0] >= 1.8 * w0) { chin = y - height * 0.01; break; }
+      }
+      const w = Math.max(height * 0.05, Math.min(height * 0.3, 0.8 * w0));
+      return { x: (e0[0] + e0[1]) / 2 - w / 2, y: headTop, w, h: Math.max(height * 0.06, chin - headTop) };
     }
     if (cutBox && cutBox.w > 0 && cutBox.h > 0) {
       const hh = Math.min(cutBox.h / 5.5, cutBox.w / 2, height * 0.16);
@@ -168,21 +184,15 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const PS = [29.4, 25.9, 44, 35.1, 35.6, 37.7, 33.9, 37.6, 40.8, 31.6, 37.7, 37.6, 35.1, 28.6, 34.2, 29.8, 35.7, 27.7, 31.5, 37.4, 37.4, 38.9, 41.5, 33.8, 33.8, 27.5, 42.2, 31.5, 31.6, 31.5, 31.5, 31.5, 31.4, 35.8, 35.1, 32.5, 33.5];
   const along = (arr, t) => { const x = t * (arr.length - 1); const i = Math.max(0, Math.min(arr.length - 2, Math.floor(x))); return arr[i] + (arr[i + 1] - arr[i]) * (x - i); };
   const grow = Math.max(0.9, Math.min(1.25, Math.sqrt(37 / Math.max(1, m))));
-  // How much of a box her silhouette hides (her outline, sampled on an 8 × 8 grid): a work behind her is moved toward
-  // the nearer side, a step at a time, until most of it shows, its zigzag kept (a wide figure hid most of them).
-  const inside = (x, y) => {
-    let c = false;
-    for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
-      const [xi, yi] = pts[i];
-      const [xj, yj] = pts[j];
-      if (yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) c = !c;
-    }
-    return c;
-  };
+  // How much of a box her silhouette hides (her outline on 8 × 8 points): a work behind her moves toward the nearer
+  // side until most of it shows (a wide figure hid most of them).
   const hidden = (b) => {
     if (pts.length < 6) return 0;
     let n = 0;
-    for (let i = 0; i < 8; i++) for (let j = 0; j < 8; j++) if (inside(b.x + ((i + 0.5) * b.w) / 8, b.y + ((j + 0.5) * b.h) / 8)) n++;
+    for (let j = 0; j < 8; j++) {
+      const xs = crossings(b.y + ((j + 0.5) * b.h) / 8);
+      for (let i = 0; i < 8; i++) { const x = b.x + ((i + 0.5) * b.w) / 8; if (xs.filter((v) => v < x).length % 2) n++; }
+    }
     return n / 64;
   };
   const format = setting("format", "carre");
@@ -226,7 +236,8 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
         cx = Math.max(width * 0.02 + w / 2, Math.min(width * 0.98 - w / 2, cx));
       }
     }
-    boxes[k] = { x: Math.round(cx - w / 2), y: Math.round(cy - hh / 2), w, h: hh };
+    const b = { x: Math.round(cx - w / 2), y: Math.round(cy - hh / 2), w, h: hh };
+    boxes[k] = { ...b, seen: 1 - hidden(b) };
     return boxes[k];
   };
   const work = (k) => {
@@ -237,16 +248,10 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
       h(Footage, { shot: works[k], at: lands[k], style: { left: 0, top: 0, width: b.w, height: b.h } }));
   };
   // The last ones over her legs, in front of her; never over her face (then behind her).
-  const inFront = (k) => k >= FRONT && !(face && overlap(boxOf(k), face) > 0.1 * face.w * face.h);
-  const behind = [];
-  const before = [];
-  for (let k = 0; k < m; k++) (inFront(k) ? before : behind).push(work(k));
+  const legs = (k) => k >= FRONT && !(face && overlap(boxOf(k), face) > 0.1 * face.w * face.h);
 
-  // 5. Her words, behind her from its first image to its last (her cut-out over their letters, the works behind her under
-  // them; without her cut-out, in front of her), kept above the works over her legs: one a line, all at one size (one box shrinks
-  // them together for a long word), wide bold capitals as tall as the original's (a line every 13,4 % of the frame),
-  // centred. More than four words: four lines at most, the longest as short as can be, never a line ending on a word
-  // that belongs to the next.
+  // 5. Her words from its first image to its last: one a line, at one size, the original's capitals (a line every 13,4 %
+  // of the frame); four lines at most, none ending on a word of the next.
   const display = "'" + brand.displayFont + "', 'Inter Tight', 'Helvetica Neue', 'Arial', sans-serif";
   const SHORT = /^(le|la|les|de|du|des|un|une|à|au|aux|en|et|ou|par|pour|sur|chez|mon|ma|mes|ton|ta|tes|son|sa|ses|the|a|an|of|my|is|on)$/i;
   const lines = (text) => {
@@ -267,9 +272,6 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
     return best.groups.map((g) => g.join(" "));
   };
   const said = lines(texts && texts.mots);
-  // Its colour: hers, deepened when pale, on a light place (a soft light halo keeping it on a darker work); a pale and
-  // vivid tint of hers on a dark place (as the original's pale acid lime reads on a sunny street), with a thin dark
-  // edge and a soft shadow. The place is read under the words on her shot (LightUnder); unread, hers.
   const rgb = (c) => { const x = /^#?([0-9a-f]{6})$/i.exec(String(c || "")); if (!x) return null; const v = parseInt(x[1], 16); return [(v >> 16) & 255, (v >> 8) & 255, v & 255]; };
   const lin = (s) => { const v = s / 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); };
   const lum = (c) => 0.2126 * lin(c[0]) + 0.7152 * lin(c[1]) + 0.0722 * lin(c[2]);
@@ -303,35 +305,18 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
     return null;
   };
   const TOP = Math.round(height * 0.205);
-  // Its bottom above the works in front of her legs (drawn over her, so over her words), down to four fifths of its height.
+  // Its box: 20,5 to 74,5 % of the frame, x 140 to 940, above the works over her legs (down to four fifths of it).
   const lowest = Math.round(height * 0.745);
-  const fronts = Array.from({ length: m }, (_, k) => k).filter(inFront);
+  const fronts = Array.from({ length: m }, (_, k) => k).filter(legs);
   const frontTop = fronts.length ? Math.min.apply(null, fronts.map((k) => boxOf(k).y)) - Math.round(height * 0.01) : lowest;
   const BOTTOM = Math.max(Math.round(TOP + 0.8 * (lowest - TOP)), Math.min(lowest, frontTop));
-  const light = LightUnder(herInfo, still, laid, { x: 140, y: TOP, w: width - 280, h: BOTTOM - TOP });
-  const asked = setting("couleur", "auto");
-  const pale = asked === "pale" || (asked === "auto" && light && Number(light.mean) < 0.42);
-  const COLOR = pale ? tone(own, (k) => 0.55 + 0.45 * k, (l) => l >= 0.6) || "#ffffff" : lum(own) > 0.3 ? tone(own, (k) => 0.5 - 0.5 * k, (l) => l <= 0.22) || "#161616" : hex(own);
-  const edge = pale ? "0 0 1px rgba(0,0,0,0.55), 0 0 2px rgba(0,0,0,0.3), 0 3px 16px rgba(0,0,0,0.28)" : "0 0 2px rgba(255,255,255,0.5), 0 2px 10px rgba(255,255,255,0.25)";
   const SIZE = Math.round(height * 0.1);
   const LINE = Math.round(height * 0.134);
-  const wordStyle = { fontFamily: display, fontWeight: 700, fontSynthesis: "none", fontSize: SIZE, lineHeight: LINE + "px", height: LINE, letterSpacing: "-0.01em", color: COLOR, whiteSpace: "nowrap", textAlign: "center", textShadow: edge };
-  // Its box: four lines from 20,5 to 74,5 % of the frame (kept above the apps' caption, between x 140 and 940); moved
-  // below her face, else above it, when one of its lines would cross it (its widths told from its letters at the size the
-  // box gives them: her face beside a short word stays, as in the original), shrinking to two fifths of its height at most.
   const BOX_W = width - 280;
   const glyph = (ch) => (/[IÎÏ1!.,:;' ]/.test(ch) ? 0.3 : /J/.test(ch) ? 0.52 : /[MWÆŒ]/.test(ch) ? 0.88 : /[EFLTZ]/.test(ch) ? 0.58 : 0.68);
-  const crosses = (list, top, bottom) => {
-    if (!face || !list.length) return false;
-    const widths = list.map((l) => Array.from(l).reduce((a, ch) => a + glyph(ch), 0) * SIZE * 0.99);
-    const s = Math.min(1, BOX_W / Math.max(1, Math.max.apply(null, widths)), (bottom - top) / (list.length * LINE));
-    const mid = (top + bottom) / 2;
-    const near = { x: face.x - height * 0.01, y: face.y - height * 0.01, w: face.w + height * 0.02, h: face.h + height * 0.02 };
-    return list.some((l, i) => {
-      const cy = mid + (i - (list.length - 1) / 2) * LINE * s;
-      return overlap({ x: width / 2 - (widths[i] * s) / 2, y: cy - 0.38 * SIZE * s, w: widths[i] * s, h: 0.76 * SIZE * s }, near) > 0;
-    });
-  };
+  const near = face ? { x: face.x - height * 0.01, y: face.y - height * 0.01, w: face.w + height * 0.02, h: face.h + height * 0.02 } : null;
+  const crosses = (list, top, bottom) => !!face && list.length > 0 && laidLines(list, top, bottom).some((b) => overlap(b, near) > 0);
+  // Off her face: below it, else above it (shrunk to two fifths at most).
   const placeFor = (list) => {
     if (!crosses(list, TOP, BOTTOM)) return { top: TOP, bottom: BOTTOM };
     const gap = Math.round(height * 0.02);
@@ -342,19 +327,10 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
     if (above - roof >= 0.4 * (BOTTOM - TOP)) return { top: roof, bottom: above };
     return { top: TOP, bottom: BOTTOM };
   };
-  // Behind her, each line only where it still reads (a third of it hidden at most, measured on her outline at three
-  // heights of its capitals, else on her cut-out's box), else in front of her (a short word across her body would be
-  // swallowed whole); its block slid up or down the frame to where the most of its lines read behind her (a fiftieth of
-  // it a step, each step weighing a twentieth of a line), a line in front never on her face.
+  // A line reads behind her with a third of it hidden at most (her outline at three heights of its capitals, else her box).
   const across = (y, x0, x1) => {
     if (pts.length >= 6) {
-      const xs = [];
-      for (let i = 0; i < pts.length; i++) {
-        const p = pts[i];
-        const q = pts[(i + 1) % pts.length];
-        if ((p[1] <= y) !== (q[1] <= y)) xs.push(p[0] + ((y - p[1]) * (q[0] - p[0])) / (q[1] - p[1]));
-      }
-      xs.sort((u, v) => u - v);
+      const xs = crossings(y);
       let c = 0;
       for (let i = 0; i + 1 < xs.length; i += 2) c += Math.max(0, Math.min(x1, xs[i + 1]) - Math.max(x0, xs[i]));
       return c;
@@ -362,49 +338,135 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
     if (cutBox && y >= cutBox.y && y <= cutBox.y + cutBox.h) return Math.max(0, Math.min(x1, cutBox.x + cutBox.w) - Math.max(x0, cutBox.x));
     return 0;
   };
-  const laidLines = (list, top, bottom) => {
+  const laidLines = (list, top, bottom, left, boxW) => {
+    const L = left === undefined ? 140 : left;
+    const W = boxW === undefined ? BOX_W : boxW;
     const widths = list.map((l) => Array.from(l).reduce((a, ch) => a + glyph(ch), 0) * SIZE * 0.99);
-    const s = Math.min(1, BOX_W / Math.max(1, Math.max.apply(null, widths)), (bottom - top) / (list.length * LINE));
+    const s = Math.min(1, W / Math.max(1, Math.max.apply(null, widths)), (bottom - top) / (list.length * LINE));
     const mid = (top + bottom) / 2;
     return list.map((l, i) => {
       const w = Math.max(1, widths[i] * s);
-      return { x: width / 2 - w / 2, y: mid + (i - (list.length - 1) / 2) * LINE * s - 0.38 * SIZE * s, w, h: 0.76 * SIZE * s };
+      return { x: L + W / 2 - w / 2, y: mid + (i - (list.length - 1) / 2) * LINE * s - 0.38 * SIZE * s, w, h: 0.76 * SIZE * s };
     });
   };
   const behindHer = (list, top, bottom) => (!cutBox ? list.map(() => true) : laidLines(list, top, bottom).map((b) => [0.1, 0.5, 0.9].reduce((a, k) => a + across(b.y + k * b.h, b.x, b.x + b.w) / b.w, 0) / 3 <= 0.38));
-  const settle = (list, place) => {
-    if (!cutBox || !list.length) return { ...place, back: behindHer(list, place.top, place.bottom) };
-    const tall = place.bottom - place.top;
-    const step = Math.round(height * 0.02);
-    const near = face ? { x: face.x - height * 0.01, y: face.y - height * 0.01, w: face.w + height * 0.02, h: face.h + height * 0.02 } : null;
-    const tries = [place.top];
-    for (let t = Math.round(height * 0.07); t + tall <= BOTTOM; t += step) tries.push(t);
-    let best = null;
-    for (const t of tries) {
-      const back = behindHer(list, t, t + tall);
-      if (near && laidLines(list, t, t + tall).some((b, i) => !back[i] && overlap(b, near) > 0)) continue;
-      const score = back.filter(Boolean).length - (0.05 * Math.abs(t - place.top)) / step;
-      if (!best || score > best.score + 1e-9) best = { score, top: t, bottom: t + tall, back };
+  // Where (v4, as its skill's v3; on a florist filling the frame, four lines across her apron): (a) behind her at full
+  // size, slid to the nearest place where every line reads; else (b) beside or above her where her shot is calm
+  // (ClearBox), two fifths of its size at least; else (c) over her, under her face, else above it. No cut-out: in front.
+  const roof = Math.round(height * 0.07);
+  let at = null;
+  if (said.length && cutBox) {
+    const span = BOTTOM - TOP;
+    for (let t = roof; t + span <= BOTTOM; t += Math.round(height * 0.02)) {
+      if (behindHer(said, t, t + span).every(Boolean) && (!at || Math.abs(t - TOP) < Math.abs(at.top - TOP))) at = { top: t, bottom: t + span, left: 140, w: BOX_W, back: true };
     }
-    return best || { ...place, back: behindHer(list, place.top, place.bottom) };
+    if (!at && behindHer(said, TOP, BOTTOM).every(Boolean)) at = { top: TOP, bottom: BOTTOM, left: 140, w: BOX_W, back: true };
+  }
+  if (said.length && !at && cutBox) {
+    const ws = said.map((l) => Array.from(l).reduce((a, ch) => a + glyph(ch), 0) * SIZE * 0.99);
+    const bw = Math.max.apply(null, ws);
+    const bh = said.length * LINE;
+    const rows = [];
+    for (let y = roof; y <= lowest; y += height * 0.02) { const e = pts.length >= 6 ? extent(y) : y >= cutBox.y ? [cutBox.x, cutBox.x + cutBox.w] : null; if (e) rows.push(e); }
+    const her0 = rows.length ? Math.min.apply(null, rows.map((e) => e[0])) : cutBox.x;
+    const her1 = rows.length ? Math.max.apply(null, rows.map((e) => e[1])) : cutBox.x + cutBox.w;
+    const pad = Math.round(width * 0.03);
+    const rooms = [
+      { x: 100, y: roof, w: her0 - pad - 100, h: lowest - roof },
+      { x: her1 + pad, y: roof, w: width - 140 - her1 - pad, h: lowest - roof },
+      { x: 140, y: roof, w: BOX_W, h: headTop - pad - roof },
+    ].filter((r) => r.w >= 0.4 * bw && r.h >= 0.4 * bh);
+    let best = null;
+    for (const r of rooms) {
+      const s = Math.min(1, r.w / bw, r.h / bh);
+      const w = Math.round(bw * s);
+      const hh = Math.round(bh * s);
+      const calm = ClearBox(herInfo, still, laid, { aspect: bw / bh, min: { w: Math.round(0.4 * bw), h: Math.round(0.4 * bh) }, max: { w, h: hh }, sky: false, prefer: "any", within: r, pad: 6, fallback: null });
+      const spot = calm || { x: Math.round(r.x + (r.w - w) / 2), y: Math.round(r.y + (r.h - hh) / 2), w, h: hh };
+      if (!best || spot.w * spot.h > best.w * best.h) best = spot;
+    }
+    if (best) at = { top: best.y, bottom: best.y + best.h, left: best.x, w: best.w, back: false };
+  }
+  if (said.length && !at) {
+    const p = placeFor(said);
+    at = { top: p.top, bottom: cutBox && p.bottom === BOTTOM ? lowest : p.bottom, left: 140, w: BOX_W, back: !cutBox };
+  }
+  const lineBoxes = at ? laidLines(said, at.top, at.bottom, at.left, at.w) : [];
+  // Its colour against her shot's light under each line (LightUnder; behind her, where it shows beside her): hers when
+  // it reads (3 to the mean), else a pale tint on a dark ground (the original's lime) or a deep one on a light one, else
+  // white (ink on light) with a firm edge. Unread: hers, deepened when pale; over her body, white. On her word, pale.
+  const groundOf = (b) => {
+    if (!at.back || pts.length < 6) return LightUnder(herInfo, still, laid, b);
+    const xs = crossings(b.y + b.h / 2);
+    const parts = [];
+    let x = b.x;
+    for (let i = 0; i + 1 < xs.length; i += 2) { if (xs[i] > x) parts.push([x, Math.min(xs[i], b.x + b.w)]); x = Math.max(x, xs[i + 1]); }
+    if (x < b.x + b.w) parts.push([x, b.x + b.w]);
+    let sum = 0;
+    let wide = 0;
+    let high = 0;
+    for (const [x0, x1] of parts) {
+      if (x1 - x0 < 20) continue;
+      const g = LightUnder(herInfo, still, laid, { x: x0, y: b.y, w: x1 - x0, h: b.h });
+      if (!g) return null;
+      sum += g.mean * (x1 - x0);
+      wide += x1 - x0;
+      high = Math.max(high, g.high);
+    }
+    return wide ? { mean: sum / wide, high } : LightUnder(herInfo, still, laid, b);
   };
-  const at = settle(said, placeFor(said));
-  const copy = (key, shown) => h(FitText, { key, style: { position: "absolute", left: 140, top: at.top, width: BOX_W, height: at.bottom - at.top } },
-    h("div", { style: { display: "flex", flexDirection: "column", alignItems: "center" } }, said.map((w, i) => h("div", { key: i, style: shown(i) ? wordStyle : { ...wordStyle, visibility: "hidden" } }, w))));
-  const shownWords = said.length && at.back.some(Boolean) ? copy("words", (i) => at.back[i]) : null;
-  const frontWords = said.length && at.back.some((b) => !b) ? copy("words-front", (i) => !at.back[i]) : null;
+  const grounds = lineBoxes.map(groundOf);
+  const read = grounds.length > 0 && grounds.every((g) => g && Number.isFinite(g.mean) && Number.isFinite(g.high));
+  const meanAll = read ? grounds.reduce((a, g) => a + g.mean, 0) / grounds.length : 0.5;
+  const ratio = (a, b) => (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+  const reads = (c) => {
+    const L = lum(rgb(c));
+    return grounds.every((g) => ratio(L, g.mean) >= 3 && ratio(L, L > g.mean ? g.high : Math.max(0, 2 * g.mean - g.high)) >= 1.5);
+  };
+  const deep = lum(own) > 0.3 ? tone(own, (k) => 0.5 - 0.5 * k, (l) => l <= 0.22) : hex(own);
+  const paleOwn = tone(own, (k) => 0.55 + 0.45 * k, (l) => l >= 0.6);
+  const asked = setting("couleur", "auto");
+  const overHer = at && !at.back && !!cutBox;
+  let firm = false;
+  let COLOR = asked === "pale" ? paleOwn || "#ffffff" : null;
+  if (!COLOR && (asked === "sienne" || (!read && !overHer))) COLOR = deep || "#161616";
+  if (!COLOR && read) COLOR = [hex(own)].concat(meanAll < 0.35 ? [paleOwn, deep] : [deep, paleOwn]).filter(Boolean).find(reads) || null;
+  if (!COLOR) { firm = true; COLOR = read && meanAll > 0.55 ? "#161616" : "#ffffff"; }
+  const lit = lum(rgb(COLOR)) > 0.35;
+  const edge = lit
+    ? firm ? "0 0 2px rgba(0,0,0,0.75), 0 0 6px rgba(0,0,0,0.45), 0 4px 18px rgba(0,0,0,0.35)" : "0 0 1px rgba(0,0,0,0.55), 0 0 2px rgba(0,0,0,0.3), 0 3px 16px rgba(0,0,0,0.28)"
+    : firm ? "0 0 2px rgba(255,255,255,0.8), 0 0 6px rgba(255,255,255,0.5), 0 2px 14px rgba(255,255,255,0.35)" : "0 0 2px rgba(255,255,255,0.5), 0 2px 10px rgba(255,255,255,0.25)";
+  const wordStyle = { fontFamily: display, fontWeight: 700, fontSynthesis: "none", fontSize: SIZE, lineHeight: LINE + "px", height: LINE, letterSpacing: "-0.01em", color: COLOR, whiteSpace: "nowrap", textAlign: "center", textShadow: edge };
+  const copy = (key) => h(FitText, { key, style: { position: "absolute", left: at.left, top: at.top, width: at.w, height: at.bottom - at.top } },
+    h("div", { style: { display: "flex", flexDirection: "column", alignItems: "center" } }, said.map((w, i) => h("div", { key: i, style: wordStyle }, w))));
+  const shownWords = at && at.back ? copy("words") : null;
+  const frontWords = at && !at.back ? copy("words-front") : null;
+  // Her works: one she still hides for the most part in front of her below her chin (her head moves with the camera),
+  // never over her words behind her; the legs in front.
+  const backBoxes = at && at.back && cutBox ? lineBoxes : [];
+  const inFront = (k) => {
+    const b = boxOf(k);
+    if (legs(k)) return true;
+    if (!cutBox || k >= FRONT || b.seen >= 0.45 || (face && b.y < face.y + face.h)) return false;
+    return !backBoxes.some((l) => overlap(b, l) > 0);
+  };
+  const behind = [];
+  const before = [];
+  for (let k = 0; k < m; k++) (inFront(k) ? before : behind).push(work(k));
 
-  // Drawn from the back: her place, the works behind her, her words, her cut-out, the works over her legs, the lines that
-  // would not read behind her.
+  // From the back: her place, works behind, words behind, her cut-out, works in front, words in front.
   return h(AbsoluteFill, { style: { backgroundColor: "#000000" } }, herShot, behind, shownWords, cutOut, before, frontWords);
 }`;
 
 export const monTravail: EffectPiece = {
   key: "mon-travail",
   // 3: her words behind her, her cut-out over their letters (Tristan on its skill's v1: « la police passe pas derrière la dame »).
-  version: 3,
+  // 4: always legible, as its skill's v3 (Tristan on its skill's v2 bench: « mes bouquets de saison ça va pas »): behind
+  // her only when every line reads there, else beside or above her where her shot is calm, else over her under her
+  // face; its colour against the light under each line; her works she would hide laid in front of her below her chin.
+  version: 4,
   name: "Voici mon travail",
-  how: "elle debout dans son lieu, plein écran et immobile, ses mots en très grandes capitales derrière elle (elle détourée passe devant leurs lettres) ; les photos de son travail se posent d'un coup derrière elle en rafale, en zigzag du haut vers le bas, de plus en plus lentement, les dernières devant ses jambes, elle détourée devant ; puis elles repartent une à une, l'avant-dernière sur un temps, et elle finit seule avec ses mots.",
+  how: "elle debout dans son lieu, plein écran et immobile, ses mots en très grandes capitales derrière elle quand chaque ligne s'y lit (elle détourée passe devant leurs lettres), sinon à côté ou au-dessus d'elle là où l'image est calme, jamais sur son visage, dans une couleur qui se lit sur ce qu'il y a dessous ; les photos de son travail se posent d'un coup derrière elle en rafale, en zigzag du haut vers le bas, de plus en plus lentement, les dernières devant ses jambes, elle détourée devant ; puis elles repartent une à une, l'avant-dernière sur un temps, et elle finit seule avec ses mots.",
   needs: "une photo ou une vidéo d'elle (ou de quelqu'un de l'équipe) debout face à l'objectif, téléphone posé, en entier ou jusqu'aux genoux, avec de la place au-dessus et autour d'elle, puis 5 à 15 photos de son travail (gros plans de ses pièces, de ses bouquets, de ses plats), qui changent de couleur et de cadrage.",
   lays: "sur son plan à elle debout (le premier sous lui, il reste figé derrière ses mots), suivi de 5 à 15 photos de son travail coupées d'un temps chacune, sa plus belle en dernier",
   shots: [6, 16],
@@ -432,7 +494,7 @@ export const monTravail: EffectPiece = {
       name: "couleur",
       want: "la couleur de ses mots",
       choices: [
-        { value: "auto", says: "selon la lumière de son plan : sa couleur profonde sur un lieu clair, une teinte pâle et vive de sa couleur sur un lieu sombre" },
+        { value: "auto", says: "choisie pour se lire sur ce qu'il y a sous ses mots : sa couleur quand elle s'y lit, sinon une teinte pâle ou profonde de la sienne, sinon du blanc ou de l'encre avec un contour" },
         { value: "sienne", says: "sa couleur telle quelle (plus profonde si elle est très pâle), lisible sur les murs clairs" },
         { value: "pale", says: "sa couleur en teinte pâle et vive, comme l'original, pour un lieu sombre ou très coloré" },
       ],

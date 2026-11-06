@@ -296,7 +296,7 @@ export const HOUSE_MODELS: HouseModel[] = [
     // last ones over her legs) and leave one by one; her words in her colour, off her face (none of the original's lime nor
     // its words: no colours here); its tempo (120, the grid of its landmarks: its music has none), no grade.
     pitch: "Toi debout dans ton lieu, tes mots en très grand derrière toi, et les photos de ton travail qui se posent en rafale derrière toi, puis repartent une à une.",
-    needs: "une photo (ou une vidéo d'au moins 6 s) de toi debout dans ton lieu, téléphone posé, et 15 à 40 photos de ton travail",
+    needs: "une photo (ou une vidéo d'au moins 6 s) de toi debout dans ton lieu, téléphone posé, plutôt d'un côté avec de la place à côté de toi, et 15 à 40 photos de ton travail",
     files: [16, 41],
     pair: "grotesque",
     example: null,
@@ -309,7 +309,7 @@ export const HOUSE_MODELS: HouseModel[] = [
       hook: { kind: "promesse", what: "elle debout dans son lieu, quelques mots en très grandes capitales derrière elle, et ses travaux qui se posent en rafale derrière elle" },
       text: {
         amount: "un message tenu",
-        composition: "2 à 4 mots courts en grandes capitales grasses et larges, un par ligne, tous à la même taille, centrés, derrière elle (elle détourée passe devant leurs lettres) et devant ses travaux de la première image à la dernière",
+        composition: "2 à 4 mots courts en grandes capitales grasses, un par ligne, à la même taille, du début à la fin : derrière elle quand chaque ligne s'y lit, sinon à côté d'elle ou sous son visage, jamais dessus, d'une couleur lisible sur le fond",
         case: "upper",
         weight: "bold",
         tracking: "normal",
