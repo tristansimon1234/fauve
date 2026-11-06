@@ -8335,6 +8335,52 @@ test("a skill timed on her voice: an idea's own images one after the other when 
   ]);
 });
 
+test("a skill that writes what is said in her shots (spoken): its plan subtitled, its code given the words said there, the engine's subtitles stepping aside", async () => {
+  const { skillPlan, skillFillInput, withoutVoice, SKILL_FILL_PROMPT } = await import("./skills.ts");
+  type Skill = Parameters<typeof skillPlan>[0]["skill"];
+  const base: Skill = {
+    key: "test-spoken",
+    version: 1,
+    bpm: 120,
+    shots: [2, 2],
+    files: [1, 2],
+    how: "",
+    end: false,
+    texts: [{ slot: "ligne", role: "caption", want: "", max: 40, required: true }],
+    timeline: () => ({ duration: 4, shots: [{ start: 0, end: 2, want: "" }, { start: 2, end: 4, want: "" }], texts: { ligne: { from: 0, to: 4 } }, marks: {} }),
+    code: String.raw`function Scene({ durationInFrames, spoken }) { const h = React.createElement; return h(AbsoluteFill, null, (spoken || []).map((w, i) => h("span", { key: i }, w.w))); }`,
+  };
+  const own: Skill = { ...base, spoken: "own" };
+  const files = [
+    { id: "talk", photo: false, seconds: 10 },
+    { id: "b", photo: false, seconds: 10 },
+  ];
+  const fill = { shots: [{ file: "talk", at: 1 }, { file: "b", at: 0 }], texts: { ligne: "Bonjour" }, end: null };
+  const plan = skillPlan({ skill: own, name: "Test", files, fill });
+  assert.equal(plan.subtitles, true);
+  assert.equal(plan.layers![0]!.motion.writes_spoken, true);
+  assert.equal(plan.layers![0]!.motion.times_spoken, undefined);
+  // The words said in her talking shot (its 1 to 3 s play from the Reel's start): given to its code on the Reel's clock,
+  // those of the passage that plays only; the engine's subtitles step aside under it.
+  const inputs = { template: "libre" as const, clipUrls: { talk: "/talk.mp4", b: "/b.mp4" }, photoIds: [], brand: { name: "Test" }, words: { talk: [word("on", 1.2, 1.4), word("goûte", 1.5, 1.9), word("après", 3.5, 3.8)], b: [] } };
+  const layer = buildReelProps(plan, inputs).layers!.find((l) => l.compose)!;
+  assert.deepEqual(layer.spoken?.map((w) => [w.w, w.from]), [["on", 6], ["goûte", 15]]);
+  assert.equal(layer.captionsStay, undefined);
+  // « engine »: the engine writes them under it, its code given them to time its own words around them.
+  const engine = skillPlan({ skill: { ...base, spoken: "engine" }, name: "Test", files, fill });
+  assert.deepEqual([engine.subtitles, engine.layers![0]!.motion.times_spoken, engine.layers![0]!.motion.writes_spoken], [true, true, false]);
+  assert.equal(buildReelProps(engine, inputs).layers!.find((l) => l.compose)!.captionsStay, true);
+  // Without it, nothing of what is said is written on a skill's Reel (heard only), as before.
+  assert.equal(skillPlan({ skill: base, name: "Test", files, fill }).subtitles, false);
+  // A voice laid over it, then taken away: still subtitled for her shots' speech; a plain skill loses its subtitles.
+  assert.equal(withoutVoice(skillPlan({ skill: own, name: "Test", files, fill, voice: { media_id: "v", at: 0 } })).subtitles, true);
+  assert.equal(withoutVoice(skillPlan({ skill: base, name: "Test", files, fill, voice: { media_id: "v", at: 0 } })).subtitles, false);
+  // Its filler is told that the subtitles of what she says are this model's own, its own lines where nobody speaks.
+  assert.match(String(skillFillInput({ skill: own, name: "Test", n: 2, files, business: {}, request: "" }).ses_paroles), /sous-titres/);
+  assert.equal(skillFillInput({ skill: base, name: "Test", n: 2, files, business: {}, request: "" }).ses_paroles, undefined);
+  assert.match(SKILL_FILL_PROMPT, /With « ses_paroles »/);
+});
+
 test("a skill timed on her voice: the frame changes on the next idea's first word when it says so, on a cut of her pauses when one is near", async () => {
   const { skillTalk, readSaid, skillSaid } = await import("./skills.ts");
   const skill = await voicedSkill();
