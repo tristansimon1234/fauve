@@ -284,21 +284,21 @@ export function PostReview({
                   </>
                 ))}
               {!parts && data.failed && (
-                <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-ink/70 p-6 text-center text-white">
-                  <span className="flex size-20 items-center justify-center rounded-full bg-white">
+                <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-ink/70 p-4 text-center text-white">
+                  <span className="flex size-20 shrink-0 items-center justify-center rounded-full bg-white text-ink">
                     <Mascot size={64} mood="sad" />
                   </span>
-                  <span className="text-[16px] font-extrabold">La vidéo n’a pas pu être fabriquée</span>
-                  <span className="text-[13px] leading-snug text-white/85">Demande-le à Edith : il la relance.</span>
+                  <span className="w-full text-balance text-[16px] font-extrabold">La vidéo n’a pas pu être fabriquée</span>
+                  <span className="w-full text-balance text-[13px] leading-snug text-white/85">Demande-le à Edith : il la relance.</span>
                 </div>
               )}
               {!parts && !data.failed && (data.making || !data.videoUrl) && (
-                <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-ink/65 p-6 text-center text-white">
-                  <span className="flex size-20 items-center justify-center rounded-full bg-white">
+                <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-ink/65 p-4 text-center text-white">
+                  <span className="flex size-20 shrink-0 items-center justify-center rounded-full bg-white text-ink">
                     <Mascot size={64} mood="thinking" />
                   </span>
-                  <span className="text-[16px] font-extrabold">{data.making?.step ? (STEPS[data.making.step] ?? "Edith y travaille") : "La vidéo se met à jour"}</span>
-                  <span className="text-[13px] leading-snug text-white/85">
+                  <span className="w-full text-balance text-[16px] font-extrabold">{data.making?.step ? (STEPS[data.making.step] ?? "Edith y travaille") : "La vidéo se met à jour"}</span>
+                  <span className="w-full text-balance text-[13px] leading-snug text-white/85">
                     {`Ça prend ${data.making?.step === "effet" ? EFFECT_MINUTES : data.making?.kind === "montage" ? REDO_MINUTES : RERENDER_MINUTES} minutes.`} Tu peux fermer, Edith te prévient.
                   </span>
                 </div>
