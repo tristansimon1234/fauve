@@ -51,6 +51,13 @@ export type SkillText = {
    * it is not known, the filler writes the slot as its `want` says (its fallback: her neighbourhood, her town).
    */
   fact?: "coordinates";
+  /**
+   * The object slot (SkillObject) whose thing its words name, written on it or beside it in its shot (« Un clic sur tes
+   * produits »: a product's name, its arrow from the product): written only when the filler found that thing in the file
+   * cast there, by words of that file's reading (namedOnSight), never a thing her request names that her files do not
+   * show (Tristan, 6 November: « il a calé "brownie" sur le café »).
+   */
+  names?: string;
 };
 
 /**
@@ -617,6 +624,45 @@ export function skillObjectName(name: string | undefined): string | null {
   return kept || null;
 }
 
+/** Words as compared with a file's reading: lower case, no accents, letters and digits only, one space between. */
+const readingWords = (s: string) =>
+  ` ${s
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
+    .trim()} `;
+
+/** One thing a text names, as its filler answered it: its object slot, its name, the words of its file's reading that show it, that reading. */
+export type NamedThing = { slot: string; name: string | null; seen?: string; reading?: string; shot?: number };
+
+/**
+ * The things a text names (SkillText.names, PieceText.names) that are not in the picture it is written on: none named
+ * (nothing there fits); its words quoted from its file's reading (`seen`) found nowhere in that reading, when the reading
+ * is known and the quote given; or the same thing as one before it on that shot (the same name, or words of the reading
+ * one inside the other: one cappuccino named twice, as a cappuccino and as a brownie). Their texts are not written and
+ * their objects not followed. Tristan, 6 November, on « Un clic sur tes produits »: « il a calé "brownie" sur le café ».
+ */
+export function unseenThings(things: NamedThing[]): Set<string> {
+  const unseen = new Set<string>();
+  const kept: { name: string; seen: string; shot?: number }[] = [];
+  for (const t of things) {
+    const name = skillObjectName(t.name ?? undefined);
+    const reading = readingWords(t.reading ?? "");
+    const seen = t.seen === undefined ? undefined : readingWords(t.seen);
+    const quoted = seen !== undefined && /\p{L}{3}/u.test(seen);
+    const off = !name || (seen !== undefined && reading.trim() !== "" && (!quoted || !reading.includes(seen)));
+    const same = kept.some((k) => k.shot === t.shot && (k.name === name || (quoted && k.seen.trim() !== "" && (k.seen.includes(seen!) || seen!.includes(k.seen)))));
+    if (off || same) unseen.add(t.slot);
+    else kept.push({ name: name!, seen: quoted ? seen! : "", ...(t.shot !== undefined ? { shot: t.shot } : {}) });
+  }
+  return unseen;
+}
+
+/** A file's reading as its filler reads it: what it shows and its moments' words. */
+export const fileReading = (f: Pick<SkillFile, "shows" | "moments"> | undefined): string =>
+  f ? [f.shows ?? "", ...(f.moments ?? []).map((m) => m.what ?? "")].join(" · ") : "";
+
 /** Its code with its objects named: « @slot » replaced by what the filler saw in her shot, the others left (no object). */
 export function skillCode(skill: Pick<MontageSkill, "code" | "objects">, objects: Record<string, string> | undefined): string {
   let code = skill.code;
@@ -885,9 +931,32 @@ export function readSkillFill(
         const file = (asked && known.get(asked.file)) ?? files[turn++ % files.length]!;
         return { file: file.id, at: file.photo ? 0 : Math.max(0, Math.min(file.seconds, asked?.at ?? 0)) };
       });
+  // Its objects named; a text that names one (SkillText.names) only for a thing seen in the file cast on its shot, each
+  // a different thing there (unseenThings): never a product her request names on a picture of another one.
+  const objects: Record<string, string> = {};
+  for (const o of skill.objects ?? []) {
+    const name = skillObjectName(answer.objets?.find((x) => x.slot === o.slot)?.name);
+    if (name) objects[o.slot] = name;
+  }
+  const tied = new Set(skill.texts.flatMap((t) => (t.names ? [t.names] : [])));
+  const unseen = unseenThings(
+    (skill.objects ?? [])
+      .filter((o) => tied.has(o.slot))
+      .map((o) => {
+        const k = o.shot < 0 ? n + o.shot : o.shot;
+        const given = answer.objets?.find((x) => x.slot === o.slot);
+        return { slot: o.slot, name: objects[o.slot] ?? null, ...(given?.seen !== undefined ? { seen: given.seen } : {}), reading: fileReading(known.get(shots[k]?.file ?? "")), shot: k };
+      }),
+  );
+  for (const slot of unseen) delete objects[slot];
   const texts: Record<string, string> = {};
   const fonts: Record<string, string> = {};
   for (const t of skill.texts) {
+    // A thing's name on a picture that does not show it: never written (a required one fails the fill: the editor makes it).
+    if (t.names && unseen.has(t.names) && !options.heard) {
+      if (t.required) return null;
+      continue;
+    }
     // Her voice leading it: her words are its texts, where she says them (a slot she never says stays empty).
     if (options.heard) {
       const said = options.heard.words.find((w) => w.slot === t.slot)?.text;
@@ -916,11 +985,6 @@ export function readSkillFill(
   const offered = unaskedOffer(`${title} ${subtitle}`, options.asked);
   const end = skill.end && title && !offered ? { title, ...(subtitle ? { subtitle } : {}) } : null;
   const settings = skillSettings(skill, answer.settings);
-  const objects: Record<string, string> = {};
-  for (const o of skill.objects ?? []) {
-    const name = skillObjectName(answer.objets?.find((x) => x.slot === o.slot)?.name);
-    if (name) objects[o.slot] = name;
-  }
   return {
     shots,
     texts,
@@ -1741,6 +1805,10 @@ export const skillFillSchema = z.object({
       z.object({
         slot: z.string().describe("The model's object slot (« objets »)"),
         name: z.string().describe("What it is in the file you cast on its slot, in plain English as the eye sees it (« shop sign », « neon sign », « every window », « string lights »), or empty when nothing there fits"),
+        seen: z
+          .string()
+          .optional()
+          .describe("The few words of that file's « montre » or « moments » that show it, copied as they are (« un brownie »); empty when nothing there shows it"),
       }),
     )
     .optional()
@@ -1770,6 +1838,7 @@ Then cast her files on its slots (« cases », in order: each with its length an
 Then write its texts, in French (what her customers read), each in its slot (« textes »: what it says and its most characters):
 - words she gives (« contrat », her request) are kept as she wrote them, only spelled right (accents, apostrophes, hyphens, « WhatsApp »), never one of her typos, never rewritten;
 - otherwise words a good creator would write for this business: concrete, specific to it, never an ad slogan, a promise or a formula; nothing invented (no price, hour, place, offer or review that is not given); and never an offer, a promotion, a discount or a price her request is not about, even one that is known (« ce_qu_on_sait »): a Reel on what is new in the shop never adds its « -20 % ce week-end »;
+- a word written on or beside a thing in a shot (a product's name, a label) names what the file cast there shows as it plays there (« montre », « moments »; a horizontal file in a vertical Reel: its middle only), never something her request names that her files do not show: « le cappuccino et le brownie » on a close-up of a cappuccino alone names the cappuccino only, the other slots empty (cast the file that shows the brownie when she sent one);
 - each within its most characters (count them), in normal case: the code sets the capitals when the model has them; a name longer than its place is never cut, write the word that sets it apart instead (« Farine » for « Maison Farine »: never « Maison »);
 - an optional slot (obligatoire false) is left empty unless her request or the Reel needs those words; a required one is always written;
 - a slot the engine writes itself (« ecrit_par_le_moteur », her place's coordinates) is never written by you: leave its text empty, and never repeat those words elsewhere;
@@ -1785,7 +1854,7 @@ A model timed on her voice (« voix »): her talking video is the Reel, cut by t
 - every text is words she says, at their numbers, spelled right (a word the transcript misheard set right: « sois » for « soins »); never a word she does not say.
 
 "settings": its settings (« reglages », when it has some), like the variants of a template: one only when her request asks for what it does (« plus de cases », « plus lent », « dans le désordre », « avec ma couleur »), with the value that does it; never to vary for its own sake; otherwise none, each one plays its default. A request a setting answers fits. A format she asks for (vertical, full screen, horizontal, in a band, her videos kept whole: « cadre ») is its « format » setting when it has one, never another layout: it fits; « format » only when she asks for one, its default playing otherwise (« par défaut »: vertical full frame for almost every model), never because her files are horizontal.
-"objets": its objects (« objets », when it has some): what in the file you cast on that slot carries its effect (a sign whose letters light up one by one, windows that light up one after the other, lamps that flash), from what the file shows (« montre », « moments »): name it in plain English as the eye sees it, two to four words (« shop sign », « neon sign », « bakery sign », « every window », « string lights », « pendant lamps »); « every » before it when there are several to take one after the other (each window, each lamp); a slot that asks for the elements a thing is made of (« cherche »: a shop front's door, windows, sign) takes them all, comma-separated, each as a detector finds it (« painted door, every window, every shutter, shop sign, awning, every plant pot »); empty when nothing in that file fits (the model does without). Cast on that slot the file that has it, when one does.
+"objets": its objects (« objets », when it has some): what in the file you cast on that slot carries its effect (a sign whose letters light up one by one, windows that light up one after the other, lamps that flash), from what the file shows (« montre », « moments »): name it in plain English as the eye sees it, two to four words (« shop sign », « neon sign », « bakery sign », « every window », « string lights », « pendant lamps »); « every » before it when there are several to take one after the other (each window, each lamp); a slot that asks for the elements a thing is made of (« cherche »: a shop front's door, windows, sign) takes them all, comma-separated, each as a detector finds it (« painted door, every window, every shutter, shop sign, awning, every plant pot »); empty when nothing in that file fits (the model does without). Cast on that slot the file that has it, when one does. "seen": the few words of that file's « montre » or « moments » that show it, copied as they are. One a text names (« son_texte ») is a different thing of that file each time, named only when the file shows it, else empty, its text too.
 "end": optional, null unless the model has an ending (« fin ») and her request (or « contrat ») is about something to end on: an offer, an opening, a date, an event she speaks of; what we know (« ce_qu_on_sait ») may complete it (its date, its place), never bring a subject of its own: an offer, a promotion, a discount or a price only when her request is about it (« Les nouveautés de la boutique cette semaine », with « -20 % sur toute la boutique ce week-end » known: null). Its title (40 characters at most) and a subtitle or empty; when in doubt, null.
 "why": one sentence for her in French (tu), what you chose and why, in plain words.`;
 
@@ -1996,7 +2065,9 @@ export function skillFillInput(input: {
       ? {
           objets: input.skill.objects.flatMap((o) => {
             const shot = skillObjectShot(o, line);
-            return shot === null ? [] : [{ slot: o.slot, case: shot + 1, cherche: o.want }];
+            // A text that names it, written on it: named only when its file shows it.
+            const named = input.skill.texts.find((t) => t.names === o.slot)?.slot;
+            return shot === null ? [] : [{ slot: o.slot, case: shot + 1, cherche: o.want, ...(named ? { son_texte: named } : {}) }];
           }),
         }
       : {}),

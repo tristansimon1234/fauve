@@ -5,7 +5,7 @@ import { REEL_FPS } from "./motion.ts";
 import { isClipSegment, screenTime, segmentSpans, SLOT_NAME, type ClipAnalysis, type EditPlan, type HandMomentKind, type MotionDrawn, type PlanLayer, type SfxCue } from "./schemas.ts";
 import { readMusicShape, type MusicShape } from "./music-shape.ts";
 import { BURST_MAX } from "./sfx.ts";
-import { fitWords, skillObjectName, skillSettings, type SkillSetting } from "./skills.ts";
+import { fitWords, skillObjectName, skillSettings, unseenThings, type SkillSetting } from "./skills.ts";
 
 // The bank of ready-to-play effects (chantier A of docs/reprise.md; docs/modeles.md, « Banque d'effets prêts à jouer »).
 // A model of Edith's is a whole Reel coded once, like an Edits or CapCut template: her files in its slots, her words in its
@@ -43,7 +43,11 @@ import { fitWords, skillObjectName, skillSettings, type SkillSetting } from "./s
  * holds. `fact`: written by the engine from what it knows, never by its filler (« coordinates », her place's, skills.ts):
  * when it is not known, its filler writes the slot as its `want` says (its fallback: her neighbourhood).
  */
-export type PieceText = { slot: string; want: string; max: number; required: boolean; fact?: "coordinates" };
+/**
+ * One of its words. `names`: the object slot whose thing it names, written on it or beside it (a product's name and its
+ * arrow): written only for a thing seen in the shot under it, by words of that shot's reading (unseenThings, as a skill's).
+ */
+export type PieceText = { slot: string; want: string; max: number; required: boolean; fact?: "coordinates"; names?: string };
 
 /**
  * Something in one of its shots its code lights up, cuts out or follows (her door, her sign, her windows): written
@@ -298,8 +302,9 @@ export const PIECE_FILL_PROMPT = `You fill one of Edith's ready-made effects (Ed
 - a creator's words, concrete, specific to this business, never an ad slogan; nothing invented (no price, hour, address, offer or review that is not given);
 - within its « max » characters (count them), in normal case (the code sets the capitals); a name longer than its place is never cut: the word that sets it apart (« Farine » for « Maison Farine »);
 - a required slot (« obligatoire » true) always written, an optional one only when the brief or her request wants those words, else an empty text;
+- a word written on or beside a thing (a product's name) names what that shot shows (« montre »), never something her request or the brief names that it does not show: a cappuccino alone names the cappuccino only;
 - « mots_actuels » (a correction): keep them, but what her request changes; its settings too (« reglages_actuels »): kept unless her request changes one.
-"objects": one per slot of « effet.ses_objets »: what in the shot it names (« plan », among « plans_dessous ») carries it, named in plain English as the eye sees it, two to four words (« back door », « shop window », « shop sign », « every window », « string lights »), « every » first for several to take one after the other; « none » when nothing in that shot fits (the code does without).
+"objects": one per slot of « effet.ses_objets »: what in the shot it names (« plan », among « plans_dessous ») carries it, named in plain English as the eye sees it, two to four words (« back door », « shop window », « shop sign », « every window », « string lights »), « every » first for several to take one after the other; « none » when nothing in that shot fits (the code does without); "seen": the few words of that shot's « montre » that show it, copied as they are. One a text names (« son_texte ») is a different thing each time, named only when the shot shows it, else « none », its text empty.
 "settings": only a setting of « effet.reglages » her request or the brief asks for, with the value that does it; otherwise none.
 With « ce_qu_elle_dit » (an effect timed on her voice): its words are hers, written exactly as she says them (a word the transcript misheard set right), in the order she says them, each one a word or a name she really says under it.
 With « ses_photos » (an effect that lays her photos): "photos", the ids of those of her photos it lays, in its order, as many as it takes at most (« effet.photos »), each one what its « veut » asks, from what each shows; none when none fits.
@@ -309,10 +314,17 @@ export const pieceFillSchema = z.object({
   fits: z.boolean().describe("true when the shots under it carry the effect and her request is served by it"),
   missing: z.string().describe("When fits is false: what is missing, in one short sentence in French; empty otherwise"),
   texts: z.array(z.object({ slot: z.string().describe("A slot of « effet.ses_mots »"), text: z.string().describe("Its words, in French; empty to leave an optional one out") })),
-  objects: z.array(z.object({ slot: z.string().describe("A slot of « effet.ses_objets »"), name: z.string().describe("What carries it in that shot, in plain English; « none » when nothing fits") })),
+  objects: z.array(
+    z.object({
+      slot: z.string().describe("A slot of « effet.ses_objets »"),
+      name: z.string().describe("What carries it in that shot, in plain English; « none » when nothing fits"),
+      seen: z.string().describe("The few words of that shot's « montre » that show it, copied as they are; empty when nothing there shows it"),
+    }),
+  ),
   settings: z.array(z.object({ name: z.string(), value: z.string() })),
 });
-export type PieceFillAnswer = z.infer<typeof pieceFillSchema> & { photos?: string[] };
+/** Its filler's answer as it is read: an object's « seen » always given by the API, absent from an answer made by hand (nothing to check it against). */
+export type PieceFillAnswer = Omit<z.infer<typeof pieceFillSchema>, "objects"> & { objects: { slot: string; name: string; seen?: string }[]; photos?: string[] };
 
 /** Its filler's answer schema: the photos it lays only for an effect that lays some (no optional parameter for the API either way). */
 export function pieceFillSchemaFor(piece: Pick<EffectPiece, "photos">) {
@@ -354,7 +366,9 @@ export function pieceFillInput(input: {
         ? {
             ses_objets: piece.objects.flatMap((o) => {
               const k = o.shot < 0 ? n + o.shot : o.shot;
-              return k >= 0 && k < n ? [{ slot: o.slot, plan: k + 1, cherche: o.want }] : [];
+              // A text that names it, written on it: named only when that shot shows it.
+              const named = piece.texts.find((t) => t.names === o.slot)?.slot;
+              return k >= 0 && k < n ? [{ slot: o.slot, plan: k + 1, cherche: o.want, ...(named ? { son_texte: named } : {}) }] : [];
             }),
           }
         : {}),
@@ -388,22 +402,37 @@ export type PieceFill = { texts: Record<string, string>; objects: Record<string,
 export function readPieceFill(
   piece: Pick<EffectPiece, "texts" | "objects" | "settings" | "photos">,
   answer: PieceFillAnswer,
-  options: { photos?: string[]; facts?: PieceFacts } = {},
+  options: { photos?: string[]; facts?: PieceFacts; under?: Pick<PieceUnder, "shows">[] } = {},
 ): PieceFill | null {
   if (!answer.fits) return null;
-  const texts: Record<string, string> = {};
-  for (const t of piece.texts) {
-    const words = pieceFact(t, options.facts) ?? fitWords(answer.texts.find((w) => w.slot === t.slot)?.text ?? "", t.max);
-    if (words) texts[t.slot] = words;
-    else if (t.required) return null;
-  }
-  const offered = new Set(options.photos ?? []);
-  const photos = piece.photos ? [...new Set(answer.photos ?? [])].filter((id) => offered.has(id)).slice(0, Math.min(4, piece.photos.most)) : [];
+  // Its objects named; a word that names one (PieceText.names) only for a thing seen in the shot under it, each a
+  // different thing there (unseenThings): never a product her request names on a picture of another one.
   const objects: Record<string, string> = {};
   for (const o of piece.objects ?? []) {
     const name = skillObjectName(answer.objects.find((x) => x.slot === o.slot)?.name);
     if (name) objects[o.slot] = name;
   }
+  const tied = new Set(piece.texts.flatMap((t) => (t.names ? [t.names] : [])));
+  const n = options.under?.length ?? 0;
+  const unseen = unseenThings(
+    (piece.objects ?? [])
+      .filter((o) => tied.has(o.slot))
+      .map((o) => {
+        const given = answer.objects.find((x) => x.slot === o.slot);
+        const k = o.shot < 0 ? n + o.shot : o.shot;
+        return { slot: o.slot, name: objects[o.slot] ?? null, ...(given?.seen !== undefined ? { seen: given.seen } : {}), reading: options.under?.[k]?.shows ?? "", shot: o.shot };
+      }),
+  );
+  for (const slot of unseen) delete objects[slot];
+  const texts: Record<string, string> = {};
+  for (const t of piece.texts) {
+    // A thing's name on a picture that does not show it: never written (a required one: the effect does not play).
+    const words = t.names && unseen.has(t.names) ? "" : (pieceFact(t, options.facts) ?? fitWords(answer.texts.find((w) => w.slot === t.slot)?.text ?? "", t.max));
+    if (words) texts[t.slot] = words;
+    else if (t.required) return null;
+  }
+  const offered = new Set(options.photos ?? []);
+  const photos = piece.photos ? [...new Set(answer.photos ?? [])].filter((id) => offered.has(id)).slice(0, Math.min(4, piece.photos.most)) : [];
   return { texts, objects, settings: skillSettings(piece, answer.settings), ...(photos.length ? { photos } : {}) };
 }
 

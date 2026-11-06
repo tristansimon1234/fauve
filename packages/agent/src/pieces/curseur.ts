@@ -41,6 +41,7 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const ZOOM = Math.round(mark("zoom", CUT));
   const L1 = Math.round(mark("label1", Math.round(D * 0.3)));
   const L2 = Math.round(mark("label2", Math.round(D * 0.42)));
+  const L3 = Math.round(mark("label3", Math.round(D * 0.52)));
   const PLAY = Math.round(mark("play", Math.round(D * 0.72)));
   const OUT = Math.round(mark("out", Math.round(D * 0.92)));
 
@@ -74,21 +75,46 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
       const mean = (l, a) => l.reduce((s, p) => s + p[a], 0) / l.length;
       if (torso.length || hands.length) person = { hand: hands.length ? { x: mean(hands, "x"), y: mean(hands, "y") } : null, right: torso.length ? Math.max.apply(null, torso.map((p) => p.x)) : null, mid: torso.length ? { x: mean(torso, "x"), y: mean(torso, "y") } : null };
     }
-    const product = (b, fb) => (b && b.w > 12 && b.h > 12 ? { x: b.x, y: b.y, w: b.w, h: b.h, found: true } : { x: W * fb[0], y: H * fb[1], w: W * fb[2], h: H * fb[3], found: false });
+    // Each product on her close-up, by the name its filler gave it; the same thing found under two names (a box mostly
+    // inside the other's) is the first one's: never named twice.
+    const box = (b) => (b && b.w > 12 && b.h > 12 ? { x: b.x, y: b.y, w: b.w, h: b.h } : null);
     const finds = kB >= 0;
+    const raw = [
+      box(finds ? SubjectBox(list[kB], firstSeen, BOX, "@produit1") : null),
+      box(finds ? SubjectBox(list[kB], firstSeen, BOX, "@produit2") : null),
+      box(finds ? SubjectBox(list[kB], firstSeen, BOX, "@produit3") : null),
+    ];
+    const same = (a, b) => {
+      const w = Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x);
+      const hh = Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y);
+      return w > 0 && hh > 0 && (w * hh) / Math.min(a.w * a.h, b.w * b.h) > 0.6;
+    };
+    // What of it the frame shows (her horizontal close-up cropped upright shows its middle only): half of it at least, or a
+    // quarter of the frame (a cup that fills it),
+    // else it is not on her picture.
+    const seen = (b) => {
+      const w = Math.min(b.x + b.w, W) - Math.max(b.x, 0);
+      const hh = Math.min(b.y + b.h, H) - Math.max(b.y, 0);
+      return w > 0 && hh > 0 && ((w * hh) / (b.w * b.h) >= 0.5 || (w * hh) / (W * H) >= 0.25) ? { x: Math.max(b.x, 0), y: Math.max(b.y, 0), w, h: hh } : null;
+    };
+    const shown = raw.map((b) => (b ? seen(b) : null));
+    const products = shown.map((b, i) => (b && !shown.slice(0, i).some((o) => o && same(o, b)) ? b : null));
     return {
       t1: inside(person ? { x: (person.right !== null ? person.right : person.hand.x) + W * 0.11, y: person.hand ? person.hand.y + H * 0.04 : person.mid.y } : kA >= 0 ? { x: W * 0.676, y: H * 0.632 } : { x: W * 0.72, y: H * 0.58 }),
       t2: inside(person ? person.hand || { x: person.mid.x, y: person.mid.y + H * 0.06 } : { x: W * 0.474, y: H * 0.602 }),
-      p1: product(finds ? SubjectBox(list[kB], firstSeen, BOX, "@produit1") : null, [0.02, 0.4, 0.46, 0.22]),
-      p2: product(finds ? SubjectBox(list[kB], firstSeen, BOX, "@produit2") : null, [0.03, 0.64, 0.6, 0.29]),
+      raw: shown,
+      products,
+      // Found but not on her picture, or the same thing as one before it: its name never written.
+      twice: raw.map((b, i) => Boolean(b) && !products[i]),
     };
   }, [track, kA, kB, PAUSE, CUT, W, H]);
-  const clickOn = (P, fb) => (P.found ? inside({ x: P.x + P.w * 0.58, y: P.y + P.h * 0.4 }) : { x: W * fb[0], y: H * fb[1] });
-  const c1 = clickOn(reads.p1, [0.413, 0.45]);
-  const c2 = clickOn(reads.p2, [0.51, 0.73]);
+  const found = reads.products.filter(Boolean);
 
-  // 3. Her products' names, each in the free space near its product, big white condensed capitals, a hand-drawn arrow
-  // from the product to the word, at once on its click; both gone on the last click.
+  // 3. Her products' names, as many as her close-up shows (one to three): each on the product it names, found on that
+  // very picture, in the free space near it, never on another product nor on another name, big white condensed
+  // capitals, a hand-drawn arrow from the product to the word only when it points at it without crossing another, at
+  // once on its click; all gone on the last click. A product not found there: its name alone, no arrow, in a free calm
+  // place. Tristan, 6 November: « il a calé "brownie" sur le café », « plus flex, place les flèches si c'est pertinent ».
   const F = Math.round(H * 0.054);
   const LH = Math.round(F * 1.18);
   const RISE = Math.round(H * 0.1);
@@ -99,6 +125,21 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
     return w > 0 && hh > 0 ? (w * hh) / (a.w * a.h) : 0;
   };
   const safe = (L) => L.x >= 44 && L.y >= 100 && L.y + L.h <= H * 0.75 - 12 && L.x + L.w <= (L.y + L.h > H / 2 ? W - 140 : W - 40) - 4;
+  const mid = (b) => ({ x: b.x + b.w / 2, y: b.y + b.h / 2 });
+  // Whether a straight line from a to b runs over a box (its inner part): an arrow there would point at it.
+  const crosses = (a, b, o) => {
+    for (let s = 0.12; s <= 0.9; s += 0.06) {
+      const x = a.x + (b.x - a.x) * s;
+      const y = a.y + (b.y - a.y) * s;
+      if (x > o.x + o.w * 0.12 && x < o.x + o.w * 0.88 && y > o.y + o.h * 0.12 && y < o.y + o.h * 0.88) return true;
+    }
+    return false;
+  };
+  // White words need the darkest place: what is brightest under them (a plate's rim) counts most.
+  const lightCost = (L) => {
+    const light = kB >= 0 ? LightUnder(list[kB], firstSeen, BOX, { x: L.x, y: L.y, w: L.w, h: L.h }) : null;
+    return light ? 2.5 * Math.max(0, light.high - 0.6) + Math.max(0, light.mean - 0.45) : 0;
+  };
   const place = (P, text, taken, avoid) => {
     const w = estimate(text);
     const cx0 = P.x + P.w / 2;
@@ -106,7 +147,7 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
     const xs = [];
     for (let i = 0; i <= 16; i++) xs.push(W * (0.14 + i * 0.045) - w / 2);
     const tries = [];
-    [1, 0.55, 1.6, 2.3].forEach((r, j) => xs.forEach((x) => {
+    [1, 0.55, 1.6, 2.3, 0.2, 3].forEach((r, j) => xs.forEach((x) => {
       tries.push({ x, y: P.y - RISE * r - 40 - LH, side: 0.12 * j });
       tries.push({ x, y: P.y + P.h + RISE * r, side: 0.35 + 0.12 * j });
     }));
@@ -114,41 +155,62 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
       tries.push({ x: P.x + P.w + 40, y: cy0 - LH / 2 + d * P.h, side: 0.5 });
       tries.push({ x: P.x - 40 - w, y: cy0 - LH / 2 + d * P.h, side: 0.5 });
     });
+    // Off every other product first (never a name on another product); only when there is no such place, the cheapest.
     let best = null;
+    let clear = null;
     tries.forEach((c) => {
       const L = { x: Math.round(c.x), y: Math.round(c.y), w, h: LH };
       if (!safe(L) || taken.some((o) => overlap(L, o) > 0)) return;
-      const light = kB >= 0 ? LightUnder(list[kB], firstSeen, BOX, { x: L.x, y: L.y, w: L.w, h: L.h }) : null;
-      // White words need the darkest place: what is brightest under them (a plate's rim) counts most.
-      const cost = 6 * avoid.reduce((s, o) => s + overlap(L, o), 0) + 3 * overlap(L, P) + Math.hypot(L.x + L.w / 2 - cx0, L.y + L.h / 2 - cy0) / (2 * W) + c.side + (light ? 2.5 * Math.max(0, light.high - 0.6) + Math.max(0, light.mean - 0.45) : 0);
+      const on = avoid.reduce((s, o) => s + overlap(L, o), 0);
+      const cost = 6 * on + 3 * overlap(L, P) + (avoid.some((o) => crosses(mid(P), mid(L), o)) ? 2 : 0) + Math.hypot(L.x + L.w / 2 - cx0, L.y + L.h / 2 - cy0) / (2 * W) + c.side + lightCost(L);
       if (!best || cost < best.cost) best = { ...L, cost };
+      if (on === 0 && (!clear || cost < clear.cost)) clear = { ...L, cost };
     });
-    return best;
+    return clear || best;
   };
-  const fallback = (fx, fy, text, taken) => {
+  // A name whose product was not found on her picture: alone, in a free calm place off every product found and every
+  // name, one under the other in their order.
+  const loose = (text, taken, i) => {
     const w = estimate(text);
-    const L = { x: Math.round(within(W * fx - w / 2, 44, W - 144 - w)), y: Math.round(H * fy - LH / 2), w, h: LH };
-    while (taken.some((o) => overlap(L, o) > 0) && L.y + 2 * LH < H * 0.75) L.y += LH + 16;
-    return L;
+    let best = null;
+    let clear = null;
+    for (let r = 0; r < 12; r++) {
+      for (let c = 0; c <= 8; c++) {
+        const L = { x: Math.round(W * (0.14 + c * 0.09) - w / 2), y: Math.round(H * (0.12 + r * 0.05)), w, h: LH };
+        if (!safe(L) || taken.some((o) => overlap(L, o) > 0)) continue;
+        const on = found.reduce((s, o) => s + overlap(L, o), 0);
+        const cost = 6 * on + Math.abs(L.y - H * (0.2 + 0.09 * i)) / H + Math.abs(L.x + w / 2 - W / 2) / (2 * W) + lightCost(L);
+        if (!best || cost < best.cost) best = { ...L, cost };
+        if (on === 0 && (!clear || cost < clear.cost)) clear = { ...L, cost };
+      }
+    }
+    return clear || best;
   };
-  const one = word("produit1");
-  const two = word("produit2");
+  const words = [word("produit1"), word("produit2"), word("produit3")];
+  const LABELS = [L1, L2, L3];
   const names = React.useMemo(() => {
     const out = [];
-    if (one) out.push({ text: one, from: L1, P: reads.p1, L: place(reads.p1, one, [], [reads.p2]) || fallback(0.565, 0.249, one, []) });
-    if (two) {
+    words.forEach((text, i) => {
+      // None, or a thing found under the name of one before it (the same product): never named, never twice.
+      if (!text || reads.twice[i]) return;
+      const P = reads.products[i];
       const taken = out.map((o) => o.L);
-      out.push({ text: two, from: L2, P: reads.p2, L: place(reads.p2, two, taken, [reads.p1]) || fallback(0.741, 0.458, two, taken) });
-    }
+      const L = (P && place(P, text, taken, found.filter((o) => o !== P))) || loose(text, taken, i);
+      if (L) out.push({ text, i, from: LABELS[i], P, L });
+    });
     return out;
-  }, [one, two, reads, L1, L2]);
+  }, [words.join("|"), reads, L1, L2, L3]);
+  // Its arrow only when it points at its product: from its edge to the word, long enough to be one, never over another;
+  // none when the word lies on its product already (it names what it is on).
   const arrowOf = (P, L) => {
+    if (!P || overlap(L, P) > 0.3) return null;
     const above = L.y + L.h <= P.y + 6;
     const below = L.y >= P.y + P.h - 6;
     const lx = L.x + L.w / 2;
     const tail = { x: within(lx, P.x + P.w * 0.25, P.x + P.w * 0.75), y: above ? P.y + P.h * 0.08 : below ? P.y + P.h * 0.92 : P.y + P.h * 0.5 };
     const headPt = { x: lx + (tail.x < lx ? -0.14 : 0.14) * L.w, y: above ? L.y + L.h + 16 : below ? L.y - 16 : L.y + L.h / 2 };
-    return Math.hypot(headPt.x - tail.x, headPt.y - tail.y) >= 60 ? { tail, head: headPt } : null;
+    const length = Math.hypot(headPt.x - tail.x, headPt.y - tail.y);
+    return length >= 60 && length <= H * 0.32 && !found.some((o) => o !== P && crosses(tail, headPt, o)) ? { tail, head: headPt } : null;
   };
   const labels = names.flatMap((o, i) => {
     if (frame < o.from || frame >= PLAY) return [];
@@ -167,13 +229,29 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
 
   // 4. The cursor: in from the left edge, its clicks, out by the bottom left; in a straight line at an even pace between
   // its keyframes, still at each.
-  const away = { x: W * 0.83, y: H * 0.554 };
+  // Its click for each name: on its product, a little right of its middle and above; a name alone, just under it; the
+  // same thing under another name, on it again (nothing written).
+  const clickAt = (i) => {
+    const o = names.find((x) => x.i === i);
+    if (o && o.P) return inside({ x: o.P.x + o.P.w * 0.58, y: o.P.y + o.P.h * 0.4 });
+    if (o) return inside({ x: o.L.x + o.L.w * 0.6, y: o.L.y + o.L.h + 30 });
+    const b = reads.raw[i];
+    return words[i] && reads.twice[i] && b ? inside({ x: b.x + b.w * 0.58, y: b.y + b.h * 0.4 }) : null;
+  };
+  const busy = names.map((o) => o.L).concat(found);
+  const spots = [[0.83, 0.554], [0.17, 0.554], [0.83, 0.33], [0.17, 0.33], [0.5, 0.68]].map((s) => ({ x: W * s[0], y: H * s[1] }));
+  const away = spots.find((p) => !busy.some((b) => p.x >= b.x - 30 && p.x <= b.x + b.w + 30 && p.y >= b.y - 30 && p.y <= b.y + b.h + 30)) || spots[0];
   const keys = [[ENTER, { x: -W * 0.03, y: H * 0.391 }], [Math.max(ENTER + 1, PAUSE - 6), reads.t1], [PAUSE, reads.t1]];
   if (kA >= 0) keys.push([Math.max(PAUSE + 2, Math.round((PAUSE + ZOOM) / 2)), reads.t2], [ZOOM, reads.t2]);
-  keys.push([Math.max(keys[keys.length - 1][0] + 1, L1 - 6), c1], [L1, c1]);
-  if (two) keys.push([Math.max(L1 + 2, L2 - 6), c2], [L2, c2]);
-  keys.push([Math.max(keys[keys.length - 1][0] + 1, PLAY - 8), away], [PLAY, away], [Math.max(PLAY + 1, OUT), { x: -W * 0.12, y: H * 0.86 }]);
-  const clicks = [PAUSE, L1, PLAY].concat(kA >= 0 ? [ZOOM] : []).concat(two ? [L2] : []);
+  [0, 1, 2].forEach((i) => {
+    const c = clickAt(i);
+    if (!c) return;
+    const last = keys[keys.length - 1][0];
+    keys.push([Math.max(last + 1, LABELS[i] - 6), c], [Math.max(last + 2, LABELS[i]), c]);
+  });
+  keys.push([Math.max(keys[keys.length - 1][0] + 1, PLAY - 8), away], [Math.max(keys[keys.length - 1][0] + 2, PLAY), away], [Math.max(PLAY + 1, OUT), { x: -W * 0.12, y: H * 0.86 }]);
+  // Its clicks: a name's only when it has one (as its timeline's sounds).
+  const clicks = [PAUSE, PLAY].concat(kA >= 0 ? [ZOOM] : [], LABELS.filter((f, i) => words[i]));
   const pointer = (() => {
     if (frame < ENTER || frame > OUT) return null;
     let p = keys[0][1];
@@ -210,10 +288,15 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
 /**
  * Its moments, frames from its start, for its length, the Reel's tempo and the shots under it (their starts): the
  * model's proportions, its pause early in the first shot, its second click on the cut to the close-up (two shots), its
- * names a click each, the play a whole beat of the Reel from its start (the music comes back there) once the second
- * name has been read (1,7 s), the cursor out before its end.
+ * names a click each (`three`: her close-up shows three products, a third click), the play a whole beat of the Reel
+ * from its start (the music comes back there) once her last name has been read (1,7 s), the cursor out before its end.
  */
-export function curseurMoments(frames: number, bpm: number, shots: { from: number; frames: number }[]): { enter: number; pause: number; zoom: number; label1: number; label2: number; play: number; out: number } {
+export function curseurMoments(
+  frames: number,
+  bpm: number,
+  shots: { from: number; frames: number }[],
+  three = false,
+): { enter: number; pause: number; zoom: number; label1: number; label2: number; label3: number; play: number; out: number } {
   const D = Math.max(1, frames);
   const beat = (60 / Math.min(140, Math.max(60, bpm))) * 30;
   const two = shots.length > 1;
@@ -224,17 +307,21 @@ export function curseurMoments(frames: number, bpm: number, shots: { from: numbe
   const zoom = two ? Math.max(cut, pause + 2) : -1;
   const from = two ? zoom : pause;
   const label1 = clamp(from + Math.max(12, D * (two ? 0.1 : 0.13)), from + 1, D - 1);
-  const label2 = clamp(label1 + Math.max(18, D * 0.12), label1 + 1, D - 1);
+  // Three names a click closer (each still 0,5 s at least after the one before), so the third is read as long.
+  const step = three ? Math.max(16, D * 0.09) : Math.max(18, D * 0.12);
+  const label2 = clamp(label1 + step, label1 + 1, D - 1);
+  const label3 = clamp(label2 + step, label2 + 1, D - 1);
+  const named = three ? label3 : label2;
   // The play on a whole beat from its start (the music comes back there: off it, it would drift from the cuts after),
-  // once her second name has been read (1,7 s), a second before its end at most; else the last whole beat that leaves
+  // once her last name has been read (1,7 s), a second before its end at most; else the last whole beat that leaves
   // it a second; else (a very short one) a second before its end.
-  const wanted = label2 + 51;
-  const latest = Math.max(label2 + 1, D - 30);
+  const wanted = named + 51;
+  const latest = Math.max(named + 1, D - 30);
   const first = Math.ceil(wanted / beat - 1e-9) * beat;
   const last = Math.floor(latest / beat + 1e-9) * beat;
-  const play = Math.round(first <= latest ? first : last > label2 + 30 ? last : Math.min(latest, Math.max(label2 + 1, D - 2)));
+  const play = Math.round(first <= latest ? first : last > named + 30 ? last : Math.min(latest, Math.max(named + 1, D - 2)));
   const out = clamp(play + Math.max(10, D * 0.12), play + 1, D);
-  return { enter, pause, zoom, label1, label2, play, out };
+  return { enter, pause, zoom, label1, label2, label3, play, out };
 }
 
 /** Whether a moment (frames from its start) is on a whole beat of the Reel, within half an image. */
@@ -245,10 +332,13 @@ export const onWholeBeat = (frames: number, bpm: number) => {
 
 export const curseur: EffectPiece = {
   key: "curseur",
-  version: 1,
+  // 2: each name on the product it names, found on that very picture, as many as it shows (one to three), its arrow only
+  // when it points at it; never a product her request names that her picture does not show (Tristan, 6 November: « il a
+  // calé "brownie" sur le café », « plus flex, place les flèches si c'est pertinent quoi »).
+  version: 2,
   name: "Un clic sur tes produits",
-  how: "un curseur d'ordinateur (la flèche blanche en pixels) entre sur sa vidéo et clique : l'image se fige et la musique s'arrête ; avec deux plans, un clic sur ce que tient la personne ouvre le gros plan de ses produits ; un clic sur chacun écrit son nom en grandes capitales blanches avec une flèche dessinée à la main ; un dernier clic efface les noms et relance la vidéo et la musique, le curseur s'en va ; chaque clic s'entend ; puis le montage reprend.",
-  needs: "une photo ou une vidéo de près de un ou deux de ses produits bien séparés, avec un peu de place libre autour ; avant elle, de préférence, une vidéo de son lieu où quelqu'un les porte.",
+  how: "un curseur d'ordinateur (la flèche blanche en pixels) entre sur sa vidéo et clique : l'image se fige et la musique s'arrête ; avec deux plans, un clic sur ce que tient la personne ouvre le gros plan de ses produits ; un clic sur chacun de ceux qu'on y voit (un à trois) écrit son nom en grandes capitales blanches, là où il est, avec une flèche dessinée à la main quand elle a quelque chose à montrer ; un dernier clic efface les noms et relance la vidéo et la musique, le curseur s'en va ; chaque clic s'entend ; puis le montage reprend.",
+  needs: "une photo ou une vidéo de près de un à trois de ses produits bien séparés, avec un peu de place libre autour ; avant elle, de préférence, une vidéo de son lieu où quelqu'un les porte.",
   lays: "sur son gros plan de produits seul, ou sur sa vidéo où quelqu'un les porte puis le gros plan (coupé sur le clic), de 4 à 9 s, le gros plan tenu 3 s au moins",
   shots: [1, 2],
   seconds: [4, 9],
@@ -256,26 +346,36 @@ export const curseur: EffectPiece = {
   texts: [
     {
       slot: "produit1",
-      want: "le nom du produit sur lequel la souris clique en premier (le plus haut, ou celui de gauche, sur le gros plan), en un à trois mots comme sur sa carte (une forme comme « Cappuccino », « Pain au chocolat ») ; jamais une phrase, rien d'inventé",
+      want: "le nom du produit que montre le gros plan, sur lequel la souris clique en premier (le plus haut, ou celui de gauche), en un à trois mots comme sur sa carte (une forme comme « Cappuccino », « Pain au chocolat ») ; un produit qu'on y voit, jamais un autre que sa demande nomme ; jamais une phrase, rien d'inventé",
       max: 18,
       required: true,
+      names: "produit1",
     },
     {
       slot: "produit2",
-      want: "facultatif : le nom du second produit du gros plan, en un à trois mots de la même façon (une forme comme « Brownie ») ; vide quand on n'en voit qu'un",
+      want: "facultatif : le nom d'un deuxième produit qu'on voit sur le gros plan, en un à trois mots de la même façon (une forme comme « Brownie ») ; vide quand il n'en montre qu'un, même si sa demande en nomme un autre",
       max: 18,
       required: false,
+      names: "produit2",
+    },
+    {
+      slot: "produit3",
+      want: "facultatif : le nom d'un troisième produit qu'on voit sur le gros plan, de la même façon ; vide quand il n'en montre pas trois",
+      max: 18,
+      required: false,
+      names: "produit3",
     },
   ],
   objects: [
     { slot: "produit1", shot: -1, want: "son premier produit sur le gros plan (le plus haut, ou celui de gauche), nommé en anglais comme l'œil le voit (« cappuccino cup », « croissant »)" },
-    { slot: "produit2", shot: -1, want: "le second produit du gros plan, nommé de même ; aucun quand on n'en voit qu'un" },
+    { slot: "produit2", shot: -1, want: "un deuxième produit qu'on voit sur le gros plan, une autre chose que le premier, nommé de même ; aucun quand il n'en montre qu'un" },
+    { slot: "produit3", shot: -1, want: "un troisième produit qu'on voit sur le gros plan, une autre chose que les deux premiers, nommé de même ; aucun quand il n'en montre pas trois" },
   ],
   timeline(input: PieceTimelineInput) {
-    const m = curseurMoments(input.frames, input.bpm, input.shots);
+    const m = curseurMoments(input.frames, input.bpm, input.shots, Boolean(input.words.produit3));
     const two = input.shots.length > 1;
     const s = (f: number) => Math.round((f / 30) * 1000) / 1000;
-    const clicks = [m.pause, ...(two ? [m.zoom] : []), m.label1, ...(input.words.produit2 ? [m.label2] : []), m.play].filter((f, i, all) => f >= 0 && f < input.frames && all.indexOf(f) === i);
+    const clicks = [m.pause, ...(two ? [m.zoom] : []), m.label1, ...(input.words.produit2 ? [m.label2] : []), ...(input.words.produit3 ? [m.label3] : []), m.play].filter((f, i, all) => f >= 0 && f < input.frames && all.indexOf(f) === i);
     return {
       marks: m,
       // Each click heard: a computer mouse's, alone in the silence between the pause and the play.

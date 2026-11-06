@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { checkMotionCode } from "../motion-scene.ts";
 import { editPlanSchema } from "../schemas.ts";
-import { readSkillFill, skillLengths, skillPlan, toFrame } from "../skills.ts";
+import { readSkillFill, SKILL_FILL_PROMPT, skillFillInput, skillFillSchema, skillLengths, skillPlan, toFrame } from "../skills.ts";
 import { clearsDrawn, objectsDrawn, readsDrawn, subjectsDrawn } from "../subject.ts";
 import { CURSEUR_CLICKS, CURSEUR_MOMENTS, curseur } from "./curseur.ts";
 
@@ -67,7 +67,7 @@ function cursorAt(tree: Drawn) {
 }
 
 test("« Un clic sur tes produits » (v1): its three shots and its moments at the original's images (90 BPM, a beat every 20), one beat more for her second name", () => {
-  assert.equal(curseur.version, 2);
+  assert.equal(curseur.version, 3);
   assert.equal(curseur.bpm, 90);
   assert.deepEqual(curseur.shots, [3, 3]);
   const line = curseur.timeline(3, { end: false });
@@ -85,15 +85,17 @@ test("« Un clic sur tes produits » (v1): its three shots and its moments at th
   assert.deepEqual(line.music!.pauses!.map((p) => [toFrame(p.from), toFrame(p.to)]), [[40, 238]]);
   assert.ok(Math.abs(line.music!.end!.at - line.duration) < 0.001);
   // Its names on their clicks, cleared together; each read long enough (0,8 s and 0,3 s a word, three words at most).
-  assert.deepEqual(Object.keys(line.texts), ["produit1", "produit2"]);
+  assert.deepEqual(Object.keys(line.texts), ["produit1", "produit2", "produit3"]);
   assert.deepEqual([toFrame(line.texts.produit1!.from), toFrame(line.texts.produit2!.from), toFrame(line.texts.produit1!.to)], [83, 109, 161]);
   assert.ok(line.texts.produit2!.to - line.texts.produit2!.from >= 0.8 + 3 * 0.3 - 0.01);
   // Nothing of her is cut out; its products are named by the filler on the close-up.
   assert.deepEqual(line.cutouts, []);
-  assert.deepEqual(curseur.objects?.map((o) => [o.slot, o.shot]), [["produit1", 1], ["produit2", 1]]);
+  assert.deepEqual(curseur.objects?.map((o) => [o.slot, o.shot]), [["produit1", 1], ["produit2", 1], ["produit3", 1]]);
+  // Each name names its product: written only for a thing seen on her close-up (unseenThings).
+  assert.deepEqual(curseur.texts.map((t) => [t.slot, t.names]), [["produit1", "produit1"], ["produit2", "produit2"], ["produit3", "produit3"]]);
   // The shots' wants for the filler: her place, her products close, the rest of the same video from its pause.
   assert.match(line.shots[0]!.want, /se met en pause/);
-  assert.match(line.shots[1]!.want, /deux de ses produits/);
+  assert.match(line.shots[1]!.want, /un à trois de ses produits/);
   assert.match(line.shots[2]!.want, /même vidéo que le premier plan.*1,37 s/);
 });
 
@@ -197,23 +199,157 @@ test("« Un clic sur tes produits »: the cursor, a pixel arrow pressed in on ea
   assert.ok(Math.abs(b.x - a.x - (c.x - b.x)) <= 1 && Math.abs(b.y - a.y - (c.y - b.y)) <= 1, JSON.stringify([a, b, c]));
 });
 
-test("« Un clic sur tes produits »: without anything read, the cursor clicks where the original's does", () => {
+test("« Un clic sur tes produits »: without anything read, the cursor clicks where the original's does, her names alone without arrows (v3)", () => {
   const draw = sceneOf(curseur.code);
   const props = propsFor(UPRIGHT, WORDS);
   const tip = (f: number) => cursorAt(draw(f, props))!;
-  // Beside the person (67,6 %, 63,2 %), on what she holds (47,4 %, 60,2 %), her two products (41,3 %, 45 % and 51 %, 73 %),
-  // away from them (82,8 %, 55,4 %), the top for the double click (62,2 %, 20 %), the person again (50 %, 62 %).
+  // Beside the person (67,6 %, 63,2 %), on what she holds (47,4 %, 60,2 %), away from her names (82,8 %, 55,4 %), the top
+  // for the double click (62,2 %, 20 %), the person again (50 %, 62 %).
   const near = (f: number, x: number, y: number) => {
     const p = tip(f - 3);
     assert.ok(Math.abs(p.x - 1080 * x) <= 2 && Math.abs(p.y - 1920 * y) <= 2, `${f}: ${JSON.stringify(p)} for ${x}, ${y}`);
   };
   near(40, 0.676, 0.632);
   near(68, 0.474, 0.602);
-  near(83, 0.413, 0.45);
-  near(109, 0.51, 0.73);
   near(161, 0.828, 0.554);
   near(194, 0.622, 0.2);
   near(238, 0.5, 0.62);
+  // No product found on her close-up: never an arrow pointing at nothing (v2 pointed at the original's dishes); each name
+  // alone, one under the other, inside the safe zone, the cursor clicking just under it as it appears.
+  const tree = draw(120, props);
+  assert.equal(nodes(tree).filter((n) => n.type === "Scribble").length, 0);
+  type R = { left: number; top: number; width: number; height: number };
+  const named = nodes(tree).filter((n) => n.type === "FitText").map((n) => [textOf(n), styleOf(n) as unknown as R] as const);
+  assert.deepEqual(named.map(([t]) => t), ["Cappuccino", "Brownie"]);
+  const [a, b] = named.map(([, r]) => r);
+  assert.ok(a!.top + a!.height <= b!.top, JSON.stringify([a, b]));
+  for (const r of [a!, b!]) assert.ok(r.left >= 40 && r.top >= 80 && r.top + r.height <= 1440 && r.left + r.width <= (r.top + r.height > 960 ? 940 : 1040), JSON.stringify(r));
+  const at83 = tip(83);
+  assert.ok(at83.y >= a!.top + a!.height && at83.y <= a!.top + a!.height + 60 && at83.x >= a!.left && at83.x <= a!.left + a!.width, JSON.stringify([at83, a]));
+});
+
+/** Her close-up with her products found where they are, the code named as its filler names them. */
+function namedScene(boxes: Record<string, Box>, light?: number) {
+  const names = Object.keys(boxes);
+  let code = curseur.code;
+  names.forEach((name, i) => (code = code.split(`"@produit${i + 1}"`).join(JSON.stringify(name))));
+  return sceneOf(code, { boxes, ...(light !== undefined ? { light } : {}) });
+}
+type R = { left: number; top: number; width: number; height: number };
+const hits = (a: R, b: Box) => a.left < b.x + b.w && b.x < a.left + a.width && a.top < b.y + b.h && b.y < a.top + a.height;
+const labelsAt = (tree: Drawn) => nodes(tree).filter((n) => n.type === "FitText" && String(n.props.key).startsWith("name-"));
+
+test("« Un clic sur tes produits » (v3): a name the picture does not show is never laid on another product (Tristan: « il a calé “brownie” sur le café »)", () => {
+  // Its production bench: « Le cappuccino et le brownie du moment », on a close-up of one cappuccino; the detector found
+  // « brownie » on the cup itself (Grounding DINO at 0,3 sees a brownie in a brown foam).
+  const cup = { x: 0, y: 300, w: 1080, h: 1250 };
+  const draw = namedScene({ "cappuccino cup": cup, brownie: { x: 120, y: 420, w: 760, h: 700 } });
+  const props = propsFor(UPRIGHT, WORDS);
+  assert.deepEqual(labelsAt(draw(120, props)).map(textOf), ["Cappuccino"]);
+  // Its click on the cup still heard (its timeline's sounds follow her words), nothing written for it. The cup fills
+  // the picture: its name on it, without an arrow (it names what it is on: « place les flèches si c'est pertinent »).
+  assert.equal(nodes(draw(120, props)).filter((n) => n.type === "Scribble").length, 0);
+  const name = styleOf(labelsAt(draw(120, props))[0]!) as unknown as R;
+  assert.ok(hits(name, cup));
+  // Its filler first: a name its close-up's reading does not show is not written at all (readSkillFill, below).
+});
+
+test("« Un clic sur tes produits » (v3): a product found off the frame (her horizontal close-up cropped upright) is not named", () => {
+  // Its bench as it was: 44954 (a cappuccino on the left, a brownie on the right, filmed in width) played upright shows
+  // its middle; the brownie found right of the frame, « BROWNIE » was written high with an arrow from the right edge.
+  const draw = namedScene({ "cappuccino cup": { x: 80, y: 520, w: 760, h: 900 }, brownie: { x: 1020, y: 700, w: 700, h: 520 } });
+  const props = propsFor(UPRIGHT, WORDS);
+  const tree = draw(120, props);
+  assert.deepEqual(labelsAt(tree).map(textOf), ["Cappuccino"]);
+  const arrows = nodes(tree).filter((n) => String(n.props.key).startsWith("arrow-"));
+  assert.ok(arrows.every((a) => (a.props.from as { x: number }).x < 1080 && (a.props.to as { x: number }).x < 1080));
+  // Half of it in the frame: named, its arrow from the part we see.
+  const half = namedScene({ "cappuccino cup": { x: 40, y: 380, w: 560, h: 420 }, brownie: { x: 600, y: 1000, w: 700, h: 380 } });
+  const both = half(120, props);
+  assert.deepEqual(labelsAt(both).map(textOf), ["Cappuccino", "Brownie"]);
+  const second = nodes(both).find((n) => n.props.key === "arrow-1");
+  if (second) assert.ok((second.props.from as { x: number }).x <= 1080, JSON.stringify(second.props.from));
+});
+
+test("« Un clic sur tes produits » (v3): as many names as her close-up shows, each on its own product, an arrow only when it points at it", () => {
+  const boxes = { "cappuccino cup": { x: 90, y: 560, w: 400, h: 330 }, brownie: { x: 600, y: 700, w: 360, h: 260 }, croissant: { x: 260, y: 1100, w: 520, h: 280 } };
+  const draw = namedScene(boxes);
+  const words = { produit1: "Cappuccino", produit2: "Brownie", produit3: "Croissant" };
+  const line = curseur.timeline(3, { end: false, words });
+  // A click a beat for three names (83, 103, 123), the third read 1,7 s, the clear at 174; its length unchanged.
+  assert.deepEqual([line.marks.label1, line.marks.label2, line.marks.label3, line.marks.clear], [83, 103, 123, 174]);
+  assert.equal(line.duration, curseur.timeline(3, { end: false }).duration);
+  assert.deepEqual(line.sounds!.map((s) => toFrame(s.at)), [40, 68, 83, 103, 123, 174, 194, 199, 238]);
+  assert.deepEqual([toFrame(line.texts.produit3!.from), toFrame(line.texts.produit3!.to)], [123, 174]);
+  const props = propsFor(UPRIGHT, words, {}, line);
+  const tree = draw(150, props);
+  const named = labelsAt(tree);
+  assert.deepEqual(named.map(textOf), ["Cappuccino", "Brownie", "Croissant"]);
+  const rects = named.map((n) => styleOf(n) as unknown as R);
+  const own = [boxes["cappuccino cup"], boxes.brownie, boxes.croissant];
+  rects.forEach((r, i) => {
+    // Never on another product nor on another name; inside the safe zone.
+    own.forEach((b, j) => assert.ok(j === i || !hits(r, b), `${i} on ${j}: ${JSON.stringify(r)}`));
+    rects.forEach((o, j) => assert.ok(j === i || !hits(r, { x: o.left, y: o.top, w: o.width, h: o.height })));
+    assert.ok(r.left >= 40 && r.top >= 80 && r.top + r.height <= 1440 && r.left + r.width <= (r.top + r.height > 960 ? 940 : 1040), JSON.stringify(r));
+  });
+  // Each arrow from its own product to its own name, over no other product.
+  const arrows = nodes(tree).filter((n) => String(n.props.key).startsWith("arrow-"));
+  assert.ok(arrows.length >= 2, `${arrows.length}`);
+  for (const a of arrows) {
+    const i = Number(String(a.props.key).slice(6));
+    const tail = a.props.from as { x: number; y: number };
+    const b = own[i]!;
+    assert.ok(tail.x >= b.x && tail.x <= b.x + b.w && tail.y >= b.y && tail.y <= b.y + b.h, JSON.stringify([i, tail, b]));
+  }
+  // The cursor on each product as it clicks it, the third included.
+  const tip = cursorAt(draw(121, props))!;
+  assert.ok(Math.abs(tip.x - (260 + 520 * 0.58)) <= 2 && Math.abs(tip.y - (1100 + 280 * 0.4)) <= 2, JSON.stringify(tip));
+  assert.ok(Math.abs(cursorAt(draw(123, props))!.h - 171 * 0.69) < 1);
+  // One name only: no second click heard nor pressed.
+  const single = curseur.timeline(3, { end: false, words: { produit1: "Croissant" } });
+  assert.deepEqual(single.sounds!.map((s) => toFrame(s.at)), [40, 68, 83, 161, 194, 199, 238]);
+});
+
+test("« Un clic sur tes produits » (v3): its filler's names kept only for what her close-up shows, each a different thing (unseenThings)", () => {
+  const files = [
+    { id: "lieu", photo: false, seconds: 10, shows: "Un barista en chemise noire tient un plateau de cafés derrière le comptoir." },
+    { id: "gros", photo: true, seconds: 0, shows: "Gros plan d'un cappuccino avec un cœur dans la mousse, tasse blanche." },
+    { id: "brownie", photo: true, seconds: 0, shows: "Un cappuccino et un brownie aux noix sur une assiette, vus de près." },
+  ];
+  const answer = (shot: string, objets: { slot: string; name: string; seen?: string }[], texts = [{ slot: "produit1", text: "Cappuccino" }, { slot: "produit2", text: "Brownie" }]) =>
+    ({ fits: true, missing: "", shots: [{ file: "lieu", at: 2 }, { file: shot, at: 0 }, { file: "lieu", at: 3.37 }], texts, objets, end: null, why: "" }) as never;
+  // Its bench: the brownie her request names, quoted from a reading that does not have it: not written, not followed.
+  const bench = readSkillFill(curseur, files, 3, answer("gros", [{ slot: "produit1", name: "cappuccino cup", seen: "un cappuccino" }, { slot: "produit2", name: "brownie", seen: "un brownie" }]))!;
+  assert.deepEqual([bench.texts, bench.objects], [{ produit1: "Cappuccino" }, { produit1: "cappuccino cup" }]);
+  // The cappuccino quoted again for it: the same thing, never named twice; no quote at all: nothing seen.
+  const twice = readSkillFill(curseur, files, 3, answer("gros", [{ slot: "produit1", name: "cappuccino cup", seen: "cappuccino" }, { slot: "produit2", name: "brownie", seen: "un cappuccino avec un coeur" }]))!;
+  assert.deepEqual(twice.texts, { produit1: "Cappuccino" });
+  assert.deepEqual(readSkillFill(curseur, files, 3, answer("gros", [{ slot: "produit1", name: "cappuccino cup", seen: "un cappuccino" }, { slot: "produit2", name: "brownie", seen: "" }]))!.texts, { produit1: "Cappuccino" });
+  // Named the same as the first: the same thing.
+  assert.deepEqual(readSkillFill(curseur, files, 3, answer("gros", [{ slot: "produit1", name: "cappuccino cup" }, { slot: "produit2", name: "Cappuccino Cup" }]))!.texts, { produit1: "Cappuccino" });
+  // Nothing named for it (nothing there fits): its name stays empty.
+  assert.deepEqual(readSkillFill(curseur, files, 3, answer("gros", [{ slot: "produit1", name: "cappuccino cup" }, { slot: "produit2", name: "" }]))!.texts, { produit1: "Cappuccino" });
+  // Her photo that shows both cast there instead: both written, both followed (accents and case aside).
+  const both = readSkillFill(curseur, files, 3, answer("brownie", [{ slot: "produit1", name: "cappuccino cup", seen: "Un cappuccino" }, { slot: "produit2", name: "brownie", seen: "un brownie aux noix" }]))!;
+  assert.deepEqual([both.texts, both.objects], [{ produit1: "Cappuccino", produit2: "Brownie" }, { produit1: "cappuccino cup", produit2: "brownie" }]);
+  // Her first product not seen there: the fill fails (a required name), the editor makes her Reel.
+  assert.equal(readSkillFill(curseur, files, 3, answer("gros", [{ slot: "produit1", name: "brownie", seen: "un brownie" }])), null);
+  // A file without a reading: nothing to check its quote against, its name kept.
+  const bare = files.map((f) => ({ ...f, shows: undefined }));
+  assert.deepEqual(readSkillFill(curseur, bare, 3, answer("gros", [{ slot: "produit1", name: "cappuccino cup", seen: "un cappuccino" }, { slot: "produit2", name: "brownie", seen: "un brownie" }]))!.texts, WORDS);
+});
+
+test("« Un clic sur tes produits » (v3): its filler is told which text names which object, and the rule for every model", () => {
+  const input = skillFillInput({ skill: curseur, name: "Un clic sur tes produits", n: 3, files: [{ id: "a", photo: true, seconds: 0, shows: "un cappuccino" }], business: { name: "Café des Arts" }, request: "Le cappuccino et le brownie du moment." });
+  assert.deepEqual(
+    (input.objets as { slot: string; son_texte?: string }[]).map((o) => [o.slot, o.son_texte]),
+    [["produit1", "produit1"], ["produit2", "produit2"], ["produit3", "produit3"]],
+  );
+  assert.match(SKILL_FILL_PROMPT, /a word written on or beside a thing in a shot \(a product's name, a label\) names what the file cast there shows/);
+  assert.match(SKILL_FILL_PROMPT, /never something her request names that her files do not show/);
+  assert.match(SKILL_FILL_PROMPT, /"seen": the few words of that file's « montre » or « moments » that show it, copied as they are/);
+  assert.ok(skillFillSchema.safeParse({ fits: true, missing: "", shots: [], texts: [], end: null, objets: [{ slot: "produit1", name: "cup", seen: "un cappuccino" }], why: "" }).success);
 });
 
 test("« Un clic sur tes produits »: the cursor goes to the person and to her products as they are read, her names placed near them", () => {

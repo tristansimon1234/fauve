@@ -121,9 +121,11 @@ export async function playPieces(input: {
       continue;
     }
     const earlier = input.previous?.layers?.find((l) => l.motion.piece?.key === key);
+    // The shots under it as its filler reads them: a name it writes on a thing is kept only for a thing they show.
+    const shown = under.map((k) => underOf(input.plan, input.facts, k));
     const fillInput = pieceFillInput({
       piece,
-      under: under.map((k) => underOf(input.plan, input.facts, k)),
+      under: shown,
       brief: layer.motion.brief,
       request: input.request?.slice(0, BRIEF_MAX) || "Un Reel avec ses fichiers.",
       business: { name: input.studio.name, activity: input.studio.business, facts: memoryLines(input.studio.memory) },
@@ -157,7 +159,7 @@ export async function playPieces(input: {
     // Its layer from an answer, then its check (its words and marks as they will play): its js, or what the check refused.
     let filledWith: Parameters<typeof pieceMotion>[0]["fill"] | null = null;
     const tried = async (answer: PieceFillAnswer): Promise<{ js: string; fonts: string[] } | { error: string } | null> => {
-      const filled = readPieceFill(piece, answer, { photos: (input.photos ?? []).map((p) => p.id), ...(facts ? { facts } : {}) });
+      const filled = readPieceFill(piece, answer, { photos: (input.photos ?? []).map((p) => p.id), under: shown, ...(facts ? { facts } : {}) });
       if (!filled) return null;
       // A correction keeps the settings it had (« papier noir » once asked) but what her request changes now.
       const read = earlier ? { ...filled, settings: mergeSkillSettings(piece, pieceSettingsOf(piece, earlier.motion), answer.settings) } : filled;
