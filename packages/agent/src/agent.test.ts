@@ -6153,6 +6153,70 @@ test("« voile », « overlay », « on voit pas bien le texte » on a model: a 
   assert.match(SKILL_FILL_PROMPT, /« voile », « overlay », « fond sombre derrière le texte », « on voit pas bien le texte »\) fit: the engine lays a soft veil/);
 });
 
+test("every model: her picture darkened under its words where they do not hold on it, never under a dark one", async () => {
+  const { veilFor, inkZones, VEIL_MAX } = await import("../../../apps/render/src/contrast.ts");
+  const { readPassages, readKey, wantsReads } = await import("./subject.ts");
+  const { buildReelProps } = await import("./motion.ts");
+  const white = 1;
+  // White words on a pale wall in the sun: darkened, just enough, never more than its most.
+  const pale = veilFor(white, { mean: 0.85, high: 0.97 });
+  assert.ok(pale > 0.3 && pale <= VEIL_MAX, String(pale));
+  // On a dark café, a night street: nothing (a veil no one needs only dulls her picture).
+  assert.equal(veilFor(white, { mean: 0.25, high: 0.4 }), 0);
+  // In between, a lighter touch.
+  const mid = veilFor(white, { mean: 0.65, high: 0.8 });
+  assert.ok(mid > 0 && mid < pale, String(mid));
+  // Dark letters are never darkened under (it would lose them); unread light: nothing, unless she asked for a veil.
+  assert.equal(veilFor(0.02, { mean: 0.9, high: 0.95 }), 0);
+  assert.equal(veilFor(white, null), 0);
+  assert.equal(veilFor(white, null, 0.45), 0.45);
+  // Asked (« voile »): the same darkening, stronger: at least that dark under each word, even on a dark picture.
+  assert.equal(veilFor(white, { mean: 0.25, high: 0.4 }, 0.45), 0.45);
+  assert.ok(veilFor(white, { mean: 0.85, high: 0.97 }, 0.45) >= Math.max(pale, 0.45));
+  // The check's sightings make one zone a word and a shot, in a row; a word seen again later is another zone.
+  const step = 15;
+  const zones = inkZones(
+    [
+      { text: "Le Marais", shot: 0, frame: 0, box: [100, 200, 400, 260], ink: 1 },
+      { text: "Le Marais", shot: 0, frame: 15, box: [110, 205, 420, 262], ink: 1 },
+      { text: "Le Marais", shot: 0, frame: 90, box: [100, 200, 400, 260], ink: 1 },
+      { text: "Paris", shot: 1, frame: 30, box: [600, 900, 800, 960], ink: 0.9 },
+    ],
+    step,
+  );
+  assert.deepEqual(zones, [
+    { shot: 0, from: 0, to: 23, box: [100, 200, 420, 262], ink: 1 },
+    { shot: 1, from: 22, to: 38, box: [600, 900, 800, 960], ink: 0.9 },
+    { shot: 0, from: 82, to: 98, box: [100, 200, 400, 260], ink: 1 },
+  ]);
+  // The shots her words lie over have their light read before the render (shot_read.py), for every model.
+  const plan = {
+    segments: [
+      { clip_id: "v0", in: 0, out: 3 },
+      { clip_id: "v1", in: 2, out: 5 },
+    ],
+    layers: [{ from: 0, to: 6, compose: true, motion: { brief: "", js: "function Scene(){ return null; }" }, ink: zones }],
+  } as never;
+  assert.equal(wantsReads(plan), true);
+  assert.deepEqual(readPassages(plan, () => true), [
+    { clip_id: "v0", from: 0, to: 3, key: readKey("v0", 0, 3), kinds: ["light"] },
+    { clip_id: "v1", from: 2, to: 5, key: readKey("v1", 2, 5), kinds: ["light"] },
+  ]);
+  // And the render gets them on the composition.
+  const reel = editPlanSchema.parse({
+    ...validPlan,
+    duration: 6,
+    images: [],
+    segments: [
+      { clip_id: "a", in: 0, out: 3 },
+      { clip_id: "a", in: 3, out: 6 },
+    ],
+    layers: [{ from: 0, to: 6, compose: true, motion: { brief: "quatre-coins", js: "function Scene(){ return null; }", draws_texts: true }, ink: zones }],
+  });
+  const props = buildReelProps(reel, { template: "libre", clipUrls: { a: "https://example.com/a.mp4" }, brand: { name: "Studio" } });
+  assert.deepEqual(props.layers?.[0]?.ink, zones);
+});
+
 test("the delivery is short: never the editor's or the filler's sentence on its choices, one sentence for the sound", async () => {
   const { deliveryWords } = await import("./editor.ts");
   const { addedSoundLine } = await import("./sound-follow.ts");

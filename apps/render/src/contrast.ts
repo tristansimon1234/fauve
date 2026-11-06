@@ -181,3 +181,70 @@ export function lostOn(text: Rgb, alpha: number, cells: Rgb[]): { lost: boolean;
   const ratios = cells.map((c) => contrast(seen(c), c)).sort((a, b) => a - b);
   return { lost: lost >= cells.length / 2, ratio: ratios[ratios.length >> 1]! };
 }
+
+// ——— A model's words on her picture: darkened under them where they do not hold (Tristan: « plutôt assombrir l'image ») ———
+
+/**
+ * A word of a model's composition seen over one of her shots (the scene check, FAUVE_WORDS): the shot it is over (its
+ * index in the composition's shots), its moment (frames of the composition), its box (px of the 1080 × 1920 frame) and
+ * the relative luminance of its letters (0 black, 1 white). Never a word on a ground the model paints itself (a band, a
+ * shadow, a gradient of its own), with an outline or a dense shadow of its own, or decor letters: those read already.
+ */
+export type InkZone = { shot: number; from: number; to: number; box: Box; ink: number };
+
+/** One word as the check sees it at one of its sampled frames. */
+export type InkSeen = { text: string; shot: number; frame: number; box: Box; ink: number };
+
+/** The most zones a Reel keeps (its words over her shots, merged by word and shot). */
+export const INK_ZONES_MAX = 48;
+
+/**
+ * The zones of a model's words over her shots, from what the check saw at its sampled frames (every `step` frames): one
+ * per word and shot, from half a step before it was first seen to half a step after it was last seen in a row, its box
+ * the union of its boxes, its letters' luminance at its lightest. INK_ZONES_MAX at most, the longest first.
+ */
+export function inkZones(seen: InkSeen[], step: number): InkZone[] {
+  const runs = new Map<string, { shot: number; first: number; last: number; box: Box; ink: number }[]>();
+  for (const s of [...seen].sort((a, b) => a.frame - b.frame)) {
+    const key = `${s.shot}|${s.text}`;
+    const list = runs.get(key) ?? runs.set(key, []).get(key)!;
+    const run = list.at(-1);
+    if (run && s.frame - run.last <= step) {
+      run.last = s.frame;
+      run.box = [Math.min(run.box[0], s.box[0]), Math.min(run.box[1], s.box[1]), Math.max(run.box[2], s.box[2]), Math.max(run.box[3], s.box[3])];
+      run.ink = Math.max(run.ink, s.ink);
+    } else list.push({ shot: s.shot, first: s.frame, last: s.frame, box: [...s.box] as Box, ink: s.ink });
+  }
+  const half = Math.ceil(step / 2);
+  return [...runs.values()]
+    .flat()
+    .map((r): InkZone => ({ shot: r.shot, from: Math.max(0, r.first - half), to: r.last + half, box: r.box.map(Math.round) as Box, ink: Math.round(r.ink * 100) / 100 }))
+    .sort((a, b) => b.to - b.from - (a.to - a.from))
+    .slice(0, INK_ZONES_MAX)
+    .sort((a, b) => a.from - b.from);
+}
+
+/** The contrast a model's light words keep on her picture once darkened (WCAG's 3:1 for large text, a little above). */
+export const VEIL_CONTRAST = 3.5;
+/** The darkest an automatic veil goes, and how dark one asked for (« voile », « on voit pas bien le texte ») is at least. */
+export const VEIL_MAX = 0.55;
+
+/**
+ * How much to darken her picture under a model's word (0 to VEIL_MAX: the opacity of black laid over it): light letters
+ * (`ink`, relative luminance) on a picture whose light there (`light`, LightUnder: mean and brightest tenth, 0 to 1) does
+ * not hold VEIL_CONTRAST get just enough black for it; a dark picture, or dark letters (which a darker picture would only
+ * lose), get none. `asked`: a veil she asked for (plan.layers[].scrim), at least that dark under every word.
+ */
+export function veilFor(ink: number, light: { mean: number; high: number } | null, asked = 0): number {
+  if (ink < 0.35) return 0;
+  if (!light) return Math.min(VEIL_MAX, asked);
+  // The picture as bright as its bright parts weigh under a word (a white wall, a sunny sky), as relative luminance.
+  const v = Math.max(0, Math.min(1, Math.max(light.mean, 0.75 * light.high)));
+  const under = v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
+  // Black at opacity d multiplies the picture's sRGB values by (1 − d): its luminance by about (1 − d)^2.2.
+  const wanted = (ink + 0.05) / VEIL_CONTRAST - 0.05;
+  const needed = under <= wanted ? 0 : wanted <= 0 ? VEIL_MAX : 1 - (wanted / under) ** (1 / 2.2);
+  // Below a light touch, nothing (a veil no one sees only dulls her picture).
+  const auto = needed < 0.06 ? 0 : needed;
+  return Math.round(Math.min(VEIL_MAX, Math.max(auto, asked)) * 100) / 100;
+}

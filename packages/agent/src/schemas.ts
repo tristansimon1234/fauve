@@ -446,8 +446,31 @@ export const editPlanLayerSchema = z.object({
    * the model's, never a box in another font (withScrim). Set by the engine, kept by a correction.
    */
   scrim: z.number().min(0.15).max(0.7).optional(),
+  /**
+   * A model's words right over her shots, as the scene check saw them when it was filled (FAUVE_WORDS of SceneCheck):
+   * the render darkens her picture under each one whose letters do not hold on it (veilFor, on the shot's light read
+   * before the render), softly and only there; never under words on a ground the model paints itself. Set by the engine.
+   */
+  ink: z.array(z.lazy(() => inkZoneSchema)).max(48).optional(),
 });
 export type PlanLayer = z.infer<typeof editPlanLayerSchema>;
+
+/** A model's word over one of her shots: the shot (its index among the composition's), its frames, its box (px), its letters' luminance. */
+export const inkZoneSchema = z.object({
+  shot: z.number().int().min(0).max(199),
+  from: z.number().int().min(0),
+  to: z.number().int().min(0),
+  box: z.tuple([z.number(), z.number(), z.number(), z.number()]),
+  ink: z.number().min(0).max(1),
+});
+export type InkZone = z.infer<typeof inkZoneSchema>;
+
+/** The scene check's words of each scene (smoke.mjs `words`), read leniently: a zone it cannot read is left out. */
+export function readInkZones(words: Record<string, unknown>): Record<string, InkZone[]> {
+  return Object.fromEntries(
+    Object.entries(words).map(([id, list]) => [id, (Array.isArray(list) ? list : []).flatMap((z) => (inkZoneSchema.safeParse(z).success ? [inkZoneSchema.parse(z)] : [])).slice(0, 48)]),
+  );
+}
 
 /** The most words an effect's kit lists for her to change. */
 export const EFFECT_WORDS_MAX = 12;

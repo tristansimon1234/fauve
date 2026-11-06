@@ -69,6 +69,7 @@ import {
   type SkillFile,
   type SkillFillAnswer,
   type SkillTalk,
+  type InkZone,
   type SceneGround,
   type VoiceTranscript,
 } from "@fauve/agent";
@@ -429,7 +430,7 @@ export async function designSkill(params: {
     // Her words read better on her pictures (« voile », « overlay », « on voit pas bien le texte »), or the veil its version
     // before had: her shots darkened softly under its words, its lettering, sizes and design the model's (never a box).
     const scrim = scrimFor(params.previous, params.brief);
-    plan.layers = [{ ...layer, motion: { ...layer.motion, js: checked.js, ...(checked.fonts.length ? { fonts: checked.fonts } : {}), ...row }, ...(scrim ? { scrim } : {}) }];
+    plan.layers = [{ ...layer, motion: { ...layer.motion, js: checked.js, ...(checked.fonts.length ? { fonts: checked.fonts } : {}), ...row }, ...(scrim ? { scrim } : {}), ...(checked.ink?.length ? { ink: checked.ink } : {}) }];
     return { plan };
   };
 
@@ -558,7 +559,7 @@ async function checkSkill(
   business: string,
   name: string,
   asked?: string,
-): Promise<{ js: string; fonts: string[]; own?: number[]; ground?: SceneGround } | { error: string }> {
+): Promise<{ js: string; fonts: string[]; own?: number[]; ground?: SceneGround; ink?: InkZone[] } | { error: string }> {
   const layer = plan.layers?.find((l) => l.compose);
   if (!layer?.motion.code) return { error: "pas de composition" };
   const timeline = planTimeline(plan);
@@ -584,7 +585,7 @@ async function checkSkill(
   };
   const [result] = await designMotionScenes(studioId, [request], undefined, brand, [], { look: { template, ...(plan.tempo ? { tempo: plan.tempo } : {}) } });
   if (!result?.js) return { error: result?.error ?? "le contrôle n'a rien rendu" };
-  return { js: result.js, fonts: result.fonts ?? [], ...(result.own?.length ? { own: result.own } : {}), ...(result.ground ? { ground: result.ground } : {}) };
+  return { js: result.js, fonts: result.fonts ?? [], ...(result.own?.length ? { own: result.own } : {}), ...(result.ground ? { ground: result.ground } : {}), ...(result.ink?.length ? { ink: result.ink } : {}) };
 }
 
 /**

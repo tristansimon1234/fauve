@@ -577,7 +577,17 @@ export function readsDrawn(js: string | undefined): { shot: number; kinds: ShotR
 }
 
 /** A plan whose animations read one of her shots (its sky, its vanishing point, its light): a composition, or one laid over the montage. */
-export const wantsReads = (plan: Pick<EditPlan, "layers">) => (plan.layers ?? []).some((l) => readsDrawn(l.motion?.js).length > 0);
+export const wantsReads = (plan: Pick<EditPlan, "layers">) => (plan.layers ?? []).some((l) => readsDrawn(l.motion?.js).length > 0 || Boolean(l.ink?.length));
+
+/**
+ * What a layer reads on her shots: what its code asks (readsDrawn), and the light of every shot a model's words lie over
+ * (plan.layers[].ink): the render darkens her picture under those that do not hold on it (veilFor).
+ */
+function layerReads(layer: NonNullable<EditPlan["layers"]>[number]): { shot: number; kinds: ShotReadKind[] }[] {
+  const drawn = readsDrawn(layer.motion?.js);
+  const inked = [...new Set((layer.ink ?? []).map((z) => z.shot))].map((shot) => ({ shot, kinds: ["light" as const] }));
+  return [...drawn, ...inked];
+}
 
 /**
  * A passage to read: its clip and seconds (a photo from 0 to 0), what to read there; `first`: on its first image only (a
@@ -600,7 +610,7 @@ export function readPassages(plan: Pick<EditPlan, "segments" | "layers">, isVide
   let seconds = 0;
   for (const layer of plan.layers ?? []) {
     const under = shotsUnder(spans, layer);
-    for (const { shot, kinds } of readsDrawn(layer.motion?.js).flatMap((r) => (r.shot === ANY_SHOT ? under.map((i) => ({ ...r, shot: i })) : [r]))) {
+    for (const { shot, kinds } of layerReads(layer).flatMap((r) => (r.shot === ANY_SHOT ? under.map((i) => ({ ...r, shot: i })) : [r]))) {
       const s = shots[shot];
       if (!s) continue;
       const photo = Boolean(s.photo);

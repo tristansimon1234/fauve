@@ -15,6 +15,7 @@ import {
   type MotionSlot,
   type SfxCue,
   type ReelProps,
+  type InkZone,
   type SceneGround,
   type ScenePhoto,
   type TrackPiece,
@@ -138,6 +139,8 @@ export type SceneResult = {
    */
   own?: number[];
   ground?: SceneGround;
+  /** A draft played as it is: its words right over her shots (the scene check's), where the render may darken her picture under them. */
+  ink?: InkZone[];
 };
 
 /** What already exists, so that a new scene takes another idea. */
@@ -500,6 +503,8 @@ function smokeScenes(results: SceneResult[], requestOf: (id: string) => SceneReq
         ...(readsSpoken(r.js!) ? { probeSpoken: true } : {}),
         // A montage skill's composition (played as it is) under subtitles: the pale grounds it paints, where they are written dark.
         ...(request.keep && request.compose?.subtitles ? { probeGround: true } : {}),
+        // A montage skill's composition over her shots: its words right over them, where the render may darken her picture.
+        ...(request.keep && request.compose?.shots.length ? { probeInk: true } : {}),
       };
     });
 }
@@ -599,7 +604,8 @@ async function checkScenes(
         const own = kept && checks.own?.[r.id]?.length ? { own: checks.own[r.id] } : {};
         const ground = kept && checks.ground?.[r.id]?.frames?.length ? { ground: checks.ground[r.id] } : {};
         const spoken = checks.spoken?.[r.id] !== undefined ? { spokenShare: checks.spoken[r.id] } : {};
-        return Object.keys(own).length || Object.keys(ground).length || Object.keys(spoken).length ? { ...r, ...spoken, ...own, ...ground } : r;
+        const ink = kept && checks.words?.[r.id]?.length ? { ink: checks.words[r.id] } : {};
+        return Object.keys(own).length || Object.keys(ground).length || Object.keys(spoken).length || Object.keys(ink).length ? { ...r, ...spoken, ...own, ...ground, ...ink } : r;
       }
       return working.get(r.id) ?? { ...r, js: null, error: checks.errors[r.id]! };
     });

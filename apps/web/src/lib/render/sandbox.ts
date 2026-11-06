@@ -40,6 +40,8 @@ import {
   TAKE_MAX_SECONDS,
   TAKE_RATE,
   usdToEur,
+  readInkZones,
+  type InkZone,
   type ComposeEnd,
   type ComposeShot,
   type ComposeText,
@@ -677,6 +679,8 @@ export type SmokeScene = {
   probeSpoken?: boolean;
   /** A montage skill's composition: the pale grounds it paints are measured, for a voice's subtitles laid over it (`ground`). */
   probeGround?: boolean;
+  /** A montage skill's composition: its words right over her shots are measured (`words`), for the render to darken her picture under them. */
+  probeInk?: boolean;
   /** Its own brand, when the scenes are checked on several (a tool proven on three charters); else the call's. */
   brand?: Pick<ReelProps["brand"], "name" | "accent" | "accentInk" | "displayFont" | "bodyFont" | "logoUrl">;
 };
@@ -697,6 +701,8 @@ export type SceneChecks = {
   ground?: Record<string, SceneGround>;
   /** For a scene whose code reads what is said: the share of the words said it was seen writing at their moment. */
   spoken?: Record<string, number>;
+  /** A model's words right over her shots (probeInk): each one's shot, moment, box and how light its letters are. */
+  words?: Record<string, InkZone[]>;
 };
 
 /**
@@ -724,6 +730,7 @@ export async function smokeTestScenes(
           own?: Record<string, number[]>;
           ground?: Record<string, SceneGround>;
           spoken?: Record<string, number>;
+          words?: Record<string, unknown>;
         } & Record<string, unknown>;
         // A workshop still on the previous checker prints the errors alone.
         if (parsed.results && typeof parsed.results === "object")
@@ -734,6 +741,7 @@ export async function smokeTestScenes(
             ...(parsed.own && typeof parsed.own === "object" ? { own: parsed.own } : {}),
             ...(parsed.ground && typeof parsed.ground === "object" ? { ground: parsed.ground } : {}),
             ...(parsed.spoken ? { spoken: parsed.spoken } : {}),
+            ...(parsed.words && typeof parsed.words === "object" ? { words: readInkZones(parsed.words) } : {}),
           };
         return { errors: parsed as Record<string, string | null>, faces: {}, cover: {} };
       } catch {
