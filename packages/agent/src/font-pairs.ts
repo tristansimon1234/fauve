@@ -234,6 +234,17 @@ export const FONT_PAIRS: FontPair[] = [
     how: "ses mots en petits groupes d'une serif grasse en minuscules, au milieu de l'image comme les sous-titres d'un créateur, aux chiffres elzéviriens, une ligne plus légère de la même famille",
     fits: "un pas à pas raconté, une recette, un tuto, des mots qui suivent les gestes",
   },
+  {
+    // « L'accueil, puis la rafale » (docs/fiches/bienvenue.md, effect 1): its sentence in capitals drawn by hand with a
+    // fine even stroke (about a tenth of their height), spaced, one word a line stacked in the middle; Mynerve, the closest
+    // of twenty handwritten Google Fonts families compared on the same words.
+    key: "main-levee",
+    name: "Capitales à main levée",
+    display: { family: "Mynerve", weight: 400, case: "upper", tracking: "wide" },
+    body: { family: "Inter Tight", weight: 500 },
+    how: "des capitales dessinées à la main d'un trait fin et égal, espacées, un mot par ligne empilé au milieu de l'image, rien d'autre",
+    fits: "une phrase d'accueil mot à mot, un message court écrit sur des plans sombres, un ton de créateur",
+  },
 ];
 
 const BY_KEY = new Map(FONT_PAIRS.map((p) => [p.key, p]));

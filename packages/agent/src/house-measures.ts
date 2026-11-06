@@ -87,4 +87,6 @@ export const HOUSE_MEASURES: Record<string, ReelMeasures> = {
   // image; no beat in its sound (its street's, cut by its first click and back on its last: its catalogue's tempo, 90,
   // decides); its loudness by ebur128.
   "curseur": { duration: 10.2, cuts: [2.27, 5.97], bpm: null, lufs: -17.3 },
+  // Its fiche's 23 cuts, read image by image (measure.py found them all); its drop's tempo (its intro's voice has its own pace).
+  "bienvenue": { duration: 7.73, cuts: [0.83, 1.5, 2.03, 2.73, 2.9, 3.07, 3.23, 3.4, 3.7, 3.97, 4.37, 4.63, 4.9, 5.3, 5.57, 5.7, 5.87, 6.1, 6.33, 6.77, 6.97, 7.23, 7.43], bpm: 91.7, lufs: -14.2 },
 };
