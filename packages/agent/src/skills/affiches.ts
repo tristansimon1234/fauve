@@ -19,6 +19,8 @@ const POSTER = 2;
 const ENDING = 4;
 /** Its title's words drop one every 0,4 beat (the original's every 6 images, 0,2 s). */
 const POP = 0.4;
+/** The engine's ending card: 1,6 s at least, after its call on the black. */
+const END_CARD = 1.6;
 const round = (n: number) => Math.round(n * 100) / 100;
 const comma = (n: number) => String(round(n)).replace(".", ",");
 
@@ -182,11 +184,12 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   // play tells the scene check it is written whole (as Handwriting keeps the unseen copy of what it lays as decor).
   const copy = band && frame >= FIRST && frame < ENDING ? h("div", { key: "names-copy", "data-fauve-decor": "", style: { position: "absolute", left: 0, top: 0, width: 1, height: 1, overflow: "hidden", opacity: 0 } }, band.text) : null;
 
-  // 4. Its ending on black (the original's #000, no paper): her call in two lines of white capitals in the middle, a word
-  // between « » in bold italic; without a call, her name; her ending card there instead when the Reel has one, her logo
-  // over it.
+  // 4. Its ending on black (the original's #000, no paper): her call in white capitals in the middle, the original's size,
+  // three lines at most, a word between « » in bold italic; without a call, her name; then her ending card when the Reel
+  // has one, at the same place, her logo over it.
   const fin = reelTexts.find((t) => t.role === "caption");
-  const card = Boolean(end) && frame >= ENDING;
+  const CARD = Math.round(mark("card", end ? end.from : durationInFrames + 1));
+  const card = Boolean(end) && frame >= CARD;
   const CTA = Math.round(H * 0.054);
   const stressed = (text) => String(text).split(/(«[^»]*»|"[^"]*"|“[^”]*”)/).filter(Boolean).map((part, i) => (/^[«"“]/.test(part) ? h("span", { key: i, style: { fontStyle: "italic", fontWeight: 800 } }, part) : part));
   const lines = (key, text, top, size, tall) => h(FitText, { key: key + "-" + text, style: { position: "absolute", left: 140, top: Math.round(top), width: W - 280, height: Math.round(tall) },
@@ -280,12 +283,14 @@ export const affiches: MontageSkill = {
     const beat = 60 / bpm;
     const posters = Math.max(1, n - 1);
     const every = settings?.etiquettes === "toutes";
-    // Its opening, each poster, the last one under the black ending (drawn by its code); an ending card takes the
-    // ending's four beats (its 1,6 s and more at every tempo it plays at).
-    const spans = beatSpans(bpm, [OPEN, ...Array.from({ length: posters }, (_, i) => (i === posters - 1 ? POSTER + ENDING : POSTER))]);
+    // Its opening, each poster, the last one under the black ending (drawn by its code); an ending card after its call,
+    // on whole beats (the engine's 1,6 s at least).
+    const card = end ? Math.ceil((END_CARD + 0.05) / beat) : 0;
+    const spans = beatSpans(bpm, [OPEN, ...Array.from({ length: posters }, (_, i) => (i === posters - 1 ? POSTER + ENDING + card : POSTER))]);
     const duration = spans.at(-1)!.end;
     const last = spans.at(-1)!;
     const ending = round(toFrame(last.start + POSTER * beat) / 30);
+    const carded = round(toFrame(last.start + (POSTER + ENDING) * beat) / 30);
     // The labelled posters in order: the k-th name of « noms » on the k-th of them.
     const ranked = Array.from({ length: posters }, (_, p) => p).filter((p) => affichesLabelled(p, posters, every));
     const poster = (p: number) => {
@@ -303,17 +308,18 @@ export const affiches: MontageSkill = {
             ? `l'ouverture, ${comma(OPEN * beat)} s : vue par une fente horizontale au milieu de l'image (un bandeau deux fois plus large que haut), sous les mots de son titre qui tombent un à un autour : un gros plan d'un regard (les yeux de quelqu'un de l'équipe), d'un détail de son produit ou d'une matière ; sinon n'importe lequel de ses plans (seule sa bande du milieu se voit)`
             : poster(i - 1),
       })),
-      // Her title over the opening, her names over the posters, her call (or her ending card) on the black.
+      // Her title over the opening, her names over the posters, her call on the black (her ending card after it).
       texts: {
         titre: { from: 0, to: round(spans[1]!.start) },
         noms: { from: round(spans[1]!.start), to: ending },
-        fin: { from: ending, to: round(duration) },
+        fin: { from: ending, to: end ? carded : round(duration) },
       },
       marks: {
         beat: round(beat * 30),
         pop: Math.max(2, Math.round(POP * beat * 30)),
         first: toFrame(spans[1]!.start),
         ending: toFrame(ending),
+        ...(end ? { card: toFrame(carded) } : {}),
       },
       // Its music composed at its tempo, its first beat on the first image (the original's comes 0,16 s in), cut dead
       // at the end as the original's is.

@@ -70,11 +70,14 @@ test("« Tes produits en affiches »: four to eleven posters from her files, up 
   // 22 beats of 0,625 s, on the frame grid.
   assert.equal(slow.duration, 13.77);
   assert.deepEqual(slow.marks, { beat: 18.75, pop: 8, first: 38, ending: 338 });
-  // An ending card takes its four beats (its 1,6 s and more at every tempo it plays at).
+  // An ending card after its call, on whole beats (its 1,6 s and more at every tempo it plays at); its call keeps its time.
   for (const bpm of [84, 120, 140]) {
+    const own = affiches.timeline(9, { end: false, bpm });
     const ended = affiches.timeline(9, { end: true, bpm });
-    assert.ok(ended.duration - ended.marks.ending! / 30 >= 1.6, `${bpm} BPM`);
+    assert.ok(ended.duration - own.duration >= 1.6 && ended.duration - ended.marks.card! / 30 >= 1.6, `${bpm} BPM`);
+    assert.deepEqual(ended.texts.fin, own.texts.fin, `${bpm} BPM`);
   }
+  assert.deepEqual(affiches.timeline(9, { end: true }).marks, { beat: 15, pop: 6, first: 30, ending: 270, card: 330 });
 });
 
 test("« Tes produits en affiches »: its plan (its words by role), its music's shape, nothing cut out, followed or read", () => {
@@ -275,8 +278,11 @@ test("« Tes produits en affiches »: its ending on black, her call in white cap
   assert.ok(flatten(call!).some((n) => n.type === "span" && styleOf(n).fontStyle === "italic" && textOf(n) === "« la boutique »"));
   // Without a call: her name.
   assert.equal(textOf(fits(drawAt(275, { texts: { fin: "" } }))[0]!), "Maison Farine");
-  // Her ending card on the black from its start, its line under it, her logo over it (white when it is a dark one-colour logo).
-  const card = drawAt(272, { end: { title: "Ouvert dimanche", subtitle: "de 8 h à 13 h" }, brand: { logoUrl: "/logo.png", logoOnDark: "white" } });
+  // Her ending card after her call, at the same place, its line under it, her logo over it (white when it is a dark
+  // one-colour logo).
+  const ended = { end: { title: "Ouvert dimanche", subtitle: "de 8 h à 13 h" }, brand: { logoUrl: "/logo.png", logoOnDark: "white" } };
+  assert.deepEqual(fits(drawAt(320, ended)).map(textOf), ["Viens les goûter à « la boutique »"]);
+  const card = drawAt(335, ended);
   assert.deepEqual(fits(card).map(textOf), ["Ouvert dimanche", "de 8 h à 13 h"]);
   fits(card).forEach(inZone);
   const logo = flatten(card).find((n) => n.type === "Img")!;
