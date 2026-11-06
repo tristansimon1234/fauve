@@ -254,10 +254,15 @@ test("« Un clic sur tes produits »: the cursor goes to the person and to her p
   const inner = named(120)[0]!.props.innerStyle as Record<string, unknown>;
   assert.deepEqual([inner.color, inner.textTransform, inner.fontSize], ["#ffffff", "uppercase", 104]);
   assert.match(String(inner.fontFamily), /Bebas Neue/);
-  const arrows = nodes(draw(120, props)).filter((n) => n.type === "Scribble");
+  const strokes = nodes(draw(120, props)).filter((n) => n.type === "Scribble");
+  const arrows = strokes.filter((n) => String(n.props.key).startsWith("arrow-"));
   assert.equal(arrows.length, 2);
-  assert.ok(arrows.every((a) => a.props.kind === "arrow" && a.props.frames === 1));
+  assert.ok(strokes.every((a) => a.props.kind === "arrow" && a.props.frames === 1));
   assert.equal(arrows[0]!.props.at, 82);
+  // Each over a thin dark edge on the same path (it reads where it crosses a white plate).
+  const edges = strokes.filter((n) => String(n.props.key).startsWith("edge-"));
+  assert.deepEqual(edges.map((e) => [e.props.seed, e.props.from, e.props.to]), arrows.map((a) => [a.props.seed, a.props.from, a.props.to]));
+  assert.ok(edges.every((e, i) => Number(e.props.width) > Number(arrows[i]!.props.width)));
   // On a bright place (a white plate under it), her dark ink instead.
   const bright = sceneOf(code, { track, boxes, light: 0.85 });
   assert.equal((nodes(bright(120, props)).find((n) => n.type === "FitText")!.props.innerStyle as { color: string }).color, "#1d1d1b");

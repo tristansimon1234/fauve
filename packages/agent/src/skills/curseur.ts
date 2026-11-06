@@ -180,32 +180,49 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
     const hh = Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y);
     return w > 0 && hh > 0 ? (w * hh) / (a.w * a.h) : 0;
   };
+  // Every place tried: above its product (at four heights), below it, beside it; inside the safe zone and off the other
+  // name, the cheapest kept: off the other product and its own, near it, above it first, on a calm dark place of the
+  // picture (white words read there; read on the close-up's held image).
+  const safe = (L) => L.x >= 44 && L.y >= 100 && L.y + L.h <= H * 0.75 - 12 && L.x + L.w <= xMax(L.y, L.h) - 4;
   const place = (P, text, taken, avoid) => {
     const w = estimate(text);
     const cx0 = P.x + P.w / 2;
-    let best = null;
+    const cy0 = P.y + P.h / 2;
+    const xs = [];
+    for (let i = 0; i <= 16; i++) xs.push(W * (0.14 + i * 0.045) - w / 2);
     const tries = [];
-    for (let i = 0; i <= 16; i++) {
-      const cx = W * (0.14 + i * 0.045);
-      tries.push({ x: cx - w / 2, y: banded1 ? B1.top - 36 - LH : P.y - RISE - 40 - LH, side: 0 });
-      tries.push({ x: cx - w / 2, y: banded1 ? B1.top + B1.height + 36 : P.y + P.h + RISE, side: 1 });
-    }
+    [1, 0.55, 1.6, 2.3].forEach((r, j) => xs.forEach((x) => {
+      tries.push({ x, y: banded1 ? B1.top - 36 - LH - j * (LH + 20) : P.y - RISE * r - 40 - LH, side: 0.12 * j });
+      tries.push({ x, y: banded1 ? B1.top + B1.height + 36 + j * (LH + 20) : P.y + P.h + RISE * r, side: 0.35 + 0.12 * j });
+    }));
+    [-0.25, 0, 0.25].forEach((d) => {
+      tries.push({ x: P.x + P.w + 40, y: cy0 - LH / 2 + d * P.h, side: 0.5 });
+      tries.push({ x: P.x - 40 - w, y: cy0 - LH / 2 + d * P.h, side: 0.5 });
+    });
+    let best = null;
     tries.forEach((c) => {
       const L = { x: Math.round(c.x), y: Math.round(c.y), w, h: LH };
-      if (L.x < 44 || L.y < 100 || L.y + L.h > H * 0.75 - 12 || L.x + L.w > xMax(L.y, L.h) - 4) return;
-      if (taken.some((o) => overlap(L, o) > 0)) return;
-      const cost = 6 * avoid.reduce((s, o) => s + overlap(L, o), 0) + 3 * overlap(L, P) + Math.abs(L.x + L.w / 2 - cx0) / W + c.side * 0.35;
+      if (!safe(L) || taken.some((o) => overlap(L, o) > 0)) return;
+      const light = banded1 || n < 2 ? null : LightUnder(shots[1], firstOf(1), B1, { x: L.x, y: L.y, w: L.w, h: L.h });
+      // White words need the darkest place: what is brightest under them (a plate's rim) counts most.
+      const cost = 6 * avoid.reduce((s, o) => s + overlap(L, o), 0) + 3 * overlap(L, P) + Math.hypot(L.x + L.w / 2 - cx0, L.y + L.h / 2 - cy0) / (2 * W) + c.side + (light ? 2.5 * Math.max(0, light.high - 0.6) + Math.max(0, light.mean - 0.45) : 0);
       if (!best || cost < best.cost) best = { ...L, cost };
     });
     return best;
   };
+  // Nowhere: the original's place, moved down off the other name.
+  const fallback = (fx, fy, text, taken) => {
+    const w = estimate(text);
+    const L = { x: Math.round(within(W * fx - w / 2, 44, W - 144 - w)), y: Math.round(H * fy - LH / 2), w, h: LH };
+    while (taken.some((o) => overlap(L, o) > 0) && L.y + 2 * LH < H * 0.75) L.y += LH + 16;
+    return L;
+  };
   const names = React.useMemo(() => {
     const out = [];
-    const one = captions[0] ? place(reads.p1, captions[0].text, [], [reads.p2]) : null;
-    if (captions[0]) out.push({ t: captions[0], P: reads.p1, L: one || { x: Math.round(W * 0.565 - estimate(captions[0].text) / 2), y: Math.round(H * 0.249 - LH / 2), w: estimate(captions[0].text), h: LH } });
+    if (captions[0]) out.push({ t: captions[0], P: reads.p1, L: place(reads.p1, captions[0].text, [], [reads.p2]) || fallback(0.565, 0.249, captions[0].text, []) });
     if (captions[1]) {
-      const two = place(reads.p2, captions[1].text, out.map((o) => o.L), [reads.p1]);
-      out.push({ t: captions[1], P: reads.p2, L: two || { x: Math.round(Math.min(W - 140 - estimate(captions[1].text), W * 0.741 - estimate(captions[1].text) / 2)), y: Math.round(H * 0.458 - LH / 2), w: estimate(captions[1].text), h: LH } });
+      const taken = out.map((o) => o.L);
+      out.push({ t: captions[1], P: reads.p2, L: place(reads.p2, captions[1].text, taken, [reads.p1]) || fallback(0.741, 0.458, captions[1].text, taken) });
     }
     return out;
   }, [reelTexts, reads, F]);
@@ -220,16 +237,24 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const inkOf = (L) => {
     if (banded1 || n < 2) return "#ffffff";
     const light = LightUnder(shots[1], firstOf(k1), B1, { x: L.x, y: L.y, w: L.w, h: L.h });
-    return light && light.mean > 0.68 ? (brand.palette && brand.palette.dark) || "#121110" : "#ffffff";
+    return light && light.mean > 0.62 ? (brand.palette && brand.palette.dark) || "#121110" : "#ffffff";
+  };
+  // A hand-drawn arrow from the product to the word, drawn at once, over a thin edge of the other tone (it still reads
+  // where it crosses a white plate or a dark table).
+  const arrowNodes = (i, a, ink, from) => {
+    const dark = ink !== "#ffffff";
+    const box = { x: Math.min(a.tail.x, a.head.x), y: Math.min(a.tail.y, a.head.y), w: Math.abs(a.head.x - a.tail.x) + 1, h: Math.abs(a.head.y - a.tail.y) + 1 };
+    const stroke = (key, color, width) => h(Scribble, { key, kind: "arrow", from: a.tail, to: a.head, box, at: from - 1, frames: 1, color, width, wobble: 0.6, seed: "curseur-" + i });
+    const w = Math.max(4, Math.round(H * 0.0032));
+    return [stroke("edge-" + i, dark ? "rgba(255,255,255,0.4)" : "rgba(0,0,0,0.38)", w + 4), stroke("arrow-" + i, ink, w)];
   };
   const labels = names.flatMap((o, i) => {
     if (frame < o.t.from || frame >= o.t.to) return [];
     const ink = inkOf(o.L);
     const dark = ink !== "#ffffff";
     const arrow = arrowOf(o.P, o.L);
-    const word = h(FitText, { key: "name-" + i + "-" + keep(o.t.text), style: { position: "absolute", left: o.L.x, top: o.L.y, width: o.L.w, height: o.L.h }, innerStyle: { fontFamily: display, fontWeight: 700, fontSynthesis: "none", fontSize: F, lineHeight: 1, letterSpacing: "0.01em", textTransform: "uppercase", color: ink, textShadow: dark ? "0 1px 8px rgba(255,255,255,0.35)" : "0 2px 10px rgba(0,0,0,0.35)", whiteSpace: "nowrap", textAlign: "center" } }, keep(o.t.text));
-    const stroke = arrow ? h(Scribble, { key: "arrow-" + i, kind: "arrow", from: arrow.tail, to: arrow.head, box: { x: Math.min(arrow.tail.x, arrow.head.x), y: Math.min(arrow.tail.y, arrow.head.y), w: Math.abs(arrow.head.x - arrow.tail.x) + 1, h: Math.abs(arrow.head.y - arrow.tail.y) + 1 }, at: o.t.from - 1, frames: 1, color: ink, width: Math.max(4, Math.round(H * 0.0032)), wobble: 0.6, seed: "curseur-" + i }) : null;
-    return [stroke, word];
+    const word = h(FitText, { key: "name-" + i + "-" + keep(o.t.text), style: { position: "absolute", left: o.L.x, top: o.L.y, width: o.L.w, height: o.L.h }, innerStyle: { fontFamily: display, fontWeight: 700, fontSynthesis: "none", fontSize: F, lineHeight: 1, letterSpacing: "0.01em", textTransform: "uppercase", color: ink, textShadow: dark ? "0 1px 10px rgba(255,255,255,0.45)" : "0 2px 12px rgba(0,0,0,0.5), 0 0 3px rgba(0,0,0,0.25)", whiteSpace: "nowrap", textAlign: "center" } }, keep(o.t.text));
+    return [...(arrow ? arrowNodes(i, arrow, ink, o.t.from) : []), word];
   });
 
   // 4. Her ending card (in option): the cursor comes back and clicks, her title pops up in the same capitals, her line under it.
