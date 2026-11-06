@@ -204,6 +204,10 @@ export const HOUSE_EFFECTS: Record<string, HouseEffect> = {
     effet: "chaque image devient une affiche : un aplat vif qui change à chaque coupe, l'image dans un tirage à bord blanc posé chaque fois ailleurs, une sur deux nommée en très grandes capitales",
     il_faut: "des photos ou de courtes vidéos de ses produits, plats ou créations, une chose seule au milieu de chacune",
   },
+  vitraux: {
+    effet: "des miroirs posés sur sa chose filmée de face qui glissent sans arrêt : elle se dédouble et se recompose en motifs symétriques, le reste vrai autour, puis redevient elle-même",
+    il_faut: "un plan fixe et bien de face de sa porte, sa devanture, sa vitrine ou une étagère, sans personne devant",
+  },
 };
 
 /** The most of Edith's models one Reel borrows from: one charter, one music, never a patchwork. */

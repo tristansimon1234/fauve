@@ -2061,6 +2061,51 @@ export const HOUSE_MODELS: HouseModel[] = [
       why: "Chaque seconde une nouvelle couleur et un nouveau produit : l'œil reste pour voir le suivant ; le nom en très grand fait de chaque produit une affiche qu'on retient, et le titre posé mot à mot dit tout de suite ce qu'on va voir.",
     },
   }),
+  model({
+    key: "vitraux",
+    name: "Ta devanture en kaléidoscope",
+    // Written on its original's fiche (v1 of its skill, docs/fiches/vitraux.md): an old building's door straight on, re-made
+    // at every image by an AI (its leaves doubling, its panes in symmetric patterns, its fanlight turning half a turn), the
+    // stone around it still, then back to the real door for the loop, over a soft house loop at 123,4 BPM (Gemini heard 95
+    // and a slit-scan); here mirrors laid on her own picture, which invent nothing. No text in the original (her name in option).
+    pitch: "Ta devanture, ta porte ou ta vitrine filmée bien droite, qui se démultiplie dans des miroirs et se recompose sans arrêt, puis redevient elle-même : une boucle qu'on regarde deux fois.",
+    needs: "une vidéo fixe et bien de face (ou une photo bien droite) de ta porte, ta devanture, ta vitrine, une étagère ou ton présentoir, sans personne qui passe devant",
+    files: [1, 3],
+    // Its name, in option, in big capitals of a high-contrast serif, a thin spaced line under it (font-pairs.ts, « didone »).
+    pair: "didone",
+    // Its skill's code is its reference.
+    example: null,
+    // Measured on its original (docs/fiches/vitraux.md): a kick on every beat, on the grid within 5 ms.
+    tempo: 123.4,
+    finish: { name: "Lumière du jour", hint: "lumière naturelle, couleurs franches, noirs profonds, sans grain ni coins sombres", contrast: 0.06, saturation: 0.04 },
+    look: {
+      name: "devanture en kaléidoscope",
+      format: "autre",
+      hook: { kind: "mystère", what: "sa devanture ou sa vitrine filmée bien droite, de face, qui se met à se dédoubler dans des miroirs dès la première seconde" },
+      text: {
+        amount: "aucun",
+        composition: "aucun texte dans l'original ; son nom en option, en grandes capitales centrées au-dessus de sa chose quand les miroirs se referment, une petite ligne en capitales espacées dessous",
+        case: "upper",
+        weight: "bold",
+        tracking: "wide",
+      },
+      layout: "un seul plan fixe plein cadre, de face ; des miroirs verticaux qui glissent sur sa chose (ou une rosace qui tourne en son milieu), le reste de l'image vrai autour",
+      moments: [
+        { at: 0, what: "sa chose vraie, de face, deux images" },
+        { at: 0.07, what: "des miroirs verticaux se posent sur elle et s'écartent : elle se dédouble en copies plus étroites, vite puis plus doucement, entière à 1,56 s" },
+        { at: 1.56, what: "les miroirs glissent sans arrêt, jamais sur le temps : sa chose se recompose en continu, ses motifs se referment en losanges et en étoiles aux lignes des miroirs, le reste de l'image vrai autour" },
+        { at: 6.18, what: "son nom en option, en grandes capitales centrées au-dessus de sa chose, sa petite ligne dessous" },
+        { at: 7.4, what: "les miroirs se referment, lentement puis plus vite ; sa vraie image revient à 8,5 s" },
+        { at: 8.5, what: "sa chose vraie, comme à la première image : la boucle" },
+      ],
+      camera: "fixe",
+      grade: "natural",
+      motion: "epure",
+      music: "soft deep house loop, four-on-the-floor sub kick, mellow chord stabs, 123 BPM",
+      ending: "sa vraie image, comme la première, tenue un temps, la musique coupée net : le Reel boucle sans qu'on voie la reprise",
+      why: "Sa chose à elle se transforme sous nos yeux sans jamais cesser d'être la sienne : on cherche comment c'est fait, on regarde jusqu'au retour à la vraie image, et la boucle fait revoir.",
+    },
+  }),
 ];
 
 const BY_KEY = new Map(HOUSE_MODELS.map((m) => [m.key, m]));
@@ -2146,6 +2191,7 @@ export const HOUSE_WHEN: Record<string, { pour: string; pas_pour: string }> = {
   "chef-face": { pour: "un plat, une recette ou une spécialité racontée face caméra et goûtée (un restaurant, un traiteur, une pâtisserie, un café) : le résultat d'abord, puis la dégustation", pas_pour: "sans vidéo où elle parle, des images sans parole, un lieu ou une ambiance sans rien à goûter" },
   recette: { pour: "montrer un savoir-faire en étapes comme un tuto, pour tout métier qui a des gestes : une recette (cuisine, pâtisserie), un bouquet monté (fleuriste), une coupe (coiffeur, barbier), une pièce tournée (céramiste), un soin ; du résultat fini à la dégustation ou à l'essai", pas_pour: "un lieu ou une ambiance, une offre à lire, quelqu'un qui parle face caméra, des vidéos filmées à la main" },
   affiches: { pour: "montrer ses produits, ses plats, ses créations ou ses services un par un avec leur nom, comme des affiches colorées : une collection, une carte, des nouveautés, une sélection, ses best-sellers", pas_pour: "un lieu qui se raconte, quelqu'un qui parle face caméra, un geste qu'il faut voir en entier (l'image est petite dans son tirage), une offre à lire en détail, moins de quatre images" },
+  vitraux: { pour: "montrer sa devanture, sa porte, sa vitrine, ses étagères ou son présentoir comme on ne les a jamais vus (une boutique, un café, une fleuriste, une librairie, une mercerie, un salon) : une boucle hypnotique qui fait s'arrêter, son nom en option", pas_pour: "quelqu'un qui parle, des gens qui passent devant, une vidéo filmée à la main qui bouge, une offre à lire en détail, plusieurs moments à raconter" },
 };
 
 /** The models for Edith: their key, name, what they do, what they want, and what only she can film for one. */

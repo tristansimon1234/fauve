@@ -80,4 +80,7 @@ export const HOUSE_MEASURES: Record<string, ReelMeasures> = {
   // BPM) leads none of them, laid on a one-second grid that drifts against it: its catalogue's tempo (120, two beats a
   // poster) decides. Its loudness by ebur128.
   "affiches": { duration: 10, cuts: [1, 2, 3, 4, 5, 6, 7, 8, 9], bpm: null, lufs: -14.2 },
+  // Its fiche (docs/fiches/vitraux.md): one still shot, no cut; a kick on every beat (123,4 BPM, the first at 0,345 s,
+  // on the grid within 5 ms); its sound cut at 9,00 s for the loop; its loudness by ebur128.
+  "vitraux": { duration: 9, cuts: [], bpm: 123.4, lufs: -14.1 },
 };
