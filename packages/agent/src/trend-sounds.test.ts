@@ -1,27 +1,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { chartSongs, instagramSounds, linkExpiry, sameSound, shortCount, soundList, soundReels, soundWords, SOUND_LIST_SIZE } from "./trend-sounds.ts";
+import { accountSongs, instagramSounds, linkExpiry, sameSound, shortCount, soundReels, soundWords } from "./trend-sounds.ts";
 
-// The shapes Treg's providers answered at the first bench (5 November 2026), trimmed.
-const chart = {
-  output: {
-    data: {
-      chart_info: { id: 7245341979050396417 },
-      music_list: [
-        { id: 7245341979050396417, trend: 4, music_info: { id: 7613798254214187000, id_str: "7613798254214187009", title: "Coming Up Roses", author: "Harry Styles", user_count: 221526, duration: 60 } },
-        { trend: 4, music_info: { id_str: "7613798254214187010", title: "Housewife", author: "Tate McRae", user_count: 527121 } },
-        { trend: 4, music_info: { title: "" } },
-      ],
-    },
-  },
-};
-
-test("trend sounds: a TikTok chart's songs, their exact id (id_str, the number loses its last digits)", () => {
-  const songs = chartSongs(chart);
-  assert.equal(songs.length, 2);
-  assert.deepEqual(songs[0], { title: "Coming Up Roses", artist: "Harry Styles", tiktokId: "7613798254214187009", users: 221526 });
-});
-
+// The shapes Treg's providers answered at the benches (5 and 6 November 2026), trimmed.
 test("trend sounds: an Instagram music search, the id of its page and its cover", () => {
   const found = instagramSounds({
     data: {
@@ -61,14 +42,14 @@ test("trend sounds: the Reels that use a sound, their plays and their video", ()
   assert.equal(linkExpiry("https://x.cdninstagram.com/a.mp4"), null);
 });
 
-test("trend sounds: 30 songs, the Top 50 first then the Viral 50, each once", () => {
-  const top = Array.from({ length: 50 }, (_, i) => ({ title: `Top ${i}`, artist: "A", tiktokId: null, users: null }));
-  const viral = [{ title: "Top 0", artist: "A", tiktokId: null, users: null }, ...Array.from({ length: 49 }, (_, i) => ({ title: `Viral ${i}`, artist: "B", tiktokId: null, users: null }))];
-  const list = soundList(top, viral);
-  assert.equal(list.length, SOUND_LIST_SIZE);
-  assert.equal(list.filter((s) => s.chart === "top").length, 20);
-  assert.equal(list[20]?.title, "Viral 0");
-  assert.equal(list[20]?.rank, 2);
+test("trend sounds: the songs of an account's Reels, its own sounds left out", () => {
+  const songs = accountSongs({
+    items: [
+      { media: { code: "DfY8zyuunEm", play_count: 6332, clips_music_attribution_info: { audio_id: "1399893890111262" }, clips_metadata: { music_info: { music_asset_info: { title: "Sweater Weather", display_artist: "The Neighbourhood", audio_cluster_id: "1399893890111262" }, music_consumption_info: { is_trending_in_clips: true } } } } },
+      { media: { code: "DfHDcFmOJwR", clips_metadata: { original_sound_info: { original_audio_title: "Original audio" } } } },
+    ],
+  });
+  assert.deepEqual(songs, [{ audioId: "1399893890111262", title: "Sweater Weather", artist: "The Neighbourhood", code: "DfY8zyuunEm", plays: 6332, trending: true }]);
   assert.equal(soundWords("SugarCrash! (Sped Up) feat. X"), "sugarcrash");
   // Its TikTok videos, the way the apps write a count.
   assert.equal(shortCount(1_240_000), "1,2\u00a0M");

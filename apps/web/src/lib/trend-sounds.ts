@@ -1,16 +1,19 @@
 import "server-only";
 import {
-  chartSongs,
+  accountSongs,
   instagramSounds,
   linkExpiry,
   sameSound,
-  soundList,
   soundReelLink,
   soundReels,
-  soundWords,
   SOUND_SEARCHES_PER_DAY,
+  SOUND_SOURCE,
+  SOUND_SOURCE_KEPT,
+  SOUND_SOURCE_PAGES,
   SOUND_TOOLS,
+  SOURCE_RANK,
   usdToEur,
+  type AccountSong,
   type InstagramSound,
 } from "@fauve/agent";
 import { costMeta } from "@/lib/cost-scope";
@@ -18,15 +21,16 @@ import { env } from "@/lib/env";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { instagramVideo, tregCall } from "@/lib/treg";
 
-// The trending sounds (packages/agent/src/trend-sounds.ts; docs/son.md, « Sons tendance »): TikTok's two charts each
-// Monday (with the trends' cron, or when its page finds the list older than 6 days), each new song found once among
-// Instagram's music; a sound she searches by name; and a few Reels that use a sound, read when someone listens to it
-// or picks it (their video links last about a day and a half). The same for every studio (table trend_sounds).
+// The trending sounds (packages/agent/src/trend-sounds.ts; docs/son.md, « Sons tendance »): « Mes sons préférés du
+// moment », the team's picks (rank under SOURCE_RANK) then the songs @muse.templates puts on its Reels, read each
+// Monday (with the cron, or when the page finds the list older than 6 days), those Instagram marks trending first; a
+// sound she searches by name; a few Reels that use a sound, read when someone listens to it or picks it (their video
+// links last about a day and a half). The same for every studio (table trend_sounds, chart house).
 
 const MAX_COST_USD = 0.01;
-/** The list is searched again when it is older than this. */
+/** The list is read again when it is older than this. */
 export const SOUND_REFRESH_DAYS = 6;
-/** New songs of the charts searched on Instagram at once. */
+/** New songs whose song and cover are read at once. */
 const AT_ONCE = 5;
 
 export type TrendSound = {
@@ -37,13 +41,12 @@ export type TrendSound = {
   cover: string | null;
   seconds: number | null;
   explicit: boolean;
-  /** house: picked from the Reels Edith's models were written on (« Les sons de nos modèles »); top, viral: TikTok's charts. */
-  chart: "house" | "top" | "viral" | null;
+  /** house: in « Mes sons préférés du moment »; null: a sound only searched. */
+  chart: "house" | null;
   rank: number | null;
-  tiktokUsers: number | null;
 };
 
-const COLUMNS = "id, audio_id, title, artist, cover_url, seconds, explicit, chart, rank, tiktok_users";
+const COLUMNS = "id, audio_id, title, artist, cover_url, seconds, explicit, chart, rank";
 
 const toSound = (r: Record<string, unknown>): TrendSound => ({
   id: r.id as string,
@@ -53,9 +56,8 @@ const toSound = (r: Record<string, unknown>): TrendSound => ({
   cover: (r.cover_url as string | null) ?? null,
   seconds: r.seconds === null || r.seconds === undefined ? null : Number(r.seconds),
   explicit: Boolean(r.explicit),
-  chart: (r.chart as "house" | "top" | "viral" | null) ?? null,
+  chart: r.chart === "house" ? "house" : null,
   rank: r.rank === null || r.rank === undefined ? null : Number(r.rank),
-  tiktokUsers: r.tiktok_users === null || r.tiktok_users === undefined ? null : Number(r.tiktok_users),
 });
 
 /** One Treg call, its cost added to the run's. */
@@ -73,33 +75,33 @@ async function logCost(studioId: string | null, spent: { usd: number; calls: num
     .insert({ studio_id: studioId, kind: "trends", provider: "treg", units: spent.calls, cost_eur: usdToEur(spent.usd, env("USD_TO_EUR")), meta: costMeta({ purpose, cost_usd: spent.usd, calls: spent.calls, ...extra }) });
 }
 
-/** This week's sounds, the Top 50's first, and when the list was made. */
+/** « Mes sons préférés du moment », in their order, and when the list was last read. */
 export async function trendSounds(): Promise<{ sounds: TrendSound[]; chartedAt: string | null }> {
-  const { data } = await supabaseAdmin().from("trend_sounds").select(`${COLUMNS}, charted_at`).not("chart", "is", null).order("chart").order("rank");
+  const { data } = await supabaseAdmin().from("trend_sounds").select(`${COLUMNS}, charted_at`).eq("chart", "house").order("rank");
   const rows = data ?? [];
-  const chartedAt = rows.reduce<string | null>((latest, r) => (r.charted_at && (!latest || (r.charted_at as string) > latest) ? (r.charted_at as string) : latest), null);
-  // « top » before « viral » (by name), each in its rank.
+  // The source's read (the team's picks keep the day they were added).
+  const chartedAt = rows.filter((r) => Number(r.rank) >= SOURCE_RANK).reduce<string | null>((latest, r) => (r.charted_at && (!latest || (r.charted_at as string) > latest) ? (r.charted_at as string) : latest), null);
   return { sounds: rows.map(toSound), chartedAt };
 }
 
-/** The list needs searching again: never made, or older than SOUND_REFRESH_DAYS. */
+/** The list needs reading again: never read, or older than SOUND_REFRESH_DAYS. */
 export function soundsStale(chartedAt: string | null): boolean {
   return !chartedAt || Date.now() - Date.parse(chartedAt) > SOUND_REFRESH_DAYS * 86_400_000;
 }
 
-let running: Promise<{ kept: number; searched: number }> | null = null;
-/** The last run of this instance: a page that finds the list old does not search it again within 10 minutes. */
+let running: Promise<{ kept: number; added: number }> | null = null;
+/** The last run of this instance: a page that finds the list old does not read it again within 10 minutes. */
 let lastRun = 0;
 const RETRY_MS = 10 * 60_000;
 
 /**
- * This week's list: TikTok's Top 50 and Viral 50, the 30 songs kept (soundList) found among Instagram's music (a song
- * found once is not searched again: its match_key), the others out of the list. A chart Treg does not answer leaves
- * last week's list. About $0.002 a call, logged once (kind trends, no studio).
+ * This week's songs of SOUND_SOURCE (its Reels, a few pages; more the first time): each one once, those Instagram
+ * marks trending first, then by plays, then last week's not seen again (they go down), SOUND_SOURCE_KEPT at most, the
+ * team's picks never moved nor repeated. New ones get their song and cover read. About 1 to 2 cents a week, logged.
  */
-export function refreshTrendSounds({ force = false }: { force?: boolean } = {}): Promise<{ kept: number; searched: number }> {
+export function refreshTrendSounds({ force = false }: { force?: boolean } = {}): Promise<{ kept: number; added: number }> {
   if (running) return running;
-  if (!force && Date.now() - lastRun < RETRY_MS) return Promise.resolve({ kept: 0, searched: 0 });
+  if (!force && Date.now() - lastRun < RETRY_MS) return Promise.resolve({ kept: 0, added: 0 });
   lastRun = Date.now();
   running = refresh().finally(() => {
     running = null;
@@ -107,46 +109,76 @@ export function refreshTrendSounds({ force = false }: { force?: boolean } = {}):
   return running;
 }
 
-async function refresh(): Promise<{ kept: number; searched: number }> {
+/** The next page of an account's Reels (its max_id), when there is one. */
+function nextPage(value: unknown, depth = 0): string | null {
+  if (!value || typeof value !== "object" || depth > 4) return null;
+  for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+    if ((k === "max_id" || k === "next_max_id") && typeof v === "string" && v) return v;
+  }
+  for (const v of Object.values(value as Record<string, unknown>)) {
+    const found = nextPage(v, depth + 1);
+    if (found) return found;
+  }
+  return null;
+}
+
+async function refresh(): Promise<{ kept: number; added: number }> {
   const db = supabaseAdmin();
   const spent = { usd: 0, calls: 0 };
-  const [top, viral] = await Promise.all([0, 1].map((scene) => called(SOUND_TOOLS.chart, { scene, cursor: 0, count: 50 }, spent).then(chartSongs)));
-  if (!top?.length || !viral?.length) {
+  const { data: listed } = await db.from("trend_sounds").select("audio_id, rank").eq("chart", "house");
+  const team = new Set((listed ?? []).filter((r) => Number(r.rank) < SOURCE_RANK).map((r) => r.audio_id as string));
+  const before = (listed ?? []).filter((r) => Number(r.rank) >= SOURCE_RANK).sort((a, b) => Number(a.rank) - Number(b.rank)).map((r) => r.audio_id as string);
+
+  // Its Reels, page after page.
+  const seen = new Map<string, AccountSong & { reels: number }>();
+  let cursor: string | null = null;
+  const pages = before.length ? SOUND_SOURCE_PAGES.weekly : SOUND_SOURCE_PAGES.first;
+  for (let page = 0; page < pages; page += 1) {
+    const answer = await called(SOUND_TOOLS.account, { handle: SOUND_SOURCE, ...(cursor ? { max_id: cursor } : {}) }, spent);
+    for (const song of accountSongs(answer)) {
+      const kept = seen.get(song.audioId);
+      if (kept) {
+        kept.reels += 1;
+        kept.plays = (kept.plays ?? 0) + (song.plays ?? 0);
+        kept.trending ||= song.trending;
+      } else seen.set(song.audioId, { ...song, reels: 1 });
+    }
+    const next = nextPage(answer);
+    if (!next || next === cursor) break;
+    cursor = next;
+  }
+  if (!seen.size) {
     await logCost(null, spent, "sounds", { missed: true });
-    return { kept: 0, searched: 0 };
-  }
-  const songs = soundList(top, viral);
-  const keyOf = (s: { title: string; artist: string | null }) => `${soundWords(s.title)}|${soundWords(s.artist ?? "")}`;
-  const { data: known } = await db.from("trend_sounds").select("audio_id, match_key").in("match_key", songs.map(keyOf));
-  const found = new Map((known ?? []).map((r) => [r.match_key as string, r.audio_id as string]));
-
-  // The new ones, a few at a time: each searched by its title and its artist.
-  const fresh = songs.filter((s) => !found.has(keyOf(s)));
-  for (let i = 0; i < fresh.length; i += AT_ONCE) {
-    await Promise.all(
-      fresh.slice(i, i + AT_ONCE).map(async (song) => {
-        const answer = await called(SOUND_TOOLS.search, { keyword: [song.title, song.artist].filter(Boolean).join(" ") }, spent);
-        const sound = sameSound(song, instagramSounds(answer));
-        if (!sound) return;
-        const { error } = await db.from("trend_sounds").upsert({ ...soundRow(sound), match_key: keyOf(song) }, { onConflict: "audio_id" });
-        if (!error) found.set(keyOf(song), sound.audioId);
-      }),
-    );
+    return { kept: 0, added: 0 };
   }
 
-  // Last week's out of the list, this week's in it, in their chart's order.
-  // The sounds of the models (chart house) stay: only the charts' are made again.
+  // Trending first, then the most played; last week's not seen again after them; never one of the team's.
+  const ordered = [...seen.values()].filter((s) => !team.has(s.audioId)).sort((a, b) => Number(b.trending) - Number(a.trending) || (b.plays ?? 0) - (a.plays ?? 0));
+  const ids = [...ordered.map((s) => s.audioId), ...before.filter((id) => !seen.has(id) && !team.has(id))].slice(0, SOUND_SOURCE_KEPT);
+
+  // The new ones, with the Reel of the source as their example (its cuts are what « Utiliser l'audio » plays).
+  const { data: known } = await db.from("trend_sounds").select("audio_id").in("audio_id", ordered.map((s) => s.audioId));
+  const exists = new Set((known ?? []).map((r) => r.audio_id as string));
+  const fresh = ordered.filter((s) => ids.includes(s.audioId) && !exists.has(s.audioId));
+  if (fresh.length) {
+    await db.from("trend_sounds").insert(fresh.map((s) => ({ audio_id: s.audioId, title: s.title, artist: s.artist, reels: [{ link: soundReelLink(s.code), video: null, plays: s.plays }] })));
+  }
+
+  // Out of the list: last week's not kept, and the TikTok charts of before.
+  await db.from("trend_sounds").update({ chart: null, rank: null }).eq("chart", "house").gte("rank", SOURCE_RANK).not("audio_id", "in", `(${ids.join(",") || "0"})`);
   await db.from("trend_sounds").update({ chart: null, rank: null }).in("chart", ["top", "viral"]);
   const now = new Date().toISOString();
   let kept = 0;
-  for (const song of songs) {
-    const audioId = found.get(keyOf(song));
-    if (!audioId) continue;
-    const { error } = await db.from("trend_sounds").update({ chart: song.chart, rank: song.rank, tiktok_users: song.users, charted_at: now }).eq("audio_id", audioId);
+  for (const [i, id] of ids.entries()) {
+    const { error } = await db.from("trend_sounds").update({ chart: "house", rank: SOURCE_RANK + i, charted_at: now }).eq("audio_id", id);
     if (!error) kept += 1;
   }
-  await logCost(null, spent, "sounds", { kept, searched: fresh.length });
-  return { kept, searched: fresh.length };
+  await logCost(null, spent, "sounds", { source: SOUND_SOURCE, kept, added: fresh.length });
+  // Their song and cover, a few at a time (about 0.2 cent each).
+  for (let i = 0; i < fresh.length; i += AT_ONCE) {
+    await Promise.all(fresh.slice(i, i + AT_ONCE).map((s) => soundListen(s.audioId, null).catch(() => null)));
+  }
+  return { kept, added: fresh.length };
 }
 
 /** What a sound found on Instagram keeps (never its chart: a search does not move it in or out of the list). */

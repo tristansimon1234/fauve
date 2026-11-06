@@ -1,6 +1,6 @@
 "use client";
 
-import { shortCount, SOUND_SEARCHES_PER_DAY } from "@fauve/agent";
+import { SOUND_SEARCHES_PER_DAY } from "@fauve/agent";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { MusicIcon, PauseIcon, PlayIcon } from "@/components/icons";
 import { Mascot } from "@/components/mascot";
@@ -74,18 +74,16 @@ export function SoundsSection({ sounds, timezone }: { sounds: TrendSound[]; time
     setPicked({ link: example.link, title: sound.title, artist: sound.artist, audioId: sound.audioId });
   };
 
-  // The models' sounds first (Tristan's picks), then the charts'.
-  const house = sounds.filter((s) => s.chart === "house");
-  const charts = sounds.filter((s) => s.chart !== "house");
-  const shown = all ? charts : charts.slice(0, SHOWN);
+  const shown = all ? sounds : sounds.slice(0, SHOWN);
   return (
     <section className="flex flex-col gap-4" aria-labelledby="sounds-title">
       <div className="flex flex-col gap-1">
-        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+        {/* Edith's own picks (Tristan: « mets mes sons préférés du moment avec la tête d'Edith »). */}
+        <div className="flex items-center gap-2.5">
+          <Mascot size={40} still />
           <h2 id="sounds-title" className="text-[22px] font-extrabold tracking-[-0.01em]">
-            Les sons du moment
+            Mes sons préférés du moment
           </h2>
-          <p className="text-[14px] text-muted">les préférés d’Edith, puis le Top 50 et le Viral 50 de TikTok, retrouvés sur Instagram</p>
         </div>
         <p className="max-w-[640px] text-[13.5px] leading-snug text-muted">
           Choisis un son : ton Reel sort sans musique, coupé sur ses temps, et tu ajoutes le son dans Instagram en le publiant (« Utiliser l’audio »). Instagram ne laisse aucune appli le mettre à ta place.
@@ -130,25 +128,13 @@ export function SoundsSection({ sounds, timezone }: { sounds: TrendSound[]; time
         </div>
       )}
 
-      {!found && house.length > 0 && (
-        <div className="flex flex-col gap-2">
-          {/* Edith's own picks (Tristan: « mets mes sons préférés du moment avec la tête d'Edith »). */}
-          <div className="flex items-center gap-2.5">
-            <Mascot size={36} still />
-            <h3 className="text-[17px] font-extrabold">Mes sons préférés du moment</h3>
-          </div>
-          <SoundList sounds={house} playing={playing} busy={busy} onListen={listen} onPick={pick} />
-        </div>
-      )}
-
       {!found &&
-        (charts.length ? (
+        (sounds.length ? (
           <div className="flex flex-col gap-2">
-            {house.length > 0 && <h3 className="text-[17px] font-extrabold">Les classements de TikTok</h3>}
             <SoundList sounds={shown} playing={playing} busy={busy} onListen={listen} onPick={pick} />
-            {charts.length > SHOWN && (
+            {sounds.length > SHOWN && (
               <button type="button" onClick={() => setAll(!all)} className="btn-secondary h-10 self-start px-4 text-[14px]">
-                {all ? "Moins de sons" : `Voir les ${charts.length} sons`}
+                {all ? "Moins de sons" : `Voir les ${sounds.length} sons`}
               </button>
             )}
           </div>
@@ -194,9 +180,6 @@ function SoundList({
           <div className="flex min-w-0 flex-1 flex-col gap-0.5">
             <p className="truncate text-[15px] font-bold">{sound.title}</p>
             <p className="truncate text-[13px] text-muted">{[sound.artist, sound.explicit ? "Explicite" : null].filter(Boolean).join(" · ")}</p>
-            <p className="mono-label truncate text-muted">
-              {[sound.chart === "house" ? "Préféré d’Edith" : sound.chart ? `${sound.chart === "top" ? "Top 50" : "Viral 50"} · N° ${String(sound.rank ?? 0).padStart(2, "0")}` : null, sound.tiktokUsers ? `${shortCount(sound.tiktokUsers)} vidéos TikTok` : null].filter(Boolean).join(" · ")}
-            </p>
           </div>
           <button type="button" onClick={() => onPick(sound)} disabled={busy === sound.audioId} className="btn-secondary h-9 shrink-0 px-3 text-[13px] disabled:opacity-50">
             Caler un Reel dessus
