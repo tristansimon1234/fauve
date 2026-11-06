@@ -1,5 +1,5 @@
 import "server-only";
-import {
+import { soundPageLink,
   APP_GUIDES,
   BY_HAND_GUIDE,
   cleanCaption,
@@ -1474,7 +1474,9 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
       // The one she picked: on WhatsApp, its Reel in Instagram behind a button (in the app, the page Sons plays it).
       if (ecouter) {
         if (!ctx.waId) return json({ note: "Elle est dans l'application : la page Sons fait écouter chaque son. Passe son son_lien à montage." });
-        ctx.extras.listen = { url: ecouter, label: "Écouter le son" };
+        // The sound's own page, not the Reel of the account it was found on.
+        const { data: known } = await db.from("trend_sounds").select("audio_id").contains("reels", [{ link: ecouter }]).limit(1).maybeSingle();
+        ctx.extras.listen = { url: known?.audio_id ? soundPageLink(known.audio_id as string) : ecouter, label: "Écouter le son" };
         return json({ bouton: "« Écouter le son » sous ton message", note: "N'écris aucun lien : le bouton ouvre ce Reel dans Instagram. Demande-lui ses vidéos si elle ne les a pas données, puis passe ce son_lien à montage." });
       }
       // Her words among Instagram's music, else this week's list; each with a Reel that uses it (its son_lien).

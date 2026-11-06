@@ -90,7 +90,7 @@ export type ReviewData = {
    * The sound she adds in Instagram when she posts it (a sound she picked or gave, or the one of the Reel she copies):
    * the Reel to open for « Utiliser l'audio », its name when known; the page plays it under the video (soundPreview).
    */
-  sound: { link: string; title: string | null; artist: string | null; followed: boolean } | null;
+  sound: { link: string; title: string | null; artist: string | null; followed: boolean; /** Its own page in Instagram, where « Utiliser l'audio » is. */ page: string | null } | null;
   /** The voice on the Reel: Edith's (which one) or her own voice note. */
   voice: {
     who: "simone" | "hers";
@@ -225,7 +225,7 @@ export async function loadReview(db: Db, studioId: string, post: ReviewPost, tim
     connect: socialConnect(),
     publishByHand: post.publish_by_hand,
     music: env("ELEVENLABS_API_KEY") ? { on: music.mode === "on", made: Boolean(music.track), sfx } : null,
-    sound: added ? { link: added.link, title: music.sound?.title ?? null, artist: music.sound?.artist ?? null, followed: Boolean(added.followed) } : null,
+    sound: added ? { link: added.link, title: music.sound?.title ?? null, artist: music.sound?.artist ?? null, followed: Boolean(added.followed), page: added.page ?? null } : null,
     voice,
     ownVoice: ownVoice ? { id: ownVoice.id, sampleUrl: ownSample?.data?.signedUrl ?? null } : null,
     slots,
