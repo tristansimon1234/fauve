@@ -158,14 +158,14 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
 
   // 4b. Its rosace (the original's fanlight): eight wedges of 45 degrees around her thing's middle, each the same wedge of
   // her picture (a little closer, x 1,15), mirrored one in two, turning 11,25 degrees a beat; a circle that opens from
-  // its middle as its force grows, as wide as her thing (half the frame's width at most), and closes back the same way.
+  // its middle as its force grows, inscribed in her thing (half the frame's width at most), and closes back the same way.
   const rosace = (i, f, box, z, s) => {
     const b = (f - FIRST) / BEAT;
     const S = 1.15;
     const cx = z.x + z.w / 2;
     const cy = z.y + z.h / 2;
     const cover = S * Math.min(cx - box.left, box.left + box.width - cx, cy - box.top, box.top + box.height - cy);
-    const R = Math.max(1, Math.min(cover, width / 2, Math.max(z.w, z.h) / 2) * s);
+    const R = Math.max(1, Math.min(cover, width / 2, Math.min(z.w, z.h) / 2) * s);
     const t0 = TURN * b - 22.5;
     const at = (a) => (cx + 1.6 * R * Math.sin((a * Math.PI) / 180)).toFixed(1) + "px " + (cy - 1.6 * R * Math.cos((a * Math.PI) / 180)).toFixed(1) + "px";
     const wedges = [];

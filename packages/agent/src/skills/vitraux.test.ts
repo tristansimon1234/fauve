@@ -212,11 +212,11 @@ test("« Ta devanture en kaléidoscope »: its rosace, eight wedges one in two m
   turns.forEach((t, j) => assert.equal(/scaleX\(-1\)/.test(t), j % 2 === 1, t));
   // It turns: its wedges' angles change from one moment to the next.
   assert.notEqual(String(styleOf((rose(150)!.children.flat() as Drawn[])[0]!.children[0] as Drawn).transform), turns[0]);
-  // On her door: centred on it, never wider than it.
+  // On her door: centred on it, inscribed in it (the wall around it real).
   const door = { x: 300, y: 500, w: 400, h: 600 };
   const onDoor = rose(120, { box: door });
   assert.deepEqual(centre(onDoor), [500, 800]);
-  assert.ok(radius(onDoor) <= 300 + 0.1);
+  assert.ok(Math.abs(radius(onDoor) - 200) < 0.1);
 });
 
 test("« Ta devanture en kaléidoscope »: its frame as her file's, a horizontal one cropped on her door when it fits, else in a band on black", () => {

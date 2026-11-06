@@ -127,10 +127,10 @@ test("« Le kaléidoscope »: inside her door when it is found, her picture real
   assert.ok(s.every((x) => Number(styleOf(x).left) >= 200 && Number(styleOf(x).left) + Number(styleOf(x).width) <= 880 && styleOf(x).top === 500), JSON.stringify(s.map((x) => styleOf(x))));
   const closed = "M 200 500 C 500 490 800 490 880 500 C 890 900 890 1500 880 1600 C 600 1610 300 1610 200 1600 C 190 900 190 600 200 500 Z";
   assert.equal(styleOf(keyed(drawAt(90, { door, outline: closed }), "battants")).clipPath, `path('${closed}')`);
-  // Its rosace: eight wedges in a circle on her door's middle, as wide as it at most.
+  // Its rosace: eight wedges in a circle inscribed in her door, on its middle.
   const rose = keyed(drawAt(90, { door, texts: { figure: "rosace" } }), "rosace")!;
   assert.equal(rose.children.flat().length, 8);
-  assert.match(String(styleOf(rose).clipPath), /^circle\([\d.]+px at 540\.0px 1050\.0px\)$/);
+  assert.match(String(styleOf(rose).clipPath), /^circle\(340\.0px at 540\.0px 1050\.0px\)$/);
   // Her name over the closing, above her door, white on her picture, an ink where it is bright.
   const marks = vitrauxTimeline({ frames: 180, bpm: 100, shots: [], words: {}, settings: {} }).marks!;
   assert.equal(flatten(drawAt(marks.name! - 1, { door, texts: { nom: "Maison Farine" } })).filter((d) => d.type === "FitText").length, 0);

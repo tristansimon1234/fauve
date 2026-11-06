@@ -201,8 +201,8 @@ export const HOUSE_EFFECTS: Record<string, HouseEffect> = {
     il_faut: "des gestes filmés téléphone posé, chaque étape d'un seul endroit en plusieurs gestes",
   },
   vitraux: {
-    effet: "des miroirs posés sur sa chose filmée de face, qui glissent sans arrêt : elle se dédouble et se recompose en motifs symétriques, le reste de l'image vrai, puis redevient elle-même",
-    il_faut: "un plan fixe et bien de face de sa porte, sa devanture, sa vitrine, une étagère ou un présentoir, sans personne devant",
+    effet: "des miroirs posés sur sa chose filmée de face qui glissent sans arrêt : elle se dédouble et se recompose en motifs symétriques, le reste vrai autour, puis redevient elle-même",
+    il_faut: "un plan fixe et bien de face de sa porte, sa devanture, sa vitrine ou une étagère, sans personne devant",
   },
 };
 

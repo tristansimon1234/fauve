@@ -124,7 +124,7 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
     const cx = z.x + z.w / 2;
     const cy = z.y + z.h / 2;
     const cover = S * Math.min(cx, W - cx, cy, H - cy);
-    const R = Math.max(1, Math.min(cover, W / 2, Math.max(z.w, z.h) / 2) * s);
+    const R = Math.max(1, Math.min(cover, W / 2, Math.min(z.w, z.h) / 2) * s);
     const t0 = (TURN * f) / BEAT - 22.5;
     const at = (a) => (cx + 1.6 * R * Math.sin((a * Math.PI) / 180)).toFixed(1) + "px " + (cy - 1.6 * R * Math.cos((a * Math.PI) / 180)).toFixed(1) + "px";
     const wedges = [];
