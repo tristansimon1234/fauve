@@ -1249,7 +1249,7 @@ test("each of Edith's models shows its original's frames as a Reel she sends: sh
   const { stolenStyleSchema } = await import("./steal.ts");
   // A studio's row written before the sheets is rewritten (11: ten models written again on their originals' fiches; 21:
   // their looks vertical full frame by default, the band on her word; 22: Vision machine v2).
-  assert.equal(HOUSE_VERSION, 22);
+  assert.equal(HOUSE_VERSION, 23);
   for (const m of HOUSE_MODELS) {
     const sheets = houseSheets(m.key);
     // A model written as a design has no original, so no sheets (its row names none).
