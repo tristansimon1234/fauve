@@ -1,4 +1,4 @@
-import { beatSpans, toFrame, type MontageSkill } from "../skills.ts";
+import { END_CARD_SECONDS, beatSpans, toFrame, type MontageSkill } from "../skills.ts";
 
 // « Un an de plus », version 1, written on its original's fiche (docs/fiches/aventure.md: a travel creator's year in
 // 46,9 s, measured image by image at 30 i/s, its counter in close-ups, its sound by bands; Tristan: « c'est un effet que
@@ -297,7 +297,7 @@ export const aventure: MontageSkill = {
     const roles = aventureRoles(n);
     const spans = beatSpans(
       bpm,
-      roles.map((r, i) => ROLES[r]![0] + (options.end && i === roles.length - 1 ? CARD : 0)),
+      roles.map((r, i) => ROLES[r]![0] + (options.end && i === roles.length - 1 ? Math.max(CARD, Math.ceil(END_CARD_SECONDS / beat - 1e-6)) : 0)),
     );
     const duration = spans.at(-1)!.end;
     const start = (role: number) => spans[roles.indexOf(role)]!.start;

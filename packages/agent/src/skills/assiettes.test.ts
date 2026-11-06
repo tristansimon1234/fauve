@@ -77,7 +77,7 @@ test("« Défilé d'assiettes »: 12 to 31 dishes from her files, whole phrases 
   // An ending card: its last dish held whole beats longer (1,6 s at least), its music to the end.
   const line = assiettes.timeline(31, { end: false });
   const ended = assiettes.timeline(31, { end: true });
-  assert.ok(ended.duration - line.duration >= 1.6);
+  assert.ok(ended.duration - line.duration >= 2.5);
   assert.equal(ended.shots.length, 31);
   assert.equal(ended.music!.end!.at, ended.duration);
   // At another tempo, every length counted in sixteenths follows it; its flash stays three images.
@@ -202,7 +202,7 @@ test("« Défilé d'assiettes » types its title and its line together, at an ev
 
 test("« Défilé d'assiettes »: its ending card over its last dish, typed as its title, readable", () => {
   const line = assiettes.timeline(31, { end: true });
-  const from = Math.round((line.duration - 1.6) * 30);
+  const from = Math.round((line.duration - 2.5) * 30);
   const end = { title: "Réservez dès 12 h", subtitle: "au 01 23 45 67 89", from };
   assert.equal(of(drawAt(from - 1, { end, end_card: true }), "TypeOn").length, 0);
   const card = of(drawAt(from + 20, { end, end_card: true }), "TypeOn");

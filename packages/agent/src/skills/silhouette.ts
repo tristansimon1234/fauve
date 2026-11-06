@@ -1,4 +1,4 @@
-import { beatSpans, toFrame, type MontageSkill, type SkillSound } from "../skills.ts";
+import { END_CARD_SECONDS, beatSpans, toFrame, type MontageSkill, type SkillSound } from "../skills.ts";
 
 // « Présente-toi » (key `silhouette`), version 4: its original's idea and its signature effect in a design of its own
 // (Tristan, 6 November: « trop similaire à la vidéo originale », and « c'est un effet que l'on veut pouvoir faire, pas
@@ -44,8 +44,8 @@ const LAST_OUT = 1.92;
 const FLIP = 3;
 /** Her trade's accent block wipes in from the drop; what she does on the hits of its sixteenths from the Reel's start. */
 const FIRST_JOB = 31;
-/** The ending card, in option: after her logo, the engine's 1,6 s at least, on whole quarters of a beat. */
-const CARD_SECONDS = 1.6;
+/** The ending card, in option: after her logo, the engine's 2,5 s at least, on whole quarters of a beat. */
+const CARD_SECONDS = END_CARD_SECONDS;
 const round = (s: number) => Math.round(s * 100) / 100;
 const round3 = (s: number) => Math.round(s * 1000) / 1000;
 /** A light click on each letter stamped, a breath rising into the drop. */
@@ -301,7 +301,7 @@ export const silhouette: MontageSkill = {
     const bpm = options.bpm ?? BPM;
     const beat = 60 / bpm;
     const f = (b: number) => toFrame(b * beat);
-    // With an ending card: after her logo, the card's 1,6 s at least, on whole quarters of a beat.
+    // With an ending card: after her logo, the card's 2,5 s at least, on whole quarters of a beat.
     const card = end ? Math.ceil((CARD_SECONDS / beat) * 4) / 4 : 0;
     const total = end ? LOGO + LOGO_HOLD + card : END;
     const spans = beatSpans(bpm, [DROP, total - DROP]);

@@ -1,4 +1,4 @@
-import { beatSpans, toFrame, type MontageSkill } from "../skills.ts";
+import { END_CARD_SECONDS, beatSpans, toFrame, type MontageSkill } from "../skills.ts";
 
 // « Nom aux cinq polices », written on its original's fiche (docs/fiches/nom-de-ville.md: Tristan's travel
 // film of a city, measured image by image at 30 i/s, its title's red read pixel by pixel image by image, its sound by
@@ -49,8 +49,8 @@ const TAIL = 2.4;
 /** Its shots: the eight it always has (title, four, alley, passing, last), the most for a length she asks for. */
 const FIXED = 8;
 const LONG = 30;
-/** The engine's ending card: the Reel's last 1,6 s, its last shot held whole half-beats longer for it. */
-const END_CARD = 1.6;
+/** The engine's ending card: the Reel's last 2,5 s, its last shot held whole half-beats longer for it. */
+const END_CARD = END_CARD_SECONDS;
 const round = (n: number) => Math.round(n * 100) / 100;
 const round3 = (n: number) => Math.round(n * 1000) / 1000;
 
@@ -286,7 +286,7 @@ export const nomDeVille: MontageSkill = {
     const half = 30 / bpm;
     const count = Math.max(FIXED, Math.min(LONG, Math.round(n)));
     const life = Array.from({ length: count - FIXED }, (_, i) => LIFE[i % LIFE.length]!);
-    // With an ending card, its last shot held whole half-beats longer (the engine's 1,6 s at least, rounded up).
+    // With an ending card, its last shot held whole half-beats longer (the engine's 2,5 s at least, rounded up).
     const card = end ? Math.ceil((END_CARD + 0.05) / half) : 0;
     const beats = [FIRST + TITLE, ...QUICK, PLUNGE, PASSER, ...life, LAST + card];
     const spans = beatSpans(bpm, beats.map((b) => b / 2));

@@ -102,7 +102,7 @@ test("« La nuit sous tous les angles » (v1): its music without its bass under 
   assert.deepEqual(LINE.sounds!.slice(1).map((s) => [s.sound, Math.round(s.at * 30)]), [["camera shutter click", 63], ["camera shutter click", 324]]);
   // An ending card after its last shot: 1,6 s more, faded under it; at another tempo all of it follows.
   const ended = nuit.timeline(29, { end: true });
-  assert.ok(ended.duration - LINE.duration >= 1.6 && ended.music!.end!.fade === 0.8);
+  assert.ok(ended.duration - LINE.duration >= 2.5 && ended.music!.end!.fade === 0.8);
   const slow = nuit.timeline(29, { end: false, bpm: 96 });
   assert.ok(Math.abs(slow.duration / LINE.duration - 136.8 / 96) < 0.01 && Math.abs(slow.music!.downbeat! / 2.425 - 136.8 / 96) < 0.01);
   assert.equal(slow.marks.scale, 1.425);
@@ -266,7 +266,7 @@ test("« La nuit sous tous les angles » (v1): its night comes in as the origina
   // With an ending card: no loop, her card over the last shot.
   const ended = nuit.timeline(29, { end: true });
   const frames = Math.round(ended.duration * 30);
-  const card = drawAt(nuit.code, frames - 1, props({ end: { title: "Ouvert jusqu'à 2 h", subtitle: "du jeudi au samedi", from: frames - 48 } }, ended));
+  const card = drawAt(nuit.code, frames - 1, props({ end: { title: "Ouvert jusqu'à 2 h", subtitle: "du jeudi au samedi", from: frames - 75 } }, ended));
   assert.equal(Number(footage(card)[0]!.props.shot), 28);
   assert.ok(flatten(card).some((n) => n.type === "FitText" && String(n.props.key).startsWith("card-")));
 });

@@ -1,4 +1,4 @@
-import { beatSpans, toFrame, type MontageSkill } from "../skills.ts";
+import { END_CARD_SECONDS, beatSpans, toFrame, type MontageSkill } from "../skills.ts";
 
 // « Tes produits en affiches », version 1, written on its original's fiche (docs/fiches/affiches.md: measured image by
 // image at 30 i/s, each poster's ground read on its pixels, each print on its white border, each label on its ink, its
@@ -19,8 +19,8 @@ const POSTER = 2;
 const ENDING = 4;
 /** Its title's words drop one every 0,4 beat (the original's every 6 images, 0,2 s). */
 const POP = 0.4;
-/** The engine's ending card: 1,6 s at least, after its call on the black. */
-const END_CARD = 1.6;
+/** The engine's ending card: 2,5 s at least, after its call on the black. */
+const END_CARD = END_CARD_SECONDS;
 const round = (n: number) => Math.round(n * 100) / 100;
 const comma = (n: number) => String(round(n)).replace(".", ",");
 
@@ -284,7 +284,7 @@ export const affiches: MontageSkill = {
     const posters = Math.max(1, n - 1);
     const every = settings?.etiquettes === "toutes";
     // Its opening, each poster, the last one under the black ending (drawn by its code); an ending card after its call,
-    // on whole beats (the engine's 1,6 s at least).
+    // on whole beats (the engine's 2,5 s at least).
     const card = end ? Math.ceil((END_CARD + 0.05) / beat) : 0;
     const spans = beatSpans(bpm, [OPEN, ...Array.from({ length: posters }, (_, i) => (i === posters - 1 ? POSTER + ENDING + card : POSTER))]);
     const duration = spans.at(-1)!.end;

@@ -101,15 +101,16 @@ test("« Rituel du matin »: its music on the original's grid, cut dead with the
   assert.ok(Math.abs(faster.duration / line.duration - 90.73 / 109) < 0.01, `${faster.duration}`);
   assert.ok(Math.abs(faster.marks.trailer_to! / 62 - 90.73 / 109) < 0.03);
   assert.ok(Math.abs(faster.music!.downbeat! - 0.214 * (90.73 / 109)) < 0.002);
-  // With an ending card: its 1,6 s at least on the black instead of the three black images, the music ending with it.
+  // With an ending card: its 2,5 s at least on the black instead of the three black images, the music ending with it.
   const ended = routine.timeline(16, { end: true });
-  assert.ok(ended.duration - line.duration >= 1.6 - 0.1 - 1 / 30);
+  assert.ok(ended.duration - line.duration >= 2.5 - 0.1 - 1 / 30);
   assert.equal(ended.marks.black, undefined);
   assert.equal(ended.music!.end!.at, ended.duration);
-  // Never slower than 89 BPM: its longest stays under 45 s, its card included; up to 109 for a short Reel.
-  assert.deepEqual(skillTempos(routine), [89, 109]);
+  // Never slower than its own tempo since the card's 2,5 s (89 BPM before): its longest stays under 45 s, its card
+  // included; up to 109 for a short Reel.
+  assert.deepEqual(skillTempos(routine), [90.73, 109]);
   assert.ok(skillLengths(routine).max <= 45);
-  assert.ok(routine.timeline(33, { end: true, bpm: 89 }).duration <= 45);
+  assert.ok(routine.timeline(33, { end: true }).duration <= 45);
   assert.deepEqual(skillFit(routine, 30), { n: 22, bpm: 90.73 });
 });
 
@@ -178,7 +179,7 @@ function props(n: number, options: { aspect?: number; end?: boolean; settings?: 
       brand: { name: "Farine", displayFont: "Inter Tight", bodyFont: "Inter Tight", accent: "#7a2e3b", palette: { light: "#f4efe9" }, ...options.brand },
       shots,
       reelTexts,
-      end: options.end ? { title: "Ouvert dès 7 h", subtitle: "12 rue des Martyrs", from: total - 48 } : null,
+      end: options.end ? { title: "Ouvert dès 7 h", subtitle: "12 rue des Martyrs", from: total - 75 } : null,
       texts: { ...Object.fromEntries(Object.entries(line.marks).map(([k, v]) => [k, String(v)])), ...options.settings },
     },
   };
@@ -247,7 +248,7 @@ test("« Rituel du matin » (v2) ends on three black images, or on her ending ca
   assert.equal(draw(total - 1, p).props.style && (draw(total - 1, p).props.style as Record<string, string>).backgroundColor, "#000000");
   // Her ending card on the black, typed like her title, her line under it once it is typed.
   const ended = props(16, { end: true });
-  const at = ended.total - 48;
+  const at = ended.total - 75;
   assert.equal(nodes(draw(at - 1, ended.p)).filter((x) => x.type === "Footage").length, 1);
   const card = nodes(draw(at + 10, ended.p));
   assert.equal(card.filter((x) => x.type === "Footage").length, 0);

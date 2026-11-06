@@ -1,4 +1,4 @@
-import { beatSpans, toFrame, type MontageSkill, type SkillSound } from "../skills.ts";
+import { END_CARD_SECONDS, beatSpans, toFrame, type MontageSkill, type SkillSound } from "../skills.ts";
 
 // « Une journée chez toi », version 2, written again on its original's fiche (docs/fiches/journee.md: « a day in
 // PARIS », measured image by image at 30 i/s, its music and its clicks; v1 was written before it). Its music is soft and
@@ -300,7 +300,7 @@ export const journee: MontageSkill = {
     // Its day for this count: fewer shots drop those with nothing at their cut first; more are moments held longer.
     const day: { beats: number; cut: string; i: number }[] = DAY.map(([beats, cut], i) => ({ beats, cut, i })).filter((d) => !DROP.slice(0, Math.max(0, 22 - count)).includes(d.i));
     if (count > 22) day.splice(MORE_AT, 0, ...Array.from({ length: count - 22 }, () => ({ beats: MORE, cut: "", i: -1 })));
-    const spans = beatSpans(bpm, [...OPENING, ...day.map((d) => d.beats), ...EVENING.slice(0, 4), EVENING[4]! + (options.end ? CARD : 0)]);
+    const spans = beatSpans(bpm, [...OPENING, ...day.map((d) => d.beats), ...EVENING.slice(0, 4), EVENING[4]! + (options.end ? Math.max(CARD, Math.ceil(END_CARD_SECONDS / beat - 1e-6)) : 0)]);
     const duration = spans.at(-1)!.end;
     const at = (i: number) => spans[i]!.start;
     // Each shot of its day ends on the cut into the next one: its flash or its burn is there.

@@ -1,4 +1,4 @@
-import { type MontageSkill } from "../skills.ts";
+import { END_CARD_SECONDS, type MontageSkill } from "../skills.ts";
 
 // « Fenêtres et étiquettes », version 2, written on its original's fiche (docs/fiches/fenetres.md: a road trip in the
 // mountains, 22 shots in 13,8 s, measured image by image at 30 i/s, its windows mapped cell by cell, its sound read by
@@ -40,7 +40,7 @@ const HOLE = { from: 60, to: FIRST_BEAT + 4 * IMAGES, tail: 0.5 };
 /** Its end (images): 13,8 s. */
 const END = 414;
 /** The engine's ending card, on whole beats. */
-const CARD_SECONDS = 1.6;
+const CARD_SECONDS = END_CARD_SECONDS;
 /** Its silhouettes' colours: white, or cream. */
 type Sil = { from: number; n: number; cream?: boolean };
 type Entry = "cells-tr" | "cells-bl" | "windows" | "center" | "decor";
@@ -325,7 +325,7 @@ export const fenetres: MontageSkill = {
     const s = (images: number) => (images / IMAGES) * beat;
     const f = (images: number) => Math.round(s(images) * 30);
     const line = fenetresLine(n);
-    // Its last shot holds whole beats more with an ending card (the engine's 1,6 s at least).
+    // Its last shot holds whole beats more with an ending card (the engine's 2,5 s at least).
     const card = options.end ? Math.ceil(CARD_SECONDS / beat - 1e-6) * IMAGES : 0;
     const total = line.end + card;
     const duration = round(s(total));

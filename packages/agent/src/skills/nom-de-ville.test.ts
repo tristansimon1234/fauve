@@ -130,7 +130,7 @@ test("« Nom aux cinq polices »: 8 to 15 shots from her files, up to 30 for a l
   // An ending card: its last shot held 1,6 s more at least, on whole half-beats; the music's end follows.
   const line = nomDeVille.timeline(15, { end: false });
   const ended = nomDeVille.timeline(15, { end: true });
-  assert.ok(ended.duration - line.duration >= 1.6 && ended.music!.end!.at === ended.duration);
+  assert.ok(ended.duration - line.duration >= 2.5 && ended.music!.end!.at === ended.duration);
   assert.deepEqual(ended.shots.slice(0, 14), line.shots.slice(0, 14));
   // At another tempo, all of it follows.
   const slower = nomDeVille.timeline(15, { end: false, bpm: 64 });
@@ -318,7 +318,7 @@ test("« Nom aux cinq polices » (v2): it comes out from behind a line at every 
 
 test("« Nom aux cinq polices »: its ending card, its last shot darkened, its words through three faces then hers", () => {
   const line = nomDeVille.timeline(15, { end: true });
-  const from = Math.round((line.duration - 1.6) * 30);
+  const from = Math.round((line.duration - 2.5) * 30);
   const end = { title: "Ouvert dimanche", subtitle: "de 10 h à 18 h", from };
   const props = { shots: shotsOf(line.shots, 16 / 9), texts: marksOf(line), end, durationInFrames: Math.round(line.duration * 30) };
   const card = (f: number) => flatten(drawAt(f, props)).find((n) => n.props.key === "endname") ?? null;

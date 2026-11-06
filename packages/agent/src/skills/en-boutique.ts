@@ -1,4 +1,4 @@
-import { beatSpans, toFrame, type MontageSkill, type SkillSound } from "../skills.ts";
+import { END_CARD_SECONDS, beatSpans, toFrame, type MontageSkill, type SkillSound } from "../skills.ts";
 
 // « Création à quatre mains », version 1, written on its original's fiche (docs/fiches/en-boutique.md: a creator's 71,7 s
 // visit to an artisan's counter, measured image by image at 30 i/s, its subtitles read on the pixels, its sticker title
@@ -31,8 +31,8 @@ const POP_IN = 31;
 const STUCK = 66;
 /** Her logo pops this long into the last shot (the original's 3 images after its jump cut, 37 into the wide shot). */
 const LOGO_IN = 37;
-/** The engine's ending card: the Reel's last 1,6 s, her last shot held that much longer. */
-const END_CARD = 1.6;
+/** The engine's ending card: the Reel's last 2,5 s, her last shot held that much longer. */
+const END_CARD = END_CARD_SECONDS;
 /** A Reel lasts 45 s at most (MAX_REEL_SECONDS): at a slower tempo, its longest versions are held to it. */
 const MAX_SECONDS = 45;
 const round = (n: number) => Math.round(n * 100) / 100;
@@ -413,7 +413,7 @@ export const enBoutique: MontageSkill = {
     const open = slots.filter((s) => s.section === "idee");
     const openFrames = sum(open.map((s) => s.frames));
     const beats = slots.map((s) => (s.section === "idee" ? (OPEN_BEATS * s.frames) / openFrames : s.frames / IMAGES_A_BEAT));
-    // With an ending card, her last shot held whole beats longer (the card's 1,6 s).
+    // With an ending card, her last shot held whole beats longer (the card's 2,5 s).
     const last = beats.length - 1;
     if (end) beats[last] = beats[last]! + Math.ceil(END_CARD / beat - 1e-6);
     // Never past 45 s: at a slower tempo, its longest versions are held to it, every shot alike.

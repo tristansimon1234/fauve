@@ -55,15 +55,16 @@ test("« Tes produits en affiches »: the first, the last and one in two named, 
   assert.deepEqual(all.shots.map((s) => /le (\d+)(?:er|e) nom/.exec(s.want)?.[1] ?? null), [null, "1", "2", "3", "4", "5"]);
 });
 
-test("« Tes produits en affiches »: four to eleven posters from her files, up to 27 for a length she asks for, its tempo within 84 to 140", () => {
+test("« Tes produits en affiches »: four to eleven posters from her files, up to 27 for a length she asks for, its tempo within 86 to 140", () => {
   assert.deepEqual(affiches.shots, [5, 12]);
   assert.deepEqual(affiches.files, [4, 12]);
   assert.equal(affiches.long, 28);
   assert.deepEqual([5, 9, 12, 28].map((n) => affiches.timeline(n, { end: false }).duration), [7, 11, 14, 30]);
-  assert.deepEqual(skillTempos(affiches), [84, 140]);
+  // Never slower than 86 BPM: its longest with its ending card (2,5 s) stays within 45 s (84 until the card's 1,6 s).
+  assert.deepEqual(skillTempos(affiches), [86, 140]);
   // 30 s at its own tempo, its most shots; at its slowest, still under 45 s, its ending card included.
   assert.deepEqual(skillFit(affiches, 30), { n: 28, bpm: 120 });
-  assert.ok(affiches.timeline(28, { end: true, bpm: 84 }).duration <= 45);
+  assert.ok(affiches.timeline(28, { end: true, bpm: 86 }).duration <= 45);
   assert.ok(skillLengths(affiches).max <= 45);
   // At another tempo, every length counted in beats follows it: two beats a poster, four for its ending.
   const slow = affiches.timeline(9, { end: false, bpm: 96 });
@@ -74,7 +75,7 @@ test("« Tes produits en affiches »: four to eleven posters from her files, up 
   for (const bpm of [84, 120, 140]) {
     const own = affiches.timeline(9, { end: false, bpm });
     const ended = affiches.timeline(9, { end: true, bpm });
-    assert.ok(ended.duration - own.duration >= 1.6 && ended.duration - ended.marks.card! / 30 >= 1.6, `${bpm} BPM`);
+    assert.ok(ended.duration - own.duration >= 2.5 && ended.duration - ended.marks.card! / 30 >= 1.6, `${bpm} BPM`);
     assert.deepEqual(ended.texts.fin, own.texts.fin, `${bpm} BPM`);
   }
   assert.deepEqual(affiches.timeline(9, { end: true }).marks, { beat: 15, pop: 6, first: 30, ending: 270, card: 330 });
@@ -133,7 +134,7 @@ function drawAt(
   const shots = line.shots.map((s, i) => ({ from: Math.round(s.start * 30), durationInFrames: Math.round((s.end - s.start) * 30), kind: "video", aspect: options.aspects?.[i] ?? 9 / 16 }));
   const marks = Object.fromEntries(Object.entries(line.marks).map(([k, v]) => [k, String(v)]));
   const brand = { name: "Maison Farine", displayFont: "Anton", bodyFont: "Inter Tight", accent: "#b5293f", palette: { secondary: "#1d3b2a", light: "#f4ebe1", dark: "#2a1f1a" }, ...options.brand };
-  const end = options.end ? { ...options.end, from: durationInFrames - 48 } : null;
+  const end = options.end ? { ...options.end, from: durationInFrames - 75 } : null;
   return make(React, ...Object.values(scope))({ width: 1080, height: 1920, durationInFrames, brand, shots, reelTexts, end, texts: { ...marks, ...options.settings } });
 }
 

@@ -1,4 +1,4 @@
-import { beatSpans, toFrame, type MontageSkill } from "../skills.ts";
+import { END_CARD_SECONDS, beatSpans, toFrame, type MontageSkill } from "../skills.ts";
 
 // « Éventail de bandes », version 2, written again on its original's fiche (docs/fiches/eventail.md: measured image by
 // image at 30 i/s, its sound read by bands of frequency, the video watched and heard by Gemini; Tristan: « c'est un
@@ -12,8 +12,9 @@ import { beatSpans, toFrame, type MontageSkill } from "../skills.ts";
 //   7 – 9    the whole shot at once on the drop, at the same place and size, a thin frame of the ground laid over it;
 //   then her shots in black and white, two beats each, cut on the kick: the fifth a split screen of two shots that answer
 //   each other (the place and its heart), the ninth a second shot with lines going out of its centre (the opening's echo);
-//   31 –     a blue black in the frame: her name in a small white serif at the middle, at once; two beats later a smaller
-//            brick red line under it; both held eight beats and a half, its music going on under them.
+//   31 –     a blue black in the frame: her name in a white serif at the middle, at once; two beats later a smaller
+//            brick red line under it; both held five beats and a half (the original's eight and a half: the engine holds
+//            a bare ending three seconds at most), its music going on under them.
 // Its music shaped as the original's: a short hit of it on each of the seven beats before the drop, through a small
 // speaker and silent between (its intro: a mid-range sound alone, 0,28 s a beat), then all of it with the whole shot.
 // Black and white with blue blacks and whites never blown, no grain, no zoom, no flash: the original has none. Played
@@ -27,12 +28,16 @@ const DROP = 7;
 const OPENING = 9;
 /** Each of her shots after it (beats). */
 const EACH = 2;
-/** The black at the end (beats): her name on it at once, its red line two beats later, both held to the end. */
+/**
+ * The black at the end (beats): her name on it at once, its red line two beats later, both held to the end; the engine
+ * holds a bare ending three seconds at most (heldEnding: five beats and a half at its tempo, 2,75 s, of the original's
+ * eight and a half, 4,26 s, too long a black around her name on the bench).
+ */
 const BLACK = 8.5;
 const LINE_AFTER = 2;
-/** With an ending card (an option): her name six beats on the black, then the card's 1,6 s (the engine's END_CARD_SECONDS). */
-const BEFORE_CARD = 6;
-const END_CARD = 1.6;
+/** With an ending card (an option): her name four beats on the black (two seconds), then the card's 2,5 s (the engine's END_CARD_SECONDS). */
+const BEFORE_CARD = 4;
+const END_CARD = END_CARD_SECONDS;
 /** Its intro: a hit of its music on each beat before the drop, this long (beats: the original's 0,28 s), then silence to the next beat. */
 const HIT = 0.56;
 /** Its music cut at the end with a short fade (beats: the original's 0,25 s). */
@@ -145,9 +150,13 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   // 3. Its end: the blue black in the frame, to the end (its ending card's too).
   const night = frame >= Math.min(BLACK, endAt) ? h("div", { key: "night", style: { ...framed, backgroundColor: NIGHT } }) : null;
 
-  // Its words, on the black only: her name white at the middle, one line in a small upright serif (the original's
-  // capitals are 5,4 % of its height: 50 px here, at the size that reads), its red line two beats later under it,
-  // smaller (a short one an accent beside her name, 4 words at most; a longer one at the size that reads).
+  // Its words, on the black only: her name white at the middle, one line in an upright serif, its red line two beats
+  // later under it, smaller (a short one an accent beside her name, 4 words at most; a longer one at the size that
+  // reads). The original's 50 px (its capitals 5,4 % of its 16:9 height) were lost in the vertical frame's black
+  // (Tristan, 6 November: « les scènes de fin avec le nom du commerce sont souvent trop courtes », the name tiny in four
+  // seconds of black): 92 px upright, 64 in its band, its line in proportion.
+  const K = (wide ? 64 : 92) / 50;
+  const LK = wide ? 1.15 : 1.4;
   const display = "'" + brand.displayFont + "', 'Instrument Serif', Georgia, serif";
   // A phone number or a date never breaks between its digits, nor « Paris 3e » before its number.
   const keep = (s) => String(s || "").replace(/(\d) (?=\d)/g, "$1\u00a0").replace(/ (\d+(?:er|e))\b/g, "\u00a0$1");
@@ -155,7 +164,7 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const line = reelTexts.find((t) => t.role === "caption");
   const others = reelTexts.filter((t) => t !== credit && t !== line);
   const shown = (t) => Boolean(t) && frame >= t.from && frame < t.to && frame < endAt;
-  // Their lines' middles, the original's (48,9 % and 56,7 % of its height): 7 px over the frame's middle and 41 under it.
+  // Their lines' middles, the original's (48,9 % and 56,7 % of its height): 7 px over the frame's middle and 41 under it, at its size.
   const mid = by + Math.round(bh / 2);
   const few = (s) => String(s || "").split(/[\s\u00a0\u202f]+/).filter((w) => /[\p{L}\p{N}]/u.test(w)).length <= 4;
   // A line in its box (top, height: room for its glyphs, so it is never shrunk), on one line, or on two for her card's
@@ -163,14 +172,17 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const say = (key, text, top, tall, size, color, accent, anchor) =>
     h(FitText, { key, style: { position: "absolute", left: 140, top: Math.round(top), width: 800, height: Math.round(tall) }, innerStyle: { fontFamily: display, fontWeight: 400, fontSize: size, lineHeight: 1.12, color, textAlign: "center", whiteSpace: anchor ? "normal" : "nowrap", textWrap: "balance", ...(anchor ? { justifyContent: anchor } : {}) } },
       accent ? h("span", { "data-fauve-accent": "" }, keep(text)) : keep(text));
-  const red = (key, text, top, anchor) => (few(text) ? say(key, text, top, anchor ? 120 : 68, 42, RED, true, anchor) : say(key, text, top, anchor ? 132 : 76, 48, RED, false, anchor));
-  const words = [shown(credit) ? say("credit", credit.text, mid - 47, 80, 50, WHITE, false, null) : null, shown(line) ? red("line", line.text, mid + 41 - (few(line.text) ? 34 : 38), null) : null];
+  const red = (key, text, top, anchor) => (few(text) ? say(key, text, top, Math.round((anchor ? 120 : 68) * LK), Math.round(42 * LK), RED, true, anchor) : say(key, text, top, Math.round((anchor ? 132 : 76) * LK), Math.round(48 * LK), RED, false, anchor));
+  const words = [
+    shown(credit) ? say("credit", credit.text, mid - 47 * K, 80 * K, Math.round(50 * K), WHITE, false, null) : null,
+    shown(line) ? red("line", line.text, mid + 41 * K - (few(line.text) ? 34 : 38) * LK, null) : null,
+  ];
 
   // Its ending card (an option): its title in place of her name and its line in place of the red one, on the black.
   const ending = end && frame >= endAt
     ? h(React.Fragment, { key: "end" },
-        say("end-title", end.title, end.subtitle ? mid - 140 : mid - 70, 140, 50, WHITE, false, end.subtitle ? "flex-end" : "center"),
-        end.subtitle ? red("end-line", end.subtitle, mid + 24, "flex-start") : null)
+        say("end-title", end.title, end.subtitle ? mid - 140 * K : mid - 70 * K, 140 * K, Math.round(50 * K), WHITE, false, end.subtitle ? "flex-end" : "center"),
+        end.subtitle ? red("end-line", end.subtitle, mid + 24 * K, "flex-start") : null)
     : null;
 
   // Any other text of the Reel (none in its slots): a plain white line off its picture, so nothing she wrote is lost.
@@ -189,7 +201,10 @@ export const eventail: MontageSkill = {
   // intro of hits alone, its split screen, its black and white with blue blacks and no grain, its end in a serif.
   // 3: vertical full frame by default, her horizontal files cropped on their subject, its band only when she asks for
   // it (Tristan, 6 November, on seven benches: « vertical please », « tout vertical please »).
-  version: 3,
+  // 4: its ending readable (Tristan, 6 November, on its bench: four seconds of black with her name tiny in the middle):
+  // her name at 92 px upright (64 in its band) and its line in proportion, its black held three seconds at most by the
+  // engine (heldEnding), two beats less before an ending card.
+  version: 4,
   bpm: BPM,
   shots: [FEWEST, ORIGINAL],
   // Up to 23 for a length she asks for: about 30 s at its own tempo (more of her place, two beats each).
@@ -253,7 +268,8 @@ export const eventail: MontageSkill = {
     // fewer drop those with no part to play first; more are moments of her place before the echo.
     const slots = SLOTS.map((want, i) => ({ want, i })).filter((s) => !DROPS.slice(0, Math.max(0, ORIGINAL - count)).includes(s.i));
     if (count > ORIGINAL) slots.splice(slots.findIndex((s) => s.i === ECHO), 0, ...Array.from({ length: count - ORIGINAL }, () => ({ want: MORE, i: -1 })));
-    // The black: eight beats and a half, or six before her ending card's 1,6 s (so the card lands on a beat).
+    // The black: eight beats and a half (held three seconds at most by the engine: `ending`), or four before her ending
+    // card's 2,5 s (so the card lands on a beat).
     const spans = beatSpans(bpm, [OPENING, ...slots.map(() => EACH), end ? BEFORE_CARD + END_CARD / beat : BLACK]);
     const duration = spans.at(-1)!.end;
     const blackAt = spans.at(-1)!.start;
@@ -278,6 +294,8 @@ export const eventail: MontageSkill = {
         filters: [{ kind: "radio", from: 0, to: round3(DROP * beat) }],
         end: { at: duration, fade: round(FADE * beat) },
       },
+      // Her name alone on the black, at once: the engine holds it three seconds at most, two at least.
+      ...(end ? {} : { ending: { from: blackAt, bare: true } }),
       marks: {
         beat: beat * 30,
         whole: toFrame(DROP * beat),

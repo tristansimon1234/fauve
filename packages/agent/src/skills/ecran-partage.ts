@@ -1,4 +1,4 @@
-import { beatSpans, type MontageSkill } from "../skills.ts";
+import { END_CARD_SECONDS, beatSpans, type MontageSkill } from "../skills.ts";
 
 // « Écran partagé titré », version 3, written again on its original's fiche (docs/fiches/ecran-partage.md: measured image
 // by image at 30 i/s, each half measured on its own, its music measured, the video watched and heard by Gemini; Tristan:
@@ -28,8 +28,8 @@ const BPM = 120;
 const OPENING = 4.5;
 const MIDDLE = [7, 4, 5.85];
 const LAST = 4.2;
-/** The engine's ending card: the Reel's last 1.6 s (motion.ts, END_CARD_SECONDS); the last pair held whole beats longer for it. */
-const END_CARD = 1.6;
+/** The engine's ending card: the Reel's last 2,5 s (motion.ts, END_CARD_SECONDS); the last pair held whole beats longer for it. */
+const END_CARD = END_CARD_SECONDS;
 /** Its music without its bass until this beat (the third bar: the original's held bass comes in at 4,55 s). */
 const BASS = 8;
 /**

@@ -107,12 +107,12 @@ test("« Un clic sur tes produits »: at another tempo all of it follows; an end
   assert.ok(Math.abs(slow.music!.pauses![0]!.to - slow.marks.play! / 30) < 0.02);
   const { min, max } = skillLengths(curseur);
   assert.ok(min >= 9 && max <= 13.5, `${min}–${max}`);
-  // An ending card: 1,6 s at least after its length, its last shot longer, one click more (the cursor comes back for it).
+  // An ending card: 2,5 s at least after its length, its last shot longer, one click more (the cursor comes back for it).
   const ended = curseur.timeline(3, { end: true });
-  assert.ok(ended.duration - line.duration >= 1.6 && ended.duration - line.duration < 1.75, `${ended.duration}`);
+  assert.ok(ended.duration - line.duration >= 2.5 && ended.duration - line.duration < 2.75, `${ended.duration}`);
   assert.equal(ended.shots[1]!.end, line.shots[1]!.end);
   assert.equal(ended.sounds!.length, line.sounds!.length + 1);
-  assert.ok(Math.abs(ended.sounds!.at(-1)!.at - (ended.duration - 1.6)) < 0.01);
+  assert.ok(Math.abs(ended.sounds!.at(-1)!.at - (ended.duration - 2.5)) < 0.01);
   assert.ok(Math.abs(ended.music!.end!.at - ended.duration) < 0.001);
 });
 
@@ -432,8 +432,8 @@ test("« Un clic sur tes produits »: one name only, its second click skipped; i
   const one = propsFor(UPRIGHT, { produit1: "Croissant" });
   assert.deepEqual(nodes(draw(120, one)).filter((n) => n.type === "FitText").map(textOf), ["Croissant"]);
   const line = curseur.timeline(3, { end: true });
-  const props = propsFor(UPRIGHT, WORDS, { end: { title: "Ouvert dimanche", subtitle: "de 9 h à 14 h", from: toFrame(line.duration) - 48 } }, line);
-  const at = toFrame(line.duration) - 48;
+  const props = propsFor(UPRIGHT, WORDS, { end: { title: "Ouvert dimanche", subtitle: "de 9 h à 14 h", from: toFrame(line.duration) - 75 } }, line);
+  const at = toFrame(line.duration) - 75;
   // The cursor back for it, its click on the card's first image.
   assert.ok(cursorAt(draw(at - 10, props)));
   assert.ok(Math.abs(cursorAt(draw(at, props))!.h - 171 * 0.69) < 1);

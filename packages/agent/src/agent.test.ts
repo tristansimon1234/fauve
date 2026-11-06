@@ -2339,7 +2339,7 @@ test("end card: the Reel ends on a real shot and no text runs under the card", a
   } as never;
   const out = normalizeEditPlan(plan, { a: 9 });
   assert.equal("clip_id" in out.segments.at(-1)!, true);
-  assert.ok(out.texts.every((t) => t.to <= out.duration - 1.6 + 0.001));
+  assert.ok(out.texts.every((t) => t.to <= out.duration - 2.5 + 0.001));
 });
 
 test("finish: clips corrected and framed, still shots as filmed, animations play over footage, texts off faces", async () => {

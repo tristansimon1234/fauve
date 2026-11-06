@@ -1,4 +1,4 @@
-import { beatSpans, type MontageSkill } from "../skills.ts";
+import { END_CARD_SECONDS, beatSpans, type MontageSkill } from "../skills.ts";
 
 // « Photo dump », written on its original (house/originals/photo-dump.mp4, 11,3 s, 32 pictures, looked at image by
 // image): on a very light grey page, one photo or video at a time, laid at once in the middle, at its own shape and
@@ -10,7 +10,7 @@ const BPM = 85;
 /** Each picture stays half a beat; the last one a beat. */
 const EACH = 1 / 2;
 const LAST = 1;
-/** The ending card's beats (at least the engine's 1,6 s). */
+/** The ending card's beats (at least the engine's 2,5 s). */
 const CARD = 2.5;
 
 const CODE = String.raw`function Scene({ width, height, durationInFrames, brand, shots, reelTexts, end }) {
@@ -73,8 +73,8 @@ export const photoDump: MontageSkill = {
     // At another tempo (a longer Reel, or a music's own): every length in beats follows it.
     const bpm = tempo ?? BPM;
     const beat = 60 / bpm;
-    // Its card lasts the engine's 1,6 s at least, whatever the tempo.
-    const spans = beatSpans(bpm, Array.from({ length: n }, (_, i) => (i < n - 1 ? EACH : LAST + (end ? Math.max(CARD, 1.6 / beat) : 0))));
+    // Its card lasts the engine's 2,5 s at least, whatever the tempo.
+    const spans = beatSpans(bpm, Array.from({ length: n }, (_, i) => (i < n - 1 ? EACH : LAST + (end ? Math.max(CARD, END_CARD_SECONDS / beat) : 0))));
     const duration = spans.at(-1)!.end;
     const wants = spans.map((_, i) =>
       i === 0

@@ -1,4 +1,4 @@
-import { beatSpans, toFrame, type MontageSkill } from "../skills.ts";
+import { END_CARD_SECONDS, beatSpans, toFrame, type MontageSkill } from "../skills.ts";
 
 // « Ta devanture en kaléidoscope », written on its original's fiche (docs/fiches/vitraux.md: measured image by image at
 // 30 i/s, each zone's distance from the real door and from the image before, close-ups of its fanlight and its leaves
@@ -53,8 +53,8 @@ const VERSE = 8;
 const CUT = FIRST + 8;
 /** The rosace turns as the original's fanlight: half a turn in about 16 beats. */
 const TURN = 11.25;
-/** The engine's ending card: the Reel's last 1,6 s. */
-const END_CARD = 1.6;
+/** The engine's ending card: the Reel's last 2,5 s. */
+const END_CARD = END_CARD_SECONDS;
 const round = (n: number) => Math.round(n * 100) / 100;
 const round3 = (n: number) => Math.round(n * 1000) / 1000;
 
@@ -342,7 +342,7 @@ export const vitraux: MontageSkill = {
     const beat = 60 / bpm;
     const verses = Math.max(0, n - 1);
     const more = verses * VERSE;
-    // With an ending card, its time after the original's length, whole beats (the engine's 1,6 s at least).
+    // With an ending card, its time after the original's length, whole beats (the engine's 2,5 s at least).
     const card = end ? Math.ceil((END_CARD + 0.05) / beat) : 0;
     const total = LENGTH + more + card;
     // Its one shot; a verse cut on the bar of beat 8, the next every eight beats, the last one to the end.

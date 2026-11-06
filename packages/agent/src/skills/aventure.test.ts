@@ -16,16 +16,16 @@ const kinds = (n: number) => {
   return line.shots.map((_, i) => line.marks[`t${i}`] ?? 0);
 };
 
-test("« Un an de plus » (v1): its tempo, its 44 shots at the original's lengths, 41 s at most (42,8 with its card), never past 45", () => {
+test("« Un an de plus » (v1): its tempo, its 44 shots at the original's lengths, 41 s at most (43,7 with its card), never past 45", () => {
   assert.equal(aventure.version, 2);
   assert.equal(aventure.bpm, 134.87);
   assert.deepEqual(aventure.shots, [20, 44]);
   assert.deepEqual(aventure.files, [8, 30]);
-  // Its longest: the original's 51 shots less the seven that repeat another, 41,03 s; its card adds 1,78 s on its last shot.
+  // Its longest: the original's 51 shots less the seven that repeat another, 41,03 s; its card adds 2,67 s on its last shot.
   const most = aventure.timeline(44, { end: false });
   assert.equal(most.shots.length, 44);
   assert.ok(Math.abs(most.duration - 41.03) < 0.02, `${most.duration}`);
-  assert.ok(Math.abs(aventure.timeline(44, { end: true }).duration - most.duration - 1.8) < 0.03);
+  assert.ok(Math.abs(aventure.timeline(44, { end: true }).duration - most.duration - 2.67) < 0.03);
   // Its cuts where the original's are, within two images, until the first shot it leaves out (the temple from the air,
   // the original's image 345): the dark covers, its counter's shot on the drop, the crowd, the whip, the smoke…
   assert.deepEqual(starts(44).slice(0, 15), [0, 10, 23, 37, 63, 97, 107, 123, 177, 210, 227, 264, 287, 317, 330]);
@@ -34,12 +34,13 @@ test("« Un an de plus » (v1): its tempo, its 44 shots at the original's length
   // Its last shot, the hugs, 2 s; the blow's four shots of one and two beats, its comeback's of three.
   const last = most.shots.at(-1)!;
   assert.ok(Math.abs(last.end - last.start - 2.0) < 0.02);
-  // Its shortest: 20 shots, 20,4 s; never slower than 130 BPM, never faster than 140.
+  // Its shortest: 20 shots, 20,4 s; never slower than 131 BPM (its own 130 until the card's 2,5 s: its longest with its
+  // card stays within 45 s), never faster than 140.
   assert.ok(Math.abs(aventure.timeline(20, { end: false }).duration - 20.37) < 0.02);
-  assert.deepEqual(skillTempos(aventure), [130, 140]);
+  assert.deepEqual(skillTempos(aventure), [131, 140]);
   const lengths = skillLengths(aventure);
   assert.ok(lengths.min > 19 && lengths.max <= 43, JSON.stringify(lengths));
-  assert.ok(aventure.timeline(44, { end: true, bpm: 130 }).duration <= 45);
+  assert.ok(aventure.timeline(44, { end: true, bpm: 131 }).duration <= 45);
   // A Reel of 30 s: its own tempo, 29 shots.
   assert.deepEqual(skillFit(aventure, 30), { n: 29, bpm: 134.87 });
   // At another tempo, every length follows.
@@ -184,7 +185,7 @@ function props(n: number, options: { aspect?: number; end?: boolean; settings?: 
       brand: { name: "Farine", displayFont: "Bebas Neue", bodyFont: "Jost", accent: "#7a2e3b", palette: {} },
       shots,
       reelTexts: [{ text: options.text ?? "5 ans", role: "hook", from: Math.round(t.from * 30), to: Math.round(t.to * 30), emphasis: [] }],
-      end: options.end ? { title: "Merci pour cette année", subtitle: "On se retrouve en janvier", from: total - 48 } : null,
+      end: options.end ? { title: "Merci pour cette année", subtitle: "On se retrouve en janvier", from: total - 75 } : null,
       texts: { ...Object.fromEntries(Object.entries(line.marks).map(([k, v]) => [k, String(v)])), ...options.settings },
     },
   };
@@ -304,7 +305,7 @@ test("« Un an de plus » (v2): full frame by default, its band on her word or a
   assert.deepEqual(styleOf(nodes(draw(from + 2, asked.p)).find((x) => x.type === "Footage")!), { position: "absolute", left: 0, top: 0, width: 1080, height: 1920 });
   // Its ending card: on its last shot (held 1,8 s more), a little darker, her words in its capitals, a line under them.
   const ended = props(30, { end: true });
-  const at = ended.total - 48;
+  const at = ended.total - 75;
   assert.equal(nodes(draw(at - 1, ended.p)).filter((x) => String(x.props.key).startsWith("e")).length, 0);
   const card = nodes(draw(at + 10, ended.p));
   assert.equal(card.filter((x) => x.type === "Footage").length, 1);

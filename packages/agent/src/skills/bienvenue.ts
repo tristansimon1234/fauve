@@ -1,4 +1,4 @@
-import type { MontageSkill, SkillShot, SkillSound } from "../skills.ts";
+import { END_CARD_SECONDS, type MontageSkill, type SkillShot, type SkillSound } from "../skills.ts";
 
 // « L'accueil, puis la rafale », version 1, written on its original's fiche (docs/fiches/bienvenue.md: measured image by
 // image at 30 i/s, its yellow letters read on the pixels, the light of each shot, its sound by bands; Tristan: « c'est un
@@ -39,8 +39,8 @@ const KEEP = [4, 15.75, 7.5, 11.5, 20.5, 24.75, 28.75, 2, 10, 22, 13.25, 26, 6, 
 const ORIGINAL = 24;
 const FEWEST = 10;
 const LONGEST = 44;
-/** The engine's ending card: the Reel's last 1,6 s, over its last shot held whole beats longer. */
-const END_CARD = 1.6;
+/** The engine's ending card: the Reel's last 2,5 s, over its last shot held whole beats longer. */
+const END_CARD = END_CARD_SECONDS;
 /** The most lines of her sentence (one per calm shot). */
 const LINES = 4;
 const round = (n: number) => Math.round(n * 100) / 100;
@@ -245,7 +245,7 @@ export const bienvenue: MontageSkill = {
     const count = Math.max(FEWEST, Math.min(LONGEST, Math.round(n)));
     const burst = burstCuts(count - CALM.length);
     const edges = [...CALM, ...burst.cuts.map((c) => DROP + c)];
-    // With an ending card, its last shot held whole beats longer (the engine's 1,6 s at least, a frame lost to rounding never cutting into it).
+    // With an ending card, its last shot held whole beats longer (the engine's 2,5 s at least, a frame lost to rounding never cutting into it).
     const card = end ? 4 * Math.ceil((END_CARD + 0.05) / (4 * s16) - 1e-6) : 0;
     const secs = (x: number) => round(onFrame(x * s16));
     const duration = secs(DROP + burst.length + card);

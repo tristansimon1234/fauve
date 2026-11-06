@@ -1,4 +1,4 @@
-import { beatSpans, toFrame, type MontageSkill } from "../skills.ts";
+import { END_CARD_SECONDS, beatSpans, toFrame, type MontageSkill } from "../skills.ts";
 
 // « Titre derrière le décor », version 2, written again on its original's fiche (docs/fiches/titre-derriere.md:
 // measured image by image at 30 i/s, its music measured and laid against « Lieu tapé »'s, the video watched and heard by
@@ -52,8 +52,8 @@ const PIECES = 7.35;
 const FLASH = 11.55;
 const GHOST = 12;
 const KNOCK = 9.52;
-/** The engine's ending card: the Reel's last 1.6 s (motion.ts, END_CARD_SECONDS); its last shot held whole bars of two beats longer for it, so it still ends on a snare. */
-const END_CARD = 1.6;
+/** The engine's ending card: the Reel's last 2,5 s (motion.ts, END_CARD_SECONDS); its last shot held whole bars of two beats longer for it, so it still ends on a snare. */
+const END_CARD = END_CARD_SECONDS;
 const LONG = 35;
 const round = (n: number) => Math.round(n * 100) / 100;
 const round3 = (n: number) => Math.round(n * 1000) / 1000;

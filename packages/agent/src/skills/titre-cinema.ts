@@ -1,4 +1,4 @@
-import { beatSpans, type MontageSkill } from "../skills.ts";
+import { END_CARD_SECONDS, beatSpans, type MontageSkill } from "../skills.ts";
 
 // « Titre de film signé », version 1, written on its original's fiche (docs/fiches/titre-cinema.md: measured image by
 // image at 30 i/s, its title's letters and colour read on the pixels, its sound by bands; Gemini's reading corrected:
@@ -34,7 +34,7 @@ const MORE = [4, 4, 8];
 const PEOPLE = 6.35;
 const LAST = 7.59;
 /**
- * With the engine's ending card (its last 1,6 s, over the walk), the walk held half a bar longer (two beats, the snare
+ * With the engine's ending card (its last 2,5 s, over the walk), the walk held half a bar longer (two beats, the snare
  * of its bar), so most of it still plays alone: whole bars longer, the card's walk outran three passages of one video.
  */
 const CARD_BEATS = 2;
@@ -197,8 +197,8 @@ export const titreCinema: MontageSkill = {
         : count === 5
           ? MIDDLE
           : [...MIDDLE, ...Array.from({ length: count - 6 }, (_, i) => MORE[i % MORE.length]!), PEOPLE];
-    // With an ending card, its last shot held two beats longer (the card over its last 1,6 s).
-    const spans = beatSpans(bpm, [TITLE, ...middle, LAST + (end ? CARD_BEATS : 0)]);
+    // With an ending card, its last shot held two beats longer (the card over its last 2,5 s).
+    const spans = beatSpans(bpm, [TITLE, ...middle, LAST + (end ? Math.max(CARD_BEATS, 2 * Math.ceil(END_CARD_SECONDS / beat / 2 - 1e-6)) : 0)]);
     const duration = spans.at(-1)!.end;
     const cut = spans[1]!.start;
     const kinds = count === 4 ? ["lights", "close"] : ["lights", "view", "close", ...Array.from({ length: Math.max(0, count - 6) }, () => "more"), ...(count >= 6 ? ["people"] : [])];

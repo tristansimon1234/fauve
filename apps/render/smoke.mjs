@@ -18,7 +18,8 @@
 //    of its texts stay on a face it follows (faces: not a failure, a reason for one more
 //    round of the motion designer), its sentences that do not stay long enough to be
 //    read, its texts drawn too small for a phone, its words lost on the picture under them and its words laid behind
-//    a person who hides them (in faces too), and, when its code reads what is said, how much of it it writes (spoken).
+//    a person who hides them, and, on a composition of the whole Reel, its name at the end held too short or drawn too
+//    small (in faces too), and, when its code reads what is said, how much of it it writes (spoken).
 // BROWSER_EXECUTABLE overrides Remotion's own Chrome (local runs).
 import { existsSync, readFileSync } from "node:fs";
 import React from "react";
@@ -245,8 +246,8 @@ if (browser) {
           logLevel: "error",
           timeoutInMilliseconds: 60000,
           onBrowserLog: (log) => {
-            // Not failures, reasons for one more round: a text on a face, a sentence too quick to read, a text too small, a word lost on the picture, a text of the Reel not written.
-            const note = /^FAUVE_(?:FACE|READ|SIZE|INK|HIDDEN|MISSING) (".*")$/.exec(log.text)?.[1];
+            // Not failures, reasons for one more round: a text on a face, a sentence too quick to read, a text too small, a word lost on the picture, a text of the Reel not written, its name at the end too short or too small.
+            const note = /^FAUVE_(?:FACE|READ|SIZE|INK|HIDDEN|MISSING|ENDING) (".*")$/.exec(log.text)?.[1];
             if (note) faces[scene.id] = [faces[scene.id], JSON.parse(note)].filter(Boolean).join("\n");
             const drawn = /^FAUVE_COVER (\[.*\])$/.exec(log.text)?.[1];
             if (drawn) cover[scene.id] = JSON.parse(drawn);

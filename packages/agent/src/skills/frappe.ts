@@ -1,4 +1,4 @@
-import { beatSpans, toFrame, type MontageSkill } from "../skills.ts";
+import { END_CARD_SECONDS, beatSpans, toFrame, type MontageSkill } from "../skills.ts";
 
 // « Lieu tapé lettre à lettre », version 2, written again on its original's fiche (docs/fiches/frappe.md: measured image
 // by image at 30 i/s, its music measured, the video watched and heard by Gemini; Tristan: « ton analyse préalable des
@@ -51,7 +51,7 @@ const BARS_LENGTH = 0.35;
 /** The burst at the end: a shot every 0,23 beat (5 images at its tempo), then black. */
 const BURST = 0.23;
 const BLACK = 1.03;
-const END_CARD = 1.6;
+const END_CARD = END_CARD_SECONDS;
 const round = (n: number) => Math.round(n * 100) / 100;
 
 const CODE = String.raw`function Scene({ width, height, durationInFrames, brand, shots, reelTexts, end, texts }) {

@@ -1,4 +1,4 @@
-import { beatSpans, type MontageSkill } from "../skills.ts";
+import { END_CARD_SECONDS, beatSpans, type MontageSkill } from "../skills.ts";
 
 // « Mosaïque qui change », version 3, written again on its original's fiche (docs/fiches/mosaique.md: measured image by
 // image at 30 i/s and tile by tile, its music measured, the video watched and heard by Gemini; Tristan: « c'est un effet
@@ -25,8 +25,8 @@ import { beatSpans, type MontageSkill } from "../skills.ts";
 const BPM = 130;
 /** Beats a picture takes to cover the grid: 2,6 at its tempo, the original's 36 images, a print every 3. */
 const WAVE = 2.6;
-/** The ending card's length (s): exactly the engine's 1,6 s at any tempo, so its words land as the paper wave ends. */
-const CARD_SECONDS = 1.6;
+/** The ending card's length (s): exactly the engine's 2,5 s at any tempo, so its words land as the paper wave ends. */
+const CARD_SECONDS = END_CARD_SECONDS;
 /** Her title stays this long at least (s): the time to read it on a phone. */
 const TITLE_SECONDS = 2.6;
 /** A picture's wave at her pace: twice as long (calmer) or half (quicker) as the original's. */

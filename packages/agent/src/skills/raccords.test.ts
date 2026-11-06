@@ -77,7 +77,7 @@ test("« Plans qui s'emboîtent »: 4 to 9 shots from her files, its middle by t
   // An ending card: its last shot held whole sixteenths longer (1,6 s at least), its music to the end.
   const line = raccords.timeline(6, { end: false });
   const ended = raccords.timeline(6, { end: true });
-  assert.ok(ended.duration - line.duration >= 1.6);
+  assert.ok(ended.duration - line.duration >= 2.5);
   assert.equal(ended.music!.end!.at, ended.duration);
   // At another tempo, every length counted in sixteenths follows it.
   const slow = raccords.timeline(6, { end: false, bpm: 80 });
@@ -258,7 +258,7 @@ test("« Plans qui s'emboîtent » (v2): full frame by default, its band as her 
 
 test("« Plans qui s'emboîtent »: its ending card over its last shot, blinking in, readable", () => {
   const line = raccords.timeline(6, { end: true });
-  const from = Math.round((line.duration - 1.6) * 30);
+  const from = Math.round((line.duration - 2.5) * 30);
   const end = { title: "Ouvert dès 7 h", subtitle: "au 12 rue des Martyrs", from };
   const card = (f: number) => of(drawAt(f, { end, end_card: true }), "FitText").map((t) => t.children[0]);
   assert.deepEqual(card(from - 1), []);

@@ -1,4 +1,4 @@
-import { beatSpans, type MontageSkill, type SkillShot } from "../skills.ts";
+import { END_CARD_SECONDS, beatSpans, type MontageSkill, type SkillShot } from "../skills.ts";
 
 // « La nuit sous tous les angles », version 1, written on its original's fiche (docs/fiches/nuit.md: measured image by
 // image at 30 i/s, its object located in each angle, its colours read on the pixels, its sound by bands; Tristan: « c'est
@@ -59,8 +59,8 @@ const ADDS = ["m", "m", "a", "r", "a", "m", "r", "m", "m", "r", "m", "r", "m", "
 const FEWEST = 15;
 const MOST = FEWEST + ADDS.length;
 const LONGEST = MOST + 14;
-/** The engine's ending card: the Reel's last 1,6 s. */
-const END_CARD = 1.6;
+/** The engine's ending card: the Reel's last 2,5 s. */
+const END_CARD = END_CARD_SECONDS;
 const round3 = (n: number) => Math.round(n * 1000) / 1000;
 
 /** How many angles, round things and night shots n shots make (the lens that flashes besides), and the extra night shots of a longer Reel. */

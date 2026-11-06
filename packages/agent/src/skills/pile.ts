@@ -1,5 +1,5 @@
 import { burstTimes } from "../sfx.ts";
-import { beatSpans, toFrame, type MontageSkill, type SkillSound } from "../skills.ts";
+import { END_CARD_SECONDS, beatSpans, toFrame, type MontageSkill, type SkillSound } from "../skills.ts";
 
 // « Pile de photos », version 3, written again on its original's fiche (docs/fiches/pile.md: measured image by image at
 // 30 i/s, each photo's landing, box and leaving found on the differences of its images, its clicks on its sound; Tristan:
@@ -42,9 +42,9 @@ const LAST_AFTER = 1 / 3;
 /** Its words alone on the white at the end (beats: its last second), or before the ending card. */
 const ALONE = 2;
 const ALONE_BEFORE_CARD = 1;
-/** The ending card's beats: the engine's last 1,6 s at least. */
+/** The ending card's beats: the engine's last 2,5 s at least. */
 const CARD = 3.25;
-const CARD_SECONDS = 1.6;
+const CARD_SECONDS = END_CARD_SECONDS;
 /**
  * Its clicking as it slows down, measured on the original's sound (s on its clock, and how strong each attack is next to
  * its hit): 40 clicks a second at 0,3 s, 17 at 1,5, 10 at 2,3, 6 at 3,3, 4 at 4,3, 2 at 6,4, up to its dry hit at 7,962 s,
@@ -258,7 +258,7 @@ export const pile: MontageSkill = {
     // just before it.
     const hit = Math.floor(lands[count - 2]! + STAY);
     const last = hit + LAST_AFTER;
-    // Its words alone after it, or a beat of them and the ending card (the engine's 1,6 s at least, whatever the tempo).
+    // Its words alone after it, or a beat of them and the ending card (the engine's 2,5 s at least, whatever the tempo).
     const total = last + (end ? ALONE_BEFORE_CARD + Math.max(CARD, CARD_SECONDS / beat) : ALONE);
     // Each shot from its landing to the next one's (the first from the start, the last to the end): its code lays each
     // photo on its shot's first image, and a video plays while it lies on top, then holds.

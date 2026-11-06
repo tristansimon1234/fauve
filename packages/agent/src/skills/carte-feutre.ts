@@ -1,4 +1,4 @@
-import { beatSpans, toFrame, type MontageSkill } from "../skills.ts";
+import { END_CARD_SECONDS, beatSpans, toFrame, type MontageSkill } from "../skills.ts";
 
 // « Carte au feutre », version 2, written again on its original's fiche (docs/fiches/carte-feutre.md: measured image by
 // image at 30 i/s, the notebook of each step found on the pixels that do not change while the photos pass under it, its
@@ -42,8 +42,8 @@ const BLANK = [12.5, 13.5] as const;
 /** Its 9 s (270 images) in beats; its sound fades over the last second. */
 const LENGTH = 20.25;
 const FADE = 2.25;
-/** The engine's ending card: the Reel's last 1,6 s; whole beats more for it, only when she has one. */
-const CARD_SECONDS = 1.6;
+/** The engine's ending card: the Reel's last 2,5 s; whole beats more for it, only when she has one. */
+const CARD_SECONDS = END_CARD_SECONDS;
 const round = (s: number) => Math.round(s * 100) / 100;
 const round3 = (s: number) => Math.round(s * 1000) / 1000;
 

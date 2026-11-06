@@ -1,4 +1,4 @@
-import { beatSpans, toFrame, type MontageSkill, type SkillSound } from "../skills.ts";
+import { END_CARD_SECONDS, beatSpans, toFrame, type MontageSkill, type SkillSound } from "../skills.ts";
 
 // « Titre qui se décode », version 4, written again on its original's fiche (docs/fiches/decode.md: measured image by
 // image at 30 i/s, its music and its sounds measured, the video watched and heard by Gemini; Tristan: « c'est un effet
@@ -39,8 +39,8 @@ const EXTRA = 2;
 const FEWEST = 9;
 const MOST = 16;
 const LONGEST = 23;
-/** The engine's ending card: the Reel's last 1.6 s (motion.ts, END_CARD_SECONDS); black under it after its ending. */
-const END_CARD = 1.6;
+/** The engine's ending card: the Reel's last 2,5 s (motion.ts, END_CARD_SECONDS); black under it after its ending. */
+const END_CARD = END_CARD_SECONDS;
 /** In the opening (beats): each band lands (its original's images 4, 9, 14, 19, 26, 32), the fold's three steps start a beat apart (69, 84, 98), each six images long. */
 const BANDS = [0.27, 0.61, 0.95, 1.29, 1.76, 2.17];
 const FOLD_AT = 4.68;

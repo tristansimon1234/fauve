@@ -1,4 +1,4 @@
-import { beatSpans, toFrame, type MontageSkill } from "../skills.ts";
+import { END_CARD_SECONDS, beatSpans, toFrame, type MontageSkill } from "../skills.ts";
 
 // « Mots aux quatre coins », version 3, written again on its original's fiche (docs/fiches/quatre-coins.md: measured
 // image by image at 30 i/s, its music measured band by band, the video watched and heard by Gemini; Tristan: « c'est un
@@ -49,8 +49,8 @@ const FRONT = 11.5;
 const NAME = 2.35;
 /** Its address reads before the cut (s): at a fast tempo, its opening lasts that much longer, in half beats. */
 const ADDRESS_READ = 2.4;
-/** The engine's ending card: the Reel's last 1,6 s (motion.ts, END_CARD_SECONDS); its front is held that much longer, in half beats. */
-const END_CARD = 1.6;
+/** The engine's ending card: the Reel's last 2,5 s (motion.ts, END_CARD_SECONDS); its front is held that much longer, in half beats. */
+const END_CARD = END_CARD_SECONDS;
 /** Its shots: the opening, six to ten of its life, its front; up to 19 for a length she asks for (about 31 s at its tempo, 45 s at its slowest). */
 const SHOTS: [number, number] = [8, 12];
 const LONGEST = 19;
@@ -228,7 +228,7 @@ export const quatreCoins: MontageSkill = {
     const life = [...kept, ...Array.from({ length: Math.max(0, middle - LIFE.length) }, () => ({ b: MORE, kind: "more" as const }))];
     // At a fast tempo the opening is never shorter than its address needs to be read; at its own tempo, its beats as written.
     const opening = Math.max(OPENING, Math.ceil((LEAD + WORDS.at(-1)! + ADDRESS_READ / beat) * 2) / 2);
-    // With an ending card, its front held half beats longer for the card's 1,6 s (her name held as long as the original's).
+    // With an ending card, its front held half beats longer for the card's 2,5 s (her name held as long as the original's).
     const front = FRONT + (end ? Math.ceil((END_CARD / beat) * 2 - 1e-6) / 2 : 0);
     const spans = beatSpans(bpm, [opening, ...life.map((l) => l.b), front]);
     const duration = spans.at(-1)!.end;

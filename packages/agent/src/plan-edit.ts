@@ -1,3 +1,4 @@
+import { END_CARD_SECONDS } from "./motion.ts";
 import { ownRequestWords } from "./request-log.ts";
 import { isClipSegment, MAX_OVERLAYS, segmentSpans, type EditPlan, type PlanOverlay } from "./schemas.ts";
 
@@ -112,8 +113,8 @@ export function insertSegment(plan: EditPlan, index: number, segment: Segment): 
   return withSegments(plan, segments, origin);
 }
 
-/** How long an end card she adds plays, after the Reel's last image (its last shot held under the card). */
-export const ADDED_END_SECONDS = 1.6;
+/** How long an end card she adds plays, after the Reel's last image (its last shot held under the card): the engine's. */
+export const ADDED_END_SECONDS = END_CARD_SECONDS;
 
 /**
  * Her end card: its words changed when the Reel has one; else added, the Reel going on by ADDED_END_SECONDS after its
@@ -129,7 +130,7 @@ export function withEndCard(plan: EditPlan, card: { title: string; subtitle?: st
   const longer: Segment = isClipSegment(last)
     ? { ...last, out: round(last.out + ADDED_END_SECONDS * (last.speed ?? 1)) }
     : { ...last, duration: Math.min("scene" in last ? 6 : 8, round(last.duration + ADDED_END_SECONDS)) };
-  return { ...updateSegment(plan, index, longer), end_card: end };
+  return { ...updateSegment(plan, index, longer), end_card: { ...end, seconds: ADDED_END_SECONDS } };
 }
 
 /** Her end card taken out: the time added for it goes with it. */

@@ -1,4 +1,4 @@
-import { toFrame, type MontageSkill, type SkillShot } from "../skills.ts";
+import { END_CARD_SECONDS, toFrame, type MontageSkill, type SkillShot } from "../skills.ts";
 
 // « Collage qui s'emboîte » (`collage`), version 1, written on its original's fiche (docs/fiches/collage.md: n° 22 of
 // Tristan's wave of 5 November, 8,37 s measured image by image at 30 i/s, its sound by bands; Tristan: « c'est un effet
@@ -48,8 +48,8 @@ const SKIES = [2, 6, 10, 15];
 const WINDOW = 7;
 /** Its title on its first ten steps (2 s at 75 BPM: the original's first ten changes, through its parade). */
 const TITLE_STEPS = 10;
-/** The engine's ending card: 1,6 s at least, in whole steps. */
-const END_CARD = 1.6;
+/** The engine's ending card: 2,5 s at least, in whole steps. */
+const END_CARD = END_CARD_SECONDS;
 const round = (x: number) => Math.round(x * 100) / 100;
 const round3 = (x: number) => Math.round(x * 1000) / 1000;
 

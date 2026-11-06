@@ -1,4 +1,4 @@
-import { beatSpans, toFrame, type MontageSkill, type SkillSound } from "../skills.ts";
+import { END_CARD_SECONDS, beatSpans, toFrame, type MontageSkill, type SkillSound } from "../skills.ts";
 
 // « Coulisses façon fiche », version 2, written again on its original's fiche (docs/fiches/coulisses.md: a creator's
 // « sound effects breakdown », measured image by image at 30 i/s, its sounds measured every 5 ms, the video watched and
@@ -59,8 +59,8 @@ const FLASHED = [17, 18, 19];
 const STUTTERS = [22, 25, 27];
 /** A shutter is loudest this many images after the flash on its cut (the original's 197,3, 206,4, 215,5). */
 const SHUTTER_HIT = 1.4;
-/** The engine's ending card: the Reel's last 1.6 s (motion.ts, END_CARD_SECONDS); its last shot held that much longer for it. */
-const END_CARD = 1.6;
+/** The engine's ending card: the Reel's last 2,5 s (motion.ts, END_CARD_SECONDS); its last shot held that much longer for it. */
+const END_CARD = END_CARD_SECONDS;
 /** Its sounds, the original's as its fiche hears them (the sound library's words; the gain from the level of sound effects). */
 const WHOOSH = { sound: "short air whoosh", seconds: 0.5, gain: 6 };
 const TICK = { sound: "camera shutter click", seconds: 0.5, gain: -3 };

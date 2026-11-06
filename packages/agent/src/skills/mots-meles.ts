@@ -1,4 +1,4 @@
-import { beatSpans, toFrame, type MontageSkill } from "../skills.ts";
+import { END_CARD_SECONDS, beatSpans, toFrame, type MontageSkill } from "../skills.ts";
 
 // « Mots mêlés », version 2, written again on its original's fiche (docs/fiches/mots-meles.md: measured image by image
 // at 30 i/s, each pixel of its strokes dated, the grid's letters, strokes and colours measured to the pixel, every word
@@ -27,8 +27,8 @@ const LENGTH = 25;
 const HOLD = 4;
 /** Its first loop starts on this image (the original's 0,13 s: the grid alone before it). */
 const FIRST_FRAME = 4;
-/** The engine's ending card: the Reel's last 1,6 s. */
-const END_CARD = 1.6;
+/** The engine's ending card: the Reel's last 2,5 s. */
+const END_CARD = END_CARD_SECONDS;
 const round = (n: number) => Math.round(n * 100) / 100;
 const comma = (n: number) => String(round(n)).replace(".", ",");
 
@@ -371,7 +371,7 @@ export const motsMeles: MontageSkill = {
     // At another tempo (a longer Reel, or a music's own): its length and its hold follow it; its loops follow the hand.
     const bpm = tempo ?? BPM;
     const beat = 60 / bpm;
-    // One shot under the grid; with an ending card, its time after the hold (the engine's 1,6 s at least, on the
+    // One shot under the grid; with an ending card, its time after the hold (the engine's 2,5 s at least, on the
     // half-beat grid, rounded up so a frame lost to rounding never cuts into it).
     const card = end ? Math.ceil(((END_CARD + 0.05) / beat) * 2) / 2 : 0;
     const spans = beatSpans(bpm, [LENGTH + card]);

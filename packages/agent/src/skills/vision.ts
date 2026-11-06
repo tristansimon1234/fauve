@@ -1,4 +1,4 @@
-import { beatSpans, toFrame, type MontageSkill } from "../skills.ts";
+import { END_CARD_SECONDS, beatSpans, toFrame, type MontageSkill } from "../skills.ts";
 
 // « Vision machine » (key `vision`), written on its original's fiche (docs/fiches/vision.md: measured image by image at
 // 30 i/s, its frames, labels, colours, grids and the share of the picture shown by its tiles measured on its pixels, the
@@ -44,8 +44,8 @@ const ANCHOR = 14;
 /** Its images held two images each (15 i/s) and the beep stopping (images). */
 const HELD: [number, number][] = [[39, 53], [164, 182]];
 const SILENT = 248;
-/** The ending card, in option: black after its last characters, the engine's 1,6 s at least. */
-const CARD_SECONDS = 1.6;
+/** The ending card, in option: black after its last characters, the engine's 2,5 s at least. */
+const CARD_SECONDS = END_CARD_SECONDS;
 const round = (s: number) => Math.round(s * 100) / 100;
 const round3 = (s: number) => Math.round(s * 1000) / 1000;
 

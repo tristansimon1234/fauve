@@ -1,4 +1,4 @@
-import { beatSpans, toFrame, type MontageSkill, type SkillShot, type SkillSound } from "../skills.ts";
+import { END_CARD_SECONDS, beatSpans, toFrame, type MontageSkill, type SkillShot, type SkillSound } from "../skills.ts";
 
 // « Photos posées sur la table », version 2, written again on its original's fiche (docs/fiches/table.md: measured image
 // by image at 30 i/s, each print's box and angle fitted to the pixel, the pile's fade by its light, each half of its
@@ -47,8 +47,8 @@ const KEPT: Record<number, number[]> = { 2: [0, 4], 3: [0, 2, 4], 4: [0, 1, 2, 4
 /** Its music's first beat at 0,13 s; 4 dB softer until its bass line comes in, on the third pair's cut (image 120). */
 const DOWNBEAT = beats(3.9);
 const SOFT_DB = -4;
-/** The engine's ending card (the Reel's last 1,6 s): its last shot held whole beats longer for it, only when she has one. */
-const CARD_SECONDS = 1.6;
+/** The engine's ending card (the Reel's last 2,5 s): its last shot held whole beats longer for it, only when she has one. */
+const CARD_SECONDS = END_CARD_SECONDS;
 /**
  * Its prints' dry clicking, measured on the original's sound (its 1,5 – 5 kHz band, where it stands 8 to 17 dB over the
  * music only while the prints land): s after the first print, and each click's level (dB from the loudest).

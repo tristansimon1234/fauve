@@ -1248,8 +1248,8 @@ test("each of Edith's models shows its original's frames as a Reel she sends: sh
   const { HOUSE_MEASURES } = await import("./house-measures.ts");
   const { stolenStyleSchema } = await import("./steal.ts");
   // A studio's row written before the sheets is rewritten (11: ten models written again on their originals' fiches; 21:
-  // their looks vertical full frame by default, the band on her word; 22: Vision machine v2; 23: Voici mon travail v3; 24: Façade v4).
-  assert.equal(HOUSE_VERSION, 24);
+  // their looks vertical full frame by default, the band on her word; 22: Vision machine v2; 23: Voici mon travail v3; 24: Façade v4; 25: Éventail its ending readable).
+  assert.equal(HOUSE_VERSION, 25);
   for (const m of HOUSE_MODELS) {
     const sheets = houseSheets(m.key);
     // A model written as a design has no original, so no sheets (its row names none).
@@ -1372,8 +1372,9 @@ test("montage skills: each one's plan holds for every number of shots it takes, 
       continue;
     }
     for (let n = skill.shots[0]; n <= Math.max(skill.shots[1], skill.long ?? 0); n++) {
-      // Enough footage for its count (a long version takes more of her files): each video three passages at most.
-      const files = Array.from({ length: Math.max(4, Math.ceil(n / 3)) }, (_, i) => ({ id: `v${i}`, photo: false, seconds: 16, moments: [{ start: 1, end: 4 }, { start: 6, end: 9 }, { start: 11, end: 14 }] }));
+      // Enough footage for its count (a long version takes more of her files): each video three passages at most, 20 s (a
+      // front held under its name and its ending card, « Mots aux quatre coins », « Titre de film signé », takes ten seconds of one).
+      const files = Array.from({ length: Math.max(4, Math.ceil(n / 3)) }, (_, i) => ({ id: `v${i}`, photo: false, seconds: 20, moments: [{ start: 1, end: 4 }, { start: 6, end: 9 }, { start: 11, end: 14 }] }));
       for (const end of [false, true]) {
         const texts = Object.fromEntries(skill.texts.map((t) => [t.slot, "abc".repeat(Math.ceil(t.max / 3)).slice(0, t.max)]));
         const plan = skillPlan({ skill, name: "Test", files, fill: { shots: Array.from({ length: n }, (_, i) => ({ file: files[i % files.length]!.id, at: Math.floor(i / files.length) * 5 })), texts, end: end && skill.end ? { title: "Ouverture samedi" } : null } });
@@ -1463,9 +1464,112 @@ test("a skill without words of its own writes its title when Edith picked the mo
   assert.equal(input.textes[0]!.obligatoire, true);
 });
 
+test("her name at the end of a model's Reel is held two seconds at least, a bare ending three at most (Tristan: « les scènes de fin avec le nom du commerce sont souvent trop courtes »)", async () => {
+  const { heldEnding, skillTimeline, ENDING_LEAST, ENDING_MOST, END_CARD_SECONDS } = await import("./skills.ts");
+  const { MONTAGE_SKILLS } = await import("./skill-library.ts");
+  const beat = 0.5;
+  // A model whose name lands in its last half second (lit in the dark as the room goes off): its time to read added there,
+  // by whole beats; what comes after its moment later by as much (its last shot, its texts, its marks, its sounds, its
+  // music's filters and its end), what comes before it as it was.
+  const short = {
+    duration: 10,
+    shots: [{ start: 0, end: 6, want: "a" }, { start: 6, end: 10, want: "b" }],
+    texts: { nom: { from: 2, to: 10 }, ligne: { from: 9.8, to: 10 } },
+    marks: { off: 270, all: 60 },
+    sounds: [{ at: 4, sound: "click" }, { at: 9.7, sound: "clunk" }],
+    music: { filters: [{ kind: "muffled" as const, from: 9, to: 10 }], end: { at: 10, fade: 0.2 } },
+    ending: { from: 9.5, bare: true },
+  };
+  const held = heldEnding(short, beat);
+  assert.equal(held.duration, 11.5);
+  assert.deepEqual(held.shots.map((s) => [s.start, s.end]), [[0, 6], [6, 11.5]]);
+  assert.deepEqual(held.texts, { nom: { from: 2, to: 11.5 }, ligne: { from: 11.3, to: 11.5 } });
+  assert.deepEqual(held.marks, { off: 270, all: 60 });
+  assert.deepEqual(held.sounds!.map((s) => s.at), [4, 11.2]);
+  assert.deepEqual(held.music, { filters: [{ kind: "muffled", from: 9, to: 11.5 }], end: { at: 11.5, fade: 0.2 } });
+  assert.ok(held.duration - held.ending!.from >= ENDING_LEAST);
+  // A four-second black around her name: its tail cut by whole beats to three seconds at most, two at least; what fell
+  // after the new end ends there.
+  const long = { ...short, duration: 14, shots: [{ start: 0, end: 10, want: "a" }, { start: 10, end: 14, want: "b" }], texts: { nom: { from: 10, to: 14 }, ligne: { from: 11, to: 14 } }, marks: { black: 300, late: 410 }, sounds: [{ at: 13.5, sound: "tick" }], music: { end: { at: 14, fade: 0.25 } }, ending: { from: 10, bare: true } };
+  const cut = heldEnding(long, beat);
+  assert.equal(cut.duration, 13);
+  assert.ok(cut.duration - cut.ending!.from <= ENDING_MOST && cut.duration - cut.ending!.from >= ENDING_LEAST);
+  assert.deepEqual(cut.texts, { nom: { from: 10, to: 13 }, ligne: { from: 11, to: 13 } });
+  assert.deepEqual([cut.shots.at(-1)!.end, cut.marks.late, cut.sounds, cut.music], [13, 390, [], { end: { at: 13, fade: 0.25 } }]);
+  // Over her footage (not bare), a long name stays; a name held already, or a timeline without an ending, is as it was.
+  const footage = { ...long, ending: { from: 10 } };
+  assert.equal(heldEnding(footage, beat), footage);
+  assert.equal(heldEnding({ ...short, ending: undefined }, beat).duration, 10);
+  // Never past 45 s.
+  assert.ok(heldEnding({ ...short, duration: 44.5, shots: [{ start: 0, end: 44.5, want: "a" }], ending: { from: 44.4 } }, beat).duration <= 45);
+  // Every model that ends on her name, as the engine plays it, at each of its counts and at its tempos' ends: two
+  // seconds of it at least, three at most when it is bare; with her ending card, the card is it (no ending held).
+  const { skillTempos, skillLongest } = await import("./skills.ts");
+  let ending = 0;
+  for (const skill of Object.values(MONTAGE_SKILLS)) {
+    if (skill.voice) continue;
+    for (const bpm of skillTempos(skill)) {
+      for (let n = skill.shots[0]; n <= skillLongest(skill); n++) {
+        const line = skillTimeline(skill, n, { end: false, ...(bpm !== skill.bpm ? { bpm } : {}) });
+        if (!line.ending) continue;
+        ending++;
+        const hold = line.duration - line.ending.from;
+        assert.ok(hold >= ENDING_LEAST - 0.02 && (!line.ending.bare || hold <= ENDING_MOST + 0.02), `${skill.key} n=${n} at ${bpm}: her name ${hold} s`);
+        assert.ok(line.duration <= 45, `${skill.key} n=${n} at ${bpm}: ${line.duration} s`);
+        assert.equal(line.shots.at(-1)!.end, line.duration);
+        assert.equal(skillTimeline(skill, n, { end: true, ...(bpm !== skill.bpm ? { bpm } : {}) }).ending, undefined, skill.key);
+      }
+    }
+  }
+  assert.ok(ending > 0);
+  // The engine's ending card: 2,5 s (her name whole two seconds once in), every model with one gives it that time.
+  assert.equal(END_CARD_SECONDS, 2.5);
+  for (const skill of Object.values(MONTAGE_SKILLS)) {
+    if (skill.voice || !skill.end) continue;
+    const n = skill.shots[0];
+    const plain = skillTimeline(skill, n, { end: false });
+    const ended = skillTimeline(skill, n, { end: true });
+    assert.ok(Object.values(ended.texts).every((t) => t.to <= ended.duration - END_CARD_SECONDS + 0.02 || t.to >= ended.duration - 0.02), `${skill.key}: a text under its card`);
+    assert.ok(ended.duration >= plain.duration - (plain.ending ? plain.duration - plain.ending.from : 0), skill.key);
+  }
+});
+
+test("the engine's ending card lasts 2,5 s on a new plan, 1,6 s on a plan made before (its texts timed on it)", async () => {
+  const { buildReelProps, endCardSeconds, END_CARD_SECONDS } = await import("./motion.ts");
+  const { withEndCard, ADDED_END_SECONDS } = await import("./plan-edit.ts");
+  const plan = {
+    format: "9:16",
+    duration: 8,
+    template: "libre",
+    segments: [{ clip_id: "a", in: 0, out: 4, zoom: "none" }, { clip_id: "b", in: 0, out: 1.5, zoom: "none" }],
+    texts: [{ text: "Viens essayer", from: 0, to: 7, style: "hook", emphasis: [] }],
+    images: [],
+    transitions: "cut",
+    subtitles: false,
+    music: null,
+    end_card: { title: "Chez Lou" },
+  } as never as EditPlan;
+  // The editor's plan: its last shot holds the card and a little of itself, its texts end where the card starts.
+  const out = normalizeEditPlan(plan, { a: 9, b: 9 });
+  assert.equal(out.end_card?.seconds, END_CARD_SECONDS);
+  assert.ok(segmentSeconds(out.segments.at(-1)!) >= END_CARD_SECONDS + 0.5);
+  assert.ok(out.texts.every((t) => t.to <= out.duration - END_CARD_SECONDS + 0.001));
+  const inputs = { template: "libre" as const, clipUrls: { a: "https://x/a.mp4", b: "https://x/b.mp4" }, brand: { name: "Chez Lou" } };
+  const props = buildReelProps(out, inputs);
+  assert.equal(props.endCard!.from, props.durationInFrames - Math.round(END_CARD_SECONDS * 30));
+  // A plan made before keeps its 1,6 s (its texts and its model's timeline were timed on it).
+  assert.equal(endCardSeconds(plan), 1.6);
+  const before = buildReelProps({ ...plan, duration: 5.5 }, inputs);
+  assert.equal(before.endCard!.from, before.durationInFrames - 48);
+  // An end card she adds: the Reel goes on by the engine's 2,5 s.
+  assert.equal(ADDED_END_SECONDS, END_CARD_SECONDS);
+  const { end_card: _card, ...bare } = plan as EditPlan & { end_card?: unknown };
+  assert.equal(withEndCard(bare as EditPlan, { title: "Chez Lou" }).end_card?.seconds, END_CARD_SECONDS);
+});
+
 test("a montage skill comes close to the length she asked for by its number of shots, then by its tempo", async () => {
   const { MONTAGE_SKILLS } = await import("./skill-library.ts");
-  const { skillFit, skillLengths, skillTempos, TALK_MAX_SECONDS } = await import("./skills.ts");
+  const { skillFit, skillLengths, skillTempos, skillTimeline, TALK_MAX_SECONDS } = await import("./skills.ts");
   for (const skill of Object.values(MONTAGE_SKILLS)) {
     // A skill timed on her voice takes her length (45 s at most), never a count of shots or a tempo for it.
     if (skill.voice) {
@@ -1474,7 +1578,8 @@ test("a montage skill comes close to the length she asked for by its number of s
     }
     const [slow, fast] = skillTempos(skill);
     assert.ok(slow >= 60 && slow <= skill.bpm && fast <= 140 && fast >= skill.bpm, skill.key);
-    const length = (fit: { n: number; bpm: number }) => skill.timeline(fit.n, { end: false, bpm: fit.bpm }).duration;
+    // Its lengths as the engine plays it (its name held at the end: skillTimeline).
+    const length = (fit: { n: number; bpm: number }) => skillTimeline(skill, fit.n, { end: false, bpm: fit.bpm }).duration;
     const { min, max } = skillLengths(skill);
     assert.ok(min <= max, skill.key);
     // Past its ends: its fastest tempo and fewest shots, its slowest tempo and most.
@@ -1483,7 +1588,7 @@ test("a montage skill comes close to the length she asked for by its number of s
     assert.equal(skillFit(skill, 999).bpm, slow, skill.key);
     assert.equal(length(skillFit(skill, 999)), max, skill.key);
     // Inside its own lengths: its own tempo, the closest count.
-    const own = Array.from({ length: Math.max(skill.shots[1], skill.long ?? 0) - skill.shots[0] + 1 }, (_, k) => skill.timeline(skill.shots[0] + k, { end: false }).duration);
+    const own = Array.from({ length: Math.max(skill.shots[1], skill.long ?? 0) - skill.shots[0] + 1 }, (_, k) => skillTimeline(skill, skill.shots[0] + k, { end: false }).duration);
     const mid = (Math.min(...own) + Math.max(...own)) / 2;
     const fit = skillFit(skill, mid);
     const gap = Math.min(...own.map((d) => Math.abs(d - mid)));
@@ -1491,7 +1596,9 @@ test("a montage skill comes close to the length she asked for by its number of s
       assert.equal(fit.bpm, skill.bpm, `${skill.key}: ${mid} s`);
       assert.equal(Math.abs(length(fit) - mid), gap, `${skill.key}: ${mid} s`);
     }
-    // A third longer than its longest at its own tempo: slower, and closer to it than its own tempo could come.
+    // A third longer than its longest at its own tempo: slower, and closer to it than its own tempo could come; unless
+    // its longest with its ending card already reaches 45 s at its own tempo (« Rituel du matin »: its slowest is its own).
+    if (slow >= skill.bpm) continue;
     const long = Math.max(...own) * 1.3;
     const slower = skillFit(skill, long);
     assert.ok(slower.bpm < skill.bpm, `${skill.key}: ${long} s at ${slower.bpm} BPM`);
@@ -1501,7 +1608,7 @@ test("a montage skill comes close to the length she asked for by its number of s
 
 test("a montage skill played at another tempo keeps its cuts on that tempo's beats and composes its music at it", async () => {
   const { MONTAGE_SKILLS } = await import("./skill-library.ts");
-  const { skillPlan } = await import("./skills.ts");
+  const { skillPlan, skillTimeline } = await import("./skills.ts");
   for (const skill of Object.values(MONTAGE_SKILLS)) {
     // A skill timed on her voice keeps its own tempo under her voice (its music only; her cuts are hers).
     if (skill.voice) continue;
@@ -1509,13 +1616,15 @@ test("a montage skill played at another tempo keeps its cuts on that tempo's bea
     const bpm = Math.max(60, Math.round(skill.bpm * 0.8));
     const own = skill.timeline(n, { end: false });
     const slower = skill.timeline(n, { end: false, bpm });
+    // As the engine plays it: its name held at the end (skillTimeline), by whole beats of that tempo.
+    const played = skillTimeline(skill, n, { end: false, bpm });
     // Every length counted in beats follows the tempo: about its ratio longer.
     assert.ok(Math.abs(slower.duration / own.duration - skill.bpm / bpm) < 0.15, `${skill.key}: ${own.duration} s → ${slower.duration} s`);
     const files = Array.from({ length: n }, (_, i) => ({ id: `f${i}`, photo: true, seconds: 0 }));
     const fill = { shots: files.map((f) => ({ file: f.id, at: 0 })), texts: Object.fromEntries(skill.texts.map((t) => [t.slot, "Chez Lou"])), end: null };
     const plan = skillPlan({ skill, name: "Chez Lou", files, fill, bpm });
     assert.equal(plan.tempo, bpm, skill.key);
-    assert.ok(Math.abs(plan.duration - slower.duration) < 0.05, `${skill.key}: ${plan.duration} s`);
+    assert.ok(Math.abs(plan.duration - played.duration) < 0.05, `${skill.key}: ${plan.duration} s`);
   }
 });
 
@@ -2046,7 +2155,7 @@ const composeShots = (aspects: number[]) => aspects.map((aspect, i) => ({ src: `
 test("« Plans fixes de cinéma » (v3) cuts where its original does, on its own music (64,6 BPM), its words on its beats", async () => {
   const { plansFixes, wordFrames } = await import("./skills/plans-fixes.ts");
   const { clearsDrawn, objectsDrawn } = await import("./subject.ts");
-  assert.equal(plansFixes.version, 4);
+  assert.equal(plansFixes.version, 5);
   assert.equal(plansFixes.bpm, 64.6);
   const line = plansFixes.timeline(9, { end: false, words: { accroche: "The power of", titre: "Static shot" } });
   // The original's nine shots, cut on its images 125, 155, 183, 210, 236, 265, 293 and 319 (measured image by image at
@@ -2066,10 +2175,18 @@ test("« Plans fixes de cinéma » (v3) cuts where its original does, on its own
   assert.ok(Math.abs(line.marks.close! - 342) <= 1, `${line.marks.close}`);
   assert.equal(line.marks.close_in, 19);
   assert.deepEqual(line.music, { end: { at: line.duration, fade: 0.93 } });
-  // With an ending card, its last shot held whole beats longer (the card's 1,6 s), its cuts the same.
+  // With an ending card, its last shot held whole beats longer (the card's 2,5 s: three beats), its cuts the same.
   const ended = plansFixes.timeline(9, { end: true });
   assert.deepEqual(ended.shots.slice(0, -1), plansFixes.timeline(9, { end: false }).shots.slice(0, -1));
-  assert.ok(ended.duration - line.duration >= 1.6 && Math.abs(((ended.duration - line.duration) * 64.6) / 60 - 2) < 0.05, `${ended.duration} s`);
+  assert.ok(ended.duration - line.duration >= 2.5 && Math.abs(((ended.duration - line.duration) * 64.6) / 60 - 3) < 0.05, `${ended.duration} s`);
+  // v5: her name, whole once faded in (image 361), held two seconds at least by the engine: two beats more than the
+  // original's half second, its cuts the same, its music dying away at the new end.
+  const { skillTimeline } = await import("./skills.ts");
+  const held = skillTimeline(plansFixes, 9, { end: false });
+  assert.deepEqual(held.shots.slice(0, -1), line.shots.slice(0, -1));
+  assert.ok(Math.abs(((held.duration - line.duration) * 64.6) / 60 - 2) < 0.05, `${held.duration} s`);
+  assert.ok(held.duration - held.ending!.from >= 2 && held.duration - held.ending!.from < 2.5, `${held.duration - held.ending!.from} s`);
+  assert.deepEqual(held.music, { end: { at: held.duration, fade: 0.93 } });
   // The camera never moves in these still shots: no push, no zoom, nothing turned (Tristan, of the light zooms: « cheap »).
   assert.doesNotMatch(plansFixes.code, /transform|scale\(/);
   // Its title is set on a calm area of her first shot (read there only); nothing is cut out.
@@ -2165,11 +2282,11 @@ test("« Plans fixes de cinéma » (v4): full frame by default, horizontal 4:3 o
   const fill = { shots: Array.from({ length: 9 }, (_, i) => ({ file: files[i % 6]!.id, at: 1 })), texts: { accroche: "un soir à", titre: "Belleville" }, end: null };
   const plan = skillPlan({ skill: plansFixes, name: "Plans fixes", files, fill: { ...fill, settings: { format: "horizontal" } } });
   assert.equal(plan.layers![0]!.motion.texts!.format, "horizontal");
-  assert.deepEqual(plan.skill, { key: "plans-fixes", version: 4, settings: { format: "horizontal" } });
+  assert.deepEqual(plan.skill, { key: "plans-fixes", version: 5, settings: { format: "horizontal" } });
   // Nothing asked: its code is told its default, the plan keeps nothing.
   const plain = skillPlan({ skill: plansFixes, name: "Plans fixes", files, fill });
   assert.equal(plain.layers![0]!.motion.texts!.format, "vertical");
-  assert.deepEqual(plain.skill, { key: "plans-fixes", version: 4 });
+  assert.deepEqual(plain.skill, { key: "plans-fixes", version: 5 });
 });
 
 // ——— « Une journée chez toi » v2, written again on its original's fiche (docs/fiches/journee.md) ———————————————————
@@ -2506,11 +2623,11 @@ test("« Mots aux quatre coins » (v2) cuts where its original does, on its own 
   const life = line.shots.slice(1, -1).map((s) => f(s.end) - f(s.start));
   assert.ok(life.at(-1)! >= Math.max(...life.slice(0, -2)) && life.at(-2)! >= Math.max(...life.slice(0, -2)), JSON.stringify(life));
   assert.ok(line.shots.slice(1, -1).every((s, i, all) => !(/de près/.test(s.want) && /de près/.test(all[i + 1]?.want ?? ""))));
-  // With an ending card, its front held half beats longer (the card's 1,6 s), its cuts the same; her name gives way to it.
+  // With an ending card, its front held half beats longer (the card's 2,5 s: four beats), its cuts the same; her name gives way to it.
   const ended = quatreCoins.timeline(12, { end: true });
   assert.deepEqual(ended.shots.slice(0, -1).map((s) => s.start), line.shots.map((s) => s.start).slice(0, -1));
-  assert.ok(ended.duration - line.duration >= 1.6 && Math.abs(((ended.duration - line.duration) * 92) / 60 - 2.5) < 0.05, `${ended.duration} s`);
-  assert.ok(Math.abs(ended.texts.nom!.to - (ended.duration - 1.6)) < 0.01);
+  assert.ok(ended.duration - line.duration >= 2.5 && Math.abs(((ended.duration - line.duration) * 92) / 60 - 4) < 0.05, `${ended.duration} s`);
+  assert.ok(Math.abs(ended.texts.nom!.to - (ended.duration - 2.5)) < 0.01);
   // Fewer moments (six at least): its opening, its first life shots and its front as the original's; more: two beats each.
   assert.deepEqual(quatreCoins.shots, [8, 12]);
   const eight = quatreCoins.timeline(8, { end: false });
@@ -2632,7 +2749,7 @@ test("« Mots aux quatre coins » (v4): full frame by default, horizontal 16:9 o
 test("« Éventail de bandes » (v2) cuts where its original does, on its own music (119,8 BPM): its star, its drop, its intro of hits alone", async () => {
   const { eventail } = await import("./skills/eventail.ts");
   const { readMusicShape } = await import("./music-shape.ts");
-  assert.equal(eventail.version, 3);
+  assert.equal(eventail.version, 4);
   assert.equal(eventail.bpm, 119.8);
   const line = eventail.timeline(13, { end: false });
   // The original's thirteen shots and its black (images at 30 i/s, docs/fiches/eventail.md), counted from its first
@@ -2664,11 +2781,22 @@ test("« Éventail de bandes » (v2) cuts where its original does, on its own mu
   assert.deepEqual(shape.filters, [{ kind: "radio", from: 0, to: Math.round((7 * beat * 1000) / 30) / 1000, open: 0.02 }]);
   assert.deepEqual(shape.end, { at: line.duration, fade: 0.25 });
   assert.equal(line.sounds, undefined);
-  // With an ending card (an option): her name six beats on the black, then the card's 1,6 s from a beat; cuts the same.
+  // With an ending card (an option): her name four beats on the black (v4; six before), then the card's 2,5 s from a
+  // beat; cuts the same.
   const ended = eventail.timeline(13, { end: true });
   assert.deepEqual(ended.shots.slice(0, -1), line.shots.slice(0, -1));
-  assert.ok(Math.abs(((ended.duration - 1.6) * 30) / beat - 37) < 0.05, `${ended.duration} s`);
-  assert.equal(ended.texts.signature!.to, Math.round((ended.duration - 1.6) * 100) / 100);
+  assert.ok(Math.abs(((ended.duration - 2.5) * 30) / beat - 35) < 0.05, `${ended.duration} s`);
+  assert.equal(ended.texts.signature!.to, Math.round((ended.duration - 2.5) * 100) / 100);
+  assert.equal(ended.ending, undefined);
+  // v4: as the engine plays it, its black held three seconds at most (the original's eight beats and a half, 4,26 s, were
+  // too long around her name): five beats and a half, her red line still two beats in, the music cut with its fade at the end.
+  const { skillTimeline } = await import("./skills.ts");
+  const held = skillTimeline(eventail, 13, { end: false });
+  assert.deepEqual(held.shots.slice(0, -1), line.shots.slice(0, -1));
+  assert.ok(Math.abs(((held.duration - held.ending!.from) * 30) / beat - 5.5) < 0.05, `${held.duration - held.ending!.from} s`);
+  assert.ok(held.duration - held.ending!.from <= 3);
+  assert.deepEqual([held.texts.signature!.to, held.texts.ligne!.from], [held.duration, line.texts.ligne!.from]);
+  assert.deepEqual(readMusicShape(held.music, held.duration)!.end, { at: held.duration, fade: 0.25 });
   // Fewer of her files: down to six shots, its split screen and its echo kept; more for a length she asks for, about 30 s.
   const fewest = eventail.timeline(6, { end: false });
   assert.equal(fewest.shots.length, 6);
@@ -2779,7 +2907,11 @@ test("« Éventail de bandes » (v3): full frame by default, 16:9 on black as he
   const [name, handle] = drawnIn(black).filter((d) => d.type === "FitText");
   assert.deepEqual([(name!.props.innerStyle as Record<string, unknown>).color, (handle!.props.innerStyle as Record<string, unknown>).color], ["#ffffff", "#972f34"]);
   assert.match(String((name!.props.innerStyle as Record<string, unknown>).fontFamily), /^'Bodoni Moda', 'Instrument Serif'/);
-  assert.ok(Math.abs(Number(style(name!).top) + Number(style(name!).height) / 2 - 953) <= 1 && Number(style(handle!).top) > Number(style(name!).top));
+  // v4: her name large enough to read (92 px upright, 64 in its band; the original's 50 were lost in the black), its
+  // middle the original's, 7 px over the frame's middle at 50 px, in proportion.
+  const nameSize = Number((name!.props.innerStyle as Record<string, unknown>).fontSize);
+  assert.ok(nameSize === 64 || nameSize === 92, `${nameSize} px`);
+  assert.ok(Math.abs(Number(style(name!).top) + Number(style(name!).height) / 2 - (960 - (7 * nameSize) / 50)) <= 1 && Number(style(handle!).top) > Number(style(name!).top));
   assert.ok(drawnIn(handle!).some((d) => "data-fauve-accent" in d.props));
   assert.equal(drawnIn(run(Number(marks.black) + 29, { shots: shots(16 / 9), texts: marks, reelTexts })).filter((d) => d.type === "FitText").length, 1);
   assert.doesNotMatch(eventail.code, /Preet|blaster|\bscale\(|\b(Flash|Whip|ZoomThrough|Fan)\b/);
@@ -2796,7 +2928,7 @@ test("« Éventail de bandes » (v3): full frame by default, 16:9 on black as he
   assert.deepEqual(skillSettings(eventail, [{ name: "fond", value: "bordeaux" }]), {});
   const plan = skillPlan({ skill: eventail, name: "Éventail de bandes", files, fill: { shots: Array.from({ length: 13 }, (_, i) => ({ file: files[i % 12]!.id, at: 1 })), texts: { signature: "Brighton Pier" }, end: null, settings: { fond: "sienne" } } });
   assert.equal(plan.layers![0]!.motion.texts!.fond, "sienne");
-  assert.deepEqual(plan.skill, { key: "eventail", version: 3, settings: { fond: "sienne" } });
+  assert.deepEqual(plan.skill, { key: "eventail", version: 4, settings: { fond: "sienne" } });
   assert.equal(plan.music_shape?.pauses?.length, 7);
 });
 
@@ -2901,7 +3033,7 @@ test("« Titre qui se décode » (v3) cuts and lands where its original does, on
   // With an ending card: the same cuts, the black after its ending long enough for the card.
   const ended = decode.timeline(16, { end: true });
   assert.deepEqual(ended.shots.slice(0, -1), line.shots.slice(0, -1));
-  assert.ok(ended.duration - line.duration >= 1.6, `${ended.duration} s`);
+  assert.ok(ended.duration - line.duration >= 2.5, `${ended.duration} s`);
   assert.equal(ended.marks.black, line.marks.black! + 1);
   // A longer Reel: more of her shots full frame after the calm one, two beats each, its opening and its ending as they are.
   const longer = decode.timeline(20, { end: false });
@@ -3092,7 +3224,7 @@ test("« Cadre dans le cadre » (v2) cuts where its original does, an eighth not
   // music cut dead 0,8 beat before the end.
   const ended = cadre.timeline(18, { end: true });
   assert.deepEqual(ended.shots.slice(0, -1), line.shots.slice(0, -1));
-  assert.ok(ended.duration - line.duration >= 1.6 && Math.abs(((ended.duration - line.duration) * 90) / 60 - 3) < 0.05, `${ended.duration} s`);
+  assert.ok(ended.duration - line.duration >= 2.5 && Math.abs(((ended.duration - line.duration) * 90) / 60 - 4) < 0.05, `${ended.duration} s`);
   assert.ok(Math.abs(ended.music!.end!.at - (ended.duration - 0.8 * (2 / 3))) < 0.01);
   // At another tempo (a longer Reel, a sound she follows), all of it follows its beats.
   const slower = cadre.timeline(18, { end: false, bpm: 72 });
@@ -3281,7 +3413,7 @@ test("« Pile de photos » (v2) lays its photos where and when its original does
   const ended = pile.timeline(37, { end: true });
   assert.deepEqual(ended.shots.slice(0, -1), line.shots.slice(0, -1));
   assert.ok(ended.duration - line.duration >= 1, `${ended.duration} s`);
-  assert.equal(ended.texts.mots!.to, Math.round((ended.duration - 1.6) * 100) / 100);
+  assert.equal(ended.texts.mots!.to, Math.round((ended.duration - 2.5) * 100) / 100);
   // At another tempo, every length in beats follows it.
   const slower = pile.timeline(37, { end: false, bpm: 100 });
   assert.equal(slower.marks.stay, 144);
@@ -3517,7 +3649,7 @@ test("« Titre derrière le décor » (v2) cuts where its original does, on its 
   const ended = titreDerriere.timeline(23, { end: true });
   assert.deepEqual(ended.shots.slice(0, -1), line.shots.slice(0, -1));
   const held = (ended.duration - line.duration) / beat;
-  assert.ok(ended.duration - line.duration >= 1.6 && Math.abs(held - 2 * Math.round(held / 2)) < 0.05, `${ended.duration} s`);
+  assert.ok(ended.duration - line.duration >= 2.5 && Math.abs(held - 2 * Math.round(held / 2)) < 0.05, `${ended.duration} s`);
   // Its finish keeps the original's warmth and contrast, without the catalogue's grain nor dark corners.
   assert.deepEqual(titreDerriere.finish, { contrast: 0.16, warmth: 0.12, grain: 0, vignette: 0 });
   // On the plan: valid, its music's shape and its sounds kept.
@@ -3834,7 +3966,7 @@ test("« Ville en coups de fouet » (v2): its whip flashes made of her sky, its 
   assert.equal(scale(drawStill(40), 1), 1);
   assert.equal(scale(drawStill(70), 2), 1);
   // Its ending card, only when she has one: its words in the name's capitals over her last shot.
-  const ending = draw(durationInFrames - 10, { end: { title: "Ouvert dimanche", subtitle: null, from: durationInFrames - 48 } });
+  const ending = draw(durationInFrames - 10, { end: { title: "Ouvert dimanche", subtitle: null, from: durationInFrames - 75 } });
   assert.ok(drawnNodes(ending).some((n) => n.type === "FitText" && heldText(n).includes("Ouvert dimanche")));
   assert.ok(!drawnNodes(draw(durationInFrames - 10)).some((n) => n.type === "FitText"));
 });
@@ -4102,8 +4234,8 @@ test("« Écran partagé titré » (v3) cuts where its original does, its two ha
   // With an ending card (the original has none: only when she wants one), its last pair held whole beats longer.
   const ended = ecranPartage.timeline(10, { end: true });
   assert.deepEqual(ended.shots.slice(0, 8), line.shots.slice(0, 8));
-  assert.ok(ended.duration - line.duration >= 1.6 && Math.abs((ended.duration - line.duration) * 2 - 4) < 0.05, `${ended.duration} s`);
-  assert.ok(Math.abs(ended.texts.personne!.to - (ended.duration - 1.6)) < 0.01);
+  assert.ok(ended.duration - line.duration >= 2.5 && Math.abs((ended.duration - line.duration) * 2 - 5) < 0.05, `${ended.duration} s`);
+  assert.ok(Math.abs(ended.texts.personne!.to - (ended.duration - 2.5)) < 0.01);
   // Cuts only: no zoom, push nor slide; nothing read in her shots (its titles stay where the original's are) and nothing
   // cut out.
   assert.doesNotMatch(ecranPartage.code, /transform|scale\(|interpolate/);
@@ -4511,7 +4643,7 @@ test("cut-outs: only on the shots a composition draws her on, as its code names 
         { text: "Paris", role: "hook", from: 0, to: 300, emphasis: [] },
         { text: "un samedi à", role: "caption", from: 0, to: 300, emphasis: [] },
       ],
-      end: end ? { title: "Ouvert dimanche", subtitle: null, from: durationInFrames - 48 } : null,
+      end: end ? { title: "Ouvert dimanche", subtitle: null, from: durationInFrames - 75 } : null,
       texts: Object.fromEntries(Object.entries(line.marks).map(([k, v]) => [k, String(v)])),
     };
     const drawn = await cutoutsDrawn(decode.code, props, Array.from({ length: durationInFrames }, (_, f) => f));
@@ -4691,7 +4823,7 @@ test("« Façade qui se construit » (v2) lays its pieces on its original's imag
   // With an ending card (an option: the original has none), the last shot held half beats more, black from its end.
   const ended = facade.timeline(3, { end: true });
   assert.deepEqual(ended.shots.slice(0, 2), three.shots.slice(0, 2));
-  assert.ok(ended.duration - three.duration >= 1.65 && ended.duration - three.duration <= 1.9, `${ended.duration} s`);
+  assert.ok(ended.duration - three.duration >= 2.55 && ended.duration - three.duration <= 2.8, `${ended.duration} s`);
   assert.equal(ended.marks.black, 390);
   assert.ok(three.marks.black! > Math.round(three.duration * 30));
   // At another tempo all of it follows its beats; a length she asks for: more of her files, a bar each, 23 s at its own
@@ -5063,7 +5195,7 @@ test("« Coulisses façon fiche » (v2) cuts where its original does, names each
   // more, the rest as it is; her video's title gone under the card.
   const ended = coulisses.timeline(28, { end: true });
   assert.deepEqual(ended.shots.slice(0, -1), line.shots.slice(0, -1));
-  assert.ok(Math.abs(ended.duration - line.duration - 1.6) < 0.02, `${ended.duration} s`);
+  assert.ok(Math.abs(ended.duration - line.duration - 2.5) < 0.02, `${ended.duration} s`);
   assert.deepEqual(ended.sounds, line.sounds);
   assert.equal(ended.texts.nom!.to, line.duration);
   // At another tempo (a length she asks for): every moment follows it.
@@ -5284,9 +5416,9 @@ test("« Recette cosy, typo pixel » (v2) cuts where its original does, gesture 
   // With an ending card (an option: the original loops), its loop held whole beats longer, the same cuts, the mix's fade.
   const ended = pixel.timeline(26, { end: true });
   assert.deepEqual(ended.shots.slice(0, -1), line.shots.slice(0, -1));
-  assert.ok(ended.duration - line.duration >= 1.6 && Math.abs(((ended.duration - line.duration) * 100) / 60 - 3) < 0.05, `${ended.duration} s`);
+  assert.ok(ended.duration - line.duration >= 2.5 && Math.abs(((ended.duration - line.duration) * 100) / 60 - 5) < 0.05, `${ended.duration} s`);
   assert.equal(ended.music!.end, undefined);
-  assert.ok(Math.abs(ended.texts.fin!.to - (ended.duration - 1.6)) < 0.01);
+  assert.ok(Math.abs(ended.texts.fin!.to - (ended.duration - 2.5)) < 0.01);
   // At another tempo, all of it follows its beats.
   const slower = pixel.timeline(26, { end: false, bpm: 80 });
   assert.ok(Math.abs(slower.duration / line.duration - 100 / 80) < 0.01);
@@ -5486,9 +5618,9 @@ test("« Titre gaufré » (v2) lands its front's pieces and cuts to its paper wh
   const ended = gaufre.timeline(2, { end: true });
   assert.deepEqual(ended.shots[0], line.shots[0]);
   const more = (ended.duration - line.duration) / s;
-  assert.ok(ended.duration - line.duration >= 1.6 && Math.abs(more - Math.round(more)) < 0.05, `${ended.duration} s`);
+  assert.ok(ended.duration - line.duration >= 2.5 && Math.abs(more - Math.round(more)) < 0.05, `${ended.duration} s`);
   assert.equal(ended.music!.end, undefined);
-  assert.ok(Math.abs(ended.texts.titre!.to - (ended.duration - 1.6)) < 0.01);
+  assert.ok(Math.abs(ended.texts.titre!.to - (ended.duration - 2.5)) < 0.01);
   // Its objects: what her front is made of, named by the filler and looked for on the passage under the paper; nobody
   // cut out, no clear area read, no zoom nor move; no grain nor dark corners.
   assert.deepEqual(objectsDrawn(gaufre.code), []);
@@ -6539,7 +6671,7 @@ test("« Voici mon travail » (v1) lays her works where and when its original do
   const ended = monTravail.timeline(38, { end: true });
   assert.deepEqual(Array.from({ length: 37 }, (_, k) => ended.marks[`l${k}`]), lands);
   assert.ok(ended.duration - line.duration >= 1, `${ended.duration} s`);
-  assert.equal(ended.texts.mots!.to, Math.round((ended.duration - 1.6) * 100) / 100);
+  assert.equal(ended.texts.mots!.to, Math.round((ended.duration - 2.5) * 100) / 100);
   // At another tempo, every length in beats follows it; fewer works keep an image each and her shot the rest.
   const slower = monTravail.timeline(38, { end: false, bpm: 100 });
   assert.ok(Math.abs(slower.duration / line.duration - 1.2) < 0.01, `${slower.duration} s`);
@@ -6747,7 +6879,7 @@ const filmTone = (tree: Drawn) => String(styleOf(drawnNodes(tree).find((n) => n.
 test("« La pièce qui se rallume » (v1): its lights on its beats faster and faster, the whole room on the downbeat, off at the end, at 96 BPM", async () => {
   const { rallume } = await import("./skills/rallume.ts");
   const { skillPlan } = await import("./skills.ts");
-  assert.equal(rallume.version, 3);
+  assert.equal(rallume.version, 4);
   assert.equal(rallume.bpm, 96);
   const beat = 60 / 96;
   const line = rallume.timeline(10, { end: false });
@@ -6778,10 +6910,27 @@ test("« La pièce qui se rallume » (v1): its lights on its beats faster and fa
   const longest = rallume.timeline(24, { end: false });
   assert.ok(longest.duration <= 30 && longest.duration > 29, `${longest.duration} s`);
   assert.equal(Math.round((longest.shots[20]!.end - longest.shots[20]!.start) / beat), 2);
-  // With an ending card, her room stays dark three beats (the card's 1,6 s), its cuts and its lights the same.
+  // With an ending card, her room stays dark five beats (the card's 2,5 s), its cuts and its lights the same.
   const ended = rallume.timeline(10, { end: true });
   assert.deepEqual(ended.shots.slice(0, -1), line.shots.slice(0, -1));
-  assert.ok(Math.abs(ended.duration - line.duration - 2 * beat) < 0.02 && ended.duration - ended.marks.off! / 30 >= 1.6, `${ended.duration} s`);
+  assert.ok(Math.abs(ended.duration - line.duration - 4 * beat) < 0.02 && ended.duration - ended.marks.off! / 30 >= 2.5, `${ended.duration} s`);
+  assert.equal(ended.ending, undefined);
+  // v4: as the engine plays it, her name lit in the dark (its tube caught over five images) held two seconds at least:
+  // four beats of dark (one before, half a second on the bench), its cuts and its lights the same, its music muffled to the end.
+  const { skillTimeline } = await import("./skills.ts");
+  const held = skillTimeline(rallume, 10, { end: false });
+  assert.deepEqual(held.shots.slice(0, -1), line.shots.slice(0, -1));
+  assert.equal(held.marks.off, line.marks.off);
+  assert.ok(Math.abs(held.duration - line.duration - 3 * beat) < 0.02, `${held.duration} s`);
+  const hold = held.duration - held.ending!.from;
+  assert.ok(hold >= 2 && hold <= 3, `${hold} s`);
+  assert.deepEqual(held.music!.filters!.at(-1), { kind: "muffled", from: line.music!.filters!.at(-1)!.from, to: held.duration });
+  assert.equal(held.music!.end!.at, held.duration);
+  // Faster (her length asks a quicker tempo) it holds as long; horizontal, her name lit above the picture from the
+  // moment the room comes on, nothing added.
+  const quick = skillTimeline(rallume, 10, { end: false, bpm: 115 });
+  assert.ok(quick.duration - quick.ending!.from >= 2, `${quick.duration - quick.ending!.from} s`);
+  assert.equal(skillTimeline(rallume, 10, { end: false, settings: { format: "horizontal" } }).duration, rallume.timeline(10, { end: false, settings: { format: "horizontal" } }).duration);
   assert.equal(ended.marks.off, line.marks.off);
   // At another tempo, all of it follows its beats.
   const slower = rallume.timeline(10, { end: false, bpm: 80 });
@@ -6933,7 +7082,7 @@ test("« La pièce qui se rallume » (v3): full frame by default, 16:9 on black 
   const passages = objectPassages(plan, () => true);
   assert.equal(passages.length, 4);
   assert.ok(passages.every((p) => p.clip_id === "v0" && p.from === 0.5 && p.to === 5.5), JSON.stringify(passages));
-  assert.deepEqual(plan.skill, { key: "rallume", version: 3 });
+  assert.deepEqual(plan.skill, { key: "rallume", version: 4 });
   // Written as a design, without a reference Reel: no original kept, so no sheets of one, whatever its measures.
   const { HOUSE_DESIGNS, houseSheets } = await import("./house-sheets.ts");
   assert.ok(HOUSE_DESIGNS.has("rallume"));
@@ -7722,7 +7871,7 @@ test("« Mots mêlés » (v2): one calm shot of 25 beats at 80 BPM as its 18,67 
   assert.deepEqual(line.texts, { mots: { from: 0, to: line.duration }, autres: { from: 0, to: line.duration } });
   // An ending card after the hold, never in its place: the grid stays its 25 beats at least, the card its 1,6 s.
   const ended = motsMeles.timeline(1, { end: true });
-  assert.ok(ended.texts.mots!.to >= line.duration - 0.02 && Math.abs(ended.duration - ended.texts.mots!.to - 1.6) < 0.02, JSON.stringify(ended.texts));
+  assert.ok(ended.texts.mots!.to >= line.duration - 0.02 && Math.abs(ended.duration - ended.texts.mots!.to - 2.5) < 0.02, JSON.stringify(ended.texts));
   // Its music calm (70 to 90 BPM): its length follows it, its loops a hand.
   assert.deepEqual(motsMeles.tempo, [70, 90]);
   assert.ok(Math.abs(motsMeles.timeline(1, { end: false, bpm: 70 }).duration - (25 * 60) / 70) < 0.02);
@@ -7907,7 +8056,7 @@ test("« Interrupteur » (v2): one shot of 9,1 s on its original's grid (143,7 B
   assert.deepEqual(line.cutouts, [0]);
   // An ending card after it (1,6 s at least, on its grid), the music ending as much later; at another tempo, all of it follows.
   const ended = interrupteur.timeline(1, { end: true });
-  assert.ok(ended.duration - line.duration >= 1.6 && Math.abs(ended.music!.end!.at - music.end!.at - (ended.duration - line.duration)) < 0.02);
+  assert.ok(ended.duration - line.duration >= 2.5 && Math.abs(ended.music!.end!.at - music.end!.at - (ended.duration - line.duration)) < 0.02);
   const slower = interrupteur.timeline(1, { end: false, bpm: 64 });
   assert.ok(Math.abs(slower.marks.flip! / line.marks.flip! - 71.85 / 64) < 0.01 && Math.abs(slower.music!.pauses![0]!.to / music.pauses![0]!.to - 71.85 / 64) < 0.01);
   // On the plan: its sound, its music's shape, her cut-out on that passage only.
@@ -8070,7 +8219,7 @@ async function fenetresAt(n: number, options: { end?: boolean; aspect?: number; 
       { text: "OUVERT DÈS 8 H", role: "hook", from: 0, to: durationInFrames, emphasis: [] },
       { text: "50.8164° N, 0.1366° O", role: "caption", from: 0, to: durationInFrames, emphasis: [] },
     ],
-    end: options.end ? { title: "Ouvert ce dimanche", subtitle: "de 9 h à 19 h", from: durationInFrames - 48 } : null,
+    end: options.end ? { title: "Ouvert ce dimanche", subtitle: "de 9 h à 19 h", from: durationInFrames - 75 } : null,
     // « Comme ses vidéos » unless said (her words: « comme mes vidéos »): its 16:9 frame for her horizontal videos.
     texts: { ...Object.fromEntries(Object.entries(line.marks).map(([k, v]) => [k, String(v)])), ...(options.settings ?? { format: "auto" }) },
   };
@@ -8120,7 +8269,7 @@ test("« Fenêtres et étiquettes » (v2) cuts where its original does, on its o
   // With an ending card, its cuts the same, its last shot held whole beats longer (the card's 1,6 s).
   const ended = fenetres.timeline(22, { end: true });
   assert.deepEqual(ended.shots.slice(0, -1), line.shots.slice(0, -1));
-  assert.ok(ended.duration - line.duration >= 1.6 && Math.abs(((ended.duration - line.duration) * 92.9) / 60 - 3) < 0.05, `${ended.duration} s`);
+  assert.ok(ended.duration - line.duration >= 2.5 && Math.abs(((ended.duration - line.duration) * 92.9) / 60 - 4) < 0.05, `${ended.duration} s`);
   // At another tempo, all of it follows its beats.
   const slower = fenetres.timeline(22, { end: false, bpm: 80 });
   assert.ok(Math.abs(slower.duration / line.duration - 92.9 / 80) < 0.01, `${slower.duration} s`);
@@ -8326,7 +8475,7 @@ async function interfaceAt(options: { end?: boolean; photo?: boolean; words?: Re
     brand: { name: "Atelier Argile", displayFont: "Inter Tight", bodyFont: "Inter Tight", accent: "#b5543a", ...options.brand },
     shots: options.photo === false ? [] : [{ src: "/her.jpg", aspect: 9 / 16, from: 0, durationInFrames, kind: "photo", segment: 0 }],
     reelTexts,
-    end: options.end ? { title: "Atelier ouvert samedi", subtitle: "de 10 h à 18 h", from: durationInFrames - 48 } : null,
+    end: options.end ? { title: "Atelier ouvert samedi", subtitle: "de 10 h à 18 h", from: durationInFrames - 75 } : null,
     texts: { ...Object.fromEntries(Object.entries(line.marks).map(([k, v]) => [k, String(v)])), ...(options.settings ?? {}) },
   };
   return { interfaceSkill, line, durationInFrames, at: (f: number) => turnedAt(interfaceSkill.code, f, props) };
@@ -8373,7 +8522,7 @@ test("« Interface minimaliste » (v2) lays its moments where its original does,
   // With an ending card, its moments the same, the card's 1,6 s after her account; at another tempo all of it follows.
   const ended = interfaceSkill.timeline(1, { end: true, words: IF_WORDS });
   assert.deepEqual(ended.marks, line.marks);
-  assert.ok(ended.duration - line.duration >= 1.6 && ended.texts.compte!.to === line.duration);
+  assert.ok(ended.duration - line.duration >= 2.5 && ended.texts.compte!.to === line.duration);
   const slower = interfaceSkill.timeline(1, { end: false, bpm: 92 });
   assert.ok(Math.abs(slower.marks.pill! / line.marks.pill! - 110.5 / 92) < 0.01 && Math.abs(slower.duration / line.duration - 110.5 / 92) < 0.01);
 });
@@ -9278,8 +9427,8 @@ test("« Carte au feutre » (v2) writes its words where its original does, a pho
   assert.deepEqual(carteFeutre.texts.map((t) => [t.slot, t.role, t.max, t.required]), [["message", "hook", 32, true], ["nom", "caption", 16, true]]);
   // With an ending card (the original has none), four whole beats more for its 1,6 s, its words up to it.
   const ended = carteFeutre.timeline(23, { end: true });
-  assert.ok(Math.abs(ended.duration - line.duration - (4 * 60) / 135) < 0.04, `${ended.duration} s`);
-  assert.equal(ended.texts.message!.to, Math.round((ended.duration - 1.6) * 100) / 100);
+  assert.ok(Math.abs(ended.duration - line.duration - (6 * 60) / 135) < 0.04, `${ended.duration} s`);
+  assert.equal(ended.texts.message!.to, Math.round((ended.duration - 2.5) * 100) / 100);
   // At another tempo its words follow its beats; its photos keep their pace of 3 images.
   const slower = carteFeutre.timeline(23, { end: false, bpm: 108 });
   assert.ok(Math.abs(slower.duration / line.duration - 135 / 108) < 0.01 && slower.marks.name! > line.marks.name!);
@@ -9494,7 +9643,7 @@ test("« Photos posées sur la table » (v2) cuts where its original does, its p
   }
   // With an ending card (the original has none), its last shot held three whole beats longer for the card's 1,6 s.
   const ended = table.timeline(25, { end: true });
-  assert.ok(Math.abs(ended.duration - line.duration - (3 * 60) / 110) < 0.04, `${ended.duration} s`);
+  assert.ok(Math.abs(ended.duration - line.duration - (5 * 60) / 110) < 0.04, `${ended.duration} s`);
   assert.deepEqual(ended.shots.slice(0, 24), line.shots.slice(0, 24));
   // At another tempo, all of it follows its beats.
   const slower = table.timeline(25, { end: false, bpm: 88 });
@@ -9708,7 +9857,7 @@ const aplatDrawn = async (frame: number, options: { n?: number; aspect?: number;
       brand: { name: "Brick Lane", displayFont: "Anton", bodyFont: "Inter Tight", accent: options.accent ?? "#e4572e" },
       shots: pileShots(line, options.aspect ?? 9 / 16),
       reelTexts: options.texts ?? [],
-      end: options.end ? { title: "Vide-dressing samedi", subtitle: "de 10 h à 18 h", from: durationInFrames - 48 } : null,
+      end: options.end ? { title: "Vide-dressing samedi", subtitle: "de 10 h à 18 h", from: durationInFrames - 75 } : null,
       texts: { ...Object.fromEntries(Object.entries(line.marks).map(([k, v]) => [k, String(v)])), ...(options.settings ?? {}) },
     },
     options.read ?? AP_READ,
@@ -9948,7 +10097,7 @@ test("« Toi sur un aplat de couleur » (v3): full frame by default, horizontal 
     for (const end of [false, true]) {
       const line = aplat.timeline(n, { end });
       const durationInFrames = Math.round(line.duration * 30);
-      const props = { width: 1080, height: 1920, durationInFrames, brand: { name: "Studio", displayFont: "Anton", bodyFont: "Inter Tight", accent: "#e4572e" }, shots: pileShots(line, 9 / 16), reelTexts: [{ text: "un samedi", role: "hook", from: 3, to: 57, emphasis: [] }], end: end ? { title: "Ouvert samedi", subtitle: null, from: durationInFrames - 48 } : null, texts: Object.fromEntries(Object.entries(line.marks).map(([k, v]) => [k, String(v)])) };
+      const props = { width: 1080, height: 1920, durationInFrames, brand: { name: "Studio", displayFont: "Anton", bodyFont: "Inter Tight", accent: "#e4572e" }, shots: pileShots(line, 9 / 16), reelTexts: [{ text: "un samedi", role: "hook", from: 3, to: 57, emphasis: [] }], end: end ? { title: "Ouvert samedi", subtitle: null, from: durationInFrames - 75 } : null, texts: Object.fromEntries(Object.entries(line.marks).map(([k, v]) => [k, String(v)])) };
       const drawn = await cutoutsDrawn(skillCode(aplat, { choses: "every table" }), props, Array.from({ length: durationInFrames }, (_, f) => f));
       assert.deepEqual([...drawn].sort((a, b) => a - b), line.cutouts, `${n} shots${end ? ", an ending card" : ""}`);
     }
@@ -10014,7 +10163,7 @@ const detouragesDrawn = async (frame: number, options: { n?: number; aspect?: nu
       brand: { name, displayFont: "Montserrat", bodyFont: "Montserrat" },
       shots: pileShots(line, options.aspect ?? 16 / 9),
       reelTexts: [{ text: name, role: "hook", from: line.marks.name, to: drop, emphasis: [] }],
-      end: options.end ? { title: "Ouvert dimanche", subtitle: "de 9 h à 18 h", from: durationInFrames - 48 } : null,
+      end: options.end ? { title: "Ouvert dimanche", subtitle: "de 9 h à 18 h", from: durationInFrames - 75 } : null,
       // « Comme ses vidéos » unless said (her words: « comme mes vidéos »): its window for her horizontal videos.
       texts: { ...Object.fromEntries(Object.entries(line.marks).map(([k, v]) => [k, String(v)])), ...(options.settings ?? { format: "auto" }) },
     },
@@ -10080,7 +10229,7 @@ test("« Ton nom qui clignote » (v2) cuts where its original does, on its own m
   // With an ending card, its last shot two beats longer, its cuts the same; at another tempo every length follows it.
   const ended = detourages.timeline(23, { end: true });
   assert.deepEqual(ended.shots.slice(0, -1), line.shots.slice(0, -1));
-  assert.ok(Math.abs(ended.duration - line.duration - 2 * beat) < 0.04);
+  assert.ok(Math.abs(ended.duration - line.duration - 6 * beat) < 0.04);
   const slower = detourages.timeline(23, { end: false, bpm: 112, words: { titre: "ICELAND" } });
   assert.ok(Math.abs(slower.duration / line.duration - 1.25) < 0.01 && Math.abs(slower.marks.on4! / line.marks.on4! - 1.25) < 0.02);
   // On the plan: valid, its sounds and its music's shape, its version.
@@ -10206,7 +10355,7 @@ test("« Ton nom qui clignote » (v3): full frame by default, its rounded window
     for (const end of [false, true]) {
       const l = detourages.timeline(n, { end, words: { titre: "Udvar" } });
       const durationInFrames = Math.round(l.duration * 30);
-      const props = { width: 1080, height: 1920, durationInFrames, brand: { name: "Udvar", displayFont: "Montserrat", bodyFont: "Montserrat" }, shots: pileShots(l, 16 / 9), reelTexts: [{ text: "Udvar", role: "hook", from: l.marks.name, to: Math.round(l.shots[1]!.start * 30), emphasis: [] }], end: end ? { title: "Ouvert dimanche", subtitle: null, from: durationInFrames - 48 } : null, texts: Object.fromEntries(Object.entries(l.marks).map(([k, v]) => [k, String(v)])) };
+      const props = { width: 1080, height: 1920, durationInFrames, brand: { name: "Udvar", displayFont: "Montserrat", bodyFont: "Montserrat" }, shots: pileShots(l, 16 / 9), reelTexts: [{ text: "Udvar", role: "hook", from: l.marks.name, to: Math.round(l.shots[1]!.start * 30), emphasis: [] }], end: end ? { title: "Ouvert dimanche", subtitle: null, from: durationInFrames - 75 } : null, texts: Object.fromEntries(Object.entries(l.marks).map(([k, v]) => [k, String(v)])) };
       const drawn = await cutoutsDrawn(detourages.code, props, Array.from({ length: durationInFrames }, (_, f) => f));
       assert.deepEqual([...drawn].sort((a, b) => a - b), l.cutouts, `${n} shots${end ? ", an ending card" : ""}`);
     }
@@ -10292,7 +10441,7 @@ async function silhouetteAt(frame: number, read: KitRead = {}, options: { settin
     brand: { name: "Atelier Rose", displayFont: "Inter Tight", bodyFont: "Inter Tight", ...options.brand },
     shots: decodeShots(silhouette.timeline(2, { end: Boolean(end) }), () => 16 / 9),
     reelTexts,
-    end: end ? { ...end, from: durationInFrames - 48 } : null,
+    end: end ? { ...end, from: durationInFrames - 75 } : null,
     texts: plan.layers![0]!.motion.texts!,
   };
   return { tree: await drawKit(silhouette.code, frame, props, read), props };
@@ -10540,7 +10689,7 @@ test("« Vision machine » (v2) passes where its original does, image by image a
   assert.equal(faster.marks.erase, Math.round(217 * 0.775));
   assert.ok(Math.abs(faster.duration - 8.5 * 0.775) < 0.05);
   const ended = vision.timeline(2, { end: true });
-  assert.ok(ended.duration - line.duration >= 1.6 && ended.music!.end!.at === ended.duration, `${ended.duration} s`);
+  assert.ok(ended.duration - line.duration >= 2.5 && ended.music!.end!.at === ended.duration, `${ended.duration} s`);
   // On the plan: valid; her still subject, what it is on and the things that repeat in her place read on the anchor shot,
   // every person on her place, within the 20 s a Reel's objects take; its depth on her place only; nothing of her cut out
   // besides; no nearness nor vanishing point read any more (its cells a grid, its back whitened from the top).
@@ -10807,7 +10956,7 @@ test("« Interrupteur » (v8): its poster's texts keyed by their words, so its e
     { text: "La Fripe Rétro", role: "hook", from: 123, to: durationInFrames, emphasis: [] },
     { text: "Nouvelle saison", role: "caption", from: 123, to: durationInFrames, emphasis: [] },
   ];
-  const end = { title: "La nouvelle saison est ouverte", subtitle: "Deux salles, de nouvelles pièces chaque semaine", from: durationInFrames - 48 };
+  const end = { title: "La nouvelle saison est ouverte", subtitle: "Deux salles, de nouvelles pièces chaque semaine", from: durationInFrames - 75 };
   const props = { width: 1080, height: 1920, durationInFrames, brand, shots: rallumeShots(line, 9 / 16), reelTexts, end, texts: marks };
   const { draw } = await kitScene(interrupteur.code);
   const fits = (f: number) => drawnNodes(draw(f, props)).filter((n) => n.type === "FitText").map((n) => String(n.props.key));

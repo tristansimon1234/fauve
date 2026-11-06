@@ -1,4 +1,4 @@
-import { beatSpans, toFrame, type MontageSkill } from "../skills.ts";
+import { END_CARD_SECONDS, beatSpans, toFrame, type MontageSkill } from "../skills.ts";
 
 // « Montage sport noir et blanc », written on its original (house/originals/nike.mp4: the sports edit in the left part
 // of a tutorial, its first 10,4 s, looked at image by image): it opens on a strobe (two images red, three in negative,
@@ -18,8 +18,8 @@ const TITLE = 4;
 const LAST = 2;
 const FROZEN = 1;
 const BLACK = 1;
-/** The engine's ending card: the Reel's last 1.6 s (motion.ts, END_CARD_SECONDS). */
-const END_CARD = 1.6;
+/** The engine's ending card: the Reel's last 2,5 s (motion.ts, END_CARD_SECONDS). */
+const END_CARD = END_CARD_SECONDS;
 /** The words' shots, in beats, over and over: one held two beats, two quick ones. */
 const PATTERN = [2, 1, 1];
 const onFrame = (s: number) => Math.round(s * 30) / 30;

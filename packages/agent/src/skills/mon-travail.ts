@@ -1,4 +1,4 @@
-import { toFrame, type MontageSkill, type SkillSound } from "../skills.ts";
+import { END_CARD_SECONDS, toFrame, type MontageSkill, type SkillSound } from "../skills.ts";
 
 // « Voici mon travail », written on its original's fiche (docs/fiches/mon-travail.md: measured image by
 // image at 30 i/s, each work's landing, box and leaving found on the differences of its images; Tristan, of the Reel he
@@ -48,9 +48,9 @@ const LAST_AFTER = 1 / 3;
 /** Her words alone with her at the end (beats: its last second), or before the ending card. */
 const ALONE = 2;
 const ALONE_BEFORE_CARD = 1;
-/** The ending card's beats: the engine's last 1,6 s at least. */
+/** The ending card's beats: the engine's last 2,5 s at least. */
 const CARD = 3.25;
-const CARD_SECONDS = 1.6;
+const CARD_SECONDS = END_CARD_SECONDS;
 /** Her shot plays this long at the end (beats: 6 s at its tempo), held on its first image before it. */
 const HER = 12;
 /** The works from this share of the collage on pass in front of her (the original's last six of 37, low, over her legs). */
@@ -526,7 +526,7 @@ export const monTravail: MontageSkill = {
     // both a little early, as the original's last ones: those before them that would stay past it leave just before it.
     const hit = Math.floor(lands[works - 2]! + STAY);
     const last = hit + LAST_AFTER;
-    // Her words alone with her after it, or a beat of them and the ending card (the engine's 1,6 s at least, whatever the tempo).
+    // Her words alone with her after it, or a beat of them and the ending card (the engine's 2,5 s at least, whatever the tempo).
     const total = frames(last + (end ? ALONE_BEFORE_CARD + Math.max(CARD, CARD_SECONDS / beat) : ALONE));
     const landed = lands.map(frames);
     const stay = Math.round(STAY * beat * 30);

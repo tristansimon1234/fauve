@@ -1,4 +1,4 @@
-import { beatSpans, toFrame, type MontageSkill } from "../skills.ts";
+import { END_CARD_SECONDS, beatSpans, toFrame, type MontageSkill } from "../skills.ts";
 
 // « Plans fixes de cinéma », version 3, written again on its original's fiche (docs/fiches/plans-fixes.md: measured image
 // by image at 30 i/s, its music measured, the video watched and heard by Gemini). Its music is a drumless electric piano
@@ -11,6 +11,7 @@ import { beatSpans, toFrame, type MontageSkill } from "../skills.ts";
 //   the lens in the middle, its last three from dusk to night;
 //   the last one held two beats, its closing line (her ending card's words, else her name) fading in small at the
 //   middle 0,83 beat after the cut, over 19 images, no veil; its music dies away over the last beat and stops with it.
+//   Her name is then held two seconds at least (the engine's heldEnding: two beats more than the original's).
 // Played as the original, a horizontal 4:3 picture on black, when her files are mostly horizontal (or she asks), else
 // full frame (Tristan: « format par défaut [comme ses vidéos], et changement à la demande du user »). Her shots as
 // filmed: the camera never moves, never zooms (a still shot is the effect), a photo stays still, a video plays.
@@ -22,8 +23,8 @@ const SHOT = 1;
 const LAST = 2;
 /** Past ten shots in the middle (a length she asked for), each one more is held two beats. */
 const MORE = 2;
-/** The engine's ending card: the Reel's last 1.6 s (motion.ts, END_CARD_SECONDS); its last shot held whole beats longer for it. */
-const END_CARD = 1.6;
+/** The engine's ending card: the Reel's last 2,5 s (motion.ts, END_CARD_SECONDS); its last shot held whole beats longer for it. */
+const END_CARD = END_CARD_SECONDS;
 /** Its closing line fades in this far after the last cut, over this long (beats: the original's images 342 to 361). */
 const CLOSE_FROM = 0.83;
 const CLOSE_IN = 0.68;
@@ -172,15 +173,16 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
 
   // 3. Its closing line, small at the middle of its last shot, as the original's « Follow for more »: her ending card's
   // words (a second line under it when it has one), else her name; in the sans of its small words, bold, fading in over
-  // 19 images from 0,83 beat after the last cut, held to the end; no veil, nothing darkened, only a thin dark edge
-  // (her last shot may be bright). 48 px (the original's 36 px would not read on a phone).
+  // 19 images from 0,83 beat after the last cut, held to the end (her name two seconds at least: the engine holds it,
+  // heldEnding); no veil, nothing darkened, only a thin dark edge (her last shot may be bright). 64 px (the original's 36
+  // px would not read on a phone, its 48 px until v5 were lost in the middle of the picture).
   const plain = (s) => String(s || "").toLowerCase().replace(/[^\p{L}\p{N}]/gu, "");
   const name = String(brand.name || "").trim();
   const line = end ? keep(end.title) : name && !(hook && plain(hook.text) === plain(name)) ? name : "";
   const fade = (a) => interpolate(frame, [a, a + CLOSE_IN], [0, 1], clamp);
   const mid = Math.round(bh / 2);
   const two = Boolean(end && end.subtitle);
-  const closeStyle = { fontFamily: body, fontWeight: 700, fontSize: 48, lineHeight: 1.18, color: "#ffffff", whiteSpace: "normal", textWrap: "balance", textAlign: "center", textShadow: "0 0 1px rgba(0,0,0,0.8), 0 1px 2px rgba(0,0,0,0.6), 0 1px 6px rgba(0,0,0,0.35)" };
+  const closeStyle = { fontFamily: body, fontWeight: 700, fontSize: 64, lineHeight: 1.18, color: "#ffffff", whiteSpace: "normal", textWrap: "balance", textAlign: "center", textShadow: "0 0 1px rgba(0,0,0,0.8), 0 1px 2px rgba(0,0,0,0.6), 0 1px 6px rgba(0,0,0,0.35)" };
   const closing = line && frame >= CLOSE
     ? h(React.Fragment, null,
         h(FitText, { key: "c", style: { position: "absolute", left: 140, top: two ? mid - 136 : mid - 65, width: bw - 280, height: 130 }, innerStyle: { ...closeStyle, justifyContent: two ? "flex-end" : "center" } },
@@ -211,7 +213,10 @@ export const plansFixes: MontageSkill = {
   // -0,04 em sets 0,65 and 5,5, Lora 700 set 0,72 and 6,3 (rounder, a larger eye, looser).
   // Also 4: vertical full frame by default, her horizontal files cropped on their subject, its band only when she asks for
   // it (Tristan, 6 November, on seven benches: « vertical please », « tout vertical please »).
-  version: 4,
+  // 5: its closing line (her name) held two seconds at least once faded in (the engine's heldEnding: two beats more, it
+  // was half a second) and set at 64 px (Tristan, 6 November: « les scènes de fin avec le nom du commerce sont souvent
+  // trop courtes »).
+  version: 5,
   bpm: BPM,
   shots: [5, 12],
   // Up to 20 for a length she asks for: about 30 s at its own tempo.
@@ -298,6 +303,9 @@ export const plansFixes: MontageSkill = {
         close: toFrame(lastCut + CLOSE_FROM * beat),
         close_in: Math.max(1, Math.round(CLOSE_IN * beat * 30)),
       },
+      // Her name, whole once faded in, to the end: held two seconds at least by the engine (it was half a second); with
+      // an ending card, its words have the card's time.
+      ...(end ? {} : { ending: { from: round((lastCut + (CLOSE_FROM + CLOSE_IN) * beat) + 1 / 30) } }),
       ...(frames.length ? { sounds: frames.map((f) => ({ at: f / 30, ...CLICK })) } : {}),
     };
   },

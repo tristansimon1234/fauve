@@ -38,7 +38,8 @@ import type { MotionTemplate, ReelProps } from "./types";
 // background replaced in production hid its big words behind her on every close-up). And a
 // scene whose code reads what is said is given words said (probeSpoken) and says how many of
 // them it writes at their moment (FAUVE_SPOKEN): the engine's subtitles step aside only for one
-// that writes them.
+// that writes them. A composition of the whole Reel whose last words (her name, her ending card)
+// stay whole less than 2 s at the end, or end it small, is reported too (FAUVE_ENDING).
 
 /**
  * Where a text may go: 40 px from the sides, 80 from the top, above the bottom quarter (the apps' caption), and 140 px
@@ -310,6 +311,56 @@ function tooQuick(frames: number[], step: number, last: number, skip: (text: str
     const seconds = (best.to - best.from + step) / 30;
     const needs = readingSeconds(text);
     return seconds < needs * 0.8 && frames.length > 1 ? [{ text, seconds, needs, from: best.from }] : [];
+  });
+}
+
+/**
+ * Her name at the end (Tristan, 6 November: « les scènes de fin avec le nom du commerce sont souvent trop courtes »): the
+ * words still on screen at the scene's last frame (her name, her signature, her ending card) stay whole ENDING_SECONDS
+ * at least before it ends, and the largest of them reads across the frame (ENDING_TYPE px), never a small signature
+ * lost in the middle of an empty frame (FAUVE_ENDING). A composition of the whole Reel only: an animation's last frame
+ * is not the Reel's end. The same as ENDING_LEAST in @fauve/agent (skills.ts).
+ */
+export const ENDING_SECONDS = 2;
+export const ENDING_TYPE = 64;
+
+/** The words on screen at the last copy, each with how long it stays whole there before it (s) and its size there (px). */
+function lastWords(frames: number[], step: number, skip: (text: string) => boolean): { text: string; seconds: number; size: number }[] {
+  const last = frames.at(-1);
+  if (last === undefined) return [];
+  const seen = new Map<string, number[]>();
+  const sizeAt = new Map<string, number>();
+  document.querySelectorAll<HTMLElement>("[data-check-frame]").forEach((copy) => {
+    const frame = Number(copy.dataset.checkFrame);
+    const walker = document.createTreeWalker(copy, NodeFilter.SHOW_TEXT);
+    for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+      const text = node.textContent?.replace(/\s+/g, " ").trim();
+      const el = node.parentElement;
+      if (!text || !el || (text.match(/\p{L}/gu)?.length ?? 0) < 2 || inDecor(node) || skip(text)) continue;
+      let opacity = 1;
+      let scale = 1;
+      for (let up: HTMLElement | null = el; up && up !== copy; up = up.parentElement) {
+        const style = getComputedStyle(up);
+        if (style.visibility === "hidden") opacity = 0;
+        opacity *= Number(style.opacity);
+        if (style.transform && style.transform !== "none") {
+          const m = new DOMMatrixReadOnly(style.transform);
+          scale *= Math.hypot(m.c, m.d);
+        }
+      }
+      if (opacity < 0.5) continue;
+      const at = seen.get(text) ?? [];
+      if (at.at(-1) !== frame) at.push(frame);
+      seen.set(text, at);
+      if (frame === last && el instanceof HTMLElement) sizeAt.set(text, Math.max(sizeAt.get(text) ?? 0, parseFloat(getComputedStyle(el).fontSize) * scale));
+    }
+  });
+  return [...seen.entries()].flatMap(([text, at]) => {
+    if (at.at(-1) !== last) return [];
+    // Its stay in one piece up to the end.
+    let from = last;
+    for (let i = at.length - 2; i >= 0 && from - at[i]! <= step; i--) from = at[i]!;
+    return [{ text, seconds: (last - from + step) / 30, size: sizeAt.get(text) ?? 0 }];
   });
 }
 
@@ -848,6 +899,21 @@ export function SceneCheck({ js, texts, durationInFrames, brand, photos = [], cu
             .join(" ; ");
           const message = `texte trop rapide pour être lu : ${detail}. Une phrase reste entière à l'écran au moins 0,8 s plus 0,3 s par mot avant de partir (le temps de la lire sur un téléphone) : fais-la arriver plus tôt ou partir plus tard, ou garde moins de phrases, sans changer l'idée.`;
           console.log(`FAUVE_READ ${JSON.stringify(message)}`);
+        }
+        // Her name at the end, on a composition of the whole Reel: whole long enough, and large enough.
+        if (reelTexts.length || end) {
+          const ending = lastWords(frames, step, skip);
+          if (ending.length) {
+            const s = (n: number) => n.toFixed(1).replace(".", ",");
+            const held = Math.max(...ending.map((w) => w.seconds));
+            const size = Math.max(...ending.map((w) => w.size));
+            const named = ending.slice(0, 2).map((w) => `« ${w.text.slice(0, 40)} »`).join(" et ");
+            const notes = [
+              held < ENDING_SECONDS - 0.1 ? `${named} reste${ending.length > 1 ? "nt" : ""} ${s(held)} s entier${ending.length > 1 ? "s" : ""} à l'écran à la fin, il faut ${ENDING_SECONDS} s au moins pour lire son nom : tiens ta fin plus longtemps (son dernier plan, son fond) ou fais-le arriver plus tôt` : "",
+              size < ENDING_TYPE - 0.5 ? `${named} fini${ending.length > 1 ? "ssent" : "t"} le Reel à ${r(size)} px : son nom à la fin se lit d'un coup d'œil à ${ENDING_TYPE} px au moins, jamais une petite signature perdue au milieu d'une image vide` : "",
+            ].filter(Boolean);
+            if (notes.length) console.log(`FAUVE_ENDING ${JSON.stringify(`fin difficile à lire : ${notes.join(" ; ")}. Une fin vide (un fond, du noir) avec seulement son nom ne dure pas plus de 3 s.`)}`);
+          }
         }
         // An accent is held to its own minimum when a text of the scene reads at the full one.
         const titled = [...largest.entries()].some(([text, size]) => !accents.has(text) && size >= MIN_TYPE - 0.5);

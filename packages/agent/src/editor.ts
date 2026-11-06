@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { compositionBrief, composedLayers } from "./compose.ts";
-import { planTimeline } from "./motion.ts";
+import { END_CARD_SECONDS, planTimeline } from "./motion.ts";
 import { renderDuration } from "./render.ts";
 import { hookAtStart } from "./hook.ts";
 import { snapToTempo, TEMPLATE_BPM } from "./tempo.ts";
@@ -554,9 +554,9 @@ export const MAX_REEL_SECONDS = 45;
 /** Crossfades only when the shots last this long on average (seconds); below, clean cuts. */
 const FADE_MIN_AVERAGE = 2.4;
 
-/** The end card's length, and the last shot that holds it with a little of itself before it. */
-export const END_CARD_SECONDS = 1.6;
-const END_CARD_HOLD = 2.2;
+/** The end card's length (motion.ts: her name whole 2 s at least once in), and the last shot that holds it with a little of itself before it. */
+export { END_CARD_SECONDS };
+const END_CARD_HOLD = END_CARD_SECONDS + 0.6;
 
 /**
  * `speech`: what was measured of the speech in her videos (speech.ts): the hesitations and long
@@ -675,7 +675,9 @@ export function normalizeEditPlan(
     .filter((t) => t.to - t.from >= MIN_TEXT_SECONDS)
     .map((t) => ({ ...t, emphasis: t.emphasis?.filter((e) => t.text.toLowerCase().includes(e.toLowerCase())) }));
 
-  return editPlanSchema.parse({ ...draft, duration, texts, layers: layers.length ? layers : undefined });
+  // Its ending card as long as the engine plays it now (a plan made before keeps nothing of its old length once normalized).
+  const endCard = plan.end_card ? { end_card: { ...plan.end_card, seconds: END_CARD_SECONDS } } : {};
+  return editPlanSchema.parse({ ...draft, ...endCard, duration, texts, layers: layers.length ? layers : undefined });
 }
 
 /**

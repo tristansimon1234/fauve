@@ -1,4 +1,4 @@
-import { toFrame, type MontageSkill, type SkillSound } from "../skills.ts";
+import { END_CARD_SECONDS, toFrame, type MontageSkill, type SkillSound } from "../skills.ts";
 
 // « Interface minimaliste », version 2, written on its original's fiche (docs/fiches/interface.md: 12,7 s of pure motion
 // design on a pale blue-grey, measured image by image at 30 i/s, its sound read by bands; Tristan: « c'est un effet que
@@ -43,8 +43,8 @@ const ANN_MORE = 2;
 const TYPED_MORE = 1;
 /** Its typing, letters a second (the original's 37 in 29 images), a soft key click every other letter. */
 const TYPING = 38;
-/** The engine's ending card: the Reel's last 1,6 s, on the half-beat grid. */
-const CARD_SECONDS = 1.6;
+/** The engine's ending card: the Reel's last 2,5 s, on the half-beat grid. */
+const CARD_SECONDS = END_CARD_SECONDS;
 const round = (n: number) => Math.round(n * 100) / 100;
 const round3 = (n: number) => Math.round(n * 1000) / 1000;
 
@@ -355,7 +355,7 @@ export const interfaceSkill: MontageSkill = {
     const at = interfaceImages();
     const seconds = (images: number) => (images / IMAGES) * beat;
     const frames = (images: number) => toFrame(seconds(images));
-    // With an ending card, its time after her account (the engine's 1,6 s at least, rounded up on the half-beat grid).
+    // With an ending card, its time after her account (the engine's 2,5 s at least, rounded up on the half-beat grid).
     const card = end ? (Math.ceil(((CARD_SECONDS + 0.05) / beat) * 2) / 2) * beat : 0;
     const lit = round(seconds(at.end));
     const duration = round(lit + card);

@@ -1,4 +1,4 @@
-import { toFrame, type MontageSkill, type SkillShot } from "../skills.ts";
+import { END_CARD_SECONDS, toFrame, type MontageSkill, type SkillShot } from "../skills.ts";
 
 // « Défilé d'assiettes », version 2 (its slots say what a business films for it, their passage and fallback), written on its original's fiche (docs/fiches/assiettes.md: measured image by image
 // at 30 i/s, its title's typing and its ink read on the pixels, its plates' place in each of its 31 shots, its sound by
@@ -76,8 +76,8 @@ const OUT = 22;
 const DRUMS_OUT = 3.25;
 const VOCAL_BACK = 16;
 const SILENCE = 3.25;
-/** The engine's ending card: the Reel's last 1,6 s, over its last dish held whole beats longer. */
-const END_CARD = 1.6;
+/** The engine's ending card: the Reel's last 2,5 s, over its last dish held whole beats longer. */
+const END_CARD = END_CARD_SECONDS;
 const round = (n: number) => Math.round(n * 100) / 100;
 const round3 = (n: number) => Math.round(n * 1000) / 1000;
 const comma = (n: number) => String(round(n)).replace(".", ",");
@@ -275,7 +275,7 @@ export const assiettes: MontageSkill = {
       });
       at += phrase.length;
     }
-    // With an ending card, its last dish held whole beats longer (the engine's 1,6 s at least, a frame lost to rounding never cutting into it).
+    // With an ending card, its last dish held whole beats longer (the engine's 2,5 s at least, a frame lost to rounding never cutting into it).
     const card = end ? 4 * Math.ceil((END_CARD + 0.05) / (4 * s16) - 1e-6) : 0;
     const total = at + card;
     const vedette = starts.vedette!;
