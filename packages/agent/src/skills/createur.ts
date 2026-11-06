@@ -1,6 +1,6 @@
 import { nominalSaid, type MontageSkill, type SkillSound } from "../skills.ts";
 
-// « Face caméra et références », version 1, written on its original's fiche (docs/fiches/createur.md: its first 31 s
+// « Face caméra et références », version 2 (v1: 5 November), written on its original's fiche (docs/fiches/createur.md: its first 31 s
 // measured image by image at 30 i/s, its cuts on her breaths and on the words that name an image, its places, its sound;
 // Tristan: « c'est un effet que l'on veut pouvoir faire, pas exactement reproduire l'image »). A creator talks to the
 // camera and what he talks about shows: above his head, in the top half, full frame for each name he cites. Timed on her
@@ -21,6 +21,9 @@ import { nominalSaid, type MontageSkill, type SkillSound } from "../skills.ts";
 //   her business named a white card grows from the middle onto her chest under her face (14 images, blurred at first)
 //                      with a chime, her logo on it (else her name), and stays her idea; above her head the next idea
 //                      when there is room.
+// Version 2 (Tristan on v1's bench, 6 November: « pas ouf »; its bench had no real person speaking, a free video and a
+// synthetic voice): a name written big on her is left out of its subtitle (never a word twice), and its filler casts an
+// image on every idea it has one for, the one that shows what she says then (the original's screen changes at each idea).
 // No music (its original has none: her voice alone), no grade (the images she shows stay as they are). Her vertical
 // video full frame (the original's), her horizontal video in the bottom half with her images in the top half all along;
 // the `format` setting: split all along, or full frame all along. Not done (docs/fiches/createur.md, its note): her
@@ -230,9 +233,14 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
       : (() => {
         const p = phrases.find((x, i) => frame >= x[0].from && frame < Math.min(x[x.length - 1].to + 8, phrases[i + 1] ? phrases[i + 1][0].from : Infinity));
         if (!p) return null;
+        // Never a word twice: a name written big on her right now is left out of its phrase (v2).
+        const plain = (s) => String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim();
+        const twice = big ? plain(big.text).split(" ") : [];
+        const left = p.filter((w) => !(plain(w.w) && plain(w.w).split(" ").every((x) => twice.includes(x))));
+        if (!left.length) return null;
         const lineH = Math.round(H * 0.034);
         return h("div", { key: "sub" + p[0].from, style: { position: "absolute", left: 120, width: W - 240, top: Math.round(subY - lineH), height: lineH * 2, display: "flex", alignItems: "center", justifyContent: "center" } },
-          h("div", { style: { fontFamily: body, fontWeight: 600, fontSize: Math.round(H * 0.026), lineHeight: 1.25, color: "#ffffff", textAlign: "center", textWrap: "balance", textShadow: "0 1px 2px rgba(0,0,0,0.55), 0 2px 10px rgba(0,0,0,0.35)" } }, p.map((w) => w.w).join(" ")));
+          h("div", { style: { fontFamily: body, fontWeight: 600, fontSize: Math.round(H * 0.026), lineHeight: 1.25, color: "#ffffff", textAlign: "center", textWrap: "balance", textShadow: "0 1px 2px rgba(0,0,0,0.55), 0 2px 10px rgba(0,0,0,0.35)" } }, left.map((w) => w.w).join(" ")));
       })();
 
   return h(AbsoluteFill, { style: { backgroundColor: "#000000" } }, layers, said);
@@ -240,7 +248,7 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
 
 export const createur: MontageSkill = {
   key: "createur",
-  version: 1,
+  version: 2,
   // Its original has no music: its tempo only counts its sounds' beats, never its cuts (her voice leads).
   bpm: 90,
   shots: [1, 40],
@@ -255,7 +263,7 @@ export const createur: MontageSkill = {
     items: "les choses qu'elle cite l'une après l'autre dans une idée (ses produits, ses plats, ses réalisations, des noms) : chaque nom au moment où elle le dit, avec l'image de ses fichiers qui le montre",
     max: { key: 20, item: 24 },
     cut: "attack",
-    refs: "une photo ou une vidéo de ce dont elle parle (un produit, un plat, une réalisation, un avant/après, son lieu) : une à trois pour une idée (en haut de l'écran pendant qu'elle la dit, un objet sur un fond simple détouré au-dessus de sa tête), quatre ou plus pour un mur derrière elle, une pour chaque nom d'une liste (plein écran à l'instant où elle le dit)",
+    refs: "une photo ou une vidéo de ce dont elle parle à ce moment-là, qui le montre vraiment (le produit qu'elle nomme, le plat, la réalisation, l'avant/après, son lieu), jamais une image au hasard : l'écran change à chaque idée comme chez l'original, donc une image pour chaque idée dont elle a une image qui va (une à trois, en haut de l'écran pendant qu'elle la dit ; un objet sur un fond simple détouré au-dessus de sa tête), quatre ou plus pour un mur derrière elle quand elle parle de tout ce qu'elle fait, une pour chaque nom d'une liste (plein écran à l'instant où elle le dit) ; ses plus belles et ses plus nettes d'abord, jamais deux fois la même, jamais sa vidéo où elle parle",
     name: "son logo surgit sur une carte blanche, avec un carillon, quand elle dit le nom de son commerce",
     subtitles: "own",
   },

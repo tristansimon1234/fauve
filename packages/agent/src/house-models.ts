@@ -17,7 +17,7 @@ import type { z } from "zod";
 
 /** The source of the inspiration row a house model is kept on, per studio (one per model, made when first used). */
 export const HOUSE_SOURCE = "house";
-/** The catalogue's version: a studio's row written by an older one is rewritten when the model is used again (3: its original's sheets; 4: no brand in a model's name; 5: Mots aux quatre coins as its original; 6: Plans fixes at 65 BPM; 7: four renamed; 8: Lieu tapé without its original's orange; 9: Plans fixes on its fiche; 10: Une journée chez toi on its fiche; 11: ten models on their fiches; 12: Façade qui se construit and Coulisses façon fiche on their fiches; 13: Recette cosy on its fiche; 14: Titre gaufré on its fiche; 15: Mots mêlés and Interrupteur on their fiches; 16: Interface minimaliste and Fenêtres et étiquettes on theirs; 17: Mot clé en grand and Face caméra et références on theirs; 18: Photos posées sur la table and Carte au feutre on theirs; 19: « S'abonner » in Interface minimaliste; 20: the last four on their fiches, Aplat, Détourages, Silhouette and Vision machine; 21: Tristan's review of 6 November, Court métrage's light and lettering, Plans fixes' lettering, Façade's first pieces, Présente-toi in its own design). */
+/** The catalogue's version: a studio's row written by an older one is rewritten when the model is used again (3: its original's sheets; 4: no brand in a model's name; 5: Mots aux quatre coins as its original; 6: Plans fixes at 65 BPM; 7: four renamed; 8: Lieu tapé without its original's orange; 9: Plans fixes on its fiche; 10: Une journée chez toi on its fiche; 11: ten models on their fiches; 12: Façade qui se construit and Coulisses façon fiche on their fiches; 13: Recette cosy on its fiche; 14: Titre gaufré on its fiche; 15: Mots mêlés and Interrupteur on their fiches; 16: Interface minimaliste and Fenêtres et étiquettes on theirs; 17: Mot clé en grand and Face caméra et références on theirs; 18: Photos posées sur la table and Carte au feutre on theirs; 19: « S'abonner » in Interface minimaliste; 20: the last four on their fiches, Aplat, Détourages, Silhouette and Vision machine; 21: Tristan's review of 6 November, Court métrage's light and lettering, Plans fixes' lettering, Façade's first pieces, Présente-toi in its own design, the kaléidoscope, Mot clé en grand and Face caméra et références). */
 export const HOUSE_VERSION = 21;
 
 export type HouseModel = {
@@ -590,10 +590,11 @@ export const HOUSE_MODELS: HouseModel[] = [
     // 15: written on its original's fiche (v1 of its skill, timed on her voice): her first two words slide in big from the
     // first image, each idea's keyword slides in under a small line of her words said one by one, a list two names at a
     // time each in its own font, a number and its three words, three frames between her ideas, a music that waits for her
-    // first keyword and loses its bass mid-way.
-    pitch: "Tu parles face caméra devant un fond uni, et le mot important de chaque phrase s'affiche en grand au-dessus de ta tête.",
-    needs: "une vidéo de toi qui parles face caméra (20 à 30 s), assise devant un mur uni, téléphone posé, la tête vers le milieu de l'image ; si tu peux, la même prise d'un second téléphone",
-    files: [1, 3],
+    // first keyword and loses its bass mid-way. v2: what she says written once by its small line (the engine's subtitles
+    // step aside), her photo of each name of a list under that name.
+    pitch: "Tu parles face caméra devant un fond uni, et le mot important de chaque phrase s'affiche en grand au-dessus de ta tête ; quand tu cites tes produits, chacun en grand dans sa police, sur sa photo.",
+    needs: "une vidéo de toi qui parles face caméra (20 à 30 s), assise devant un mur uni, téléphone posé, la tête vers le milieu de l'image, avec ta vraie voix ; si tu peux, la même prise d'un second téléphone, et une photo de chaque chose que tu cites",
+    files: [1, 12],
     // Its hook, keywords and small words in a bold geometric (the original's Poppins-like), its number condensed (Anton,
     // brought by its skill): not the condensed Bebas Neue of « condensee-geometrique », which only fits its number.
     pair: "geometrique",
@@ -606,24 +607,24 @@ export const HOUSE_MODELS: HouseModel[] = [
       hook: { kind: "promesse", what: "ses deux premiers mots en grandes capitales grasses qui glissent de la gauche dès la première image, au-dessus de sa tête" },
       text: {
         amount: "plusieurs",
-        composition: "au-dessus de sa tête : ses premiers mots puis le mot clé de chaque idée en capitales grasses glissant de la gauche, ses mots dits en petit au-dessus ; une liste deux noms à la fois, chacun dans sa police ; ses sous-titres sur sa poitrine",
+        composition: "au-dessus de sa tête : ses premiers mots puis le mot clé de chaque idée en capitales grasses, le reste de ce qu'elle dit en petit au-dessus, mot à mot, jamais deux fois ; une liste deux noms à la fois, chacun dans sa police, sur sa photo",
         case: "upper",
         weight: "bold",
-        subtitles: true,
+        subtitles: false,
       },
       layout: "elle assise face caméra devant un mur uni, plein cadre vertical (sa vidéo horizontale entière dans une bande 16:9 sur du noir), un autre cadre entre deux idées, les mots au-dessus de sa tête",
       moments: [
         { at: 0, what: "ses deux premiers mots glissent de la gauche, flous, rebondissent sur un souffle grave, tenus jusqu'à ce qu'elle dise la suite" },
         { at: 1.07, what: "ses mots s'écrivent un à un sur une petite ligne très espacée ; le mot clé glisse dessous sur son mot (1,73 s) et reste toute l'idée" },
         { at: 5.67, what: "coupe sur un autre cadre entre deux idées, rien au-dessus de sa tête jusqu'à la suivante" },
-        { at: 7.1, what: "une liste deux noms à la fois, chacun dans sa police, le premier petit en haut, le second grand dessous, chacun sur son mot" },
+        { at: 7.1, what: "une liste deux noms à la fois, chacun dans sa police, le premier petit en haut, le second grand dessous, chacun sur son mot, sur sa photo plein écran quand elle en a une" },
         { at: 17.6, what: "un chiffre très condensé et ses trois mots empilés à sa droite, d'un coup, tenus 4 s" },
       ],
       camera: "fixe",
       grade: "natural",
       motion: "energique",
       music: "laid-back hip-hop beat at 108 BPM, deep sub bass, coming in after the hook",
-      ending: "elle dit au revoir, plus rien au-dessus de sa tête, la musique coupée avec l'image",
+      ending: "elle dit au revoir, ses mots en petit au-dessus de sa tête, la musique coupée avec l'image",
       why: "Chaque idée a son mot en grand, chaque nom sa police : on retient ce qui est dit même sans le son, et la personne reste au centre.",
     },
   }),
@@ -2072,8 +2073,9 @@ export const HOUSE_MODELS: HouseModel[] = [
     // Written on its original's fiche (v1 of its skill, docs/fiches/vitraux.md): an old building's door straight on, re-made
     // at every image by an AI (its leaves doubling, its panes in symmetric patterns, its fanlight turning half a turn), the
     // stone around it still, then back to the real door for the loop, over a soft house loop at 123,4 BPM (Gemini heard 95
-    // and a slit-scan); here mirrors laid on her own picture, which invent nothing. No text in the original (her name in option).
-    pitch: "Ta devanture, ta porte ou ta vitrine filmée bien droite, qui se démultiplie dans des miroirs et se recompose sans arrêt, puis redevient elle-même : une boucle qu'on regarde deux fois.",
+    // and a slit-scan); here mirrors laid on her own picture, which invent nothing: since v2 a true kaleidoscope (v1's
+    // sliding strips were « très moyen » for Tristan on a bookshop's front). No text in the original (her name in option).
+    pitch: "Ta devanture, ta porte ou ta vitrine filmée bien droite devient un kaléidoscope : huit miroirs s'ouvrent en cercle depuis son milieu, tournent et la recomposent en rosaces de ses propres couleurs, puis elle redevient elle-même : une boucle qu'on regarde deux fois.",
     needs: "une vidéo fixe et bien de face (ou une photo bien droite) de ta porte, ta devanture, ta vitrine, une étagère ou ton présentoir, sans personne qui passe devant",
     files: [1, 3],
     // Its name, in option, in big capitals of a high-contrast serif, a thin spaced line under it (font-pairs.ts, « didone »).
@@ -2086,21 +2088,21 @@ export const HOUSE_MODELS: HouseModel[] = [
     look: {
       name: "devanture en kaléidoscope",
       format: "autre",
-      hook: { kind: "mystère", what: "sa devanture ou sa vitrine filmée bien droite, de face, qui se met à se dédoubler dans des miroirs dès la première seconde" },
+      hook: { kind: "mystère", what: "sa devanture ou sa vitrine filmée bien droite, de face, où un kaléidoscope s'ouvre en cercle depuis son milieu dès la première seconde" },
       text: {
         amount: "aucun",
-        composition: "aucun texte dans l'original ; son nom en option, en grandes capitales centrées au-dessus de sa chose quand les miroirs se referment, une petite ligne en capitales espacées dessous",
+        composition: "aucun texte dans l'original ; son nom en option, en grandes capitales centrées au-dessus de la rosace où le kaléidoscope se retire, sur sa vraie image, une petite ligne en capitales espacées dessous",
         case: "upper",
         weight: "bold",
         tracking: "wide",
       },
-      layout: "un seul plan fixe plein cadre, de face ; des miroirs verticaux qui glissent sur sa chose (ou une rosace qui tourne en son milieu), le reste de l'image vrai autour",
+      layout: "un seul plan fixe plein cadre vertical, de face ; un kaléidoscope de huit miroirs qui remplit sa chose (ou une rosace ronde, ou des battants), le reste de l'image vrai autour",
       moments: [
         { at: 0, what: "sa chose vraie, de face, deux images" },
-        { at: 0.07, what: "des miroirs verticaux se posent sur elle et s'écartent : elle se dédouble en copies plus étroites, vite puis plus doucement, entière à 1,56 s" },
-        { at: 1.56, what: "les miroirs glissent sans arrêt, jamais sur le temps : sa chose se recompose en continu, ses motifs se referment en losanges et en étoiles aux lignes des miroirs, le reste de l'image vrai autour" },
-        { at: 6.18, what: "son nom en option, en grandes capitales centrées au-dessus de sa chose, sa petite ligne dessous" },
-        { at: 7.4, what: "les miroirs se referment, lentement puis plus vite ; sa vraie image revient à 8,5 s" },
+        { at: 0.07, what: "un kaléidoscope de huit miroirs s'ouvre en cercle depuis le milieu de sa chose, vite puis plus doucement, jusqu'à la remplir à 1,56 s" },
+        { at: 1.56, what: "il tourne et se recompose à chaque image, jamais sur le temps : des rosaces de ses propres couleurs, ses lettres devenues des motifs, le reste de l'image vrai autour" },
+        { at: 6.18, what: "son nom en option : le kaléidoscope se retire dans une rosace ronde au milieu, son nom en grandes capitales au-dessus, sur sa vraie image, sa petite ligne dessous" },
+        { at: 7.4, what: "la rosace se referme, lentement puis plus vite ; sa vraie image revient à 8,5 s" },
         { at: 8.5, what: "sa chose vraie, comme à la première image : la boucle" },
       ],
       camera: "fixe",

@@ -205,7 +205,7 @@ export const HOUSE_EFFECTS: Record<string, HouseEffect> = {
     il_faut: "des photos ou de courtes vidéos de ses produits, plats ou créations, une chose seule au milieu de chacune",
   },
   vitraux: {
-    effet: "des miroirs posés sur sa chose filmée de face qui glissent sans arrêt : elle se dédouble et se recompose en motifs symétriques, le reste vrai autour, puis redevient elle-même",
+    effet: "un vrai kaléidoscope de huit miroirs sur sa chose filmée de face, qui s'ouvre en cercle, tourne et la recompose à chaque image en rosaces de ses couleurs, puis redevient elle-même",
     il_faut: "un plan fixe et bien de face de sa porte, sa devanture, sa vitrine ou une étagère, sans personne devant",
   },
   curseur: {

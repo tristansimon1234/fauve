@@ -13,9 +13,9 @@ import { vitraux } from "./vitraux.ts";
 /** The original's images, at 30 i/s (the fiche): the change from its third image, whole by 1,56 s, back from 7,40 s, real from 8,50 s, its end. */
 const ORIGINAL = { open: 2, full: 47, close: 222, real: 255, end: 270 };
 
-test("« Ta devanture en kaléidoscope » (v1): one still shot on its original's grid (123,4 BPM, its first beat at 0,345 s), its landmarks within an image", () => {
+test("« Ta devanture en kaléidoscope » (v2): one still shot on its original's grid (123,4 BPM, its first beat at 0,345 s), its landmarks within an image", () => {
   assert.equal(vitraux.key, "vitraux");
-  assert.equal(vitraux.version, 1);
+  assert.equal(vitraux.version, 2);
   assert.equal(vitraux.bpm, 123.4);
   assert.deepEqual(vitraux.shots, [1, 1]);
   assert.equal(vitraux.long, 3);
@@ -149,19 +149,20 @@ function strips(tree: Drawn) {
   });
 }
 
-test("« Ta devanture en kaléidoscope »: her real picture first, mirrors that open fast then slower, slide all along, close and give her picture back", () => {
+test("« Ta devanture en kaléidoscope »: its battants (a setting since v2), her real picture first, mirrors that open fast then slower, slide all along, close", () => {
+  const B = { settings: { figure: "battants" } };
   // Her real picture alone on its first images, and again at the end: the loop.
-  for (const f of [0, 1, 2, 255, 262, 269]) assert.equal(keyed(drawAt(f), "battants"), null, `frame ${f}`);
+  for (const f of [0, 1, 2, 255, 262, 269]) assert.equal(keyed(drawAt(f, B), "battants"), null, `frame ${f}`);
   assert.ok(keyed(drawAt(0), "real"));
   // From its third image: a few strips, the middle one nearly her whole picture at its own place.
-  const early = strips(drawAt(4));
+  const early = strips(drawAt(4, B));
   const middle = early.find((s) => s.left <= 540 && s.right >= 540)!;
   assert.ok(middle.right - middle.left > 700, JSON.stringify(early.map((s) => [s.left, s.right])));
   assert.ok(Math.abs(middle.source(540) - 540) < 40);
   // At full: three to five strips over her whole picture, from edge to edge, joined: each mirror line shows the same
   // column of her picture on both sides (no seam), every strip the same window of it, one in two mirrored.
   for (const f of [60, 110, 160, 210]) {
-    const s = strips(drawAt(f)).sort((a, b) => a.left - b.left);
+    const s = strips(drawAt(f, B)).sort((a, b) => a.left - b.left);
     assert.ok(s.length >= 3 && s.length <= 7, `frame ${f}: ${s.length}`);
     assert.equal(s[0]!.left, 0);
     assert.equal(s.at(-1)!.right, 1080);
@@ -174,67 +175,130 @@ test("« Ta devanture en kaléidoscope »: her real picture first, mirrors that 
     assert.ok(s.every((x) => x.top === 0 && x.height === 1920));
   }
   // It never comes back the same: its strips move from one moment to the next.
-  const at = (f: number) => strips(drawAt(f)).map((s) => s.left).join(",");
+  const at = (f: number) => strips(drawAt(f, B)).map((s) => s.left).join(",");
   assert.notEqual(at(100), at(130));
   assert.notEqual(at(130), at(160));
   // Closing: its middle strip wide again, then none.
-  const closing = strips(drawAt(250)).find((s) => s.left <= 540 && s.right >= 540)!;
+  const closing = strips(drawAt(250, B)).find((s) => s.left <= 540 && s.right >= 540)!;
   assert.ok(closing.right - closing.left > 600, JSON.stringify(closing));
 });
 
-test("« Ta devanture en kaléidoscope »: inside her door when it is found (clipped to its outline when whole), her picture real around it", () => {
+/** Its kaleidoscope at a frame: its zone's clip, its iris (radius, centre), its wedges' transforms. */
+function kaleidoscope(tree: Drawn, key = "kaleidoscope") {
+  const group = keyed(tree, key);
+  if (!group) return null;
+  const iris = group.children.flat()[0] as Drawn;
+  const m = /circle\(([\d.]+)px at ([\d.]+)px ([\d.]+)px\)/.exec(String(styleOf(iris).clipPath))!;
+  const wedges = iris.children.flat() as Drawn[];
+  const moves = wedges.map((w) => String(styleOf(w.children[0] as Drawn).transform));
+  return { clip: String(styleOf(group).clipPath), radius: Number(m[1]), centre: [Number(m[2]), Number(m[3])], wedges, moves };
+}
+/** Where a wedge's transform takes a point of her picture (CSS order: the rightmost first). */
+function mapped(move: string, x: number, y: number) {
+  const ops = [...move.matchAll(/(translate|rotate|scaleX|scale)\(([^)]*)\)/g)].map((o) => [o[1], o[2]!.split(",").map((v) => parseFloat(v))] as const).reverse();
+  let px = x;
+  let py = y;
+  for (const [op, v] of ops) {
+    if (op === "translate") {
+      px += v[0]!;
+      py += v[1]!;
+    } else if (op === "scale") {
+      px *= v[0]!;
+      py *= v[0]!;
+    } else if (op === "scaleX") px *= v[0]!;
+    else {
+      const a = (v[0]! * Math.PI) / 180;
+      [px, py] = [px * Math.cos(a) - py * Math.sin(a), px * Math.sin(a) + py * Math.cos(a)];
+    }
+  }
+  return [px, py] as const;
+}
+/** Its cone in her picture: where it starts, how far its circle's edge reaches in it. */
+function coneOf(k: NonNullable<ReturnType<typeof kaleidoscope>>) {
+  const [sx, sy] = /translate\((-?[\d.]+)px, (-?[\d.]+)px\)$/.exec(k.moves[0]!)!.slice(1, 3).map((v) => -Number(v)) as [number, number];
+  const scale = Number(/ scale\(([\d.]+)\)/.exec(k.moves[0]!)![1]);
+  return { sx, sy, reach: k.radius / scale, side: (k.radius / scale) * Math.sin(Math.PI / 8) };
+}
+
+test("« Ta devanture en kaléidoscope » (v2): its kaleidoscope by default, eight wedges of one cone of her picture, opening from her thing's middle to fill it, turning, closing", () => {
+  // Her real picture alone on its first images and at the end (the loop); no battants by default.
+  for (const f of [0, 1, 2, 255, 262, 269]) assert.equal(keyed(drawAt(f), "kaleidoscope"), null, `frame ${f}`);
+  assert.equal(keyed(drawAt(120), "battants"), null);
+  const full = kaleidoscope(drawAt(120))!;
+  assert.equal(full.wedges.length, 8);
+  // Over her whole picture: centred on it, its circle out to its corners, clipped to her picture.
+  assert.deepEqual(full.centre, [540, 960]);
+  assert.ok(Math.abs(full.radius - Math.hypot(540, 960) - 2) < 1, String(full.radius));
+  assert.equal(full.clip, "inset(0px 0px 0px 0px)");
+  // A small circle at first, growing fast then slower, back down when it closes.
+  const r = (f: number) => kaleidoscope(drawAt(f))!.radius;
+  assert.ok(r(4) < r(20) && r(20) < r(120) && r(252) < 300);
+  assert.ok(r(20) > 0.5 * r(120), "fast then slower");
+  // One in two mirrored; a point of her cone lands at the same distance from its middle in every wedge (mirrored
+  // neighbours meet on the same line of her picture: no seam).
+  full.moves.forEach((t, j) => assert.equal(/scaleX\(-1\)/.test(t), j % 2 === 1, t));
+  const c = coneOf(full);
+  const d = full.moves.map((t) => mapped(t, c.sx + 40, c.sy - 300)).map(([x, y]) => Math.hypot(x - 540, y - 960));
+  assert.ok(d.every((v) => Math.abs(v - d[0]!) < 0.5), JSON.stringify(d));
+  // Its cone never leaves her picture: as far as its circle reaches, it maps back inside it.
+  assert.ok(c.sy - c.reach >= 0 && c.sx - c.side >= 0 && c.sx + c.side <= 1080, JSON.stringify(c));
+  // It never comes back the same: it turns, its cone slides and comes closer.
+  assert.notEqual(kaleidoscope(drawAt(100))!.moves[0], kaleidoscope(drawAt(130))!.moves[0]);
+  assert.notEqual(kaleidoscope(drawAt(130))!.moves[0], kaleidoscope(drawAt(160))!.moves[0]);
+});
+
+test("« Ta devanture en kaléidoscope »: inside her door when it is found (clipped to its outline when whole), her picture real around it; its cone in her door", () => {
   const door = { x: 200, y: 300, w: 680, h: 1300 };
-  const s = strips(drawAt(120, { reads: { box: door } }));
-  assert.ok(s.length >= 3);
-  assert.ok(s.every((x) => x.left >= 200 && x.right <= 880 && x.top === 300 && x.height === 1300), JSON.stringify(s.map((x) => [x.left, x.right, x.top, x.height])));
-  // Its outline whole in the picture (a closed path): the mirrors clipped to it; cut by the picture's edge: its box.
+  const k = kaleidoscope(drawAt(120, { reads: { box: door } }))!;
+  assert.deepEqual(k.centre, [540, 950]);
+  assert.equal(k.clip, "inset(300px 200px 320px 200px)");
+  const c = coneOf(k);
+  assert.ok(c.sy - c.reach >= 300 && c.sx - c.side >= 200 && c.sx + c.side <= 880, JSON.stringify(c));
   const closed = "M 200 300 C 500 290 800 290 880 300 C 890 900 890 1500 880 1600 C 600 1610 300 1610 200 1600 C 190 900 190 600 200 300 Z";
-  assert.equal(styleOf(keyed(drawAt(120, { reads: { box: door, outline: closed } }), "battants")).clipPath, `path('${closed}')`);
-  assert.equal(styleOf(keyed(drawAt(120, { reads: { box: door, outline: "M 0 300 C 500 290 800 290 880 300 M 880 1600 C 600 1610 300 1610 0 1600" } }), "battants")).clipPath, undefined);
-  // Too small to carry it, or her whole picture already: the mirrors take her whole picture.
-  assert.ok(strips(drawAt(120, { reads: { box: { x: 500, y: 900, w: 120, h: 200 } } })).every((x) => x.top === 0 && x.height === 1920));
-  assert.ok(strips(drawAt(120, { reads: { box: { x: 0, y: 0, w: 1080, h: 1920 } } })).every((x) => x.top === 0 && x.height === 1920));
+  assert.equal(kaleidoscope(drawAt(120, { reads: { box: door, outline: closed } }))!.clip, `path('${closed}')`);
+  // A wide thing (a shop's front): its cone along it, pointing right, inside it.
+  const front = kaleidoscope(drawAt(120, { reads: { box: { x: 0, y: 500, w: 1080, h: 700 } } }))!;
+  assert.match(front.moves[0]!, /rotate\(-90deg\)/);
+  const f = coneOf(front);
+  assert.ok(f.sx + f.reach <= 1080 && f.sy - f.side >= 500 && f.sy + f.side <= 1200, JSON.stringify(f));
+  // Too small to carry it, or her whole picture already: the kaleidoscope takes her whole picture.
+  assert.equal(kaleidoscope(drawAt(120, { reads: { box: { x: 500, y: 900, w: 120, h: 200 } } }))!.clip, "inset(0px 0px 0px 0px)");
+  // Its battants keep their own place: in her door.
+  const s = strips(drawAt(120, { reads: { box: door }, settings: { figure: "battants" } }));
+  assert.ok(s.length >= 3 && s.every((x) => x.left >= 200 && x.right <= 880 && x.top === 300 && x.height === 1300));
+  assert.equal(styleOf(keyed(drawAt(120, { reads: { box: door, outline: closed }, settings: { figure: "battants" } }), "battants")).clipPath, `path('${closed}')`);
 });
 
-test("« Ta devanture en kaléidoscope »: its rosace, eight wedges one in two mirrored, opening from her thing's middle, turning, closing", () => {
-  const rose = (f: number, reads?: Reads) => keyed(drawAt(f, { settings: { figure: "rosace" }, ...(reads ? { reads } : {}) }), "rosace");
+test("« Ta devanture en kaléidoscope »: its rosace, the same kaleidoscope held in a round window in her thing's middle; the kaleidoscope draws back to it when her name comes in", () => {
+  const rose = (f: number, reads?: Reads) => kaleidoscope(drawAt(f, { settings: { figure: "rosace" }, ...(reads ? { reads } : {}) }), "rosace");
   assert.equal(rose(1), null);
-  assert.equal(keyed(drawAt(120, { settings: { figure: "rosace" } }), "battants"), null);
-  const radius = (d: Drawn | null) => Number(/circle\(([\d.]+)px at ([\d.]+)px ([\d.]+)px\)/.exec(String(styleOf(d).clipPath))![1]);
-  const centre = (d: Drawn | null) => /circle\([\d.]+px at ([\d.]+)px ([\d.]+)px\)/.exec(String(styleOf(d).clipPath))!.slice(1, 3).map(Number);
-  // A small circle at first, as wide as half the frame at full, back down when it closes.
-  assert.ok(radius(rose(5)) < radius(rose(20)) && radius(rose(20)) < radius(rose(120)));
-  assert.ok(Math.abs(radius(rose(120)) - 540) < 1);
-  assert.ok(radius(rose(250)) < 200);
-  assert.deepEqual(centre(rose(120)), [540, 960]);
-  const wedges = rose(120)!.children.flat() as Drawn[];
-  assert.equal(wedges.length, 8);
-  const turns = wedges.map((w) => String(styleOf(w.children[0] as Drawn).transform));
-  turns.forEach((t, j) => assert.equal(/scaleX\(-1\)/.test(t), j % 2 === 1, t));
-  // It turns: its wedges' angles change from one moment to the next.
-  assert.notEqual(String(styleOf((rose(150)!.children.flat() as Drawn[])[0]!.children[0] as Drawn).transform), turns[0]);
-  // On her door: centred on it, inscribed in it (the wall around it real).
+  assert.ok(rose(5)!.radius < rose(20)!.radius && rose(20)!.radius < rose(120)!.radius);
+  assert.ok(Math.abs(rose(120)!.radius - 540) < 1);
   const door = { x: 300, y: 500, w: 400, h: 600 };
-  const onDoor = rose(120, { box: door });
-  assert.deepEqual(centre(onDoor), [500, 800]);
-  assert.ok(Math.abs(radius(onDoor) - 200) < 0.1);
+  assert.deepEqual(rose(120, { box: door })!.centre, [500, 800]);
+  assert.ok(Math.abs(rose(120, { box: door })!.radius - 200) < 0.1);
+  // Her name in: the kaleidoscope's circle draws back to the rosace's in half a beat; without a name, it stays whole.
+  const from = Math.round(vitraux.timeline(1, { end: false }).texts.nom!.from * 30);
+  const at = (f: number, hook?: string) => kaleidoscope(drawAt(f, hook ? { hook } : {}))!.radius;
+  assert.ok(at(from - 1, "Maison Farine") > 1000 && Math.abs(at(from + 8, "Maison Farine") - 540) < 1);
+  assert.ok(at(from + 8) > 1000);
 });
 
-test("« Ta devanture en kaléidoscope »: its frame as her file's, a horizontal one cropped on her door when it fits, else in a band on black", () => {
+test("« Ta devanture en kaléidoscope »: vertical full frame by default (v2), a horizontal file cropped on her door (else on its middle); a band on black only on her word", () => {
   const real = (tree: Drawn) => styleOf(keyed(tree, "real"));
-  assert.deepEqual(real(drawAt(60)), { left: 0, top: 0, width: 1080, height: 1920 });
-  // Horizontal, her door found (500 px wide in her 3413 px picture): cropped on it, its middle in the frame's.
+  const frame = { left: 0, top: 0, width: 1080, height: 1920 };
+  assert.deepEqual(real(drawAt(60)), frame);
   const wide = real(drawAt(60, { aspect: 16 / 9, reads: { box: { x: 2000, y: 300, w: 500, h: 1300 } } }));
   assert.equal(wide.width, 3413);
   assert.equal(Number(wide.left) + 2250, 540);
-  // Too wide for the vertical frame, or nothing found: her whole video in a 16:9 band on black, the mirrors in it.
+  // Even too wide for the frame (v1 laid it whole in a band): cropped on its middle.
+  const across = real(drawAt(60, { aspect: 16 / 9, reads: { box: { x: 400, y: 300, w: 2400, h: 1300 } } }));
+  assert.equal(Number(across.left) + 1600, 540);
+  assert.deepEqual(real(drawAt(60, { aspect: 16 / 9 })), frame);
   const band = { left: 0, top: 656, width: 1080, height: 608 };
-  assert.deepEqual(real(drawAt(60, { aspect: 16 / 9, reads: { box: { x: 400, y: 300, w: 2400, h: 1300 } } })), band);
-  assert.deepEqual(real(drawAt(60, { aspect: 16 / 9 })), band);
-  assert.ok(strips(drawAt(60, { aspect: 16 / 9 })).every((s) => s.top === 656 && s.height === 608));
-  // As her words ask.
-  assert.deepEqual(real(drawAt(60, { aspect: 16 / 9, settings: { format: "vertical" } })), { left: 0, top: 0, width: 1080, height: 1920 });
+  assert.deepEqual(real(drawAt(60, { aspect: 16 / 9, settings: { format: "horizontal" } })), band);
   assert.deepEqual(real(drawAt(60, { settings: { format: "horizontal" } })), band);
+  assert.equal(kaleidoscope(drawAt(60, { settings: { format: "horizontal" } }))!.clip, "inset(656px 0px 656px 0px)");
 });
 
 test("« Ta devanture en kaléidoscope »: her name in capitals over the mirrors closing, her line under it, in the safe zone; her ending card after", () => {
@@ -257,13 +321,17 @@ test("« Ta devanture en kaléidoscope »: her name in capitals over the mirrors
   assert.ok(Number((small.props.innerStyle as Record<string, number>).fontSize) >= 48);
   // It comes in softly (a few images), then holds.
   assert.ok(Number(styleOf(words(from)[0]!).opacity) < 0.2 && Number(styleOf(words(from + 12)[0]!).opacity) === 1);
-  // Over her picture left real above her door when there is room, its line just over the door; else in the calm part of
-  // her picture when there is one; white on a dark one, an ink on a bright one.
-  const over = words(from + 30, { reads: { box: { x: 200, y: 620, w: 680, h: 1000 } } });
-  const sign = styleOf(over[1]!);
-  assert.ok(Number(sign.top) + Number(sign.height) <= 620 - 10 && Number(sign.top) + Number(sign.height) >= 620 - 40 && Number(styleOf(over[0]!).top) >= 110, JSON.stringify([styleOf(over[0]!), sign]));
+  // Over her picture left real above the rosace her kaleidoscope draws back to (its line just over it: on her whole
+  // picture, 420 px down), or above her door for its battants; else in the calm part of her picture when there is one;
+  // white on a dark one, an ink on a bright one.
+  const lineEnd = (ws: Drawn[]) => Number(styleOf(ws[1]!).top) + Number(styleOf(ws[1]!).height);
+  const whole = words(from + 30);
+  assert.ok(lineEnd(whole) <= 420 - 10 && lineEnd(whole) >= 420 - 40 && Number(styleOf(whole[0]!).top) >= 110, JSON.stringify(whole.map(styleOf)));
+  const B = { settings: { figure: "battants" } };
+  const over = words(from + 30, { reads: { box: { x: 200, y: 620, w: 680, h: 1000 } }, ...B });
+  assert.ok(lineEnd(over) <= 620 - 10 && lineEnd(over) >= 620 - 40 && Number(styleOf(over[0]!).top) >= 110, JSON.stringify(over.map(styleOf)));
   const clear = { x: 200, y: 900, w: 680, h: 180 };
-  assert.equal(styleOf(words(from + 30, { reads: { clear } })[0]!).top, 900);
+  assert.equal(styleOf(words(from + 30, { reads: { clear }, ...B })[0]!).top, 900);
   assert.equal((words(from + 30)[0]!.props.innerStyle as Record<string, string>).color, "#ffffff");
   assert.equal((words(from + 30, { reads: { light: 0.8 } })[0]!.props.innerStyle as Record<string, string>).color, "#1c1a17");
   // Her ending card in their place, after her loop.
