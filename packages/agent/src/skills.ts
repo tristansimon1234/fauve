@@ -4,7 +4,7 @@ import { planLook, type ReelLook } from "./looks.ts";
 import { REEL_FPS } from "./motion.ts";
 import { readMusicShape, type MusicShape } from "./music-shape.ts";
 import { SUBTITLE_ROW, subtitleRowAmong } from "./retouch.ts";
-import type { ClipSegment, ClipSpeech, EditPlan, HandMomentKind, MotionDrawn, PlanSegment, SfxCue } from "./schemas.ts";
+import { MAX_SPEED, type ClipSegment, type ClipSpeech, type EditPlan, type HandMomentKind, type MotionDrawn, type PlanSegment, type SfxCue } from "./schemas.ts";
 import { BURST_MAX, soundSeconds } from "./sfx.ts";
 import { laterAudio } from "./sound-follow.ts";
 import { speechCuts } from "./speech.ts";
@@ -65,9 +65,11 @@ export type SkillText = {
  * plays at its own pace, a video of the main line: a shot beside another is seen, never heard; drawn once at a time by
  * its code, else heard twice); her other shots stay silent under the music. A skill timed on her voice may say which
  * of her takes plays a shot (`take`: 0 her main video, 1 her other angle synced on its sound, as SkillSaid.shots gives
- * them by default) and whether it is framed tighter (`punch`).
+ * them by default) and whether it is framed tighter (`punch`). `speed`: its passage played faster than filmed (« Le grand
+ * départ »: the crowd of its arrival rushing, as the original's), 2 at most (MAX_SPEED): it takes that much more of her
+ * video, as much as her video gives (a video too short for it plays slower, never under its own pace; a photo stays still).
  */
-export type SkillShot = { start: number; end: number; want: string; beside?: boolean; sound?: boolean; take?: number; punch?: boolean };
+export type SkillShot = { start: number; end: number; want: string; beside?: boolean; sound?: boolean; take?: number; punch?: boolean; speed?: number };
 
 /** One of her words on the Reel's clock (s), her hesitations out: what a skill timed on her voice reads of what she says. */
 export type SkillWord = { w: string; start: number; end: number };
@@ -918,6 +920,13 @@ function castSegments(files: SkillFile[], fill: SkillFill, line: SkillTimeline):
     if (file.seconds < length + 0.05) {
       const speed = Math.max(0.5, Math.min(1, file.seconds / length));
       return { clip_id: file.id, in: 0, out: round(Math.min(file.seconds, length * speed)), zoom: "none", speed: round(speed), ...beside, ...heard };
+    }
+    // Played faster than filmed when its model says so (SkillShot.speed): that much more of her video, as much as it gives.
+    const fast = Math.floor(Math.min(MAX_SPEED, span.speed ?? 1, file.seconds / length) * 100) / 100;
+    if (fast > 1 && !span.beside) {
+      const source = round(length * fast);
+      const from = passage(file, source, pick.at, taken);
+      return { clip_id: file.id, in: from, out: round(from + source), zoom: "none", speed: fast, ...heard };
     }
     const at = passage(file, length, pick.at, taken);
     return { clip_id: file.id, in: at, out: round(at + length), zoom: "none", ...beside, ...heard };
