@@ -1,5 +1,6 @@
 import "server-only";
 import {
+  asksCreation,
   CHAT_MODEL,
   HOUSE_PICK_AVOID,
   OWN_LOOK_WORDS,
@@ -9,6 +10,7 @@ import {
   housePickSchema,
   readHousePick,
   houseModel,
+  ownRequestWords,
   type HousePickFile,
   type HousePickTaste,
 } from "@fauve/agent";
@@ -36,6 +38,17 @@ export async function ensureEdithModel(input: { studioId: string; postId: string
     .eq("studio_id", input.studioId)
     .maybeSingle();
   if (!post || (post.kind !== "reel" && post.kind !== "post")) return null;
+  // She asks Edith to be creative (« sois créatif », « surprends-moi », « libre »): created freely with every tool, never
+  // in a model (Tristan's « sois creatif ! sur le marais a paris » was made on « Mots aux quatre coins »); a model Edith
+  // had picked for an earlier launch of this Reel is let go.
+  if (asksCreation(ownRequestWords(input.brief))) {
+    if (post.inspiration_id && post.inspiration_id === post.edith_pick) {
+      const { error } = await db.from("posts").update({ inspiration_id: null, edith_pick: null }).eq("id", input.postId).eq("studio_id", input.studioId);
+      if (error) console.warn("house pick: Edith's earlier pick not let go", input.postId, error.message);
+    }
+    console.log("house pick: she asks for creation, no model", input.postId);
+    return null;
+  }
   // Already picked (a design that went on after recording a voice): kept.
   if (post.inspiration_id && post.inspiration_id === post.edith_pick) return "kept";
   // Hers: a Reel to copy, a model she chose, a form she asked for (the collage).

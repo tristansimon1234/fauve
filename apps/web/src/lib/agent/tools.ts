@@ -59,6 +59,9 @@ import { soundPageLink,
   MAX_MONTAGE_FILES,
   type ExchangeRow,
   withEndCard,
+  withScrim,
+  drawsItsTexts,
+  readsBetter,
   addOverlay,
   insertSegment,
   insertableFrom,
@@ -76,6 +79,7 @@ import { createLoginLink } from "@/lib/auth/login-link";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { acceptQuote, createMontageQuote, stopMontages } from "@/lib/credits";
 import { correctionQuote, startMontage } from "@/lib/montage-start";
+import { runningJobs } from "@/lib/studio-jobs";
 import { bakedReel, insertPlanVersion } from "@/lib/edit-plans";
 import { effectRoute } from "@/lib/agent/effects-agent";
 import { fewSubjects } from "@/lib/agent/copy-design";
@@ -259,6 +263,18 @@ const COSTLY_TOOLS = [
 /** Reels she likes read before she subscribes: what she shows during her getting started (Tristan: « logos / images / reels ? »). */
 const EARLY_STEALS = 2;
 
+/**
+ * A change asked while a montage runs on the same Reel (Tristan, 6 November: an end card and a veil asked a minute apart
+ * ran side by side, and two identical « prêt » came a second apart): it joins the montage, in one correction with all
+ * of her request, which replaces the one running; never a second run beside it.
+ */
+const MONTAGE_RUNNING =
+  "Un montage tourne déjà sur ce Reel : rien ne part à côté. Relance montage (correction: true) avec toute sa demande dans brief, ce changement compris : il remplace celui en cours (arrêté sans débit) et une seule version lui arrive. Dis-le en une phrase.";
+
+/** A Reel whose model draws its texts: a style set on them would take the model's lettering away. */
+const MODEL_LETTERING =
+  "Ce Reel est fait sur un modèle qui dessine lui-même ses textes : un style posé ici remplacerait sa typo par une autre. Pour mieux les lire (un fond, un voile, une ombre) : add_to_reel avec voile true, gratuit, sa typo et ses tailles gardées. Pour changer sa police, sa couleur ou sa taille : montage (correction: true) avec sa demande dans brief.";
+
 export function createToolHandlers(ctx: ToolContext): ToolHandlers {
   const db = supabaseAdmin();
   /** A Reel she likes, sent before she subscribes: read for her first Reel, like her first videos (two at most). */
@@ -273,6 +289,8 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
   const turnStartedAt = new Date();
   /** Posts whose render already waits for the end of this turn. */
   const rendering = new Set<string>();
+  /** A montage runs on this Reel: a change asked now goes into one correction with the rest of her request, never beside it. */
+  const montageRunning = async (postId: string) => (await runningJobs(studioId, { postId, kind: "montage" }).catch(() => [])).length > 0;
   /** A montage launched in this turn keeps the exchange that led to it, word for word, for every agent. */
   const chatRequest = (postId: string) => ({ via: "chat" as const, lines: exchangeLines(ctx.exchange ?? [], postId) });
 
@@ -834,10 +852,12 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
       });
     },
 
-    async add_to_reel({ post_id, ecran_de_fin, elements, scene }) {
-      if (!ecran_de_fin && !elements?.length && !scene) return json({ error: "Dis ce qu'il faut ajouter : ecran_de_fin, elements ou scene." });
+    async add_to_reel({ post_id, ecran_de_fin, elements, scene, voile }) {
+      if (!ecran_de_fin && !elements?.length && !scene && !voile) return json({ error: "Dis ce qu'il faut ajouter : ecran_de_fin, elements, scene ou voile." });
       const post = unwrap(await db.from("posts").select("id, title, edit_plan_id").eq("id", post_id).eq("studio_id", studioId).single());
       if (!post.edit_plan_id) return json({ error: "Ce Reel n'est pas encore monté : lance d'abord montage." });
+      // One change at a time on a Reel: a montage running on it takes this addition with the rest of her request.
+      if (await montageRunning(post_id)) return json({ en_cours: true, note: MONTAGE_RUNNING });
       if (await bakedReel(studioId, post_id)) return json({ error: "Ce Reel a un effet dessiné image par image : un ajout passe par une correction de l'effet (montage, correction)." });
       const current = editPlanSchema.safeParse((await db.from("edit_plans").select("plan").eq("id", post.edit_plan_id).single()).data?.plan);
       if (!current.success) return json({ error: "Je n'arrive pas à relire ce montage : passe par montage (correction)." });
@@ -888,6 +908,14 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
         const card = fitEndCard(ecran_de_fin.titre, ecran_de_fin.sous_titre);
         plan = withEndCard(plan, { title: card.title, ...(card.subtitle ? { subtitle: card.subtitle } : {}) });
         done.push("un écran de fin");
+      }
+      // A veil under its words, on a Reel whose composition draws them (a model's): its lettering kept, never a box.
+      if (voile) {
+        if (!plan.layers?.some((l) => l.compose)) {
+          return json({ error: "Ce Reel n'est pas fait sur un modèle : pour mieux lire ses textes, style_texts (une ombre forte : shadow strong, ou un contour), sans changer leur police." });
+        }
+        plan = withScrim(plan);
+        done.push("un voile sous les textes");
       }
       const checked = editPlanSchema.safeParse(plan);
       if (!checked.success) return json({ error: "Cet ajout ne tient pas dans le Reel (durée, place) : passe par montage (correction)." });
@@ -1693,6 +1721,29 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
       const { data: post } = await db.from("posts").select("slides").eq("id", post_id).eq("studio_id", studioId).maybeSingle();
       const slidesTemplate = slidesPlanSchema.safeParse(post?.slides);
       if (slidesTemplate.data?.design) return json({ error: DESIGNED });
+      if (!slidesTemplate.success) {
+        // One change at a time on a Reel: a montage running on it takes this one with the rest of her request.
+        if (await montageRunning(post_id)) return json({ en_cours: true, note: MONTAGE_RUNNING });
+        // A Reel whose model draws its texts keeps its lettering (Tristan, 6 November: « voile sombre » became a black
+        // rounded box behind each text, in Inter Tight 46 px instead of the model's): a ground, an outline or a shadow asked
+        // is a veil on her pictures under its words; another style is a correction, the model drawing it.
+        const { data: reel } = await db.from("posts").select("edit_plan_id").eq("id", post_id).eq("studio_id", studioId).maybeSingle();
+        const current = reel?.edit_plan_id ? editPlanSchema.safeParse((await db.from("edit_plans").select("plan").eq("id", reel.edit_plan_id as string).maybeSingle()).data?.plan) : null;
+        if (current?.success && drawsItsTexts(current.data) && current.data.layers?.some((l) => l.compose)) {
+          if (reset || named || !look || !readsBetter(look)) return json({ error: MODEL_LETTERING });
+          const row = await insertPlanVersion(studioId, post_id, withScrim(current.data));
+          check(await db.from("posts").update({ edit_plan_id: row.id }).eq("id", post_id).eq("studio_id", studioId));
+          if (!rendering.has(post_id)) {
+            rendering.add(post_id);
+            ctx.afterReply.push(() => queueRerender({ studioId, postId: post_id, waId: ctx.waId, replyTo: ctx.replyToMessageId, conversationId: ctx.conversationId }));
+          }
+          return json({
+            status: "started",
+            voile: true,
+            note: "Un voile doux assombrit ses images sous les mots, la typo et les tailles du modèle gardées (gratuit, la vidéo se refait et arrive toute seule). Dis-le en une phrase.",
+          });
+        }
+      }
       const starts = new Map<string, TextLook>();
       const startFor = async (role: "hook" | "band" | "caption") => {
         if (!starts.has(role)) starts.set(role, await lookDefaults(studioId, slidesTemplate.success ? slidesTemplate.data.template : undefined, role));

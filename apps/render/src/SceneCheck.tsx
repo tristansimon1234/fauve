@@ -1,6 +1,6 @@
 import { Component, createContext, useContext, useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import { AbsoluteFill, cancelRender, continueRender, delayRender } from "remotion";
-import { cellsUnder, decodeGrid, lostOn, luminance, outlined, parseColor, type Rgb, type SceneBackdrop } from "./contrast";
+import { cellsUnder, decodeGrid, inkZones, lostOn, luminance, outlined, parseColor, type InkSeen, type Rgb, type SceneBackdrop } from "./contrast";
 import { fitsPending } from "./Fit";
 import { fontsLoaded, loadFonts } from "./fonts";
 import { makeKit } from "./Kit";
@@ -99,6 +99,8 @@ export type SceneCheckProps = {
   probeSpoken?: boolean;
   /** A montage skill's composition: the pale grounds it paints are measured (FAUVE_GROUND), for a voice's subtitles laid over it. */
   probeGround?: boolean;
+  /** A montage skill's composition: its words right over her shots are measured (FAUVE_WORDS), for the render to darken her picture under them. */
+  probeInk?: boolean;
 };
 
 const FrameContext = createContext(0);
@@ -439,6 +441,50 @@ function cellsAt(
   return { cells: footage ? cellsUnder(gridOf(footage.grid), box, [0, 0, 1080, 1920]) : null, unknown: false };
 }
 
+/**
+ * The words of a copy drawn right over one of her shots (a composition's Footage, the first thing under their middle):
+ * where a model's words may need her picture darkened under them (FAUVE_WORDS, veilFor at the render). Never a word on
+ * a ground the scene paints itself (a band, a shadow, a gradient, a picture of its own), with its own edge (an outline,
+ * dense tight shadows), faded, or decor letters: those read already.
+ */
+function wordsOver(copy: HTMLElement, frame: number): InkSeen[] {
+  const origin = copy.getBoundingClientRect();
+  const range = document.createRange();
+  const walker = document.createTreeWalker(copy, NodeFilter.SHOW_TEXT);
+  const seen: InkSeen[] = [];
+  for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+    const text = node.textContent?.replace(/\s+/g, " ").trim();
+    const el = node.parentElement;
+    if (!text || !el || (text.match(/\p{L}/gu)?.length ?? 0) < 2 || inDecor(node)) continue;
+    if (seenOpacity(el, copy) < 0.5) continue;
+    const style = getComputedStyle(el);
+    const fill = parseColor(style.webkitTextFillColor || style.color);
+    if (!fill || fill.alpha < 0.3) continue;
+    if (outlined(fill.rgb, style.textShadow, parseFloat(style.webkitTextStrokeWidth) || 0, style.webkitTextStrokeColor)) continue;
+    range.selectNodeContents(node);
+    const rects = Array.from(range.getClientRects()).filter((r) => r.width >= 1 && r.height >= 1);
+    if (!rects.length) continue;
+    const box: [number, number, number, number] = [
+      Math.min(...rects.map((r) => r.left)) - origin.left,
+      Math.min(...rects.map((r) => r.top)) - origin.top,
+      Math.max(...rects.map((r) => r.right)) - origin.left,
+      Math.max(...rects.map((r) => r.bottom)) - origin.top,
+    ];
+    const under = document.elementsFromPoint(origin.left + (box[0] + box[2]) / 2, origin.top + (box[1] + box[3]) / 2).filter((e) => e !== copy && copy.contains(e));
+    for (const e of under) {
+      if (e === el || e.contains(node) || seenOpacity(e, copy) < 0.5) continue;
+      const shot = e.getAttribute("data-fauve-shot");
+      if (shot !== null) seen.push({ text, shot: Number(shot), frame, box, ink: luminance(fill.rgb) });
+      // The first thing under it decides: her shot, or a ground of the scene's own (it reads there already).
+      if (shot !== null || PICTURES.has(e.tagName.toLowerCase())) break;
+      const painted = getComputedStyle(e);
+      const flat = parseColor(painted.backgroundColor);
+      if ((flat && flat.alpha >= 0.3) || painted.backgroundImage !== "none") break;
+    }
+  }
+  return seen;
+}
+
 /** The vector shapes a scene draws with a stroke: a circle around a word, an underline, a frame, an arrow. */
 const MARKS = "path, ellipse, circle, line, polyline, polygon, rect";
 
@@ -718,7 +764,7 @@ function missingTexts(reelTexts: NonNullable<SceneCheckProps["reelTexts"]>, fram
   });
 }
 
-export function SceneCheck({ js, texts, durationInFrames, brand, photos = [], cuts = [], shots = [], track: pieces, look, fonts = [], reelTexts = [], end = null, backdrop, probeSpoken = false, probeGround = false }: SceneCheckProps) {
+export function SceneCheck({ js, texts, durationInFrames, brand, photos = [], cuts = [], shots = [], track: pieces, look, fonts = [], reelTexts = [], end = null, backdrop, probeSpoken = false, probeGround = false, probeInk = false }: SceneCheckProps) {
   const width = 1080;
   const height = 1920;
   const [track] = useState(() => footageTrack(pieces, themeFor(look?.template ?? "libre", look?.signature, look?.tempo), { width, height }, { shots }));
@@ -848,6 +894,20 @@ export function SceneCheck({ js, texts, durationInFrames, brand, photos = [], cu
           for (const other of sampled) other.style.visibility = "";
           hitAll.remove();
           console.log(`FAUVE_GROUND ${JSON.stringify({ frames: sampled.map((copy) => Number(copy.dataset.checkFrame)), pale })}`);
+        }
+        // A model's composition (probeInk): its words right over her shots, where and when, and how light their letters are:
+        // the render darkens her picture under those that do not hold on it (veilFor). One copy shown at a time.
+        if (probeInk) {
+          const hitAll = document.createElement("style");
+          hitAll.textContent = "[data-check-frame], [data-check-frame] * { pointer-events: auto !important; }";
+          document.head.appendChild(hitAll);
+          const words = sampled.flatMap((copy) => {
+            for (const other of sampled) other.style.visibility = other === copy ? "" : "hidden";
+            return wordsOver(copy, Number(copy.dataset.checkFrame));
+          });
+          for (const other of sampled) other.style.visibility = "";
+          hitAll.remove();
+          console.log(`FAUVE_WORDS ${JSON.stringify(inkZones(words, step))}`);
         }
         return continueRender(handle);
       }

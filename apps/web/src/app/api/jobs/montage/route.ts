@@ -4,6 +4,7 @@ import { z } from "zod";
 import {
   BRIEF_MAX,
   alternativeBrief,
+  asksCreation,
   blockingIssues,
   EFFECT_MAX_CREDITS,
   EFFECTS_TIMEOUT_MINUTES,
@@ -20,6 +21,7 @@ import {
   montageIssueSchema,
   MAX_MONTAGE_FILES,
   motionTemplateSchema,
+  ownRequestWords,
   reelContractSchema,
   reelFormatSchema,
   usdToEur,
@@ -406,7 +408,11 @@ function designInput(job: Job) {
  */
 async function edithModelFirst(job: Job): Promise<void> {
   if (job.correction) return;
-  if (!job.free)
+  // « Sois créatif », « surprends-moi », « libre »: created freely, as the lab's creative test (free=1), never in a model
+  // (ensureEdithModel lets go of a model Edith picked for an earlier launch of this Reel).
+  const creative = asksCreation(ownRequestWords(job.brief));
+  if (creative) job.free = true;
+  if (!job.free || creative)
     await ensureEdithModel({ studioId: job.studioId, postId: job.postId, mediaIds: job.mediaIds, brief: job.brief }).catch((error: unknown) =>
     console.warn("house pick failed, the Reel is made freely", job.postId, error),
   );

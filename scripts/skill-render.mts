@@ -95,7 +95,8 @@ import { HDR_MARKS, HDR_TAGS, HDR_TO_SDR, PREPARED_CODEC, preparedFilter } from 
 import { MONTAGE_SKILLS } from "../packages/agent/src/skill-library.ts";
 import { EFFECT_PIECES } from "../packages/agent/src/piece-library.ts";
 import { pieceTestPlan, type EffectPiece } from "../packages/agent/src/pieces.ts";
-import { isClipSegment } from "../packages/agent/src/schemas.ts";
+import { isClipSegment, readInkZones } from "../packages/agent/src/schemas.ts";
+import { SCRIM, withScrim } from "../packages/agent/src/plan-edit.ts";
 import { followedFrom, signatureOf } from "../packages/agent/src/steal.ts";
 import { clearPassages, layerObjects, objectKey, objectPassages, readPassages, shotReadingSchema, subjectKey, subjectShots, type ClearMap, type ShotReading } from "../packages/agent/src/subject.ts";
 import { tracksFileSchema, type TracksByClip } from "../packages/agent/src/tracking.ts";
@@ -147,6 +148,10 @@ const { values } = parseArgs({
     "no-render": { type: "boolean", default: false },
     dressed: { type: "boolean", default: false },
     "no-finish": { type: "boolean", default: false },
+    // Without the darkening under its words that do not hold on her picture (FAUVE_WORDS, veilFor): to compare.
+    "no-veil": { type: "boolean", default: false },
+    // A veil she asked for (« voile »: plan.layers[].scrim), as a correction lays it.
+    veil: { type: "string" },
     talk: { type: "string" },
     said: { type: "string" },
     takes: { type: "string" },
@@ -438,7 +443,10 @@ if (clears.length) {
 }
 // What else its code reads on her shots (its light, its vanishing point, its skyline): read on her own files as the
 // engine reads them, never a ground (a sky matte video).
-const reads = readPassages(plan, (id) => !files.find((f) => f.id === id)?.photo).map((p) => ({ ...p, kinds: p.kinds.map((k) => (k === "ground" ? ("sky" as const) : k)) }));
+const readShots = (only?: (key: string) => boolean) => {
+const reads = readPassages(plan, (id) => !files.find((f) => f.id === id)?.photo)
+  .map((p) => ({ ...p, kinds: p.kinds.map((k) => (k === "ground" ? ("sky" as const) : k)) }))
+  .filter((p) => !only || only(p.key));
 if (reads.length) {
   const jobs = reads.map((p) => ({ id: p.key, src: files.find((f) => f.id === p.clip_id)!.path, from: p.from, to: p.first ? p.from : p.to, read: [...new Set(p.kinds)], ...(p.photo ? { photo: true } : {}) }));
   writeFileSync(`${media}/read-jobs.json`, JSON.stringify(jobs));
@@ -455,6 +463,8 @@ if (reads.length) {
     console.log("shots not read (PYTHON: a Python with OpenCV and numpy):", error instanceof Error ? error.message.split("\n")[0] : error);
   }
 }
+};
+readShots();
 // Her tracks by clip (track.py's files), as the render gets them.
 const tracks: TracksByClip = Object.fromEntries(
   Object.entries(json<Record<string, string>>(values.tracks) ?? {}).flatMap(([k, path]) => {
@@ -548,7 +558,9 @@ function voiceHere(h: Heard): { src: string; words: Timed[] } {
   plan.voice = { media_id: "hers", at: 0 };
   return { src: `/public/jobs/${job}/${basename(track)}`, words: ownTrackTranscript(h.talk, lead).words };
 }
-const props = buildReelProps(plan, {
+// A veil she asked for (« voile »), as a correction lays it on the composition.
+if (values.veil && !piece) Object.assign(plan, withScrim(plan, Number(values.veil) || SCRIM));
+const propsOf = () => buildReelProps(plan, {
   template: "libre",
   clipUrls: Object.fromEntries(files.map((f) => [f.id, f.src])),
   photoIds: files.filter((f) => f.photo).map((f) => f.id),
@@ -576,6 +588,7 @@ const props = buildReelProps(plan, {
       })()
     : {}),
 });
+let props = propsOf();
 const out = resolve(values.out ?? `${ROOT}/${key}.mp4`);
 writeFileSync(`${out}.plan.json`, JSON.stringify(plan, null, 1));
 writeFileSync(`${out}.props.json`, JSON.stringify(props));
@@ -606,6 +619,8 @@ writeFileSync(
       ...(readsSpoken(layer.js) ? { probeSpoken: true } : {}),
       // A voice laid over it: the pale grounds its composition paints, where its subtitles are written dark.
       ...(laidVoice ? { probeGround: true } : {}),
+      // A model's composition over her shots: its words right over them, where her picture is darkened (as designSkill).
+      ...(!piece && layer.shots?.length ? { probeInk: true } : {}),
     },
   ]),
 );
@@ -632,6 +647,27 @@ const refused = (() => {
 if (refused) {
   console.log("SCENE CHECK REFUSED: read its notes above");
   process.exitCode = 2;
+}
+// Its words right over her shots, as the check saw them (as designSkill keeps them on the composition): the light of the
+// shots under them read, and her picture darkened under those that do not hold on it (veilFor), unless --no-veil.
+if (!piece && !values["no-veil"]) {
+  const words = (() => {
+    try {
+      return readInkZones((JSON.parse(verdict) as { words?: Record<string, unknown> }).words ?? {}).skill ?? [];
+    } catch {
+      return [];
+    }
+  })();
+  const composed = plan.layers?.find((l) => l.compose);
+  if (composed && words.length) {
+    composed.ink = words;
+    const known = new Set(Object.entries(subjects).flatMap(([k, s]) => ((s as { reading?: { light?: unknown } }).reading?.light ? [k] : [])));
+    readShots((k) => !known.has(k));
+    props = propsOf();
+    writeFileSync(`${out}.plan.json`, JSON.stringify(plan, null, 1));
+    writeFileSync(`${out}.props.json`, JSON.stringify(props));
+    console.log(`its words over her shots: ${words.map((w) => `shot ${w.shot} ${(w.from / 30).toFixed(2)}–${(w.to / 30).toFixed(2)} s at x ${w.box[0]}–${w.box[2]}, y ${w.box[1]}–${w.box[3]} (letters ${w.ink})`).join("; ")}`);
+  } else console.log("its words over her shots: none measured");
 }
 // A voice laid over it: its subtitles on the skill's row, else off what its composition writes and draws of its own on
 // this Reel (the check's `own`, her pictures left out), as designSkill sets them.

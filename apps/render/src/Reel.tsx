@@ -255,6 +255,8 @@ export function Reel(props: ReelProps) {
             depth: (shot, size) => drawShot(props.segments[shot.segment], theme, size, shot.face, "depth"),
             ground: (shot, size) => drawShot(props.segments[shot.segment], theme, size, shot.face, "ground"),
             near: (shot, size) => drawShot(props.segments[shot.segment], theme, size, shot.face, "near"),
+            ...(compose.scrim ? { scrim: compose.scrim } : {}),
+            ...(compose.ink?.length ? { ink: compose.ink } : {}),
           }}
           reelTexts={compose.reelTexts}
           end={compose.end}

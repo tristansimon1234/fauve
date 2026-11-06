@@ -131,20 +131,6 @@ export async function settleReelSound(
   return { plays: "model" };
 }
 
-/** What the delivery tells her of a Reel without music for the model's sound: how to add it, and the Business caveat. */
-export function modelSoundLine(sound: { link: string; business: boolean | null; followed?: boolean; page?: string }): string {
-  return [
-    sound.page
-      ? `Elle est sans musique, coupée sur les temps de ce son : dans Instagram, ouvre-le (${sound.page}), « Utiliser l'audio », puis choisis cette vidéo (télécharge-la depuis sa page).`
-      : sound.followed
-      ? `Elle est sans musique, coupée sur les temps du son que tu m'as donné : dans Instagram, ouvre ce Reel (${sound.link}), touche le nom du son en bas, « Utiliser l'audio », puis choisis cette vidéo (télécharge-la depuis sa page). Laisse le son partir du début : c'est là que tombent les coupes.`
-      : `Elle est sans musique, sur les coupes du Reel que tu m'as envoyé, pour que tu mettes son son : dans Instagram, ouvre ce Reel (${sound.link}), touche le nom du son en bas, « Utiliser l'audio », puis choisis cette vidéo (télécharge-la depuis sa page).`,
-    sound.business
-      ? "Ton compte est un compte Entreprise : Instagram n'y propose pas tous les sons. Si « Utiliser l'audio » n'apparaît pas, dis-moi « mets ta musique »."
-      : "Si « Utiliser l'audio » n'apparaît pas (certains sons ne sont pas proposés aux comptes Entreprise), dis-moi « mets ta musique ».",
-  ].join(" ");
-}
-
 /**
  * The sound she adds in Instagram, heard on the Reel's page (Tristan: « TB une zone grise »): the video of the Reel it
  * comes from, played from Instagram's CDN under her silent Reel (Instagram serves it to any page:

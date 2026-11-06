@@ -157,6 +157,8 @@ const own = {};
 const ground = {};
 // For a scene whose code reads what is said (probeSpoken): the share of the words said it writes at their moment.
 const spoken = {};
+// A model's words right over her shots, each with its shot, moment, box and how light its letters are (probeInk).
+const words = {};
 for (const scene of scenes) {
   try {
     const factory = new Function(
@@ -227,6 +229,7 @@ if (browser) {
         ...(scene.backdrop ? { backdrop: scene.backdrop } : {}),
         ...(scene.probeSpoken ? { probeSpoken: true } : {}),
         ...(scene.probeGround ? { probeGround: true } : {}),
+        ...(scene.probeInk ? { probeInk: true } : {}),
       };
       try {
         const composition = await selectComposition({ serveUrl: bundle, id: "SceneCheck", inputProps, puppeteerInstance: browser, browserExecutable, logLevel: "error" });
@@ -251,6 +254,9 @@ if (browser) {
             if (marks) own[scene.id] = JSON.parse(marks);
             const grounds = /^FAUVE_GROUND (\{.*\})$/.exec(log.text)?.[1];
             if (grounds) ground[scene.id] = JSON.parse(grounds);
+            // A model's words right over her shots (probeInk): where the render may darken her picture under them.
+            const inked = /^FAUVE_WORDS (\[.*\])$/.exec(log.text)?.[1];
+            if (inked) words[scene.id] = JSON.parse(inked);
             // Its code reads what is said: the share of the words said it writes at their moment.
             const written = /^FAUVE_SPOKEN ([0-9.]+)$/.exec(log.text)?.[1];
             if (written) spoken[scene.id] = Number(written);
@@ -268,4 +274,4 @@ if (browser) {
     await browser.close({ silent: true });
   }
 }
-console.log(JSON.stringify({ results, faces, cover, own, ground, spoken }));
+console.log(JSON.stringify({ results, faces, cover, own, ground, spoken, words }));

@@ -65,3 +65,14 @@ export function laterAudio(audio: Pick<EditPlan, "sounds" | "music_shape">, lead
     ...(audio.music_shape ? { music_shape: shiftMusicShape(audio.music_shape, lead) } : {}),
   };
 }
+
+/**
+ * What the delivery says of a Reel left silent for her to add its sound in Instagram (the sound she gave, or the one of
+ * the Reel she copies): one short sentence, the button under it opening its page, where « Utiliser l'audio » is shown
+ * step by step with the link to its Reel (Tristan, 6 November: the delivery carried the whole how-to, against « un user
+ * aura la flemme de tout lire »). On a Business account, Instagram may not offer it: « mets ta musique » in the same sentence.
+ */
+export function addedSoundLine(sound: { business: boolean | null; followed?: boolean }): string {
+  const what = sound.followed ? "le son que tu m'as donné" : "le son du Reel que tu recopies";
+  return `Sans musique : ajoute ${what} en la publiant, sa page montre comment${sound.business ? " (sinon, dis-moi « mets ta musique »)" : ""}.`;
+}

@@ -12,6 +12,7 @@ import {
   useCurrentFrame,
   useVideoConfig,
 } from "remotion";
+import { veilFor, type InkZone } from "./contrast";
 import { Fit } from "./Fit";
 import { makeKit } from "./Kit";
 import { makeType } from "./Type";
@@ -76,7 +77,86 @@ export type FootageSource = {
   ground?: (shot: ComposeShot, size: { width: number; height: number }) => ReactNode;
   /** The shot with its depth as its transparency (depth_video.py: near opaque), drawn exactly like the shot; nothing when it has none. */
   near?: (shot: ComposeShot, size: { width: number; height: number }) => ReactNode;
+  /** A veil on her pictures while the Reel's words show (« voile »): how dark, and when (frames of the composition). */
+  scrim?: { strength: number; spans: [number, number][] };
+  /**
+   * A model's words right over her shots (the scene check's, frames of the composition, px of the frame): her picture is
+   * darkened softly under each one that does not hold on it (veilFor, on the shot's light), only there.
+   */
+  ink?: InkZone[];
 };
+
+/** Frames a veil fades in and out over, at the edges of its spans (they are padded by as much). */
+const SCRIM_FADE = 6;
+
+/** How much of a span plays at a frame: full inside it, fading at its edges, none outside. */
+const fadeIn = (from: number, to: number, frame: number) => (frame < from || frame >= to ? 0 : Math.max(0, Math.min(1, (frame - from + 1) / SCRIM_FADE, (to - frame) / SCRIM_FADE)));
+
+/** How much of a veil plays at a frame: full inside its spans, fading at their edges, none outside. */
+function scrimAt(scrim: FootageSource["scrim"], frame: number): number {
+  if (!scrim) return 0;
+  for (const [from, to] of scrim.spans) if (frame >= from && frame < to) return fadeIn(from, to, frame);
+  return 0;
+}
+
+/** A shot's light over its whole passage, as read (its mean and its brightest tenth), or null when it was not read. */
+const wholeLight = (info: ComposeShot): { mean: number; high: number } | null => {
+  const light = (info.read as { light?: { mean?: unknown; high?: unknown } } | undefined)?.light;
+  return typeof light?.mean === "number" && typeof light.high === "number" ? { mean: light.mean, high: light.high } : null;
+};
+
+/**
+ * Her picture darkened under a model's words (Tristan, 6 November: « plutôt assombrir l'image »), drawn over the shot
+ * only, under everything the composition draws after it, never a box: under each of its words over this shot whose
+ * letters do not hold on its light there (veilFor on LightUnder), a soft dark glow the size of the word, fading at its
+ * edges and in and out with it; a veil she asked for (`scrim`) at least that dark under each word. A plan measured before
+ * the words were (no `ink`): the veil she asked for over the whole shot while its words show, darker at the edges.
+ */
+function Scrim({ source, info, shot, frame, laid }: { source: FootageSource; info: ComposeShot; shot: number; frame: number; laid: { left: number; top: number; width: number; height: number } }) {
+  const asked = source.scrim?.strength ?? 0;
+  if (source.ink?.length) {
+    const glows = source.ink.flatMap((zone, i) => {
+      const amount = zone.shot === shot ? fadeIn(zone.from, zone.to, frame) : 0;
+      if (amount <= 0) return [];
+      // Its light under the word; where its reading has no cell there (a camera move read off the picture), the shot's own.
+      const under = LightUnder(info, frame, laid, { x: zone.box[0], y: zone.box[1], w: zone.box[2] - zone.box[0], h: zone.box[3] - zone.box[1] }) ?? LightUnder(info, frame, laid) ?? wholeLight(info);
+      const dark = veilFor(zone.ink, under, asked) * amount;
+      if (dark < 0.02) return [];
+      const [x0, y0, x1, y1] = zone.box;
+      // Wide and soft, like light falling off around the word: never a shape of its own (a pill, a box).
+      const padX = (x1 - x0) * 0.45 + 120;
+      const padY = (y1 - y0) * 1.1 + 120;
+      return [
+        <div
+          key={i}
+          data-fauve-decor=""
+          aria-hidden="true"
+          style={{
+            position: "absolute",
+            left: x0 - padX - laid.left,
+            top: y0 - padY - laid.top,
+            width: x1 - x0 + 2 * padX,
+            height: y1 - y0 + 2 * padY,
+            pointerEvents: "none",
+            background: `radial-gradient(closest-side, rgba(0,0,0,${dark.toFixed(3)}) 0%, rgba(0,0,0,${(dark * 0.8).toFixed(3)}) 30%, rgba(0,0,0,${(dark * 0.4).toFixed(3)}) 60%, rgba(0,0,0,${(dark * 0.12).toFixed(3)}) 82%, rgba(0,0,0,0) 100%)`,
+          }}
+        />,
+      ];
+    });
+    return glows.length ? <>{glows}</> : null;
+  }
+  const amount = scrimAt(source.scrim, frame);
+  if (!source.scrim || amount <= 0) return null;
+  const s = asked * amount;
+  const a = (k: number) => Math.min(0.85, s * k).toFixed(3);
+  return (
+    <div
+      data-fauve-decor=""
+      aria-hidden="true"
+      style={{ position: "absolute", inset: 0, pointerEvents: "none", background: `radial-gradient(ellipse 75% 60% at 50% 50%, rgba(0,0,0,${a(0.7)}) 0%, rgba(0,0,0,${a(1)}) 65%, rgba(0,0,0,${a(1.3)}) 100%)` }}
+    />
+  );
+}
 
 /** Given by the Reel to a collage's composition only; none in the scene check (a grey card stands in for each shot). */
 export const FootageContext = createContext<FootageSource | null>(null);
@@ -114,6 +194,15 @@ function Footage({ shot, style, hold, at }: { shot: number; style?: CSSPropertie
       ) : (
         <Freeze frame={Math.max(0, Math.min(info.durationInFrames - 1, local))}>{media}</Freeze>
       )}
+      {source.scrim || source.ink?.length ? (
+        <Scrim
+          source={source}
+          info={info}
+          shot={shot}
+          frame={frame}
+          laid={{ left: typeof style?.left === "number" ? style.left : 0, top: typeof style?.top === "number" ? style.top : 0, width: px(style?.width) ?? width, height: px(style?.height) ?? height }}
+        />
+      ) : null}
     </div>
   );
 }

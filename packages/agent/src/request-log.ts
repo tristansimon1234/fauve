@@ -104,6 +104,33 @@ function entryText(entry: RequestEntry, index: number): string {
   return [head, ...entry.lines.map((l) => `${l.who === "elle" ? "Elle" : "Edith"} : ${l.text}`)].join("\n");
 }
 
+/** The headers of a launch's brief (requestBrief), read back by ownRequestWords. */
+const EXCHANGE_HEAD = "Sa conversation avec Edith pour ce Reel, mot pour mot";
+const BRIEF_HEAD = /^Le brief d'Edith(?: pour ce lancement)? :$/;
+const RECENT_HEAD = "Ce qu'elle a dit de ses Reels récents";
+
+/**
+ * What she asked for this Reel, in a launch's brief (requestBrief): her own messages of this Reel's exchange and Edith's
+ * brief (her reading of them), without Edith's replies nor what she said of her other Reels; a brief without an exchange
+ * (the lab's idea, an older launch) is read whole, her other Reels left out. What decides a form from her words
+ * (« sois créatif »: no model, house-pick.ts) reads this, never an earlier Reel's words nor Edith's (« je crée ton Reel »).
+ */
+export function ownRequestWords(brief: string | null | undefined): string {
+  const text = (brief ?? "").split(`\n\n${RECENT_HEAD}`)[0]!.replace(new RegExp(`^${RECENT_HEAD}[^]*$`), "");
+  if (!text.startsWith(EXCHANGE_HEAD)) return text.trim();
+  const kept: string[] = [];
+  let who: "elle" | "edith" | "brief" | null = null;
+  for (const line of text.split("\n").slice(1)) {
+    if (BRIEF_HEAD.test(line.trim())) who = "brief";
+    else if (who !== "brief" && line.startsWith("Elle : ")) {
+      who = "elle";
+      kept.push(line.slice(7));
+    } else if (who !== "brief" && (line.startsWith("Edith : ") || /^\[(Demande|Correction \d+), /.test(line))) who = "edith";
+    else if (who === "elle" || who === "brief") kept.push(line);
+  }
+  return kept.join("\n").trim();
+}
+
 /**
  * What every agent gets as the request for one launch: her exchange with Edith for this Reel, word for word (its latest
  * launches whole), then Edith's brief for this launch as her reading of it, then what she said of her recent Reels (her
@@ -122,7 +149,7 @@ export function requestBrief(log: RequestEntry[], brief: string | undefined, rec
   if (!kept.length && !taste) return brief;
   return [
     kept.length
-      ? `Sa conversation avec Edith pour ce Reel, mot pour mot (ses messages et les réponses d'Edith, dans l'ordre) : ce sont ses mots qui comptent, le brief d'Edith plus bas en est la lecture.\n\n${kept.join("\n\n")}`
+      ? `${EXCHANGE_HEAD} (ses messages et les réponses d'Edith, dans l'ordre) : ce sont ses mots qui comptent, le brief d'Edith plus bas en est la lecture.\n\n${kept.join("\n\n")}`
       : "",
     brief?.trim() ? `${kept.length ? "Le brief d'Edith pour ce lancement" : "Le brief d'Edith"} :\n${brief.trim()}` : "",
     taste,
@@ -143,7 +170,7 @@ function recentWords(recent: { title: string; log: RequestEntry[] }[]): string {
     parts.push(part);
     length += part.length;
   }
-  return parts.length ? `Ce qu'elle a dit de ses Reels récents (ses goûts ; la demande de ce Reel passe avant) :\n${parts.join("\n")}` : "";
+  return parts.length ? `${RECENT_HEAD} (ses goûts ; la demande de ce Reel passe avant) :\n${parts.join("\n")}` : "";
 }
 
 /** Her messages since the last montage launched in this exchange. */

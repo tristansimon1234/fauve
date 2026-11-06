@@ -80,6 +80,12 @@ export type RenderResult = {
   durationMs: number;
   /** Signed link to the MP4, valid 24 h (WhatsApp fetches it, the web app shows it). */
   url: string;
+  /**
+   * Still the post's video: rendered from the version given, or from the post's current one that is still current. False
+   * when a newer version was made while it rendered (another change asked meanwhile, which renders its own): the post
+   * keeps the newer one, and a re-render never delivers this video (Tristan's two « prêt » a second apart, 6 November).
+   */
+  current: boolean;
 };
 
 function check<T extends { error: { message: string } | null }>(result: T): T {
@@ -601,7 +607,11 @@ export async function renderPost(studioId: string, postId: string, options: { ed
 
     let status = postStatusSchema.parse(post.status);
     for (const next of towardsDraft(status)) status = next;
-    check(await db.from("posts").update({ render_id: renderId, status, ...(options.editPlanId ? { edit_plan_id: planRow.id } : {}) }).eq("id", postId));
+    // Rendered from the post's current version: it becomes the post's video only while that version is still the current one.
+    const update = db.from("posts").update({ render_id: renderId, status, ...(options.editPlanId ? { edit_plan_id: planRow.id } : {}) }).eq("id", postId);
+    const linked = check(await (options.editPlanId || !post.edit_plan_id ? update : update.eq("edit_plan_id", planRow.id)).select("id")).data;
+    const current = Boolean(linked?.length);
+    if (!current) console.log("render: a newer version was made while it rendered, this one is not the post's video", postId, renderId);
 
     const url = check(await db.storage.from("media").createSignedUrl(storagePath, 24 * 3600)).data!.signedUrl;
     // The strip of scenes under the Reel, when the video follows the plan (the ffmpeg engine drops its animations;
@@ -630,6 +640,7 @@ export async function renderPost(studioId: string, postId: string, options: { ed
       storagePath,
       durationMs,
       url,
+      current,
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);

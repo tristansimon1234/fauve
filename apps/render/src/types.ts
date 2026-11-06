@@ -331,6 +331,16 @@ export type ReelProps = {
     spoken?: { w: string; from: number; to: number }[];
     /** Its code only times its own words on them (a montage skill timed on her voice): the engine's captions stay under it. */
     captionsStay?: true;
+    /**
+     * A composition's veil on her pictures while its words show (« voile », « on voit pas bien le texte »): how dark, and
+     * when (frames from its start). Each of her shots it lays (Footage) is darkened softly there, its lettering untouched.
+     */
+    scrim?: { strength: number; spans: [number, number][] };
+    /**
+     * A model's words right over her shots, as the scene check saw them (frames from its start, px of the frame, their
+     * letters' luminance): her picture is darkened softly under each one that does not hold on its light (veilFor).
+     */
+    ink?: { shot: number; from: number; to: number; box: [number, number, number, number]; ink: number }[];
   }[];
   /** What she added on her Reel (a text, one of her photos or its cut-out), drawn over everything, in frames. */
   overlays?: {

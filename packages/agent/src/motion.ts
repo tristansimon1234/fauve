@@ -7,7 +7,7 @@ import type { BrandSignature } from "./signature.ts";
 import { previewMusic, speechWindows, type MixCase } from "./mix.ts";
 import { musicEnvelope } from "./music-shape.ts";
 import { placeSounds, planCues, type SoundFacts, type SoundPlacement } from "./sfx.ts";
-import type { SfxLevel } from "./schemas.ts";
+import type { InkZone, SfxLevel } from "./schemas.ts";
 import { faceZone, layerTrack, sceneTrack, shotTrack, type FaceZone, type ShotTrack, type TrackPiece, type TracksByClip } from "./tracking.ts";
 import { DEPTH_MOVES, reliefOf } from "./depth.ts";
 import { clearKey, depthKey, groundKey, nearKey, photoKey, readKey, subjectKey, type ClearMap, type ShotReading } from "./subject.ts";
@@ -272,6 +272,30 @@ export type ComposeText = {
 /** The Reel's end (an offer, an announcement) that a composition draws itself: its title and line, from its frame. */
 export type ComposeEnd = { title: string; subtitle: string | null; from: number };
 
+/** A veil on her pictures in a composition (mirror of the render's): how dark, and the spans it plays (frames from its start). */
+export type ReelScrim = { strength: number; spans: [number, number][] };
+
+/** Frames the veil fades in and out over, around her words. */
+const SCRIM_PAD = 6;
+
+/**
+ * When a composition's veil plays (plan.layers[].scrim): while its words show (each text from a few frames before it to
+ * a few after), the spans that touch merged, within the composition; nothing without words.
+ */
+export function scrimSpans(texts: { from: number; to: number }[], length: number): [number, number][] {
+  const spans = texts
+    .map((t): [number, number] => [Math.max(0, Math.round(t.from) - SCRIM_PAD), Math.min(length, Math.round(t.to) + SCRIM_PAD)])
+    .filter(([a, b]) => b > a)
+    .sort((a, b) => a[0] - b[0]);
+  const merged: [number, number][] = [];
+  for (const span of spans) {
+    const last = merged.at(-1);
+    if (last && span[0] <= last[1] + SCRIM_PAD * 2) last[1] = Math.max(last[1], span[1]);
+    else merged.push([...span]);
+  }
+  return merged;
+}
+
 /** The Reel's texts as a composition reads them, from its start (`from`, frames). */
 export function composeTexts(texts: ReelText[], from = 0): ComposeText[] {
   return texts.map((t) => ({
@@ -475,6 +499,10 @@ export type ReelProps = {
     spoken?: ReelWord[];
     /** Its code only times its own words on them (a skill timed on her voice, its subtitles the engine's): the captions stay. */
     captionsStay?: true;
+    /** A composition's veil on her pictures while its words show (plan.layers[].scrim): how dark, and when (frames from its start). */
+    scrim?: ReelScrim;
+    /** A model's words right over her shots (plan.layers[].ink): her picture darkened under those that do not hold on it. */
+    ink?: InkZone[];
   }[];
   /** Components of the studio's bank placed on a still: drawn at their design width (base), then scaled into their box (shares of the frame). */
   /** A simple copied Reel remade by code (copy.ts), in frames (mirror of the render's). */
@@ -1069,6 +1097,10 @@ export function buildReelProps(plan: EditPlan, inputs: ReelInputs): ReelProps {
             })()
           : {}),
         ...(track.length ? { track } : {}),
+        // Her words read better on her pictures (« voile »): her shots darkened softly under them, the composition's lettering kept.
+        ...(l.compose && l.scrim && scrimSpans(composeTexts(texts, from), length).length ? { scrim: { strength: l.scrim, spans: scrimSpans(composeTexts(texts, from), length) } } : {}),
+        // Its words right over her shots, as its check saw them: darkened under, where they do not hold (every model, by itself).
+        ...(l.compose && l.ink?.length ? { ink: l.ink } : {}),
         ...(l.motion.fonts?.length ? { fonts: l.motion.fonts } : {}),
         // An animation that writes what is said itself (Captions, around her or behind her): the words under it. A montage
         // skill timed on her voice gets them whether it writes them or not (its keywords set on them): the engine's
