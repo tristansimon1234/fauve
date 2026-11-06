@@ -76,4 +76,8 @@ export const HOUSE_MEASURES: Record<string, ReelMeasures> = {
   // Its fiche's 56 cuts (13 to a new place, 43 in the same place, a gesture each), read image to image with its
   // subtitles masked; no steady beat under its voice (its catalogue's tempo, 85, decides); its loudness by ebur128.
   "recette": { duration: 44.97, cuts: [1.03, 3.67, 4.27, 5.03, 5.73, 6.5, 7.13, 7.9, 8.53, 9.1, 9.6, 10.23, 11.87, 12.43, 13.1, 13.77, 14.43, 15.43, 15.93, 16.3, 16.93, 17.6, 18.4, 19.3, 19.83, 20.5, 21.17, 21.8, 22.57, 23.17, 23.83, 24.23, 25.2, 25.83, 26.43, 27.17, 27.73, 28.37, 29.1, 29.7, 30.4, 30.9, 31.5, 32.6, 33.3, 34.27, 35.4, 36.3, 37.37, 38.57, 39.2, 40.1, 41.27, 42.03, 42.9, 43.57], bpm: null, lufs: -14.3 },
+  // Its fiche's 50 cuts (docs/fiches/aventure.md), the first image of each new picture, read image by image: its 10
+  // hidden ones included (the dark passing, the powder, the smoke, the fabric, the whips, the plunge, the rising water,
+  // its dissolve by its middle); on its cuts' grid, 134,87 BPM (its music 134,8, its cuts 0,107 s after its beats); ebur128.
+  "aventure": { duration: 46.88, cuts: [0.3, 0.77, 1.2, 2.07, 3.2, 3.53, 4.17, 5.87, 7.03, 7.53, 8.8, 9.57, 10.53, 11.07, 11.5, 12.27, 13.27, 13.97, 14.53, 15.03, 15.97, 16.8, 17.67, 18.6, 19.5, 20.33, 20.83, 21.73, 22.6, 23.5, 24.8, 25.7, 26.6, 28.8, 29.4, 30.07, 31.1, 31.93, 32.7, 33.67, 34.5, 35.87, 36.33, 37.87, 38.67, 40, 41.3, 42.97, 43.9, 44.83], bpm: 134.87, lufs: -14.1 },
 };
