@@ -145,8 +145,8 @@ export const HOUSE_EFFECTS: Record<string, HouseEffect> = {
     il_faut: "une vidéo fixe de quelqu'un de profil devant un fond clair, qui baisse puis relève la tête",
   },
   vision: {
-    effet: "son lieu vu par une machine, chaque passant dans un cadre bleu qui clignote, reliés par des fils, puis l'image redessinée en caractères",
-    il_faut: "un plan fixe de son lieu fréquenté filmé de haut, quelqu'un d'immobile au milieu et des gens qui passent autour",
+    effet: "son lieu vu par une machine, chaque personne et chaque chose dans un cadre bleu ou à points qui clignote, reliés par des fils, puis l'image redessinée en caractères sur ses contours",
+    il_faut: "un plan fixe de son lieu avec du monde (de haut si possible), quelqu'un qui bouge peu et des gens qui passent ou s'affairent autour",
   },
   "court-metrage": {
     effet: "ses plans projetés comme une vieille pellicule aux coins arrondis : l'image qui s'ouvre depuis une fente, son titre de film en jaune, une brûlure sur la coupe, la pellicule qui saute",

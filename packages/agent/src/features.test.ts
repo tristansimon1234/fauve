@@ -1248,8 +1248,8 @@ test("each of Edith's models shows its original's frames as a Reel she sends: sh
   const { HOUSE_MEASURES } = await import("./house-measures.ts");
   const { stolenStyleSchema } = await import("./steal.ts");
   // A studio's row written before the sheets is rewritten (11: ten models written again on their originals' fiches; 21:
-  // their looks vertical full frame by default, the band on her word).
-  assert.equal(HOUSE_VERSION, 21);
+  // their looks vertical full frame by default, the band on her word; 22: Vision machine v2).
+  assert.equal(HOUSE_VERSION, 22);
   for (const m of HOUSE_MODELS) {
     const sheets = houseSheets(m.key);
     // A model written as a design has no original, so no sheets (its row names none).
@@ -10344,11 +10344,14 @@ test("« Présente-toi » (v4): vertical by default, a 16:9 frame on her word; l
   }
 });
 
-const VIS_NAMED = { sujet: "woman standing at the tram stop", support: "tram shelter" };
-/** What is read on her shots: her still subject and her shelter on the anchor, three passers-by on her place. */
+const VIS_NAMED = { sujet: "woman standing at the tram stop", support: "tram shelter", choses: "every street lamp" };
+/** What is read on her shots: her still subject, her shelter and three street lamps on the anchor, three passers-by on her place. */
 const VIS_READ: KitRead = {
   boxes: { "0#woman standing at the tram stop": { x: 420, y: 900, w: 150, h: 420 }, "0#tram shelter": { x: 40, y: 700, w: 330, h: 520 } },
-  parts: { "1#every person": [{ x: 700, y: 820, w: 60, h: 160 }, { x: 820, y: 860, w: 50, h: 140 }, { x: 600, y: 1300, w: 160, h: 420 }] },
+  parts: {
+    "1#every person": [{ x: 700, y: 820, w: 60, h: 160 }, { x: 820, y: 860, w: 50, h: 140 }, { x: 600, y: 1300, w: 160, h: 420 }],
+    "0#every street lamp": [{ x: 100, y: 300, w: 40, h: 200 }, { x: 500, y: 320, w: 40, h: 190 }, { x: 900, y: 340, w: 40, h: 180 }],
+  },
 };
 /** « Vision machine » as its composition gets it at a frame, from its plan on her one video, its objects named. */
 async function visionAt(frame: number, read: KitRead = VIS_READ, options: { settings?: Record<string, string>; titre?: string } = {}) {
@@ -10364,11 +10367,11 @@ async function visionAt(frame: number, read: KitRead = VIS_READ, options: { sett
 /** Her shot's media mounted at a frame (what decodes a video). */
 const mediaOf = (tree: Drawn) => drawnNodes(tree).filter((n) => ["Footage", "Subject", "Depth", "Near"].includes(String(n.type)));
 
-test("« Vision machine » (v1) passes where its original does, image by image at its tempo (77,5 BPM, a beat every two beeps), its blacks, its silence", async () => {
+test("« Vision machine » (v2) passes where its original does, image by image at its tempo (77,5 BPM, a beat every two beeps), its blacks, its silence", async () => {
   const { vision, PASSES } = await import("./skills/vision.ts");
   const { skillPlan } = await import("./skills.ts");
   const { objectPassages, depthPassages, nearPassages, subjectShots, readsDrawn, OBJECT_MAX_SECONDS } = await import("./subject.ts");
-  assert.equal(vision.version, 1);
+  assert.equal(vision.version, 2);
   assert.equal(vision.bpm, 77.5);
   assert.deepEqual([vision.shots, vision.files], [[2, 2], [1, 3]]);
   const line = vision.timeline(2, { end: false });
@@ -10397,26 +10400,29 @@ test("« Vision machine » (v1) passes where its original does, image by image a
   assert.ok(Math.abs(faster.duration - 8.5 * 0.775) < 0.05);
   const ended = vision.timeline(2, { end: true });
   assert.ok(ended.duration - line.duration >= 1.6 && ended.music!.end!.at === ended.duration, `${ended.duration} s`);
-  // On the plan: valid; her still subject and what it is on followed on the anchor shot, every person on her place, within
-  // the 20 s a Reel's objects take; its depth and its nearness on her place only; nothing of her cut out besides; the
-  // vanishing point of her place read for its tiles.
+  // On the plan: valid; her still subject, what it is on and the things that repeat in her place read on the anchor shot,
+  // every person on her place, within the 20 s a Reel's objects take; its depth on her place only; nothing of her cut out
+  // besides; no nearness nor vanishing point read any more (its cells a grid, its back whitened from the top).
   const { plan } = await visionAt(0);
   assert.ok(editPlanSchema.safeParse(plan).success);
-  assert.deepEqual(plan.skill, { key: "vision", version: 1 });
+  assert.deepEqual(plan.skill, { key: "vision", version: 2 });
   const objects = objectPassages(plan, () => true);
-  assert.deepEqual(objects.map((o) => [o.clip_id, o.from, o.to, o.name]), [["v0", 0, 0.47, "tram shelter"], ["v0", 0, 0.47, "woman standing at the tram stop"], ["v0", 0.5, 8.53, "every person"]]);
+  assert.deepEqual(objects.map((o) => [o.clip_id, o.from, o.to, o.name]).sort(), [["v0", 0, 0.47, "every street lamp"], ["v0", 0, 0.47, "tram shelter"], ["v0", 0, 0.47, "woman standing at the tram stop"], ["v0", 0.5, 8.53, "every person"]]);
   assert.ok(objects.reduce((s, o) => s + o.to - o.from, 0) <= OBJECT_MAX_SECONDS);
   assert.deepEqual(depthPassages(plan, () => true).map((p) => [p.from, p.to]), [[0.5, 8.53]]);
-  assert.deepEqual(nearPassages(plan, () => true).map((p) => [p.from, p.to]), [[0.5, 8.53]]);
+  assert.deepEqual(nearPassages(plan, () => true), []);
   assert.deepEqual([...subjectShots(plan)], []);
-  assert.deepEqual(readsDrawn(plan.layers![0]!.motion.js).map((r) => r.shot), [1]);
+  assert.deepEqual(readsDrawn(plan.layers![0]!.motion.js), []);
+  // With an ending card too, its objects within the 20 s (the things read on the anchor, never on her whole place).
+  const carded = skillPlan({ skill: vision, name: "Vision machine", files: [{ id: "v0", photo: false, seconds: 12 }], fill: { shots: [{ file: "v0", at: 0 }, { file: "v0", at: 0.5 }], texts: { etiquette: "LE SALON" }, end: { title: "Ouvert dimanche" }, objects: VIS_NAMED } });
+  assert.ok(objectPassages(carded, () => true).reduce((s, o) => s + o.to - o.from, 0) <= OBJECT_MAX_SECONDS);
   for (const end of [false, true]) {
     const p = skillPlan({ skill: vision, name: "Vision machine", files: [{ id: "v0", photo: false, seconds: 12 }], fill: { shots: [{ file: "v0", at: 0 }, { file: "v0", at: 0.5 }], texts: { etiquette: "LE SALON" }, end: end ? { title: "Ouvert dimanche" } : null } });
     assert.ok(editPlanSchema.safeParse(p).success && p.texts.length === 1 && p.duration <= 45);
   }
 });
 
-test("« Vision machine » (v1): its machine looks pass by pass, each at its own moment of her place, its labels dropping letters, its tiles from her still subject", async () => {
+test("« Vision machine » (v2): its machine looks pass by pass, each at its own moment of her place, its labels dropping letters, its cells from her still subject", async () => {
   const at = async (f: number, read = VIS_READ, options = {}) => (await visionAt(f, read, options)).tree;
   const kinds = (tree: Drawn) => drawnNodes(tree).map((n) => String(n.type));
   // The man and his bench alone on white in their frames: blue (their cut-outs in two tones of blue), then black with
@@ -10438,42 +10444,57 @@ test("« Vision machine » (v1): its machine looks pass by pass, each at its own
   assert.deepEqual(mediaOf(await at(3)), []);
   const alone = await at(11);
   assert.deepEqual(mediaOf(alone).map((n) => [n.type, n.props.object]), [["Subject", "tram shelter"], ["Subject", "woman standing at the tram stop"]]);
-  // Her place built tile by tile round her (half of it at once on image 21, the others fading in from white), its back's
-  // openings left white; its tiles in the perspective of her floor, the nearest to her first.
+  // Her place built cell by cell round her (half of it at once on image 21, the others fading in from white), the farthest
+  // left white; its cells a grid of 9 columns wider than tall, the nearest to her first, she whole over them.
   const tilesAt = async (f: number) => (String(styleOf(drawnNodes(await at(f)).find((n) => /^path\('M/.test(String(styleOf(n).clipPath)))!).clipPath).match(/M/g) ?? []).length;
   const counts = await Promise.all([14, 20, 21, 28, 35].map(tilesAt));
   assert.ok(counts.every((c, i) => i === 0 || c >= counts[i - 1]!), JSON.stringify(counts));
   assert.ok(counts[2]! - counts[1]! > counts[1]! - counts[0]!, JSON.stringify(counts));
   assert.ok(drawnNodes(await at(22)).some((n) => n.type === "path" && n.props.fill === "#fdfdfd" && Number(n.props.opacity) < 1));
-  // A frame on everyone: her place, its frames in two tones of blue or black with light dots at random at every image.
+  const cells = String(styleOf(drawnNodes(await at(20)).find((n) => /^path\('M/.test(String(styleOf(n).clipPath)))!).clipPath);
+  assert.ok(/^path\('M\d+ \d+h120v83h-120Z/.test(cells), cells.slice(0, 40));
+  const built = drawnNodes(await at(20)).map((n) => String(n.type));
+  assert.ok(built.lastIndexOf("Subject") > built.indexOf("Footage"), "her still subject over her place");
+  // A frame on everyone and on every thing that repeats there: her place, its frames in two tones of blue or black with
+  // light dots on its edges (Sketch under the dots) at random at every image; eight frames, eight tabs.
   const frames = await at(41);
-  assert.deepEqual(kinds(frames).filter((k) => k === "Footage").length, 2);
+  assert.deepEqual(kinds(frames).filter((k) => k === "Footage").length, 3);
   assert.ok(drawnNodes(frames).some((n) => styleOf(n).filter === "url(#vblue)" && /^path\('M/.test(String(styleOf(n).clipPath))));
-  assert.ok(drawnNodes(drawnNodes(frames).find((n) => n.type === "Ascii")!).some((n) => n.type === "Subject" && n.props.object === "every person"));
-  // The depth in grey; the network: the depth with its blacks lifted, everyone as filmed in a black frame, wires between.
-  assert.ok(kinds(await at(56)).includes("Depth"));
+  const dottedIn = drawnNodes(drawnNodes(frames).find((n) => n.type === "Ascii")!);
+  assert.ok(dottedIn.some((n) => n.type === "Sketch") && dottedIn.some((n) => n.type === "Footage"));
+  assert.equal(drawnNodes(drawnNodes(frames).find((n) => "data-fauve-decor" in n.props)!).filter((n) => styleOf(n).fontSize === 17).length, 8);
+  // The depth in grey, over a grey of near and far with her still subject light in it (its depth missing: never black);
+  // the network: the depth with its blacks lifted, everyone as filmed in a black frame, wires between.
+  const deep = kinds(await at(56));
+  assert.ok(deep.includes("Depth") && deep.indexOf("Subject") < deep.indexOf("Depth"));
+  assert.ok(drawnNodes(await at(56)).some((n) => /^linear-gradient/.test(String(styleOf(n).background))));
   const net = await at(38);
   assert.equal(styleOf(drawnNodes(net).find((n) => n.type === "Depth")!).filter, "contrast(0.78) brightness(1.18)");
   assert.ok(drawnNodes(net).filter((n) => n.type === "path" && n.props.stroke === "#c8c8c8").length >= 5);
   // The graph alone (a dot for each one seen, binary codes), then everyone in their frames on it.
   const graph = await at(109);
-  assert.equal(drawnNodes(graph).filter((n) => n.type === "circle").length, 5);
+  assert.equal(drawnNodes(graph).filter((n) => n.type === "circle").length, 8);
   assert.ok(/^[01]{16} [01]{8} [01]{8} [01]{8}$/.test(textIn(drawnNodes(graph).find((n) => n.type === "div" && /^[01]/.test(textIn(n)) && styleOf(n).fontSize === 14))));
   assert.ok(kinds(await at(117)).includes("Footage") && !kinds(graph).includes("Footage"));
-  // Everyone in dots on white, tight on their edges (them in pale grey with a dark rim of two hard shadows, in halftone:
-  // no cut-out's rim, a dilation over her whole picture); the whole place in characters; at the end, her still subject
+  // Everyone in dots on white, tight on their outlines and sparser inside: the dots drawn on their edges (Sketch on
+  // white, widened, inverted); the whole place in characters on its edges and details; at the end, her still subject
   // alone in characters, then black.
-  const dots = drawnNodes(drawnNodes(await at(174)).find((n) => n.type === "Ascii")!).filter((n) => n.type === "Subject");
-  assert.deepEqual(dots.map((n) => [n.props.object, n.props.rim ?? 0]), [["every person", 0]]);
-  assert.match(String(styleOf(dots[0]!).filter), /^grayscale\(1\).*drop-shadow\(3px 2px 0 #1a1a1a\) drop-shadow\(-3px -2px 0 #1a1a1a\)$/);
-  assert.ok(drawnNodes(drawnNodes(await at(201)).find((n) => n.type === "Ascii")!).some((n) => n.type === "Footage"));
+  const dots = drawnNodes(drawnNodes(await at(174)).find((n) => n.type === "Ascii")!);
+  assert.deepEqual(dots.filter((n) => n.type === "Subject").map((n) => [n.props.object, n.props.rim ?? 0]), [["every person", 0]]);
+  assert.ok(dots.some((n) => n.type === "Sketch") && dots.some((n) => /invert\(1\)$/.test(String(styleOf(n).filter))));
+  const whole = drawnNodes(drawnNodes(await at(201)).find((n) => n.type === "Ascii")!);
+  assert.ok(whole.some((n) => n.type === "Footage") && whole.some((n) => n.type === "Sketch"));
   const end = drawnNodes(drawnNodes(await at(242)).find((n) => n.type === "Ascii")!);
   assert.ok(end.some((n) => n.type === "Subject") && !end.some((n) => n.type === "Footage"));
   assert.deepEqual(mediaOf(await at(250)), []);
-  // Its place erased from the back towards her: fewer tiles at every image; its back whitening by depth.
+  // Its place erased from the farthest towards her: fewer cells at every image; its back whitening from the top, more at
+  // every image, never a cell on her still subject.
   const erased = await Promise.all([217, 225, 235].map(tilesAt));
   assert.ok(erased[0]! > erased[1]! && erased[1]! > erased[2]!, JSON.stringify(erased));
-  assert.ok(Number(drawnNodes(await at(100)).find((n) => n.type === "Near")!.props.depth) < Number(drawnNodes(await at(99)).find((n) => n.type === "Near")!.props.depth));
+  const whites = async (f: number) => drawnNodes(await at(f)).filter((n) => n.type === "path" && n.props.fill === "#fdfdfd" && n.props.opacity === undefined);
+  const [w99, w102] = await Promise.all([whites(99), whites(102)]);
+  assert.ok(w102.length > w99.length && w99.length > 0, `${w99.length} ${w102.length}`);
+  assert.ok(w102.every((n) => { const [x, y] = String(n.props.d).slice(1).split(/[ h]/).map(Number); return !(x! < 573 && x! + 120 > 417 && y! < 1323 && y! + 83 > 897); }));
   // Each pass at its own moment of her place; held two images each where the original is (15 i/s).
   const momentOf = async (f: number) => drawnNodes(await at(f)).find((n) => n.type === "Footage")!.props;
   const [first, second] = await Promise.all([momentOf(41), momentOf(83)]);
@@ -10481,7 +10502,7 @@ test("« Vision machine » (v1): its machine looks pass by pass, each at its own
   assert.deepEqual([(await momentOf(40)).hold, (await momentOf(68)).hold], [2, 1]);
 });
 
-test("« Vision machine » (v1): vertical as its original, her shot in a 16:9 band on her word; her title in option; light to render", async () => {
+test("« Vision machine » (v2): vertical as its original, her shot in a 16:9 band on her word; her title in option; light to render", async () => {
   const { vision } = await import("./skills/vision.ts");
   // Vertical full frame; on her word her shot in a 16:9 band in the middle on the white of the passes, its blacks full frame.
   assert.deepEqual(vision.settings?.map((s) => [s.name, s.choices.map((c) => c.value)]), [["format", ["vertical", "horizontal", "auto"]]]);

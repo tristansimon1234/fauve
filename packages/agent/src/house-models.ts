@@ -17,8 +17,8 @@ import type { z } from "zod";
 
 /** The source of the inspiration row a house model is kept on, per studio (one per model, made when first used). */
 export const HOUSE_SOURCE = "house";
-/** The catalogue's version: a studio's row written by an older one is rewritten when the model is used again (3: its original's sheets; 4: no brand in a model's name; 5: Mots aux quatre coins as its original; 6: Plans fixes at 65 BPM; 7: four renamed; 8: Lieu tapé without its original's orange; 9: Plans fixes on its fiche; 10: Une journée chez toi on its fiche; 11: ten models on their fiches; 12: Façade qui se construit and Coulisses façon fiche on their fiches; 13: Recette cosy on its fiche; 14: Titre gaufré on its fiche; 15: Mots mêlés and Interrupteur on their fiches; 16: Interface minimaliste and Fenêtres et étiquettes on theirs; 17: Mot clé en grand and Face caméra et références on theirs; 18: Photos posées sur la table and Carte au feutre on theirs; 19: « S'abonner » in Interface minimaliste; 20: the last four on their fiches, Aplat, Détourages, Silhouette and Vision machine; 21: Tristan's review of 6 November, Court métrage's light and lettering, Plans fixes' lettering, Façade's first pieces, Présente-toi in its own design, the kaléidoscope, Mot clé en grand and Face caméra et références; every model vertical by default, its band only when she asks). */
-export const HOUSE_VERSION = 21;
+/** The catalogue's version: a studio's row written by an older one is rewritten when the model is used again (3: its original's sheets; 4: no brand in a model's name; 5: Mots aux quatre coins as its original; 6: Plans fixes at 65 BPM; 7: four renamed; 8: Lieu tapé without its original's orange; 9: Plans fixes on its fiche; 10: Une journée chez toi on its fiche; 11: ten models on their fiches; 12: Façade qui se construit and Coulisses façon fiche on their fiches; 13: Recette cosy on its fiche; 14: Titre gaufré on its fiche; 15: Mots mêlés and Interrupteur on their fiches; 16: Interface minimaliste and Fenêtres et étiquettes on theirs; 17: Mot clé en grand and Face caméra et références on theirs; 18: Photos posées sur la table and Carte au feutre on theirs; 19: « S'abonner » in Interface minimaliste; 20: the last four on their fiches, Aplat, Détourages, Silhouette and Vision machine; 21: Tristan's review of 6 November, Court métrage's light and lettering, Plans fixes' lettering, Façade's first pieces, Présente-toi in its own design, the kaléidoscope, Mot clé en grand and Face caméra et références; every model vertical by default, its band only when she asks; 22: Vision machine v2, any fixed shot of her place). */
+export const HOUSE_VERSION = 22;
 
 export type HouseModel = {
   key: string;
@@ -1363,11 +1363,12 @@ export const HOUSE_MODELS: HouseModel[] = [
   model({
     key: "vision",
     name: "Vision machine",
-    // Written on its original's fiche (v1 of its skill, docs/fiches/vision.md): one fixed shot through some ten machine
-    // looks taking turns in a strobe of clean cuts; its frames blue or dotted (not the people tinted), characters and dots
-    // (not a line drawing), its labels dropping letters, its place built and erased tile by tile; its beep at 155 BPM.
-    pitch: "Ton lieu vu par une machine : chaque passant dans un cadre qui clignote en bleu, reliés par des fils, puis des points, des caractères et ton lieu qui s'efface dalle par dalle.",
-    needs: "un seul plan fixe de 8 à 10 s de ton lieu filmé de haut (une mezzanine, un escalier), téléphone posé : quelqu'un qui ne bouge pas au milieu et des gens qui passent autour, un sol à carreaux ou à dalles",
+    // Written on its original's fiche (v2 of its skill, docs/fiches/vision.md): one fixed shot through some ten machine
+    // looks taking turns in a strobe of clean cuts; its frames blue or dotted on every person and every thing that
+    // repeats there, characters and dots drawn on the picture's edges, its labels dropping letters, its place built and
+    // erased cell by cell round the person who moves least; its beep at 155 BPM. Any fixed shot of her place with people.
+    pitch: "Ton lieu vu par une machine : chaque personne et chaque chose dans un cadre qui clignote en bleu, reliés par des fils, puis des points, des caractères et ton lieu qui s'efface case par case.",
+    needs: "un seul plan fixe de 8 à 10 s de ton lieu, téléphone posé ou tenu très immobile (de haut si tu peux : une mezzanine, un escalier) : quelqu'un qui bouge peu au milieu et des gens qui passent ou s'affairent autour",
     files: [1, 3],
     pair: "technique",
     // Its old reference composition (people tinted blue, a decoding title, a line drawing) is what its fiche corrects:
@@ -1388,21 +1389,21 @@ export const HOUSE_MODELS: HouseModel[] = [
         tracking: "normal",
       },
       colors: ["#142754", "#aabcdd", "#07070e"],
-      layout: "son plan plein cadre vu par une dizaine de regards de machine : fonds blancs et noirs, cadres bleus ou à points sur chaque passant, profondeur grise, réseau, graphe, caractères",
+      layout: "son plan plein cadre vu par une dizaine de regards de machine : fonds blancs et noirs, cadres bleus ou à points sur chaque personne et chaque chose, profondeur grise, réseau, graphe, caractères",
       moments: [
         { at: 0, what: "la personne immobile et ce sur quoi elle est, seuls sur blanc dans leurs cadres, qui clignotent : bleu, noir à points, bleu, des noirs entre" },
-        { at: 0.47, what: "son lieu se construit dalle par dalle autour d'elle, la moitié d'un coup, les autres en fondu depuis le blanc, le fond laissé blanc" },
-        { at: 1.2, what: "un premier clignotement de coupes franches d'une à huit images : un cadre sur chaque passant, bleu en deux tons ou noir à points, une étiquette qui perd ses lettres ; la profondeur en gris ; le réseau des passants reliés par des fils ; les passants en points ; la personne en caractères ; des noirs" },
-        { at: 3.63, what: "le graphe seul sur blanc, un point par passant relié aux autres par des fils, des codes binaires ; puis les passants dans leurs cadres dessus" },
-        { at: 4.53, what: "un second clignotement plus serré, une passe toutes les deux images quand le bip double ; toute la place en caractères clairs sur noir" },
-        { at: 7.23, what: "son lieu s'efface dalle par dalle, du fond vers la personne immobile, jusqu'à elle seule" },
+        { at: 0.47, what: "son lieu se construit case par case autour d'elle, les plus proches d'abord, la moitié d'un coup, les autres en fondu depuis le blanc, les plus lointaines laissées blanches" },
+        { at: 1.2, what: "un premier clignotement de coupes franches : un cadre sur chaque personne et chaque chose, bleu en deux tons ou noir à points, une étiquette qui perd ses lettres ; la profondeur en gris ; le réseau des cadres reliés ; les gens en points sur leurs contours ; la personne en caractères ; des noirs" },
+        { at: 3.63, what: "le graphe seul sur blanc, un point par cadre relié aux autres par des fils, des codes binaires ; puis eux dans leurs cadres dessus" },
+        { at: 4.53, what: "un second clignotement plus serré, une passe toutes les deux images quand le bip double ; tout le lieu en caractères clairs sur noir" },
+        { at: 7.23, what: "son lieu s'efface case par case, des plus lointaines vers la personne immobile, jusqu'à elle seule" },
         { at: 8.03, what: "la personne en caractères clairs sur noir, puis le noir" },
       ],
       camera: "fixe",
       transitions: "coupes nettes",
       motion: "energique",
       music: "a held high beep retriggered on every beat, 155 BPM, a deep rumble, no drums",
-      ending: "son lieu effacé dalle par dalle jusqu'à la personne immobile, en caractères clairs sur noir, puis le noir",
+      ending: "son lieu effacé case par case jusqu'à la personne immobile, en caractères clairs sur noir, puis le noir",
       why: "Son lieu ordinaire vu comme par une machine : le stroboscope de regards intrigue, chaque passe montre autre chose, et la personne immobile au milieu tient l'œil.",
     },
   }),
@@ -2539,7 +2540,7 @@ export const HOUSE_WHEN: Record<string, { pour: string; pas_pour: string }> = {
   detourages: { pour: "présenter un lieu, un paysage ou une sortie avec de l'élan, un nom à faire retenir", pas_pour: "sans plan large et fixe de son lieu ou de son paysage" },
   createur: { pour: "quelqu'un qui explique en parlant face caméra et montre ce dont il parle (ses produits, ses réalisations, son lieu, son site)", pas_pour: "des images sans parole, quelqu'un qui parle sans rien à montrer" },
   silhouette: { pour: "se présenter (elle ou quelqu'un de son équipe), présenter son métier et ce qu'elle fait, un lancement, un ton de studio graphique", pas_pour: "des produits seuls, un lieu sans personne, une offre à lire" },
-  vision: { pour: "son lieu fréquenté filmé de haut, quelqu'un d'immobile au milieu et des gens qui passent autour ; un ton tech ou graphique", pas_pour: "un lieu vide, un plan qui bouge, des produits en gros plan, un message à lire" },
+  vision: { pour: "un plan fixe de son lieu fréquenté (de haut si possible), quelqu'un qui bouge peu au milieu et des gens qui passent ou s'affairent autour ; un ton tech ou graphique", pas_pour: "un lieu vide, un plan qui bouge, des produits en gros plan, un message à lire" },
   "court-metrage": { pour: "raconter sa journée, son quartier ou une sortie comme un petit film, une ouverture, une saison, de belles lumières (le matin, l'heure dorée)", pas_pour: "une offre à lire, quelqu'un qui parle, des vidéos sombres ou toutes en gros plan" },
   "titre-cinema": { pour: "son lieu ou une sortie racontés comme un court film signé de son nom : son métier en un mot, un lieu au soir, une escapade, une ambiance", pas_pour: "sans plan large et fixe où quelqu'un se tient avec du ciel au-dessus, une offre à lire, quelqu'un qui parle" },
   "celui-la": { pour: "montrer ses produits un par un avec humour et en rythme (une collection, des nouveautés, ses pièces, ses gâteaux, ses bouquets, ses réalisations)", pas_pour: "un lieu, quelqu'un qui parle, une offre à lire en détail, un seul produit" },
