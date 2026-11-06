@@ -116,10 +116,11 @@ test("« Un an de plus »: its plan, her files in its slots, her counter at its 
   assert.equal(plan.layers![0]!.motion.drawn, undefined);
   assert.deepEqual(plan.skill, { key: "aventure", version: 1 });
   assert.deepEqual(aventure.reads, ["moves", "covered"]);
-  // Nothing cut out, followed or cleared; only the light under its counter on the three shots it can be on.
+  // Nothing cut out, followed or cleared; only the light under its counter on the shots it can be on (its strong shot,
+  // the third, fourth or fifth; then the next one).
   assert.deepEqual(checkMotionCode(aventure.code), []);
   assert.deepEqual([subjectsDrawn(aventure.code), objectsDrawn(aventure.code), clearsDrawn(aventure.code)], [[], [], []]);
-  assert.deepEqual(readsDrawn(aventure.code), [{ shot: 2, kinds: ["light"] }, { shot: 3, kinds: ["light"] }, { shot: 4, kinds: ["light"] }]);
+  assert.deepEqual(readsDrawn(aventure.code), [2, 3, 4, 5].map((shot) => ({ shot, kinds: ["light"] })));
   assert.ok(aventure.code.length < 24000);
   assert.deepEqual(aventure.finish, { grain: 0, vignette: 0 });
   assert.deepEqual(aventure.settings?.map((s) => [s.name, s.choices.map((c) => c.value)]), [["format", ["auto", "vertical", "horizontal"]]]);
@@ -137,17 +138,18 @@ function interpolate(x: number, [a, b]: number[], [p, q]: number[]) {
   return p! + (q! - p!) * t;
 }
 
-/** Its Scene, run with a plain tree for React (no renderer): the kit's pieces as named nodes. */
-function scene(light?: number) {
+/** Its Scene, run with a plain tree for React (no renderer): the kit's pieces as named nodes; `light`, each shot's (by its segment). */
+function scene(light?: number | ((segment: number) => number)) {
   let current = 0;
   const React = { createElement: (type: unknown, p: Record<string, unknown> | null, ...children: unknown[]): Drawn => ({ type, props: p ?? {}, children }), Fragment: "Fragment" };
+  const lit = (shot: { segment: number }) => (light === undefined ? null : typeof light === "number" ? light : light(shot.segment));
   const scope: Record<string, unknown> = {
     AbsoluteFill: "AbsoluteFill",
     FitText: "FitText",
     Footage: "Footage",
     Whip: "Whip",
     interpolate,
-    LightUnder: () => (light === undefined ? null : { mean: light, high: light }),
+    LightUnder: (shot: { segment: number }) => (lit(shot) === null ? null : { mean: lit(shot), high: lit(shot) }),
     useCurrentFrame: () => current,
   };
   const make = new Function("React", ...Object.keys(scope), `"use strict";\n${aventure.code}\nreturn Scene;`) as (...args: unknown[]) => (p: Record<string, unknown>) => Drawn;
@@ -222,8 +224,11 @@ test("« Un an de plus » draws its counter: the number one less, one more a bea
   // Inside the safe zone, swelled too: left of the apps' buttons (its boxes 590 wide, centred; 1,35 times: 797).
   for (const x of [a, b]) assert.ok(x.left >= 140 && x.left + x.width * 1.35 <= 1080 - 140 + (x.width * 0.35) / 2 && x.top >= 80 && x.top + x.height <= 1440, JSON.stringify(x));
   assert.ok(590 * 1.35 <= 800);
-  // On a bright place (her shot's light under it), in dark ink.
+  // On a bright place (the light of the shot under it), in dark ink; white again over the next shot when it is dark.
   assert.equal((counterAt(scene(0.72), from + 2, p)[0]!.props.innerStyle as Record<string, unknown>).color, "#17130f");
+  const flour = scene((segment) => (segment === 4 ? 0.72 : 0.2));
+  assert.equal((counterAt(flour, from + 2, p)[0]!.props.innerStyle as Record<string, unknown>).color, "#17130f");
+  assert.equal((counterAt(flour, to - 2, p)[0]!.props.innerStyle as Record<string, unknown>).color, "#ffffff");
   // A year, a season: the number before it, then hers; « 1 an » from 0; no number: her words swell on the beat.
   assert.deepEqual(counterAt(draw, from, props(44, { text: "2026" }).p).map(textOf), ["2025"]);
   assert.deepEqual(counterAt(draw, from, props(44, { text: "saison 3" }).p).map(textOf), ["saison", "2"]);

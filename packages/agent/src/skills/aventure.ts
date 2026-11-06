@@ -205,7 +205,10 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const CAP = wide ? Math.max(bh * 0.08, height * 0.045) : bh * 0.08;
   const cy = by + bh * 0.527;
   const zone = { x: bw * 0.2, y: cy - CAP * 1.4, w: bw * 0.6, h: CAP * 2.8 };
-  const light = KC === 2 ? LightUnder(shots[2], frame, laid, zone) : KC === 3 ? LightUnder(shots[3], frame, laid, zone) : KC === 4 ? LightUnder(shots[4], frame, laid, zone) : null;
+  // Read on the shot under it now: its strong shot, then the next one it stays over (each written as a number, so only
+  // those are read).
+  const under = cur === KC + 1 ? KC + 1 : KC;
+  const light = under === 2 ? LightUnder(shots[2], frame, laid, zone) : under === 3 ? LightUnder(shots[3], frame, laid, zone) : under === 4 ? LightUnder(shots[4], frame, laid, zone) : under === 5 ? LightUnder(shots[5], frame, laid, zone) : null;
   const INK = light && light.mean >= 0.6 ? "#17130f" : "#ffffff";
   const display = "'" + brand.displayFont + "', 'Bebas Neue', 'Oswald', sans-serif";
   const body = "'" + brand.bodyFont + "', 'Jost', 'Inter Tight', sans-serif";

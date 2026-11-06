@@ -71,15 +71,17 @@ function interpolate(x: number, [a, b]: number[], [p, q]: number[]) {
 }
 
 /** What its Scene draws at a frame, run with a plain tree for React (no renderer): the kit's pieces as named nodes. */
-function drawAt(frame: number, props: { texts?: Record<string, string>; light?: number; one?: boolean } = {}): Drawn {
+function drawAt(frame: number, props: { texts?: Record<string, string>; light?: number | ((from: number) => number); one?: boolean } = {}): Drawn {
   const React = { createElement: (type: unknown, p: Record<string, unknown> | null, ...children: unknown[]): Drawn => ({ type, props: p ?? {}, children }) };
+  // Each shot's light, by where it starts.
+  const lit = (shot: { from: number }) => (props.light === undefined ? null : typeof props.light === "number" ? props.light : props.light(shot.from));
   const scope: Record<string, unknown> = {
     AbsoluteFill: "AbsoluteFill",
     FitText: "FitText",
     Footage: "Footage",
     interpolate,
     useCurrentFrame: () => frame,
-    LightUnder: () => (props.light === undefined ? null : { mean: props.light, high: props.light }),
+    LightUnder: (shot: { from: number }) => (lit(shot) === null ? null : { mean: lit(shot), high: lit(shot) }),
   };
   const make = new Function("React", ...Object.keys(scope), `"use strict";\n${aventure.code}\nreturn Scene;`) as (...args: unknown[]) => (p: Record<string, unknown>) => Drawn;
   const list = [
@@ -122,6 +124,10 @@ test("« Un an de plus » draws its counter: one less first, hers a beat later s
   assert.ok(Math.abs((Number(styleOf(top!).top) + Number(styleOf(bottom!).top) + Number(styleOf(bottom!).height)) / 2 - 1920 * 0.527) < 4);
   assert.ok(Number(styleOf(top!).left) >= 140 && Number(styleOf(top!).left) + Number(styleOf(top!).width) <= 940);
   assert.equal((counter(drawAt(5, { light: 0.8 }))[0]!.props.innerStyle as Record<string, string>).color, "#17130f");
+  // Its ink read on the shot under it: dark on her bright strong shot, white again over the dark one after the cut.
+  const flour = (from: number) => (from === 0 ? 0.8 : 0.2);
+  assert.equal((counter(drawAt(35, { light: flour }))[0]!.props.innerStyle as Record<string, string>).color, "#17130f");
+  assert.equal((counter(drawAt(37, { light: flour }))[0]!.props.innerStyle as Record<string, string>).color, "#ffffff");
   // A year: the one before it first; no number: her words swell on the beat.
   assert.deepEqual(counter(drawAt(2, { texts: { compteur: "2026" } })).map(textOf), ["2025"]);
   assert.equal(styleOf(counter(drawAt(16, { texts: { compteur: "L'été" } }))[0]!).transform, "scale(1.35)");

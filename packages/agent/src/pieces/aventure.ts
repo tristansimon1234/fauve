@@ -51,7 +51,9 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const CAP = height * 0.08;
   const cy = height * 0.527;
   const zone = { x: width * 0.2, y: cy - CAP * 1.4, w: width * 0.6, h: CAP * 2.8 };
-  const light = k0 >= 0 ? LightUnder(list[k0], frame, BOX, zone) : null;
+  // Read on the shot under it now: her strong shot, then the next one it stays over.
+  const under = k1 >= 0 && frame >= CUT ? k1 : k0;
+  const light = under >= 0 ? LightUnder(list[under], frame, BOX, zone) : null;
   const INK = light && light.mean >= 0.6 ? "#17130f" : "#ffffff";
   const display = "'" + brand.displayFont + "', 'Bebas Neue', 'Oswald', sans-serif";
   const counter = (() => {
