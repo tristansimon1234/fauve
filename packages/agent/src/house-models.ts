@@ -1802,8 +1802,8 @@ export const HOUSE_MODELS: HouseModel[] = [
     name: "Petites lumières",
     // Written on its original's fiche (v1 of its skill, docs/fiches/petites-lumieres.md): three still pictures of a city at
     // dusk where only lights move, on a beat that stops dead three times; its second example is the same song.
-    pitch: "Trois images immobiles de ton lieu le soir où seules tes lumières bougent sur la musique : ta lampe ou ton enseigne qui clignote, tes fenêtres qui s'allument en rouge, un soleil derrière tes toits, puis tout s'éteint d'un coup.",
-    needs: "3 photos ou vidéos fixes de ton lieu le soir : une de tes lumières de près (lampe, enseigne, néon), ta rue ou ta façade avec des fenêtres et un peu de ciel, une façade de face",
+    pitch: "Trois images immobiles de ton lieu le soir où seules tes lumières bougent sur la musique : ta lampe ou ton enseigne qui clignote, tes fenêtres qui s'allument en rouge, un soleil derrière tes toits quand ton ciel se voit, puis tout s'éteint d'un coup.",
+    needs: "3 photos ou vidéos fixes de ton lieu le soir : une de tes lumières de près (lampe, enseigne, néon), ta rue ou ta façade avec des fenêtres et du ciel au-dessus des toits, une façade de face",
     files: [3, 4],
     pair: "editorial",
     // Its original's skill is its reference: no composition of its own.

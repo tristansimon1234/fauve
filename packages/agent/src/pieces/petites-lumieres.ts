@@ -2,14 +2,15 @@ import { REEL_FPS } from "../motion.ts";
 import type { EffectPiece, PieceTimeline, PieceTimelineInput } from "../pieces.ts";
 
 // « Petites lumières », the effect (docs/fiches/petites-lumieres.md, effects 1, 2 and 5; its whole Reel is
-// skills/petites-lumieres.ts, version 1): over one or two still shots of her place, only her lights move, on the beat.
+// skills/petites-lumieres.ts, version 3): over one or two still shots of her place, only her lights move, on the beat.
 // On its first shot, her light (a lamp, a lantern, her sign, a neon: named by its filler) is dimmed off, lit four images on
 // its first beat, off while the music stops for a beat (or two), then three blinks of four images (two off between) as it
 // comes back, and held lit to the end of its shot; on its second, her windows (« every window », or what she has several
 // of that can light) fill with her colour in six waves from the bottom, lit to its end. Kept from its skill: the light's
 // look (its own picture brighter, a glow of its highlights when it already shines in her picture, a lamp's warm light in
 // its shape and a halo when it is off there; nothing named: her own highlights bloom on the same beats), its blinks'
-// four images on and two off, its waves' offsets after the cut and their order (the lowest first), the original's red
+// four images on and two off, its waves' offsets after the cut and their order (the lowest first; a window already lit in
+// her picture flashed and brightened, never covered), the original's red
 // (or a window's warm light, or her colour), and her name lit like a neon, the last light. Its music stopped dead after
 // the opening flash and back on a whole beat of the Reel with the blinks, as its skill's (its first stop). Left out: its
 // sun behind her roofs (her sky is not always under it), its last shot's column going off, its 16:9 band (an effect
@@ -103,7 +104,10 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const TUBE = hers ? "rgb(" + hers.map((c) => Math.round(c + (255 - c) * 0.72)).join(",") + ")" : warm ? "#fff3df" : "#ffe1dc";
   // Her shot as the montage plays it, under its lights (so the layer always holds a picture, even with nothing to light).
   const layers = [h(Footage, { key: "film", shot: cur, style: full })];
-  const bloom = (k, a) => h("div", { key: "bloom", style: { ...full, mixBlendMode: "screen", opacity: a, filter: "brightness(1.15) contrast(2.4) blur(" + Math.max(6, Math.round(H * 0.012)) + "px)" } }, h(Footage, { shot: k, style: full }));
+  // What already shines in her picture, bloomed (nothing named to light): only when something does shine there (its
+  // brightest tenth well above its mean); a grey front, a dull room: nothing.
+  const shines = (k) => { const l = LightUnder(list[k], frame, BOX, null); return !l || (l.high > 0.55 && l.high > l.mean + 0.2); };
+  const bloom = (k, a) => (shines(k) ? h("div", { key: "bloom", style: { ...full, mixBlendMode: "screen", opacity: a, filter: "brightness(1.15) contrast(2.4) blur(" + Math.max(6, Math.round(H * 0.012)) + "px)" } }, h(Footage, { shot: k, style: full })) : null);
 
   // 1. Its first shot: her light dimmed off, lit on its spans (its first beat, three blinks, held). Lit: its own picture
   // brighter, a glow of its highlights when it already shines in her picture, else a lamp's warm light in its shape,
@@ -139,12 +143,23 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
     const now = SubjectParts(list[k1], frame, BOX, "@fenetres", 6);
     const order = ref.map((p, i) => ({ p, box: now[i] || p })).filter((q) => q.box.w > 2 && q.box.h > 2).sort((a, b) => b.p.y + b.p.h - (a.p.y + a.p.h) || a.p.x - b.p.x);
     const rank = (g) => (order.length >= WAVES.length ? Math.floor((g * WAVES.length) / order.length) : g);
-    const lit = order.filter((q, g) => WAVES.length && frame >= WAVES[Math.min(WAVES.length - 1, rank(g))]).map((q) => q.box);
+    const lit = WAVES.length ? order.map((q, g) => ({ box: q.box, at: WAVES[Math.min(WAVES.length - 1, rank(g))] })).filter((q) => frame >= q.at) : [];
     const pad = Math.max(2, Math.round(H * 0.003));
-    const clip = "path('" + lit.map((b) => "M" + Math.round(b.x - pad) + " " + Math.round(b.y - pad) + "h" + Math.round(b.w + 2 * pad) + "v" + Math.round(b.h + 2 * pad) + "h" + -Math.round(b.w + 2 * pad) + "Z").join(" ") + "')";
+    const clip = (boxes) => "path('" + boxes.map((b) => "M" + Math.round(b.x - pad) + " " + Math.round(b.y - pad) + "h" + Math.round(b.w + 2 * pad) + "v" + Math.round(b.h + 2 * pad) + "h" + -Math.round(b.w + 2 * pad) + "Z").join(" ") + "')";
     const draw = () => h(Subject, { shot: k1, object: "@fenetres", style: full, fill: WIN });
-    if (lit.length) layers.push(h("div", { key: "windows", style: { ...full, clipPath: clip } }, draw(), warm || hers ? h("div", { style: { ...full, mixBlendMode: "screen", opacity: 0.6, filter: "blur(" + Math.max(3, Math.round(H * 0.004)) + "px)" } }, draw()) : null));
-    else if (!order.length && WAVES.some((f) => frame >= f && frame < f + 3)) layers.push(bloom(k1, 0.6));
+    // A window already lit in her picture (a shop window at night, her room seen through it: far brighter than her shot)
+    // is never covered: a warm white flash on its first image and half as bright two more, then its own picture brighter
+    // under her colour laid in multiply (her room still seen through it, tinted).
+    const base = LightUnder(list[k1], frame, BOX, null);
+    const alight = (b) => { const l = base && LightUnder(list[k1], frame, BOX, b); return Boolean(l && l.mean > 0.36 && l.mean > base.mean + 0.2); };
+    const dark = lit.filter((q) => !alight(q.box)).map((q) => q.box);
+    const shine = lit.filter((q) => alight(q.box));
+    const flash = shine.filter((q) => frame - q.at < 3).map((q) => q.box);
+    const burst = shine.some((q) => frame - q.at < 1) ? 0.9 : 0.45;
+    if (dark.length) layers.push(h("div", { key: "windows", style: { ...full, clipPath: clip(dark) } }, draw(), warm || hers ? h("div", { style: { ...full, mixBlendMode: "screen", opacity: 0.6, filter: "blur(" + Math.max(3, Math.round(H * 0.004)) + "px)" } }, draw()) : null));
+    if (shine.length) layers.push(h("div", { key: "windows-own", style: { ...full, clipPath: clip(shine.map((q) => q.box)) } }, h("div", { style: { ...full, filter: "brightness(1.3) saturate(1.2)" } }, h(Subject, { shot: k1, object: "@fenetres", style: full })), h("div", { style: { ...full, mixBlendMode: "multiply", opacity: 0.85 } }, draw())));
+    if (flash.length) layers.push(h("div", { key: "windows-flash", style: { ...full, clipPath: clip(flash), mixBlendMode: "screen", opacity: burst } }, h("div", { style: { ...full, backgroundColor: "#fff6dc" } })));
+    if (!order.length && WAVES.some((f) => frame >= f && frame < f + 3)) layers.push(bloom(k1, 0.6));
   }
 
   // 3. Her name lit like a neon (a tube catching: off, on, almost off, on, half, on) in the calm part of its last shot,
@@ -170,7 +185,9 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
 
 export const petitesLumieres: EffectPiece = {
   key: "petites-lumieres",
-  version: 1,
+  // 2: her windows already lit in her picture (her shop windows at night) never covered with a flat colour, flashed and
+  // brightened as its second example lights what already shines (Tristan's Procope bench, 6 November).
+  version: 2,
   name: "Petites lumières",
   how: "sur une image immobile de son lieu, seule sa lumière bouge : sa lampe, son enseigne ou un néon s'allume quatre images sur le temps, s'éteint quand la musique s'arrête, clignote trois fois quand elle revient puis tient allumée ; sur l'image suivante, s'il y en a une, ses fenêtres se remplissent de rouge par vagues du bas vers le haut ; son nom peut s'allumer comme un néon, puis le montage reprend.",
   needs: "une photo ou une vidéo fixe de son lieu le soir avec une lumière de près (une lampe, une lanterne, une enseigne, un néon) ; pour la suite, une façade avec des fenêtres.",

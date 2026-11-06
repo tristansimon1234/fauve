@@ -16,8 +16,8 @@ import { beatSpans, toFrame, type MontageSkill, type SkillSound } from "../skill
 //                 9,88 · 10,16 · 10,39), all off at once on 12,19; the music cut on 12,37, the picture held to the end.
 // Here on her place: her own light (a lamp, a lantern, her sign, a neon: named by the filler) dimmed off and lit on those
 // beats; her windows (or what she has several of that can light) filled with her red in waves from the bottom, and a red
-// sun in her sky, behind her roofs (her skyline read on her shot cuts it, her shot without its sky laid over it when the
-// engine has it); her last shot's column lit from the bottom, then everything off. Its words: none in the original; her
+// sun in her sky, behind her roofs, only when her shot shows sky (her skyline read on her shot cuts it, her shot without
+// its sky laid over it when the engine has it); her last shot's column lit from the bottom, then everything off. Its words: none in the original; her
 // name, when the Reel wants words, lit like a neon in the calm part of her last shot and left on as the last light. A
 // longer Reel she asks for adds a verse: one more bar, lit like the last shot and kept on to its cut, on the next stop's
 // tick (its second example has four shots). Her photos stay still, her videos play (the original's slow push and pull-back left
@@ -105,19 +105,41 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   // 3. Her shot as filmed (a photo still, a video playing), cut on its beats.
   const film = h(Footage, { key: "film", shot: cur, style: full });
   const layers = [];
-  const bloom = (k, a) => h("div", { key: "bloom", style: { ...full, mixBlendMode: "screen", opacity: a, filter: "brightness(1.15) contrast(2.4) blur(" + Math.max(6, Math.round(bh * 0.012)) + "px)" } }, h(Footage, { shot: k, style: full }));
+  // What already shines in her picture, bloomed (nothing named to light): only when something does shine there, its
+  // brightest tenth well above its mean (a lit sign, lamps, lit windows); a grey front, a dull room: nothing (Tristan,
+  // 6 November: « toujours mettre de l'intelligence », every effect on the real thing, nothing when it is not there).
+  const shines = (k) => { const l = LightUnder(shots[k], frame, laid, null); return !l || (l.high > 0.55 && l.high > l.mean + 0.2); };
+  const bloom = (k, a) => (shines(k) ? h("div", { key: "bloom", style: { ...full, mixBlendMode: "screen", opacity: a, filter: "brightness(1.15) contrast(2.4) blur(" + Math.max(6, Math.round(bh * 0.012)) + "px)" } }, h(Footage, { shot: k, style: full })) : null);
   // Pieces in the order they light: the lowest first, left to right (the original's waves climb its floors), read on the
   // shot's first image so each keeps its rank; drawn where they are now.
   const climb = (ref, now) => ref.map((p, i) => ({ i, p, box: now[i] || p })).filter((q) => q.box.w > 2 && q.box.h > 2).sort((a, b) => b.p.y + b.p.h - (a.p.y + a.p.h) || a.p.x - b.p.x);
   const rankOf = (count, steps, g) => (count >= steps ? Math.floor((g * steps) / count) : g);
   const pad = Math.max(2, Math.round(bh * 0.003));
   const clip = (boxes) => "path('" + boxes.map((b) => "M" + Math.round(b.x - pad) + " " + Math.round(b.y - pad) + "h" + Math.round(b.w + 2 * pad) + "v" + Math.round(b.h + 2 * pad) + "h" + -Math.round(b.w + 2 * pad) + "Z").join(" ") + "')";
-  // Lit pieces of an object: its silhouette in her colour shown only through their boxes; a soft halo for the warm light.
-  const litPieces = (key, boxes, draw) => boxes.length
-    ? h("div", { key, style: { ...full, clipPath: clip(boxes) } },
+  // Lit pieces of an object ({ box, at }: its box, the frame it lit), shown only through their boxes. A dark one (the
+  // original's: unlit windows) filled with her colour, a soft halo for the warm light; one already lit in her picture (a
+  // shop window at night, her room seen through it: far brighter than her shot) never covered: a warm white flash on its
+  // first image and half as bright two more, then its own picture brighter under her colour laid in multiply: her room
+  // still seen through it, tinted, as the original's red keeps the glass's matter (its second example lights what already
+  // shines the same way: a flash, then half light).
+  const litPieces = (key, k, items, draw, own) => {
+    if (!items.length) return null;
+    const base = LightUnder(shots[k], frame, laid, null);
+    const alight = (b) => { const l = base && LightUnder(shots[k], frame, laid, b); return Boolean(l && l.mean > 0.36 && l.mean > base.mean + 0.2); };
+    const dark = items.filter((q) => !alight(q.box)).map((q) => q.box);
+    const shine = items.filter((q) => alight(q.box));
+    const flash = shine.filter((q) => frame - q.at < 3).map((q) => q.box);
+    const burst = shine.some((q) => frame - q.at < 1) ? 0.9 : 0.45;
+    return [
+      dark.length ? h("div", { key, style: { ...full, clipPath: clip(dark) } },
         draw(),
-        warm || hers ? h("div", { style: { ...full, mixBlendMode: "screen", opacity: 0.6, filter: "blur(" + Math.max(3, Math.round(bh * 0.004)) + "px)" } }, draw()) : null)
-    : null;
+        warm || hers ? h("div", { style: { ...full, mixBlendMode: "screen", opacity: 0.6, filter: "blur(" + Math.max(3, Math.round(bh * 0.004)) + "px)" } }, draw()) : null) : null,
+      shine.length ? h("div", { key: key + "-own", style: { ...full, clipPath: clip(shine.map((q) => q.box)) } },
+        h("div", { style: { ...full, filter: "brightness(1.3) saturate(1.2)" } }, own()),
+        h("div", { style: { ...full, mixBlendMode: "multiply", opacity: 0.85 } }, draw())) : null,
+      flash.length ? h("div", { key: key + "-flash", style: { ...full, clipPath: clip(flash), mixBlendMode: "screen", opacity: burst } }, h("div", { style: { ...full, backgroundColor: "#fff6dc" } })) : null,
+    ];
+  };
 
   // 4. Its first shot: her light dimmed off, lit on the original's beats (the opening hit, three blinks, held), off again.
   // Lit: its own picture brighter, with a glow of its own highlights when it already shines in her picture (a lit neon, a
@@ -146,59 +168,74 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
     else if (lampOn) layers.push(bloom(0, 0.85));
   }
 
-  // 5. Its second shot: a sun in her sky behind her roofs, shrinking slowly (its radius from 20 to 15,7 % of the width), cut
+  // 5. Its sun: a flat disc in her sky behind her roofs, shrinking slowly (its radius from 20 to 15,7 % of the width), cut
   // to the sky above her skyline as read on her shot, her shot without its sky laid over it; set where her sky goes
   // deepest across a sun's width (the nearest the middle when two places are as good, as the original's), its centre a
-  // little above her roofline there, the whole disc inside the frame (smaller under a low sky, none under too little);
-  // her windows filled with her colour in six waves from the bottom, lit to the cut. No sky read (an interior): no sun.
+  // little above her roofline there, the whole disc inside the frame (smaller under a low sky, none under too little).
+  // Only where her shot shows sky (Tristan, 6 November, on the Procope: « l'effet soleil … que sur un ciel »; it had
+  // fallen on a café's front at night, which the skyline read as sky): the sky named by the filler and found in her frame
+  // (« @ciel »…), the sun inside it, under its skyline. On her second shot as the original; when it shows none, on the
+  // next of her shots that does (« toujours mettre de l'intelligence »), never her lamp's; no sky anywhere: no sun, her
+  // lights alone (as its second example, the same song without one).
+  const heavenOf = (k, f) => (k === 1 ? SubjectBox(shots[1], f, laid, "@ciel") : k === last ? SubjectBox(shots[last], f, laid, "@ciel_fin") : SubjectBox(shots[2], f, laid, "@ciel_suite"));
+  const skylineOf = (k, f, x) => (k === 1 ? SkylineAt(shots[1], f, laid, x) : k === 2 ? SkylineAt(shots[2], f, laid, x) : SkylineAt(shots[3], f, laid, x));
+  const sunOf = (k, f) => {
+    const heaven = heavenOf(k, f);
+    if (!heaven || !(heaven.y < bh * 0.12 && heaven.h > bh * 0.12)) return null;
+    const COLS = 64;
+    const cw = bw / COLS;
+    const read = Array.from({ length: COLS }, (_, c) => skylineOf(k, f, { from: c * cw, to: (c + 1) * cw }));
+    const known = read.map((y, c) => (y !== null ? c : -1)).filter((c) => c >= 0);
+    if (!known.length) return null;
+    const prof = read.map((y, c) => (y !== null ? y : read[known.reduce((a, j) => (Math.abs(j - c) < Math.abs(a - c) ? j : a), known[0])]));
+    const t = Math.max(0, Math.min(1, (f - shots[k].from) / Math.max(1, shots[k].durationInFrames)));
+    const R0 = Math.round(Math.min(bw * 0.2, bh * 0.24));
+    const span = Math.max(1, Math.round(R0 / cw));
+    // Its whole disc inside the frame (only the columns a sun's width from both edges), its middle in her sky, never
+    // lower than the sky found there.
+    const cols = [];
+    const floor = heaven.y + heaven.h;
+    for (let c = 0; c < COLS; c++) {
+      const x = (c + 0.5) * cw;
+      if (x < R0 + bw * 0.06 || x > bw - R0 - bw * 0.06 || x < heaven.x + R0 * 0.5 || x > heaven.x + heaven.w - R0 * 0.5) continue;
+      cols.push({ depth: Math.min(floor, ...prof.slice(Math.max(0, c - Math.floor(span / 2)), Math.min(COLS, c + Math.ceil(span / 2)))), x });
+    }
+    const deepest = Math.max(-1, ...cols.map((q) => q.depth));
+    const best = cols.filter((q) => q.depth >= deepest - 0.25 * R0).sort((p, q) => Math.abs(p.x - bw / 2) - Math.abs(q.x - bw / 2))[0];
+    // Its top a little below the frame's: the disc made smaller to fit (half its size at least).
+    const m = bh * 0.04;
+    const fit = best ? Math.min(1, (best.depth - m) / (1.45 * R0), (bh * 0.5 - m) / R0) : 0;
+    if (!best || fit < 0.5) return null;
+    const r = Math.round(R0 * fit * (1 - 0.215 * t));
+    // Her sky: above a line through her skyline's points (a roof's slope stays a slope, never a staircase), never below
+    // the sky found.
+    const yk = (c) => Math.round(Math.min(floor, prof[c]));
+    let d = "M0 0H" + bw + "V" + yk(COLS - 1);
+    for (let c = COLS - 1; c >= 0; c--) d += "L" + Math.round((c + 0.5) * cw) + " " + yk(c);
+    d += "L0 " + yk(0) + "Z";
+    return { d, r, cx: Math.round(best.x), cy: Math.round(Math.min(best.depth - 0.45 * r, bh * 0.5)) };
+  };
+  const sunShot = setting("soleil", "oui") === "non" ? -1 : [1, 2, 3].filter((k) => k < n).find((k) => sunOf(k, shots[k].from)) ?? -1;
+  const sun = cur === sunShot ? sunOf(cur, frame) : null;
+  if (sun) layers.push(
+    h("div", { key: "sky", style: { ...full, clipPath: "path('" + sun.d + "')" } },
+      h("div", { style: { position: "absolute", left: sun.cx - sun.r, top: sun.cy - sun.r, width: 2 * sun.r, height: 2 * sun.r, borderRadius: "50%", backgroundColor: SUN } })),
+    cur === 1 ? h(Skyline, { key: "ground", shot: 1, style: full }) : cur === 2 ? h(Skyline, { key: "ground", shot: 2, style: full }) : h(Skyline, { key: "ground", shot: 3, style: full }));
+
+  // 6. Its second shot: her windows filled with her colour in six waves from the bottom, lit to the cut.
   if (n > 1 && cur === 1) {
     const s1 = shots[1];
-    if (setting("soleil", "oui") !== "non") {
-      const COLS = 64;
-      const cw = bw / COLS;
-      const read = Array.from({ length: COLS }, (_, k) => SkylineAt(shots[1], frame, laid, { from: k * cw, to: (k + 1) * cw }));
-      const known = read.map((y, k) => (y !== null ? k : -1)).filter((k) => k >= 0);
-      const prof = known.length ? read.map((y, k) => (y !== null ? y : read[known.reduce((a, j) => (Math.abs(j - k) < Math.abs(a - k) ? j : a), known[0])])) : [];
-      const t = Math.max(0, Math.min(1, rel / Math.max(1, s1.durationInFrames)));
-      const R0 = Math.round(Math.min(bw * 0.2, bh * 0.24));
-      const span = Math.max(1, Math.round(R0 / cw));
-      // Its whole disc inside the frame: only the columns a sun's width from both edges.
-      const cols = [];
-      for (let c = 0; c < prof.length; c++) {
-        const x = (c + 0.5) * cw;
-        if (x < R0 + bw * 0.06 || x > bw - R0 - bw * 0.06) continue;
-        cols.push({ depth: Math.min(...prof.slice(Math.max(0, c - Math.floor(span / 2)), Math.min(COLS, c + Math.ceil(span / 2)))), x });
-      }
-      const deepest = Math.max(-1, ...cols.map((q) => q.depth));
-      const best = cols.filter((q) => q.depth >= deepest - 0.25 * R0).sort((a, b) => Math.abs(a.x - bw / 2) - Math.abs(b.x - bw / 2))[0];
-      // Its top a little below the frame's: the disc made smaller to fit (half its size at least).
-      const m = bh * 0.04;
-      const fit = best ? Math.min(1, (best.depth - m) / (1.45 * R0), (bh * 0.5 - m) / R0) : 0;
-      if (best && fit >= 0.5) {
-        const r = Math.round(R0 * fit * (1 - 0.215 * t));
-        const cy = Math.round(Math.min(best.depth - 0.45 * r, bh * 0.5));
-        const cx = Math.round(best.x);
-        // Her sky: above a line through her skyline's points (a roof's slope stays a slope, never a staircase).
-        let d = "M0 0H" + bw + "V" + Math.round(prof[COLS - 1]);
-        for (let k = COLS - 1; k >= 0; k--) d += "L" + Math.round((k + 0.5) * cw) + " " + Math.round(prof[k]);
-        d += "L0 " + Math.round(prof[0]) + "Z";
-        layers.push(
-          h("div", { key: "sky", style: { ...full, clipPath: "path('" + d + "')" } },
-            h("div", { style: { position: "absolute", left: cx - r, top: cy - r, width: 2 * r, height: 2 * r, borderRadius: "50%", backgroundColor: SUN } })),
-          h(Skyline, { key: "ground", shot: 1, style: full }));
-      }
-    }
     const WAVES = [0, 1, 2, 3, 4, 5].map((k) => mark("wave_" + k, NaN)).filter(Number.isFinite);
     const order = climb(SubjectParts(shots[1], s1.from, laid, "@fenetres", 6), SubjectParts(shots[1], frame, laid, "@fenetres", 6));
-    const lit = order.filter((q, g) => frame >= WAVES[Math.min(WAVES.length - 1, rankOf(order.length, WAVES.length, g))]).map((q) => q.box);
-    if (order.length) layers.push(litPieces("windows", lit, () => h(Subject, { shot: 1, object: "@fenetres", style: full, fill: WIN })));
+    const lit = order.map((q, g) => ({ box: q.box, at: WAVES[Math.min(WAVES.length - 1, rankOf(order.length, WAVES.length, g))] })).filter((q) => frame >= q.at);
+    if (order.length) layers.push(litPieces("windows", 1, lit, () => h(Subject, { shot: 1, object: "@fenetres", style: full, fill: WIN }), () => h(Subject, { shot: 1, object: "@fenetres", style: full })));
     else {
       const hit = WAVES.filter((f) => frame >= f && frame < f + 3).length;
       if (hit) layers.push(bloom(1, 0.6));
     }
   }
 
-  // 6. Its later shots: a column lit from the bottom in four steps after its cut; in the last one everything goes off at
+  // 7. Its later shots: a column lit from the bottom in four steps after its cut; in the last one everything goes off at
   // once, then the picture holds. A verse (a fourth shot, for a longer Reel) keeps its column on to its cut.
   if (cur >= 2 && n > 2) {
     const STEPS = [0, 1, 2, 3].map((k) => mark("step_" + k, NaN)).filter(Number.isFinite);
@@ -207,14 +244,15 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
     const parts = (f) => (verse ? SubjectParts(shots[2], f, laid, "@suite", 8) : SubjectParts(shots[last], f, laid, "@colonne", 8));
     const order = climb(parts(shots[cur].from), parts(frame));
     const on = verse || rel < OFF;
-    const lit = on ? order.filter((q, g) => rel >= STEPS[Math.min(STEPS.length - 1, rankOf(order.length, STEPS.length, g))]).map((q) => q.box) : [];
-    if (order.length) layers.push(litPieces("column", lit, () => (verse ? h(Subject, { shot: 2, object: "@suite", style: full, fill: WIN }) : h(Subject, { shot: last, object: "@colonne", style: full, fill: WIN }))));
+    const lit = on ? order.map((q, g) => ({ box: q.box, at: shots[cur].from + STEPS[Math.min(STEPS.length - 1, rankOf(order.length, STEPS.length, g))] })).filter((q) => frame >= q.at) : [];
+    const piece = (fill) => (verse ? h(Subject, { shot: 2, object: "@suite", style: full, fill }) : h(Subject, { shot: last, object: "@colonne", style: full, fill }));
+    if (order.length) layers.push(litPieces("column", cur, lit, () => piece(WIN), () => piece(undefined)));
     else if (on && STEPS.length && rel >= STEPS[0]) layers.push(bloom(cur, rel < STEPS[STEPS.length - 1] + 3 ? 0.7 : 0.45));
   }
 
   const frameBox = h("div", { style: { position: "absolute", left: 0, top: by, width: bw, height: bh, overflow: "hidden", backgroundColor: "#000000" } }, film, ...layers);
 
-  // 7. Her name lit like a neon (a tube catching: off, on, almost off, on, half, on) in the calm part of her last shot (its
+  // 8. Her name lit like a neon (a tube catching: off, on, almost off, on, half, on) in the calm part of her last shot (its
   // sky first), with its column's first step, left on once everything else is off: the last light. Horizontal: above
   // the band, on the black. Her ending card in its place after the held picture, lit the same way.
   const hook = reelTexts.find((t) => t.role === "hook");
@@ -255,13 +293,18 @@ export const petitesLumieres: MontageSkill = {
   key: "petites-lumieres",
   // 2: vertical full frame by default, her horizontal files cropped on their subject, its band only when she asks for
   // it (Tristan, 6 November, on seven benches: « vertical please », « tout vertical please »).
-  version: 2,
+  // 3: its sun only in a sky (Tristan, 6 November, on the Procope bench, where it sat on a café's front at night: « l'effet
+  // soleil … que sur un ciel ») — the sky named by the filler and found in her frame, the sun inside it, under her
+  // skyline; none on a front, a wall, an interior. Her windows already lit in her picture (her shop windows at night)
+  // never covered with a flat colour: flashed and brightened, as its second example lights what already shines. When her
+  // second shot shows no sky, the sun on the next of her shots that does (« toujours mettre de l'intelligence »).
+  version: 3,
   bpm: BPM,
   // Three shots, as the original (three videos giving several passages each still make three); a verse for a longer Reel she asks for.
   shots: [3, 3],
   long: 4,
   files: [3, 4],
-  how: "Trois images immobiles de son lieu le soir où seules les lumières bougent, sur un beat qui s'arrête net trois fois : sa lampe (ou son enseigne, un néon) clignote sur la musique puis tient allumée et s'éteint ; ses fenêtres se remplissent de rouge par vagues du bas vers le haut, un soleil rouge derrière ses toits ; une colonne de fenêtres s'allume du bas vers le haut, puis tout s'éteint d'un coup ; son nom, quand il faut des mots, reste allumé comme un néon, la dernière lumière. En vertical plein écran ; ses images horizontales entières dans une bande 16:9 sur du noir.",
+  how: "Trois images immobiles de son lieu le soir où seules les lumières bougent, sur un beat qui s'arrête net trois fois : sa lampe (ou son enseigne, un néon) clignote sur la musique puis tient allumée et s'éteint ; ses fenêtres se remplissent de rouge par vagues du bas vers le haut, un soleil rouge derrière ses toits quand son ciel se voit ; une colonne de fenêtres s'allume du bas vers le haut, puis tout s'éteint d'un coup ; son nom, quand il faut des mots, reste allumé comme un néon, la dernière lumière. En vertical plein écran ; ses images horizontales entières dans une bande 16:9 sur du noir.",
   end: true,
   texts: [
     {
@@ -293,6 +336,21 @@ export const petitesLumieres: MontageSkill = {
       shot: -1,
       want: "ses fenêtres dans ce plan, chacune à part (« every window »), le mieux les unes au-dessus des autres, ou ce qui s'aligne en hauteur : une guirlande, une enseigne verticale, ses étagères éclairées ; vide sinon",
     },
+    {
+      slot: "ciel",
+      shot: 1,
+      want: "« sky » seulement si le ciel se voit dans ce plan au-dessus de ses toits, en haut de l'image (le soleil s'y pose) ; vide pour une façade de près, un mur, une vitrine, un intérieur, ou un ciel qui ne tient qu'au coin d'une vidéo horizontale : pas de soleil alors",
+    },
+    {
+      slot: "ciel_suite",
+      shot: 2,
+      want: "« sky » seulement si le ciel se voit dans ce plan au-dessus de ses toits, en haut de l'image (le soleil s'y pose quand le deuxième plan n'en montre pas) ; vide pour une façade de près, un mur, une vitrine, un intérieur",
+    },
+    {
+      slot: "ciel_fin",
+      shot: -1,
+      want: "« sky » seulement si le ciel se voit dans ce plan au-dessus de ses toits, en haut de l'image (le soleil s'y pose quand les plans d'avant n'en montrent pas) ; vide pour une façade de près, un mur, une vitrine, un intérieur",
+    },
   ],
   settings: [
     {
@@ -317,7 +375,7 @@ export const petitesLumieres: MontageSkill = {
       name: "soleil",
       want: "le soleil rouge dans son ciel, derrière ses toits, sur le deuxième plan",
       choices: [
-        { value: "oui", says: "un soleil dans son ciel derrière ses toits, qui rétrécit lentement" },
+        { value: "oui", says: "un soleil dans son ciel derrière ses toits, qui rétrécit lentement, seulement quand son plan montre du ciel" },
         { value: "non", says: "sans soleil, son ciel tel quel" },
       ],
     },
@@ -337,7 +395,7 @@ export const petitesLumieres: MontageSkill = {
     const name = at(lastCut + STEPS[0]!);
     const wants = [
       `une de ses lumières de près, sur une photo ou une vidéo fixe (téléphone posé), le soir : un lampadaire, une lanterne, une applique, son enseigne lumineuse, un néon, devant un ciel ou un mur calme ; elle y clignote sur la musique, tient allumée puis s'éteint (${comma(spans[0]!.end)} s)`,
-      `sa rue, sa façade ou son lieu en plan large, sur une photo ou une vidéo fixe, avec des fenêtres (éclairées ou pas) ou des lumières répétées, et un peu de ciel au-dessus des toits : ses fenêtres s'y allument par vagues, un soleil se pose derrière ses toits (${comma(spans[1]!.end - spans[1]!.start)} s)`,
+      `sa rue, sa façade ou son lieu en plan large, sur une photo ou une vidéo fixe, avec des fenêtres (éclairées ou pas) ou des lumières répétées, et du ciel au-dessus des toits en haut de l'image, le mieux de ses fichiers celui qui en montre : ses fenêtres s'y allument par vagues, un soleil se pose dans son ciel derrière ses toits (sans ciel, pas de soleil : ses fenêtres seules) (${comma(spans[1]!.end - spans[1]!.start)} s)`,
       ...(verse ? ["une autre façade ou une autre vue de son lieu, fixe, avec des fenêtres ou des lumières les unes au-dessus des autres : elles s'y allument du bas vers le haut"] : []),
       "sa façade ou un immeuble de face, sur une photo ou une vidéo fixe, ses fenêtres les unes au-dessus des autres (ou une guirlande, une enseigne verticale) : elles s'allument du bas vers le haut, puis tout s'éteint d'un coup et l'image reste",
     ];
@@ -365,7 +423,7 @@ export const petitesLumieres: MontageSkill = {
         end: { at: round3(at(MUSIC_END + verse) + card * beat), fade: 0.012 },
       },
       // Its verse's column on its third shot, only with four of them.
-      objects: { suite: verse ? 2 : 99 },
+      objects: { suite: verse ? 2 : 99, ciel_suite: verse ? 2 : 99 },
     };
   },
   code: CODE,
