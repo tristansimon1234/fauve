@@ -256,15 +256,17 @@ function CalloutOf(hooks: KitHooks) {
     const head = 22 + width * 2;
     const tip = (s: number) => `${a.x - Math.cos(ang + s) * head},${a.y - Math.sin(ang + s) * head}`;
     const labelIn = interpolate(frame, [at + frames * 0.6, at + frames], [0, 1], clamp);
+    // Its line is decoration; its label is a word to read, checked as a small label (data-fauve-accent): it escaped every check.
     return (
-      <div data-fauve-decor="" style={{ position: "absolute", inset: 0, pointerEvents: "none", opacity: fade }}>
-        <svg width={video.width} height={video.height} style={{ position: "absolute", left: 0, top: 0 }} aria-hidden="true">
+      <div style={{ position: "absolute", inset: 0, pointerEvents: "none", opacity: fade }}>
+        <svg data-fauve-decor="" width={video.width} height={video.height} style={{ position: "absolute", left: 0, top: 0 }} aria-hidden="true">
           <path d={path} fill="none" stroke={color} strokeWidth={width} strokeLinecap="round" strokeDasharray={total} strokeDashoffset={total * (1 - p)} />
           {p >= 0.98 && kind === "arrow" ? <polyline points={`${tip(0.45)} ${a.x},${a.y} ${tip(-0.45)}`} fill="none" stroke={color} strokeWidth={width} strokeLinecap="round" strokeLinejoin="round" /> : null}
           {p >= 0.98 && kind === "dot" ? <circle cx={a.x} cy={a.y} r={width * 2.5} fill={color} /> : null}
         </svg>
         {label ? (
           <div
+            data-fauve-accent=""
             style={{
               position: "absolute",
               left: to.x,
@@ -321,14 +323,14 @@ function BracketsOf(hooks: KitHooks) {
       `M ${x0 + l} ${y1} L ${x0} ${y1} L ${x0} ${y1 - l}`,
     ];
     return (
-      <div data-fauve-decor="" style={{ position: "absolute", inset: 0, pointerEvents: "none", opacity: p }}>
-        <svg width="100%" height="100%" style={{ position: "absolute", left: 0, top: 0, overflow: "visible" }} aria-hidden="true">
+      <div style={{ position: "absolute", inset: 0, pointerEvents: "none", opacity: p }}>
+        <svg data-fauve-decor="" width="100%" height="100%" style={{ position: "absolute", left: 0, top: 0, overflow: "visible" }} aria-hidden="true">
           {corners.map((d, i) => (
             <path key={i} d={d} fill="none" stroke={color} strokeWidth={width} strokeLinecap="square" />
           ))}
         </svg>
         {label ? (
-          <div style={{ position: "absolute", left: x0, top: y0 - 44, color, fontFamily: "'IBM Plex Mono', 'Space Mono', monospace", fontSize: 26, letterSpacing: "0.08em", textTransform: "uppercase", textShadow: "0 1px 3px rgba(0,0,0,0.5)", whiteSpace: "nowrap" }}>{label}</div>
+          <div data-fauve-accent="" style={{ position: "absolute", left: x0, top: y0 - 44, color, fontFamily: "'IBM Plex Mono', 'Space Mono', monospace", fontSize: 26, letterSpacing: "0.08em", textTransform: "uppercase", textShadow: "0 1px 3px rgba(0,0,0,0.5)", whiteSpace: "nowrap" }}>{label}</div>
         ) : null}
       </div>
     );

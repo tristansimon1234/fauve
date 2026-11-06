@@ -874,6 +874,21 @@ function freePassage(file: SkillFile, length: number, wanted: number, taken: Map
   return starts.find(free) ?? null;
 }
 
+/** Words as compared: lower case, no accents, no punctuation. */
+const plainText = (s: string) =>
+  s
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
+    .trim();
+
+/** Her sentence whole in a model's words, read in their order (one place, or over the places that follow each other). */
+export function holdsWhole(words: string[], herText: string): boolean {
+  const her = plainText(herText);
+  return !her || ` ${plainText(words.filter(Boolean).join(" "))} `.includes(` ${her} `);
+}
+
 /** Its words cut to their place: at the last word that fits, never in the middle of one. */
 export function fitWords(text: string, max: number): string {
   const clean = text.replace(/\s+/g, " ").trim();
@@ -917,7 +932,7 @@ export function readSkillFill(
   files: SkillFile[],
   n: number,
   answer: SkillFillAnswer,
-  options: { wordsWanted?: boolean; talk?: SkillTalk; facts?: SkillFacts; heard?: SkillHeard; asked?: string } = {},
+  options: { wordsWanted?: boolean; talk?: SkillTalk; facts?: SkillFacts; heard?: SkillHeard; asked?: string; herText?: string | null } = {},
 ): SkillFill | null {
   if (!files.length) return null;
   // Timed on her voice: her talk is its shots (cut by the engine), and her words its texts; without her talk, nothing to play.
@@ -981,6 +996,9 @@ export function readSkillFill(
   if (skill.voice && !said) return null;
   const title = fitWords(answer.end?.title ?? "", 40);
   const subtitle = answer.end?.subtitle?.trim() ? fitWords(answer.end.subtitle, 60) : "";
+  // Her own words for the screen are never cut to a place (« Nouvelle carte d'automne » came out « Nouvelle carte »):
+  // a model that cannot hold them whole is not played by code, and the chain makes her Reel with them (Tristan: « ok »).
+  if (options.herText?.trim() && !options.heard && !holdsWhole([...Object.values(texts), title, subtitle], options.herText)) return null;
   // Its ending card stays optional: one that brings an offer she did not ask for is left out, never written.
   const offered = unaskedOffer(`${title} ${subtitle}`, options.asked);
   const end = skill.end && title && !offered ? { title, ...(subtitle ? { subtitle } : {}) } : null;

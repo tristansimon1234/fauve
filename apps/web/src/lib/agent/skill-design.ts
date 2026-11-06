@@ -398,7 +398,14 @@ export async function designSkill(params: {
     const bpm = !heard && fit.bpm !== skill.bpm ? fit.bpm : undefined;
     // What she asked (her request and what she fixed): an offer she never spoke of is not written (unaskedOffer).
     const asked = [input.demande, ...(input.contrat ?? [])].join("\n");
-    const read = readSkillFill(skill, files, n, answer, { wordsWanted, asked, ...(talk ? { talk } : {}), ...(known ? { facts: known } : {}), ...(heard ? { heard: heard.said } : {}) });
+    const read = readSkillFill(skill, files, n, answer, {
+      wordsWanted,
+      asked,
+      herText: params.contract?.screen_text,
+      ...(talk ? { talk } : {}),
+      ...(known ? { facts: known } : {}),
+      ...(heard ? { heard: heard.said } : {}),
+    });
     if (!read) return null;
     // A correction keeps the settings it had but what her request changes (a new Reel: only those she asks); her videos
     // kept whole (the contract's frame) play its band when her words chose no format (vertical full frame by default).

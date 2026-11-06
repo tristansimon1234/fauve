@@ -2597,6 +2597,33 @@ test("ending: the last text cut by the end starts earlier, never over another on
   assert.deepEqual(readableEnding(texts, [{ from: 8, to: 9.2 }], 10).at(-1), { from: 9.3, to: 10 });
 });
 
+test("her own words for the screen are never taken off nor cut, by an animation or by a model's place", async () => {
+  const { clearOfAnimations, holdsHerWords } = await import("./editor.ts");
+  const { holdsWhole } = await import("./skills.ts");
+  const her = "-20 % ce week-end";
+  // An animation all along where she wanted her offer written: it went without a word; now it stays where the editor put it.
+  const offer = { text: "-20 % ce week-end", from: 2, to: 4 };
+  const animation = { from: 1.5, to: 9.5, words: "notre nouvelle carte" };
+  assert.deepEqual(clearOfAnimations([offer], [animation], 10), []);
+  assert.deepEqual(clearOfAnimations([offer], [animation], 10, (t) => holdsHerWords(t.text, her)), [offer]);
+  // Another text gives way to hers, never the other way round.
+  const other = { text: "on t'attend", from: 2, to: 4 };
+  const kept = clearOfAnimations([other, offer], [], 10, (t) => holdsHerWords(t.text, her));
+  assert.deepEqual(kept[0], offer);
+  assert.ok(kept.every((t) => t === offer || t.from >= offer.to - 0.001));
+  // Her sentence, or a part of it written as its own text; another text is not hers.
+  assert.equal(holdsHerWords("−20 % CE WEEK-END !", her), true);
+  assert.equal(holdsHerWords("ce week-end", her), true);
+  assert.equal(holdsHerWords("on t'attend", her), false);
+  // One word of hers alone is not her text (« ce »); « week-end » reads as two words.
+  assert.equal(holdsHerWords("ce", her), false);
+  assert.equal(holdsHerWords("ce week-end", null), false);
+  // A model's places hold her sentence whole, in one place or over places that follow each other; a cut does not.
+  assert.equal(holdsWhole(["Nouvelle carte d'automne", "Chez Lina"], "Nouvelle carte d'automne"), true);
+  assert.equal(holdsWhole(["Nouvelle carte", "d'automne"], "Nouvelle carte d'automne"), true);
+  assert.equal(holdsWhole(["Nouvelle carte", "Chez Lina"], "Nouvelle carte d'automne"), false);
+});
+
 test("texts and animations: an animated hook is not written again after it, and two texts never show at once", async () => {
   const { clearOfAnimations } = await import("./editor.ts");
   const opening = { from: 0, to: 1.67, words: "alors, tu reviens quand ?" };

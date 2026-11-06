@@ -199,9 +199,19 @@ type OnFace = { text: string; frames: number[]; face: [number, number, number, n
 
 /**
  * Visible texts outside the safe zone, per text, in one copy of the scene; and those over the eyes,
- * nose or mouth of a face seen under it at that frame (`onFace`).
+ * nose or mouth of a face seen under it at that frame (`onFace`), unless her cut-out (`people`) is drawn
+ * over the text there: a word laid behind her head covers nothing of her face.
  */
-function measure(copy: HTMLElement, frame: number, width: number, height: number, out: Map<string, Out>, seen: Seen, onFace: Map<string, OnFace>) {
+function measure(
+  copy: HTMLElement,
+  frame: number,
+  width: number,
+  height: number,
+  out: Map<string, Out>,
+  seen: Seen,
+  onFace: Map<string, OnFace>,
+  people: DrawnPerson[] = [],
+) {
   const origin = copy.getBoundingClientRect();
   const zone = {
     left: SAFE_ZONE.edge - TOLERANCE,
@@ -228,10 +238,11 @@ function measure(copy: HTMLElement, frame: number, width: number, height: number
     for (const r of Array.from(range.getClientRects())) {
       if (r.width < 1 || r.height < 1) continue;
       const box: Out["box"] = [r.left - origin.left, r.top - origin.top, r.right - origin.left, r.bottom - origin.top];
+      const hiddenThere = (x: number, y: number) => people.some((p) => paintedUnder(node.parentElement!, p.marker) && inBox(p.box, x, y) && p.shapes.some((shape) => inShape(shape, x, y)));
       for (const face of seen.faces) {
         const features = [face.points?.right_eye, face.points?.left_eye, face.points?.nose, face.points?.mouth];
         const covered = features.some(
-          (p) => p && p.x >= box[0] - FACE_MARGIN && p.x <= box[2] + FACE_MARGIN && p.y >= box[1] - FACE_MARGIN && p.y <= box[3] + FACE_MARGIN,
+          (p) => p && p.x >= box[0] - FACE_MARGIN && p.x <= box[2] + FACE_MARGIN && p.y >= box[1] - FACE_MARGIN && p.y <= box[3] + FACE_MARGIN && !hiddenThere(p.x, p.y),
         );
         if (!covered) continue;
         const entry = onFace.get(text) ?? { text, frames: [], face: [face.x - face.width / 2, face.y - face.height / 2, face.x + face.width / 2, face.y + face.height / 2] };
@@ -672,11 +683,14 @@ function paintedUnder(a: Element, b: Element): boolean {
  * The words of a copy laid behind her (painted before a Subject) that her silhouette hides, read from what was
  * tracked in her shot placed in the box she is drawn in: more than HIDDEN_SHARE of a word covered.
  */
-function hiddenBehind(copy: HTMLElement, frame: number, track: TrackFn, found: Map<string, Hidden>) {
+/** Her cut-out drawn in a copy (a Subject), with the box she is drawn in and her silhouette there. */
+type DrawnPerson = { marker: HTMLElement; box: PersonBox; shapes: Shape[] };
+
+function drawnPeople(copy: HTMLElement, frame: number, track: TrackFn): DrawnPerson[] {
   const markers = Array.from(copy.querySelectorAll<HTMLElement>("[data-fauve-subject]"));
-  if (!markers.length) return;
+  if (!markers.length) return [];
   const origin = copy.getBoundingClientRect();
-  const people = markers.flatMap((marker) => {
+  return markers.flatMap((marker) => {
     // Her shadow (a faint copy of her, offset): it hides nothing.
     if (seenOpacity(marker, copy) < 0.5) return [];
     const r = marker.getBoundingClientRect();
@@ -686,7 +700,29 @@ function hiddenBehind(copy: HTMLElement, frame: number, track: TrackFn, found: M
     const shapes: Shape[] = silhouette(seen, box);
     return shapes.length ? [{ marker, box, shapes }] : [];
   });
+}
+
+/**
+ * The faces seen in a copy: those of the footage under the scene, and in a composition (a split screen, a mosaic)
+ * those of each of her shots in the box it is drawn in. A composition's faces were never checked: a text could sit
+ * on her eyes in a split screen without anything seeing it.
+ */
+function facesIn(copy: HTMLElement, frame: number, track: TrackFn): Seen["faces"] {
+  const origin = copy.getBoundingClientRect();
+  const laid = Array.from(copy.querySelectorAll<HTMLElement>("[data-fauve-shot]")).flatMap((el) => {
+    if (seenOpacity(el, copy) < 0.5) return [];
+    const r = el.getBoundingClientRect();
+    const shot = Number(el.dataset.fauveShot);
+    if (!(r.width > 0 && r.height > 0) || !Number.isFinite(shot)) return [];
+    return track(frame, { shot, left: r.left - origin.left, top: r.top - origin.top, width: r.width, height: r.height }).faces;
+  });
+  return [...track(frame).faces, ...laid];
+}
+
+function hiddenBehind(copy: HTMLElement, frame: number, track: TrackFn, found: Map<string, Hidden>, drawn?: DrawnPerson[]) {
+  const people = drawn ?? drawnPeople(copy, frame, track);
   if (!people.length) return;
+  const origin = copy.getBoundingClientRect();
   const range = document.createRange();
   const walker = document.createTreeWalker(copy, NodeFilter.SHOW_TEXT);
   for (let node = walker.nextNode(); node; node = walker.nextNode()) {
@@ -799,9 +835,10 @@ export function SceneCheck({ js, texts, durationInFrames, brand, photos = [], cu
       const hidden = new Map<string, Hidden>();
       document.querySelectorAll<HTMLElement>("[data-check-frame]").forEach((copy) => {
         const frame = Number(copy.dataset.checkFrame);
-        measure(copy, frame, width, height, out, track(frame), onFace);
+        const people = drawnPeople(copy, frame, track);
+        measure(copy, frame, width, height, out, { ...track(frame), faces: facesIn(copy, frame, track) }, onFace, people);
         sizes(copy, largest, accents, skip);
-        hiddenBehind(copy, frame, track, hidden);
+        hiddenBehind(copy, frame, track, hidden, people);
         if (backdrop) {
           inks(copy, frame, backdrop, grids, lost);
           marks(copy, frame, backdrop, grids, lost);

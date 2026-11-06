@@ -1335,7 +1335,7 @@ test("the director's look at its own Reel: its first image, each text coming in 
   assert.equal(long.at(-1), 39.7);
 });
 
-test("a model Edith picked holds her floor: words on screen, an ambiance 15 s at most when nobody speaks", async () => {
+test("a model Edith picked holds her floor: words on screen, its own length at most (15 to 45 s) when nobody speaks", async () => {
   const { dressedFloorNote, AMBIANCE_MAX_SECONDS } = await import("./editor.ts");
   const base = { duration: 12, texts: [{ text: "le premier café", from: 0, to: 2 }], end_card: undefined } as unknown as Parameters<typeof dressedFloorNote>[0];
   const quiet = { voice: false, speech: false };
@@ -1352,6 +1352,16 @@ test("a model Edith picked holds her floor: words on screen, an ambiance 15 s at
   assert.equal(dressedFloorNote({ ...base, texts: [] } as typeof base, { ...quiet, request: "Juste les images, sans texte." }), null);
   // An end card is a word on screen.
   assert.equal(dressedFloorNote({ ...base, texts: [], end_card: { title: "Café Tolbiac" } } as unknown as typeof base, quiet), null);
+  // A model longer than an ambiance plays all its moments: its own length is the ceiling, 45 s at most (Tristan: « 45 »).
+  const { pickedModelMaxSeconds } = await import("./editor.ts");
+  assert.equal(pickedModelMaxSeconds(41), 41);
+  assert.equal(pickedModelMaxSeconds(6), AMBIANCE_MAX_SECONDS);
+  assert.equal(pickedModelMaxSeconds(80), 45);
+  assert.equal(pickedModelMaxSeconds(null), AMBIANCE_MAX_SECONDS);
+  const worded = { ...base, duration: 38 } as typeof base;
+  assert.equal(dressedFloorNote(worded, { ...quiet, model: 41 }), null);
+  assert.match(dressedFloorNote({ ...worded, duration: 44 } as typeof base, { ...quiet, model: 41 })!, /le modèle dure 41 s, coupe à 41 s au plus/);
+  assert.match(dressedFloorNote(worded, quiet)!, /coupe à 15 s au plus/);
 });
 
 test("montage skills: each one's plan holds for every number of shots it takes, with or without its ending", async () => {

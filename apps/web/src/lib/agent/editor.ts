@@ -83,7 +83,7 @@ import {
   honestLength,
   lengthNote,
   missesLength,
-  AMBIANCE_MAX_SECONDS,
+  pickedModelMaxSeconds,
   dressedFloorNote,
   houseModel,
   FONT_PAIRS,
@@ -800,7 +800,7 @@ export async function designEdit(params: {
     const offeredPieces = lending?.pieces ? [...lending.pieces.keys()] : [];
     let piecesLeft = MAX_PIECES;
     const uncounted = (l: PlanLayer) => Boolean(offeredPieces.length && piecesLeft > 0 && layerPiece(l, offeredPieces) && piecesLeft--);
-    return carryRetouch(carryTextStyle(normalizeEditPlan(capped, durations, allowed, speech, uncounted), params.fresh ? null : base), base);
+    return carryRetouch(carryTextStyle(normalizeEditPlan(capped, durations, allowed, speech, uncounted, params.contract?.screen_text), params.fresh ? null : base), base);
   };
   let plan = toPlan(output);
   // Her videos whole and horizontal on black (her contract): the engine draws it on every version.
@@ -852,7 +852,14 @@ export async function designEdit(params: {
   }
   // A model Edith picked holds her floor (dressedFloorNote): a plan without one word, or too long for an ambiance,
   // reads what was measured and answers once more; the retry is kept when it holds (or holds better).
-  const floorContext = { voice: Boolean(voice), speech: clips.some((c) => Boolean(c.analysis.words?.length)), request: params.brief, duration: params.contract?.duration };
+  const floorContext = {
+    voice: Boolean(voice),
+    speech: clips.some((c) => Boolean(c.analysis.words?.length)),
+    request: params.brief,
+    duration: params.contract?.duration,
+    // Its own length is its ceiling (45 s at most), so that all its moments play.
+    model: followed?.measured?.duration,
+  };
   const floor = followed?.picked && !correction ? dressedFloorNote(plan, floorContext) : null;
   if (floor && directed) directorNotes.push(floor);
   else if (floor) {
@@ -862,7 +869,7 @@ export async function designEdit(params: {
     });
     if (again?.parsed_output) {
       const retried = framed(toPlan(again.parsed_output));
-      const fails = (p: typeof plan) => (p.texts.length ? 0 : 2) + (p.duration > AMBIANCE_MAX_SECONDS + 0.5 ? 1 : 0);
+      const fails = (p: typeof plan) => (p.texts.length ? 0 : 2) + (p.duration > pickedModelMaxSeconds(floorContext.model) + 0.5 ? 1 : 0);
       if (!dressedFloorNote(retried, floorContext) || fails(retried) < fails(plan)) {
         output = again.parsed_output;
         plan = retried;

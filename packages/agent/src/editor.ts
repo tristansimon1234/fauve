@@ -569,6 +569,8 @@ export function normalizeEditPlan(
   speech?: Record<string, SpeechFacts>,
   /** A layer the budget does not count: an effect of the bank the engine plays as it is (pieces.ts), no motion designer. */
   uncounted?: (layer: PlanLayer) => boolean,
+  /** Her own words for the screen (the contract's screen_text): the texts that carry them are never taken off nor shortened. */
+  herText?: string | null,
 ): EditPlan {
   let freeScenes = 0;
   const shownTemplates = new Set<string>();
@@ -658,6 +660,9 @@ export function normalizeEditPlan(
       return words ? [{ from: l.from, to: l.to, words }] : [];
     }),
   ];
+  // Her words (« écris -20 % ce week-end ») stay whatever falls at the same moment (Tristan: « ok » to « ton texte jamais
+  // retiré ni coupé »): an animation over them, or too little room, took them off without a word.
+  const hers = (t: { text: string }) => holdsHerWords(t.text, herText);
   const texts = longEnoughToRead(
     readableEnding(
     clearOfAnimations(
@@ -665,6 +670,7 @@ export function normalizeEditPlan(
       hookAtStart(tempo.texts.map((t) => ({ ...t, from: round(Math.max(0, t.from)), to: round(Math.min(t.to, textsEnd)) }))),
       animations,
       textsEnd,
+      hers,
     ),
     animations,
     textsEnd,
@@ -672,7 +678,7 @@ export function normalizeEditPlan(
     animations,
     textsEnd,
   )
-    .filter((t) => t.to - t.from >= MIN_TEXT_SECONDS)
+    .filter((t) => t.to - t.from >= MIN_TEXT_SECONDS || hers(t))
     .map((t) => ({ ...t, emphasis: t.emphasis?.filter((e) => t.text.toLowerCase().includes(e.toLowerCase())) }));
 
   return editPlanSchema.parse({ ...draft, duration, texts, layers: layers.length ? layers : undefined });
@@ -760,12 +766,14 @@ function motionWords(motion: { brief?: string; texts?: Record<string, string> })
  * the words of the animation it meets goes; one that starts during an animation waits for
  * its end, one that runs into it stops before it (if it still lasts long enough to be
  * read); otherwise it goes. Never over another text: one that starts while another shows
- * waits for its end.
+ * waits for its end. Her own words (`locked`) are placed first, the others give way to
+ * them, and they never go: with no room elsewhere, they stay where the editor put them.
  */
 export function clearOfAnimations<T extends { from: number; to: number; text?: string }>(
   texts: T[],
   animations: { from: number; to: number; words?: string }[],
   end: number,
+  locked: (text: T) => boolean = () => false,
 ): T[] {
   const kept: T[] = [];
   const free = (from: number, to: number) => to <= end + 0.001 && kept.every((k) => k.to <= from + 0.001 || k.from >= to - 0.001);
@@ -773,7 +781,8 @@ export function clearOfAnimations<T extends { from: number; to: number; text?: s
     const own = plainWords(text.text ?? "");
     return own.split(" ").length >= 2 && Boolean(words) && ` ${plainWords(words!)} `.includes(` ${own} `);
   };
-  for (const text of [...texts].sort((a, b) => a.from - b.from)) {
+  for (const text of [...texts].sort((a, b) => Number(locked(b)) - Number(locked(a)) || a.from - b.from)) {
+    const hers = locked(text);
     const hit = animations.find((a) => text.from < a.to - 0.05 && text.to > a.from + 0.05);
     if (!hit) {
       if (free(text.from, text.to)) {
@@ -784,6 +793,7 @@ export function clearOfAnimations<T extends { from: number; to: number; text?: s
       const from = round(Math.max(...kept.filter((k) => k.to > text.from + 0.001 && k.from < text.to - 0.001).map((k) => k.to)));
       const clear = !animations.some((a) => from < a.to - 0.05 && text.to > a.from + 0.05);
       if (text.to - from >= 1.2 && clear && free(from, text.to)) kept.push({ ...text, from });
+      else if (hers) kept.push(text);
       continue;
     }
     const length = text.to - text.from;
@@ -801,8 +811,22 @@ export function clearOfAnimations<T extends { from: number; to: number; text?: s
     const to = round(Math.min(end, hit.to + length));
     const clear = !animations.some((a) => from < a.to - 0.05 && to > a.from + 0.05);
     if (to - from >= 1.2 && clear && free(from, to)) kept.push({ ...text, from, to });
+    // Her words never go: with no room after it, they stay where the editor put them.
+    else if (hers) kept.push(text);
   }
   return kept.sort((a, b) => a.from - b.from);
+}
+
+/**
+ * A text of the plan that carries her own words for the screen (the contract's screen_text, « écris -20 % ce
+ * week-end »): her whole sentence, or a part of it of two words or more when the editor wrote it over several texts.
+ */
+export function holdsHerWords(text: string, herText: string | null | undefined): boolean {
+  const her = plainWords(herText ?? "");
+  const own = plainWords(text);
+  if (!her || !own) return false;
+  if (` ${own} `.includes(` ${her} `)) return true;
+  return own.split(" ").length >= 2 && ` ${her} `.includes(` ${own} `);
 }
 
 /**
@@ -822,8 +846,17 @@ export function lengthNote(actual: number, asked: number): string {
   return `[Contrôle du moteur, pas de la gérante] Ton plan dure ${seconds(actual)} une fois monté (somme des plans, moins les fondus) ; elle a demandé environ ${seconds(Math.min(asked, MAX_REEL_SECONDS))}. Rends le plan entier avec cette durée : une animation dure 8 s au plus, un plan filmé ne dépasse pas sa vidéo, une photo 5 s ; une voix plus courte ne s'étire pas, ce sont les images qui tiennent (une fin ou un écran de fin tenus après elle). « rationale » dit la vraie durée.`;
 }
 
-/** The longest a Reel made in a model Edith picked runs when nobody speaks and she asked for no length (an ambiance, an announcement). */
+/** The longest an ambiance or an announcement runs when nobody speaks and she asked for no length. */
 export const AMBIANCE_MAX_SECONDS = 15;
+
+/**
+ * The longest a Reel made in a model Edith picked runs when nobody speaks and she asked for no length: the model's own
+ * length, so that its moments all play (« Un an de plus » lasts 41 s), never under an ambiance's 15 s nor past 45 s
+ * (Tristan, 6 November: « 45 », to « leur vraie longueur, jusqu'à 45 s »); 15 s when its length is unknown.
+ */
+export function pickedModelMaxSeconds(modelSeconds?: number | null): number {
+  return Math.min(MAX_REEL_SECONDS, Math.max(AMBIANCE_MAX_SECONDS, modelSeconds ?? 0));
+}
 /** Her request asks for no words on screen. */
 const NO_WORDS = /sans (aucun )?(texte|mots?)|pas de (texte|mots?)|aucun (texte|mot)|z[ée]ro (texte|mot)|no text/i;
 
@@ -833,17 +866,21 @@ const NO_WORDS = /sans (aucun )?(texte|mots?)|pas de (texte|mots?)|aucun (texte|
  * with no word on screen (no voice, her request not asking for none), or longer than an ambiance with nobody speaking
  * and no length asked, is sent back once to the editor with what was measured; null when it holds.
  */
-export function dressedFloorNote(plan: Pick<EditPlan, "duration" | "texts" | "end_card">, context: { voice: boolean; speech: boolean; request?: string; duration?: number | null }): string | null {
+export function dressedFloorNote(
+  plan: Pick<EditPlan, "duration" | "texts" | "end_card">,
+  context: { voice: boolean; speech: boolean; request?: string; duration?: number | null; model?: number | null },
+): string | null {
   const wordless = !plan.texts.length && !plan.end_card && !context.voice && !NO_WORDS.test(context.request ?? "");
-  const long = !context.voice && !context.speech && !context.duration && plan.duration > AMBIANCE_MAX_SECONDS + 0.5;
+  const most = pickedModelMaxSeconds(context.model);
+  const long = !context.voice && !context.speech && !context.duration && plan.duration > most + 0.5;
   if (!wordless && !long) return null;
   return [
-    "[Contrôle du moteur, pas de la gérante] Ce Reel est fait dans un modèle d'Edith qu'elle n'a pas choisi elle-même : le modèle donne la forme et les moments, jamais la longueur ni le silence.",
+    "[Contrôle du moteur, pas de la gérante] Ce Reel est fait dans un modèle d'Edith qu'elle n'a pas choisi elle-même : le modèle donne la forme, les moments et la longueur la plus grande, jamais le silence.",
     wordless
       ? "Ton plan n'a aucun texte à l'écran : écris son accroche, lisible dès la première seconde (ses mots, son nom ou ce qu'elle annonce, une phrase courte de créateur), et ce qui le termine (son nom ou une invitation) ; la composition les dessine dans le style du modèle."
       : "",
     long
-      ? `Ton plan dure ${seconds(plan.duration)} alors que personne n'y parle et qu'elle n'a pas demandé de durée : une ambiance ou une annonce tient en 7 à ${AMBIANCE_MAX_SECONDS} s, coupe à ${AMBIANCE_MAX_SECONDS} s au plus (moins de plans, ou des plans plus courts, sur le temps).`
+      ? `Ton plan dure ${seconds(plan.duration)} alors que personne n'y parle et qu'elle n'a pas demandé de durée : ${most > AMBIANCE_MAX_SECONDS ? `le modèle dure ${seconds(most)}` : `une ambiance ou une annonce tient en 7 à ${AMBIANCE_MAX_SECONDS} s`}, coupe à ${seconds(most)} au plus (moins de plans, ou des plans plus courts, sur le temps).`
       : "",
     "Rends le plan entier.",
   ]
