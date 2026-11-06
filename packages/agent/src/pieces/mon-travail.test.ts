@@ -95,7 +95,7 @@ const worksIn = (tree: Node) =>
       return { shot, x: s.left!, y: s.top!, w: s.width!, h: s.height! };
     });
 
-test("« Voici mon travail »: what it draws, frame by frame — her and her cut-out held, her works in and out, her words in front; off her when nobody is cut out", () => {
+test("« Voici mon travail »: what it draws, frame by frame — her and her cut-out held, her works in and out, her words behind her; off her when nobody is cut out", () => {
   const works = 8;
   const span: [number, number] = [1.2, 1.2 + (works + 1) * 0.6];
   const plan = pieceTestPlan({ piece: monTravail, shots: run(works), span, fill: { texts: { mots: "voici mon atelier" }, objects: {}, settings: {} }, bpm: 100 });
@@ -111,6 +111,13 @@ test("« Voici mon travail »: what it draws, frame by frame — her and her cut
   assert.equal(nodes(first).find((n) => n.type === "Subject")!.props.at, F - 18);
   assert.deepEqual(nodes(nodes(first).find((n) => n.type === "FitText")).flatMap((n) => n.children.filter((c) => typeof c === "string")), ["VOICI", "MON", "ATELIER"]);
   assert.equal(worksIn(first).length, 0);
+  // Her words behind her (effect v3; Tristan on its skill's v1: « la police passe pas derrière la dame »): drawn before her
+  // cut-out, after the works behind her, before those over her legs.
+  assert.equal(monTravail.version, 3);
+  const laid = nodes(drawAt(Number(texts.l7), props));
+  const wordsAt = laid.findIndex((n) => n.type === "FitText");
+  assert.ok(wordsAt >= 0 && wordsAt < laid.findIndex((n) => n.type === "Subject"));
+  assert.ok(wordsAt > laid.map((n) => n.type === "Footage" && n.props.key !== "her").indexOf(true));
   // Its burst: at its fourth landing, its first four works on their own shots, the lead never one of them.
   assert.deepEqual(worksIn(drawAt(Number(texts.l3), props)).map((w) => w.shot), [2, 3, 4, 5]);
   // Its last image: all gone, her alone with her words.
