@@ -720,15 +720,20 @@ export const fewFiles = (skill: Pick<MontageSkill, "files">, files: number) => f
  * never overlapping one it already gave (the same picture twice reads as a missed cut).
  */
 function passage(file: SkillFile, length: number, wanted: number, taken: Map<string, [number, number][]>): number {
+  const at = freePassage(file, length, wanted, taken) ?? Math.min(Math.max(0, file.seconds - length), Math.max(0, wanted));
+  taken.set(file.id, [...(taken.get(file.id) ?? []), [at, at + length]]);
+  return round(at);
+}
+
+/** Where a passage of that length can start without overlapping one already given (as `passage` looks), or null. */
+function freePassage(file: SkillFile, length: number, wanted: number, taken: Map<string, [number, number][]>): number | null {
   const shown = taken.get(file.id) ?? [];
   const room = Math.max(0, file.seconds - length);
   const free = (at: number) => shown.every(([a, b]) => at + length <= a + 0.01 || at >= b - 0.01);
   const starts = [wanted, ...(file.moments ?? []).map((m) => m.start), ...Array.from({ length: Math.floor(room / 0.25) + 1 }, (_, k) => k * 0.25)].map((t) =>
     Math.min(room, Math.max(0, t)),
   );
-  const at = starts.find(free) ?? Math.min(room, Math.max(0, wanted));
-  taken.set(file.id, [...shown, [at, at + length]]);
-  return round(at);
+  return starts.find(free) ?? null;
 }
 
 /** Its words cut to their place: at the last word that fits, never in the middle of one. */
@@ -921,12 +926,15 @@ function castSegments(files: SkillFile[], fill: SkillFill, line: SkillTimeline):
       const speed = Math.max(0.5, Math.min(1, file.seconds / length));
       return { clip_id: file.id, in: 0, out: round(Math.min(file.seconds, length * speed)), zoom: "none", speed: round(speed), ...beside, ...heard };
     }
-    // Played faster than filmed when its model says so (SkillShot.speed): that much more of her video, as much as it gives.
+    // Played faster than filmed when its model says so (SkillShot.speed): that much more of her video, as much as it gives
+    // without showing a passage another shot shows (then less fast, down to as filmed).
     const fast = Math.floor(Math.min(MAX_SPEED, span.speed ?? 1, file.seconds / length) * 100) / 100;
-    if (fast > 1 && !span.beside) {
-      const source = round(length * fast);
-      const from = passage(file, source, pick.at, taken);
-      return { clip_id: file.id, in: from, out: round(from + source), zoom: "none", speed: fast, ...heard };
+    for (const speed of fast > 1 && !span.beside ? [fast, round(Math.max(1, (fast + 1) / 2))] : []) {
+      const source = round(length * speed);
+      const from = speed > 1 ? freePassage(file, source, pick.at, taken) : null;
+      if (from === null) continue;
+      taken.set(file.id, [...(taken.get(file.id) ?? []), [from, from + source]]);
+      return { clip_id: file.id, in: round(from), out: round(from + source), zoom: "none", speed, ...heard };
     }
     const at = passage(file, length, pick.at, taken);
     return { clip_id: file.id, in: at, out: round(at + length), zoom: "none", ...beside, ...heard };
