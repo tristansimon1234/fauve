@@ -8,7 +8,7 @@ import { landingSlots, welcomeLines } from "../skills/bienvenue.ts";
 // stacked in the middle of the frame (a line every 185 px, the stack centred on the middle, as the original's « WELCOME /
 // TO / OUR / SALON »): its first line a sixteenth after its start, each next one on the next cut, the last always on its
 // last shot; her shots under it darker (a veil dosed on the light read under her words, as the model's: their mean
-// brought to about 0,3, their brightest tenth to about 0,7), a snap of fingers as each line lands, the music stopped from
+// brought to about 0,25, their brightest tenth to about 0,6), a snap of fingers as each line lands, the music stopped from
 // its start and back on the Reel's beat at its end (the original's voice counting alone, then the drop). Then the montage
 // takes over without her words. Its ink: her colour when it reads on a dark picture, else the original's fluo yellow (or
 // the yellow, or white, as her words ask). Kept from the skill: its hand and its sizes, its four lines at most (the cut
@@ -57,7 +57,7 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const mark = (k, d) => { const v = Number(texts && texts[k]); return Number.isFinite(v) && v >= 0 ? v : d; };
   const setting = (k, d) => { const v = texts && texts[k]; return typeof v === "string" && v ? v : d; };
   // Its shots: her shots that play during it, in order, as the engine counts them.
-  const own = String(word("mine")).split(",").map(Number).filter((i) => Number.isInteger(i) && i >= 0 && i < shots.length);
+  const own = String(word("mine")).split(",").filter(Boolean).map(Number).filter((i) => Number.isInteger(i) && i >= 0 && i < shots.length);
   const mine = own.length ? own : shots.map((s, i) => i).filter((i) => shots[i].from < durationInFrames && shots[i].from + shots[i].durationInFrames > 0);
   const n = mine.length;
   const BEAT = mark("beat", 18);
@@ -65,17 +65,17 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const cur = mine.reduce((c, i, k) => (startOf(k) <= frame ? k : c), 0);
 
   // 1. Her shots under it darker: a black veil dosed on the light read under her words (LightUnder, read before the
-  // render on the shots under it): their mean brought to about 0,3 and their brightest tenth to about 0,7, a shot already
+  // render on the shots under it): their mean brought to about 0,25 and their brightest tenth to about 0,6, a shot already
   // dark hardly touched; without a reading, a middle dose. The montage plays under it, as filmed.
   const LAID = { left: 0, top: 0, width, height };
   const AREA = { x: 140, y: Math.round(height * 0.3), w: width - 280, h: Math.round(height * 0.4) };
   const read = n ? LightUnder(shots[mine[cur]], frame, LAID, AREA) : null;
-  const dose = read ? Math.max(0.4, Math.min(0.92, 0.3 / Math.max(0.05, read.mean), 0.7 / Math.max(0.05, read.high))) : 0.72;
+  const dose = read ? Math.max(0.35, Math.min(0.92, 0.25 / Math.max(0.05, read.mean), 0.6 / Math.max(0.05, read.high))) : 0.7;
   const veil = h("div", { key: "veil", style: { position: "absolute", left: 0, top: 0, width, height, backgroundColor: "#000000", opacity: Number((1 - dose).toFixed(3)) } });
 
   // 2. Her sentence: in capitals, four lines at most (and never more than her shots), the cut whose longest line is the
   // shortest; one line more on each shot, stacked in the middle of the frame, each landing whole at once and still.
-  const keep = (s) => String(s || "").normalize("NFC").replace(/(\d) (?=\d)/g, "$1 ");
+  const keep = (s) => String(s || "").normalize("NFC").replace(/(\d) (?=\d)/g, "$1\u00a0");
   const up = (s) => keep(s).toLocaleUpperCase("fr").replace(/\s+/g, " ").trim();
   const length = (s) => Array.from(s).length;
   const split = (list, k) => {
@@ -108,7 +108,7 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const words = lines.map((t, g) => {
     if (frame < landOf(g)) return null;
     const cy = Math.round(height / 2 + (g - (L - 1) / 2) * PITCH);
-    return h(Handwriting, { key: "accueil-" + g + "-" + t, text: t, box: { x: 140, y: Math.round(cy - SLOT / 2), w: width - 280, h: SLOT }, color: INK, grain: 0, wobble: 1.6, bend: 0, last: 1, align: "center", style: { fontFamily: hand, fontWeight: 400, fontSize: SIZE, letterSpacing: "0.12em" }, seed: "accueil-" + g + "-" + t });
+    return h(Handwriting, { key: "accueil-" + g + "-" + t, text: t, box: { x: 140, y: Math.round(cy - SLOT / 2), w: width - 280, h: SLOT }, color: INK, grain: 0, wobble: 1.6, bend: 0, last: 1, align: "center", style: { fontFamily: hand, fontWeight: 400, fontSize: SIZE, letterSpacing: "0.12em", textShadow: "0 0 2px rgba(0,0,0,0.45)" }, seed: "accueil-" + g + "-" + t });
   });
 
   return h(AbsoluteFill, { style: { overflow: "hidden" } }, veil, words);

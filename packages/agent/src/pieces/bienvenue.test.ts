@@ -77,10 +77,10 @@ test("« L'accueil, puis la rafale » (effect v1): her sentence a line on each s
 });
 
 test("« L'accueil, puis la rafale » (effect v1): her shots darker under it, dosed on their light; the music stopped until its end", () => {
-  // A middle dose without a reading; a bright shot much darker, a dark one hardly, never under 0,4.
-  assert.equal(veil(draw(10, props(4))), 0.28);
-  assert.equal(veil(draw(10, props(4), () => ({ mean: 0.6, high: 0.9 }))), 0.5);
-  assert.equal(veil(draw(10, props(4), () => ({ mean: 0.75, high: 1 }))), 0.6);
+  // A middle dose without a reading; a bright shot much darker, a dark one hardly, never under 0,35.
+  assert.equal(veil(draw(10, props(4))), 0.3);
+  assert.equal(veil(draw(10, props(4), () => ({ mean: 0.6, high: 0.9 }))), 0.583);
+  assert.equal(veil(draw(10, props(4), () => ({ mean: 0.75, high: 1 }))), 0.65);
   assert.equal(veil(draw(10, props(4), () => ({ mean: 0.2, high: 0.5 }))), 0.08);
   // On the Reel: the music stopped from its start, back on the beat at its end (the cut after it), within its span.
   const shots = [{ file: "lead", at: 1, seconds: 1.2 }, ...Array.from({ length: 4 }, (_, i) => ({ file: `f${i}`, at: 0, seconds: 0.6 })), { file: "after", at: 2, seconds: 1.8 }];

@@ -120,12 +120,12 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
 
   // 2. Her four calm shots, before the drop: her place before it opens, darker and paler (the original's are half as
   // bright as its burst, pale and cool, a light of about 0,2 under its words), a veil dosed on the light read under her
-  // words (LightUnder, read before the render on these four only): its mean brought to about 0,3 and its brightest tenth
-  // to about 0,7, a shot already dark hardly touched; without a reading, a middle dose. Under her ending card, her last
+  // words (LightUnder, read before the render on these four only): its mean brought to about 0,25 and its brightest tenth
+  // to about 0,6, a shot already dark hardly touched; without a reading, a middle dose. Under her ending card, her last
   // shot gets the middle dose (never read: a shot named by a variable would have every shot of the Reel read).
   const AREA = { x: 140, y: Math.round(height * 0.3), w: width - 280, h: Math.round(height * 0.4) };
   const lightOf = (k) => (k === 0 ? LightUnder(shots[0], frame, LAID, AREA) : k === 1 ? LightUnder(shots[1], frame, LAID, AREA) : k === 2 ? LightUnder(shots[2], frame, LAID, AREA) : k === 3 ? LightUnder(shots[3], frame, LAID, AREA) : null);
-  const dose = (read) => (read ? Math.max(0.4, Math.min(0.92, 0.3 / Math.max(0.05, read.mean), 0.7 / Math.max(0.05, read.high))) : 0.72);
+  const dose = (read) => (read ? Math.max(0.35, Math.min(0.92, 0.25 / Math.max(0.05, read.mean), 0.6 / Math.max(0.05, read.high))) : 0.7);
   const veil = (b) => "brightness(" + b.toFixed(3) + ") saturate(0.7)";
   const calm = n > 0 && frame < DROP && cur < 4;
   const filter = calm ? veil(dose(lightOf(cur))) : card ? veil(0.62) : null;
@@ -136,9 +136,10 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   // last calm shot), each landing whole at once and still, stacked in the middle of the frame (a line every 185 px, the
   // stack centred on the middle, as the original's), gone at once on the drop. Mynerve, the closest monoline hand to the
   // original's doodle capitals, 112 px (its capitals about 80 px, the original's 78), spaced 0,12 em, no grain (a digital
-  // pen), its letters strayed a little more for their bounce. Its ink: her colour when it reads on a dark picture (light
-  // enough), else the original's fluo yellow; or the yellow, or white, as her words ask.
-  const keep = (s) => String(s || "").normalize("NFC").replace(/(\d) (?=\d)/g, "$1 ");
+  // pen), its letters strayed a little more for their bounce, a thin dark edge so they still read on a bright spot. Its
+  // ink: her colour when it reads on a dark picture (light enough), else the original's fluo yellow; or the yellow, or
+  // white, as her words ask.
+  const keep = (s) => String(s || "").normalize("NFC").replace(/(\d) (?=\d)/g, "$1\u00a0");
   const up = (s) => keep(s).toLocaleUpperCase("fr").replace(/\s+/g, " ").trim();
   const length = (s) => Array.from(s).length;
   const split = (list, k) => {
@@ -167,7 +168,7 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const SLOT = Math.round(height * 0.075);
   const lineAt = (text, g, count, size, seed) => {
     const cy = Math.round(height / 2 + (g - (count - 1) / 2) * PITCH);
-    return h(Handwriting, { key: seed + "-" + text, text, box: { x: 140, y: Math.round(cy - SLOT / 2), w: width - 280, h: SLOT }, color: INK, grain: 0, wobble: 1.6, bend: 0, last: 1, align: "center", style: { fontFamily: hand, fontWeight: 400, fontSize: size, letterSpacing: "0.12em" }, seed: seed + "-" + text });
+    return h(Handwriting, { key: seed + "-" + text, text, box: { x: 140, y: Math.round(cy - SLOT / 2), w: width - 280, h: SLOT }, color: INK, grain: 0, wobble: 1.6, bend: 0, last: 1, align: "center", style: { fontFamily: hand, fontWeight: 400, fontSize: size, letterSpacing: "0.12em", textShadow: "0 0 2px rgba(0,0,0,0.45)" }, seed: seed + "-" + text });
   };
   const hook = reelTexts.find((t) => t.role === "hook");
   const others = reelTexts.filter((t) => t !== hook);

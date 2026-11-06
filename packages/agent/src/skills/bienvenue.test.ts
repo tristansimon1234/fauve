@@ -166,13 +166,13 @@ test("« L'accueil, puis la rafale » plays the shot on now, its calm shots dark
     assert.equal(shot.length, 1);
     assert.equal(shot[0]!.props.shot, k, `image ${f}`);
     // A veil on its four calm shots (a middle dose without a reading), none on the burst.
-    assert.equal(styleOf(shot[0]!).filter, k < 4 ? "brightness(0.720) saturate(0.7)" : undefined, `shot ${k}`);
+    assert.equal(styleOf(shot[0]!).filter, k < 4 ? "brightness(0.700) saturate(0.7)" : undefined, `shot ${k}`);
     assert.deepEqual([styleOf(shot[0]!).left, styleOf(shot[0]!).top, styleOf(shot[0]!).width, styleOf(shot[0]!).height], [0, 0, 1080, 1920]);
   }
-  // Dosed on the light read under her words: a bright shot much darker, a dark one hardly, never under 0,4.
+  // Dosed on the light read under her words: a bright shot much darker, a dark one hardly, never under 0,35.
   const dose = (light: { mean: number; high: number }) => styleOf(of(drawAt(10, { light: () => light }), "Footage")[0]!).filter;
-  assert.equal(dose({ mean: 0.6, high: 0.9 }), "brightness(0.500) saturate(0.7)");
-  assert.equal(dose({ mean: 0.75, high: 1 }), "brightness(0.400) saturate(0.7)");
+  assert.equal(dose({ mean: 0.6, high: 0.9 }), "brightness(0.417) saturate(0.7)");
+  assert.equal(dose({ mean: 0.75, high: 1 }), "brightness(0.350) saturate(0.7)");
   assert.equal(dose({ mean: 0.2, high: 0.5 }), "brightness(0.920) saturate(0.7)");
   // Most of her videos in width (or her word): whole in a 16:9 band in the middle, on black; upright as asked.
   assert.deepEqual([styleOf(of(drawAt(100, { aspect: 16 / 9 }), "Footage")[0]!).top, styleOf(of(drawAt(100, { aspect: 16 / 9 }), "Footage")[0]!).height], [656, 608]);
