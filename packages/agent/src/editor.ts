@@ -1013,5 +1013,11 @@ export function deliveryWords(rationale: string | null | undefined): string {
   const sentences = sentencesOf((rationale ?? "").trim());
   if (!sentences.length) return "";
   if (/^je n['’]ai pas (réussi|pu)/i.test(sentences[0]!)) return sentences.join(" ");
-  return sentences.slice(1).join(" ");
+  // After it, only a limit or what she can do (Tristan, 6 November: the filler's « J'ai ouvert sur la terrasse fleurie… »,
+  // its second sentence on a model, reached her): never another sentence on its choices.
+  return sentences.slice(1).filter((s) => LIMIT_WORDS.test(s)).join(" ");
 }
+
+/** A sentence that says a limit or what she can do: something missing or not done, too long or short, what to film or send. */
+const LIMIT_WORDS =
+  /(?:\bn['’]|\bne\s|\bpas\b|\baucun|\bmanqu|\bil (?:te |me )?faut\b|\bfilme|\benvoie|\bdis-moi\b|\bréessaie\b|\btrop\b|\bau plus\b|\bseulement\b|\bimpossible\b|\bplus (?:court|long)|\blimite|\bdépass|\bhors (?:du|de) (?:cadre|champ)|\bsi tu veux\b)/i;

@@ -1,3 +1,4 @@
+import { ownRequestWords } from "./request-log.ts";
 import { isClipSegment, MAX_OVERLAYS, segmentSpans, type EditPlan, type PlanOverlay } from "./schemas.ts";
 
 // Manual edits of a montage (the scene editor): every change keeps the plan
@@ -166,3 +167,67 @@ export function insertableFrom(plan: EditPlan): number {
   return first === -1 ? plan.segments.length : first;
 }
 
+
+/** How dark the veil under a model's words is (« voile », « overlay »): her pictures stay seen, its words read. */
+export const SCRIM = 0.45;
+
+/**
+ * A Reel whose texts a composition draws itself (one of Edith's models, a composition that draws the whole picture): a
+ * look set on its texts would only show in its fallback, in the engine's font; its words are read better by a veil on
+ * her pictures under them (withScrim), never by a box.
+ */
+export function drawsItsTexts(plan: Pick<EditPlan, "layers" | "skill">): boolean {
+  return Boolean(plan.skill) || Boolean(plan.layers?.some((l) => l.compose && l.motion.draws_texts));
+}
+
+/**
+ * Her words read better on a model (« voile », « overlay », « fond sombre derrière le texte », « on voit pas bien le
+ * texte »: Tristan, 6 November): a soft dark veil on her pictures while its words show, at `strength`, on the composition
+ * that draws them; its lettering, sizes and design kept. Unchanged when no composition draws the Reel's texts.
+ */
+export function withScrim(plan: EditPlan, strength = SCRIM): EditPlan {
+  if (!plan.layers?.some((l) => l.compose)) return plan;
+  const dark = Math.round(Math.max(0.15, Math.min(0.7, strength)) * 100) / 100;
+  return { ...plan, layers: plan.layers.map((l) => (l.compose ? { ...l, scrim: dark } : l)) };
+}
+
+/**
+ * The veil of a Reel made on a model (skills.ts): the one its version before had (a correction keeps it), else one when
+ * her request asks for her words to read better (asksLegibility, on her own words and Edith's brief: ownRequestWords);
+ * none otherwise.
+ */
+export function scrimFor(previous: Pick<EditPlan, "layers"> | null | undefined, request: string | null | undefined): number | undefined {
+  const kept = previous?.layers?.find((l) => l.compose)?.scrim;
+  if (kept) return kept;
+  return asksLegibility(ownRequestWords(request)) ? SCRIM : undefined;
+}
+
+/**
+ * Her words ask for her texts to read better on their pictures (Tristan, 6 November: « on voit pas bien le texte au debut
+ * il faut peut etre un overlay »; Edith: « un voile sombre »): a veil, an overlay, a dark ground behind the text, a text
+ * she cannot read. On a model: a veil on her pictures under its words (withScrim), its lettering kept.
+ */
+export function asksLegibility(text: string | null | undefined): boolean {
+  const words = (text ?? "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/[’'`-]/g, " ");
+  return LEGIBLE.test(words);
+}
+
+const LEGIBLE = new RegExp(
+  [
+    String.raw`\bvoiles?\b(?! (?:de mariee|de bateau|du bateau))`,
+    String.raw`\boverlays?\b`,
+    // A dark ground behind her words (never an end card « sur fond noir »).
+    String.raw`\b(?:fond|degrade|ombre|bande|calque|filtre)s? (?:plus )?(?:sombres?|noirs?|fonces?) (?:derriere|sous|pour|sur|a) (?:le |les |du |des |ce |ces |mes |tes )?(?:texte|textes|mots?|ecrit|lire)\b`,
+    String.raw`\b(?:texte|textes|mots?) (?:sur|avec) (?:un )?(?:fond|degrade) (?:plus )?(?:sombres?|noirs?|fonces?)\b`,
+    String.raw`\bassombri\w*`,
+    String.raw`\b(?:on|j|tu|je) (?:ne |n )?(?:voit|vois|lit|lis|arrive)(?: pas| plus| mal| rien)\b[^.!?\n]{0,40}\b(?:texte|textes|mots?|ecrit|lire)\b`,
+    String.raw`\b(?:texte|textes|mots?)\b[^.!?\n]{0,30}(?:illisibles?|pas lisibles?|peu lisibles?|mal lisibles?|ne (?:se )?(?:voi|li)\w*)`,
+    String.raw`\b(?:plus|mieux) lisibles?\b`,
+    String.raw`\billisibles?\b`,
+    String.raw`\b(?:se voit|se lit|ressort) (?:pas|mal)\b`,
+  ].join("|"),
+);

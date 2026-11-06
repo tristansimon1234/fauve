@@ -12,6 +12,67 @@ import { HOUSE_MODELS, HOUSE_WHEN, houseModel } from "./house-models.ts";
 export const OWN_LOOK_WORDS =
   /(?:^|[\s,;.!?«"'(])(?:(?:mes|nos) (?:couleurs|polices|typos?)|(?:ma|notre) (?:charte|police|typo|palette|identité|da)(?![a-zà-ÿ])|ma direction artistique|à (?:mon|notre) (?:style|image)|(?:à|aux) (?:mes|nos) couleurs|aux couleurs de (?:mon|ma|notre|chez)|avec mon style)/i;
 
+/** Her words, plain for the patterns below: lower case, no accents, apostrophes and hyphens as spaces. */
+const plain = (t: string) =>
+  t
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/[’'`-]/g, " ")
+    .replace(/[ \t]+/g, " ");
+
+/** Creativity she turns down (« pas besoin d'être créatif », « sans surprise »): left out before the rest is read. */
+const NOT_CREATIVE = /\b(?:pas|sans|ni|jamais|rien|moins)(?: (?:de|d|trop|tres|vraiment|besoin|d etre|etre|la|ta|du|un|une|truc|chose|faire))* (?:creati\w*|surpri\w*|surpren\w*|libre\w*)/g;
+
+/**
+ * What asks for creation rather than a model (Tristan, 6 November: « sois creatif ! sur le marais a paris » was made on
+ * « Mots aux quatre coins »; « sois créatif » must mean creation, never a model): « sois créatif », « un Reel créatif »,
+ * « de la créativité », « fais-toi plaisir », « lâche-toi », « surprends-moi », « étonne-moi », « carte blanche », « libre »,
+ * « en toute liberté », « crée ! », « crée ce que tu veux ». Never a business's own word (« l'atelier créatif du
+ * mercredi », « entrée libre », « ma nouvelle création ») nor the plain verb of a request (« crée un Reel sur la
+ * terrasse »), which every request is. Read on her plain words.
+ */
+const CREATIVE = new RegExp(
+  [
+    // créatif, créative, asked for (never the name of a workshop: « atelier créatif »)
+    String.raw`(?:^|[^a-z])(?:sois|soit|soyez|etre|plus|tres|super|hyper|vraiment|peu|mode|reel|video|montage|truc|chose|qqch|qqc|de|fais|fait|faire) (?:un peu |plus |tres |vraiment |hyper |super )?creati(?:f|ve|fs|ves)\b`,
+    String.raw`^\s*creati(?:f|ve)\b`,
+    String.raw`\bcreativite\b`,
+    String.raw`\bfai(?:s|t|tes) (?:toi|te|vous) plaisir\b`,
+    String.raw`\blache(?:z)? (?:toi|vous)\b`,
+    String.raw`\bsurpren(?:ds|d|ez) (?:moi|nous)\b`,
+    String.raw`\b(?:etonne|epate|bluffe)(?:z)? (?:moi|nous)\b`,
+    String.raw`\bcarte blanche\b`,
+    String.raw`\btoute liberte\b`,
+    String.raw`\bliberte totale\b`,
+    String.raw`\blibrement\b`,
+    String.raw`\blibre a (?:toi|vous)\b`,
+    String.raw`^\s*libre\b(?! (?:service|de droits?|acces))`,
+    String.raw`\b(?:sois|soit|reste|soyez|t es|tu es|mode|style|forme|format|champ|montage|reel|creation|totalement|completement|entierement) libre\b(?! (?:service|de droits?|acces|cours))`,
+    String.raw`\bcree(?:z)? ?(?:!|$)`,
+    String.raw`\bcree(?:z)? (?:librement|ce que tu veux|ce qui te plait|quelque chose|qqch|qqc|un truc|a ta (?:facon|sauce|guise|maniere|idee)|comme tu (?:veux|le sens|l entends))`,
+    String.raw`\ba toi de creer\b`,
+    String.raw`\b(?:creation libre|en mode creation|fais (?:une|de la) creation|creation pure)\b`,
+  ].join("|"),
+  "m",
+);
+
+/** Her request asks Edith to be creative (CREATIVE): the Reel is created freely, in none of Edith's models. */
+export function asksCreation(text: string | null | undefined): boolean {
+  return CREATIVE.test(plain(text ?? "").replace(NOT_CREATIVE, " "));
+}
+
+/** Her words name this model of Edith's (its name, or its key): a model she chose, even with « sois créatif ». */
+export function namesHouseModel(text: string | null | undefined, key: string): boolean {
+  const model = houseModel(key.trim().toLowerCase());
+  if (!model) return false;
+  const words = ` ${plain(text ?? "").replace(/[^a-z0-9]+/g, " ")} `;
+  return [model.name, model.key].some((n) => {
+    const name = plain(n).replace(/[^a-z0-9]+/g, " ").trim();
+    return name.length > 2 && words.includes(` ${name} `);
+  });
+}
+
 /** How many of her last Reels' models are not picked again. */
 export const HOUSE_PICK_AVOID = 3;
 
@@ -23,7 +84,8 @@ How to choose
 - Then her request (demande): what people must feel or do; when she names a form (a split screen, a collage, a word in big, black and white, a mosaic…), the model that is that form.
 - Then her taste (ses_gouts, when given): her moodboard and art direction, the Reels she sent to copy, the Reels she kept as models, the models of the Reels she published. Between the models her files and her request allow, the one in that spirit (its energy, its typography, what it puts forward); never against her files or her request, never the same model as one she just published.
 - Then her trade and what her footage shows: the model whose idea makes this business look its best (a mosaic for dishes or creations, fixed cinema shots for a calm place, whip pans for a lively street, a typed name for a place in the sun…).
-- When she asks to surprise, for an effect or to say something (an offer, a name, a moment), a model whose idea is in its words or its effect (a title that decodes, a word you pass through, a title behind the passers-by, words that slam on each cut), never one made of images alone (a mosaic, a photo dump, fixed shots) unless she asks for that.
+- When she asks you to be creative, to surprise her or to go free (« sois créatif », « surprends-moi », « fais-toi plaisir », « libre »): "none", the Reel is then created freely with every tool, never in a model.
+- When she asks for an effect or to say something (an offer, a name, a moment), a model whose idea is in its words or its effect (a title that decodes, a word you pass through, a title behind the passers-by, words that slam on each cut), never one made of images alone (a mosaic, a photo dump, fixed shots) unless she asks for that.
 - Never one of derniers_modeles (the models of her last Reels): each Reel must look new.
 - When none can be made with her files, answer "none".
 

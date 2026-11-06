@@ -6,6 +6,7 @@ import {
   editPlanSchema,
   isBaked,
   motionTemplateSchema,
+  reelSized,
   resolveReelBrand,
   savedLookSchema,
   SLIDE_Y,
@@ -135,7 +136,8 @@ export async function restyleTexts(studioId: string, postId: string, change: Loo
     throw new Error("Ce Reel a un effet dessiné image par image : ses textes sont dans l'image. Pour les changer, lance montage avec correction: true et dis le changement dans brief (police, couleur, taille, place).");
   }
   if (!motionTemplateSchema.safeParse(plan.data.template).success) throw new Error("Ce montage ancien ne prend pas les styles de texte : refais-le d'abord");
-  const next = { ...plan.data, texts: plan.data.texts.map((t) => apply(t, { min: 0.05, max: 0.66 })) };
+  // On a Reel, her words are never set under 48 px (reelSized).
+  const next = { ...plan.data, texts: plan.data.texts.map((t) => apply(t, { min: 0.05, max: 0.66 })).map((t) => (t.look ? { ...t, look: reelSized(t.look) } : t)) };
   if (!changed) throw new Error("Ce montage n'a pas de texte à styler");
 
   const { data: versions } = await db.from("edit_plans").select("version").eq("post_id", postId);

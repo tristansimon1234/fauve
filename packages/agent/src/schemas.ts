@@ -440,6 +440,12 @@ export const editPlanLayerSchema = z.object({
   words: z.boolean().optional(),
   /** A composition that starts after the Reel does (the sound she follows starts its beats later): its first image held until then. Set by the engine. */
   hold_first: z.boolean().optional(),
+  /**
+   * A composition that draws the Reel's texts (a model's): a soft dark veil on her pictures while its words show, how
+   * dark (« voile », « overlay », « on voit pas bien le texte »: Tristan, 6 November). Its lettering, sizes and design stay
+   * the model's, never a box in another font (withScrim). Set by the engine, kept by a correction.
+   */
+  scrim: z.number().min(0.15).max(0.7).optional(),
 });
 export type PlanLayer = z.infer<typeof editPlanLayerSchema>;
 

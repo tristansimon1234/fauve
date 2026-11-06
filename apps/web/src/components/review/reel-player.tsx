@@ -189,7 +189,8 @@ export function AddedSound({ sound, heard, dark = false }: { sound: ReviewData["
         <span className="truncate">{name}</span>
       </p>
       <p className={`text-[12.5px] leading-snug ${dark ? "text-white/80" : "text-muted"}`}>
-        {heard ? "Ici en aperçu, son activé. " : ""}Il n’est pas dans la vidéo : en la publiant, ouvre ce Reel dans Instagram, touche le son, « Utiliser l’audio ».
+        {heard ? "Ici en aperçu, son activé. " : ""}Il n’est pas dans la vidéo : en la publiant, ouvre ce Reel dans Instagram, touche le son, « Utiliser l’audio », puis choisis ta vidéo
+        {sound.followed ? ", le son parti du début (c’est là que tombent les coupes)" : ""}. S’il n’apparaît pas, dis à Edith « mets ta musique ».
       </p>
       <a href={sound.link} target="_blank" rel="noopener noreferrer" className={`self-start text-[13px] font-bold underline underline-offset-3 ${dark ? "text-white" : "text-violet"}`}>
         Ouvrir le Reel du son

@@ -53,6 +53,27 @@ export function montageJobSteps(o: { effort: Effort | null; kind: "montage" | "c
     .map((s) => (s.stage === "design" && o.kind === "correction" ? { ...s, label: "Correction" } : s));
 }
 
+/**
+ * Whether a video made again (a re-render: an end card, a veil, a style, its music) is delivered once rendered. Only the
+ * latest version of a Reel reaches her (Tristan, 6 November: an end card and a veil asked a minute apart rendered side by
+ * side, and two identical « Ton montage … est prêt » came a second apart): never when a newer version of its plan was
+ * made while it rendered (`current` false: the newer one renders and delivers itself), when its job was stopped, when a
+ * montage runs on the same Reel (it delivers its own version, made from this one), or when another re-render of the
+ * same Reel started after it (it holds this change and the next).
+ */
+export function rerenderDelivers(o: {
+  current: boolean;
+  mine: { id: string; startedAt: string; finished: boolean } | null;
+  /** The other jobs running on the same post. */
+  running: { id: string; kind: JobKind; startedAt: string }[];
+}): boolean {
+  if (!o.current || o.mine?.finished) return false;
+  const others = o.running.filter((j) => j.id !== o.mine?.id);
+  if (others.some((j) => j.kind === "montage")) return false;
+  const since = o.mine ? Date.parse(o.mine.startedAt) : -Infinity;
+  return !others.some((j) => j.kind === "rerender" && Date.parse(j.startedAt) >= since);
+}
+
 export const JOB_KIND_LABELS: Record<JobKind, string> = {
   montage: "Montage vidéo",
   text_layer: "Texte sur photo",

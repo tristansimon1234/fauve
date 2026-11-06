@@ -1,17 +1,17 @@
 import "server-only";
-import { PUBLISH_OFFER_OPTIONS, publishQuestion, publishWhen, shortSentence, STYLE_CHECK_OPTIONS, offersLine, deliveryWords } from "@fauve/agent";
+import { addedSoundLine, PUBLISH_OFFER_OPTIONS, publishQuestion, publishWhen, shortSentence, STYLE_CHECK_OPTIONS, offersLine, deliveryWords } from "@fauve/agent";
 import { studioAccess } from "@/lib/billing/access";
 import { createLoginLink } from "@/lib/auth/login-link";
 import { socialConnect } from "@/lib/social/connect";
 import { env } from "@/lib/env";
 import { supabaseAdmin } from "@/lib/supabase/admin";
-import { modelSound, modelSoundLine } from "@/lib/model-sound";
+import { modelSound } from "@/lib/model-sound";
 import { readPostMusic } from "@/lib/render/music";
 import { isFirstReel } from "@/lib/onboarding";
 import { ownerWhatsApp } from "@/lib/owner-message";
 import { instagramAccount } from "@/lib/social/publish";
 import { sendFirstTemplate, sendImage, sendLinkButton, sendLinkThenReply, sendReply, sendText } from "@/lib/whatsapp/client";
-import { renderPost } from "./render-post";
+import { renderPost, type RenderResult } from "./render-post";
 import { renderSlides } from "./slides";
 
 export type DeliveryTarget = {
@@ -125,12 +125,12 @@ export async function messageStudio(
  */
 export async function renderAndDeliver(
   target: DeliveryTarget,
-  stillWanted?: () => Promise<boolean>,
+  stillWanted?: (rendered: RenderResult) => Promise<boolean>,
 ): Promise<{ title: string; cost: { credits: number; left: number } | null } | "stopped" | null> {
   try {
     const r = await renderPost(target.studioId, target.postId, { freshMusic: target.freshMusic });
     // A newer request replaced this work while it rendered: nothing goes out.
-    if (stillWanted && !(await stillWanted())) return "stopped";
+    if (stillWanted && !(await stillWanted(r))) return "stopped";
     // What it cost, once rendered: the message says what will be charged.
     const cost = target.costOf ? await target.costOf().catch(() => null) : (target.cost ?? null);
     await deliverMontage({ ...target, cost }, r);
@@ -187,10 +187,10 @@ export async function deliverMontage(target: DeliveryTarget, r: { title: string;
         : target.voiceOffer
           ? "Tu peux y poser une voix off : dis-le-moi."
           : "";
-  // Without music for the sound of the Reel she copies: how to add it in Instagram, and the Business caveat.
+  // Without music for a sound she adds in Instagram: one short sentence, its page shows how (addedSoundLine).
   const { data: sounded } = await supabaseAdmin().from("posts").select("music").eq("id", target.postId).eq("studio_id", target.studioId).maybeSingle();
   const sound = readPostMusic(sounded?.music).mode === "model" ? await modelSound(target.studioId, target.postId).catch(() => null) : null;
-  const soundLine = sound ? modelSoundLine(sound) : "";
+  const soundLine = sound ? addedSoundLine(sound) : "";
   // No quote before: what it used is said once it is there.
   const costLine = unlocked && target.cost?.credits ? `${target.cost.credits} crédit${target.cost.credits > 1 ? "s" : ""} utilisé${target.cost.credits > 1 ? "s" : ""}, il t’en reste ${target.cost.left}.` : "";
   // The editor's and the critic's words are the model's: no stray markup (« </br> ») reaches her; of the editor's, only a limit.

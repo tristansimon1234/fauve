@@ -4,6 +4,7 @@ import { z } from "zod";
 import { cronAuthorized } from "@/lib/cron-auth";
 import { renderAndDeliver } from "@/lib/render/deliver";
 import { renderPost } from "@/lib/render/render-post";
+import { rerenderStillWanted } from "@/lib/rerender";
 import { finishJob, keepAlive } from "@/lib/studio-jobs";
 
 // A video made again from the chat (lib/rerender.ts): rendered with what changed (its music, its voice, its texts),
@@ -36,7 +37,9 @@ export async function POST(request: Request) {
         await finishJob(jobId);
         return;
       }
-      const delivered = await renderAndDeliver(target);
+      // Only the latest version of the Reel goes out (rerenderStillWanted): a newer change, or a montage on it, delivers its own.
+      const delivered = await renderAndDeliver(target, (r) => rerenderStillWanted(jobId, target.studioId, target.postId, r.current));
+      if (delivered === "stopped") console.log("rerender: a newer version of the Reel delivers, this one stays silent", target.postId, jobId);
       await finishJob(jobId, delivered === null);
     } catch (error) {
       console.error("rerender failed", target.postId, error);

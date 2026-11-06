@@ -76,7 +76,40 @@ export type FootageSource = {
   ground?: (shot: ComposeShot, size: { width: number; height: number }) => ReactNode;
   /** The shot with its depth as its transparency (depth_video.py: near opaque), drawn exactly like the shot; nothing when it has none. */
   near?: (shot: ComposeShot, size: { width: number; height: number }) => ReactNode;
+  /** A veil on her pictures while the Reel's words show (« voile »): how dark, and when (frames of the composition). */
+  scrim?: { strength: number; spans: [number, number][] };
 };
+
+/** Frames a veil fades in and out over, at the edges of its spans (they are padded by as much). */
+const SCRIM_FADE = 6;
+
+/** How much of a veil plays at a frame: full inside its spans, fading at their edges, none outside. */
+function scrimAt(scrim: FootageSource["scrim"], frame: number): number {
+  if (!scrim) return 0;
+  for (const [from, to] of scrim.spans) {
+    if (frame < from || frame >= to) continue;
+    return Math.max(0, Math.min(1, (frame - from + 1) / SCRIM_FADE, (to - frame) / SCRIM_FADE));
+  }
+  return 0;
+}
+
+/**
+ * The veil over one of her shots (a model's words read on it): darker towards its edges, where most models write, softer
+ * in its middle, never a box; drawn over the shot only, under everything the composition draws after it.
+ */
+function Scrim({ scrim, frame }: { scrim: FootageSource["scrim"]; frame: number }) {
+  const amount = scrimAt(scrim, frame);
+  if (!scrim || amount <= 0) return null;
+  const s = scrim.strength * amount;
+  const a = (k: number) => Math.min(0.85, s * k).toFixed(3);
+  return (
+    <div
+      data-fauve-decor=""
+      aria-hidden="true"
+      style={{ position: "absolute", inset: 0, pointerEvents: "none", background: `radial-gradient(ellipse 75% 60% at 50% 50%, rgba(0,0,0,${a(0.7)}) 0%, rgba(0,0,0,${a(1)}) 65%, rgba(0,0,0,${a(1.3)}) 100%)` }}
+    />
+  );
+}
 
 /** Given by the Reel to a collage's composition only; none in the scene check (a grey card stands in for each shot). */
 export const FootageContext = createContext<FootageSource | null>(null);
@@ -114,6 +147,7 @@ function Footage({ shot, style, hold, at }: { shot: number; style?: CSSPropertie
       ) : (
         <Freeze frame={Math.max(0, Math.min(info.durationInFrames - 1, local))}>{media}</Freeze>
       )}
+      <Scrim scrim={source.scrim} frame={frame} />
     </div>
   );
 }

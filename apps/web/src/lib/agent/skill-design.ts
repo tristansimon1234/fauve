@@ -22,6 +22,7 @@ import {
   planTimeline,
   readSkillFill,
   resolveReelBrand,
+  scrimFor,
   shotScore,
   SKILL_FILL_PROMPT,
   skillFillInput,
@@ -425,7 +426,10 @@ export async function designSkill(params: {
     const subtitleY = laid && !heard ? skillSubtitleRow(skill, checked.own, plan.duration) : undefined;
     const pale = subtitleY !== undefined ? paleSpans(checked.ground, subtitleY, Math.round((layer.to - layer.from) * 30)) : [];
     const row = subtitleY !== undefined ? { subtitle_y: subtitleY, ...(pale.length ? { subtitle_pale: pale } : {}) } : {};
-    plan.layers = [{ ...layer, motion: { ...layer.motion, js: checked.js, ...(checked.fonts.length ? { fonts: checked.fonts } : {}), ...row } }];
+    // Her words read better on her pictures (« voile », « overlay », « on voit pas bien le texte »), or the veil its version
+    // before had: her shots darkened softly under its words, its lettering, sizes and design the model's (never a box).
+    const scrim = scrimFor(params.previous, params.brief);
+    plan.layers = [{ ...layer, motion: { ...layer.motion, js: checked.js, ...(checked.fonts.length ? { fonts: checked.fonts } : {}), ...row }, ...(scrim ? { scrim } : {}) }];
     return { plan };
   };
 

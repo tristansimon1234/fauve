@@ -6042,3 +6042,134 @@ test("house models: each one read like a Reel she sends, measured, finished, set
   assert.equal(followed.filter_look?.highlights, "#EDE9E0");
   assert.equal(followed.bpm, 122);
 });
+
+test("« sois créatif » means creation, never one of Edith's models (Tristan, 6 November)", async () => {
+  const { asksCreation, namesHouseModel, HOUSE_PICK_PROMPT } = await import("./house-pick.ts");
+  const { ownRequestWords, requestBrief } = await import("./request-log.ts");
+  for (const asked of [
+    "sois creatif ! sur le marais a paris",
+    "Sois créative",
+    "fais-toi plaisir",
+    "Surprends-moi",
+    "libre",
+    "crée !",
+    "crée ce que tu veux sur le marais",
+    "un reel créatif sur la terrasse",
+    "laisse parler ta créativité",
+    "carte blanche",
+    "en toute liberté",
+    "style libre",
+    "lâche-toi",
+  ])
+    assert.equal(asksCreation(asked), true, asked);
+  for (const not of [
+    "Un Reel sur l'atelier créatif du mercredi",
+    "entrée libre samedi",
+    "ma nouvelle création",
+    "crée un Reel sur la terrasse",
+    "pas besoin d'être créatif, reste simple",
+    "Fais comme tu le sens",
+    "libre service ouvert",
+    "Je suis libre mardi",
+    "je ne veux pas de surprise",
+  ])
+    assert.equal(asksCreation(not), false, not);
+  // Read on her own words for this Reel and Edith's brief, never on Edith's replies nor on what she said of other Reels.
+  const brief = requestBrief(
+    [{ at: "2026-11-06T13:32:00Z", via: "chat", lines: [{ who: "elle", text: "sois creatif ! sur le marais a paris" }, { who: "simone", text: "Je crée ton Reel, plan :\n- Ouverture : la terrasse" }] }],
+    "Un Reel sur le Marais, avec le son donné.",
+    [{ title: "Le café", log: [{ at: "2026-11-01T10:00:00Z", via: "chat", lines: [{ who: "elle", text: "surprends-moi" }] }] }],
+  );
+  const own = ownRequestWords(brief);
+  assert.match(own, /sois creatif/);
+  assert.match(own, /Un Reel sur le Marais/);
+  assert.doesNotMatch(own, /Je crée ton Reel|Ouverture : la terrasse|surprends-moi/);
+  assert.equal(asksCreation(ownRequestWords(requestBrief([{ at: "x", via: "chat", lines: [{ who: "elle", text: "un Reel sur la terrasse" }, { who: "simone", text: "Je peux être créatif !" }] }], "La terrasse", [{ title: "Avant", log: [{ at: "y", via: "chat", lines: [{ who: "elle", text: "sois créatif" }] }] }]))), false);
+  // A brief without an exchange (the lab's idea) is read whole.
+  assert.equal(ownRequestWords("Sois créatif sur Budapest"), "Sois créatif sur Budapest");
+  // A model she names herself stays hers, creative or not.
+  assert.equal(namesHouseModel("sois créatif, façon mots aux quatre coins", "quatre-coins"), true);
+  assert.equal(namesHouseModel("sois créatif sur le marais", "quatre-coins"), false);
+  // The picker, if it is ever asked, answers none.
+  assert.match(HOUSE_PICK_PROMPT, /be creative, to surprise her or to go free[^\n]*"none"/);
+});
+
+test("only the latest version of a Reel is delivered: a re-render never beside a newer one or a montage", async () => {
+  const { rerenderDelivers } = await import("./jobs.ts");
+  const mine = { id: "r1", startedAt: "2026-11-06T13:41:00Z", finished: false };
+  assert.equal(rerenderDelivers({ current: true, mine, running: [{ id: "r1", kind: "rerender", startedAt: mine.startedAt }] }), true);
+  // Tristan's end card then veil, a minute apart: the first one stays silent, the second (with both) delivers.
+  assert.equal(rerenderDelivers({ current: true, mine, running: [{ id: "r2", kind: "rerender", startedAt: "2026-11-06T13:42:00Z" }] }), false);
+  assert.equal(rerenderDelivers({ current: true, mine: { ...mine, id: "r2", startedAt: "2026-11-06T13:42:00Z" }, running: [] }), true);
+  // An older one still running never stops the newer.
+  assert.equal(rerenderDelivers({ current: true, mine: { ...mine, id: "r2", startedAt: "2026-11-06T13:42:00Z" }, running: [{ id: "r1", kind: "rerender", startedAt: mine.startedAt }] }), true);
+  // A newer version of its plan was made while it rendered, its job was stopped, or a montage runs on the Reel: silent.
+  assert.equal(rerenderDelivers({ current: false, mine, running: [] }), false);
+  assert.equal(rerenderDelivers({ current: true, mine: { ...mine, finished: true }, running: [] }), false);
+  assert.equal(rerenderDelivers({ current: true, mine, running: [{ id: "m1", kind: "montage", startedAt: "2026-11-06T13:30:00Z" }] }), false);
+  // Edith puts all she is asked in one go in one call, never « après la livraison ».
+  const { FAUVE_SYSTEM_PROMPT } = await import("./prompts.ts");
+  assert.match(FAUVE_SYSTEM_PROMPT, /All she asks in one go is one change, launched now in one call[^.]*never two runs on a Reel, never « après la livraison »/);
+  const { toolSpecs } = await import("./tools.ts");
+  assert.match(toolSpecs.add_to_reel.description, /un seul appel \(un écran de fin et un voile ensemble\)/);
+});
+
+test("« voile », « overlay », « on voit pas bien le texte » on a model: a veil on her pictures, its lettering kept", async () => {
+  const { asksLegibility, drawsItsTexts, scrimFor, withScrim, SCRIM } = await import("./plan-edit.ts");
+  const { readsBetter, reelSized, defaultLook, REEL_TEXT_MIN_PX } = await import("./text-look.ts");
+  const { scrimSpans } = await import("./motion.ts");
+  const { SKILL_FILL_PROMPT } = await import("./skills.ts");
+  for (const asked of ["on voit pas bien le texte au debut il faut peut etre un overlay", "Oui, voile sombre", "mets un fond sombre derrière le texte", "le texte est illisible", "plus lisible stp", "on lit mal les mots"])
+    assert.equal(asksLegibility(asked), true, asked);
+  for (const not of ["edith a la fin sur fond noir", "plus court", "change la police", "le voile de mariée en vitrine"]) assert.equal(asksLegibility(not), false, not);
+  // On a model's composition: its layer darkens her pictures, nothing of its texts changes (no look, no box, no font).
+  const texts = [{ text: "Le Marais", from: 0, to: 3, style: "caption" as const }];
+  const plan = editPlanSchema.parse({ ...validPlan, texts, skill: { key: "quatre-coins", version: 4 }, layers: [{ motion: { brief: "quatre-coins", js: "function Scene(){}", draws_texts: true }, from: 0, to: 12, compose: true }] });
+  assert.equal(drawsItsTexts(plan), true);
+  const veiled = editPlanSchema.parse(withScrim(plan));
+  assert.equal(veiled.layers![0]!.scrim, SCRIM);
+  assert.deepEqual(veiled.texts, plan.texts);
+  assert.equal(veiled.texts[0]!.look, undefined);
+  // Without a composition (the engine's texts), nothing to veil.
+  const engine = editPlanSchema.parse(validPlan);
+  assert.equal(drawsItsTexts(engine), false);
+  assert.deepEqual(withScrim(engine), engine);
+  // Set when her request asks for it, kept by the corrections after.
+  assert.equal(scrimFor(null, "Elle : on voit pas bien le texte au debut"), SCRIM);
+  assert.equal(scrimFor(null, "plus court"), undefined);
+  assert.equal(scrimFor(veiled, "plus court"), SCRIM);
+  // It plays while her words show, fading over a few frames, the spans that touch merged.
+  assert.deepEqual(scrimSpans([{ from: 0, to: 90 }, { from: 95, to: 150 }, { from: 400, to: 460 }], 600), [[0, 156], [394, 466]]);
+  assert.deepEqual(scrimSpans([], 600), []);
+  // A style that only asks to read better is a veil there; a font or a colour is not.
+  assert.equal(readsBetter({ fill: { kind: "box", color: "#000000", opacity: 0.55, radius: 12 } }), true);
+  assert.equal(readsBetter({ shadow: "strong" }), true);
+  assert.equal(readsBetter({ fill: { kind: "box", color: "#000000", opacity: 0.55 }, font: "Inter Tight" }), false);
+  assert.equal(readsBetter({ shadow: "none" }), false);
+  // On a Reel her words are never under 48 px (the starting look of a caption was 46).
+  assert.equal(reelSized(defaultLook("caption", { display: "Anton", body: "Inter Tight" })).size, REEL_TEXT_MIN_PX);
+  assert.equal(reelSized(defaultLook("hook", { display: "Anton", body: "Inter Tight" })).size, 112);
+  // The filler knows a veil fits the model.
+  assert.match(SKILL_FILL_PROMPT, /« voile », « overlay », « fond sombre derrière le texte », « on voit pas bien le texte »\) fit: the engine lays a soft veil/);
+});
+
+test("the delivery is short: never the editor's or the filler's sentence on its choices, one sentence for the sound", async () => {
+  const { deliveryWords } = await import("./editor.ts");
+  const { addedSoundLine } = await import("./sound-follow.ts");
+  // A Reel on a model: « Je l'ai monté sur le modèle… » then the filler's why, which the video shows.
+  assert.equal(deliveryWords("Je l'ai monté sur le modèle « Mots aux quatre coins ». J'ai ouvert sur la terrasse fleurie, puis les ruelles pavées, et je finis sur ta devanture."), "");
+  // A limit is still said.
+  assert.equal(
+    deliveryWords("J'ouvre sur la terrasse. J'ai gardé tes plus beaux plans. Il manque un plan de ta devanture : filme-la 3 secondes."),
+    "Il manque un plan de ta devanture : filme-la 3 secondes.",
+  );
+  const followed = addedSoundLine({ business: true, followed: true });
+  const copied = addedSoundLine({ business: false });
+  for (const line of [followed, copied]) {
+    assert.equal(line.split(/[.!?](?:\s|$)/).filter((s) => s.trim()).length, 1, line);
+    assert.doesNotMatch(line, /https?:|Utiliser l'audio|télécharge/);
+    assert.ok(line.split(/\s+/).length <= 30, line);
+  }
+  assert.match(followed, /mets ta musique/);
+  assert.doesNotMatch(copied, /mets ta musique/);
+});

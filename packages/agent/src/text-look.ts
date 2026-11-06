@@ -107,6 +107,25 @@ export function lookColor(color: string, brand: { accent: string; accentInk: str
   return color === "accent" ? brand.accent : color === "accent_ink" ? brand.accentInk : color;
 }
 
+/** The smallest size her words take on a Reel (px for a 1080 px wide frame): under it they do not read on a phone. */
+export const REEL_TEXT_MIN_PX = 48;
+
+/** A look for a Reel's text, never under REEL_TEXT_MIN_PX (the starting look of a caption was 46 px, a band's 44). */
+export function reelSized(look: TextLook): TextLook {
+  return look.size < REEL_TEXT_MIN_PX ? { ...look, size: REEL_TEXT_MIN_PX } : look;
+}
+
+/**
+ * A change of a text's look that only asks for it to read better on its picture: a ground behind it (a box, a pill, a
+ * highlight), an outline or a shadow, nothing of its font, size or colour. On a Reel whose model draws its texts, that is
+ * a veil on her pictures under them (withScrim), its lettering kept.
+ */
+export function readsBetter(patch: Partial<Record<keyof TextLook, unknown>>): boolean {
+  const given = Object.entries(patch).filter(([, v]) => v !== undefined);
+  if (!given.length || given.some(([k]) => k !== "fill" && k !== "stroke" && k !== "shadow")) return false;
+  return Boolean(patch.fill) || Boolean(patch.stroke) || (typeof patch.shadow === "string" && patch.shadow !== "none");
+}
+
 /** A starting look for a text styled by hand, close to what the template draws for its role. */
 export function defaultLook(role: "hook" | "band" | "caption", fonts: { display: string; body: string }): TextLook {
   if (role === "hook") {
