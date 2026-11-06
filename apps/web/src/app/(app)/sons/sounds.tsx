@@ -3,6 +3,7 @@
 import { shortCount, SOUND_SEARCHES_PER_DAY } from "@fauve/agent";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { MusicIcon, PauseIcon, PlayIcon } from "@/components/icons";
+import { Mascot } from "@/components/mascot";
 import { NewPostSheet, type PickedSound } from "@/components/new-post-sheet";
 import type { TrendSound } from "@/lib/trend-sounds";
 import { findSounds, soundToPlay } from "./actions";
@@ -81,7 +82,7 @@ export function SoundsSection({ sounds, timezone }: { sounds: TrendSound[]; time
           <h2 id="sounds-title" className="text-[22px] font-extrabold tracking-[-0.01em]">
             Les sons du moment
           </h2>
-          <p className="text-[14px] text-muted">ceux de nos modèles, puis le Top 50 et le Viral 50 de TikTok, retrouvés sur Instagram</p>
+          <p className="text-[14px] text-muted">les préférés d’Edith, puis le Top 50 et le Viral 50 de TikTok, retrouvés sur Instagram</p>
         </div>
         <p className="max-w-[640px] text-[13.5px] leading-snug text-muted">
           Choisis un son : ton Reel sort sans musique, coupé sur ses temps, et tu ajoutes le son dans Instagram en le publiant (« Utiliser l’audio »). Instagram ne laisse aucune appli le mettre à ta place.
@@ -128,9 +129,10 @@ export function SoundsSection({ sounds, timezone }: { sounds: TrendSound[]; time
 
       {!found && house.length > 0 && (
         <div className="flex flex-col gap-2">
-          <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-            <h3 className="text-[17px] font-extrabold">Les sons de nos modèles</h3>
-            <p className="text-[13px] text-muted">repérés dans les Reels dont les modèles d’Edith sont faits</p>
+          {/* Edith's own picks (Tristan: « mets mes sons préférés du moment avec la tête d'Edith »). */}
+          <div className="flex items-center gap-2.5">
+            <Mascot size={36} still />
+            <h3 className="text-[17px] font-extrabold">Mes sons préférés du moment</h3>
           </div>
           <SoundList sounds={house} playing={playing} busy={busy} onListen={listen} onPick={pick} />
         </div>
@@ -190,7 +192,7 @@ function SoundList({
             <p className="truncate text-[15px] font-bold">{sound.title}</p>
             <p className="truncate text-[13px] text-muted">{[sound.artist, sound.explicit ? "Explicite" : null].filter(Boolean).join(" · ")}</p>
             <p className="mono-label truncate text-muted">
-              {[sound.chart === "house" ? "Nos modèles" : sound.chart ? `${sound.chart === "top" ? "Top 50" : "Viral 50"} · N° ${String(sound.rank ?? 0).padStart(2, "0")}` : null, sound.tiktokUsers ? `${shortCount(sound.tiktokUsers)} vidéos TikTok` : null].filter(Boolean).join(" · ")}
+              {[sound.chart === "house" ? "Préféré d’Edith" : sound.chart ? `${sound.chart === "top" ? "Top 50" : "Viral 50"} · N° ${String(sound.rank ?? 0).padStart(2, "0")}` : null, sound.tiktokUsers ? `${shortCount(sound.tiktokUsers)} vidéos TikTok` : null].filter(Boolean).join(" · ")}
             </p>
           </div>
           <button type="button" onClick={() => onPick(sound)} disabled={busy === sound.audioId} className="btn-secondary h-9 shrink-0 px-3 text-[13px] disabled:opacity-50">
