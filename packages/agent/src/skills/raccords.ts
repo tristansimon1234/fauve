@@ -257,7 +257,7 @@ export const raccords: MontageSkill = {
     {
       slot: "mot",
       role: "hook",
-      want: "un seul mot de 2 à 9 lettres, en très grandes capitales qui clignotent sur le premier plan : le mot de son nom qui la distingue (« Farine » pour « Maison Farine »), ou le mot le plus fort de sa demande (« Ouvert », « Nouveau », « Samedi », « Soldes »), jamais une phrase ni deux mots",
+      want: "un seul mot de 2 à 10 lettres, en très grandes capitales qui clignotent sur le premier plan : le mot de son nom qui la distingue (« Farine » pour « Maison Farine »), ou le mot le plus fort de sa demande (« Ouvert », « Nouveau », « Samedi », « Soldes »), jamais une phrase ni deux mots",
       max: 10,
       required: true,
     },
