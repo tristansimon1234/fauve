@@ -104,8 +104,10 @@ test("« Images qui s'emboîtent » (effect v1): on each cut's last step, the ne
   // Then a person again (the original's order); no cut-out of her: a plain cut.
   assert.deepEqual(laid(drawAt(66)), ["Subject 5"]);
   assert.deepEqual(laid(drawAt(66, { reads: { cut: (i) => i !== 5 } })), []);
-  // After its last cut, nothing more: the montage plays on under it; never during a shot's first images.
+  // After its last cut, nothing more: the montage plays on under it; never during a shot's first images. Its root keeps
+  // a style even then (the scene check refuses an output under 20 characters: « empty output »).
   assert.deepEqual([72, 80, 89].map((f) => laid(drawAt(f))), [[], [], []]);
+  assert.deepEqual(drawAt(89).props.style, { pointerEvents: "none" });
   assert.deepEqual([0, 18, 36, 54].map((f) => laid(drawAt(f))), [[], [], [], []]);
   // A slower Reel: its step a sixteenth, the original's 6 images (beat 24).
   assert.deepEqual([11, 12].map((f) => laid(drawAt(f, { texts: { beat: "24", step: "6" } }))), [[], ["Subject 2"]]);

@@ -71,7 +71,8 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
       ]
     : null;
 
-  return h(AbsoluteFill, null, band, pieces);
+  // A layer over the montage: nothing of its own between two cuts, the montage showing through.
+  return h(AbsoluteFill, { style: { pointerEvents: "none" } }, band, pieces);
 }`;
 
 /** Its step for a span (frames): a sixteenth of the beat, an eighth when a sixteenth is under 5 images. */
