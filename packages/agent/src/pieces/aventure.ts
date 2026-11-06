@@ -71,7 +71,8 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
     return lines.map((line, i) => {
       const y = lines.length > 1 ? cy + (i ? 0.585 : -0.585) * CAP : cy;
       const s = numLine < 0 || numLine === i ? swell : 1;
-      return h(FitText, { key: "n" + i + line, style: { position: "absolute", left: Math.round(width / 2 - 295), top: Math.round(y - CAP * 0.72), width: 590, height: Math.round(CAP * 1.44), opacity: 0.48, ...(s !== 1 ? { transform: "scale(" + s + ")", filter: k <= 2 ? "blur(2px)" : "none" } : {}) }, innerStyle: { fontFamily: display, fontWeight: 400, fontSize: F, lineHeight: 1, letterSpacing: "0.01em", textTransform: "uppercase", whiteSpace: "nowrap", color: INK } }, line);
+      // Its box holds the font's whole height (about 1,2 of its size), so its capitals keep their 8 % (a tighter box shrank them).
+      return h(FitText, { key: "n" + i + line, style: { position: "absolute", left: Math.round(width / 2 - 295), top: Math.round(y - CAP * 0.9), width: 590, height: Math.round(CAP * 1.8), opacity: 0.48, ...(s !== 1 ? { transform: "scale(" + s + ")", filter: k <= 2 ? "blur(2px)" : "none" } : {}) }, innerStyle: { fontFamily: display, fontWeight: 400, fontSize: F, lineHeight: 1, letterSpacing: "0.01em", textTransform: "uppercase", whiteSpace: "nowrap", color: INK } }, line);
     });
   })();
   return h(AbsoluteFill, null, fill, counter);

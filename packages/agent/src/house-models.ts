@@ -2044,7 +2044,7 @@ export const HOUSE_MODELS: HouseModel[] = [
         weight: "regular",
         tracking: "normal",
       },
-      layout: "plein cadre, une cinquantaine de plans coupés sur les temps, presque tous de deux temps, dix coupes cachées derrière ce qui passe devant l'objectif ; en 16:9 sur du noir si ses vidéos sont en largeur",
+      layout: "des plans en plein cadre sur les temps, dix coupes cachées par ce qui passe devant l'objectif, un compteur posé sur le plan fort ; en 16:9 sur du noir si ses vidéos sont en largeur",
       moments: [
         { at: 0, what: "trois plans éclair (une façade en contre-plongée, une rue, un plan de nuit), chaque coupe cachée derrière quelque chose de sombre qui passe devant l'objectif ; la musique sans sa basse" },
         { at: 2.07, what: "la basse tombe sur un visage de près dans un moment fort, au ralenti : un compteur de deux lignes en capitales étroites, blanches et translucides, au milieu ; un temps plus tard son nombre prend un de plus et gonfle trois images" },
