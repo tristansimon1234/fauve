@@ -2264,6 +2264,54 @@ export const HOUSE_MODELS: HouseModel[] = [
       why: "L'œil ne saute jamais : ce qu'on va regarder est déjà là avant la coupe, à sa place, et se construit en morceaux sur les coups ; on reste pour voir l'image suivante arriver.",
     },
   }),
+  model({
+    key: "aventure",
+    name: "Un an de plus",
+    // Written on its original's fiche (v1 of its skill, docs/fiches/aventure.md): a creator's year told as an adventure
+    // film on an acoustic folk at 134,87 BPM, its counter taking one more on the drop, its cuts hidden behind what
+    // passes before the lens, its plunge under a muffled music, its blow, its comeback and its people at the end.
+    pitch: "Ton année comme un film d'aventure : ton compteur qui prend un an sur le temps fort, tes moments à toute allure, coupés derrière ce qui passe devant l'objectif, un coup dur, la reprise, et les tiens à la fin.",
+    needs: "12 à 30 vidéos de ton année : un gros plan fort pour le compteur (un visage dans un moment fort, de la farine, des confettis, de la vapeur), tes moments, ton lieu, ton équipe et tes clients, un moment plus dur et la reprise, les tiens réunis pour finir ; et ce que tu comptes (« 5 ans », « saison 3 »)",
+    files: [8, 30],
+    // Its counter in tall condensed capitals (Bebas Neue, the original's grotesque), its ending card's line in a fine geometric.
+    pair: "condensee-geometrique",
+    // Its skill's code is its reference.
+    example: null,
+    // Its cuts' grid (docs/fiches/aventure.md): its music at 134,8 BPM, its cuts on a grid of 134,87, 0,107 s after its beats.
+    tempo: 134.87,
+    finish: { name: "Film de voyage", hint: "ombres un peu froides, hautes lumières chaudes, blancs retenus, noirs à peine levés, sans grain ni coins sombres", contrast: 0.06, warmth: 0.04, fade: 0.03, shadows: "#1C2A2E", highlights: "#E8DDC4", split: 0.18 },
+    look: {
+      name: "l'année en aventure",
+      format: "autre",
+      hook: { kind: "chiffre", what: "trois plans éclair qui passent derrière du sombre, puis la basse qui tombe sur un visage de près dans un moment fort et un compteur translucide au milieu qui prend un an sur le temps suivant" },
+      text: {
+        amount: "une ligne",
+        composition: "un seul texte : un compteur sur deux lignes en capitales très étroites, blanches et translucides, au milieu de l'image (un mot dessus, le nombre dessous), qui passe au nombre suivant et gonfle trois images, parti trois temps après",
+        case: "upper",
+        weight: "regular",
+        tracking: "normal",
+      },
+      layout: "des plans en plein cadre sur les temps, dix coupes cachées par ce qui passe devant l'objectif, un compteur posé sur le plan fort ; en 16:9 sur du noir si ses vidéos sont en largeur",
+      moments: [
+        { at: 0, what: "trois plans éclair (une façade en contre-plongée, une rue, un plan de nuit), chaque coupe cachée derrière quelque chose de sombre qui passe devant l'objectif ; la musique sans sa basse" },
+        { at: 2.07, what: "la basse tombe sur un visage de près dans un moment fort, au ralenti : un compteur de deux lignes en capitales étroites, blanches et translucides, au milieu ; un temps plus tard son nombre prend un de plus et gonfle trois images" },
+        { at: 3.2, what: "ce qui remplit l'objectif (de la poudre de couleur) cache la coupe sur une foule floue ; le compteur part d'un coup au milieu de ce plan" },
+        { at: 3.53, what: "ses moments à toute allure, un plan tous les deux temps, les coupes cachées par un fouet de la caméra, une fumée qui remplit l'image, un tissu tout contre l'objectif" },
+        { at: 13.27, what: "la caméra plonge dans l'eau : trois plans dessous, la musique étouffée, puis la musique revient d'un coup sur une vue d'en haut à l'air libre" },
+        { at: 20.33, what: "le coup dur en quatre plans plus sombres : un bras en écharpe, l'hôpital, la tête basse, une main sur une cicatrice" },
+        { at: 23.5, what: "la reprise sur un grand décor, un long plan qui tourne, un objet montré à l'objectif puis le même ailleurs quand l'eau monte du bas de l'image" },
+        { at: 33.9, what: "un profil se fond une seconde dans un coucher de soleil, le seul fondu ; puis quelque chose qui file après un fouet" },
+        { at: 41.3, what: "les siens : des gens qui courent vers la caméra en riant, une photo de groupe, des embrassades ; le dernier plan tenu sans la basse" },
+      ],
+      camera: "mixte",
+      transitions: "effets",
+      grade: "film",
+      motion: "energique",
+      music: "galloping acoustic indie folk, guitar strummed in eighths, warm bass, 135 BPM",
+      ending: "les siens qui se prennent dans les bras, le dernier plan tenu sans la basse, la musique qui s'éteint",
+      why: "Le compteur dit d'emblée ce qu'on fête, sur la basse qui tombe ; les plans s'enchaînent sur les temps sans qu'on voie une coupe, et le coup dur avant la reprise fait une histoire : on reste jusqu'aux embrassades.",
+    },
+  }),
 ];
 
 const BY_KEY = new Map(HOUSE_MODELS.map((m) => [m.key, m]));
@@ -2353,6 +2401,7 @@ export const HOUSE_WHEN: Record<string, { pour: string; pas_pour: string }> = {
   curseur: { pour: "montrer deux de ses produits avec humour, comme sur un écran d'ordinateur (un café, une boulangerie, un restaurant, un traiteur, une boutique, un fleuriste) : quelqu'un de son lieu qui les porte ou les montre, puis la photo de près des deux, chacun nommé d'un clic", pas_pour: "sans vidéo de son lieu où quelqu'un bouge, sans photo de près de ses produits, quelqu'un qui parle face caméra, un long message ou une offre à lire, un lieu sans rien à montrer" },
   bienvenue: { pour: "présenter son lieu et ce qu'on y fait (un salon, un café, un restaurant, une boutique, un studio, un atelier) : une phrase d'accueil mot à mot sur son lieu au calme, puis sa vie en rafale ; une ouverture, une réouverture, une rentrée, un nouveau lieu", pas_pour: "un seul produit, quelqu'un qui parle face caméra (ses mots s'écrivent, aucune voix), un long message à lire, moins de six vidéos (la rafale en veut une dizaine)" },
   raccords: { pour: "présenter son lieu, sa journée ou ses produits en quelques images qui s'enchaînent avec style, pour tout commerce (un café, une boutique, un salon, un atelier, un studio) : chaque plan a quelque chose de net au milieu qui arrive en avance sur le précédent", pas_pour: "un message à lire, quelqu'un qui parle face caméra, des plans flous ou sans rien de net au milieu, moins de quatre images" },
+  aventure: { pour: "fêter ses années (un anniversaire, un an d'ouverture), le bilan de son année ou de sa saison, une rétrospective, un merci à ses clients et à son équipe, avec beaucoup de moments différents", pas_pour: "peu de vidéos (moins de huit), un produit seul, une offre à lire en détail, quelqu'un qui parle face caméra, un Reel court" },
 };
 
 /** The models for Edith: their key, name, what they do, what they want, and what only she can film for one. */
