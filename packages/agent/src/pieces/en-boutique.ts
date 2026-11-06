@@ -113,7 +113,10 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
           splitName(keep(title)).map((l, i) => h("div", { key: i, style: { whiteSpace: "nowrap" } }, l))),
         line ? h(FitText, { key: "l-" + line, style: { position: "absolute", left: 40, top: Math.round(tall * 0.72), width: SW - 80, height: 62 }, innerStyle: { fontFamily: body, fontWeight: 700, fontSize: 48, lineHeight: 1.1, letterSpacing: "0.05em", textTransform: "uppercase", color: "#141414", whiteSpace: "nowrap", textAlign: "center" } }, keep(line)) : null)
     : null;
-  return h(AbsoluteFill, null, card);
+  // Before its pop and after its exit, its words stay in the page, hidden: the scene check finds them whole.
+  const hidden = { position: "absolute", left: 0, top: 0, opacity: 0, fontSize: 1, whiteSpace: "pre" };
+  const rest = !card && title ? h("span", { key: "rest", style: hidden }, keep(title) + (line ? "\n" + keep(line) : "")) : null;
+  return h(AbsoluteFill, null, card, rest);
 }`;
 
 /** Its moments, frames from its start: the pop (the original's 31 images into the shot when there is room), its exit 66 images later at most. */

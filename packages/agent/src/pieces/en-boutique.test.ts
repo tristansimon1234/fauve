@@ -87,6 +87,10 @@ const styleOf = (n: Drawn) => (n.props.style ?? {}) as Record<string, string | n
 
 test("« Titre en autocollant » draws: nothing before its pop, then its bounce, two seconds, its exit, never a fade", () => {
   assert.equal(sticker(drawAt(30)), null);
+  // Its words in the page all the same, hidden (the scene check finds them whole; nothing shows).
+  const before = flatten(drawAt(30)).find((n) => n.props.key === "rest")!;
+  assert.deepEqual([own(before), (before.props.style as Record<string, number>).opacity], ["Pizza du marché\navec Léa & Marco".replace(/\s+/g, " "), 0]);
+  assert.equal(flatten(drawAt(60)).find((n) => n.props.key === "rest"), undefined);
   const look = (f: number) => {
     const s = sticker(drawAt(f))!;
     const t = String(styleOf(s).transform);
