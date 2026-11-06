@@ -50,6 +50,8 @@ import { soundPageLink,
   effectWords,
   type ToolName,
   keptPlan,
+  validatedPlanVoice,
+  withSoundLine,
   planMessage,
   PLAN_BUTTONS,
   exchangeLines,
@@ -691,7 +693,7 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
     },
 
     async montage({ post_id, media_ids, brief, correction, max_new_scenes, plan, effort, inspiration_id, son, son_lien, anciens_fichiers, remplacer_fichiers, avec_ceux_la, duree, garde_la_duree }) {
-      const post = unwrap(await db.from("posts").select("id, title, edit_plan_id, media_ids").eq("id", post_id).eq("studio_id", studioId).single());
+      const post = unwrap(await db.from("posts").select("id, kind, title, edit_plan_id, media_ids, voice_over").eq("id", post_id).eq("studio_id", studioId).single());
       // A correction's new files join the Reel's own, unless Edith read that she wants to start again from them alone:
       // given alone, Promo Edith 2's five new photos replaced its twenty files and it came back as 3 s.
       if (correction && media_ids?.length && !remplacer_fichiers && post.edit_plan_id) {
@@ -772,6 +774,14 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
             note: `Ce Reel est fait pour durer ${long.max} s au plus : au-delà, il perd ce qui le rend bon. Dis-le-lui en une phrase, sans la décourager, sans nommer sa forme ni parler de modèle, avec les boutons « Fais-le à ${long.max} s » et « Garde ${duree} s » (reply_with). Sur « Fais-le à ${long.max} s », relance montage avec duree ${long.max} et cette durée dans brief à la place de la sienne ; sur « Garde ${duree} s », avec garde_la_duree true (le monteur l'étire). Rien n'est lancé d'ici là.`,
           });
         }
+      }
+      // « C'est parti » launches the plan as she read it: its sound (a voice over or not) goes on the Reel, unless the Reel
+      // has its own choice (Créer, set_voice); her words since still come first (reelVoiceChoice). Edith no longer sets it again.
+      const shownVoice = correction || post.kind !== "reel" ? undefined : validatedPlanVoice(ctx.exchange ?? []);
+      const setVoice = readPostVoice(post.voice_over);
+      if (shownVoice !== undefined && (!setVoice || setVoice.from === "plan")) {
+        const voice_over = { ...(setVoice?.voice_id ? { voice_id: setVoice.voice_id } : {}), mode: shownVoice ? "on" : "off", from: "plan" };
+        check(await db.from("posts").update({ voice_over }).eq("id", post_id).eq("studio_id", studioId));
       }
       // The level asked for, else the studio's default (Réglages).
       const studio = await db.from("studios").select("montage_effort").eq("id", studioId).single();
@@ -1988,7 +1998,10 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
     },
 
     async reply_with({ options, posts, grid, upload, pick_media, step_card, plan }) {
-      const kept = plan ? keptPlan(plan) : null;
+      const read = plan ? keptPlan(plan) : null;
+      // A Reel's plan says its sound, and her « C'est parti » applies it (validatedPlanVoice, at the montage).
+      const planVoice = read && typeof plan?.voix_off === "boolean" ? plan.voix_off : undefined;
+      const kept = read ? withSoundLine(read, planVoice) : null;
       if (plan && !kept) return "Plan trop court : un titre, 4 à 6 points « Rubrique : ce qu'on fait », et pourquoi. Rappelle reply_with avec le plan entier.";
       let own: string[] = [];
       if (posts?.length) {
@@ -2013,6 +2026,7 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
       ctx.extras.options = answers;
       ctx.plan = kept ? planMessage(kept) : undefined;
       ctx.extras.plan = kept ? true : undefined;
+      ctx.extras.plan_voice = planVoice;
       ctx.extras.posts = own.length ? own : undefined;
       ctx.extras.grid = grid || undefined;
       // The drop zone is the app's; on WhatsApp, files asked for become her upload link under the message (full quality).

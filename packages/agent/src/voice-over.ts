@@ -160,9 +160,21 @@ export const postVoiceSchema = z.object({
   wish: z.string().max(300).optional(),
   /** Edith's voice on the Reel is made again at the next montage (another text or voice), once. */
   remake: z.boolean().optional(),
+  /** Set from the plan she said yes to (« C'est parti »), not chosen in so many words: her own words since come first. */
+  from: z.literal("plan").optional(),
 });
 export type PostVoice = z.infer<typeof postVoiceSchema>;
 export const readPostVoice = (value: unknown): PostVoice | null => postVoiceSchema.nullable().catch(null).parse(value ?? null);
+
+/**
+ * This Reel's voice: the choice set on it (Créer, set_voice), else her own words (« Avec une voix off », « Juste la
+ * musique », read by the contract). The sound of a plan she said yes to is set on it too, but her words since win over it
+ * (« C'est parti », then « finalement avec une voix off »).
+ */
+export function reelVoiceChoice(set: PostVoice | null, said: { mode: "on" | "off" } | null): PostVoice | null {
+  if (set?.from === "plan") return said ? { ...set, mode: said.mode } : set;
+  return set ?? said;
+}
 
 /** Footage enough to show while a voice of 15 to 22 s speaks (a photo shows about 3 s). */
 export const VOICE_MIN_FOOTAGE_SECONDS = 12;

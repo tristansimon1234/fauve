@@ -5745,6 +5745,41 @@ test("a new Reel starts once a plan was put to her, with the files of this excha
   assert.equal(planShown([]), false);
 });
 
+test("« C'est parti » launches the plan as she read it: its sound goes on the Reel, her words since come first", async () => {
+  const { validatedPlanVoice } = await import("./request-log.ts");
+  const { reelVoiceChoice } = await import("./voice-over.ts");
+  const { withSoundLine } = await import("./post-ideas.ts");
+  const { toolSpecs } = await import("./tools.ts");
+  const at = "2026-11-06T13:00:00Z";
+  const her = (body: string) => ({ direction: "inbound" as const, type: "text", body, created_at: at });
+  const edith = (body: string, extra: { launched?: boolean; plan?: boolean; planVoice?: boolean } = {}) => ({ direction: "outbound" as const, type: "text", body, created_at: at, ...extra });
+  // Her go on a plan with a voice over: the voice is applied; not answered yet, nothing.
+  const shown = [her("Un Reel sur la nouvelle carte"), edith("Le plan…", { plan: true, planVoice: true })];
+  assert.equal(validatedPlanVoice(shown), undefined);
+  assert.equal(validatedPlanVoice([...shown, her("C'est parti")]), true);
+  // The plan redone after « Changer le plan »: the last one counts.
+  assert.equal(validatedPlanVoice([...shown, her("sans voix"), edith("Le plan…", { plan: true, planVoice: false }), her("C'est parti")]), false);
+  // A plan of the Reel before the last launch does not count, nor a plan that says nothing of the sound (a carousel).
+  assert.equal(validatedPlanVoice([...shown, her("go"), edith("C'est lancé", { launched: true }), her("Un autre")]), undefined);
+  assert.equal(validatedPlanVoice([edith("Le plan…", { plan: true }), her("go")]), undefined);
+  // On the Reel: the plan's sound, unless she said otherwise in her own words (the contract); an explicit choice stays.
+  assert.deepEqual(reelVoiceChoice({ mode: "on", from: "plan" }, null), { mode: "on", from: "plan" });
+  assert.equal(reelVoiceChoice({ mode: "on", from: "plan" }, { mode: "off" })?.mode, "off");
+  assert.equal(reelVoiceChoice({ mode: "off" }, { mode: "on" })?.mode, "off");
+  assert.equal(reelVoiceChoice(null, { mode: "on" })?.mode, "on");
+  assert.equal(reelVoiceChoice(null, null), null);
+  // The plan she reads always says it: a « Le son » line is added when Edith wrote none.
+  const plan = { title: "Nouvelle carte", points: ["Accroche : le plat qui fume", "Ensuite : la salle", "Fin : réserve ta table"], why: "" };
+  assert.equal(withSoundLine(plan, true).points.at(-1), "Le son : avec une voix off");
+  assert.equal(withSoundLine(plan, false).points.at(-1), "Le son : sans voix off");
+  assert.equal(withSoundLine({ ...plan, points: [...plan.points, "Le son : ta musique douce"] }, false).points.length, 4);
+  assert.equal(withSoundLine(plan, undefined), plan);
+  // Edith gives it with the plan; the payload mark is the code's own.
+  const replyWith = toolSpecs.reply_with.input;
+  assert.equal(replyWith.safeParse({ plan: { ...plan, voix_off: true } }).success, true);
+  assert.equal("plan_voice" in replyWith.shape, false);
+});
+
 test("what a copied Reel lays over its shots is told the same way to her and to Edith, counted on its shots", async () => {
   const { laidOver } = await import("./steal.ts");
   const ground = (at: number) => ({ at, ground: "une rue", laid: "aucun" as const, subject: "" });

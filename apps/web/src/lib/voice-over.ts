@@ -22,6 +22,7 @@ import {
   readingVoice,
   readOwnVoice,
   readPostVoice,
+  reelVoiceChoice,
   type PostVoice,
   readVoiceSetting,
   sentencePauses,
@@ -435,8 +436,9 @@ export async function voiceOverIfWanted(params: {
   ]);
   if (post.error || post.data.kind !== "reel") return null;
   // This Reel's choice: set on the post (Créer, set_voice), else her answer read from her own words (« Avec une voix off »,
-  // « Juste la musique »), which nothing recorded when Edith asked it before the post existed.
-  const choice: PostVoice | null = readPostVoice(post.data.voice_over) ?? contractVoice(params.contract);
+  // « Juste la musique »), which nothing recorded when Edith asked it before the post existed. The sound of the plan she
+  // said yes to is set on the post too, and her words since win over it.
+  const choice: PostVoice | null = reelVoiceChoice(readPostVoice(post.data.voice_over), contractVoice(params.contract));
   // A sound she chose for it (a trending one, the sound of the Reel she copies) plays instead of the video's sound: no voice
   // of Edith's over it unless she asks for one (then the voice wins, with Edith's music: settleReelSound).
   if (readPostMusic(post.data.music).mode === "model" && choice?.mode !== "on") return null;

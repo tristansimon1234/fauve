@@ -39,6 +39,8 @@ export type ExchangeRow = {
   launched?: boolean;
   /** Edith's message that put a post's plan to her (reply_with plan: its « C'est parti » / « Changer le plan » buttons). */
   plan?: boolean;
+  /** That plan's sound, for a Reel: with a voice over or not (reply_with plan, voix_off). */
+  planVoice?: boolean;
   unprompted?: { post?: string };
 };
 
@@ -204,4 +206,19 @@ export function exchangeFiles(rows: ExchangeRow[]): Set<string> {
  */
 export function planShown(rows: ExchangeRow[]): boolean {
   return sinceLaunch(rows).some((r) => (r.direction === "outbound" && r.plan) || (r.direction === "inbound" && /^(Le plan validé|Nouvelle publication)/m.test(r.body ?? "")));
+}
+
+/**
+ * The sound of the last plan put to her since the last launch, once she answered it: with a voice over (true), without
+ * (false), or nothing said. Her « C'est parti » launches the plan as it was shown (Tristan: « ok » to « "C'est parti"
+ * applique tout »): Edith no longer has to set it again, and her words since still come first (reelVoiceChoice).
+ */
+export function validatedPlanVoice(rows: ExchangeRow[]): boolean | undefined {
+  const since = sinceLaunch(rows);
+  let at = -1;
+  since.forEach((r, i) => {
+    if (r.direction === "outbound" && r.plan) at = i;
+  });
+  if (at < 0 || !since.slice(at + 1).some((r) => r.direction === "inbound")) return undefined;
+  return since[at]!.planVoice;
 }

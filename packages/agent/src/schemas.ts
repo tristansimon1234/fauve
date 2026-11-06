@@ -43,6 +43,11 @@ export const reactionSchema = z.enum(["👍", "🔥", "✅", "😊", "❤️", "
 export const replyExtrasSchema = z.object({
   /** Edith's message puts a post's plan to her (reply_with plan). */
   plan: z.boolean().optional(),
+  /**
+   * That plan's sound, for a Reel: with a voice over (true) or not (false). Her « C'est parti » launches the plan as shown,
+   * this sound included, unless her own words since say otherwise (validatedPlanVoice); set by reply_with, not by the model.
+   */
+  plan_voice: z.boolean().optional(),
   options: z.array(z.string().trim().min(1).max(24)).min(2).max(6).optional(),
   posts: z.array(z.uuid()).max(4).optional(),
   grid: z.boolean().optional(),

@@ -252,6 +252,15 @@ export function keptPlan(p: Proposal | null | undefined): PostPlan | null {
   return { title: tidy(p.title, 60) || "Ta publication", points, why: tidy(p.why, 420) };
 }
 
+/**
+ * A Reel's plan says its sound (Tristan: « ok » to « un plan qui dit tout »): when Edith set it (voix_off) and wrote no
+ * « Le son » line, the line is added, so what her « C'est parti » applies is what she read.
+ */
+export function withSoundLine(plan: PostPlan, voice: boolean | undefined): PostPlan {
+  if (voice === undefined || plan.points.some((point) => /^\s*(le\s+)?son\s*:/i.test(point))) return plan;
+  return { ...plan, points: [...plan.points, voice ? "Le son : avec une voix off" : "Le son : sans voix off"] };
+}
+
 /** The buttons under a plan in the chat (20 characters at most: a WhatsApp button). */
 export const PLAN_BUTTONS = ["C'est parti", "Changer le plan"] as const;
 

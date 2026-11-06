@@ -338,7 +338,7 @@ const UNPROMPTED = new Set(["reminder", "nudge", "daily_cap", "new_numbers_alert
  * a message she sent on her own (a delivery, a reminder) says which post it is about.
  */
 function toExchange(row: { direction: string; type: string; body: string | null; media_id?: string | null; created_at: string; payload: unknown }): ExchangeRow {
-  const payload = row.payload as { quote?: unknown; notes?: string[]; open_post?: unknown; kind?: unknown; plan?: unknown; options?: unknown } | null;
+  const payload = row.payload as { quote?: unknown; notes?: string[]; open_post?: unknown; kind?: unknown; plan?: unknown; plan_voice?: unknown; options?: unknown } | null;
   const outbound = row.direction === "outbound";
   const launched = outbound && Boolean(payload?.quote || payload?.notes?.some((n) => LAUNCHED.test(n)));
   // A plan put to her: marked by reply_with plan, or (before the mark) its own two buttons.
@@ -352,6 +352,7 @@ function toExchange(row: { direction: string; type: string; body: string | null;
     ...(row.media_id ? { media_id: row.media_id } : {}),
     ...(launched ? { launched } : {}),
     ...(plan ? { plan } : {}),
+    ...(plan && typeof payload?.plan_voice === "boolean" ? { planVoice: payload.plan_voice } : {}),
     ...(unprompted ? { unprompted: typeof payload?.open_post === "string" ? { post: payload.open_post } : {} } : {}),
   };
 }
