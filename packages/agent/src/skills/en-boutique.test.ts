@@ -45,6 +45,8 @@ test("« Création à quatre mains » (v1): its sections on its original's, 133,
   assert.match(wants[6]!, /derrière son comptoir ou à son poste, face caméra, sérieux.*; sinon/);
   assert.match(wants[7]!, /un titre en autocollant surgit/);
   assert.ok(wants.every((w) => w.length > 20));
+  // Each one its fallback in it: what does when she has not filmed it, else the same video as the shot before.
+  assert.deepEqual(wants.filter((w) => !/ ; sinon | ou un autre angle|^la même vidéo que la case précédente/.test(w)), []);
   // The shots where people speak keep their sound; the close-ups play under the music.
   assert.deepEqual(line.shots.filter((s) => s.sound).length, 17);
   assert.equal(line.shots[1]!.sound, undefined);
