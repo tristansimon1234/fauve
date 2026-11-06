@@ -16,7 +16,7 @@ import {
 import { costMeta } from "@/lib/cost-scope";
 import { env } from "@/lib/env";
 import { supabaseAdmin } from "@/lib/supabase/admin";
-import { tregCall } from "@/lib/treg";
+import { instagramVideo, tregCall } from "@/lib/treg";
 
 // The trending sounds (packages/agent/src/trend-sounds.ts; docs/son.md, « Sons tendance »): TikTok's two charts each
 // Monday (with the trends' cron, or when its page finds the list older than 6 days), each new song found once among
@@ -37,7 +37,8 @@ export type TrendSound = {
   cover: string | null;
   seconds: number | null;
   explicit: boolean;
-  chart: "top" | "viral" | null;
+  /** house: picked from the Reels Edith's models were written on (« Les sons de nos modèles »); top, viral: TikTok's charts. */
+  chart: "house" | "top" | "viral" | null;
   rank: number | null;
   tiktokUsers: number | null;
 };
@@ -52,7 +53,7 @@ const toSound = (r: Record<string, unknown>): TrendSound => ({
   cover: (r.cover_url as string | null) ?? null,
   seconds: r.seconds === null || r.seconds === undefined ? null : Number(r.seconds),
   explicit: Boolean(r.explicit),
-  chart: (r.chart as "top" | "viral" | null) ?? null,
+  chart: (r.chart as "house" | "top" | "viral" | null) ?? null,
   rank: r.rank === null || r.rank === undefined ? null : Number(r.rank),
   tiktokUsers: r.tiktok_users === null || r.tiktok_users === undefined ? null : Number(r.tiktok_users),
 });
@@ -134,7 +135,8 @@ async function refresh(): Promise<{ kept: number; searched: number }> {
   }
 
   // Last week's out of the list, this week's in it, in their chart's order.
-  await db.from("trend_sounds").update({ chart: null, rank: null }).not("chart", "is", null);
+  // The sounds of the models (chart house) stay: only the charts' are made again.
+  await db.from("trend_sounds").update({ chart: null, rank: null }).in("chart", ["top", "viral"]);
   const now = new Date().toISOString();
   let kept = 0;
   for (const song of songs) {
@@ -200,11 +202,22 @@ export type SoundExample = { link: string; video: string | null; plays: number |
 export async function soundExample(audioId: string, studioId: string | null): Promise<SoundExample | null> {
   if (!/^\d{5,25}$/.test(audioId)) return null;
   const db = supabaseAdmin();
-  const { data: row } = await db.from("trend_sounds").select("reels, reels_until").eq("audio_id", audioId).maybeSingle();
+  const { data: row } = await db.from("trend_sounds").select("reels, reels_until, chart").eq("audio_id", audioId).maybeSingle();
   if (!row) return null;
   const kept = Array.isArray(row.reels) ? (row.reels as SoundExample[]) : [];
   const valid = row.reels_until && Date.parse(row.reels_until as string) > Date.now() + 15 * 60_000;
-  if (valid && kept[0]) return kept[0];
+  if (valid && kept[0]?.video) return kept[0];
+  // A sound of the models keeps its model's Reel: the one its cuts come from, its video read again when it expired.
+  const model = row.chart === "house" ? kept[0] : undefined;
+  if (model?.link) {
+    const fetched = await instagramVideo(model.link).catch(() => null);
+    if (fetched) await logCost(studioId, { usd: fetched.costUsd, calls: 1 }, "sound_reels", { audio_id: audioId, model: true });
+    if (!fetched?.video) return model;
+    const example = { ...model, video: fetched.video };
+    const until = (linkExpiry(fetched.video) ?? new Date(Date.now() + 12 * 3_600_000)).toISOString();
+    await db.from("trend_sounds").update({ reels: [example, ...kept.slice(1)], reels_until: until }).eq("audio_id", audioId);
+    return example;
+  }
   const spent = { usd: 0, calls: 0 };
   const answer = await called(SOUND_TOOLS.reels, { audio_id: audioId }, spent);
   await logCost(studioId, spent, "sound_reels", { audio_id: audioId });

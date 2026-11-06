@@ -70,7 +70,10 @@ export function SoundsSection({ sounds, timezone }: { sounds: TrendSound[]; time
     setPicked({ link: example.link, title: sound.title, artist: sound.artist, audioId: sound.audioId });
   };
 
-  const shown = all ? sounds : sounds.slice(0, SHOWN);
+  // The models' sounds first (Tristan's picks), then the charts'.
+  const house = sounds.filter((s) => s.chart === "house");
+  const charts = sounds.filter((s) => s.chart !== "house");
+  const shown = all ? charts : charts.slice(0, SHOWN);
   return (
     <section className="flex flex-col gap-4" aria-labelledby="sounds-title">
       <div className="flex flex-col gap-1">
@@ -78,7 +81,7 @@ export function SoundsSection({ sounds, timezone }: { sounds: TrendSound[]; time
           <h2 id="sounds-title" className="text-[22px] font-extrabold tracking-[-0.01em]">
             Les sons du moment
           </h2>
-          <p className="text-[14px] text-muted">Top 50 et Viral 50 de TikTok aux États-Unis, retrouvés sur Instagram</p>
+          <p className="text-[14px] text-muted">ceux de nos modèles, puis le Top 50 et le Viral 50 de TikTok, retrouvés sur Instagram</p>
         </div>
         <p className="max-w-[640px] text-[13.5px] leading-snug text-muted">
           Choisis un son : ton Reel sort sans musique, coupé sur ses temps, et tu ajoutes le son dans Instagram en le publiant (« Utiliser l’audio »). Instagram ne laisse aucune appli le mettre à ta place.
@@ -123,16 +126,27 @@ export function SoundsSection({ sounds, timezone }: { sounds: TrendSound[]; time
         </div>
       )}
 
+      {!found && house.length > 0 && (
+        <div className="flex flex-col gap-2">
+          <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+            <h3 className="text-[17px] font-extrabold">Les sons de nos modèles</h3>
+            <p className="text-[13px] text-muted">repérés dans les Reels dont les modèles d’Edith sont faits</p>
+          </div>
+          <SoundList sounds={house} playing={playing} busy={busy} onListen={listen} onPick={pick} />
+        </div>
+      )}
+
       {!found &&
-        (sounds.length ? (
-          <>
+        (charts.length ? (
+          <div className="flex flex-col gap-2">
+            {house.length > 0 && <h3 className="text-[17px] font-extrabold">Les classements de TikTok</h3>}
             <SoundList sounds={shown} playing={playing} busy={busy} onListen={listen} onPick={pick} />
-            {sounds.length > SHOWN && (
+            {charts.length > SHOWN && (
               <button type="button" onClick={() => setAll(!all)} className="btn-secondary h-10 self-start px-4 text-[14px]">
-                {all ? "Moins de sons" : `Voir les ${sounds.length} sons`}
+                {all ? "Moins de sons" : `Voir les ${charts.length} sons`}
               </button>
             )}
-          </>
+          </div>
         ) : (
           <p className="bg-soft px-5 py-6 text-[14px] text-muted">La liste de la semaine arrive dans une minute. En attendant, cherche un son par son titre.</p>
         ))}
@@ -176,7 +190,7 @@ function SoundList({
             <p className="truncate text-[15px] font-bold">{sound.title}</p>
             <p className="truncate text-[13px] text-muted">{[sound.artist, sound.explicit ? "Explicite" : null].filter(Boolean).join(" · ")}</p>
             <p className="mono-label truncate text-muted">
-              {[sound.chart ? `${sound.chart === "top" ? "Top 50" : "Viral 50"} · N° ${String(sound.rank ?? 0).padStart(2, "0")}` : null, sound.tiktokUsers ? `${shortCount(sound.tiktokUsers)} vidéos TikTok` : null].filter(Boolean).join(" · ")}
+              {[sound.chart === "house" ? "Nos modèles" : sound.chart ? `${sound.chart === "top" ? "Top 50" : "Viral 50"} · N° ${String(sound.rank ?? 0).padStart(2, "0")}` : null, sound.tiktokUsers ? `${shortCount(sound.tiktokUsers)} vidéos TikTok` : null].filter(Boolean).join(" · ")}
             </p>
           </div>
           <button type="button" onClick={() => onPick(sound)} disabled={busy === sound.audioId} className="btn-secondary h-9 shrink-0 px-3 text-[13px] disabled:opacity-50">

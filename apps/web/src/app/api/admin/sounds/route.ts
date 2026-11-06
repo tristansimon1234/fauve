@@ -262,7 +262,9 @@ async function benchLinks(body: unknown) {
         : await tregCall("scrapecreators.x.v1-instagram-post", { url }, 0.02, "GET").catch(() => null);
       costUsd += done?.costUsd ?? 0;
       const fields = soundFields(done?.answer ?? null);
-      return { link, url, videoId: videoId ?? null, found: Boolean(done?.answer), fields, ...(Object.keys(fields).length ? {} : { raw: trimmed(done?.answer ?? null) }) };
+      // Its length, to find which of Edith's models it is (house-measures.ts: each original's duration).
+      const duration = Number(pick(done?.answer ?? null, ["video_duration", "duration", "durationSeconds"]) ?? NaN);
+      return { link, url, videoId: videoId ?? null, found: Boolean(done?.answer), duration: Number.isFinite(duration) ? duration : null, fields, ...(Object.keys(fields).length ? {} : { raw: trimmed(done?.answer ?? null) }) };
     }),
   );
   await supabaseAdmin()
