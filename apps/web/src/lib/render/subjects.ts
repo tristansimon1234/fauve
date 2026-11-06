@@ -12,6 +12,7 @@ import {
   OBJECT_CARD,
   objectKey,
   objectPassages,
+  stillLacking,
   objectsWithinBudget,
   PHOTO_OBJECT_MAX,
   photoKey,
@@ -402,10 +403,11 @@ export async function ensureObjects(studioId: string, postId: string, plan: Plan
   const ids = [...new Set(plan.segments.flatMap((s) => (isClipSegment(s) ? [s.clip_id] : [])))];
   const { data } = await db.from("media_assets").select("id, kind, storage_path, subjects, tracks").eq("studio_id", studioId).in("id", ids);
   const rows = new Map(((data ?? []) as Row[]).map((r) => [r.id, r]));
-  const due = (p: SubjectPassage & { photo?: true }) => {
+  const due = (p: SubjectPassage & { photo?: true; still?: true }) => {
     if (p.photo && rows.get(p.clip_id)?.kind !== "image") return false;
     const k = kept(rows.get(p.clip_id))[p.key];
-    return !k || ("failed_at" in k && retryDue(k));
+    // Followed through its passage before its skill read it once on a still: read again, every piece outlined.
+    return !k || ("failed_at" in k && retryDue(k)) || stillLacking(k, p.still);
   };
   // A video held as filmed (steady off) is read on its steadied copy: not read then. A photo is read on itself.
   const isVideo = (id: string) => plan.finish?.steady !== "off" && rows.get(id)?.kind === "video";

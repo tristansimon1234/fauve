@@ -764,6 +764,8 @@ export const mediaSubjectsSchema = z.record(
       clear: z.boolean().optional(),
       /** Its readings (a JSON file: ShotReading), not a cut-out: SkylineAt, VanishingPoint and LightUnder read them. */
       read: z.boolean().optional(),
+      /** What its readings hold (shot_read.py's kinds, its ground aside); one kept before they were noted holds READ_BEFORE. */
+      kinds: z.array(z.string()).optional(),
       /** Her shot without its sky (a transparent video, or a PNG for a photo): Skyline draws it. */
       ground: z.boolean().optional(),
       /** Her shot with its depth as its transparency (near opaque, a WebM): Near draws it. */
@@ -775,6 +777,29 @@ export const mediaSubjectsSchema = z.record(
   ]),
 );
 export type MediaSubjects = z.infer<typeof mediaSubjectsSchema>;
+
+/** What a passage's readings kept before their kinds were noted can hold: never its regions (« Façade qui se construit » v4). */
+export const READ_BEFORE: ShotReadKind[] = ["sky", "vanish", "light"];
+
+/**
+ * What a passage's kept readings lack of what a plan asks there (its ground aside, kept on its own), so they are read
+ * again: all of it when none are kept; nothing when they failed (retried on their own clock). A video read before a
+ * model asked its regions (the boutique's painted door, read before « Façade » v4: its door alone, held on black) gets
+ * them read when one does.
+ */
+export function readingLacks(kept: MediaSubjects[string] | undefined, kinds: ShotReadKind[]): ShotReadKind[] {
+  const asked = kinds.filter((k) => k !== "ground");
+  if (!kept) return asked;
+  if (!("path" in kept) || !kept.read) return [];
+  const have = kept.kinds ?? READ_BEFORE;
+  return asked.filter((k) => !have.includes(k));
+}
+
+/**
+ * An object its skill reads once on a still whose kept cut-out was followed through the passage instead (before the
+ * skill read it so): read again on its first image, every piece with its own outline.
+ */
+export const stillLacking = (kept: MediaSubjects[string] | undefined, still: boolean | undefined) => Boolean(still && kept && "path" in kept && !kept.still);
 
 /** The files of a video's cut-outs (the retention removes them with it). */
 export function subjectFiles(subjects: unknown): string[] {

@@ -7,6 +7,7 @@ import {
   isClipSegment,
   mediaSubjectsSchema,
   readPassages,
+  readingLacks,
   shotReadingSchema,
   wantsReads,
   type EditPlan,
@@ -69,7 +70,8 @@ export async function ensureShotReadings(studioId: string, postId: string, plan:
   const missing = readPassages(plan, isVideo).flatMap((p): ReadPassage[] => {
     if (p.photo && rows.get(p.clip_id)?.kind !== "image") return [];
     const have = kept(rows.get(p.clip_id));
-    const readDue = due(have[p.key]);
+    // Never read, failed a while ago, or read before what is asked now was (its regions, for a model built of them).
+    const readDue = due(have[p.key]) || readingLacks(have[p.key], p.kinds).length > 0;
     const groundDue = p.kinds.includes("ground") && due(have[groundKey(p.clip_id, p.from, p.to)]);
     if (!readDue && !groundDue) return [];
     // Its ground made only when it is missing; its readings read again with it (one pass reads both).
@@ -118,7 +120,7 @@ export async function ensureShotReadings(studioId: string, postId: string, plan:
         console.warn("shot readings not kept", p.key, saved.error.message);
         continue;
       }
-      record(p.clip_id, p.key, { path, still: result.still, at, frames: result.frames, read: true });
+      record(p.clip_id, p.key, { path, still: result.still, at, frames: result.frames, read: true, kinds: p.kinds.filter((k) => k !== "ground") });
       const key = groundKey(p.clip_id, p.from, p.to);
       // Asked and not made: no sky in this shot (Skyline draws nothing there); not asked again for six hours (retryDue).
       if (!result.ground && p.kinds.includes("ground")) record(p.clip_id, key, { failed_at: at, error: "aucun ciel" });

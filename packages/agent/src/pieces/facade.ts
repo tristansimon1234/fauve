@@ -188,7 +188,9 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const B = all.length ? Math.max(...all.map((b) => b.y + b.h)) : Math.round(0.71 * bh);
   const S = Math.round(all.length ? Math.max(0.5 * bh, Math.min(0.9 * bh, B + 0.05 * bh)) : 0.71 * bh);
   let slow, burst, big;
-  if (all.length || regs.length) {
+  // Her own shapes when her picture gave enough of them for its rhythm (ten at least, her elements and her regions): never a
+  // build stalled on one piece (the boutique's bench of v4: her door alone held 6 s on black, then all of it at once).
+  if (all.length + regs.length >= 10) {
     // Her front in its own shapes, as many pieces as her picture has, nothing invented (v4; Tristan: « toujours mettre
     // de l'intelligence », « plus flex »): her sign first (else her largest element), then three of her elements far
     // from it and from each other (her regions of a middle size when she has fewer), each along its own outline; the
@@ -214,13 +216,14 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
     const others = after.filter((r) => !street.includes(r) && !upper.includes(r));
     big = [join(street.length ? street : after.slice(-1)), join(upper.length ? upper : others.slice(-1))].filter(Boolean);
   } else {
-    // Nothing read of her picture (neither an element nor its regions: the scene check, a read that failed; almost never
-    // in production, where her regions are read on one image of every front): her picture cut as a
-    // front is built, in pieces of every shape, never a grid of squares (v3, Tristan: « les formes au départ ne sont pas
-    // toutes carrées »): the part above the street split again and again at a random place, most often across its longer
-    // side, now and then across the other (tall pieces, wide ones, flat bands, as doors, bays, windows and awnings),
-    // laid at random on the same times; its first four the farthest apart and the most unlike, the tallest topped by an arch, the flattest a band wider at its foot (the original's arched window
-    // and awning); then the street, the top's left third, then the rest.
+    // Her regions not read (the scene check, a read that failed; rare in production, where they are read on one image
+    // of every front, read again when kept without them): her elements first, as many as were found, each along its own
+    // outline (her sign first, then those far from it), then the rest of her picture cut as a front is built, in pieces
+    // of every shape, never a grid of squares (v3, Tristan: « les formes au départ ne sont pas toutes carrées »), so
+    // the build keeps its rhythm: the part above the street split again and again at a random place, most often across
+    // its longer side (tall pieces, wide ones, flat bands), laid at random on the same times after her elements; without
+    // any, its first four the farthest apart and the most unlike, the tallest topped by an arch, the flattest a band
+    // wider at its foot (the original's arched window and awning); then the street, the top's left third, the rest.
     const S2 = Math.round(bh * 0.71);
     const cells = [];
     const want = (bw * S2) / 17;
@@ -242,22 +245,24 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
       }
     };
     cut(0, 0, bw, S2, 0);
-    const picked = spread(cells, [cells[Math.floor(random("facade-first") * cells.length)]], 4);
+    const mine = all.length ? spread(all, [sign || all.reduce((m, b) => (area(b) > area(m) ? b : m))], 4) : { out: [], rest: [] };
+    const picked = spread([...mine.out, ...cells], mine.out.length ? mine.out : [cells[Math.floor(random("facade-first") * cells.length)]], 4);
     slow = picked.out;
-    {
-      const tall = slow.reduce((m, b) => (shape(b) > shape(m) ? b : m));
-      const flat = slow.reduce((m, b) => (shape(b) < shape(m) ? b : m));
+    const cutOnes = slow.filter((b) => !all.includes(b));
+    if (cutOnes.length) {
+      const tall = cutOnes.reduce((m, b) => (shape(b) > shape(m) ? b : m));
+      const flat = cutOnes.reduce((m, b) => (shape(b) < shape(m) ? b : m));
       if (shape(tall) > 0.25) tall.d = "M" + tall.x + " " + (tall.y + tall.h) + "L" + tall.x + " " + (tall.y + tall.w / 2) + "A" + tall.w / 2 + " " + tall.w / 2 + " 0 0 1 " + (tall.x + tall.w) + " " + (tall.y + tall.w / 2) + "L" + (tall.x + tall.w) + " " + (tall.y + tall.h) + "Z";
       if (flat !== tall && shape(flat) < -0.6) flat.d = "M" + Math.round(flat.x + 0.05 * flat.w) + " " + flat.y + "L" + Math.round(flat.x + 0.95 * flat.w) + " " + flat.y + "L" + (flat.x + flat.w) + " " + (flat.y + flat.h) + "L" + flat.x + " " + (flat.y + flat.h) + "Z";
     }
-    burst = picked.rest.map((c) => ({ c, k: random("facade-" + c.x + "-" + c.y) })).sort((p, q) => p.k - q.k).slice(0, 12).map((p) => p.c);
+    burst = [...mine.rest.sort(lowFirst), ...picked.rest.filter((c) => !all.includes(c)).map((c) => ({ c, k: random("facade-" + c.x + "-" + c.y) })).sort((p, q) => p.k - q.k).map((p) => p.c)].slice(0, 12);
     big = [R(0, S2, bw, bh), R(0, 0, 0.339 * bw, 0.5 * S2)];
   }
-  // Each one on its time; a burst of fewer than twelve spread over its twelve notes; each in its own shape (its
+  // Each one on its time; a burst of fewer than twelve spread over its twelve notes, its last on the last (v5); each in its own shape (its
   // outline, its region's, or its box when only that was read).
   const pieces = [
     ...slow.map((b, i) => ({ ...b, at: AT[i] })),
-    ...burst.map((b, i) => ({ ...b, at: AT[4 + Math.round((i * 12) / Math.max(1, burst.length))] })),
+    ...burst.map((b, i) => ({ ...b, at: AT[4 + Math.round((i * 11) / Math.max(1, burst.length - 1))] })),
     ...big.map((b, i) => ({ ...b, at: AT[16 + i] })),
   ];
 
@@ -329,7 +334,9 @@ export const facade: EffectPiece = {
   // 4: its skill's v4 pieces: each one a shape of her picture cut along its own edges, her front's elements (named as a
   // list, read once on its first image, each along its own outline) then her picture's regions (Tristan: « le montage
   // devrait détourer la photo pour adapter les formes tu vois ? »).
-  version: 4,
+  // 5: its skill's v5: never stalled on one piece; her elements first, then her regions, else the rest of her picture
+  // cut at its rhythm.
+  version: 5,
   name: "Façade qui se construit",
   how: "l'écran passe au noir et sa devanture s'y construit morceau par morceau, chaque morceau un élément de sa propre image détouré le long de ses bords (sa porte, une fenêtre, son enseigne, puis les pans de son mur, du trottoir), d'un coup à sa place, sa vidéo jouant dedans, un par note : son enseigne d'abord, trois éléments loin l'un de l'autre, une rafale de douze, une courte pause, puis les trois grands sur le temps, et sa devanture entière s'anime, caméra fixe, sans texte, jusqu'à la coupe ; posée en entier dans une bande au milieu du noir quand sa vidéo est horizontale.",
   needs: "une vidéo fixe de sa devanture filmée de face, de l'autre côté de la rue, 5 s au moins : toute la façade dans l'image, son enseigne ou sa porte à son nom bien visible, faite d'éléments qu'on reconnaît seuls (fenêtres, vitrine, store, tables), un peu de vie devant.",
