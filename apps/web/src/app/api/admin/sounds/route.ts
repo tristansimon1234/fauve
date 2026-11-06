@@ -67,6 +67,7 @@ export async function POST(request: Request) {
   // The covers the removed trend videos kept (media/trends/{list}/{video}.webp), deleted once.
   if (action === "drop_trend_covers") return Response.json(await dropTrendCovers());
   // The sounds of the top Reels of a few hashtags (Tristan: « les sons tendances insta […] aesthetic videos editing »).
+  if (action === "bench_links") return Response.json(await benchLinks(await request.json().catch(() => ({}))));
   if (action === "bench_tags") return Response.json(await benchTags((new URL(request.url).searchParams.get("tags") ?? "").split(",")));
   if (action !== "bench") return Response.json({ error: "action=bench|refresh" }, { status: 400 });
   let costUsd = 0;
@@ -230,4 +231,38 @@ async function benchTags(asked: string[]) {
       .map((s) => ({ title: s.title, author: s.author, reels: s.reels, views: s.views, tags: [...s.tags], example: s.example, fields: s.fields })),
     sample: trimmed(read.find((r) => r.posts.length)?.posts[0] ?? null),
   };
+}
+
+/** A vm.tiktok.com short link opened to the video it leads to (its redirect), else as given. */
+async function longTikTok(link: string): Promise<string> {
+  if (!/\/\/(vm|vt)\.tiktok\.com\//i.test(link)) return link;
+  const res = await fetch(link, { redirect: "manual", signal: AbortSignal.timeout(10_000) }).catch(() => null);
+  const to = res?.headers.get("location");
+  return to ? to.replace(/[?#].*$/, "") : link;
+}
+
+/**
+ * The bench of the sounds of Reels Tristan saved (« Documentation des liens », 43 links, 6 November): each one read
+ * through Treg (Instagram: anyapi.instagram.post.detail; TikTok: treg.tiktok.video.detail), what it tells of its sound,
+ * and the sounds counted. About $0.0015 a Reel, logged (kind trends, purpose sounds_links_bench).
+ */
+async function benchLinks(body: unknown) {
+  const links = (Array.isArray((body as { links?: unknown })?.links) ? ((body as { links: unknown[] }).links as unknown[]) : [])
+    .filter((l): l is string => typeof l === "string" && /^https:\/\/(www\.instagram\.com|vm\.tiktok\.com|vt\.tiktok\.com|www\.tiktok\.com)\//.test(l))
+    .slice(0, 60);
+  let costUsd = 0;
+  const read = await Promise.all(
+    links.map(async (link) => {
+      const tiktok = /tiktok\.com/.test(link);
+      const url = tiktok ? await longTikTok(link) : link;
+      const done = await tregCall(tiktok ? "treg.tiktok.video.detail" : "anyapi.instagram.post.detail", tiktok ? { post: url } : { url }, 0.02).catch(() => null);
+      costUsd += done?.costUsd ?? 0;
+      const fields = soundFields(done?.answer ?? null);
+      return { link, url, found: Boolean(done?.answer), fields };
+    }),
+  );
+  await supabaseAdmin()
+    .from("cost_events")
+    .insert({ studio_id: null, kind: "trends", provider: "treg", units: links.length, cost_eur: usdToEur(costUsd, env("USD_TO_EUR")), meta: { purpose: "sounds_links_bench", cost_usd: costUsd } });
+  return { cost_usd: costUsd, read: read.length, answered: read.filter((r) => r.found).length, links: read };
 }
