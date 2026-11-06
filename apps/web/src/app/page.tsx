@@ -170,14 +170,14 @@ const mini = (id: WorkId, alt: string): Token => ({ video: workMedia(id).mini, p
 
 /** The principle, written as the page scrolls: never twice the same, her images, her Reel. */
 const PRINCIPLE: Token[] = [
-  { text: "Un caviste", face: "serif" },
-  mini("cave", "Reel d’un bar à vins"),
+  { text: "Une fleuriste", face: "caveat" },
+  mini("fleuriste", "Reel d’une fleuriste"),
   { text: "ne raconte pas son métier" },
-  { text: "comme une joaillière", face: "archivo" },
-  mini("joaillier", "Reel d’une joaillerie"),
+  { text: "comme un caviste", face: "serif" },
+  mini("cave", "Reel d’un bar à vins"),
   { text: "ni comme" },
-  { text: "une styliste.", face: "caveat" },
-  mini("styliste", "Reel d’une styliste"),
+  { text: "un studio de yoga.", face: "archivo" },
+  mini("yoga", "Reel d’un studio de yoga"),
   { text: "Alors Edith ne fait" },
   { text: "jamais deux fois le même.", face: "anton" },
   { text: "Il regarde tes images," },

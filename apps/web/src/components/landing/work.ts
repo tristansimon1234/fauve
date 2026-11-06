@@ -115,7 +115,7 @@ export const WORK = [
 
 /**
  * The Reels of the landing before (lot 6 bis), made by hand on Mixkit clips with Edith's Reel composition: kept only for
- * the trade pages no new Reel fits (hair salon, yoga studio) and the hero scene's demo salon, never shown on the landing.
+ * the trade pages no new Reel fits (hair salon, yoga studio), the hero scene's demo salon and the principle's small loops (Tristan: « mets pas styliste, mets studio de yoga, des trucs comme ça », « fleuriste »), never in the landing's wall.
  */
 export const OLDER_WORK = [
   {
@@ -133,6 +133,14 @@ export const OLDER_WORK = [
     brief: "La coupe du jeudi, sans rendez-vous.",
     sent: "5 vidéos brutes",
     made: ["Quatre coins", "Écran partagé titré", "Grotesque très noire"],
+  },
+  {
+    id: "fleuriste",
+    trade: "Fleuriste",
+    brand: "Pivoine",
+    brief: "L’arrivage du lundi, un peu comme un carnet.",
+    sent: "6 vidéos brutes",
+    made: ["Tirages posés sur la table", "Écrit à la main", "Fenêtre qui s’ouvre"],
   },
   {
     id: "yoga",
