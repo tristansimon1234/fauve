@@ -215,6 +215,8 @@ const proposalInput = z.object({
     .max(20),
   /** For a Reel: « off » just the music, a voice id, « auto » Edith chooses. */
   voice: z.string().max(60).optional(),
+  /** The sound she picked on the page Sons: her Reel is cut on it, she adds it in Instagram (never a music of Edith's). */
+  sound: z.object({ title: z.string().max(200), artist: z.string().max(200).optional() }).optional(),
   /** She follows a Reel she likes: its form, not her own; what her Reel takes from it, once read. */
   copying: z.boolean().optional(),
   copy: z.object({ name: z.string().max(120).nullable().optional(), lines: z.array(z.string().max(300)).max(4) }).optional(),
@@ -234,7 +236,7 @@ export async function proposePlan(input: z.input<typeof proposalInput>): Promise
   const { db, member } = await getStudioContext();
   if (!member || !parsed.success) return { plan: null };
   const studioId = member.studio.id;
-  const { kind, idea, files, voice, copying, copy } = parsed.data;
+  const { kind, idea, files, voice, copying, copy, sound } = parsed.data;
   const [{ data: studio }, { data: brand }, { data: recent }] = await Promise.all([
     db.from("studios").select("name, business_type, memory").eq("id", studioId).maybeSingle(),
     db.from("brand_profiles").select("profile").eq("studio_id", studioId).order("version", { ascending: false }).limit(1).maybeSingle(),
@@ -304,7 +306,9 @@ export async function proposePlan(input: z.input<typeof proposalInput>): Promise
       return url ? [{ type: "text" as const, text: `Image ${l.n}` }, { type: "image" as const, source: { type: "url" as const, url } }] : [];
     });
     const format = { reel: "un Reel", carousel: "un carrousel", post: "un post photo", story: "une story" }[kind];
-    const spoken = kind !== "reel" || !voice ? undefined : voice === "off" ? "juste la musique, sans voix" : voice === "auto" ? "elle laisse Edith choisir" : "avec une voix off qui raconte";
+    // A sound she picked is the Reel's sound: cut on its beats, added by her in Instagram, no voice over.
+    const picked = kind === "reel" && sound ? `calé sur le son « ${sound.title} »${sound.artist ? ` de ${sound.artist}` : ""}, qu'elle ajoute dans Instagram en le publiant (pas de musique d'Edith, pas de voix off)` : undefined;
+    const spoken = kind !== "reel" || !voice ? undefined : picked ? picked : voice === "off" ? "juste la musique, sans voix" : voice === "auto" ? "elle laisse Edith choisir" : "avec une voix off qui raconte";
     const response = await anthropic().beta.messages.parse({
       model: ANALYST_MODEL,
       max_tokens: 1500,
