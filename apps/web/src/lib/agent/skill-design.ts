@@ -7,6 +7,8 @@ import {
   compositionTexts,
   copyByModel,
   COPY_BY_MODEL_WORDS,
+  exchangeTurns,
+  shownPlan,
   dressSkillPlan,
   fewFiles,
   finishPlan,
@@ -342,6 +344,11 @@ export async function designSkill(params: {
   const currentSaid = skill.voice && params.previous?.skill?.key === skill.key ? saidCurrent(params.previous.texts) : undefined;
   // Her voice leading it, a correction keeps her words it showed but what her request changes.
   const currentHeard = params.previous?.skill?.key === skill.key ? heardCurrent(params.previous) : undefined;
+  // What binds the model: her own messages and her contract; the plan Edith showed her is Edith's reading, adapted to the
+  // model (its words in its text slots, its order where its slots allow), never a reason to refuse it (Tristan, 7 November:
+  // « pourtant il ressemble fort à un modèle », after « Petites lumières » was refused over Edith's own plan).
+  const turns = exchangeTurns(params.brief);
+  const own = turns.exchange ? { words: turns.hers.join("\n"), plan: shownPlan(params.brief) } : undefined;
   // Its input for a count and a tempo: her voice leading it (its cases what she says), else laid over it, else none.
   const inputFor = (count: { n: number; bpm: number }) =>
     skillFillInput({
@@ -367,6 +374,7 @@ export async function designSkill(params: {
       ...(laid && !hers ? { voiceOver: { text: laid.transcript.text, phrases: voicePhrases(laid.transcript, laid.at) } } : {}),
       // Its own words said by a voice: each one told how many times and in how long, to be said in time.
       ...(saying ? { says: true } : {}),
+      ...(own ? { own } : {}),
     });
   let input = inputFor(fit);
   // One small call fills it; `again`: its answer and what the check said of it, for a second try.
@@ -557,8 +565,12 @@ async function placeFacts(studioId: string): Promise<SkillFacts | undefined> {
 
 /**
  * The scene check of a skill's composition on her Reel (its shots as grey cards, its texts and marks): its js, and what it
- * writes and draws of its own row by row (`own`, for a voice's subtitles laid over it), or what it refused.
+ * writes and draws of its own row by row (`own`, for a voice's subtitles laid over it), or what it refused. Also the
+ * check of any Reel-wide composition kept as it is but for its fonts or text colour (lib/agent/reel-fonts.ts): never
+ * written again, only checked.
  */
+export const checkComposition = (...args: Parameters<typeof checkSkill>) => checkSkill(...args);
+
 async function checkSkill(
   studioId: string,
   plan: EditPlan,

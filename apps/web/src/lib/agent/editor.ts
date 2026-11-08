@@ -92,8 +92,12 @@ import {
   soundTempo,
   laysVoice,
   withoutVoiceVideo,
+  beyondSkills,
+  houseFallback,
+  type FollowedStyle,
   type MontageSkill,
 } from "@fauve/agent";
+import { replaceEdithModel } from "./house-pick";
 import { chainLetterbox } from "./reel-frame";
 import { outputFormat } from "@fauve/agent/answer";
 import { HOUSE_EXAMPLES } from "@fauve/agent/house-examples";
@@ -326,6 +330,8 @@ export async function designEdit(params: {
   director?: { look: SavedDirector };
   /** False: no effect of Edith's models lent to this Reel (the lab's effects=0, the chain as before; borrowed-effects.ts). */
   effects?: boolean;
+  /** The picker's next best model of Edith's, tried once when its filler refuses the one Edith picked (houseFallback). */
+  houseNext?: string;
 }): Promise<DesignedEdit> {
   const db = supabaseAdmin();
   const [post, studio, brand, previous, recent, report, inspirations, hooks, readyForEditor] = await Promise.all([
@@ -422,13 +428,14 @@ export async function designEdit(params: {
 
   // The inspiration she picked for this post (read now if it was just added in the app), or the Reel
   // she sent to copy: its form and pace, its look over her charter, for this Reel only.
-  const inspirationId = post.data.inspiration_id as string | null;
-  const followed = await copying;
+  // (Let go below when the model Edith picked cannot play and none of hers can: the Reel is then made freely.)
+  let inspirationId = post.data.inspiration_id as string | null;
+  let followed = await copying;
   // A Reel she copies has its animations written for it, in the copied Reel's look (a black ending stays black): no scene
   // of the library but this Reel's own (a reused closing card from an earlier try had painted the copied black ending violet).
   const copiedOnly = Boolean(followed && !followed.own);
-  const offered = copiedOnly ? library.filter((t) => own.has(t.id)) : library;
-  const chosenInspiration = inspirationId ? await ensureInspirationRead(params.studioId, inspirationId).catch(() => null) : null;
+  let offered = copiedOnly ? library.filter((t) => own.has(t.id)) : library;
+  let chosenInspiration = inspirationId ? await ensureInspirationRead(params.studioId, inspirationId).catch(() => null) : null;
   const chosenTemplate = motionTemplateSchema.safeParse(post.data.template);
   // A collage composes with her photos' cut-outs: for one she chose for this post or asks for now (« en collage »), they are
   // made while the editor works (their own sandbox); one the editor chooses itself has them made after it.
@@ -483,10 +490,10 @@ export async function designEdit(params: {
   const playing = skill ?? copiedBy?.skill;
   const skillSound = sound ?? copiedBy?.sound;
   const previousSkill = previousPlan.success && previousPlan.data.skill?.key === playing?.key ? previousPlan.data : null;
-  // (Never in the director's look at a Reel it made: that step only looks at its own composition.)
-  if (playing && followed && !params.director && (!correction || previousSkill)) {
+  // A Reel played on a skill: filled by one small call, its composition checked, no editor nor motion designer.
+  const playOn = async (on: MontageSkill, by: FollowedStyle): Promise<DesignedEdit | null> => {
     // Timed on her voice: her speech read first (her words timed exactly, her « euh »), a minute and a half at most.
-    if (playing.voice && earlySpeech) {
+    if (on.voice && earlySpeech) {
       const read = await Promise.race([earlySpeech, new Promise<null>((resolve) => setTimeout(() => resolve(null), SPEECH_WAIT_MS))]);
       if (read) clips = read;
     }
@@ -498,21 +505,63 @@ export async function designEdit(params: {
     const made = await designSkill({
       studioId: params.studioId,
       postId: params.postId,
-      skill: playing,
-      followed,
+      skill: on,
+      followed: by,
       mediaIds,
       clips,
       photos: Object.fromEntries(photoIds.flatMap((id, i) => (photoReads[i] ? [[id, photoReads[i]!] as const] : []))),
       brief: params.brief,
       contract: params.contract,
-      previous: correction ? previousSkill : null,
+      previous: correction && previousSkill?.skill?.key === on.key ? previousSkill : null,
       studio: { name: studio.data?.name, business: studio.data?.business_type, memory: studio.data?.memory, booking: Boolean(studio.data?.booking_url) },
       profile,
       ...(skillSound ? { sound: skillSound } : {}),
       ...(copiedBy ? { copied: true } : {}),
       ...(laid ? { voice: laid } : {}),
     });
-    if (made) return { editPlanId: made.editPlanId, version: made.version, plan: made.plan, rationale: made.rationale, newScenes: 0, reusedScenes: 0 };
+    return made ? { editPlanId: made.editPlanId, version: made.version, plan: made.plan, rationale: made.rationale, newScenes: 0, reusedScenes: 0 } : null;
+  };
+  // (Never in the director's look at a Reel it made: that step only looks at its own composition.)
+  if (playing && followed && !params.director && (!correction || previousSkill)) {
+    const made = await playOn(playing, followed);
+    if (made) return made;
+  }
+  // A model Edith picked (never one she chose nor a Reel she copies) that does not play is never redrawn by hand by the
+  // editor and the motion designer (Tristan, 7 November: « mais comment ça a pu coûter si cher ? »): the picker's next best
+  // once, else the Reel made freely, the model let go (houseFallback). Only for a model coded as a skill this studio plays.
+  const pickedSkill = followed?.picked && followed.house && !params.director ? gate(skillFor(followed.house)) : undefined;
+  if (pickedSkill && followed?.house) {
+    const files = new Set(mediaIds).size;
+    const fallback = houseFallback({
+      picked: true,
+      correction,
+      refused: followed.house,
+      // The version corrected was played by this model's skill (its correction starts from its code, as before).
+      previousOnModel: previousPlan.success && previousPlan.data.skill?.key === followed.house,
+      next: params.houseNext,
+      playable: (key) => {
+        const s = gate(skillFor(key));
+        return Boolean(s && !beyondSkills(params.contract, Boolean(voice), laysVoice(s)) && files >= s.files[0]);
+      },
+    });
+    if (fallback && "next" in fallback && (await replaceEdithModel(params.studioId, params.postId, fallback.next))) {
+      const nextFollowed = await postStyle(params.studioId, params.postId).catch(() => undefined);
+      const nextSkill = gate(skillFor(fallback.next));
+      console.log("house pick: refused, its next best model is tried", params.postId, followed.house, "→", fallback.next);
+      if (nextFollowed?.house === fallback.next && nextSkill) {
+        const made = await playOn(nextSkill, nextFollowed);
+        if (made) return made;
+      }
+    }
+    if (fallback) {
+      // None plays: made freely (its inspiration cleared on the post, so its render, critic and corrections follow no model).
+      await replaceEdithModel(params.studioId, params.postId, null);
+      console.log("house pick: no model of Edith's plays this Reel, made freely, the model let go (never redrawn by hand)", params.postId, followed.house, correction ? "(correction)" : "");
+      followed = undefined;
+      inspirationId = null;
+      chosenInspiration = null;
+      offered = library;
+    }
   }
   // What moves in her videos, followed before the editor cuts: which gestures show their hands in the vertical
   // frame (the editor puts an animation that hangs on a gesture where it can be seen), where the faces really are
