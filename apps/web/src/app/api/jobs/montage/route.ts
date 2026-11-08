@@ -148,6 +148,8 @@ const bodySchema = z.object({
   route: z.enum(["agent", "chain"]).optional(),
   /** Made freely, in none of Edith's models (the lab's creative test, free=1): the editor and the motion designer choose everything. */
   free: z.boolean().optional(),
+  /** The picker's next best model of Edith's for this Reel, tried once when its filler refuses the first (houseFallback). */
+  houseNext: z.string().max(40).optional(),
   /** False (the lab's effects=0): no effect of Edith's models lent to a Reel in none of them, the chain as before, to compare on the same videos. */
   effects: z.boolean().optional(),
   /** The editor's reasoning effort, set on a montage queued by hand to compare two levels; else its level of care's. */
@@ -357,6 +359,8 @@ function designInput(job: Job) {
     looks: EFFORTS[job.effort ?? DEFAULT_EFFORT].looks,
     // The lab's effects=0: no effect of Edith's models lent (every step of the job, its corrections and second take too).
     ...(job.effects === false ? { effects: false } : {}),
+    // The model of Edith's tried next when its filler refuses the one she picked (never one redrawn by hand).
+    ...(job.houseNext ? { houseNext: job.houseNext } : {}),
   };
 }
 
@@ -370,10 +374,14 @@ async function edithModelFirst(job: Job): Promise<void> {
   // (ensureEdithModel lets go of a model Edith picked for an earlier launch of this Reel).
   const creative = asksCreation(ownRequestWords(job.brief));
   if (creative) job.free = true;
-  if (!job.free || creative)
-    await ensureEdithModel({ studioId: job.studioId, postId: job.postId, mediaIds: job.mediaIds, brief: job.brief }).catch((error: unknown) =>
-    console.warn("house pick failed, the Reel is made freely", job.postId, error),
-  );
+  if (!job.free || creative) {
+    const picked = await ensureEdithModel({ studioId: job.studioId, postId: job.postId, mediaIds: job.mediaIds, brief: job.brief }).catch((error: unknown) => {
+      console.warn("house pick failed, the Reel is made freely", job.postId, error);
+      return null;
+    });
+    // Its next best, carried with the job (a voice recorded sends the design to a new invocation, the pick then "kept").
+    if (picked?.next) job.houseNext = picked.next;
+  }
   // A Reel she copies stays faithful to it unless she asked for her own look on it.
   await ensureCopyCharter({ studioId: job.studioId, postId: job.postId, brief: job.brief }).catch((error: unknown) => console.warn("copy charter not read", job.postId, error));
 }

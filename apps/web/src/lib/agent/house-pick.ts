@@ -8,28 +8,38 @@ import {
   HOUSE_SOURCE,
   housePickInput,
   housePickSchema,
+  houseRoom,
+  readHouseNext,
   readHousePick,
   houseModel,
   ownRequestWords,
+  shownPlan,
   type HousePickFile,
   type HousePickTaste,
+  type HouseRoom,
 } from "@fauve/agent";
 import { outputFormat, readAnswer } from "@fauve/agent/answer";
 import { MONTAGE_SKILLS } from "@fauve/agent/skills";
 import { houseInspiration } from "@/lib/house-models";
+import { skillGate } from "@/lib/skill-reviews";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { anthropic, logClaudeCost } from "./run";
 
 /** The files each model coded as a montage skill wants at least: Edith picks one only when her files fill it. */
 const SKILL_LEAST: Record<string, number> = Object.fromEntries(Object.values(MONTAGE_SKILLS).map((s) => [s.key, s.files[0]]));
+/** Each coded model's room for words (its text slots, its ending card): the model picked holds the plan Edith showed her. */
+const SKILL_ROOM: Record<string, HouseRoom> = Object.fromEntries(Object.values(MONTAGE_SKILLS).map((s) => [s.key, houseRoom(s)]));
 
 // Edith's art direction by default (packages/agent/src/house-pick.ts): a new Reel with no model, no Reel to copy and no
 // form of her own is made in one of Edith's models, picked here once from her files, her request and her trade, and
 // kept on the post (inspiration_id, and edith_pick: the one Edith picked, dressed in her charter). Never blocks the
 // montage: unread, the Reel is made as before.
 
-/** The model the Reel is made in: the one she chose, the one Edith picked before, or one picked now; null for none. */
-export async function ensureEdithModel(input: { studioId: string; postId: string; mediaIds?: string[]; brief?: string }): Promise<string | null> {
+/**
+ * The model the Reel is made in: the one she chose, the one Edith picked before ("kept"), or one picked now with the
+ * picker's next best (`next`, tried once if the filler refuses the first: houseFallback); null for none.
+ */
+export async function ensureEdithModel(input: { studioId: string; postId: string; mediaIds?: string[]; brief?: string }): Promise<{ key: string; next?: string } | null> {
   const db = supabaseAdmin();
   const { data: post } = await db
     .from("posts")
@@ -50,18 +60,24 @@ export async function ensureEdithModel(input: { studioId: string; postId: string
     return null;
   }
   // Already picked (a design that went on after recording a voice): kept.
-  if (post.inspiration_id && post.inspiration_id === post.edith_pick) return "kept";
+  if (post.inspiration_id && post.inspiration_id === post.edith_pick) return { key: "kept" };
   // Hers: a Reel to copy, a model she chose, a form she asked for (the collage).
   if (post.inspiration_id || (post.template && post.template !== "libre")) return null;
   const mediaIds = (input.mediaIds?.length ? input.mediaIds : ((post.media_ids as string[] | null) ?? [])).slice(0, 20);
   if (!mediaIds.length) return null;
-  const [files, avoid, studio, taste] = await Promise.all([
+  const [files, avoid, studio, taste, gate] = await Promise.all([
     pickFiles(mediaIds),
     recentHouseKeys(input.studioId, input.postId),
     db.from("studios").select("business_type").eq("id", input.studioId).maybeSingle(),
     tasteOf(input.studioId, input.postId).catch(() => undefined),
+    skillGate(input.studioId),
   ]);
   if (!files.length) return null;
+  // Only a model whose skill this business plays (added to the library): the model Edith picks is the one that plays,
+  // never one the editor and the motion designer would redraw by hand.
+  const playable = Object.values(MONTAGE_SKILLS).filter((s) => gate(s)).map((s) => s.key);
+  if (!playable.length) return null;
+  const only = (key: string | null) => (key && playable.includes(key) ? key : null);
   // A voice over the Reel (hers, or one she asked Edith for): a model with room for its subtitles.
   const voice = Boolean(post.voice_media_id) || (post.voice_over as { mode?: string } | null)?.mode === "on";
   try {
@@ -70,21 +86,60 @@ export async function ensureEdithModel(input: { studioId: string; postId: string
       max_tokens: 1500,
       output_config: { effort: "low", format: outputFormat(housePickSchema) },
       system: HOUSE_PICK_PROMPT,
-      messages: [{ role: "user", content: housePickInput({ request: input.brief ?? "", business: (studio.data?.business_type as string | null) ?? null, files, voice, avoid, least: SKILL_LEAST, taste }) }],
+      messages: [
+        {
+          role: "user",
+          content: housePickInput({
+            request: input.brief ?? "",
+            business: (studio.data?.business_type as string | null) ?? null,
+            files,
+            voice,
+            avoid,
+            least: SKILL_LEAST,
+            taste,
+            // The plan Edith showed her and she said yes to: the model picked holds it (its words in its text slots).
+            plan: shownPlan(input.brief),
+            room: SKILL_ROOM,
+            only: playable,
+          }),
+        },
+      ],
     });
     await logClaudeCost(input.studioId, response.usage, "house_pick", CHAT_MODEL);
-    const key = readHousePick(response.parsed_output ? readAnswer(housePickSchema, response.parsed_output) : null, files.length, avoid, SKILL_LEAST);
+    const answer = response.parsed_output ? readAnswer(housePickSchema, response.parsed_output) : null;
+    const key = only(readHousePick(answer, files.length, avoid, SKILL_LEAST));
     if (!key) return null;
     const house = await houseInspiration(input.studioId, key);
     if (!house) return null;
     const { error } = await db.from("posts").update({ inspiration_id: house.id, edith_pick: house.id }).eq("id", input.postId).eq("studio_id", input.studioId).is("inspiration_id", null);
     if (error) throw new Error(error.message);
-    console.log("house pick", input.postId, key, response.parsed_output?.why);
-    return key;
+    const next = only(readHouseNext(answer, files.length, avoid, SKILL_LEAST));
+    console.log("house pick", input.postId, key, next ? `(next: ${next})` : "", response.parsed_output?.why);
+    return { key, ...(next ? { next } : {}) };
   } catch (error) {
     console.warn("house model not picked, the Reel is made freely", input.postId, error);
     return null;
   }
+}
+
+/**
+ * The model Edith picked, refused by its filler (houseFallback): another of hers in its place (the picker's next best),
+ * or none (`key` null), the Reel then made freely, never on a model redrawn by hand. Only a model Edith picked is changed
+ * (inspiration_id still her pick). True when the post was changed.
+ */
+export async function replaceEdithModel(studioId: string, postId: string, key: string | null): Promise<boolean> {
+  const db = supabaseAdmin();
+  const { data: post } = await db.from("posts").select("inspiration_id, edith_pick").eq("id", postId).eq("studio_id", studioId).maybeSingle();
+  if (!post?.inspiration_id || post.inspiration_id !== post.edith_pick) return false;
+  const house = key ? await houseInspiration(studioId, key) : null;
+  if (key && !house) return false;
+  const id = house?.id ?? null;
+  const { error } = await db.from("posts").update({ inspiration_id: id, edith_pick: id }).eq("id", postId).eq("studio_id", studioId).eq("inspiration_id", post.inspiration_id as string);
+  if (error) {
+    console.warn("house pick: the model not replaced", postId, key, error.message);
+    return false;
+  }
+  return true;
 }
 
 /** Her files as the picker reads them: a video's summary, length and speech, a photo's reading. */

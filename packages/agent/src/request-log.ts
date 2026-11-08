@@ -134,6 +134,53 @@ export function ownRequestWords(brief: string | null | undefined): string {
 }
 
 /**
+ * A launch's brief read back by who said what (requestBrief): her messages, Edith's replies (each whole, its lines
+ * kept) and Edith's brief for the launch; `exchange` false when the brief keeps no exchange (the lab's idea, an older
+ * launch: read whole as hers). Her other Reels' words are left out.
+ */
+export function exchangeTurns(brief: string | null | undefined): { exchange: boolean; hers: string[]; edith: string[]; brief: string } {
+  const text = (brief ?? "").split(`\n\n${RECENT_HEAD}`)[0]!.replace(new RegExp(`^${RECENT_HEAD}[^]*$`), "");
+  if (!text.startsWith(EXCHANGE_HEAD)) return { exchange: false, hers: text.trim() ? [text.trim()] : [], edith: [], brief: "" };
+  const hers: string[][] = [];
+  const edith: string[][] = [];
+  const briefLines: string[] = [];
+  let who: "elle" | "edith" | "brief" | null = null;
+  for (const line of text.split("\n").slice(1)) {
+    if (BRIEF_HEAD.test(line.trim())) who = "brief";
+    else if (who === "brief") briefLines.push(line);
+    else if (line.startsWith("Elle : ")) {
+      who = "elle";
+      hers.push([line.slice(7)]);
+    } else if (line.startsWith("Edith : ")) {
+      who = "edith";
+      edith.push([line.slice(8)]);
+    } else if (/^\[(Demande|Correction \d+), /.test(line)) who = null;
+    else if (who === "elle") hers.at(-1)!.push(line);
+    else if (who === "edith") edith.at(-1)!.push(line);
+  }
+  const whole = (turns: string[][]) => turns.map((t) => t.join("\n").trim()).filter(Boolean);
+  return { exchange: true, hers: whole(hers), edith: whole(edith), brief: briefLines.join("\n").trim() };
+}
+
+/**
+ * Her own messages for this Reel, without Edith's replies, plan or brief (the whole brief when it keeps no exchange).
+ * What binds a model of Edith's: her words and what she fixed (the contract); Edith's plan is Edith's reading, adapted to
+ * the model (docs/montage.md, « Contrat d'un Reel »).
+ */
+export function herOwnMessages(brief: string | null | undefined): string {
+  return exchangeTurns(brief).hers.join("\n").trim();
+}
+
+/**
+ * The plan Edith showed her for this Reel, as she read it (the latest reply of Edith's with at least two « • » points;
+ * reply_with plan), or "" when none was shown.
+ */
+export function shownPlan(brief: string | null | undefined): string {
+  const plans = exchangeTurns(brief).edith.filter((t) => t.split("\n").filter((l) => /^\s*[•·]\s/.test(l)).length >= 2);
+  return plans.at(-1) ?? "";
+}
+
+/**
  * What every agent gets as the request for one launch: her exchange with Edith for this Reel, word for word (its latest
  * launches whole), then Edith's brief for this launch as her reading of it, then what she said of her recent Reels (her
  * taste). Without an exchange kept, Edith's brief as it was.
