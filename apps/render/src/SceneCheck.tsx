@@ -12,6 +12,7 @@ import { compileScene, SCOPE, type SceneComponent } from "./MotionScene";
 import { makeLooks } from "./PassageLook";
 import { makePicture } from "./Picture";
 import { themeFor } from "./theme";
+import { slowPush, type PushSample } from "./push";
 import { inBox, inShape, onlyProbe, probeSpoken as probeWords, silhouette, type Box as PersonBox, type Shape } from "./silhouette";
 import { footageTrack, NOTHING_SEEN, type Seen, type TrackFn, type TrackPiece } from "./track";
 import type { MotionTemplate, ReelProps } from "./types";
@@ -102,6 +103,8 @@ export type SceneCheckProps = {
   probeGround?: boolean;
   /** A montage skill's composition: its words right over her shots are measured (FAUVE_WORDS), for the render to darken her picture under them. */
   probeInk?: boolean;
+  /** A composition whose request asks for no camera move: a slow push it lays on a whole shot is reported (FAUVE_PUSH). */
+  probePush?: boolean;
 };
 
 const FrameContext = createContext(0);
@@ -421,6 +424,19 @@ function seenOpacity(el: Element, copy: HTMLElement): number {
     opacity *= Number(style.opacity);
   }
   return opacity;
+}
+
+/**
+ * The size of each of her shots as a copy draws it (its widest picture over the frame's width), for the shots playing at
+ * that frame: what slowPush reads, shot by shot.
+ */
+function pictureSizes(copy: HTMLElement, frame: number, shots: NonNullable<SceneCheckProps["shots"]>, width: number, found: Map<number, PushSample[]>) {
+  shots.forEach((shot, k) => {
+    if (frame < shot.from || frame >= shot.from + shot.durationInFrames) return;
+    const widest = Math.max(0, ...Array.from(copy.querySelectorAll(`[data-fauve-shot="${k}"]`)).map((e) => e.getBoundingClientRect().width));
+    if (!widest) return;
+    found.set(k, [...(found.get(k) ?? []), { frame, scale: widest / width }]);
+  });
 }
 
 /** Elements drawn as pictures: what is under a word there is not known. */
@@ -851,7 +867,7 @@ function missingTexts(reelTexts: NonNullable<SceneCheckProps["reelTexts"]>, fram
   });
 }
 
-export function SceneCheck({ js, texts, durationInFrames, brand, photos = [], cuts = [], shots = [], track: pieces, look, fonts = [], reelTexts = [], end = null, backdrop, probeSpoken = false, probeGround = false, probeInk = false }: SceneCheckProps) {
+export function SceneCheck({ js, texts, durationInFrames, brand, photos = [], cuts = [], shots = [], track: pieces, look, fonts = [], reelTexts = [], end = null, backdrop, probeSpoken = false, probeGround = false, probeInk = false, probePush = false }: SceneCheckProps) {
   const width = 1080;
   const height = 1920;
   const [track] = useState(() => footageTrack(pieces, themeFor(look?.template ?? "libre", look?.signature, look?.tempo), { width, height }, { shots }));
@@ -884,8 +900,10 @@ export function SceneCheck({ js, texts, durationInFrames, brand, photos = [], cu
       const lost = new Map<string, Ink>();
       const grids = new Map<string, Uint8Array>();
       const hidden = new Map<string, Hidden>();
+      const shotSizes = new Map<number, PushSample[]>();
       document.querySelectorAll<HTMLElement>("[data-check-frame]").forEach((copy) => {
         const frame = Number(copy.dataset.checkFrame);
+        if (probePush) pictureSizes(copy, frame, shots, width, shotSizes);
         const people = drawnPeople(copy, frame, track);
         measure(copy, frame, width, height, out, { ...track(frame), faces: facesIn(copy, frame, track) }, onFace, people);
         sizes(copy, largest, accents, skip);
@@ -927,6 +945,18 @@ export function SceneCheck({ js, texts, durationInFrames, brand, photos = [], cu
           console.log(`FAUVE_HIDDEN ${JSON.stringify(message)}`);
         }
         if (probeSpoken) console.log(`FAUVE_SPOKEN ${spokenWritten(spoken, frames, step).toFixed(2)}`);
+        // A slow push laid on a whole shot, when her words ask for no camera move (Tristan: « je trouve ça cheap »).
+        const pushed = [...shotSizes.entries()].flatMap(([k, samples]) => {
+          const move = slowPush(samples, shots[k]?.durationInFrames ?? 0);
+          return move ? [{ k, ...move }] : [];
+        });
+        if (pushed.length) {
+          const detail = pushed
+            .slice(0, 3)
+            .map((p) => `shots[${p.k}] (images ${p.from} à ${p.to}, ${p.ratio > 1 ? "+" : ""}${Math.round((p.ratio - 1) * 100)} %)`)
+            .join(" ; ");
+          console.log(`FAUVE_PUSH ${JSON.stringify(`mouvement lent posé sur tout un plan : ${detail}. Sa demande n'en veut pas : ce plan reste tel qu'il est filmé, sans zoom ni recul continu ; garde l'idée.`)}`);
+        }
         const quick = tooQuick(frames, step, frames.at(-1) ?? 0, skip);
         if (quick.length) {
           const s = (n: number) => n.toFixed(1).replace(".", ",");

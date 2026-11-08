@@ -148,6 +148,8 @@ const bodySchema = z.object({
   route: z.enum(["agent", "chain"]).optional(),
   /** Made freely, in none of Edith's models (the lab's creative test, free=1): the editor and the motion designer choose everything. */
   free: z.boolean().optional(),
+  /** A Reel already made, redone as a new creation (Edith's montage `refaire`, or « sois créatif » in her words): made freely, from her files. */
+  redo: z.boolean().optional(),
   /** The picker's next best model of Edith's for this Reel, tried once when its filler refuses the first (houseFallback). */
   houseNext: z.string().max(40).optional(),
   /** False (the lab's effects=0): no effect of Edith's models lent to a Reel in none of them, the chain as before, to compare on the same videos. */
@@ -372,10 +374,11 @@ async function edithModelFirst(job: Job): Promise<void> {
   if (job.correction) return;
   // « Sois créatif », « surprends-moi », « libre »: created freely, as the lab's creative test (free=1), never in a model
   // (ensureEdithModel lets go of a model Edith picked for an earlier launch of this Reel).
-  const creative = asksCreation(ownRequestWords(job.brief));
+  // A Reel already made, redone as a new creation (her intent, as Edith read it: `redo`), is one too.
+  const creative = Boolean(job.redo) || asksCreation(ownRequestWords(job.brief));
   if (creative) job.free = true;
   if (!job.free || creative) {
-    const picked = await ensureEdithModel({ studioId: job.studioId, postId: job.postId, mediaIds: job.mediaIds, brief: job.brief }).catch((error: unknown) => {
+    const picked = await ensureEdithModel({ studioId: job.studioId, postId: job.postId, mediaIds: job.mediaIds, brief: job.brief, creative }).catch((error: unknown) => {
       console.warn("house pick failed, the Reel is made freely", job.postId, error);
       return null;
     });

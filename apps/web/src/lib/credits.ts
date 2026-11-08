@@ -207,6 +207,8 @@ export async function createMontageQuote(input: {
   plan?: MontagePlan;
   /** Level of care; a lower one is quoted when the balance is short. */
   effort?: Effort;
+  /** A Reel already made, redone as a new creation (Edith read it in her words): made freely, priced as a montage. */
+  redo?: boolean;
 }): Promise<Quote | { error: string; balance: number; needed: number }> {
   const balance = await availableCredits(input.studioId);
   if (input.plan && input.maxNewScenes === undefined) {
@@ -246,6 +248,7 @@ export async function createMontageQuote(input: {
         efforts,
         // Charged on what it really costs.
         metered: true,
+        ...(input.redo ? { redo: true } : {}),
       },
       expires_at: new Date(Date.now() + QUOTE_TTL_MS).toISOString(),
     })
@@ -264,6 +267,8 @@ export type AcceptedQuote = {
   maxNewScenes: number;
   /** Level of care; null for an older quote (one version, no review). */
   effort: Effort | null;
+  /** A Reel already made, redone as a new creation: made freely, never in a model, never from the version she has. */
+  redo?: boolean;
 };
 
 const levelPriceSchema = z.object({
@@ -321,7 +326,7 @@ export async function acceptQuote(
   if (effort && effort !== current && !level) {
     return { error: `Le niveau ${EFFORTS[effort].label} n'est pas possible avec le solde : garde le niveau prévu.` };
   }
-  const params = (q.params ?? {}) as { media_ids?: string[]; brief?: string | null; max_new_scenes?: number; plan?: unknown };
+  const params = (q.params ?? {}) as { media_ids?: string[]; brief?: string | null; max_new_scenes?: number; plan?: unknown; redo?: boolean };
   // Checked and claimed under the studio's lock: two launches at the same moment never count on the same credits.
   const claim = await withSlot({ kind: `credits:${studioId}`, slots: 1, perSlot: 1, leaseMs: 30_000, waitMs: 20_000 }, async (): Promise<{ error: string } | { maxNewScenes: number }> => {
     const available = await availableCredits(studioId, quoteId);
@@ -367,6 +372,7 @@ export async function acceptQuote(
     brief,
     maxNewScenes: claim.maxNewScenes,
     effort: level ? effort! : current,
+    ...(params.redo && q.kind === "montage" ? { redo: true } : {}),
   };
 }
 

@@ -29,6 +29,9 @@ import {
   compositionShots,
   compositionTexts,
   isComposed,
+  composedShots,
+  composedShotsMoved,
+  withoutStaleComposition,
   holdAfterVoice,
   keepComposition,
   keepWrittenAnimations,
@@ -1007,9 +1010,19 @@ export async function designEdit(params: {
   };
   Object.assign(plan, finishPlan(plan, facts, durations));
 
+  // A composition and its shots never get out of step: when its code names her shots by number (the lamp of shots[2]), a
+  // re-cut Reel (a shot split, added, removed or moved) has its composition written again for the new shots, never the
+  // earlier code played over them (Novembre, version cocon: the lamp lit up on the candle). A new montage never takes
+  // the earlier composition either: it starts from her files.
+  const shotsMoved = previousPlan.success && composedShotsMoved(plan, previousPlan.data);
+  Object.assign(plan, withoutStaleComposition(plan, previousPlan.success && !params.fresh ? previousPlan.data : null));
+  if (shotsMoved) console.log("composition: her shots changed, written again for them", params.postId, composedShots(previousPlan.data)?.length, composedShots(plan)?.length);
   // The animations of the version corrected: a scene kept by its id keeps the photos it composes with.
   const previousMotions = previousPlan.success
-    ? [...previousPlan.data.segments.filter(isMotionSegment).map((s) => s.motion), ...(previousPlan.data.layers ?? []).map((l) => l.motion)]
+    ? [
+        ...previousPlan.data.segments.filter(isMotionSegment).map((s) => s.motion),
+        ...(previousPlan.data.layers ?? []).filter((l) => !(l.compose && (shotsMoved || params.fresh))).map((l) => l.motion),
+      ]
     : [];
   const photosOfTemplate = new Map(previousMotions.flatMap((m) => (m.template_id && m.photos?.length ? [[m.template_id, m.photos] as const] : [])));
 
@@ -1376,10 +1389,15 @@ export async function designEdit(params: {
     };
   });
   // An animation over several shots has no fixed version: one that could not be written is left out.
-  const earlierComposition = correction && previousPlan.success ? previousPlan.data.layers?.find((l) => l.compose && l.motion.js) : undefined;
+  // (Never one written for other shots: the correction is then missed, her version stays and nothing is charged.)
+  const earlierComposition = correction && previousPlan.success && !shotsMoved ? previousPlan.data.layers?.find((l) => l.compose && l.motion.js) : undefined;
+  // The shots each composition is written for, kept with its code: an object it names is looked for on that shot only.
+  // (A model's composition reads any number of shots: its objects are placed by its filler.)
+  const laid = plan.skill ? undefined : (composedShots(plan) ?? undefined);
+  const stamped = <L extends (typeof layers)[number]>(l: L): L => (l.compose && laid ? { ...l, motion: { ...l.motion, laid } } : l);
   let compositionKept = false;
   const written = layers.flatMap((l, i) => {
-    if (l.motion.js) return [l];
+    if (l.motion.js) return [stamped(l)];
     const kept = reusedLayer(l) ? reusable.get(l.motion.brief) : undefined;
     if (kept?.js) {
       const motion = {
@@ -1395,7 +1413,7 @@ export async function designEdit(params: {
         ...(kept.subtitle_y !== undefined ? { subtitle_y: kept.subtitle_y } : {}),
         ...(kept.writes_spoken !== undefined ? { writes_spoken: kept.writes_spoken } : {}),
       };
-      return [{ ...l, motion }];
+      return [stamped({ ...l, motion })];
     }
     const result = resultOf(`l${i}`);
     // A correction whose composition could not be written again keeps the one her Reel had (it lays out the new
@@ -1404,7 +1422,7 @@ export async function designEdit(params: {
     if (earlier) {
       console.warn("composition not rewritten, the earlier one kept", params.postId, result?.error);
       compositionKept = true;
-      return [{ ...l, motion: { ...earlier.motion, brief: l.motion.brief } }];
+      return [stamped({ ...l, motion: { ...earlier.motion, brief: l.motion.brief } })];
     }
     if (!result?.js) {
       console.warn("animation over several shots left out", l.motion.brief.slice(0, 80), result?.error);
@@ -1424,7 +1442,7 @@ export async function designEdit(params: {
       // Its code reads what is said: whether the check saw it written (else the engine's subtitles stay).
       ...(result.spokenShare !== undefined ? { writes_spoken: result.spokenShare >= SPOKEN_WRITTEN } : {}),
     };
-    return [{ ...l, motion }];
+    return [stamped({ ...l, motion })];
   });
   if (written.length) plan.layers = written;
   else delete plan.layers;

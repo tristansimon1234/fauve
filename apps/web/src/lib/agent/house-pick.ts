@@ -39,7 +39,7 @@ const SKILL_ROOM: Record<string, HouseRoom> = Object.fromEntries(Object.values(M
  * The model the Reel is made in: the one she chose, the one Edith picked before ("kept"), or one picked now with the
  * picker's next best (`next`, tried once if the filler refuses the first: houseFallback); null for none.
  */
-export async function ensureEdithModel(input: { studioId: string; postId: string; mediaIds?: string[]; brief?: string }): Promise<{ key: string; next?: string } | null> {
+export async function ensureEdithModel(input: { studioId: string; postId: string; mediaIds?: string[]; brief?: string; creative?: boolean }): Promise<{ key: string; next?: string } | null> {
   const db = supabaseAdmin();
   const { data: post } = await db
     .from("posts")
@@ -51,7 +51,8 @@ export async function ensureEdithModel(input: { studioId: string; postId: string
   // She asks Edith to be creative (« sois créatif », « surprends-moi », « libre »): created freely with every tool, never
   // in a model (Tristan's « sois creatif ! sur le marais a paris » was made on « Mots aux quatre coins »); a model Edith
   // had picked for an earlier launch of this Reel is let go.
-  if (asksCreation(ownRequestWords(input.brief))) {
+  // (Or a Reel already made that she wants redone as a new creation, as Edith read her: `creative`.)
+  if (input.creative || asksCreation(ownRequestWords(input.brief))) {
     if (post.inspiration_id && post.inspiration_id === post.edith_pick) {
       const { error } = await db.from("posts").update({ inspiration_id: null, edith_pick: null }).eq("id", input.postId).eq("studio_id", input.studioId);
       if (error) console.warn("house pick: Edith's earlier pick not let go", input.postId, error.message);

@@ -55,6 +55,9 @@ import { soundPageLink,
   planMessage,
   PLAN_BUTTONS,
   exchangeLines,
+  asksCreation,
+  herWordsFor,
+  planMediaIds,
   exchangeFiles,
   planShown,
   isClipSegment,
@@ -696,8 +699,20 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
       });
     },
 
-    async montage({ post_id, media_ids, brief, correction, max_new_scenes, plan, effort, inspiration_id, son, son_lien, anciens_fichiers, remplacer_fichiers, avec_ceux_la, duree, garde_la_duree }) {
+    async montage({ post_id, media_ids, brief, correction, refaire, max_new_scenes, plan, effort, inspiration_id, son, son_lien, anciens_fichiers, remplacer_fichiers, avec_ceux_la, duree, garde_la_duree }) {
       const post = unwrap(await db.from("posts").select("id, kind, title, edit_plan_id, media_ids, voice_over").eq("id", post_id).eq("studio_id", studioId).single());
+      // A Reel she wants redone rather than changed (Edith's reading, refaire; or « sois créatif » in her own words for it):
+      // a new creation from its files, made freely and priced as a montage, never a correction patching the version she has
+      // (« Sois créatif » on Novembre, version cocon: a correction kept its composition over re-cut shots).
+      const redo = refaire === true || (correction && Boolean(post.edit_plan_id) && asksCreation(herWordsFor(chatRequest(post_id).lines)));
+      if (redo && post.edit_plan_id) {
+        const current = editPlanSchema.safeParse((await db.from("edit_plans").select("plan").eq("id", post.edit_plan_id).maybeSingle()).data?.plan);
+        const files = current.success ? [...planMediaIds(current.data), ...(current.data.copy?.cutouts.map((c) => c.photo) ?? [])] : ((post.media_ids as string[] | null) ?? []);
+        media_ids = [...new Set([...files, ...(media_ids ?? [])])].slice(0, MAX_MONTAGE_FILES);
+        correction = false;
+        anciens_fichiers = true;
+        avec_ceux_la = true;
+      }
       // A correction's new files join the Reel's own, unless Edith read that she wants to start again from them alone:
       // given alone, Promo Edith 2's five new photos replaced its twenty files and it came back as 3 s.
       if (correction && media_ids?.length && !remplacer_fichiers && post.edit_plan_id) {
@@ -800,7 +815,7 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
       const planned = plan ? animations : correction ? 0 : motionOnly ? 3 : 1;
       const scenes = Math.min(MAX_FREE_SCENES, max_new_scenes ?? (firstReel ? Math.max(2, planned) : planned));
       // No quote to show: the work is priced, started at once (her request is the go) and charged on delivery for what was made.
-      const job = await createMontageQuote({ studioId, postId: post_id, mediaIds: media_ids ?? [], brief, correction, maxNewScenes: scenes, plan, effort: wanted });
+      const job = await createMontageQuote({ studioId, postId: post_id, mediaIds: media_ids ?? [], brief, correction, maxNewScenes: scenes, plan, effort: wanted, ...(redo ? { redo: true } : {}) });
       if ("error" in job) {
         return json({
           possible: false,
@@ -835,6 +850,8 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
               peu_de_sujets: `Le Reel qu'elle recopie pose un sujet détouré (un objet, une personne) sur presque chaque plan, et ses photos n'en montrent que ${subjects}. Dis-le en une phrase : ça part quand même, avec plus de plans sans détourage, et 4 ou 5 photos d'objets ou de personnes sur un fond simple le rendraient plus varié.`,
             }
           : {}),
+        // Redone as a new creation: priced as what it is, a new montage (never the price of a correction said before).
+        ...(redo ? { refait: `Un nouveau Reel créé librement depuis ses fichiers, pas une correction : entre ${job.base} et ${job.max} crédits, débités à la livraison. Si tu lui as donné un autre prix, corrige-le en une phrase.` } : {}),
         note: `C'est lancé. Dis en une ou deux phrases ce que tu vas faire et quand la vidéo arrive (${minutes} min). Ne parle pas de prix ni de devis : le message de livraison dira combien de crédits ont servi. Ne demande pas « je lance ? ».`,
       });
     },

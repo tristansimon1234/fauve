@@ -240,3 +240,14 @@ export function checkMotionCode(code: string): string[] {
   for (const [pattern, label] of FORBIDDEN_CODE) if (pattern.test(code)) problems.push(label);
   return problems;
 }
+
+/**
+ * Her words ask for a camera move (« zoom lent sur la vitrine », « un travelling », « plus de mouvement ») : then a slow
+ * push a composition lays on a shot is hers, never reported by the scene check (FAUVE_PUSH). Read on her own words
+ * only (herOwnMessages), never on Edith's brief: « plus de mouvement » from Edith had laid two slow pushes on a Reel
+ * where she had only said « Sois créatif ».
+ */
+export function asksCameraMove(words: string | null | undefined): boolean {
+  const text = (words ?? "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+  return /\b(?:zoom\w*|dezoom\w*|travelling|ken ?burns|pousse[er]?s?|recul\w*|camera qui (?:avance|bouge|recule)|mouvements? de camera|plus de mouvement|que (?:ca|la video) bouge)\b/.test(text);
+}

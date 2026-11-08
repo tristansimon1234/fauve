@@ -171,6 +171,15 @@ export function herOwnMessages(brief: string | null | undefined): string {
   return exchangeTurns(brief).hers.join("\n").trim();
 }
 
+/** Her own words in one launch's exchange (exchangeLines), never Edith's: what a request of hers is read on (asksCreation). */
+export function herWordsFor(lines: RequestLine[]): string {
+  return lines
+    .filter((l) => l.who === "elle")
+    .map((l) => l.text)
+    .join("\n")
+    .trim();
+}
+
 /**
  * The plan Edith showed her for this Reel, as she read it (the latest reply of Edith's with at least two « • » points;
  * reply_with plan), or "" when none was shown.

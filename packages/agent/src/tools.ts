@@ -199,6 +199,10 @@ export const toolSpecs = {
         .boolean()
         .default(false)
         .describe("true pour modifier le montage existant de cette publication ; false pour un nouveau montage, qui ne reprend rien de la version d'avant (« repars de zéro », « refais-le avec tout ça », d'autres fichiers)"),
+      refaire: z
+        .boolean()
+        .optional()
+        .describe("true quand elle veut ce Reel refait autrement plutôt que modifié (« sois créatif », « c'est plat, fais mieux ») : une création libre depuis ses fichiers, au prix d'un montage"),
       plan: montagePlanSchema
         .optional()
         .describe("Facultatif : ta piste pour ce Reel (durée, forme, scènes) ; le monteur la lit comme ta proposition, jamais comme un plan qu'elle a validé. Ce qu'elle a fixé elle-même va dans brief, dans ses mots ; sinon le monteur décide"),

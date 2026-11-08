@@ -41,6 +41,71 @@ export function composedLayers(plan: Pick<EditPlan, "template" | "texts" | "laye
 /** A plan composed by its own animation, a collage or another form (its texts and subtitles keep their usual rows). */
 export const isComposed = (plan: Pick<EditPlan, "layers">) => Boolean(plan.layers?.some((l) => l.compose));
 
+/**
+ * The shots a plan's composition lays, as its code reads them (shots[0], shots[1]…): the clip of each of her shots that
+ * starts before the composition ends, in the montage's order (buildReelProps lists them the same way); null without one.
+ */
+export function composedShots(plan: Pick<EditPlan, "segments" | "layers" | "transitions">): string[] | null {
+  const layer = plan.layers?.find((l) => l.compose);
+  if (!layer) return null;
+  const spans = planTimeline(plan).segments;
+  return plan.segments.flatMap((s, i) => (isClipSegment(s) && (spans[i]?.start ?? 0) < layer.to - 0.01 ? [s.clip_id] : []));
+}
+
+/**
+ * A composition's code names her shots by their index (« the lamp of shots[2] »): it fits a plan only when it lays the
+ * same clips in the same order (each one trimmed as the plan wants: its code reads each shot's moment and length).
+ * A shot split, added, removed or moved changes what each index shows: the code no longer fits (Novembre, version
+ * cocon: three shots re-cut into five, the lamp lit on the candle). A plan without composition fits nothing.
+ */
+export function sameComposedShots(a: Pick<EditPlan, "segments" | "layers" | "transitions">, b: Pick<EditPlan, "segments" | "layers" | "transitions">): boolean {
+  const x = composedShots(a);
+  const y = composedShots(b);
+  return Boolean(x && y && x.length === y.length && x.every((id, i) => id === y[i]));
+}
+
+/**
+ * A composition's code that names one of her shots by its number (shots[2], <Footage shot={0} />, Subject shot: 2):
+ * what it does on that shot belongs to the clip it was written for. One that only reads them as they come (shots[cur],
+ * shots.map) lays any shots: a correction that changes them keeps it as it is (keepComposition).
+ */
+export const namesShotsByIndex = (js: string | undefined) => Boolean(js && /\bshots\s*\[\s*\d+\s*\]|\bshot\s*[:=]\s*\{?\s*\d+\s*\}?\s*[,}\s]/.test(js));
+
+/** The version corrected had a composition whose code names her shots by number, and the new plan lays other shots under it. */
+export function composedShotsMoved(plan: EditPlan, previous: EditPlan | null): boolean {
+  const earlier = previous?.layers?.find((l) => l.compose && l.motion.js);
+  return Boolean(earlier && previous && !plan.skill && isComposed(plan) && namesShotsByIndex(earlier.motion.js) && !sameComposedShots(plan, previous));
+}
+
+/**
+ * A plan whose composition carries code written for other shots (a correction that kept the earlier version's code,
+ * its brief unchanged, while the editor re-cut the Reel): that code is taken off, so the composition is written again
+ * for the new shots, never played over them (Tristan: « à mon avis la tâche est un effet mal appliqué »). Its code is
+ * known to fit when it says the shots it was written for (`laid`), or when it is the code of the version corrected,
+ * whose shots it laid. Code that never names a shot by its number, and a model's composition (a montage skill), read
+ * any number of shots: left alone.
+ */
+export function withoutStaleComposition(plan: EditPlan, previous: EditPlan | null): EditPlan {
+  if (plan.skill || !plan.layers?.some((l) => l.compose && l.motion.js)) return plan;
+  const now = composedShots(plan) ?? [];
+  const fits = (motion: PlanLayer["motion"]) => {
+    if (!namesShotsByIndex(motion.js)) return true;
+    if (motion.laid) return motion.laid.length === now.length && motion.laid.every((id, i) => id === now[i]);
+    const earlier = previous?.layers?.find((l) => l.compose && l.motion.js);
+    // Code that is not the earlier version's: written for this plan.
+    if (!earlier || earlier.motion.js !== motion.js) return true;
+    return sameComposedShots(plan, previous!);
+  };
+  let changed = false;
+  const layers = plan.layers.map((l) => {
+    if (!l.compose || !l.motion.js || fits(l.motion)) return l;
+    changed = true;
+    const { code: _code, js: _js, laid: _laid, template_id: _id, sounds: _sounds, photos: _photos, fonts: _fonts, subtitle_y: _row, writes_spoken: _spoken, ...motion } = l.motion;
+    return { ...l, motion };
+  });
+  return changed ? { ...plan, layers } : plan;
+}
+
 /** One of her shots as the composition's designer reads it: when it plays (frames from the start), what it is and shows. */
 export type CompositionShot = {
   shot: number;
