@@ -64,6 +64,9 @@ import { soundPageLink,
   withScrim,
   drawsItsTexts,
   readsBetter,
+  fontOrColorOnly,
+  BRAND_FONTS,
+  type FontChange,
   addOverlay,
   insertSegment,
   insertableFrom,
@@ -86,6 +89,7 @@ import { bakedReel, insertPlanVersion } from "@/lib/edit-plans";
 import { effectRoute } from "@/lib/agent/effects-agent";
 import { fewSubjects } from "@/lib/agent/copy-design";
 import { skillTooShort, skillWantsMore } from "@/lib/agent/skill-design";
+import { restyleReelFonts } from "@/lib/agent/reel-fonts";
 import { keepModelSound } from "@/lib/model-sound";
 import { followSound } from "@/lib/sound-follow";
 import { searchSounds, soundExample, trendSounds } from "@/lib/trend-sounds";
@@ -281,7 +285,7 @@ const MONTAGE_RUNNING =
 
 /** A Reel whose model draws its texts: a style set on them would take the model's lettering away. */
 const MODEL_LETTERING =
-  "Ce Reel est fait sur un modèle qui dessine lui-même ses textes : un style posé ici remplacerait sa typo par une autre. Pour mieux les lire (un fond, un voile, une ombre) : add_to_reel avec voile true, gratuit, sa typo et ses tailles gardées. Pour changer sa police, sa couleur ou sa taille : montage (correction: true) avec sa demande dans brief.";
+  "Ce Reel dessine lui-même ses textes : un style posé ici remplacerait son dessin. Sa police ou la couleur de ses textes se changent ici, gratuitement (charter fonts, look.font ou look.color seuls). Pour mieux les lire (un fond, un voile, une ombre) : add_to_reel avec voile true, gratuit, sa typo et ses tailles gardées. Pour changer leur taille ou un autre style : montage (correction: true) avec sa demande dans brief.";
 
 export function createToolHandlers(ctx: ToolContext): ToolHandlers {
   const db = supabaseAdmin();
@@ -1729,11 +1733,11 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
       });
     },
 
-    async style_texts({ post_id, target, photos, look_name, look, reset, save_as }) {
+    async style_texts({ post_id, target, photos, look_name, look, reset, charter, save_as }) {
       const saved = look_name ? await loadTextLooks(studioId) : [];
       const named = look_name ? saved.find((l) => l.name.toLowerCase() === look_name.toLowerCase()) : undefined;
       if (look_name && !named) return json({ error: `Aucun style enregistré « ${look_name} ». Styles du studio : ${saved.map((l) => l.name).join(", ") || "aucun"}` });
-      if (!reset && !named && !look) return json({ error: "Donne un style enregistré (look_name), des changements (look) ou reset." });
+      if (!reset && !named && !look && !charter) return json({ error: "Donne un style enregistré (look_name), des changements (look), charter ou reset." });
 
       const { data: post } = await db.from("posts").select("slides").eq("id", post_id).eq("studio_id", studioId).maybeSingle();
       const slidesTemplate = slidesPlanSchema.safeParse(post?.slides);
@@ -1743,10 +1747,44 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
         if (await montageRunning(post_id)) return json({ en_cours: true, note: MONTAGE_RUNNING });
         // A Reel whose model draws its texts keeps its lettering (Tristan, 6 November: « voile sombre » became a black
         // rounded box behind each text, in Inter Tight 46 px instead of the model's): a ground, an outline or a shadow asked
-        // is a veil on her pictures under its words; another style is a correction, the model drawing it.
+        // is a veil on her pictures under its words; its fonts and its texts' colour change here (below); another style is
+        // a correction, the model drawing it.
         const { data: reel } = await db.from("posts").select("edit_plan_id").eq("id", post_id).eq("studio_id", studioId).maybeSingle();
         const current = reel?.edit_plan_id ? editPlanSchema.safeParse((await db.from("edit_plans").select("plan").eq("id", reel.edit_plan_id as string).maybeSingle()).data?.plan) : null;
-        if (current?.success && drawsItsTexts(current.data) && current.data.layers?.some((l) => l.compose)) {
+        const drawn = Boolean(current?.success && drawsItsTexts(current.data) && current.data.layers?.some((l) => l.compose));
+        // Its fonts or its texts' colour (« remets ma police », « mets ma typo », « change la couleur du texte »): free, the
+        // Reel kept as it is, never a correction (Tristan's « Met ma police please » had cost 6 credits and 0,77 € of
+        // editor and motion designer, 7 November). Her charter on any Reel; a font or a colour alone on one that draws its texts.
+        if (current?.success && (charter || (drawn && !reset && !named && fontOrColorOnly(look)))) {
+          const font = look?.font && !BRAND_FONTS.includes(look.font as (typeof BRAND_FONTS)[number]) ? look.font : undefined;
+          const color = look?.color;
+          if (color && !/^#[0-9a-f]{6}$/i.test(color)) return json({ error: "Donne la couleur des textes en #rrggbb (ex. #FFD400)." });
+          const change: FontChange = {
+            ...(charter === "fonts" || charter === "both" || (look?.font && !font) ? { charter: true } : {}),
+            ...(charter === "colors" || charter === "both" ? { charterColors: true } : {}),
+            ...(font && !charter ? (target === "hook" ? { display: font } : target === "all" ? { display: font, body: font } : { body: font }) : {}),
+            ...(color ? { color } : {}),
+          };
+          const done = await restyleReelFonts(studioId, post_id, change);
+          if (!done.ok) return json({ error: done.error });
+          if (done.same) {
+            return json({
+              status: "same",
+              polices: done.fonts,
+              note: `Ce Reel est déjà en ${done.fonts.display} (titres) et ${done.fonts.body} (textes) : rien à refaire, rien de débité. Dis-le en une phrase et demande ce qu'elle voit de différent.`,
+            });
+          }
+          if (!rendering.has(post_id)) {
+            rendering.add(post_id);
+            ctx.afterReply.push(() => queueRerender({ studioId, postId: post_id, waId: ctx.waId, replyTo: ctx.replyToMessageId, conversationId: ctx.conversationId }));
+          }
+          return json({
+            status: "started",
+            polices: done.fonts,
+            note: `Polices ${done.fonts.display} et ${done.fonts.body}${color && !done.colorMissed ? `, textes en ${color}` : ""}, le reste du Reel gardé tel quel : gratuit, sans nouveau montage, la vidéo se refait et arrive toute seule.${done.colorMissed ? " Sa couleur de texte est calculée par son animation : elle n'a pas changé ; la changer redessine l'animation (une correction) : dis-le-lui et demande si elle la veut." : ""} Dis-le en une phrase.`,
+          });
+        }
+        if (current?.success && drawn) {
           if (reset || named || !look || !readsBetter(look)) return json({ error: MODEL_LETTERING });
           const row = await insertPlanVersion(studioId, post_id, withScrim(current.data));
           check(await db.from("posts").update({ edit_plan_id: row.id }).eq("id", post_id).eq("studio_id", studioId));
@@ -1777,7 +1815,9 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
           if (photos?.length && (photo === undefined || !photos.includes(photo))) return undefined;
           if (reset) return { look: null };
           const base = named?.look ?? t.look ?? starts.get(t.style)!;
-          const merged: Record<string, unknown> = { ...base, ...(look ?? {}) };
+          // Her charter's fonts on her photos' texts (« remets ma police »): each on her title or text font by its role.
+          const brandFont = charter === "fonts" || charter === "both" ? { font: t.style === "hook" ? "brand_display" : "brand_body" } : {};
+          const merged: Record<string, unknown> = { ...base, ...(look ?? {}), ...brandFont };
           for (const key of ["fill", "stroke", "emphasis"]) if (merged[key] === null) delete merged[key];
           const parsed = textLookSchema.safeParse(merged);
           if (!parsed.success) {

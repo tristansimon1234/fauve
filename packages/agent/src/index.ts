@@ -16,6 +16,7 @@ export * from "./moodboard.ts";
 export * from "./credits.ts";
 export * from "./performance.ts";
 export * from "./plan-edit.ts";
+export * from "./reel-fonts.ts";
 export * from "./slides.ts";
 export * from "./carousel.ts";
 export * from "./text-spots.ts";
