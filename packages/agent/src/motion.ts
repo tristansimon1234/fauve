@@ -997,20 +997,24 @@ export function buildReelProps(plan: EditPlan, inputs: ReelInputs): ReelProps {
   const endCardFrames = toFrames(endCardSeconds(plan));
 
   // A collage's composition lays her shots itself: each one's segment, span, shape and subject (a photo's cut-out too).
-  const composeShots = (from: number, length: number): ComposeShot[] =>
-    plan.segments.flatMap((s, i): ComposeShot[] => {
+  // `laid`: the clips its code was written for (motion.laid): an object it names is given on that shot only.
+  const composeShots = (from: number, length: number, laid?: string[]): ComposeShot[] => {
+    let k = -1;
+    return plan.segments.flatMap((s, i): ComposeShot[] => {
+      if (isClipSegment(s)) k++;
       const segment = segments[i];
       if (!isClipSegment(s) || !segment || (segment.type !== "clip" && segment.type !== "image")) return [];
       // A shot added after the composition ends is the engine's to play, not one it lays.
       if (segment.startAt >= from + length) return [];
       const span = { segment: i, from: segment.startAt - from, durationInFrames: segment.durationInFrames };
+      const found = (key: string) => (laid && laid[k] !== s.clip_id ? [] : passageObjects(inputs.subjects, key));
       if (segment.type === "image") {
         const photo = scenePhotos([s.clip_id], inputs)[0];
         const aspect = segment.edit ? segment.edit.source.width / segment.edit.source.height : (photo?.aspect ?? 3 / 4);
         const focus = s.photo?.adjust?.focus;
         // Its subject and the objects found on it, one image for the whole shot: SubjectBox, SubjectOutline and Outline place them as Photo draws it.
         const cut = inputs.sceneCutouts?.[s.clip_id];
-        const found = passageObjects(inputs.subjects, photoKey(s.clip_id));
+        const objects = found(photoKey(s.clip_id));
         return [
           {
             ...(photo ?? { src: segment.src }),
@@ -1021,8 +1025,8 @@ export function buildReelProps(plan: EditPlan, inputs: ReelInputs): ReelProps {
             ...(segment.edit ? { edit: segment.edit } : {}),
             ...(cut ? { subjectBoxes: [[cut.box.x, cut.box.y, cut.box.w, cut.box.h]] } : {}),
             ...(cut?.contour?.length ? { subjectContours: [cut.contour] } : {}),
-            ...(found.length
-              ? { objects: Object.fromEntries(found.map(([name, o]) => [name, objectReading(o)])) }
+            ...(objects.length
+              ? { objects: Object.fromEntries(objects.map(([name, o]) => [name, objectReading(o)])) }
               : {}),
             ...(inputs.subjects?.[clearKey(s.clip_id, 0, 0)]?.clear ? { clear: inputs.subjects[clearKey(s.clip_id, 0, 0)]!.clear } : {}),
             ...(inputs.subjects?.[readKey(s.clip_id, 0, 0)]?.reading ? { read: inputs.subjects[readKey(s.clip_id, 0, 0)]!.reading } : {}),
@@ -1044,10 +1048,10 @@ export function buildReelProps(plan: EditPlan, inputs: ReelInputs): ReelProps {
           ...(track ? { track: face ? { ...track, look: { ...track.look, face } } : track } : {}),
           ...(inputs.subjects?.[subjectKey(s.clip_id, s.in, s.out)]?.boxes?.length ? { subjectBoxes: inputs.subjects[subjectKey(s.clip_id, s.in, s.out)]!.boxes } : {}),
           ...(inputs.subjects?.[subjectKey(s.clip_id, s.in, s.out)]?.contours?.length ? { subjectContours: inputs.subjects[subjectKey(s.clip_id, s.in, s.out)]!.contours } : {}),
-          ...(passageObjects(inputs.subjects, subjectKey(s.clip_id, s.in, s.out)).length
+          ...(found(subjectKey(s.clip_id, s.in, s.out)).length
             ? {
                 objects: Object.fromEntries(
-                  passageObjects(inputs.subjects, subjectKey(s.clip_id, s.in, s.out)).map(([name, o]) => [name, objectReading(o)]),
+                  found(subjectKey(s.clip_id, s.in, s.out)).map(([name, o]) => [name, objectReading(o)]),
                 ),
               }
             : {}),
@@ -1062,6 +1066,7 @@ export function buildReelProps(plan: EditPlan, inputs: ReelInputs): ReelProps {
         },
       ];
     });
+  };
 
   // Animations over several shots: their span in frames and the cuts under them (from their start).
   // (Two shots laid side by side cut on the same frame: one cut, in order.)
@@ -1089,7 +1094,7 @@ export function buildReelProps(plan: EditPlan, inputs: ReelInputs): ReelProps {
         durationInFrames: length,
         cuts: starts.filter((f) => f > from && f < from + length).map((f) => f - from),
         ...(l.motion.photos?.length ? { photos: scenePhotos(l.motion.photos, inputs) } : {}),
-        ...(l.compose ? { compose: true, shots: composeShots(from, length) } : {}),
+        ...(l.compose ? { compose: true, shots: composeShots(from, length, l.motion.laid) } : {}),
         ...(l.compose && l.hold_first && from > 0 ? { holdFirst: true } : {}),
         // An animation over the montage that draws one of her shots, her cut out, an object or its depth: the shots under it,
         // played full frame by the montage (its Subject laid full frame falls exactly on her).

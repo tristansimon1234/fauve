@@ -58,6 +58,8 @@ export async function startMontage(
     // Soigné and Max: reviewed by the critic before delivery (montage job).
     effort: quote.effort ?? undefined,
     correction: quote.kind === "correction",
+    // Redone as a new creation: made freely, never in a model (the job's edithModelFirst).
+    ...(quote.redo ? { redo: true } : {}),
     waId: target.waId,
     replyTo: target.replyTo,
     notify: target.notify || undefined,

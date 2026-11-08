@@ -360,6 +360,16 @@ export const PHOTO_OBJECT_MAX = 6;
 export const photoKey = (mediaId: string) => subjectKey(mediaId, 0, 0);
 
 /**
+ * Whether an object an animation names on her shot n may be looked for there: always, unless its code says the shots it
+ * was written for (motion.laid, a composition) and shot n is now another clip (a correction that re-cut the Reel, a shot
+ * moved by hand): « the table lamp of shots[2] » is never looked for in a candle.
+ */
+export function onLaidShot(layer: Pick<PlanLayer, "motion">, shot: number, clipId: string | undefined): boolean {
+  const laid = layer.motion?.laid;
+  return !laid || (clipId !== undefined && laid[shot] === clipId);
+}
+
+/**
  * The objects an animation's code follows, by shot: as read in its code (objectsDrawn), a shot it writes as a variable
  * placed where its montage skill declared that object (motion.drawn.objects: her sign on her last shot), else on every
  * shot under it; `still` when its skill declared it read once on that shot's first image (a still camera).
@@ -395,6 +405,8 @@ export function objectPassages(plan: Pick<EditPlan, "segments" | "layers">, isVi
   for (const layer of plan.layers ?? []) {
     for (const { shot, name, still } of layerObjects(plan, layer, spans)) {
       const s = shots[shot];
+      // Never looked for on a shot its code was not written for (Novembre, version cocon: « table lamp » found in the candle).
+      if (!onLaidShot(layer, shot, s?.clip_id)) continue;
       // A photo: the object found once on it (a glass on a table, the cup she holds), whatever its move.
       if (s?.photo) {
         const key = objectKey(s.clip_id, 0, 0, name);

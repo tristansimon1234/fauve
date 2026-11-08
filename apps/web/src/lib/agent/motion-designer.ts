@@ -20,6 +20,8 @@ import {
   type ScenePhoto,
   type TrackPiece,
   readsSpoken,
+  asksCameraMove,
+  herOwnMessages,
 } from "@fauve/agent";
 import { outputFormat, readAnswer } from "@fauve/agent/answer";
 import { GoogleGenAI } from "@google/genai";
@@ -505,6 +507,9 @@ function smokeScenes(results: SceneResult[], requestOf: (id: string) => SceneReq
         ...(request.keep && request.compose?.subtitles ? { probeGround: true } : {}),
         // A montage skill's composition over her shots: its words right over them, where the render may darken her picture.
         ...(request.keep && request.compose?.shots.length ? { probeInk: true } : {}),
+        // A composition written now, nor a model's nor a copy's (they move as their original does): a slow push it lays on
+        // a whole shot goes back to it, unless her own words ask for a camera move (Tristan: « je trouve ça cheap »).
+        ...(request.compose && !request.keep && !request.model?.length && !request.example && !asksCameraMove(herOwnMessages(request.request)) ? { probePush: true } : {}),
       };
     });
 }

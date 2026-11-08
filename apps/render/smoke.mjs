@@ -8,7 +8,8 @@
 // families its code brings besides the brand's two, laid out with them; reelTexts, end: for a composition that
 // draws the whole picture, the Reel's texts it must write at their moment, and its end; backdrop: the colours of the
 // picture under it, each shot's and the footage's at some of its frames, for the words lost on it; probeSpoken: its
-// code reads what is said, so it is given words said under it, and how many of them it writes is measured).
+// code reads what is said, so it is given words said under it, and how many of them it writes is measured; probePush: a
+// composition whose request asks for no camera move, a slow push it lays on a whole shot reported).
 // 1. Each scene is rendered at its first, middle and last frame with React's server
 //    renderer and minimal Remotion shims, which catches crashes and bad output early. Its `track` sees
 //    nothing there: a scene must stand without anyone in the picture (reused over other footage).
@@ -231,6 +232,7 @@ if (browser) {
         ...(scene.probeSpoken ? { probeSpoken: true } : {}),
         ...(scene.probeGround ? { probeGround: true } : {}),
         ...(scene.probeInk ? { probeInk: true } : {}),
+        ...(scene.probePush ? { probePush: true } : {}),
       };
       try {
         const composition = await selectComposition({ serveUrl: bundle, id: "SceneCheck", inputProps, puppeteerInstance: browser, browserExecutable, logLevel: "error" });
@@ -246,8 +248,8 @@ if (browser) {
           logLevel: "error",
           timeoutInMilliseconds: 60000,
           onBrowserLog: (log) => {
-            // Not failures, reasons for one more round: a text on a face, a sentence too quick to read, a text too small, a word lost on the picture, a text of the Reel not written, its name at the end too short or too small.
-            const note = /^FAUVE_(?:FACE|READ|SIZE|INK|HIDDEN|MISSING|ENDING) (".*")$/.exec(log.text)?.[1];
+            // Not failures, reasons for one more round: a text on a face, a sentence too quick to read, a text too small, a word lost on the picture, a text of the Reel not written, its name at the end too short or too small, a slow push on a whole shot.
+            const note = /^FAUVE_(?:FACE|READ|SIZE|INK|HIDDEN|MISSING|ENDING|PUSH) (".*")$/.exec(log.text)?.[1];
             if (note) faces[scene.id] = [faces[scene.id], JSON.parse(note)].filter(Boolean).join("\n");
             const drawn = /^FAUVE_COVER (\[.*\])$/.exec(log.text)?.[1];
             if (drawn) cover[scene.id] = JSON.parse(drawn);

@@ -681,6 +681,8 @@ export type SmokeScene = {
   probeGround?: boolean;
   /** A montage skill's composition: its words right over her shots are measured (`words`), for the render to darken her picture under them. */
   probeInk?: boolean;
+  /** A composition whose request asks for no camera move: a slow push it lays on a whole shot goes back to its author (FAUVE_PUSH). */
+  probePush?: boolean;
   /** Its own brand, when the scenes are checked on several (a tool proven on three charters); else the call's. */
   brand?: Pick<ReelProps["brand"], "name" | "accent" | "accentInk" | "displayFont" | "bodyFont" | "logoUrl">;
 };

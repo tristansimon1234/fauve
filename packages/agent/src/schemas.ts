@@ -323,6 +323,11 @@ export const editPlanMotionSegmentSchema = z.object({
      * over the shots under it, its words written by its filler. Set by the engine; a correction fills it again.
      */
     piece: z.object({ key: z.string().min(1).max(40), version: z.number().int().min(1) }).optional(),
+    /**
+     * A composition's shots as its code was written for them: the clip of each shots[i] (composedShots). Its code names
+     * them by index (the lamp of shots[2]), so an object is looked for only on the shot it was written for. Set by the engine.
+     */
+    laid: z.array(z.string().min(1).max(64)).max(200).optional(),
   }),
   duration: z.number().min(1).max(8),
   /**
