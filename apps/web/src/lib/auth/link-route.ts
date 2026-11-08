@@ -86,7 +86,15 @@ export async function consumeLoginLink(request: NextRequest, token: string, urlN
   }
 
   const next = safePath(data.next as string | null) ?? safePath(urlNext) ?? "/fauve";
+  // Already signed in as this phone on this device: nothing to open (Tristan, 8 November: « une fois sur deux je tombe
+  // sur une page de connexion » — the code to open a session had failed while she was signed in all along).
+  const phone = (data.phone_e164 as string).replace(/^\+/, "");
+  const { data: current } = await (await supabaseServer()).auth.getClaims();
+  if (current?.claims && String(current.claims.phone ?? "").replace(/^\+/, "") === phone) return go(next);
   const ok = await openSessionForPhone(data.phone_e164 as string);
-  if (!ok) return go(`/connexion?next=${encodeURIComponent(next)}`);
+  if (!ok) {
+    console.error("login link: no session opened for its phone; sending to the sign-in page", next);
+    return go(`/connexion?next=${encodeURIComponent(next)}`);
+  }
   return go(next);
 }
