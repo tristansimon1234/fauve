@@ -20,6 +20,7 @@ import { brandSignatureSchema } from "./signature.ts";
 import { ONBOARDING_STEPS } from "./onboarding.ts";
 import { slideTextSchema } from "./slides.ts";
 import { textLookSchema } from "./text-look.ts";
+import { FILM_KINDS, ON_SCREEN } from "./shooting.ts";
 
 /** Changes to a text look: only the fields given change; null removes a fill, an outline or an emphasis style. */
 const lookPatchSchema = textLookSchema.partial().extend({
@@ -104,6 +105,17 @@ export const toolSpecs = {
     description:
       "Les prochains jours libres pour publier (sans publication déjà prévue), à l'heure habituelle du commerce. Pour proposer une date en boutons quand elle crée une publication sans en donner.",
     input: z.object({ count: z.number().int().min(1).max(6).default(3) }),
+  },
+  film_guide: {
+    description:
+      "Comment filmer une idée au téléphone, dès que tu lui proposes quelque chose à filmer ou qu'elle demande comment : 3 plans (le 1er est l'accroche, ce que montre la 1re seconde), leur durée, où se mettre, la lumière et le téléphone, dans les mots de son métier, selon qui accepte d'apparaître et ce que ses dernières vidéos ont montré. « court » va avec l'idée ; « points » seulement quand elle demande comment. Gratuit.",
+    input: z.object({
+      genre: z
+        .enum(FILM_KINDS)
+        .describe("geste : un geste de son métier, de près ; resultat : le résultat fini (un plat, une coupe, un produit) ; avant_apres ; lieu : son lieu à l'ouverture ; conseil : un conseil dit à la caméra (ou en voix sur ses mains) ; coulisses : avant d'ouvrir ; moment : son lieu en pleine activité"),
+      qui: z.enum(ON_SCREEN).optional().describe("Qui accepte d'apparaître, d'après sa Mémoire : elle, equipe, ou personne (les mains et le résultat) ; rien dans sa Mémoire : laisse vide"),
+      sujet: z.string().max(60).optional().describe("De quoi il s'agit, dans ses mots (« le balayage », « la tarte du jour »)"),
+    }),
   },
   list_inspirations: {
     description:

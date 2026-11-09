@@ -3,6 +3,8 @@ import { soundPageLink,
   APP_GUIDES,
   BY_HAND_GUIDE,
   cleanCaption,
+  filmGuide,
+  filesVerdict,
   instagramProfileHandle,
   cleanHandle,
   periodTotals,
@@ -130,6 +132,7 @@ import { addToMoodboard } from "@/lib/moodboard-add";
 import { completeFirstPost, isFirstReel } from "@/lib/onboarding";
 import { listInspirations } from "@/lib/inspirations";
 import { freeSlots } from "@/lib/slots";
+import { checkedFiles, filmHabit } from "@/lib/file-check";
 import { studioAccess } from "@/lib/billing/access";
 import { blurMontage, retouchPostPhotos } from "@/lib/retouch";
 import { readSiteLook, sitePage } from "@/lib/site-look";
@@ -682,6 +685,11 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
           })),
         ),
       );
+      // Their form as a set, from what was just measured (file-check.ts): what Edith's advice on weak files says.
+      const { data: studio } = await db.from("studios").select("business_type").eq("id", studioId).single();
+      const form = await checkedFiles(studioId, media_ids)
+        .then((files) => filesVerdict(files, (studio?.business_type as string | null) ?? null))
+        .catch(() => null);
       // The chat only needs the gist; the editor reads the full analyses itself.
       return json({
         clips: results.map((r) =>
@@ -696,6 +704,9 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
               }
             : r,
         ),
+        ...(form?.measured
+          ? { forme: form.problems.length ? { a_redire: form.problems.slice(0, 3).map((p) => p.words), a_filmer_en_10_s: form.fix ?? undefined } : "rien à redire" }
+          : {}),
       });
     },
 
@@ -1508,6 +1519,23 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
       return json({
         jours_libres: slots.map((s) => ({ date: s.date, heure: s.time, libelle: `${s.label} à ${s.time.replace(":", " h ").replace(/ 00$/, "")}` })),
         note: slots.length ? "Propose-les en boutons (reply_with options, le libellé), plus « Autre date »." : "Aucun jour libre dans les deux semaines : demande-lui une date.",
+      });
+    },
+
+    async film_guide({ genre, qui, sujet }) {
+      const { data } = await db.from("studios").select("business_type, timezone").eq("id", studioId).single();
+      const timezone = (data?.timezone as string | undefined) ?? "Europe/Paris";
+      const month = Number(new Intl.DateTimeFormat("en-GB", { month: "numeric", timeZone: timezone }).format(new Date())) - 1;
+      const habit = await filmHabit(studioId).catch(() => null);
+      const guide = filmGuide({ businessType: (data?.business_type as string | null) ?? null, kind: genre, who: qui, subject: sujet, month, habit });
+      return json({
+        idee: guide.idea,
+        court: guide.short,
+        points: guide.points,
+        note: [
+          "Avec une idée, « court » en une phrase ; les points seulement quand elle demande comment, en liste, tels quels.",
+          ...(qui ? [] : ["Qui apparaît n'est pas dans sa Mémoire : ces plans ne montrent que les mains et le résultat. Tu peux lui demander une fois qui elle veut voir (elle, l'équipe, personne), puis remember."]),
+        ].join(" "),
       });
     },
 

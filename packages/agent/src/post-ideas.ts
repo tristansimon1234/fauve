@@ -4,7 +4,8 @@ import { z } from "zod";
 // business (studios.business_type): a restaurant does not post what a hair salon does.
 
 export type IdeaKind = "reel" | "carousel" | "post" | "story";
-type Family = "sport" | "beauty" | "food" | "shop" | "other";
+export type BusinessFamily = "sport" | "beauty" | "food" | "shop" | "other";
+type Family = BusinessFamily;
 
 const FAMILIES: [Family, RegExp][] = [
   ["sport", /pilates|yoga|fitness|sport|danse|boxe|gym|salle|crossfit|coach|studio de|natation|escalade|barre/i],

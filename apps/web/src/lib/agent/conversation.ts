@@ -6,6 +6,8 @@ import {
   DEFAULT_EFFORT,
   DEFAULT_VOICE_ID,
   effortSchema,
+  exchangeFiles,
+  filesVerdictLine,
   findVoice,
   finishDefaultWords,
   orderReplies,
@@ -31,6 +33,7 @@ import { studioModels } from "@/lib/reel-models";
 import { pendingSteal } from "@/lib/steal";
 import { socialConnect } from "@/lib/social/connect";
 import { latestReport } from "@/lib/performance";
+import { checkedFiles } from "@/lib/file-check";
 
 /** A « Ce qui marche » older than this no longer speaks for her: Edith does not lean on it. */
 const REPORT_FRESH_MS = 35 * 86_400_000;
@@ -240,6 +243,20 @@ export async function replyInConversation(params: {
   if (day === "silent") return silent;
   if (day === "notice") return { ...silent, reply: DAILY_CAP_REPLY, extras: { kind: "daily_cap" } };
 
+  // The conversation this turn answers (her latest message's): a montage launched now keeps its exchange for every
+  // agent. On WhatsApp the history spans her earlier conversations, whose talk was about other things.
+  const exchange = [...kept]
+    .reverse()
+    .filter((r) => !latest?.conversation_id || r.conversation_id === latest.conversation_id)
+    .map(toExchange);
+  // The files she sent or picked since the last launch, judged on their form from what was measured when they arrived.
+  const files = await checkedFiles(params.studioId, [...exchangeFiles(exchange)])
+    .then((checked) => filesVerdictLine(checked, (studio.data.business_type as string | null) ?? null))
+    .catch((error: unknown) => {
+      console.warn("files check failed", error);
+      return null;
+    });
+
   return runFauve({
     studioId: params.studioId,
     memberId: params.memberId,
@@ -248,12 +265,7 @@ export async function replyInConversation(params: {
     reactToRowId: params.reactToRowId,
     // In the app, what she starts here is delivered here (WhatsApp delivers on WhatsApp).
     conversationId: params.waId ? undefined : conversation?.id,
-    // The conversation this turn answers (her latest message's): a montage launched now keeps its exchange for every
-    // agent. On WhatsApp the history spans her earlier conversations, whose talk was about other things.
-    exchange: [...kept]
-      .reverse()
-      .filter((r) => !latest?.conversation_id || r.conversation_id === latest.conversation_id)
-      .map(toExchange),
+    exchange,
     timezone: studio.data.timezone,
     reactions: [],
     extras: {},
@@ -282,6 +294,7 @@ export async function replyInConversation(params: {
         : { state: "off", handle: null, direct: false },
       channel: params.channel ?? (params.waId ? "whatsapp" : "web"),
       whatsappVideos: videos,
+      files,
       montageEffort: effortSchema.catch(DEFAULT_EFFORT).parse(studio.data.montage_effort),
       known: {
         website: (studio.data.website_url as string | null) ?? null,

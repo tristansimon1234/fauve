@@ -255,7 +255,7 @@ Un fichier par sujet dans `docs/`, un paragraphe par fonction (ses fichiers, ses
 - `docs/voix.md` — Voix off : Sa voix sur un Reel ; Sa propre voix clonée ; Voix moins expressives ; Scénariste des voix off ; Voix d'Edith sur un Reel ; Une voix sur un modèle ; La voix dit les mots du modèle ; Sa voix mène le modèle ; Sa voix tirée d'une de ses vidéos ; Avec ou sans voix off, décidé une fois et su.
 - `docs/carrousels.md` — Carrousels et texte sur photo : Texte sur les photos ; Carrousel composé ; Calques de texte ; Éditeur de carrousel ; Mises en page dans l'éditeur de carrousel ; Mises en page souples ; Designer de texte ; Composants (retirés).
 - `docs/marque.md` — Marque et style du commerce : Signature du commerce ; Charte, source unique des polices et des couleurs ; Ton style en onglets sur ordinateur ; Ton style ; Style (réglages) ; Styles de texte ; Police et couleurs d'un Reel changées sans le refaire ; Polices que Google Fonts ne sert pas ; Polices de la gérante ; Sa DA sans site ; Son site change.
-- `docs/medias.md` — Photos et vidéos reçues : Analyse vidéo ; Images par IA ; Médiathèque ; Médiathèque pour Fauve ; Retouche et floutage ; Conservation des médias ; Photos lues dès leur arrivée ; Envoi au compte-gouttes.
+- `docs/medias.md` — Photos et vidéos reçues : Analyse vidéo ; Images par IA ; Médiathèque ; Médiathèque pour Fauve ; Retouche et floutage ; Conservation des médias ; La forme de ses fichiers avant un Reel ; Photos lues dès leur arrivée ; Envoi au compte-gouttes.
 
 **Publier et mesurer**
 
@@ -265,7 +265,7 @@ Un fichier par sujet dans `docs/`, un paragraphe par fonction (ses fichiers, ses
 
 **Edith et la conversation**
 
-- `docs/edith.md` — Edith, l'assistant : Mascotte et humeurs ; Outils d'Edith, qui se fabriquent et se mettent à jour tout seuls ; Activité ; Relire et retoucher les textes ; Mode d'emploi ; Mémoire de Fauve ; Pas de planning imposé ; Consigne d'Edith courte ; Consigne d'Edith ; Conseiller, jamais obliger.
+- `docs/edith.md` — Edith, l'assistant : Mascotte et humeurs ; Outils d'Edith, qui se fabriquent et se mettent à jour tout seuls ; Activité ; Relire et retoucher les textes ; Mode d'emploi ; Mémoire de Fauve ; Pas de planning imposé ; Consigne d'Edith courte ; Consigne d'Edith ; Conseiller, jamais obliger ; Conseils avant la conception d'un Reel (comment filmer, la forme de ses fichiers).
 - `docs/chat.md` — Le chat : Conversations ; Photos et vidéos dans le chat de l'app ; Panneau Fauve ; Boutons et cartes dans le chat ; Chat en direct ; Bulles en direct ; Chat fluide ; Canal ; Zone de dépôt dans le chat.
 - `docs/whatsapp.md` — WhatsApp (détails) : Une réponse que WhatsApp refuse ; WhatsApp est l'interface principale sur téléphone.
 - `docs/connexion.md` — Connexion : Connexion et liens ; Commencer et se connecter sur ordinateur sans SMS ni modèle Meta.

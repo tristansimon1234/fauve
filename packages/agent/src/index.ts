@@ -107,3 +107,5 @@ export * from "./pieces.ts";
 export * from "./director.ts";
 export * from "./takes.ts";
 export * from "./geo.ts";
+export * from "./shooting.ts";
+export * from "./file-check.ts";
