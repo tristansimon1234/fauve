@@ -101,6 +101,8 @@ export type RunFauveInput = ToolContext & {
     publicHandles?: StudioContextForPrompt["publicHandles"];
     channel?: "whatsapp" | "web";
     whatsappVideos?: "full" | "compressed" | null;
+    /** The files of this exchange judged on their form (file-check.ts), one line. */
+    files?: string | null;
     /** Default level of care for montages (Réglages). */
     montageEffort?: Effort;
     /** What Fauve knows about the business (site, tone, memory). */
@@ -191,6 +193,7 @@ export async function runFauve(input: RunFauveInput): Promise<RunFauveResult> {
           connect: socialConnect(),
           channel: input.studio.channel,
           whatsappVideos: input.studio.whatsappVideos,
+          files: input.studio.files,
           montageEffort: input.studio.montageEffort,
           known: input.studio.known,
           work: input.studio.work,
