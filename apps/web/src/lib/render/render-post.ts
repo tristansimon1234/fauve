@@ -46,6 +46,9 @@ import {
   wantsObjects,
   wantsReads,
   wantsSubjects,
+  gradeReel,
+  tonePassages,
+  withTones,
 } from "@fauve/agent";
 import { z } from "zod";
 import { supabaseAdmin } from "@/lib/supabase/admin";
@@ -64,7 +67,7 @@ import { smoothSlowMotion } from "./smooth";
 import { ensureCleanCopies } from "@/lib/video/speech";
 import { ensureTracks, loadTracks } from "./tracks";
 import { postStyle } from "@/lib/steal";
-import { renderInSandbox, renderReelInSandbox, sandboxCostEur, smokeTestScenes, type SceneChecks } from "./sandbox";
+import { renderInSandbox, renderReelInSandbox, sandboxCostEur, smokeTestScenes, type SceneChecks, type ToneRead } from "./sandbox";
 import { withoutCompositions } from "./render-tries";
 import { costMeta } from "@/lib/cost-scope";
 
@@ -256,6 +259,19 @@ export async function loadMontageInputs(
     tracks,
     facts,
   };
+}
+
+/** What the workshop read on a version's shots (shot-tone.ts), kept on its segments as they were read: never fails the render. */
+async function keepShotTones(planId: string, raw: unknown, plan: EditPlan, read: Record<number, ToneRead | null>): Promise<void> {
+  const tones = withTones(plan, read).segments;
+  const stored = raw as { segments?: Record<string, unknown>[] };
+  if (!Array.isArray(stored.segments)) return;
+  const segments = stored.segments.map((s, i) => {
+    const t = tones[i];
+    return t && "tone" in t && t.tone && s.clip_id === t.clip_id ? { ...s, tone: t.tone } : s;
+  });
+  const { error } = await supabaseAdmin().from("edit_plans").update({ plan: { ...stored, segments } }).eq("id", planId);
+  if (error) console.warn("shots' light not kept on the plan", planId, error.message);
 }
 
 /** A photo's reading as kept on it (its size and what Gemini saw: faces, lettering). */
@@ -455,6 +471,7 @@ export async function renderPost(studioId: string, postId: string, options: { ed
 
   const started = Date.now();
   const waited = meterWaits();
+  let toned: Record<number, ToneRead | null> | null = null;
   try {
     // The ffmpeg engine has no motion-design scenes: it renders the clips only.
     // Blurred zones (faces, plates) only exist in the Remotion composition: never fall back without them.
@@ -546,6 +563,7 @@ export async function renderPost(studioId: string, postId: string, options: { ed
         props.subtitleY = row;
         const saved = await db.from("edit_plans").update({ plan: { ...(planRow.plan as Record<string, unknown>), subtitle_y: row } }).eq("id", planRow.id);
         if (saved.error) console.warn("subtitles' row not kept on the plan", planRow.id, saved.error.message);
+        else (planRow.plan as Record<string, unknown>).subtitle_y = row;
       }
       // Its slow-motion passages made smooth on the card (RIFE), when it is set up; else the sandbox makes them.
       const slowmo = await smoothSlowMotion(studioId, postId, plan, props).catch((e: unknown) => {
@@ -559,11 +577,25 @@ export async function renderPost(studioId: string, postId: string, options: { ed
       // again). Photos, blurred zones or her voice: the ffmpeg engine cannot render them; anything else falls back to it
       // only after that second try.
       const composed = Boolean(props.layers?.some((l) => l.compose));
+      // Each shot's light read in the workshop on the file it plays, when it was not on this passage yet (shot-tone.ts):
+      // every shot brought to the same light, and what was read kept on the plan (the preview and the next versions grade the same).
+      const passages = tonePassages(plan);
       try {
         mp4 = await renderReelInSandbox({
           id: renderId,
           props,
           slowmo,
+          ...(passages.length
+            ? {
+                tones: {
+                  passages,
+                  apply: (local, read) => {
+                    toned = read;
+                    return gradeReel(local, withTones(plan, read));
+                  },
+                },
+              }
+            : {}),
           again: (local, error) => {
             console.error("remotion render failed, trying again", renderId, composed ? "without its composition" : "", error);
             return withoutCompositions(local);
@@ -579,6 +611,8 @@ export async function renderPost(studioId: string, postId: string, options: { ed
     } else {
       mp4 = await ffmpegRender();
     }
+    // What the workshop read on her shots, kept on this version of the plan.
+    if (toned && Object.values(toned).some(Boolean)) await keepShotTones(planRow.id as string, planRow.plan, plan, toned);
     // Edith's music, composed for this cut (or the one kept for it), on the video.
     const effects = sounds.placed.length
       ? await soundFiles(

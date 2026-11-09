@@ -39,6 +39,7 @@ import {
   speechLevelsFilter,
   TAKE_MAX_SECONDS,
   TAKE_RATE,
+  toneCrop,
   usdToEur,
   readInkZones,
   type InkZone,
@@ -586,6 +587,45 @@ async function localMedia(sandbox: Sandbox, id: string, props: ReelProps, option
   return { ...props, segments, ...(layers ? { layers } : {}) };
 }
 
+/** A shot whose light is read before the render (shot-tone.ts, tonePassages): its place among the segments, its in and out (s of the clip). */
+export type TonePassage = { index: number; in: number; out: number };
+/** What the workshop read on a shot (tone_read.mjs), null when its file could not be read. */
+export type ToneRead = { mean: number; low: number; high: number; burnt: number; rgb: [number, number, number] | null };
+
+/**
+ * The light and colour of each shot asked (tone_read.mjs), read on her files as they were just prepared for this render
+ * (the very images it plays), cropped as the Reel shows them. A second or two of the workshop's CPU; never fails the
+ * render: what could not be read is simply not graded.
+ */
+async function readShotTones(sandbox: Sandbox, dir: string, local: ReelProps, passages: TonePassage[]): Promise<Record<number, ToneRead | null>> {
+  const frameAspect = local.width / local.height;
+  type Job = { id: string; file: string; crop: [number, number, number, number]; still?: boolean; from?: number; to?: number };
+  const jobs = passages.flatMap((p): Job[] => {
+    const segment = local.segments[p.index];
+    if (!segment || (segment.type !== "clip" && segment.type !== "image") || !segment.src.startsWith("/public/")) return [];
+    const file = `${REMOTION}/build${segment.src}`;
+    if (segment.type === "image") {
+      const edit = segment.edit;
+      const aspect = edit ? edit.source.width / edit.source.height : undefined;
+      return [{ id: String(p.index), file, still: true, crop: toneCrop(aspect, edit?.adjust?.focus, frameAspect) }];
+    }
+    // A slow motion's own file starts later in the clip.
+    const offset = (segment.srcFrom ?? 0) / REEL_FPS;
+    const crop: Job["crop"] = local.frame === "letterbox" ? [0, 0, 1, 1] : toneCrop(segment.aspect, segment.adjust?.focus, frameAspect);
+    return [{ id: String(p.index), file, from: Math.max(0, p.in - offset), to: Math.max(0, p.out - offset), crop }];
+  });
+  if (!jobs.length) return {};
+  try {
+    await sandbox.writeFiles([{ path: `${dir}/tones.json`, content: JSON.stringify(jobs) }]);
+    const result = await bash(sandbox, `cd ${REMOTION} && FFMPEG=${ROOT}/ffmpeg timeout 90 node tone_read.mjs "$1/tones.json"`, [dir]);
+    const line = (await result.stdout()).trim().split("\n").at(-1) ?? "{}";
+    return Object.fromEntries(Object.entries(JSON.parse(line) as Record<string, ToneRead | null>).map(([id, tone]) => [Number(id), tone]));
+  } catch (error) {
+    console.warn("shots' light not read, the Reel renders without their correction", error instanceof Error ? error.message.slice(0, 300) : error);
+    return {};
+  }
+}
+
 /**
  * A Reel rendered by Remotion, in a render sandbox of its own (withRender). A frame of her video waits 60 s at most
  * (the default 28 s gave up on a workshop busy with another render, and the Reel fell back to the plain ffmpeg engine).
@@ -601,6 +641,11 @@ export async function renderReelInSandbox(job: {
   slowmo?: SmoothFiles;
   /** The second try's props, from the first try's (their files already in the sandbox) and its error. */
   again?: (local: ReelProps, error: unknown) => ReelProps;
+  /**
+   * Shots whose light is read on their prepared files before the render (shot-tone.ts), and how what was read grades the
+   * props (the plan's gradeReel): every shot brought to the same light.
+   */
+  tones?: { passages: TonePassage[]; apply: (local: ReelProps, read: Record<number, ToneRead | null>) => ReelProps };
 }): Promise<Buffer> {
   return withRender(async (sandbox, held) => {
     const dir = `${ROOT}/jobs/${job.id}`;
@@ -635,6 +680,8 @@ export async function renderReelInSandbox(job: {
       await bash(sandbox, 'rm -rf "$1" "$2" && mkdir -p "$1"', [dir, media]);
       try {
         local = await localMedia(sandbox, job.id, job.props, { smooth: true, made: job.slowmo });
+        // Each shot's light read on the very file it plays, then the Reel graded from it (before both tries).
+        if (job.tones?.passages.length) local = job.tones.apply(local, await readShotTones(sandbox, dir, local, job.tones.passages));
         // Sharing its sandbox (no place was free past its wait): gently, as a second try.
         return await render(local, held ? FIRST_TRY : PATIENT_TRY);
       } catch (error) {

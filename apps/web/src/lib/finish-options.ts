@@ -27,13 +27,31 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 const changesCut = (plan: EditPlan, change: ReelFinish) =>
   (change.cuts !== undefined && change.cuts !== (plan.finish?.cuts ?? "auto")) || (change.ramp !== undefined && change.ramp !== (plan.finish?.ramp ?? "auto"));
 
-/** The post's current plan with her finishing touches changed, as a new version (the post points to it). False when nothing changed. */
-export async function refinishPost(studioId: string, postId: string, change: ReelFinish): Promise<boolean> {
+/**
+ * The post's current plan with her finishing touches changed, as a new version (the post points to it). False when
+ * nothing changed. With `scenes` (1 = the first) and a colour: only those shots' colours, as filmed (« off ») or
+ * corrected again (shot-tone.ts, `keep_colour`).
+ */
+export async function refinishPost(studioId: string, postId: string, change: ReelFinish, scenes?: number[]): Promise<boolean> {
   const db = supabaseAdmin();
   const { data: post } = await db.from("posts").select("edit_plan_id").eq("id", postId).eq("studio_id", studioId).maybeSingle();
   if (!post?.edit_plan_id) throw new Error("no montage to refinish");
   const { data: row } = await db.from("edit_plans").select("plan").eq("id", post.edit_plan_id as string).eq("studio_id", studioId).maybeSingle();
   const plan = editPlanSchema.parse(row?.plan);
+  if (scenes?.length && change.colour) {
+    const asFilmed = change.colour === "off";
+    const segments = plan.segments.map((s, i) => {
+      if (!scenes.includes(i + 1) || !isClipSegment(s)) return s;
+      const rest = { ...s };
+      delete rest.keep_colour;
+      return asFilmed ? { ...rest, keep_colour: true } : rest;
+    });
+    if (JSON.stringify(segments) === JSON.stringify(plan.segments)) return false;
+    const { id } = await insertPlanVersion(studioId, postId, editPlanSchema.parse({ ...plan, segments }));
+    const { error } = await db.from("posts").update({ edit_plan_id: id }).eq("id", postId).eq("studio_id", studioId);
+    if (error) throw new Error(error.message);
+    return true;
+  }
   const finish = { ...plan.finish, ...change };
   if (JSON.stringify(finish) === JSON.stringify(plan.finish ?? {})) return false;
   let next: EditPlan = { ...plan, finish };

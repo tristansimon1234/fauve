@@ -20,6 +20,7 @@ import { Overlays } from "./Overlays";
 import { COLLAGE_OVERLAP, COLLAGE_SERIF, CollageBackdrop, CollageBand, CollageCaption, CollageCard, CollageEndCard, CollageHook, CollageMessage, Grain, printSize, stickerTop, type Sticker } from "./Collage";
 import { DEPTH_MOVES, DepthPhoto, ReliefPhoto } from "./Depth";
 import { gradesFootage, LookDefs, LookOverlay, lookFilter } from "./Looks";
+import { shotFilter, ToneDefs } from "./Tone";
 import { Fit } from "./Fit";
 import { loadCustomFonts, loadFonts } from "./fonts";
 import { Marker } from "./Marker";
@@ -30,7 +31,7 @@ import { Elements } from "./Elements";
 import { TextLayer } from "./TextLayer";
 import { TEXT_Y, themeFor, type Theme } from "./theme";
 import { burnsMotion, burnsOf, cameraMotion, faceFocus, framingPercent, punchScale, straightening, type FaceZone } from "./track";
-import type { CameraMove, ComposeShot, ReelProps, ReelUnder, SpeedPiece, TextLook } from "./types";
+import type { CameraMove, ComposeShot, ReelProps, ReelUnder, ShotGrade, SpeedPiece, TextLook } from "./types";
 
 const clamp = { extrapolateLeft: "clamp", extrapolateRight: "clamp" } as const;
 
@@ -49,7 +50,9 @@ const SPACES = /[^\S\u00a0\u202f]+/;
 
 export function Reel(props: ReelProps) {
   // The Reel's rhythm (its tempo; an older Reel: its ambiance), set the business's way (its titles, key words, boxes and light).
-  const theme = themeFor(props.template, props.brand.signature, props.tempo);
+  // Her colours as filmed (finish.colour « off »): the ambiance's light on her shots goes too.
+  const themed = themeFor(props.template, props.brand.signature, props.tempo);
+  const theme = props.asFilmed ? { ...themed, grade: "" } : themed;
   // The studio's own fonts first, so their families are not asked of Google.
   loadCustomFonts(props.brand.customFonts);
   if (props.carousel) {
@@ -140,7 +143,7 @@ export function Reel(props: ReelProps) {
       <Sequence key={i} from={segment.startAt - from} durationInFrames={Math.min(segment.durationInFrames + COLLAGE_OVERLAP, props.durationInFrames - segment.startAt)} layout="none">
         {/* Over the opening shot, its sticker is drawn above the texts (the hook behind the subject), back in its card for the overlap. */}
         <CollageCard index={i} props={props} sticker={stickerOf(segment, theme)} layer={hookBehind(props, i) ? "print" : "all"} stickerFrom={segment.durationInFrames}>
-          {segment.type === "clip" ? <Shot segment={segment} theme={theme} /> : <Photo src={segment.src} edit={segment.edit} grade={theme.grade} frame={printSize(props)} />}
+          {segment.type === "clip" ? <Shot segment={segment} theme={theme} /> : <Photo src={segment.src} edit={segment.edit} grade={photoGrade(segment, theme)} frame={printSize(props)} />}
         </CollageCard>
       </Sequence>
     ) : null;
@@ -186,13 +189,13 @@ export function Reel(props: ReelProps) {
               )
             ) : segment.relief && segment.relief.frames === segment.durationInFrames && segment.edit && !segment.edit.blur?.length && segment.move && DEPTH_MOVES.includes(segment.move) ? (
               // A moving photo whose depth the card read: every pixel moves by its depth, the room's own move on top.
-              <ReliefPhoto src={segment.src} relief={segment.relief.src} edit={segment.edit} grade={theme.grade} move={segment.move} durationInFrames={segment.durationInFrames} theme={theme} />
+              <ReliefPhoto src={segment.src} relief={segment.relief.src} edit={segment.edit} grade={photoGrade(segment, theme)} move={segment.move} durationInFrames={segment.durationInFrames} theme={theme} />
             ) : segment.depth && segment.edit && !segment.edit.blur?.length && segment.move && DEPTH_MOVES.includes(segment.move) ? (
               // A moving photo whose subject cuts out cleanly: in relief, the subject ahead of the room.
-              <DepthPhoto src={segment.src} cutout={segment.depth} edit={segment.edit} grade={theme.grade} move={segment.move} durationInFrames={segment.durationInFrames} theme={theme} />
+              <DepthPhoto src={segment.src} cutout={segment.depth} edit={segment.edit} grade={photoGrade(segment, theme)} move={segment.move} durationInFrames={segment.durationInFrames} theme={theme} />
             ) : (
               <KenBurns on={Boolean(segment.zoom)} move={segment.move} index={i} durationInFrames={segment.durationInFrames} theme={theme}>
-                <Photo src={segment.src} edit={segment.edit} grade={theme.grade} />
+                <Photo src={segment.src} edit={segment.edit} grade={photoGrade(segment, theme)} />
               </KenBurns>
             )}
             <Legibility theme={theme} />
@@ -349,6 +352,8 @@ export function Reel(props: ReelProps) {
     <CaptionLookContext.Provider value={captionLook}>
     <AbsoluteFill style={{ backgroundColor: "#000" }}>
       <ExposureFilters />
+      {/* Each shot's grade (brought to the Reel's light), drawn on her footage only, under the look. */}
+      <ToneDefs tones={props.segments.flatMap((s) => (s.type === "clip" || s.type === "image" ? [s.tone] : [s.under?.tone]))} k={k} />
       {look && gradesFootage(look) ? <LookDefs look={look} k={k} /> : null}
       {look && gradesFootage(look) ? <AbsoluteFill style={{ filter: lookFilter(look, k) }}>{footage}</AbsoluteFill> : footage}
       {look ? <LookOverlay look={look} stamp={props.stamp} k={k} /> : null}
@@ -417,7 +422,7 @@ function drawShot(
     const src =
       layer === "subject" ? segment.subject?.src : layer === "ground" ? segment.ground?.src : layer === "depth" || layer === "near" ? undefined : layer ? segment.objects?.[layer.object]?.src : segment.src;
     if (!src) return null;
-    const photo = <Photo src={src} edit={segment.edit} grade={theme.grade} frame={size} />;
+    const photo = <Photo src={src} edit={segment.edit} grade={photoGrade(segment, theme)} frame={size} />;
     if (montage === undefined) return photo;
     return (
       <Accent kind={segment.accent === "punch" ? "punch" : undefined} color="">
@@ -448,8 +453,11 @@ function drawShot(
  * video's camera move and straightening (in a composition's box as over the montage), and over the montage a photo's
  * own move or slow zoom and the punch on its cut. A photo a composition lays stays still, as Footage draws it.
  */
-function placedShot(shot: ComposeShot, segment: ReelProps["segments"][number] | undefined, theme: Theme, montage: boolean): ComposeShot {
+function placedShot(placed: ComposeShot, segment: ReelProps["segments"][number] | undefined, theme: Theme, montage: boolean): ComposeShot {
   const base = { zoomTo: theme.zoomTo, punch: theme.punch };
+  // Its light as the Reel shows it once graded (LightUnder, the veil under a model's words).
+  const curve = (segment?.type === "clip" || segment?.type === "image") && segment.tone ? segment.tone.curve : undefined;
+  const shot: ComposeShot = curve ? { ...placed, toneCurve: curve } : placed;
   if (segment?.type === "clip") {
     const move = segment.move ?? (segment.zoom ? "in" : "none");
     return {
@@ -477,9 +485,14 @@ function placedShot(shot: ComposeShot, segment: ReelProps["segments"][number] | 
   return shot;
 }
 
+/** A photo's own filter: its grade, then the ambiance's light (none when she wants it as filmed). */
+function photoGrade(segment: { tone?: ShotGrade; asFilmed?: true }, theme: Theme): string | undefined {
+  return shotFilter(segment.tone, theme.grade, segment.asFilmed);
+}
+
 /** A collage photo's sticker: its cut-out with the photo's framing and the Reel's light (none without a clean cut-out). */
 function stickerOf(segment: ReelProps["segments"][number], theme: Theme): Sticker | undefined {
-  return segment.type === "image" && segment.cutout && segment.edit ? { src: segment.cutout.src, box: segment.cutout.box, edit: segment.edit, grade: theme.grade } : undefined;
+  return segment.type === "image" && segment.cutout && segment.edit ? { src: segment.cutout.src, box: segment.cutout.box, edit: segment.edit, grade: photoGrade(segment, theme) ?? "" } : undefined;
 }
 
 /** The hooks that may pass behind a sticker: plain words (a styled or composed text stays in front). */
@@ -687,7 +700,8 @@ function Shot({ segment, theme, frame: box, face, layer }: { segment: ClipSegmen
     height: "100%",
     objectFit: "cover",
     objectPosition: framing(focus, segment.aspect, frameAspect),
-    filter: [theme.grade, cssFilter(segment.adjust)].filter(Boolean).join(" ") || undefined,
+    // Its grade (Tone.tsx: brought to the Reel's light), the ambiance's light, her retouch: her footage only.
+    filter: shotFilter(segment.tone, theme.grade, segment.asFilmed, cssFilter(segment.adjust)),
   };
   // Her subject's cut-out, or an object's (a cup she lifts), drawn exactly where the shot is; or its depth, grey and
   // without the shot's light (it is a machine's view of the room, not her picture).
@@ -760,11 +774,11 @@ function Under({ under, durationInFrames, theme }: { under: ReelUnder; durationI
               height: "100%",
               objectFit: "cover",
               objectPosition: framing(under.adjust?.focus, under.aspect, width / height),
-              filter: [theme.grade, cssFilter(under.adjust)].filter(Boolean).join(" ") || undefined,
+              filter: shotFilter(under.tone, theme.grade, under.asFilmed, cssFilter(under.adjust)),
             }}
           />
         ) : (
-          <Photo src={under.src} edit={under.edit} grade={theme.grade} />
+          <Photo src={under.src} edit={under.edit} grade={shotFilter(under.tone, theme.grade, under.asFilmed)} />
         )}
       </AbsoluteFill>
     </AbsoluteFill>

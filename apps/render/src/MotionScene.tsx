@@ -1,4 +1,5 @@
 import React, { Component, createContext, useContext, useId, useMemo, type CSSProperties, type ReactNode } from "react";
+import { tonedLight } from "./Tone";
 import {
   AbsoluteFill,
   Easing,
@@ -102,7 +103,7 @@ function scrimAt(scrim: FootageSource["scrim"], frame: number): number {
 /** A shot's light over its whole passage, as read (its mean and its brightest tenth), or null when it was not read. */
 const wholeLight = (info: ComposeShot): { mean: number; high: number } | null => {
   const light = (info.read as { light?: { mean?: unknown; high?: unknown } } | undefined)?.light;
-  return typeof light?.mean === "number" && typeof light.high === "number" ? { mean: light.mean, high: light.high } : null;
+  return typeof light?.mean === "number" && typeof light.high === "number" ? tonedLight({ mean: light.mean, high: light.high }, info.toneCurve) : null;
 };
 
 /**

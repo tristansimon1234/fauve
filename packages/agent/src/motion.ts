@@ -12,6 +12,7 @@ import { faceZone, layerTrack, sceneTrack, shotTrack, type FaceZone, type ShotTr
 import { DEPTH_MOVES, reliefOf } from "./depth.ts";
 import { clearKey, depthKey, groundKey, nearKey, photoKey, readKey, subjectKey, type ClearMap, type ShotReading } from "./subject.ts";
 import { LOOK_PRESETS, lookMatrix, lookStamp, planLook, type ReelLook } from "./looks.ts";
+import { colourMode, reelGrades, toneAdjust, toneFor, tonePhotoEdit, type ShotGrade } from "./shot-tone.ts";
 
 // Edit plan → props of the Remotion "Reel" composition (apps/render). Everything
 // is converted to frames on the output timeline here, so the templates only
@@ -73,9 +74,10 @@ export function rampFrames(s: Pick<ClipSegment, "in" | "out" | "speed" | "ramp">
 }
 
 /** Footage that keeps playing under an animation: a passage of a clip, or a photo. */
+/** tone: the grade of the shot of the same file in the Reel (shot-tone.ts); asFilmed: its colours as filmed. */
 export type ReelUnder =
-  | { type: "clip"; src: string; startFrom: number; adjust?: Adjust; aspect?: number }
-  | { type: "image"; src: string; edit?: PhotoEdit };
+  | { type: "clip"; src: string; startFrom: number; adjust?: Adjust; aspect?: number; tone?: ShotGrade; asFilmed?: true }
+  | { type: "image"; src: string; edit?: PhotoEdit; tone?: ShotGrade; asFilmed?: true };
 
 export type ReelSegment =
   /**
@@ -121,6 +123,10 @@ export type ReelSegment =
       near?: { src: string };
       /** Laid beside another shot on the same moment (a split screen's other half): only a composition draws it, the plain montage skips it. */
       beside?: true;
+      /** Its grade (shot-tone.ts): the colour matrix, tone curve and glow that bring it to the Reel's light, on her footage only. */
+      tone?: ShotGrade;
+      /** Its colours as filmed (she asked): no grade of the engine on it, nor its light retouch. */
+      asFilmed?: true;
     }
   /**
    * A photo: a carousel slide (with its retouch and blurred zones), or a photo in a Reel (zoom: a slow Ken Burns move).
@@ -149,6 +155,10 @@ export type ReelSegment =
       ground?: { src: string; still?: boolean };
       /** Laid beside another shot on the same moment: only a composition draws it, the plain montage skips it. */
       beside?: true;
+      /** Its grade (shot-tone.ts): the colour matrix, tone curve and glow that bring it to the Reel's light, on her footage only. */
+      tone?: ShotGrade;
+      /** Its colours as filmed (she asked): no grade of the engine on it, nor its light retouch. */
+      asFilmed?: true;
     }
   /**
    * Animations play over her footage when there is some (`under`), else on the studio's colours. composed: an engine
@@ -462,6 +472,8 @@ export type ReelProps = {
   voice?: { src: string; from: number } | null;
   /** A look over the whole video (looks.ts): its settings, and its grade as one colour matrix over the footage; its texture under the texts. */
   look?: (ReelLook & { matrix: number[] }) | null;
+  /** Her colours as filmed (finish.colour « off »): no grade of the engine on her footage (the ambiance's light included). */
+  asFilmed?: true;
   /** The date a look prints, in its camera's format (« '26 10 29 », « 29 OCT. 2026 »). */
   stamp?: string;
   /**
@@ -1150,7 +1162,7 @@ export function buildReelProps(plan: EditPlan, inputs: ReelInputs): ReelProps {
 
   const copy = plan.copy ? copyProps(plan.copy, segments, inputs, durationInFrames) : null;
   const overlays = overlayProps(plan.overlays ?? [], inputs, durationInFrames);
-  return {
+  return gradeReel({
     template: inputs.template,
     ...(plan.tempo ? { tempo: plan.tempo } : {}),
     ...SIZES[plan.format],
@@ -1180,7 +1192,49 @@ export function buildReelProps(plan: EditPlan, inputs: ReelInputs): ReelProps {
     ...(layers.length ? { layers } : {}),
     ...(copy ? { copy } : {}),
     ...(overlays.length ? { overlays } : {}),
-  };
+  }, plan);
+}
+
+/**
+ * Each of her shots' grade on the Reel's props (shot-tone.ts: reelGrades), from the plan alone: a shot's tone (its
+ * matrix, curve and glow), or its colours as filmed; her light retouch under it (the measure's light and warmth replace
+ * the ones guessed when the file was read); the footage under an animation graded like the shot of the same file. Set by
+ * buildReelProps, and again on the render's own props once the workshop has read the shots not read yet.
+ */
+export function gradeReel(props: ReelProps, plan: Pick<EditPlan, "segments" | "finish" | "look" | "effect" | "skill" | "baked">): ReelProps {
+  const grades = reelGrades(plan);
+  const graded = (g: ShotGrade | "as_filmed" | null) => (g === "as_filmed" ? { asFilmed: true as const } : g ? { tone: g } : {});
+  const sameFile = (clipId: string) => plan.segments.findIndex((x) => isClipSegment(x) && x.clip_id === clipId);
+  const segments = props.segments.map((seg, i): ReelSegment => {
+    const s = plan.segments[i];
+    if (!s) return seg;
+    if (seg.type === "clip" && isClipSegment(s)) {
+      const { tone: _tone, asFilmed: _filmed, adjust: _adjust, ...rest } = seg;
+      const adjust = toneAdjust(s.adjust, grades[i] ?? null, Boolean(toneFor(s)));
+      return { ...rest, ...(adjust ? { adjust } : {}), ...graded(grades[i] ?? null) };
+    }
+    if (seg.type === "image" && isClipSegment(s)) {
+      const { tone: _tone, asFilmed: _filmed, edit: _edit, ...rest } = seg;
+      const edit = tonePhotoEdit(s.photo, grades[i] ?? null, Boolean(toneFor(s)));
+      return { ...rest, ...(edit ? { edit } : {}), ...graded(grades[i] ?? null) };
+    }
+    if ((seg.type === "motion" || seg.type === "scene") && seg.under && isMotionSegment(s) && s.over) {
+      const j = sameFile(s.over.clip_id);
+      const source = j >= 0 ? plan.segments[j] : undefined;
+      if (!source || !isClipSegment(source)) return seg;
+      const g = grades[j] ?? null;
+      const { tone: _tone, asFilmed: _filmed, ...under } = seg.under;
+      if (under.type === "clip") {
+        const { adjust: _adjust, ...bare } = under;
+        const adjust = toneAdjust(source.adjust, g, Boolean(toneFor(source)));
+        return { ...seg, under: { ...bare, ...(adjust ? { adjust } : {}), ...graded(g) } };
+      }
+      return { ...seg, under: { ...under, ...graded(g) } };
+    }
+    return seg;
+  });
+  const { asFilmed: _filmed, ...rest } = props;
+  return { ...rest, segments, ...(colourMode(plan) === "off" ? { asFilmed: true as const } : {}) };
 }
 
 /** What she added, in frames: a text as written, a photo by its signed link (its cut-out when she wants it and it has one). */
