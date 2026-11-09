@@ -1161,9 +1161,10 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
       });
     },
 
-    async set_finish({ post_id, ...asked }) {
+    async set_finish({ post_id, scenes, ...asked }) {
       const change = Object.fromEntries(Object.entries(asked).filter(([, v]) => v !== undefined)) as ReelFinish;
-      if (!Object.keys(change).length) return json({ error: "Dis ce qui change : sound, video_sound, cuts, ramp, relief, steady ou captions." });
+      if (!Object.keys(change).length) return json({ error: "Dis ce qui change : sound, video_sound, cuts, ramp, relief, steady, captions ou colour." });
+      if (scenes?.length && (!post_id || !change.colour || Object.keys(change).length > 1)) return json({ error: "scenes se donne avec post_id et colour seul (les couleurs de ces scènes)." });
       // Her defaults, for all her next Reels.
       if (!post_id) {
         await insertProfileVersion(studioId, (profile) => ({ ...profile, finish: { ...reelFinishSchema.catch({}).parse(profile.finish ?? {}), ...change } }));
@@ -1183,10 +1184,15 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
       if (change.steady === "off" && plan.data.segments.some((s) => "clip_id" in s && s.blur?.tracks.length)) {
         return json({ error: "Ce Reel floute des zones qui suivent l'image stabilisée : sans stabilisation, elles ne seraient plus au bon endroit. Retire d'abord le floutage (blur_video) si elle le veut." });
       }
+      if (scenes?.length) {
+        const n = plan.data.segments.length;
+        const missing = scenes.filter((k) => k > n || !("clip_id" in plan.data.segments[k - 1]!));
+        if (missing.length) return json({ error: `Ce Reel a ${n} scènes, et seules ses photos et vidéos ont des couleurs à régler : la scène ${missing.join(", ")} n'en a pas.` });
+      }
       ctx.afterReply.push(async () => {
         const target = { studioId, postId: post_id, waId: ctx.waId, replyTo: ctx.replyToMessageId, conversationId: ctx.conversationId };
         try {
-          await refinishPost(studioId, post_id, change);
+          await refinishPost(studioId, post_id, change, scenes);
           // Made again in its own background job (800 s), followed, never announced delivered by mistake.
           await queueRerender(target);
         } catch (error) {

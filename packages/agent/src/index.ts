@@ -39,6 +39,7 @@ export * from "./upscale.ts";
 export * from "./subject.ts";
 export * from "./contour.ts";
 export * from "./looks.ts";
+export * from "./shot-tone.ts";
 export * from "./story.ts";
 export * from "./nudge.ts";
 export * from "./clip-sort.ts";

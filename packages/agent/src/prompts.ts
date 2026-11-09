@@ -190,7 +190,7 @@ export type StudioContextForPrompt = {
 };
 
 /** Her finishing touches set for all her Reels, in words (only what differs from the engine's own). */
-export function finishDefaultWords(finish: Partial<Record<"sound" | "video_sound" | "cuts" | "ramp" | "relief" | "steady" | "captions", string>> | undefined): string[] {
+export function finishDefaultWords(finish: Partial<Record<"sound" | "video_sound" | "cuts" | "ramp" | "relief" | "steady" | "captions" | "colour", string>> | undefined): string[] {
   if (!finish) return [];
   const words: Record<string, Record<string, string>> = {
     sound: { clean: "son toujours nettoyé", voice: "sa voix seule, la musique derrière retirée", original: "son tel qu'enregistré" },
@@ -200,6 +200,7 @@ export function finishDefaultWords(finish: Partial<Record<"sound" | "video_sound
     relief: { off: "photos à plat" },
     steady: { off: "vidéos non stabilisées" },
     captions: { kinetic: "sous-titres créatifs autour de la personne", stickers: "sous-titres en étiquettes" },
+    colour: { natural: "couleurs naturelles, sans finition", off: "couleurs telles que filmées" },
   };
   return Object.entries(finish).flatMap(([key, value]) => (value && words[key]?.[value] ? [words[key][value]] : []));
 }

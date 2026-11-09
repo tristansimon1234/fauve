@@ -5,6 +5,7 @@ import { renderDuration } from "./render.ts";
 import { hookAtStart } from "./hook.ts";
 import { snapToTempo, TEMPLATE_BPM } from "./tempo.ts";
 import { lookChoice, type ReelLook } from "./looks.ts";
+import { toneFor } from "./shot-tone.ts";
 import { applySpeechCuts, spokenShot, type SpeechFacts } from "./speech.ts";
 import {
   cameraMoveSchema,
@@ -151,7 +152,7 @@ export const editorOutputSchemaLegacy = z.object({
     segments: z
       .array(
         z.union([
-          editPlanSegmentSchema.omit({ adjust: true, blur: true, photo: true, accent: true, ramp: true, jump: true, beside: true, sound: true }),
+          editPlanSegmentSchema.omit({ adjust: true, blur: true, photo: true, accent: true, ramp: true, jump: true, beside: true, sound: true, tone: true, keep_colour: true }),
           editPlanSceneSegmentSchema,
           editorMotionSegmentSchema,
         ]),
@@ -322,13 +323,23 @@ export function replacedAnimations(plan: EditPlan, previous: EditPlan | null): n
 /** The retouch and blur of each clip in the previous version, kept on the same clip in the new one. */
 export function carryRetouch(plan: EditPlan, previous: EditPlan | null): EditPlan {
   if (!previous) return plan;
-  const byClip = new Map(previous.segments.filter(isClipSegment).map((s) => [s.clip_id, { adjust: s.adjust, blur: s.blur, photo: s.photo }]));
+  const byClip = new Map(previous.segments.filter(isClipSegment).map((s) => [s.clip_id, { adjust: s.adjust, blur: s.blur, photo: s.photo, keep_colour: s.keep_colour }]));
+  // The light read on a passage (shot-tone.ts) stays with the same passage of the same clip: another is read again.
+  const tones = previous.segments.filter(isClipSegment).flatMap((s) => (s.tone ? [{ clip: s.clip_id, tone: s.tone }] : []));
   return {
     ...plan,
     segments: plan.segments.map((s) => {
       if (!isClipSegment(s)) return s;
       const kept = byClip.get(s.clip_id);
-      return kept ? { ...s, ...(kept.adjust ? { adjust: kept.adjust } : {}), ...(kept.blur ? { blur: kept.blur } : {}), ...(kept.photo ? { photo: kept.photo } : {}) } : s;
+      const tone = tones.find((t) => t.clip === s.clip_id && toneFor({ ...s, tone: t.tone }))?.tone;
+      return {
+        ...s,
+        ...(kept?.adjust ? { adjust: kept.adjust } : {}),
+        ...(kept?.blur ? { blur: kept.blur } : {}),
+        ...(kept?.photo ? { photo: kept.photo } : {}),
+        ...(kept?.keep_colour ? { keep_colour: true } : {}),
+        ...(tone && !s.tone ? { tone } : {}),
+      };
     }),
   };
 }

@@ -69,6 +69,8 @@ export type ComposeShot = ScenePhoto & {
   clear?: ClearMap;
   /** Its skyline, its vanishing point and its light, and how its camera moves, read before the render: SkylineAt, VanishingPoint and LightUnder read them. */
   read?: ShotReading;
+  /** The tone curve of its grade (Tone.tsx): LightUnder reads its light as the Reel shows it, corrected. */
+  toneCurve?: number[];
 };
 /** How the Reel moves a shot as it draws it, so what is read on its picture follows it (mirror of packages/agent/src/motion.ts). */
 export type ShotCamera = {
@@ -139,8 +141,11 @@ export type CameraMove = "none" | "in" | "out" | "left" | "right" | "punch";
 
 /** Footage that keeps playing under an animation (mirror of ReelUnder). */
 export type ReelUnder =
-  | { type: "clip"; src: string; startFrom: number; adjust?: Adjust; aspect?: number }
-  | { type: "image"; src: string; edit?: PhotoEdit };
+  | { type: "clip"; src: string; startFrom: number; adjust?: Adjust; aspect?: number; tone?: ShotGrade; asFilmed?: true }
+  | { type: "image"; src: string; edit?: PhotoEdit; tone?: ShotGrade; asFilmed?: true };
+
+/** A shot's grade (mirror of ShotGrade, packages/agent/src/shot-tone.ts): its colour matrix, tone curve and glow. */
+export type ShotGrade = { matrix: number[]; curve: number[]; glow: number };
 
 export type ReelProps = {
   template: MotionTemplate;
@@ -185,6 +190,9 @@ export type ReelProps = {
         near?: { src: string };
         /** Laid beside another shot on the same moment (a split screen's other half): only a composition draws it, the plain montage skips it. */
         beside?: true;
+        /** Its grade, on her footage only (Tone.tsx), and her wish to keep its colours as filmed. */
+        tone?: ShotGrade;
+        asFilmed?: true;
       }
     | {
         type: "image";
@@ -210,6 +218,9 @@ export type ReelProps = {
         ground?: { src: string; still?: boolean };
         /** Laid beside another shot on the same moment: only a composition draws it, the plain montage skips it. */
         beside?: true;
+        /** Its grade, on her footage only (Tone.tsx), and her wish to keep its colours as filmed. */
+        tone?: ShotGrade;
+        asFilmed?: true;
       }
     /** composed: an engine screen inside a composition that draws the whole picture, drawn only in its fallback. */
     | { type: "scene"; scene: Scene; startAt: number; durationInFrames: number; under?: ReelUnder; composed?: true }
@@ -288,6 +299,8 @@ export type ReelProps = {
   voice?: { src: string; from: number } | null;
   /** A look over the whole video (Looks.tsx): its grade over the footage, its texture under the texts. */
   look?: ReelLookDraw | null;
+  /** Her colours as filmed (finish.colour « off »): no grade of the engine on her footage. */
+  asFilmed?: true;
   /** The date a look prints, in its camera's format (« '26 10 29 », « 29 OCT. 2026 »). */
   stamp?: string;
   /**

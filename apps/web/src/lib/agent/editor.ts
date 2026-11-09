@@ -688,7 +688,10 @@ export async function designEdit(params: {
                     },
                     duration: s.duration,
                   }
-                : s,
+                : // The light the workshop read on a shot is the engine's (shot-tone.ts): not the editor's to read.
+                  "tone" in s
+                  ? { ...s, tone: undefined }
+                  : s,
             ),
             // Its animations over several shots, by their brief and span (a collage's composition named as such).
             layers: asWritten.layers?.map((l) => ({ brief: l.motion.brief, from: l.from, to: l.to, ...(l.compose ? { composition_du_reel: true } : {}) })),

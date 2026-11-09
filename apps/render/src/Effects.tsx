@@ -1,4 +1,5 @@
 import { useId, type CSSProperties, type ReactNode } from "react";
+import { tonedLight } from "./Tone";
 import { Easing, interpolate, random } from "remotion";
 import { affineOf, cameraAt, chooseClear, clearRoom, placeClear, readableMap, withCamera, type ClearMap, type ClearOptions } from "./clear";
 import type { Box, KitHooks } from "./Kit";
@@ -561,7 +562,8 @@ export function VanishingPoint(shot: ComposeShot | undefined, frame: number, lai
  */
 export function LightUnder(shot: ComposeShot | undefined, frame: number, laid?: Laid, box?: Box | null): { mean: number; high: number } | null {
   if (!shot?.read) return null;
-  return lightIn(shot.read, readPlace(shot, frame, laid), box, laid ?? { left: 0, top: 0, width: 1080, height: 1920 });
+  // Read on her file as filmed: its light as the Reel shows it, once brought to the Reel's light (Tone.tsx).
+  return tonedLight(lightIn(shot.read, readPlace(shot, frame, laid), box, laid ?? { left: 0, top: 0, width: 1080, height: 1920 }), shot.toneCurve);
 }
 
 /**

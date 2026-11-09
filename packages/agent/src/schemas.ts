@@ -6,6 +6,7 @@ import { styleSampleSchema } from "./moodboard.ts";
 import { voiceSettingSchema } from "./voice-over.ts";
 import { REEL_EFFECTS, reelLookSchema } from "./looks.ts";
 import { musicShapeSchema } from "./music-shape.ts";
+import { COLOUR_MODES, shotToneSchema } from "./shot-tone.ts";
 
 // Mirrors the Postgres enums in supabase/migrations.
 export const postStatusSchema = z.enum([
@@ -141,6 +142,13 @@ export const editPlanSegmentSchema = z.object({
    * never by the editor nor the browser.
    */
   sound: z.boolean().optional(),
+  /**
+   * Its light and colour as the render workshop read them on its passage (shot-tone.ts, tone_read.mjs), before its first
+   * render: every shot of the Reel is brought to the same light from them. Set by the engine, never by the editor.
+   */
+  tone: shotToneSchema.optional(),
+  /** She wants this shot's colours as filmed (Edith's set_finish colour « off » on its scene): no correction on it. */
+  keep_colour: z.boolean().optional(),
 });
 
 /**
@@ -168,6 +176,12 @@ export const reelFinishSchema = z.object({
   ramp: z.enum(["auto", "off"]).optional(),
   relief: z.enum(["auto", "off"]).optional(),
   steady: z.enum(["auto", "off"]).optional(),
+  /**
+   * Its colours (shot-tone.ts): auto, every shot brought to the same light and a light finish (highlights pulled, a
+   * small glow); natural, the shots matched without the finish (« couleurs naturelles »); off, as filmed (« sans
+   * retouche des couleurs »: no correction, no grade of the engine; a look she asked for stays).
+   */
+  colour: z.enum(COLOUR_MODES).optional(),
 });
 export type ReelFinish = z.infer<typeof reelFinishSchema>;
 
