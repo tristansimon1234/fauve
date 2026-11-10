@@ -143,11 +143,11 @@ export async function replaceEdithModel(studioId: string, postId: string, key: s
   return true;
 }
 
-/** Her files as the picker reads them: a video's summary, length and speech, a photo's reading. */
-async function pickFiles(mediaIds: string[]): Promise<HousePickFile[]> {
+/** Her files as the picker reads them: a video's summary, length and speech, a photo's reading (and their shape, for the ideas door). */
+export async function pickFiles(mediaIds: string[]): Promise<HousePickFile[]> {
   const db = supabaseAdmin();
   const [{ data: assets }, { data: analyses }] = await Promise.all([
-    db.from("media_assets").select("id, kind, duration, regions").in("id", mediaIds),
+    db.from("media_assets").select("id, kind, duration, regions, width, height").in("id", mediaIds),
     db.from("clip_analyses").select("media_id, analysis").in("media_id", mediaIds).order("created_at", { ascending: false }),
   ]);
   const read = new Map<string, Record<string, unknown>>();
@@ -155,16 +155,17 @@ async function pickFiles(mediaIds: string[]): Promise<HousePickFile[]> {
   return mediaIds.flatMap((id): HousePickFile[] => {
     const asset = (assets ?? []).find((a) => a.id === id);
     if (!asset) return [];
+    const aspect = typeof asset.width === "number" && typeof asset.height === "number" && asset.height > 0 ? { aspect: asset.width / asset.height } : {};
     if (asset.kind === "image") {
       const notes = (asset.regions as { detection?: { notes?: string } } | null)?.detection?.notes ?? "";
-      return [{ kind: "photo", shows: notes || "une photo" }];
+      return [{ kind: "photo", shows: notes || "une photo", ...aspect }];
     }
     if (asset.kind !== "video") return [];
     const a = read.get(id) ?? {};
     const shows = [a.summary, a.setting].filter((x): x is string => typeof x === "string" && x.trim().length > 0).join(" ; ");
     const transcript = typeof a.transcript === "string" ? a.transcript.trim() : "";
     const seconds = typeof a.duration === "number" ? a.duration : typeof asset.duration === "number" ? asset.duration : undefined;
-    return [{ kind: "video", ...(seconds ? { seconds } : {}), shows: shows || "une vidéo", ...(transcript.length > 20 ? { speaks: true } : {}) }];
+    return [{ kind: "video", ...(seconds ? { seconds } : {}), shows: shows || "une vidéo", ...(transcript.length > 20 ? { speaks: true } : {}), ...aspect }];
   });
 }
 
@@ -202,7 +203,7 @@ async function tasteOf(studioId: string, postId: string): Promise<HousePickTaste
 }
 
 /** The models of her last Reels (the latest first), not to pick again. */
-async function recentHouseKeys(studioId: string, postId: string): Promise<string[]> {
+export async function recentHouseKeys(studioId: string, postId: string): Promise<string[]> {
   const db = supabaseAdmin();
   const { data: posts } = await db
     .from("posts")
@@ -236,6 +237,8 @@ export async function ensureCopyCharter(input: { studioId: string; postId: strin
   const db = supabaseAdmin();
   const { data: post } = await db.from("posts").select("inspiration_id, edith_pick, copy_charter").eq("id", input.postId).eq("studio_id", input.studioId).maybeSingle();
   if (!post?.inspiration_id || post.inspiration_id === post.edith_pick) return;
-  const asked = OWN_LOOK_WORDS.test(herWords(input.brief ?? ""));
+  // An idea she chose among ours (« Regarde nos idées », idea_offers): one of Edith's models, always in her charter.
+  const idea = await db.from("idea_offers").select("id").eq("studio_id", input.studioId).eq("post_id", input.postId).not("chosen", "is", null).limit(1).maybeSingle();
+  const asked = Boolean(idea.data) || OWN_LOOK_WORDS.test(herWords(input.brief ?? ""));
   if (asked !== post.copy_charter) await db.from("posts").update({ copy_charter: asked }).eq("id", input.postId).eq("studio_id", input.studioId);
 }

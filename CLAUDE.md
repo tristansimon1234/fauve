@@ -267,7 +267,7 @@ Un fichier par sujet dans `docs/`, un paragraphe par fonction (ses fichiers, ses
 
 - `docs/edith.md` — Edith, l'assistant : Mascotte et humeurs ; Outils d'Edith, qui se fabriquent et se mettent à jour tout seuls ; Activité ; Relire et retoucher les textes ; Mode d'emploi ; Mémoire de Fauve ; Pas de planning imposé ; Consigne d'Edith courte ; Consigne d'Edith ; Conseiller, jamais obliger ; Conseils avant la conception d'un Reel (comment filmer, la forme de ses fichiers).
 - `docs/chat.md` — Le chat : Conversations ; Photos et vidéos dans le chat de l'app ; Panneau Fauve ; Boutons et cartes dans le chat ; Chat en direct ; Bulles en direct ; Chat fluide ; Canal ; Zone de dépôt dans le chat.
-- `docs/whatsapp.md` — WhatsApp (détails) : Une réponse que WhatsApp refuse ; WhatsApp est l'interface principale sur téléphone.
+- `docs/whatsapp.md` — WhatsApp (détails) : Une réponse que WhatsApp refuse ; WhatsApp est l’interface principale sur téléphone ; Les trois portes d’un nouveau Reel sur WhatsApp.
 - `docs/connexion.md` — Connexion : Connexion et liens ; Commencer et se connecter sur ordinateur sans SMS ni modèle Meta.
 - `docs/onboarding.md` — Onboarding : Premier Reel ; Étape Style de l'onboarding ; Accueil sur WhatsApp ; Onboarding ; Carte du rythme.
 

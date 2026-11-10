@@ -24,7 +24,9 @@ import { useRouter } from "next/navigation";
 import { createContext, useContext, useEffect, useId, useRef, useState, useTransition, type ReactNode } from "react";
 import { creationProgress, launchCreation, type CreationProgress, type LaunchResult } from "@/app/(app)/create-actions";
 import { FileStrip, MAX_FILE_BYTES, MAX_FILES, useChatUploads, type DraftFile } from "@/app/(app)/fauve/chat-uploads";
-import { copyReel, copyState, newPostOptions, proposePlan, type CopyState, type NewPostOptions } from "@/app/(app)/new-post-actions";
+import { copyReel, copyState, ideasFor, newPostOptions, pickIdea, proposePlan, type CopyState, type NewPostOptions } from "@/app/(app)/new-post-actions";
+import type { IdeaCard } from "@/lib/house-ideas";
+import { IdeaDoors, IdeaGrid, type Door } from "./idea-doors";
 import { useFauveDrawer } from "./fauve-drawer";
 import { publicEnv } from "@/lib/public-env";
 import { supabaseBrowser } from "@/lib/supabase/client";
@@ -38,7 +40,7 @@ export const NewPostHandOffContext = createContext<NewPostHandOff | null>(null);
 
 // « Nouvelle publication », in four steps (Tristan : « trop d'étapes », « écrans vides ») :
 // what to make (the type, and for a Reel a voice or just the music, on one screen), her photos and videos (her library or her phone), what she imagines or a Reel she
-// likes, then Edith's proposal: her request said back as one plan in points, with why
+// likes (for a Reel, three doors: « Fais-moi confiance », « Je sais ce que je veux », « Regarde nos idées »), then Edith's proposal: her request said back as one plan in points, with why
 // (« la demande bien reformulée, claire et précise, lisible »), which she takes or changes.
 // « C'est parti »: a Reel starts at once and the screen follows it (« Je m'en occupe »);
 // a carousel, a photo or a story goes on with Edith in the chat, who writes the texts.
@@ -195,6 +197,11 @@ function Create({
   const [copyChoice, setCopyChoice] = useState<"mine" | "copy" | null>(null);
   const [copyRead, setCopyRead] = useState<CopyState | null>(null);
   const [sheet, setSheet] = useState<"format" | "date" | "voice" | "nothing" | null>(null);
+  // A Reel's three doors (Tristan, 10 November): Edith chooses (the default), her idea, or one of our ideas.
+  const [door, setDoor] = useState<Door | null>(null);
+  const [ideaOffer, setIdeaOffer] = useState<{ ask: string; offerId: string; cards: IdeaCard[] } | { ask: string; error: string } | null>(null);
+  const [ideaPicked, setIdeaPicked] = useState<{ offerId: string; key: string; id: string; name: string; pitch: string } | null>(null);
+  const [ideaBusy, setIdeaBusy] = useState<string | null>(null);
   const [all, setAll] = useState(false);
   const [dragging, setDragging] = useState(false);
   const [pending, start] = useTransition();
@@ -245,7 +252,17 @@ function Create({
   const reading: CopyState | null = copyRead ?? (sent && model === sent.id ? (sent.lines.length ? { state: "read", name: sent.name, lines: sent.lines } : { state: "reading" }) : null);
   // A Reel that could not be read copies nothing: her own style, and the sheet says what to send instead.
   const usable = model && reading?.state !== "missed" ? model : null;
-  const copying = kind === "reel" && usable && (copyChoice ?? (sent ? "copy" : "mine")) === "copy" ? usable : null;
+  // Her door for a Reel: « Je sais ce que je veux » by default when she sent Edith a Reel to copy, else « Fais-moi confiance ».
+  const doorAt: Door = kind !== "reel" ? "know" : (door ?? (sent ? "know" : "trust"));
+  const pickedIdea = doorAt === "ideas" && ideaPicked && ideaOffer && "offerId" in ideaOffer && ideaOffer.offerId === ideaPicked.offerId ? ideaPicked : null;
+  const copying =
+    kind !== "reel" || doorAt === "trust"
+      ? null
+      : doorAt === "ideas"
+        ? (pickedIdea?.id ?? null)
+        : usable && (copyChoice ?? (sent ? "copy" : "mine")) === "copy"
+          ? usable
+          : null;
   // One of her own Reels kept as a model (« Garder comme modèle »): already read, never one shot.
   const models = options?.models ?? [];
   const pickModel = (m: (typeof models)[number]) => {
@@ -285,9 +302,11 @@ function Create({
   const [linkBusy, setLinkBusy] = useState(false);
   const [linkError, setLinkError] = useState<string | null>(null);
   // What she asks for: her own words, and the plan Edith said back for them (« La proposition »).
-  const finalIdea = idea.trim();
+  // Her words count only behind « Je sais ce que je veux » (and for the other formats).
+  const words = doorAt === "know" ? idea.trim() : "";
+  const finalIdea = words;
   // On « Ton idée », what she gave (her words, a Reel to copy, captures): nothing means « propose-moi ».
-  const gaveIdea = Boolean(idea.trim()) || Boolean(copying) || refShots.length > 0;
+  const gaveIdea = Boolean(words) || Boolean(copying) || refShots.length > 0;
 
   // One question per screen, in her order (Tristan: « un form avec stepper plutôt que tout dans une modale »);
   // what she imagines or a Reel she likes on its own step, before Edith's proposal (« dans une étape à part entière »).
@@ -297,7 +316,13 @@ function Create({
   const step = steps[at]!;
   const last = at === steps.length - 1;
   const canNext =
-    step === "what" ? kind !== "reel" || voiceAsked : step === "files" ? picked.length > 0 && !unfit && !sending && !broken : step === "idea" ? !refSending && !linkBusy : true;
+    step === "what"
+      ? kind !== "reel" || voiceAsked
+      : step === "files"
+        ? picked.length > 0 && !unfit && !sending && !broken
+        : step === "idea"
+          ? !refSending && !linkBusy && (doorAt !== "ideas" || Boolean(pickedIdea))
+          : true;
   const bodyRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     bodyRef.current?.scrollTo({ top: 0 });
@@ -311,7 +336,7 @@ function Create({
     picked.length && !sending && !broken
       ? JSON.stringify({
           kind,
-          ...(idea.trim() ? { idea: idea.trim().slice(0, 500) } : {}),
+          ...(words ? { idea: words.slice(0, 500) } : {}),
           files: picked.flatMap((k): ({ media: string } | { upload: { path: string; mime: string; video: boolean } })[] => {
             if (k.startsWith("m:")) return [{ media: k.slice(2) }];
             const f = drafts.get(k.slice(2));
@@ -322,7 +347,11 @@ function Create({
                 voice: soundOn ? "off" : chosenVoice,
                 ...(soundOn ? { sound: { title: soundOn.title, ...(soundOn.artist ? { artist: soundOn.artist } : {}) } } : {}),
                 copying: Boolean(copying),
-                ...(copying && reading?.state === "read" ? { copy: { name: reading.name, lines: reading.lines } } : {}),
+                ...(pickedIdea
+                  ? { copy: { name: pickedIdea.name, lines: pickedIdea.pitch ? [pickedIdea.pitch] : [] } }
+                  : copying && reading?.state === "read"
+                    ? { copy: { name: reading.name, lines: reading.lines } }
+                    : {}),
               }
             : {}),
         })
@@ -349,6 +378,38 @@ function Create({
       live = false;
     };
   }, [settledAsk]);
+
+  // « Regarde nos idées »: 6 to 8 ideas for the files she picked, asked once for these files (again when they change).
+  const ideasAsk =
+    doorAt === "ideas" && picked.length && !sending && !broken
+      ? JSON.stringify(
+          picked.flatMap((k): ({ media: string } | { upload: { video: boolean } })[] => {
+            if (k.startsWith("m:")) return [{ media: k.slice(2) }];
+            const f = drafts.get(k.slice(2));
+            return f ? [{ upload: { video: f.video } }] : [];
+          }),
+        )
+      : null;
+  useEffect(() => {
+    if (!ideasAsk || ideaOffer?.ask === ideasAsk) return;
+    let live = true;
+    ideasFor(JSON.parse(ideasAsk))
+      .then((r) => live && setIdeaOffer(r.ok ? { ask: ideasAsk, offerId: r.offerId, cards: r.cards } : { ask: ideasAsk, error: r.error }))
+      .catch(() => live && setIdeaOffer({ ask: ideasAsk, error: "Les idées ne s’affichent pas pour l’instant. Réessaie dans un instant." }));
+    return () => {
+      live = false;
+    };
+  }, [ideasAsk, ideaOffer?.ask]);
+  const ideasShown = ideasAsk && ideaOffer?.ask === ideasAsk ? ideaOffer : null;
+  const chooseIdea = (offerId: string, card: IdeaCard) => {
+    if (ideaBusy) return;
+    setIdeaBusy(card.key);
+    setError(null);
+    pickIdea(offerId, card.key)
+      .then((r) => (r.ok ? setIdeaPicked({ offerId, key: card.key, id: r.id, name: card.name, pitch: card.pitch }) : setError(r.error)))
+      .catch(() => setError("Je n’arrive pas à prendre cette idée pour l’instant. Réessaie dans un instant."))
+      .finally(() => setIdeaBusy(null));
+  };
 
   const followGiven = (id: string) => {
     setGiven(id);
@@ -409,6 +470,7 @@ function Create({
         ...(kind === "reel" && soundOn ? { sound: { link: soundOn.link, title: soundOn.title, artist: soundOn.artist ?? undefined, audioId: soundOn.audioId ?? undefined } } : {}),
         platforms: where.filter((p): p is "instagram" | "tiktok" => p === "instagram" || p === "tiktok"),
         copy: copying ?? false,
+        ...(pickedIdea ? { ideaOffer: pickedIdea.offerId } : {}),
         refs: refShots.map((f) => ({ path: f.path!, mime: f.file.type, size: f.file.size })),
       }).catch(
         (): LaunchResult => ({ ok: false, error: "Ça n’est pas parti. Réessaie dans un instant." }),
@@ -689,14 +751,35 @@ function Create({
         </section>
         )}
 
-        {step === "idea" && (
+        {step === "idea" && kind === "reel" && (
+        <section className="flex flex-col gap-2.5">
+          <h3 className="text-[17px] font-extrabold tracking-[-0.01em]">Comment tu veux ce Reel ?</h3>
+          <IdeaDoors value={doorAt} ideas={Boolean(options?.houseIdeas)} onPick={setDoor} />
+          {doorAt === "ideas" && (
+            <div className="mt-2 flex flex-col gap-2.5">
+              <p className="text-[13.5px] leading-snug text-muted">Des idées de forme choisies pour ton métier et tes fichiers. Ton Reel est fait avec tes images, ta charte et ta musique.</p>
+              {!ideasShown ? (
+                <p className="flex items-center gap-2 text-[13.5px] text-muted">
+                  <Spinner /> Je choisis des idées pour tes fichiers…
+                </p>
+              ) : "error" in ideasShown ? (
+                <p className="text-[13.5px] leading-snug text-danger">{ideasShown.error}</p>
+              ) : (
+                <IdeaGrid cards={ideasShown.cards} chosen={pickedIdea?.key ?? null} busy={ideaBusy} onPick={(card) => chooseIdea(ideasShown.offerId, card)} />
+              )}
+            </div>
+          )}
+        </section>
+        )}
+
+        {step === "idea" && (kind !== "reel" || doorAt === "know") && (
         <section className="flex flex-col gap-2.5">
           <label htmlFor={`${titleId}-idea`} className="text-[17px] font-extrabold tracking-[-0.01em]">
             {imagineQuestion(kind)}
           </label>
           <p className="-mt-1 text-[13.5px] leading-snug text-muted">
             {kind === "reel"
-              ? "Par quoi commencer, comment finir, ce que les gens doivent faire. Ou colle le lien d’un Reel que tu aimes. Rien en tête ? Passe, je te propose des idées."
+              ? "Par quoi commencer, comment finir, ce que les gens doivent faire. Ou colle le lien d’un Reel que tu aimes."
               : "Par quoi commencer, comment finir, ce que les gens doivent faire. Rien en tête ? Passe, je te propose des idées."}
           </p>
           <textarea
@@ -832,11 +915,11 @@ function Create({
             <Mascot size={46} mood={proposing ? "thinking" : "happy"} still />
             <p aria-live="polite" className="bg-soft px-[15px] py-3 text-[15.5px] leading-[1.4] font-medium">
               {proposing
-                ? idea.trim()
+                ? words
                   ? "Je relis ta demande et je regarde tes fichiers…"
                   : "Je regarde tes photos et vidéos…"
                 : plan
-                  ? idea.trim()
+                  ? words
                     ? "Voilà ce que je vais faire, d’après ta demande."
                     : "Voilà ce que je te propose."
                   : "Je n’ai pas pu préparer mon plan : je partirai de ta demande."}
@@ -851,8 +934,8 @@ function Create({
             </div>
           ) : plan ? (
             <PlanCard plan={plan} />
-          ) : idea.trim() ? (
-            <p className="bg-soft px-4 py-3 text-[14.5px] leading-snug">{idea.trim()}</p>
+          ) : words ? (
+            <p className="bg-soft px-4 py-3 text-[14.5px] leading-snug">{words}</p>
           ) : null}
           {!proposing && (
             <button type="button" onClick={() => setStepAt(steps.indexOf("idea"))} className="self-start py-1 text-[14px] font-bold text-violet">
@@ -892,7 +975,7 @@ function Create({
           </button>
         ) : (
           <button type="button" onClick={next} disabled={!canNext} className="btn btn-primary h-[54px] text-[17px] font-extrabold disabled:bg-line disabled:text-muted">
-            {step === "idea" && !gaveIdea ? "Passer, propose-moi des idées" : "Suivant"}
+            {step === "idea" && kind !== "reel" && !gaveIdea ? "Passer, propose-moi des idées" : "Suivant"}
           </button>
         )}
         {step === "files" && !picked.length ? (

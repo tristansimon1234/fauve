@@ -29,6 +29,7 @@ import { env } from "@/lib/env";
 import { queueWait } from "@/lib/montage-queue";
 import { startMontage } from "@/lib/montage-start";
 import { isFirstReel } from "@/lib/onboarding";
+import { linkOfferPost } from "@/lib/house-ideas";
 import { followSound } from "@/lib/sound-follow";
 import { pendingSteal } from "@/lib/steal";
 import { getStudioContext } from "@/lib/studio";
@@ -60,6 +61,8 @@ const launchSchema = z.object({
   platforms: z.array(z.enum(["instagram", "tiktok"])).min(1).max(2).optional(),
   /** A Reel made like another (« Steal »): the one she chose on this screen (its inspiration), or true for the one she sent Edith, false for her own style. */
   copy: z.union([z.uuid(), z.boolean()]).default(true),
+  /** The ideas she chose one from (« Regarde nos idées », idea_offers): its post is kept on it, and dressed in her charter. */
+  ideaOffer: z.uuid().optional(),
   /** A carousel or a post she likes, as captures or a screen recording of it (Instagram does not open a carousel's link to us): its form is followed, never its words. */
   refs: z.array(uploadSchema).max(4).default([]),
   /** A Reel cut on a sound she picked on the page Sons: the link of a Reel that uses it (she adds it from there in Instagram), its name. */
@@ -166,6 +169,8 @@ export async function launchCreation(input: LaunchInput): Promise<LaunchResult> 
 
   const created = await createPost({ kind, date, time, intention: idea || plan?.title || "", mediaIds, inspirationId: copying?.id });
   if (!created.ok) return created;
+  // Made in one of our ideas she chose: the offer keeps its post (before the montage reads it, for her charter).
+  if (kind === "reel" && copying && parsed.data.ideaOffer) await linkOfferPost(studioId, parsed.data.ideaOffer, created.id);
   // Her choices, before anything is made: where it goes, and the voice over of a Reel.
   const where = platforms ? [...new Set(platforms.filter((p) => p === "instagram" || kind === "reel"))] : [];
   // One of Edith's voices, or her own clone.
