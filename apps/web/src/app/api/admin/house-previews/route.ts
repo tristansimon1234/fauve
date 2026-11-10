@@ -14,6 +14,28 @@ export async function POST(request: Request) {
   if (!cronAuthorized(request)) return new Response("unauthorized", { status: 401 });
   const params = new URL(request.url).searchParams;
   const storage = supabaseAdmin().storage.from("media");
+  // The bench Reel of each model (its current version's, else its latest), as signed download links (1 h): the
+  // previews are cut from them again in full-screen quality (Tristan, 10 November: « pourquoi la qualité est naze »,
+  // the first ones were 2 s at 360 × 640 for small cards).
+  if (params.get("benches") === "1") {
+    const { MONTAGE_SKILLS } = await import("@fauve/agent/skills");
+    const { data, error } = await supabaseAdmin().from("skill_benches").select("key, version, path, created_at").order("created_at", { ascending: false });
+    if (error) return Response.json({ error: error.message }, { status: 500 });
+    const best = new Map<string, string>();
+    for (const row of data ?? []) {
+      const key = row.key as string;
+      const current = MONTAGE_SKILLS[key]?.version === Number(row.version);
+      if (!best.has(key) || current) best.set(key, row.path as string);
+      if (current) best.set(`${key}#current`, row.path as string);
+    }
+    const chosen = HOUSE_MODELS.flatMap((m) => {
+      const path = best.get(`${m.key}#current`) ?? best.get(m.key);
+      return path ? [[m.key, path] as const] : [];
+    });
+    const { data: signed } = await storage.createSignedUrls(chosen.map(([, path]) => path), 3600);
+    const url = new Map((signed ?? []).flatMap((s) => (s.path && s.signedUrl ? [[s.path, s.signedUrl] as const] : [])));
+    return Response.json({ ok: true, benches: Object.fromEntries(chosen.flatMap(([key, path]) => (url.get(path) ? [[key, url.get(path)]] : []))) });
+  }
   if (params.get("list") === "1") {
     const { data, error } = await storage.list(IDEA_PREVIEW_DIR, { limit: 500 });
     if (error) return Response.json({ error: error.message }, { status: 500 });
