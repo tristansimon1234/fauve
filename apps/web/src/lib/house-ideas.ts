@@ -41,7 +41,7 @@ async function keptPreviews(): Promise<string[]> {
 async function signedPreviews(keys: string[]): Promise<Record<string, string>> {
   "use cache";
   cacheLife({ stale: 1800, revalidate: 1800, expire: 3600 });
-  const paths = keys.flatMap((k) => [ideaPreviewPath(k, "mp4"), ideaPreviewPath(k, "jpg")]);
+  const paths = keys.flatMap((k) => [ideaPreviewPath(k, "mp4"), ideaPreviewPath(k, "hd"), ideaPreviewPath(k, "jpg")]);
   const { data, error } = await supabaseAdmin().storage.from("media").createSignedUrls(paths, 7200);
   if (error) throw new Error(error.message);
   return Object.fromEntries((data ?? []).flatMap((item) => (item.path && item.signedUrl && !item.error ? [[item.path, item.signedUrl]] : [])));
@@ -62,7 +62,7 @@ export async function ideasPossible(studioId: string): Promise<boolean> {
 }
 
 /** One idea as she sees it: its name, what it does, its loop and its poster. */
-export type IdeaCard = { key: string; name: string; pitch: string; video: string; poster: string };
+export type IdeaCard = { key: string; name: string; pitch: string; video: string; poster: string; videoHd?: string };
 
 /** The cards of these ideas, in order (one whose preview could not be signed is left out). */
 export async function ideaCards(keys: string[]): Promise<IdeaCard[]> {
@@ -75,7 +75,8 @@ export async function ideaCards(keys: string[]): Promise<IdeaCard[]> {
     const name = ideaName(key);
     const video = signed[ideaPreviewPath(key, "mp4")];
     const poster = signed[ideaPreviewPath(key, "jpg")];
-    return name && video && poster ? [{ key, name, pitch: ideaPitch(key) ?? "", video, poster }] : [];
+    const videoHd = signed[ideaPreviewPath(key, "hd")];
+    return name && video && poster ? [{ key, name, pitch: ideaPitch(key) ?? "", video, poster, ...(videoHd ? { videoHd } : {}) }] : [];
   });
 }
 

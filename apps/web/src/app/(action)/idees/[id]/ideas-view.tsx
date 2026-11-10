@@ -22,35 +22,19 @@ export function IdeasView({ offerId, cards, files, launched }: { offerId: string
   const list = useRef<HTMLDivElement>(null);
 
   const [onScreen, setOnScreen] = useState(0);
-  // The idea on screen plays, the others rest; the next one is loaded ahead (six to eight at once would stall a phone).
+  // Which idea is on screen; each one plays or rests by itself (IdeaVideo).
   useEffect(() => {
     const root = list.current;
     if (!root || typeof IntersectionObserver === "undefined") return;
     const seen = new IntersectionObserver(
       (entries) => {
-        for (const e of entries) {
-          const at = Number((e.target as HTMLElement).dataset.at);
-          const video = (e.target as HTMLElement).querySelector("video");
-          if (e.isIntersecting) {
-            setOnScreen(at);
-            if (video) {
-              video.muted = true;
-              void video.play().catch(() => {});
-            }
-          } else video?.pause();
-        }
+        for (const e of entries) if (e.isIntersecting) setOnScreen(Number((e.target as HTMLElement).dataset.at));
       },
       { root, threshold: 0.6 },
     );
     root.querySelectorAll("[data-at]").forEach((section) => seen.observe(section));
     return () => seen.disconnect();
   }, [cards]);
-
-  const toggle = (video: HTMLVideoElement | null) => {
-    if (!video) return;
-    if (video.paused) void video.play().catch(() => {});
-    else video.pause();
-  };
 
   const go = (card: IdeaCard) =>
     start(async () => {
@@ -94,20 +78,9 @@ export function IdeasView({ offerId, cards, files, launched }: { offerId: string
     <main className="fixed inset-0 bg-black text-white">
       <div ref={list} className="h-dvh snap-y snap-mandatory overflow-y-scroll overscroll-contain [scrollbar-width:none]">
         {cards.map((card, i) => {
-          const near = Math.abs(i - onScreen) <= 1;
           return (
             <section key={card.key} data-at={i} className="relative h-dvh w-full snap-start snap-always overflow-hidden">
-              <video
-                src={near ? card.video : undefined}
-                poster={card.poster}
-                muted
-                loop
-                playsInline
-                autoPlay={i === 0}
-                preload={near ? "auto" : "none"}
-                onClick={(e) => toggle(e.currentTarget)}
-                className="absolute inset-0 size-full object-cover"
-              />
+              <IdeaVideo card={card} at={i} onScreen={onScreen} />
               <div className="pointer-events-none absolute inset-x-0 top-0 flex items-center justify-between gap-3 bg-gradient-to-b from-black/60 to-transparent px-4 pt-[max(1rem,env(safe-area-inset-top))] pb-10">
                 <span className="flex items-center gap-2">
                   <Mascot size={30} mood="happy" still />
@@ -174,5 +147,77 @@ export function IdeasView({ offerId, cards, files, launched }: { offerId: string
         </div>
       )}
     </main>
+  );
+}
+
+/**
+ * One idea's loop, as Instagram does it (Tristan, 10 November: « comment fait Insta pour avoir en bonne qualité ? »,
+ * « il faut charger plusieurs vidéos à la fois non ? »): the light loop of this idea and of the three after it loads
+ * ahead and starts at once; the HD loop of the one on screen and the next loads behind it and takes over, at the
+ * same moment of the loop, as soon as it can play through. Only the idea on screen plays; a tap pauses it.
+ */
+function IdeaVideo({ card, at, onScreen }: { card: IdeaCard; at: number; onScreen: number }) {
+  const light = useRef<HTMLVideoElement>(null);
+  const hd = useRef<HTMLVideoElement>(null);
+  const [hdReady, setHdReady] = useState(false);
+  const active = at === onScreen;
+  const loadLight = at >= onScreen - 1 && at <= onScreen + 3;
+  const loadHd = Boolean(card.videoHd) && at >= onScreen && at <= onScreen + 1;
+  const showHd = hdReady && Boolean(card.videoHd);
+
+  useEffect(() => {
+    const l = light.current;
+    const h = hd.current;
+    if (!active) {
+      l?.pause();
+      h?.pause();
+      return;
+    }
+    if (showHd && h) {
+      if (l && l.duration && h.duration) h.currentTime = l.currentTime % h.duration;
+      h.muted = true;
+      void h.play().catch(() => {});
+      l?.pause();
+    } else if (l) {
+      l.muted = true;
+      void l.play().catch(() => {});
+    }
+  }, [active, showHd]);
+
+  const toggle = () => {
+    const v = showHd ? hd.current : light.current;
+    if (!v) return;
+    if (v.paused) void v.play().catch(() => {});
+    else v.pause();
+  };
+
+  return (
+    <>
+      <video
+        ref={light}
+        src={loadLight ? card.video : undefined}
+        poster={card.poster}
+        muted
+        loop
+        playsInline
+        autoPlay={at === 0}
+        preload={loadLight ? "auto" : "none"}
+        onClick={toggle}
+        className="absolute inset-0 size-full object-cover"
+      />
+      {card.videoHd && (loadHd || hdReady) && (
+        <video
+          ref={hd}
+          src={card.videoHd}
+          muted
+          loop
+          playsInline
+          preload="auto"
+          onCanPlayThrough={() => setHdReady(true)}
+          onClick={toggle}
+          className={`absolute inset-0 size-full object-cover transition-opacity duration-300 ${showHd ? "opacity-100" : "pointer-events-none opacity-0"}`}
+        />
+      )}
+    </>
   );
 }

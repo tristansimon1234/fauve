@@ -16,7 +16,8 @@ export const IDEAS_FLOOR = 3;
 
 /** Where a model's preview is kept (bucket media; never under a studio's folder, never a media_asset: retention never sees it). */
 export const IDEA_PREVIEW_DIR = "house/previews";
-export const ideaPreviewPath = (key: string, ext: "mp4" | "jpg") => `${IDEA_PREVIEW_DIR}/${key}.${ext}`;
+/** A model's preview: its light loop (mp4, to start at once), its HD loop (hd, swapped in once loaded) and its poster (jpg). */
+export const ideaPreviewPath = (key: string, ext: "mp4" | "jpg" | "hd") => `${IDEA_PREVIEW_DIR}/${key}${ext === "hd" ? "-hd.mp4" : `.${ext}`}`;
 
 /** The three doors of a new Reel, as buttons (WhatsApp's are 20 characters at most: « J'ai mon idée » there). */
 export const IDEA_DOORS = { trust: "Fais-moi confiance", know: "Je sais ce que je veux", ideas: "Regarde nos idées" } as const;

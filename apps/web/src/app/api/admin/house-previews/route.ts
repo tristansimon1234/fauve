@@ -46,7 +46,7 @@ export async function POST(request: Request) {
   const key = params.get("key") ?? "";
   if (!HOUSE_MODELS.some((m) => m.key === key)) return Response.json({ error: `modèle inconnu : ${key}` }, { status: 400 });
   const ext = params.get("ext");
-  if (ext !== "mp4" && ext !== "jpg") return Response.json({ error: "ext=mp4 ou ext=jpg" }, { status: 400 });
+  if (ext !== "mp4" && ext !== "jpg" && ext !== "hd") return Response.json({ error: "ext=mp4, ext=hd ou ext=jpg" }, { status: 400 });
   const path = ideaPreviewPath(key, ext);
   if (params.get("drop") === "1") {
     const { error } = await storage.remove([path]);
