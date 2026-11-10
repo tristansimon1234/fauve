@@ -157,6 +157,30 @@ export async function sendVideo(toWaId: string, link: string, caption?: string):
   return res.messages[0]?.id;
 }
 
+/**
+ * Edith's own contact card (Tristan, 10 November: without the blue tick, WhatsApp shows the number, not « Edith », in
+ * her chat list until she saves the contact): one touch on « Ajouter » and Edith is in her contacts under his name.
+ * `number`: digits with country code (NEXT_PUBLIC_FAUVE_WHATSAPP_NUMBER).
+ */
+export async function sendContactCard(toWaId: string, number: string, site: string): Promise<string | undefined> {
+  const digits = number.replace(/\D/g, "");
+  if (!digits) return undefined;
+  const res = await sendMessage({
+    recipient_type: "individual",
+    to: toWaId,
+    type: "contacts",
+    contacts: [
+      {
+        name: { formatted_name: "Edith", first_name: "Edith" },
+        org: { company: "Edith" },
+        phones: [{ phone: `+${digits}`, type: "WORK", wa_id: digits }],
+        urls: [{ url: site, type: "WORK" }],
+      },
+    ],
+  });
+  return res.messages[0]?.id;
+}
+
 /** Sends an image by link (JPEG or PNG, max 5 MB) with a caption (max 1024 chars). */
 export async function sendImage(toWaId: string, link: string, caption?: string): Promise<string | undefined> {
   const res = await sendMessage({

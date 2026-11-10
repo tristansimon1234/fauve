@@ -22,7 +22,9 @@ import { withSlot } from "@/lib/work-slots";
 import { runningJobs } from "@/lib/studio-jobs";
 import { feedbackFromMessage } from "@/lib/feedback";
 import { refreshOutdatedReading } from "@/lib/steal";
-import { downloadMedia, markReadAndTyping, sendLinkButton, sendReaction, sendReply, sendText, sendVideo } from "./client";
+import { publicEnv } from "@/lib/public-env";
+import { SITE_URL } from "@/lib/site";
+import { downloadMedia, markReadAndTyping, sendContactCard, sendLinkButton, sendReaction, sendReply, sendText, sendVideo } from "./client";
 import { mediaOf, textOf, toE164, type InboundMessage } from "./schema";
 
 // Several messages often arrive together (a caption + 5 clips). We wait briefly and
@@ -342,6 +344,23 @@ async function welcomeIfNew(studioId: string, phone: string, message: InboundMes
     payload: { reply_to: message.id, kind: "welcome", ...(sent.video ? { video } : {}), ...(sent.error ? { undelivered: sent.error } : {}) },
   });
   if (terms && sent.id) await markTermsShown(studioId).catch((e) => console.warn("terms not marked shown", e));
+  // Right after the welcome, Edith's contact card, so his name shows in her chats instead of the number (no blue tick yet).
+  if (sent.id) {
+    const card = await sendContactCard(message.from, publicEnv.fauveWhatsAppNumber, SITE_URL).catch((e: unknown) => {
+      console.warn("whatsapp: contact card not sent", e);
+      return undefined;
+    });
+    if (card)
+      await db.from("whatsapp_messages").insert({
+        studio_id: studioId,
+        wa_message_id: card,
+        direction: "outbound",
+        phone_e164: phone,
+        type: "contacts",
+        body: "Edith (fiche contact)",
+        payload: { kind: "contact_card" },
+      });
+  }
   return enough ? "enough" : "sent";
 }
 
