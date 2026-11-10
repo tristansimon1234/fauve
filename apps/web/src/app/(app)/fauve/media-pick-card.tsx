@@ -1,5 +1,6 @@
 "use client";
 
+import { pickedLine } from "@fauve/agent";
 import { useEffect, useRef, useState } from "react";
 import { CheckIcon, PlayIcon, UploadIcon } from "@/components/icons";
 import { libraryForPicker, type LibraryItem } from "../new-post-actions";
@@ -37,8 +38,7 @@ export function MediaPickCard({
 
   const toggle = (id: string) => setChosen((c) => (c.includes(id) ? c.filter((x) => x !== id) : c.length >= 10 ? c : [...c, id]));
   const send = () => {
-    const n = chosen.length;
-    onPick(`Je prends ${n === 1 ? "celle-ci" : `ces ${n}`} dans la médiathèque, dans cet ordre (media_id : ${chosen.join(", ")}).`);
+    onPick(pickedLine(chosen));
   };
 
   return (

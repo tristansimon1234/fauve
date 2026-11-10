@@ -62,6 +62,8 @@ import { soundPageLink,
   planMediaIds,
   exchangeFiles,
   ideaDoors,
+  doorsReady,
+  pickButton,
   planShown,
   isClipSegment,
   MAX_MONTAGE_FILES,
@@ -2124,7 +2126,11 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
       // In the app, a step with its own card (site, style, rhythm) is answered on the card:
       // never answer buttons beside it, which would show the same choice twice.
       let card = ctx.waId ? undefined : step_card;
-      // A new Reel without a clear request: the three ways to make it (the ideas one when enough play for her).
+      // A new Reel without a clear request: the three ways to make it (the ideas one when enough play for her), once
+      // her files of this Reel are known (doorsReady).
+      if (doors && !kept && !doorsReady(ctx.exchange ?? [])) {
+        return "Pas encore ces boutons : il te faut d'abord ses fichiers pour ce Reel. Rappelle reply_with avec pick_media (sa médiathèque à cocher, et l'ajout depuis son téléphone), ou upload si elle n'a rien, avec une phrase courte qui lui demande de les choisir ; l'idée vient après.";
+      }
       const doorButtons = doors && !kept ? ideaDoors(ctx.waId ? "whatsapp" : "app", await ideasPossible(studioId).catch(() => false)) : undefined;
       let answers = doorButtons ?? options ?? (kept ? [...PLAN_BUTTONS] : undefined);
       if (!ctx.waId && (answers?.length || card)) {
@@ -2142,13 +2148,19 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
       ctx.extras.plan_voice = planVoice;
       ctx.extras.posts = own.length ? own : undefined;
       ctx.extras.grid = grid || undefined;
-      // The drop zone is the app's; on WhatsApp, files asked for become her upload link under the message (full quality).
-      ctx.extras.upload = ctx.waId ? (upload ?? pick_media) : upload;
+      // The drop zone and the picker are the app's; on WhatsApp, her médiathèque is a page of her phone behind a button
+      // (her pick comes back here as her message) and files asked for are her upload link (full quality).
+      ctx.extras.upload = upload;
       ctx.extras.pick_media = ctx.waId ? undefined : pick_media;
+      if (ctx.waId && pick_media) ctx.extras.link = pickButton(pick_media);
       if (kept) return "ok : ton plan est écrit sous ta phrase, avec ses boutons ; ne le réécris pas.";
       const shown = doorButtons
         ? `ok : ${doorButtons.map((b) => `« ${b} »`).join(", ")} sous ton message. « ${doorButtons[0]} » : ton plan pour ses fichiers ; « ${doorButtons[1]} » : ce qu'elle imagine, ou un Reel qu'elle aime${doorButtons[2] ? ` ; « ${doorButtons[2]} » : get_page_link idees avec ses fichiers` : ""}.`
-        : ctx.waId && (upload ?? pick_media) ? "ok : son lien de dépôt (pleine qualité) est ajouté sous ton message ; n'écris aucun lien." : "ok : affiché sous ton message.";
+        : ctx.waId && pick_media
+          ? "ok : le bouton « Choisir mes fichiers » sous ton message ouvre sa médiathèque à cocher ; n'écris aucun lien, son choix revient ici."
+          : ctx.waId && upload
+            ? "ok : son lien de dépôt (pleine qualité) est ajouté sous ton message ; n'écris aucun lien."
+            : "ok : affiché sous ton message.";
       // Called before a word was written, the model was asked again and wrote « Voilà, j'attends ton choix. » or
       // « Voilà, j'ai mis les boutons juste en dessous. » as if its question had been sent: only what it writes
       // reaches her, never its thoughts. The loop knows whether anything was written: when nothing was, it says so plainly.

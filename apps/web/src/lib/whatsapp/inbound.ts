@@ -1,5 +1,5 @@
 import "server-only";
-import { ackFor, awaitsAnswer, echoFor, emojiOnly, HD_TIP, INTRO_VIDEO, isChaser, justHello, mp4Video, onboardingStepOf, replyExtrasSchema, WHATSAPP_WELCOME, type Reaction } from "@fauve/agent";
+import { ackFor, awaitsAnswer, echoFor, emojiOnly, HD_TIP, INTRO_VIDEO, isChaser, justHello, mp4Video, onboardingStepOf, replyExtrasSchema, WHATSAPP_WELCOME, whatsappButton, type Reaction } from "@fauve/agent";
 import { createLoginLink } from "@/lib/auth/login-link";
 import { answerPairing, claimPairing, PAIRING_YES, PAIRING_NO } from "@/lib/auth/pairing";
 import { TERMS_LINE } from "@/lib/legal";
@@ -456,15 +456,9 @@ async function answerOnWhatsApp({ studioId, memberId, waId, phone, replyTo, note
     // (none for a montage already launched).
     const buttons = quote ? await quoteButtons(studioId, quote).catch(() => []) : [];
     const options = buttons.length ? buttons : result.extras.options;
-    // Cards are app-only: on WhatsApp, a page made for her phone behind a button (no long link in her chat).
-    // Files asked for (a drop zone or the library in the app): her own upload link, in full quality (WhatsApp compresses videos).
-    const button =
-      result.extras.link ??
-      ((result.extras.upload && videos.quality !== "full") || result.extras.pick_media
-        ? { path: "/depot", label: "Envoyer mes fichiers", purpose: "upload" as const }
-        : posts?.length === 1
-          ? { path: `/v/${posts[0]}`, label: "Voir la publication", purpose: "open_post" as const }
-          : null);
+    // Cards are app-only: on WhatsApp, a page made for her phone behind a button (no long link in her chat):
+    // her médiathèque to pick from, her upload link in full quality (WhatsApp compresses videos), a publication.
+    const button = whatsappButton(result.extras, videos.quality);
     const url = button ? await createLoginLink(phone, button.path, button.purpose).catch((e: unknown) => void console.warn("button link failed", e)) : undefined;
     // Several posts: their pages, in text under the message.
     const links = [
