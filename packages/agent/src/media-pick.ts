@@ -22,9 +22,20 @@ type PageButton = NonNullable<ReplyExtras["link"]>;
 export const pickButton = (kind: PickKind): PageButton => ({ path: kind === "any" ? "/choisir" : `/choisir?type=${kind}`, label: "Choisir mes fichiers", purpose: "pick" });
 
 /** Her pick, as her message in the conversation: the same words from the app's card and from her phone's page. */
-export function pickedLine(ids: string[]): string {
+export function pickedLine(ids: string[], seen: Record<string, string> = {}): string {
   const n = ids.length;
-  return `Je prends ${n === 1 ? "celle-ci" : `ces ${n}`} dans la médiathèque, dans cet ordre (media_id : ${ids.join(", ")}).`;
+  // What each one shows, when known (Tristan, 10 November: « j'ai sélectionné 11 vidéos, il m'a repris des anciennes
+  // vidéos dans son plan »: with ids only, Edith wrote his plan from files listed earlier in the conversation).
+  const shown = ids.map((id, i) => (seen[id] ? `${i + 1}. ${seen[id]}` : "")).filter(Boolean);
+  const what = shown.length ? ` : ${shown.join(" ; ")}` : "";
+  return `Je prends ${n === 1 ? "celle-ci" : `ces ${n}`} dans la médiathèque, dans cet ordre${what} (media_id : ${ids.join(", ")}).`;
+}
+
+/** A file's short label for her pick: the first clause of what its reading saw, 70 characters at most. */
+export function pickLabel(summary: string | null | undefined): string {
+  const first = (summary ?? "").replace(/\s+/g, " ").trim().split(/(?<=[.!?])\s|,\s(?=avec|où|qui|tandis)/)[0] ?? "";
+  const cut = first.length > 70 ? `${first.slice(0, 69).replace(/\s+\S*$/, "")}…` : first;
+  return cut.replace(/[.;]+$/, "");
 }
 
 /** Her pick kept as she made it: in her order, each file once, only hers, MAX_PICK at most. */

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { APP_GUIDES } from "./app-guide.ts";
-import { MAX_PICK, doorsReady, ownPick, pickButton, pickedLine, whatsappButton } from "./media-pick.ts";
+import { MAX_PICK, doorsReady, ownPick, pickButton, pickedLine, pickLabel, whatsappButton } from "./media-pick.ts";
 import { FAUVE_SYSTEM_PROMPT } from "./prompts.ts";
 import { exchangeFiles, type ExchangeRow } from "./request-log.ts";
 import { replyExtrasSchema } from "./schemas.ts";
@@ -36,6 +36,12 @@ test("on WhatsApp, her médiathèque is a page behind a button; her upload link 
 test("her pick comes back as her message, in her order, only her files, and becomes the files of her Reel", () => {
   assert.equal(pickedLine([A]), `Je prends celle-ci dans la médiathèque, dans cet ordre (media_id : ${A}).`);
   assert.equal(pickedLine([B, A]), `Je prends ces 2 dans la médiathèque, dans cet ordre (media_id : ${B}, ${A}).`);
+  // What each one shows, when known: Edith plans with the right files, never ones listed earlier in the conversation.
+  assert.equal(
+    pickedLine([B, A], { [B]: "La Seine au crépuscule" }),
+    `Je prends ces 2 dans la médiathèque, dans cet ordre : 1. La Seine au crépuscule (media_id : ${B}, ${A}).`,
+  );
+  assert.equal(pickLabel("Vue panoramique sur la Seine à Paris au crépuscule, avec un bateau-mouche naviguant devant. Puis un pont."), "Vue panoramique sur la Seine à Paris au crépuscule");
   // Her order kept, each file once, another studio's file left out, MAX_PICK at most.
   assert.deepEqual(ownPick([C, A, C.toUpperCase(), B], [A, C]), [C, A]);
   assert.deepEqual(ownPick([B], [A]), []);

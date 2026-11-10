@@ -1,5 +1,5 @@
 import "server-only";
-import { isInSessionWindow, ownPick, pickedLine, type PickKind } from "@fauve/agent";
+import { isInSessionWindow, ownPick, pickedLine, pickLabel, type PickKind } from "@fauve/agent";
 import { signMediaUrls, type StudioContext } from "@/lib/studio";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
@@ -76,7 +76,21 @@ export async function deliverPick(input: { studioId: string; phone: string; ids:
   const open = isInSessionWindow(last ? new Date(last.created_at as string) : null);
   const row = await db
     .from("whatsapp_messages")
-    .insert({ studio_id: input.studioId, channel: "whatsapp", direction: "inbound", phone_e164: input.phone, type: "text", body: pickedLine(ids), payload: { via: "media_pick" } });
+    .insert({ studio_id: input.studioId, channel: "whatsapp", direction: "inbound", phone_e164: input.phone, type: "text", body: pickedLine(ids, await pickLabels(ids)), payload: { via: "media_pick" } });
   if (row.error) return { ok: false, error: "Ton choix n’est pas passé. Réessaie." };
   return { ok: true, count: ids.length, open };
+}
+
+/** What each picked file shows, from its reading (a video's analysis, a photo's), for Edith to plan with the right ones. */
+async function pickLabels(ids: string[]): Promise<Record<string, string>> {
+  const { data } = await supabaseAdmin().from("clip_analyses").select("media_id, analysis, created_at").in("media_id", ids).order("created_at", { ascending: false });
+  const labels: Record<string, string> = {};
+  for (const row of data ?? []) {
+    const id = row.media_id as string;
+    if (labels[id]) continue;
+    const a = row.analysis as { summary?: unknown; description?: unknown } | null;
+    const label = pickLabel(typeof a?.summary === "string" ? a.summary : typeof a?.description === "string" ? a.description : "");
+    if (label) labels[id] = label;
+  }
+  return labels;
 }
