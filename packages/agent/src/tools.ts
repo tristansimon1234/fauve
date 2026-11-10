@@ -84,8 +84,8 @@ export const toolSpecs = {
   },
   get_page_link: {
     description:
-      "Sur WhatsApp, son canal principal sur téléphone, ce qui demande un écran passe par une page faite pour son téléphone, derrière un bouton sous ton message (n'écris jamais de lien) : voix, la voix de ses Reels (écouter les voix et en choisir une, quand mettre une voix off, cloner sa propre voix en lisant un petit texte) : dès qu'elle veut changer de voix, entendre les voix ou mettre sa propre voix ; abonnement, les offres et le paiement (s'abonner, « 1 Reel de plus », passer à l'offre au-dessus) : dès qu'il faut s'abonner ou reprendre des crédits ; factures, ses factures en PDF (abonnement et packs) et « Gérer mon abonnement » (sa carte, son offre, l'arrêter) : dès qu'elle demande une facture, un reçu, ou de changer sa carte ou d'arrêter. Dans l'application, il renvoie où aller.",
-    input: z.object({ page: z.enum(["voix", "abonnement", "factures"]) }),
+      "Sur WhatsApp, son canal principal sur téléphone, ce qui demande un écran passe par une page faite pour son téléphone, derrière un bouton sous ton message (n'écris jamais de lien) : voix, la voix de ses Reels (écouter les voix et en choisir une, quand mettre une voix off, cloner sa propre voix en lisant un petit texte) : dès qu'elle veut changer de voix, entendre les voix ou mettre sa propre voix ; abonnement, les offres et le paiement (s'abonner, « 1 Reel de plus », passer à l'offre au-dessus) : dès qu'il faut s'abonner ou reprendre des crédits ; factures, ses factures en PDF (abonnement et packs) et « Gérer mon abonnement » (sa carte, son offre, l'arrêter) : dès qu'elle demande une facture, un reçu, ou de changer sa carte ou d'arrêter ; idees, des idées de forme pour son nouveau Reel, choisies pour son métier et ses fichiers (media_ids : ceux de ce Reel) : quand elle touche « Regarde nos idées ». Dans l'application, il renvoie où aller.",
+    input: z.object({ page: z.enum(["voix", "abonnement", "factures", "idees"]), media_ids: z.array(z.uuid()).max(20).optional() }),
   },
   get_post_link: {
     description:
@@ -562,6 +562,10 @@ export const toolSpecs = {
     description:
       "Ajoute à ta réponse des boutons et des cartes, affichés sous ton message (dans l'app ; sur WhatsApp, les boutons deviennent des boutons WhatsApp). options : les réponses possibles quand tu poses une question fermée (« Oui, lance » / « Non », un choix d'horaire, de format…), 2 à 6, courtes. posts : les publications dont tu parles, montrées en carte avec leur aperçu (vidéo, photo), format, date et statut. grid : true pour montrer la grille Instagram avec les publications à venir. upload : une zone de dépôt (video, photo ou any) quand tu lui demandes des fichiers ; sur WhatsApp, elle devient son lien de dépôt en pleine qualité, ajouté sous ton message. pick_media (video, photo ou any) : sa médiathèque en vignettes à cocher, avec aussi l'ajout de nouveaux fichiers ; sa réponse revient avec les media_id choisis. step_card (onboarding, dans l'app) : la carte de l'étape en cours (website : champ pour son site ; style : sa charte trouvée et son moodboard ; rhythm : son rythme ; connect : le bouton Instagram ; first_post : créer sa première publication). Ni pick_media ni step_card n'apparaissent sur WhatsApp. plan : ton plan avant de produire (« Avant de produire ») : title, points (4 à 6, dans l'ordre, chacun « Rubrique : ce qu'on fait »), why (pourquoi ça marche, une phrase), et pour un Reel voix_off ; il est écrit sous ta phrase tel quel, avec les boutons « C'est parti » et « Changer le plan » : ne l'écris jamais dans ton texte, une courte phrase avant suffit. Son « C'est parti » lance le plan tel qu'elle l'a lu, son son compris. Appelle-le au plus une fois par réponse, avec ton message.",
     input: replyExtrasSchema.omit({ quote: true, link: true, kind: true, option_notes: true, listen: true, plan_voice: true }).extend({
+      doors: z
+        .boolean()
+        .optional()
+        .describe("Un nouveau Reel sans demande claire : true pose, à la place des options, les façons de le faire (« Fais-moi confiance », son idée, « Regarde nos idées »)"),
       plan: proposalSchema
         .extend({
           voix_off: z

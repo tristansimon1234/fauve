@@ -61,6 +61,7 @@ import { soundPageLink,
   herWordsFor,
   planMediaIds,
   exchangeFiles,
+  ideaDoors,
   planShown,
   isClipSegment,
   MAX_MONTAGE_FILES,
@@ -128,6 +129,7 @@ import { blockFor, keepTextLooks, loadTextLooks, lookDefaults, readTextExample, 
 import { startCarousel } from "@/lib/carousels";
 import { charterFromImages, rereadBrand } from "@/lib/brand-read";
 import { socialConnect } from "@/lib/social/connect";
+import { ideasPossible, offerIdeas } from "@/lib/house-ideas";
 import { addToMoodboard } from "@/lib/moodboard-add";
 import { completeFirstPost, isFirstReel } from "@/lib/onboarding";
 import { listInspirations } from "@/lib/inspirations";
@@ -515,7 +517,25 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
       return json({ url, expires_in_minutes: 15 });
     },
 
-    async get_page_link({ page }) {
+    async get_page_link({ page, media_ids }) {
+      // « Regarde nos idées »: 6 to 8 ideas of form for her trade and the files of this Reel, kept on an offer that the
+      // page of her phone shows (/idees/<id>); never named by Edith, the page shows them.
+      if (page === "idees") {
+        const given = media_ids?.length ? media_ids : [...exchangeFiles(ctx.exchange ?? [])];
+        const { data: owned } = given.length ? await db.from("media_assets").select("id").eq("studio_id", studioId).in("id", given) : { data: [] };
+        const files = given.filter((id) => (owned ?? []).some((m) => (m.id as string).toLowerCase() === id.toLowerCase()));
+        if (!files.length) return json({ refused: "Il me faut d'abord ses photos ou vidéos pour ce Reel : demande-les-lui (reply_with upload), puis rappelle get_page_link idees avec leurs media_ids." });
+        const offer = await offerIdeas({ studioId, mediaIds: files, via: ctx.waId ? "whatsapp" : "app" }).catch((error: unknown) => {
+          console.warn("ideas not offered", error);
+          return null;
+        });
+        if (!offer) return json({ refused: "Pas assez d'idées pour ces fichiers : propose ton plan (reply_with plan), comme pour « Fais-moi confiance »." });
+        if (ctx.waId) {
+          ctx.extras.link = { path: `/idees/${offer.id}`, label: "Voir les idées", purpose: "ideas" };
+          return json({ bouton: "« Voir les idées » sous ton message", idees: offer.keys.length, note: "Une phrase courte, sans lien : elle choisit sur la page et le montage part de là, je te le dirai. Ne nomme ni ne décris aucune idée." });
+        }
+        return json({ ou: "« Créer une publication », étape « Ton idée », « Regarde nos idées »", note: "Elle est dans l'application : dis-lui où les voir en quelques mots." });
+      }
       // WhatsApp is her interface on her phone: what needs a screen is a page made for it, behind a button.
       // The offers bring her back to /merci, which sends her back to WhatsApp with her message ready.
       const pages = {
@@ -523,7 +543,7 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
         abonnement: { path: "/abonnement?next=/merci", label: "Voir les offres", purpose: "billing" as const, app: "la page des offres (/abonnement)" },
         factures: { path: "/factures", label: "Voir mes factures", purpose: "billing" as const, app: "Réglages › Abonnement et crédits, « Mes factures »" },
       };
-      const target = pages[page];
+      const target = pages[page as keyof typeof pages];
       if (ctx.waId) {
         ctx.extras.link = { path: target.path, label: target.label, purpose: target.purpose };
         return json({ bouton: `« ${target.label} » sous ton message`, note: "N'écris aucun lien : le bouton ouvre la page." });
@@ -2088,7 +2108,7 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
       return "ok";
     },
 
-    async reply_with({ options, posts, grid, upload, pick_media, step_card, plan }) {
+    async reply_with({ options, posts, grid, upload, pick_media, step_card, plan, doors }) {
       const read = plan ? keptPlan(plan) : null;
       // A Reel's plan says its sound, and her « C'est parti » applies it (validatedPlanVoice, at the montage).
       const planVoice = read && typeof plan?.voix_off === "boolean" ? plan.voix_off : undefined;
@@ -2104,7 +2124,9 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
       // In the app, a step with its own card (site, style, rhythm) is answered on the card:
       // never answer buttons beside it, which would show the same choice twice.
       let card = ctx.waId ? undefined : step_card;
-      let answers = options ?? (kept ? [...PLAN_BUTTONS] : undefined);
+      // A new Reel without a clear request: the three ways to make it (the ideas one when enough play for her).
+      const doorButtons = doors && !kept ? ideaDoors(ctx.waId ? "whatsapp" : "app", await ideasPossible(studioId).catch(() => false)) : undefined;
+      let answers = doorButtons ?? options ?? (kept ? [...PLAN_BUTTONS] : undefined);
       if (!ctx.waId && (answers?.length || card)) {
         const { data: studio } = await db.from("studios").select("onboarding_step").eq("id", studioId).single();
         const step = onboardingStepOf(studio?.onboarding_step);
@@ -2124,7 +2146,9 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
       ctx.extras.upload = ctx.waId ? (upload ?? pick_media) : upload;
       ctx.extras.pick_media = ctx.waId ? undefined : pick_media;
       if (kept) return "ok : ton plan est écrit sous ta phrase, avec ses boutons ; ne le réécris pas.";
-      const shown = ctx.waId && (upload ?? pick_media) ? "ok : son lien de dépôt (pleine qualité) est ajouté sous ton message ; n'écris aucun lien." : "ok : affiché sous ton message.";
+      const shown = doorButtons
+        ? `ok : ${doorButtons.map((b) => `« ${b} »`).join(", ")} sous ton message. « ${doorButtons[0]} » : ton plan pour ses fichiers ; « ${doorButtons[1]} » : ce qu'elle imagine, ou un Reel qu'elle aime${doorButtons[2] ? ` ; « ${doorButtons[2]} » : get_page_link idees avec ses fichiers` : ""}.`
+        : ctx.waId && (upload ?? pick_media) ? "ok : son lien de dépôt (pleine qualité) est ajouté sous ton message ; n'écris aucun lien." : "ok : affiché sous ton message.";
       // Called before a word was written, the model was asked again and wrote « Voilà, j'attends ton choix. » or
       // « Voilà, j'ai mis les boutons juste en dessous. » as if its question had been sent: only what it writes
       // reaches her, never its thoughts. The loop knows whether anything was written: when nothing was, it says so plainly.

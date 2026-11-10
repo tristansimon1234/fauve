@@ -65,7 +65,7 @@ export const replyExtrasSchema = z.object({
    * the link tools, not by the model; its one-time sign-in link is made when the message is sent.
    */
   link: z
-    .object({ path: z.string().startsWith("/").max(200), label: z.string().min(1).max(20), purpose: z.enum(["open_post", "connect_social", "upload", "voice", "billing"]) })
+    .object({ path: z.string().startsWith("/").max(200), label: z.string().min(1).max(20), purpose: z.enum(["open_post", "connect_social", "upload", "voice", "billing", "ideas"]) })
     .optional(),
   /** WhatsApp: a line under each answer of its list (« Harry Styles · Top 50 n° 1 »), by the answer's text; set by find_sound, not by the model. */
   option_notes: z.record(z.string().max(24), z.string().max(72)).optional(),

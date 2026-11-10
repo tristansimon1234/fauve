@@ -100,7 +100,7 @@ export const housePickSchema = z.object({
 export type HousePick = z.infer<typeof housePickSchema>;
 
 /** One of her files as the picker reads it. */
-export type HousePickFile = { kind: "video" | "photo"; seconds?: number; shows: string; speaks?: boolean; people?: boolean };
+export type HousePickFile = { kind: "video" | "photo"; seconds?: number; shows: string; speaks?: boolean; people?: boolean; /** Width / height, when measured (the ideas door reads it; the picker does not). */ aspect?: number };
 
 /**
  * Her taste as the picker reads it (Tristan: « attention, le user a aussi un mood board »): the reading of her moodboard

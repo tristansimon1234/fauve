@@ -1,6 +1,6 @@
 "use server";
 
-import { ANALYST_MODEL, BUSY_TEXT, filmIdeas, keptPlan, postIdeas, postKindSchema, PROPOSAL_PROMPT, proposalSchema, publishWhen, memoryLines, readOwnVoice, readVoiceSetting, reelLink, stolenStyleLines, stolenStyleSchema, offersLine, packLine, type PostIdea, type PostPlan } from "@fauve/agent";
+import { ANALYST_MODEL, BUSY_TEXT, filmIdeas, keptPlan, postIdeas, postKindSchema, PROPOSAL_PROMPT, proposalSchema, publishWhen, memoryLines, readOwnVoice, readVoiceSetting, reelLink, stolenStyleLines, stolenStyleSchema, offersLine, packLine, type IdeaFile, type PostIdea, type PostPlan } from "@fauve/agent";
 import { outputFormat } from "@fauve/agent/answer";
 import { z } from "zod";
 import { anthropic, logClaudeCost } from "@/lib/agent/run";
@@ -8,6 +8,8 @@ import { studioAccess } from "@/lib/billing/access";
 import { localInstant, localDateOf, localTimeOf, parseIsoDate, toIsoDate } from "@/lib/dates";
 import { queueJob } from "@/lib/jobs";
 import { freeSlots, type Slot } from "@/lib/slots";
+import { chooseOffered, ideaCards, ideasPossible, offerIdeas, type IdeaCard } from "@/lib/house-ideas";
+import { houseInspiration } from "@/lib/house-models";
 import { studioModels, type ReelModel } from "@/lib/reel-models";
 import { missMessage, pendingSteal, READING_MS, startSteal, type StealMissReason, type StealSource } from "@/lib/steal";
 import { getStudioContext, signMediaUrls } from "@/lib/studio";
@@ -41,6 +43,8 @@ export type NewPostOptions = {
   copy: { id: string; name: string | null; lines: string[] } | null;
   /** Her Reels kept as models (« Garder comme modèle »): a new Reel made like one of them. */
   models: ReelModel[];
+  /** « Regarde nos idées » can be offered: enough of our ideas play for her business (validated, a preview kept). */
+  houseIdeas: boolean;
 };
 
 export async function newPostOptions(): Promise<NewPostOptions | null> {
@@ -54,12 +58,13 @@ export async function newPostOptions(): Promise<NewPostOptions | null> {
     freeSlots(studioId, tz, 4, now),
     db.from("media_assets").select("id, storage_path, kind, created_at, duration").eq("studio_id", studioId).in("kind", ["image", "video"]).neq("source", "render").order("created_at", { ascending: false }).limit(40),
   ]);
-  const [{ data: studio }, { data: brand }, { data: tiktok }, copy, models] = await Promise.all([
+  const [{ data: studio }, { data: brand }, { data: tiktok }, copy, models, houseIdeas] = await Promise.all([
     db.from("studios").select("business_type").eq("id", studioId).maybeSingle(),
     db.from("brand_profiles").select("profile").eq("studio_id", studioId).order("version", { ascending: false }).limit(1).maybeSingle(),
     db.from("social_accounts").select("status").eq("studio_id", studioId).eq("platform", "tiktok").maybeSingle(),
     pendingSteal(studioId).catch(() => null),
     studioModels(studioId).catch(() => []),
+    ideasPossible(studioId).catch(() => false),
   ]);
   const voice = readVoiceSetting((brand?.profile as { voice?: unknown } | null)?.voice);
   const own = readOwnVoice((brand?.profile as { own_voice?: unknown } | null)?.own_voice);
@@ -98,7 +103,44 @@ export async function newPostOptions(): Promise<NewPostOptions | null> {
     tiktok: tiktok?.status === "connected",
     copy: copy ? { id: copy.id, name: copy.name, lines: copy.lines } : null,
     models,
+    houseIdeas,
   };
+}
+
+/** « Regarde nos idées » on the Créer screen: 6 to 8 ideas of form for her files (her library's, or just sent, by their kind). */
+export type IdeasResult = { ok: true; offerId: string; cards: IdeaCard[] } | { ok: false; error: string };
+
+const ideaFilesSchema = z.array(z.union([z.object({ media: z.uuid() }), z.object({ upload: z.object({ video: z.boolean() }) })])).min(1).max(20);
+
+export async function ideasFor(files: unknown): Promise<IdeasResult> {
+  const parsed = ideaFilesSchema.safeParse(files);
+  if (!parsed.success) return { ok: false, error: "Choisis d’abord tes photos ou vidéos." };
+  const { member } = await getStudioContext();
+  if (!member) return { ok: false, error: "Connecte-toi d’abord." };
+  const mediaIds = parsed.data.flatMap((f) => ("media" in f ? [f.media] : []));
+  // Files just sent from her phone are not read yet: their kind only.
+  const extra = parsed.data.flatMap((f): IdeaFile[] => ("upload" in f ? [{ kind: f.upload.video ? "video" : "photo" }] : []));
+  try {
+    const offer = await offerIdeas({ studioId: member.studio.id, mediaIds, via: "app", extra });
+    if (!offer) return { ok: false, error: "Je n’ai pas assez d’idées pour ces fichiers. Fais-moi confiance, ou dis-moi ce que tu veux." };
+    const cards = await ideaCards(offer.keys);
+    return cards.length ? { ok: true, offerId: offer.id, cards } : { ok: false, error: "Les idées ne s’affichent pas pour l’instant. Réessaie dans un instant." };
+  } catch (error) {
+    console.warn("ideas not offered", error);
+    return { ok: false, error: "Les idées ne s’affichent pas pour l’instant. Réessaie dans un instant." };
+  }
+}
+
+/** One idea picked on the Créer screen: kept on its offer, and the studio's row of that model for this Reel to follow. */
+export async function pickIdea(offerId: string, key: string): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
+  const parsed = z.object({ offerId: z.uuid(), key: z.string().max(40) }).safeParse({ offerId, key });
+  if (!parsed.success) return { ok: false, error: "Cette idée n’existe plus." };
+  const { member } = await getStudioContext();
+  if (!member) return { ok: false, error: "Connecte-toi d’abord." };
+  const studioId = member.studio.id;
+  const chosen = await chooseOffered(studioId, parsed.data.offerId, parsed.data.key).catch(() => false);
+  const house = chosen ? await houseInspiration(studioId, parsed.data.key).catch(() => null) : null;
+  return house ? { ok: true, id: house.id } : { ok: false, error: "Je n’arrive pas à prendre cette idée pour l’instant. Réessaie dans un instant." };
 }
 
 export type CopyStart = { ok: true; id: string } | { ok: false; error: string };
