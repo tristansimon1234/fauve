@@ -13,7 +13,7 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "test": "node --test src/agent.test.ts src/features.test.ts src/model-scout.test.ts src/trend-sounds.test.ts src/model-voice.test.ts src/own-voice.test.ts src/pieces/*.test.ts src/skills/*.test.ts src/formats.test.ts src/model-plays.test.ts src/reel-fonts.test.ts src/composition-shots.test.ts src/shooting.test.ts src/shot-tone.test.ts src/house-ideas.test.ts"
+    "test": "node --test src/agent.test.ts src/features.test.ts src/model-scout.test.ts src/trend-sounds.test.ts src/model-voice.test.ts src/own-voice.test.ts src/pieces/*.test.ts src/skills/*.test.ts src/formats.test.ts src/model-plays.test.ts src/reel-fonts.test.ts src/composition-shots.test.ts src/shooting.test.ts src/shot-tone.test.ts src/house-ideas.test.ts src/media-pick.test.ts"
   },
   "devDependencies": {
     "@types/node": "^22.20.5",

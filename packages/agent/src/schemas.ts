@@ -54,7 +54,7 @@ export const replyExtrasSchema = z.object({
   grid: z.boolean().optional(),
   /** A drop zone for photos or videos under the message (app only). */
   upload: z.enum(["video", "photo", "any"]).optional(),
-  /** A picker of the studio's library under the message (app only): she ticks files, they come back as media_id. */
+  /** A picker of the studio's library: she ticks files, they come back as media_id (a card in the app, a page behind a button on WhatsApp, media-pick.ts). */
   pick_media: z.enum(["video", "photo", "any"]).optional(),
   /** The card of an onboarding step under the message (app only). */
   step_card: z.enum(["website", "style", "rhythm", "connect", "first_post"]).optional(),
@@ -65,7 +65,7 @@ export const replyExtrasSchema = z.object({
    * the link tools, not by the model; its one-time sign-in link is made when the message is sent.
    */
   link: z
-    .object({ path: z.string().startsWith("/").max(200), label: z.string().min(1).max(20), purpose: z.enum(["open_post", "connect_social", "upload", "voice", "billing", "ideas"]) })
+    .object({ path: z.string().startsWith("/").max(200), label: z.string().min(1).max(20), purpose: z.enum(["open_post", "connect_social", "upload", "voice", "billing", "ideas", "pick"]) })
     .optional(),
   /** WhatsApp: a line under each answer of its list (« Harry Styles · Top 50 n° 1 »), by the answer's text; set by find_sound, not by the model. */
   option_notes: z.record(z.string().max(24), z.string().max(72)).optional(),
