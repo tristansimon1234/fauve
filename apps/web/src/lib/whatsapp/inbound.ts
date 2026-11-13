@@ -449,6 +449,9 @@ async function answerOnWhatsApp({ studioId, memberId, waId, phone, replyTo, note
     // Never leave the manager on a "typing…" that leads nowhere. Not stored, so
     // the conversation history stays clean for the next attempt.
     console.error("agent failed, sending fallback reply", error);
+    // A refused key stops every reply (13 November: Anthropic answered 401 after the key was revoked): said plainly.
+    if ((error as { status?: unknown } | null)?.status === 401)
+      console.error("ANTHROPIC_API_KEY refused (401): replace it in Vercel's environment variables, then redeploy");
     await sendText(waId, TECHNICAL_ISSUE_REPLY).catch((e) => console.error("fallback reply failed", e));
     return [];
   }
