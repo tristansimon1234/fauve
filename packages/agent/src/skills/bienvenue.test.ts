@@ -216,9 +216,9 @@ test("« L'accueil, puis la rafale » writes her sentence a line on each calm sh
   assert.deepEqual(written(drawAt(70, { reel: [{ text: "Bienvenue dans notre nouveau salon", role: "hook" }] })), ["BIENVENUE", "DANS NOTRE", "NOUVEAU", "SALON"]);
 });
 
-test("« L'accueil, puis la rafale »: its ink, hers when it reads on a dark picture, else the original's fluo yellow; its ending card", () => {
+test("« L'accueil, puis la rafale »: its ink, hers when it reads on a dark picture, else white (its fluo yellow on her word); its ending card", () => {
   const ink = (accent: string, encre?: string) => of(drawAt(70, { accent, ...(encre ? { texts: { encre } } : {}) }), "Handwriting")[0]!.props.color;
-  assert.equal(ink("#3b2a4d"), "#f4ff00");
+  assert.equal(ink("#3b2a4d"), "#ffffff");
   assert.equal(ink("#F4B6C2"), "#f4b6c2");
   assert.equal(ink("#f4b6c2", "jaune"), "#f4ff00");
   assert.equal(ink("#3b2a4d", "blanc"), "#ffffff");

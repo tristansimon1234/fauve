@@ -342,7 +342,7 @@ export const interfaceSkill: MontageSkill = {
       want: "la couleur de son accent (le trait sous sa liste, le curseur, le bouton, son compte à la fin)",
       choices: [
         { value: "bleu", says: "le dégradé bleu roi vers indigo de l'original" },
-        { value: "sienne", says: "sa couleur à elle (celle de sa charte ; le bleu si elle est trop pâle pour se lire sur le fond clair)" },
+        { value: "sienne", says: "sa couleur à elle (celle de sa charte ; le bleu si elle est trop pâle pour se lire sur le fond clair)", charter: true },
       ],
     },
   ],

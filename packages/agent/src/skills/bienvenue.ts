@@ -137,7 +137,7 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   // stack centred on the middle, as the original's), gone at once on the drop. Mynerve, the closest monoline hand to the
   // original's doodle capitals, 112 px (its capitals about 80 px, the original's 78), spaced 0,12 em, no grain (a digital
   // pen), its letters strayed a little more for their bounce, a thin dark edge so they still read on a bright spot. Its
-  // ink: her colour when it reads on a dark picture (light enough), else the original's fluo yellow; or the yellow, or
+  // ink: her colour when it reads on a dark picture (light enough), else white (her charter first, 18 November; the original's fluo yellow on her word); or the yellow, or
   // white, as her words ask.
   const keep = (s) => String(s || "").normalize("NFC").replace(/(\d) (?=\d)/g, "$1\u00a0");
   const up = (s) => keep(s).toLocaleUpperCase("fr").replace(/\s+/g, " ").trim();
@@ -161,7 +161,8 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const lum = (c) => { const m = /^#?([0-9a-f]{6})$/i.exec(String(c || "").trim()); if (!m) return -1; const v = parseInt(m[1], 16); return 0.2126 * lin(((v >> 16) & 255) / 255) + 0.7152 * lin(((v >> 8) & 255) / 255) + 0.0722 * lin((v & 255) / 255); };
   const YELLOW = "#f4ff00";
   const encre = setting("encre", "sienne");
-  const INK = encre === "blanc" ? "#ffffff" : encre === "sienne" && lum(brand.accent) >= 0.35 ? String(brand.accent).toLowerCase() : YELLOW;
+  // Her charter first: her colour when it reads, else white; its yellow only when she asks for it.
+  const INK = encre === "jaune" ? YELLOW : encre === "sienne" && lum(brand.accent) >= 0.35 ? String(brand.accent).toLowerCase() : "#ffffff";
   const hand = "'Mynerve', '" + brand.displayFont + "', cursive";
   const PITCH = Math.round(height * 0.0964);
   const SIZE = Math.round(height * 0.0583);
@@ -231,7 +232,7 @@ export const bienvenue: MontageSkill = {
       name: "encre",
       want: "la couleur de sa phrase écrite à la main",
       choices: [
-        { value: "sienne", says: "sa couleur quand elle est assez claire pour se lire sur ses plans assombris, sinon le jaune fluo de l'original" },
+        { value: "sienne", says: "sa couleur quand elle est assez claire pour se lire sur ses plans assombris, sinon du blanc", charter: true },
         { value: "jaune", says: "le jaune fluo de l'original" },
         { value: "blanc", says: "blanc" },
       ],

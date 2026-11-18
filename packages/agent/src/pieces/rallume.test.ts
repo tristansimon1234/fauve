@@ -135,7 +135,8 @@ test("« La pièce qui se rallume » (effect v2): its layer over her room shot, 
   assert.equal(fill.texts.ligne, undefined);
   assert.deepEqual(fill.settings, { couleur: "sienne" });
   assert.equal(readPieceFill(rallume, { ...answer, texts: [{ slot: "ligne", text: "bar à vins" }] }), null);
-  assert.deepEqual(readPieceFill(rallume, { ...answer, settings: [{ name: "couleur", value: "chaude" }] })!.settings, {});
+  // Her charter's colour by default; the original's warm light kept when she asks for it.
+  assert.deepEqual(readPieceFill(rallume, { ...answer, settings: [{ name: "couleur", value: "chaude" }] })!.settings, { couleur: "chaude" });
 });
 
 test("« La pièce qui se rallume » (effect v2): dark, her lamps lit one by one at their own light, all at once on the beat, her name like a sign, to the cut", () => {

@@ -62,7 +62,7 @@ test("« L'accueil, puis la rafale » (effect v1): her sentence a line on each s
   for (const n of hands) {
     const b = n.props.box as { x: number; y: number; w: number; h: number };
     assert.ok(b.x >= 140 && b.x + b.w <= 940 && b.y >= 80 && b.y + b.h <= 1440);
-    assert.deepEqual([(n.props.style as { fontSize: number }).fontSize, n.props.grain, n.props.color], [112, 0, "#f4ff00"]);
+    assert.deepEqual([(n.props.style as { fontSize: number }).fontSize, n.props.grain, n.props.color], [112, 0, "#ffffff"]); // her dark colour does not read: white, her charter first (18 November)
   }
   // Fewer shots than words: as many lines as shots (two short words on one), the last on its last shot.
   assert.deepEqual(written(draw(53, props(3))), ["BIENVENUE", "DANS NOTRE", "SALON"]);
@@ -71,9 +71,9 @@ test("« L'accueil, puis la rafale » (effect v1): her sentence a line on each s
   const five = props(5, { accueil: "Entrez, c'est ouvert" });
   assert.deepEqual(bienvenueLands(90, 18, under(5).slice(1), { accueil: "Entrez, c'est ouvert" }), [5, 18, 72]);
   assert.deepEqual([written(draw(40, five)), written(draw(72, five))], [["ENTREZ,", "C'EST"], ["ENTREZ,", "C'EST", "OUVERT"]]);
-  // Its ink: hers when light enough to read on a dark picture, else the original's yellow; white on her word.
+  // Its ink: hers when light enough to read on a dark picture, else white (her charter first); its yellow on her word.
   const ink = (accent: string, encre?: string) => nodes(draw(60, props(4, encre ? { encre } : {}, { brand: { ...brand, accent } }))).find((n) => n.type === "Handwriting")!.props.color;
-  assert.deepEqual([ink("#1d4d3a"), ink("#ffd6e0"), ink("#ffd6e0", "jaune"), ink("#1d4d3a", "blanc")], ["#f4ff00", "#ffd6e0", "#f4ff00", "#ffffff"]);
+  assert.deepEqual([ink("#1d4d3a"), ink("#ffd6e0"), ink("#ffd6e0", "jaune"), ink("#1d4d3a", "blanc")], ["#ffffff", "#ffd6e0", "#f4ff00", "#ffffff"]);
 });
 
 test("« L'accueil, puis la rafale » (effect v1): her shots darker under it, dosed on their light; the music stopped until its end", () => {

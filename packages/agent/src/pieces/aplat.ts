@@ -221,7 +221,7 @@ export const aplat: EffectPiece = {
       name: "couleur",
       want: "la couleur de l'aplat",
       choices: [
-        { value: "sienne", says: "sa couleur à elle quand elle est vive (celle de sa charte), sinon le rouge pur de l'original" },
+        { value: "sienne", says: "sa couleur à elle quand elle est vive (celle de sa charte), sinon le rouge pur de l'original", charter: true },
         { value: "rouge", says: "le rouge pur de l'original, quelle que soit sa couleur" },
       ],
     },

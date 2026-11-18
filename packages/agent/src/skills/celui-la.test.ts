@@ -483,7 +483,8 @@ test("« Celui-là » (v3): what she says does not make it when she points at fe
     });
     assert.ok(editPlanSchema.safeParse(plan).success);
     assert.equal(plan.texts.length, HEARD.words.length);
-    // Its marks are numbers (its format, told to its code since vertical became the default, is a word).
-    for (const [k, v] of Object.entries(plan.layers![0]!.motion.texts!)) if (k !== "format") assert.ok(Number.isFinite(Number(v)), k);
+    // Its marks are numbers (its format, told to its code since vertical became the default, and its colour, her
+    // charter's unless she asks for another since 18 November, are words).
+    for (const [k, v] of Object.entries(plan.layers![0]!.motion.texts!)) if (k !== "format" && k !== "couleur") assert.ok(Number.isFinite(Number(v)), k);
   }
 });

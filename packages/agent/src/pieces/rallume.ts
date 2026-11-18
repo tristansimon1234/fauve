@@ -338,7 +338,7 @@ export const rallume: EffectPiece = {
       want: "la lumière de son nom allumé",
       choices: [
         { value: "chaude", says: "un blanc chaud, comme une ampoule" },
-        { value: "sienne", says: "sa couleur à elle (celle de sa charte ; le blanc chaud si elle est trop pâle ou trop sombre pour briller)" },
+        { value: "sienne", says: "sa couleur à elle (celle de sa charte ; le blanc chaud si elle est trop pâle ou trop sombre pour briller)", charter: true },
       ],
     },
   ],

@@ -373,7 +373,7 @@ export const vlogVille: MontageSkill = {
       name: "couleur",
       want: "la couleur du titre, de sa signature et de sa petite ligne",
       choices: [
-        { value: "sienne", says: "sa couleur à elle quand elle est vive (celle de sa charte), sinon le rouge de titre de film de l'original" },
+        { value: "sienne", says: "sa couleur à elle quand elle est vive (celle de sa charte), sinon le rouge de titre de film de l'original", charter: true },
         { value: "rouge", says: "le rouge de titre de film de l'original, quelle que soit sa couleur" },
       ],
     },

@@ -354,8 +354,26 @@ export type SkillSetting = {
    * that lays her files whole in a band (on black, or on its own ground), the one she asks with « en bande », « garde mes
    * vidéos entières », « en horizontal » (the contract's frame letterbox: skillFramed).
    */
-  choices: { value: string; says: string; band?: boolean }[];
+  choices: { value: string; says: string; band?: boolean; charter?: boolean }[];
 };
+
+/**
+ * The choices that follow her charter rather than the original (`charter` on a choice: her colour, her own light), played
+ * whenever her words chose nothing else for that setting (Tristan, 18 November: « les couleurs doivent respecter la DA,
+ * surtout pas le modèle », after « Court métrage » laid its lemon-yellow title and its golden light, saturation ×1.7, on
+ * a black-and-white charter). The original's colour stays a choice she can ask for (« le jaune de l'original »).
+ */
+/** What a setting plays when nothing is asked: its charter choice when it has one (charterSettings), else its first. */
+export const defaultChoice = (setting: Pick<SkillSetting, "choices">): string | undefined => (setting.choices.find((c) => c.charter) ?? setting.choices[0])?.value;
+
+export function charterSettings(skill: Pick<MontageSkill, "settings">): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const s of skill.settings ?? []) {
+    const own = s.choices.find((c) => c.charter);
+    if (own) out[s.name] = own.value;
+  }
+  return out;
+}
 
 /** The setting that frames a model (« format »): vertical full frame by default, her files whole in a band on request. */
 export const SKILL_FORMAT = "format";
@@ -374,7 +392,7 @@ export const skillBand = (skill: Pick<MontageSkill, "settings">): string | undef
  */
 export function playedSettings(skill: Pick<MontageSkill, "settings">, chosen: Record<string, string> | undefined): Record<string, string> | undefined {
   const format = formatOf(skill)?.choices[0]?.value;
-  const played = { ...(format ? { [SKILL_FORMAT]: format } : {}), ...(chosen ?? {}) };
+  const played = { ...(format ? { [SKILL_FORMAT]: format } : {}), ...charterSettings(skill), ...(chosen ?? {}) };
   return Object.keys(played).length ? played : undefined;
 }
 
@@ -730,19 +748,19 @@ export function mergeSkillSettings(skill: Pick<MontageSkill, "settings">, previo
   for (const a of asked ?? []) {
     const setting = skill.settings?.find((x) => x.name === a.name);
     if (!setting || !setting.choices.some((c) => c.value === a.value)) continue;
-    if (setting.choices[0]?.value === a.value) delete merged[a.name];
+    if (defaultChoice(setting) === a.value) delete merged[a.name];
     else merged[a.name] = a.value;
   }
   return merged;
 }
 
-/** The settings a fill keeps: each one a skill's, at one of its choices, never its default (which needs no saying). */
+/** The settings a fill keeps: each one a skill's, at one of its choices, never its default (defaultChoice: needs no saying; the original's colour asked is kept). */
 export function skillSettings(skill: Pick<MontageSkill, "settings">, asked: { name: string; value: string }[] | Record<string, string> | undefined): Record<string, string> {
   const pairs = Array.isArray(asked) ? asked.map((a) => [a.name, a.value] as const) : Object.entries(asked ?? {});
   const kept: Record<string, string> = {};
   for (const [name, value] of pairs) {
     const setting = skill.settings?.find((x) => x.name === name);
-    if (setting && setting.choices.some((c) => c.value === value) && setting.choices[0]?.value !== value) kept[name] = value;
+    if (setting && setting.choices.some((c) => c.value === value) && defaultChoice(setting) !== value) kept[name] = value;
   }
   return kept;
 }

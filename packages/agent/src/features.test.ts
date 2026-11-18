@@ -2935,10 +2935,12 @@ test("« Éventail de bandes » (v3): full frame by default, 16:9 on black as he
   const files = Array.from({ length: 12 }, (_, i) => ({ id: `v${i}`, photo: false, seconds: 12 }));
   const input = skillFillInput({ skill: eventail, name: "Éventail de bandes", n: 13, files, business: {}, request: "avec ma couleur" });
   assert.deepEqual([input.objets?.[0]?.slot, input.objets?.[0]?.case], ["coeur", 1]);
-  assert.deepEqual(skillSettings(eventail, [{ name: "fond", value: "bordeaux" }]), {});
+  // Her charter's ground plays by default (charterSettings): the original's bordeaux, asked, is kept.
+  assert.deepEqual(skillSettings(eventail, [{ name: "fond", value: "bordeaux" }]), { fond: "bordeaux" });
   const plan = skillPlan({ skill: eventail, name: "Éventail de bandes", files, fill: { shots: Array.from({ length: 13 }, (_, i) => ({ file: files[i % 12]!.id, at: 1 })), texts: { signature: "Brighton Pier" }, end: null, settings: { fond: "sienne" } } });
   assert.equal(plan.layers![0]!.motion.texts!.fond, "sienne");
-  assert.deepEqual(plan.skill, { key: "eventail", version: 4, settings: { fond: "sienne" } });
+  // Her charter's ground is its default: played (above) without being kept on the plan.
+  assert.deepEqual(plan.skill, { key: "eventail", version: 4 });
   assert.equal(plan.music_shape?.pauses?.length, 7);
 });
 
@@ -7068,7 +7070,9 @@ test("« La pièce qui se rallume » (v3): full frame by default, 16:9 on black 
   assert.equal(style(draw(16 / 9, 120, { couleur: "sienne" }, { accent: "#f4efe6" })).color, "#fff3df");
   assert.equal(style(draw(16 / 9, 120, {}, { accent: "#7a2e8c" })).color, "#fff3df");
   assert.deepEqual(rallume.settings?.map((s) => [s.name, s.choices.map((c) => c.value)]), [["format", ["vertical", "horizontal", "auto"]], ["couleur", ["chaude", "sienne"]]]);
-  assert.deepEqual(skillSettings(rallume, [{ name: "format", value: "vertical" }, { name: "couleur", value: "sienne" }]), { couleur: "sienne" });
+  // Her colour is its default now (charterSettings): nothing to keep; the original's warm light, asked, is.
+  assert.deepEqual(skillSettings(rallume, [{ name: "format", value: "vertical" }, { name: "couleur", value: "sienne" }]), {});
+  assert.deepEqual(skillSettings(rallume, [{ name: "couleur", value: "chaude" }]), { couleur: "chaude" });
   // Its objects: up to four kinds of her things in her room shot, named by the filler; nothing named, nothing followed.
   assert.deepEqual(checkMotionCode(rallume.code), []);
   assert.deepEqual(objectsDrawn(rallume.code), []);

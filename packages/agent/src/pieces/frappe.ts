@@ -320,7 +320,7 @@ export const frappe: EffectPiece = {
       name: "couleur",
       want: "la couleur du nom tapé",
       choices: [
-        { value: "sienne", says: "sa couleur à elle (celle de sa charte ; trop pâle pour un ciel, son autre couleur, sinon un rouge orangé)" },
+        { value: "sienne", says: "sa couleur à elle (celle de sa charte ; trop pâle pour un ciel, son autre couleur, sinon un rouge orangé)", charter: true },
         { value: "blanc", says: "en blanc, avec un liseré sombre fin" },
         { value: "original", says: "le rouge orangé de l'original" },
       ],

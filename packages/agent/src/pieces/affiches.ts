@@ -119,7 +119,7 @@ export const affiches: EffectPiece = {
       want: "les couleurs des aplats derrière ses tirages : les huit couleurs vives de l'original, celles de sa charte en alternance, ou du noir",
       choices: [
         { value: "vives", says: "rouge, bleu roi, orange, rose, gris, noir, bleu ciel et jaune, une par affiche, comme l'original" },
-        { value: "sa-charte", says: "les couleurs de sa charte, une par affiche en alternance (au moins deux)" },
+        { value: "sa-charte", says: "les couleurs de sa charte, une par affiche en alternance (au moins deux)", charter: true },
         { value: "noir", says: "tous ses tirages sur du noir" },
       ],
     },

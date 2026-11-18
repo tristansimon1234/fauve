@@ -505,7 +505,7 @@ export const monTravail: MontageSkill = {
       want: "la couleur de ses mots",
       choices: [
         { value: "auto", says: "choisie pour se lire sur ce qu'il y a sous ses mots : sa couleur quand elle s'y lit, sinon une teinte pâle ou profonde de la sienne, sinon du blanc ou de l'encre avec un contour" },
-        { value: "sienne", says: "sa couleur telle quelle (plus profonde si elle est très pâle), lisible sur les murs clairs de la plupart des lieux" },
+        { value: "sienne", says: "sa couleur telle quelle (plus profonde si elle est très pâle), lisible sur les murs clairs de la plupart des lieux", charter: true },
         { value: "pale", says: "sa couleur en teinte pâle et vive, comme l'original, pour un lieu sombre ou très coloré" },
         { value: "original", says: "le vert anis pâle de l'original" },
       ],

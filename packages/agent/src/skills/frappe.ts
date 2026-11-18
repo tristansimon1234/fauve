@@ -265,7 +265,7 @@ export const frappe: MontageSkill = {
       name: "couleur",
       want: "la couleur du nom tapé",
       choices: [
-        { value: "sienne", says: "sa couleur à elle (celle de sa charte ; un rouge orangé si elle est trop pâle)" },
+        { value: "sienne", says: "sa couleur à elle (celle de sa charte ; un rouge orangé si elle est trop pâle)", charter: true },
         { value: "original", says: "le rouge orangé de l'original" },
       ],
     },

@@ -166,7 +166,7 @@ export const nike: EffectPiece = {
       want: "la couleur de ses mots et de ses plans rouges",
       choices: [
         { value: "rouge", says: "le rouge de l'original" },
-        { value: "sienne", says: "sa couleur à elle (celle de sa charte) quand elle est assez vive et foncée pour tenir sur le noir et blanc ; le rouge sinon" },
+        { value: "sienne", says: "sa couleur à elle (celle de sa charte) quand elle est assez vive et foncée pour tenir sur le noir et blanc ; le rouge sinon", charter: true },
       ],
     },
     {

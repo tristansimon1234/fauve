@@ -222,7 +222,7 @@ export const petitesLumieres: EffectPiece = {
       choices: [
         { value: "rouge", says: "le rouge de l'original : des fenêtres rouges, un néon rouge" },
         { value: "chaude", says: "la lumière chaude d'une fenêtre allumée, un néon blanc chaud" },
-        { value: "sienne", says: "sa couleur à elle (celle de sa charte ; le rouge si elle est trop pâle ou trop sombre pour briller)" },
+        { value: "sienne", says: "sa couleur à elle (celle de sa charte ; le rouge si elle est trop pâle ou trop sombre pour briller)", charter: true },
       ],
     },
   ],

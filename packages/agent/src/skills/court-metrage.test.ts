@@ -273,3 +273,13 @@ test("« Court métrage »: its ending card on the black after the fade, in its 
   assert.ok(card.every((t) => Number((t.props.innerStyle as { fontSize: number }).fontSize) >= 48));
   assert.equal(Number(styleOf(keyed(drawAt(from, { end, end_card: true }), "fade")!).opacity), 1);
 });
+
+test("« Court métrage » follows her charter unless she asks: her colour and her shots as filmed, its yellow and gold on her word", async () => {
+  const { playedSettings, mergeSkillSettings } = await import("../skills.ts");
+  const played = playedSettings(courtMetrage, undefined)!;
+  assert.equal(played.couleur, "sienne");
+  assert.equal(played.lumiere, "naturelle");
+  const asked = mergeSkillSettings(courtMetrage, undefined, [{ name: "couleur", value: "jaune" }, { name: "lumiere", value: "doree" }]);
+  assert.deepEqual(asked, { couleur: "jaune", lumiere: "doree" });
+  assert.equal(playedSettings(courtMetrage, asked)!.lumiere, "doree");
+});

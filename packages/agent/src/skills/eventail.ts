@@ -250,7 +250,7 @@ export const eventail: MontageSkill = {
       want: "la couleur du fond de l'étoile et du cadre",
       choices: [
         { value: "bordeaux", says: "le bordeaux profond de l'original" },
-        { value: "sienne", says: "sa couleur foncée à elle (celle de sa charte ; le bordeaux si elle n'en a pas)" },
+        { value: "sienne", says: "sa couleur foncée à elle (celle de sa charte ; le bordeaux si elle n'en a pas)", charter: true },
       ],
     },
   ],

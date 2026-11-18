@@ -240,7 +240,7 @@ export const carteFeutre: MontageSkill = {
       name: "encre",
       want: "la couleur de l'encre",
       choices: [
-        { value: "sienne", says: "sa couleur quand elle est assez foncée pour se lire sur le papier gris, sinon le rouge de l'original" },
+        { value: "sienne", says: "sa couleur quand elle est assez foncée pour se lire sur le papier gris, sinon le rouge de l'original", charter: true },
         { value: "rouge", says: "le rouge du feutre de l'original" },
       ],
     },

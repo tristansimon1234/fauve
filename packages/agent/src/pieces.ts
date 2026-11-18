@@ -5,7 +5,7 @@ import { REEL_FPS } from "./motion.ts";
 import { isClipSegment, screenTime, segmentSpans, SLOT_NAME, type ClipAnalysis, type EditPlan, type HandMomentKind, type MotionDrawn, type PlanLayer, type SfxCue } from "./schemas.ts";
 import { readMusicShape, type MusicShape } from "./music-shape.ts";
 import { BURST_MAX } from "./sfx.ts";
-import { fitWords, skillObjectName, skillSettings, unseenThings, type SkillSetting } from "./skills.ts";
+import { charterSettings, fitWords, skillObjectName, skillSettings, unseenThings, type SkillSetting } from "./skills.ts";
 
 // The bank of ready-to-play effects (chantier A of docs/reprise.md; docs/modeles.md, « Banque d'effets prêts à jouer »).
 // A model of Edith's is a whole Reel coded once, like an Edits or CapCut template: her files in its slots, her words in its
@@ -433,7 +433,8 @@ export function readPieceFill(
   }
   const offered = new Set(options.photos ?? []);
   const photos = piece.photos ? [...new Set(answer.photos ?? [])].filter((id) => offered.has(id)).slice(0, Math.min(4, piece.photos.most)) : [];
-  return { texts, objects, settings: skillSettings(piece, answer.settings), ...(photos.length ? { photos } : {}) };
+  // Her charter's colour unless her words ask for another (charterSettings: « les couleurs doivent respecter la DA »).
+  return { texts, objects, settings: { ...charterSettings(piece), ...skillSettings(piece, answer.settings) }, ...(photos.length ? { photos } : {}) };
 }
 
 // ——— Its plan ——————————————————————————————————————————————————————————————————————————————————————————————————————

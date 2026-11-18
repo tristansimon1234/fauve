@@ -122,7 +122,9 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   };
   const tone = setting("couleur", "jaune");
   const hers = [brand.accent, brand.palette && brand.palette.light].find((c) => luma(c) >= 0.45);
-  const COLOR = tone === "blanc" ? "#f4f1e8" : tone === "sienne" && hers ? hers : "#f2ea4a";
+  // Her charter first (« les couleurs doivent respecter la DA, surtout pas le modèle »): her colour when it reads on a dark
+  // picture, else a warm white; the original's lemon yellow only when she asks for it.
+  const COLOR = tone === "jaune" ? "#f2ea4a" : tone === "sienne" && hers ? hers : "#f4f1e8";
   const display = "'" + brand.displayFont + "', 'Noto Serif Display', Georgia, serif";
   const body = "'" + brand.bodyFont + "', 'Noto Serif Display', Georgia, serif";
   const shade = "0 0 1px rgba(0,0,0,0.35), 0 2px 12px rgba(0,0,0,0.38)";
@@ -290,7 +292,7 @@ export const courtMetrage: MontageSkill = {
       want: "la couleur de son titre et de ses petits mots",
       choices: [
         { value: "jaune", says: "le jaune citron d'un générique, comme l'original" },
-        { value: "sienne", says: "sa couleur (celle de sa charte, si elle se lit sur une image sombre)" },
+        { value: "sienne", says: "sa couleur (celle de sa charte, si elle se lit sur une image sombre ; sinon un blanc chaud)", charter: true },
         { value: "blanc", says: "un blanc chaud" },
       ],
     },
@@ -299,7 +301,7 @@ export const courtMetrage: MontageSkill = {
       want: "la lumière de ses plans",
       choices: [
         { value: "doree", says: "la lumière dorée d'une vieille pellicule, chaude et riche, comme l'original" },
-        { value: "naturelle", says: "ses plans tels qu'elle les a filmés" },
+        { value: "naturelle", says: "ses plans tels qu'elle les a filmés", charter: true },
       ],
     },
   ],

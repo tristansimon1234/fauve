@@ -10,7 +10,7 @@ import { landingSlots, welcomeLines } from "../skills/bienvenue.ts";
 // last shot; her shots under it darker (a veil dosed on the light read under her words, as the model's: their mean
 // brought to about 0,25, their brightest tenth to about 0,6), a snap of fingers as each line lands, the music stopped from
 // its start and back on the Reel's beat at its end (the original's voice counting alone, then the drop). Then the montage
-// takes over without her words. Its ink: her colour when it reads on a dark picture, else the original's fluo yellow (or
+// takes over without her words. Its ink: her colour when it reads on a dark picture, else white (her charter first, 18 November; the original's fluo yellow on her word) (or
 // the yellow, or white, as her words ask). Kept from the skill: its hand and its sizes, its four lines at most (the cut
 // whose longest line is the shortest), its landings, its snaps, its silence until the drop. Left out: its burst (the
 // editor cuts the Reel after it), its format setting (the montage frames her shots), its ending card.
@@ -100,7 +100,7 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const lin = (v) => (v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4));
   const lum = (c) => { const m = /^#?([0-9a-f]{6})$/i.exec(String(c || "").trim()); if (!m) return -1; const v = parseInt(m[1], 16); return 0.2126 * lin(((v >> 16) & 255) / 255) + 0.7152 * lin(((v >> 8) & 255) / 255) + 0.0722 * lin((v & 255) / 255); };
   const encre = setting("encre", "sienne");
-  const INK = encre === "blanc" ? "#ffffff" : encre === "sienne" && lum(brand.accent) >= 0.35 ? String(brand.accent).toLowerCase() : "#f4ff00";
+  const INK = encre === "jaune" ? "#f4ff00" : encre === "sienne" && lum(brand.accent) >= 0.35 ? String(brand.accent).toLowerCase() : "#ffffff";
   const hand = "'Mynerve', '" + brand.displayFont + "', cursive";
   const PITCH = Math.round(height * 0.0964);
   const SIZE = Math.round(height * 0.0583);
@@ -137,7 +137,7 @@ export const bienvenue: EffectPiece = {
       name: "encre",
       want: "la couleur de sa phrase écrite à la main",
       choices: [
-        { value: "sienne", says: "sa couleur quand elle est assez claire pour se lire sur ses plans assombris, sinon le jaune fluo de l'original" },
+        { value: "sienne", says: "sa couleur quand elle est assez claire pour se lire sur ses plans assombris, sinon le jaune fluo de l'original", charter: true },
         { value: "jaune", says: "le jaune fluo de l'original" },
         { value: "blanc", says: "blanc" },
       ],

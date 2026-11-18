@@ -326,7 +326,7 @@ export const celuiLa: MontageSkill = {
       choices: [
         { value: "creme", says: "jaune crème pâle, comme l'original" },
         { value: "blanc", says: "blanc" },
-        { value: "sa-couleur", says: "la couleur de sa charte" },
+        { value: "sa-couleur", says: "la couleur de sa charte", charter: true },
       ],
     },
   ],
