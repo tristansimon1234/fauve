@@ -40,8 +40,8 @@ export function preparedFilter(hold = 2): string {
   return `scale='if(gt(iw,ih),min(iw,${side}),-2)':'if(gt(iw,ih),-2,min(ih,${side}))':flags=lanczos,fps=${FPS},tpad=stop_mode=clone:stop_duration=${hold},format=yuv420p`;
 }
 
-/** Its encoding: H.264 at a near-transparent quality, a key image every second, its sound kept. */
-export const PREPARED_CODEC: readonly string[] = ["-c:v", "libx264", "-preset", "veryfast", "-crf", "16", "-g", String(keyInterval()), "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart"];
+/** Its encoding: H.264 at a near-transparent quality (CRF 12: 52.5 dB from her file on the bench of 18 November, 50.2 at CRF 16), a key image every second, its sound kept. */
+export const PREPARED_CODEC: readonly string[] = ["-c:v", "libx264", "-preset", "veryfast", "-crf", "12", "-g", String(keyInterval()), "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart"];
 
 /** What ffmpeg says of an iPhone's HDR video (HLG or PQ, 10 bits), as a grep pattern: such a video is tone-mapped (HDR_TO_SDR). */
 export const HDR_MARKS = "arib-std-b67|smpte2084";

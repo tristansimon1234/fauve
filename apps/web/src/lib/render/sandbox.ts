@@ -657,9 +657,12 @@ export async function renderReelInSandbox(job: {
       const bound = renderBoundSeconds(timeLeft());
       // BT.709, said in the file: by default the video was encoded in BT.601 without saying so (18 November: « unknown »),
       // and a phone or Instagram reading it as an HD video's BT.709 showed its colours about 7 % more saturated.
+      // Its frames in PNG and the video at CRF 14 (Tristan: « je veux une qualité iso entre l'envoi et le rendu »; local
+      // bench on a 4K phone-like video, docs/rendu.md « Rendu au plus près de ses fichiers »): JPEG frames and CRF 18 left
+      // smudges on flat walls and skies; same render time, about 9 Mb/s instead of 5.
       await bash(
         sandbox,
-        `cd ${REMOTION} && rm -f "$1/out.mp4" && ${bound ? `timeout -k 10 ${bound} ` : ""}npx remotion render build Reel "$1/out.mp4" --props="$1/props.json" ${remotionFlags(how)} --codec=h264 --crf=18 --jpeg-quality=95 --pixel-format=yuv420p --color-space=bt709 --enforce-audio-track --log=error`,
+        `cd ${REMOTION} && rm -f "$1/out.mp4" && ${bound ? `timeout -k 10 ${bound} ` : ""}npx remotion render build Reel "$1/out.mp4" --props="$1/props.json" ${remotionFlags(how)} --codec=h264 --crf=14 --image-format=png --pixel-format=yuv420p --color-space=bt709 --enforce-audio-track --log=error`,
         [dir],
       ).catch((error: unknown) => {
         // 124: stopped by its bound.
