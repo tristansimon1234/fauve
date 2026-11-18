@@ -17,6 +17,11 @@ import { replyOnWhatsApp } from "@/lib/whatsapp/inbound";
 // once she has looked at them. Outside the 24 h window Edith cannot write first: the button
 // back to WhatsApp has « C'est envoyé ! » ready, and her message opens the window.
 
+/** The note of the turn that answers her once her dropped files are read (« C'est arrivé » already said). */
+const DROP_NOTE =
+  "[Ses fichiers déposés par son lien sont lus (ton « C'est arrivé » n'a fait que les accuser) : réponds-lui maintenant sur eux, " +
+  "comme si elle venait de les envoyer, sans redire qu'ils sont arrivés.]";
+
 const filesSchema = z
   .array(z.object({ path: z.string().max(300), mime: z.string().max(100), size: z.number().int().positive() }))
   .min(1)
@@ -90,7 +95,10 @@ export async function sendDropped(input: z.input<typeof filesSchema>): Promise<D
       ),
     );
     if (!open) return;
-    await replyOnWhatsApp({ studioId, memberId: member.id, waId, phone: member.phone_e164 }).catch((e: unknown) => console.error("upload link: reply failed", e));
+    // Its « C'est arrivé » was sent before they were read, so it is the conversation's last message: without this note, the
+    // turn found everything answered and stayed silent (18 November, twice: « je reviens vers toi », then nothing until
+    // her « Alors ? »).
+    await replyOnWhatsApp({ studioId, memberId: member.id, waId, phone: member.phone_e164, note: DROP_NOTE }).catch((e: unknown) => console.error("upload link: reply failed", e));
   });
   return { ok: true, count: added.length, answered: open };
 }
