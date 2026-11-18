@@ -1869,9 +1869,9 @@ test("a model's music shape: read on the Reel, kept on the plan, shaped on its o
   const gains = mixGains({ speech: null, music: -15 }, false);
   const shaped = mixFilter(gains, 7.2, [], { shape: { pauses: [{ from: 2, to: 2.5 }], end: { at: 7.5 } }, duration: 8 });
   assert.match(shaped, /^\[1:a\]aformat=sample_rates=44100:channel_layouts=stereo,volume=1dB\[ms_in\];\[ms_in\]asplit=2/);
-  assert.match(shaped, /\[ms_out\]anull,alimiter=limit=0\.891:level=false,afade=t=out:st=7\.980:d=0\.02,apad\[a\]$/);
+  assert.match(shaped, /\[ms_out\]anull,alimiter=limit=0\.891:level=false,afade=t=out:st=7\.980:d=0\.02,apad=whole_dur=8\.000\[a\]$/);
   // Without an end of its own, the mix's fade; without a shape, the mix as before.
-  assert.match(mixFilter(gains, 7.2, [], { shape: { pauses: [{ from: 2, to: 2.5 }] }, duration: 8 }), /afade=t=out:st=7\.20:d=0\.8,apad\[a\]$/);
+  assert.match(mixFilter(gains, 7.2, [], { shape: { pauses: [{ from: 2, to: 2.5 }] }, duration: 8 }), /afade=t=out:st=7\.20:d=0\.8,apad=whole_dur=8\.000\[a\]$/);
   assert.equal(mixFilter(gains, 7.2, [], { shape: { none: true }, duration: 8 }), mixFilter(gains, 7.2));
   const ducked = mixFilter(mixGains({ speech: -20, music: -15 }, false), 7.2, [], { shape: { pauses: [{ from: 2, to: 2.5 }] }, duration: 8 });
   assert.match(ducked, /\[ms_out\]anull\[m\];\[m\]\[key\]sidechaincompress/);
@@ -11576,7 +11576,7 @@ test("a voice over a model that plays without music is still brought to the leve
   const { soundsOnlyFilter } = await import("./mix.ts");
   const effect = { at: 1, gain: -3, onset: 0, end: 0.5 };
   // Her voice alone, levelled, its peaks held.
-  assert.match(soundsOnlyFilter(true, 12, [], 9.5), /^\[0:a\]aformat=sample_rates=44100:channel_layouts=stereo,volume=9\.5dB\[pre\];\[pre\]alimiter=limit=0\.891:level=false,apad\[a\]$/);
+  assert.match(soundsOnlyFilter(true, 12, [], 9.5), /^\[0:a\]aformat=sample_rates=44100:channel_layouts=stereo,volume=9\.5dB\[pre\];\[pre\]alimiter=limit=0\.891:level=false,apad=whole_dur=12\.000\[a\]$/);
   // With the model's sounds over it.
   assert.match(soundsOnlyFilter(true, 12, [effect], 9.5), /volume=9\.5dB\[pre\];\[1:a\]atrim=/);
   // As before without a voice: its own sound as it is.

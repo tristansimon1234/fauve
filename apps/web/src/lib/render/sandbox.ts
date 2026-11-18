@@ -1155,6 +1155,12 @@ function printed(stdout: string, name: string): number | null {
  * the Reel's length when the video's cannot be read; `grid`, the music's beats once set on the cuts (its pauses come
  * back on them). `ambient` « shots »: only a model's shots keep their own sound, the music stepping back under them.
  */
+/**
+ * The most a mix may take (s): a few seconds for a Reel; a mix that hangs (18 November, an endless « apad » under ffmpeg
+ * 7.0.2) fails here instead of holding the step until its 800 s.
+ */
+const MIX_BOUND_SECONDS = 180;
+
 export async function muxAudioInSandbox(
   id: string,
   mp4: Buffer,
@@ -1203,7 +1209,7 @@ export async function muxAudioInSandbox(
       console.info("mix", id, measured.trim(), { sounds: placed.length, ...(voiced ? { speechGain: voiced } : {}) });
       await bash(
         sandbox,
-        `cd "$1" && ${ROOT}/ffmpeg -loglevel error -y -i in.mp4 ${inputs.map((_, i) => `"\${${i + 3}}"`).join(" ")} -filter_complex "$2" -map 0:v:0 -map "[a]" -c:v copy -c:a aac -b:a 192k -shortest -movflags +faststart out.mp4`,
+        `cd "$1" && timeout -k 5 ${MIX_BOUND_SECONDS} ${ROOT}/ffmpeg -loglevel error -y -i in.mp4 ${inputs.map((_, i) => `"\${${i + 3}}"`).join(" ")} -filter_complex "$2" -map 0:v:0 -map "[a]" -c:v copy -c:a aac -b:a 192k -shortest -movflags +faststart out.mp4`,
         [dir, filter, ...inputs],
       );
     } else {
@@ -1218,7 +1224,7 @@ export async function muxAudioInSandbox(
       console.info("mix", id, measured.trim(), gains, { sounds: placed.length, ...(shaped ? { shape: options.shape } : {}) });
       await bash(
         sandbox,
-        `cd "$1" && ${ROOT}/ffmpeg -loglevel error -y -i in.mp4 -i music.mp3 ${inputs.map((_, i) => `"\${${i + 3}}"`).join(" ")} -filter_complex "$2" -map 0:v:0 -map "[a]" -c:v copy -c:a aac -b:a 192k -shortest -movflags +faststart out.mp4`,
+        `cd "$1" && timeout -k 5 ${MIX_BOUND_SECONDS} ${ROOT}/ffmpeg -loglevel error -y -i in.mp4 -i music.mp3 ${inputs.map((_, i) => `"\${${i + 3}}"`).join(" ")} -filter_complex "$2" -map 0:v:0 -map "[a]" -c:v copy -c:a aac -b:a 192k -shortest -movflags +faststart out.mp4`,
         [dir, mixFilter(gains, duration ? duration - MIX_FADE : null, placed, shaped), ...inputs],
       );
     }

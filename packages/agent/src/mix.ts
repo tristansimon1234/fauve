@@ -95,6 +95,15 @@ const MIX_EDGE = 0.02;
  * music's beats once set on the cuts (its returns land on them): the music is shaped before anything joins it; when it
  * ends by its own shape, the mix only fades its last 20 ms.
  */
+/**
+ * The silence that pads a mix's sound up to the picture's length, so a sound shorter than the video never cuts it
+ * (-shortest: 18 November, a Reel delivered at 14.9 s of 27.2). Always to a length: an endless « apad » never let the
+ * workshop's ffmpeg 7.0.2 finish a mix with the picture copied (two montages ran to the step's 800 s, the same evening).
+ */
+export function padUntil(seconds: number | null | undefined): string {
+  return seconds && Number.isFinite(seconds) && seconds > 0 ? `,apad=whole_dur=${seconds.toFixed(3)}` : "";
+}
+
 export function mixFilter(
   gains: ReturnType<typeof mixGains>,
   fadeAt: number | null,
@@ -110,17 +119,19 @@ export function mixFilter(
         ? `,afade=t=out:st=${Math.max(0, fadeAt + MIX_FADE - MIX_EDGE).toFixed(3)}:d=${MIX_EDGE}`
         : `,afade=t=out:st=${Math.max(0, fadeAt).toFixed(2)}:d=${MIX_FADE}`;
   const limit = `alimiter=limit=${MIX_CEILING}:level=false`;
+  // Its sound padded with silence up to the picture's length, never past it (padUntil).
+  const pad = padUntil(shaped?.duration ?? (fadeAt !== null ? fadeAt + MIX_FADE : null));
   const music = `[1:a]${STEREO},volume=${gains.musicGain}dB${shape ? `[ms_in];${musicShapeGraph(shape, "ms_in", "ms_out", shaped!.duration, shaped!.grid)};[ms_out]anull` : ""}`;
   // The sound effects (inputs 2…), added to the mix before its limiter and its fade.
   const end = sounds.length ? `[pre];${soundChains(sounds, 2)};[pre]${sounds.map((_, i) => `[x${i}]`).join("")}amix=inputs=${sounds.length + 1}:duration=first:normalize=0,` : ",";
   // The ambience of her videos under the music, both as they are.
-  if (gains.kind === "ambient") return `[0:a]${STEREO},volume=${gains.speechGain}dB[own];${music}[m];[m][own]amix=inputs=2:duration=first:normalize=0${end}${limit}${fade},apad[a]`;
-  if (!gains.duck) return `${music}${end}${limit}${fade},apad[a]`;
+  if (gains.kind === "ambient") return `[0:a]${STEREO},volume=${gains.speechGain}dB[own];${music}[m];[m][own]amix=inputs=2:duration=first:normalize=0${end}${limit}${fade}${pad}[a]`;
+  if (!gains.duck) return `${music}${end}${limit}${fade}${pad}[a]`;
   const d = gains.duck;
   return (
     `[0:a]${STEREO},volume=${gains.speechGain}dB,asplit=2[key][own];${music}[m];` +
     `[m][key]sidechaincompress=threshold=${d.threshold}:ratio=${d.ratio}:attack=${d.attack}:release=${d.release}[ducked];` +
-    `[ducked][own]amix=inputs=2:duration=first:normalize=0${end}${limit}${fade},apad[a]`
+    `[ducked][own]amix=inputs=2:duration=first:normalize=0${end}${limit}${fade}${pad}[a]`
   );
 }
 
@@ -166,8 +177,7 @@ export function soundChains(sounds: SoundInMix[], first: number): string {
 export function soundsOnlyFilter(hasAudio: boolean, duration: number, sounds: SoundInMix[], speechGain = 0): string {
   const gain = hasAudio && speechGain ? `,volume=${speechGain}dB` : "";
   const base = hasAudio ? `[0:a]${STEREO}${gain}[pre]` : `anullsrc=r=44100:cl=stereo,atrim=duration=${duration.toFixed(2)}[pre]`;
-  // apad: its sound never ends before the picture (the mix stops with the video, -shortest).
-  const limit = `alimiter=limit=${MIX_CEILING}:level=false,apad[a]`;
+  const limit = `alimiter=limit=${MIX_CEILING}:level=false${padUntil(duration)}[a]`;
   if (!sounds.length) return `${base};[pre]${limit}`;
   return `${base};${soundChains(sounds, 1)};[pre]${sounds.map((_, i) => `[x${i}]`).join("")}amix=inputs=${sounds.length + 1}:duration=first:normalize=0,${limit}`;
 }
