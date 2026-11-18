@@ -1,6 +1,5 @@
 "use client";
 
-import { EFFECT_MINUTES, REDO_MINUTES, RERENDER_MINUTES } from "@fauve/agent";
 import { unstable_rethrow, useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { updatePost } from "@/app/(app)/publications/[id]/actions";
@@ -193,7 +192,7 @@ export function PhoneReview({ data }: { data: ReviewData }) {
       ) : (
         (data.making || !data.videoUrl) && (
           <div className="absolute inset-0 flex items-center justify-center bg-ink/80 px-8">
-            <Making step={data.making?.step ?? null} kind={data.making?.kind ?? "render"} minutes={data.making?.minutes} again={Boolean(data.videoUrl)} />
+            <Making />
           </div>
         )
       )}
@@ -220,16 +219,19 @@ export function PhoneReview({ data }: { data: ReviewData }) {
         )}
       </div>
 
-      {/* Bottom: the caption as the feed shows it, then what she does. */}
-      <div className={`relative z-10 mt-auto flex flex-col gap-3 ${fade} bg-gradient-to-t from-black/85 via-black/60 to-transparent px-4 pt-16 pb-[calc(1rem+env(safe-area-inset-bottom))]`}>
+      {/* Bottom, once the video is there (while it is made, the page says only that: Tristan, 18 November, « il faut
+          juste une page montage en cours, revenez dans quelques minutes »): what she does, her caption behind a link. */}
+      {ready && <div className={`relative z-10 mt-auto flex flex-col gap-3 ${fade} bg-gradient-to-t from-black/85 via-black/60 to-transparent px-4 pt-16 pb-[calc(1rem+env(safe-area-inset-bottom))]`}>
         {ready && !data.locked && <AddedSound sound={data.sound} heard={Boolean(preview)} dark />}
+        {/* Her caption, secondary (Tristan: « trop présente, juste un bouton voir la légende »): behind one link, its
+            sheet to copy it or write over it; published, to copy it. */}
         {data.locked ? (
           data.captionShown && (
             <div className="flex flex-col gap-1.5">
-              <button type="button" onClick={() => setOpen(!open)} className="text-left text-[14px] leading-snug drop-shadow">
-                {data.handle && <strong className="font-extrabold">{data.handle} </strong>}
-                <span className={open ? "whitespace-pre-line" : "line-clamp-2"}>{data.captionShown}</span>
+              <button type="button" onClick={() => setOpen(!open)} className="inline-flex items-center gap-1.5 self-start text-[13px] font-semibold text-white/85 underline underline-offset-3">
+                <CaptionIcon size={14} /> {open ? "Masquer la légende" : "Voir la légende"}
               </button>
+              {open && <p className="whitespace-pre-line text-[14px] leading-snug drop-shadow">{data.captionShown}</p>}
               {open && (
                 <button type="button" onClick={() => copy(data.captionShown)} className="inline-flex items-center gap-1.5 self-start text-[13px] font-semibold text-white/85 underline underline-offset-3">
                   {copied ? <CheckIcon size={14} /> : <CaptionIcon size={14} />}
@@ -239,19 +241,10 @@ export function PhoneReview({ data }: { data: ReviewData }) {
             </div>
           )
         ) : (
-          // Touched, it opens to be written over.
-          <div className="flex flex-col gap-1.5">
-            {caption.trim() && (
-              <button type="button" onClick={writeCaption} className="text-left text-[14px] leading-snug drop-shadow">
-                {data.handle && <strong className="font-extrabold">{data.handle} </strong>}
-                <span className="line-clamp-2">{caption}</span>
-              </button>
-            )}
-            <button type="button" onClick={writeCaption} className="inline-flex items-center gap-1.5 self-start text-[13px] font-semibold text-white/85 underline underline-offset-3">
-              <PenIcon size={14} />
-              {caption.trim() ? "Modifier la légende" : "Écrire la légende"}
-            </button>
-          </div>
+          <button type="button" onClick={writeCaption} className="inline-flex items-center gap-1.5 self-start text-[13px] font-semibold text-white/85 underline underline-offset-3">
+            <CaptionIcon size={14} />
+            {caption.trim() ? "Voir la légende" : "Écrire la légende"}
+          </button>
         )}
 
         {data.previous !== null && !data.locked && !data.making && (
@@ -267,14 +260,10 @@ export function PhoneReview({ data }: { data: ReviewData }) {
         )}
 
         {data.locked ? (
-          sharing.can && ready ? (
+          sharing.can && (
             <button type="button" onClick={saveVideo} disabled={sharing.busy} className="flex h-[50px] items-center justify-center gap-2 bg-white/15 text-[15px] font-extrabold backdrop-blur-sm">
               <DownloadIcon size={19} /> {sharing.busy ? "Un instant…" : "Enregistrer"}
             </button>
-          ) : data.downloadUrl && (
-            <a href={data.downloadUrl} download className="flex h-[50px] items-center justify-center gap-2 bg-white/15 text-[15px] font-extrabold backdrop-blur-sm">
-              <DownloadIcon size={19} /> Télécharger
-            </a>
           )
         ) : sent ? (
           <p className="flex items-start gap-2 bg-white/15 px-4 py-3 text-[14.5px] leading-snug font-semibold backdrop-blur-sm">
@@ -283,7 +272,9 @@ export function PhoneReview({ data }: { data: ReviewData }) {
           </p>
         ) : (
           <div className="flex flex-col gap-1.5">
-            <div className="grid grid-cols-3 gap-2">
+            {/* No « Télécharger » (Tristan: « tu le télécharges en dossier, ça sert à rien »): « Enregistrer » puts it in her
+                Photos when her phone shares files, else the row is « Publier » and « Prévoir ». */}
+            <div className={`grid gap-2 ${sharing.can ? "grid-cols-3" : "grid-cols-2"}`}>
               <button type="button" onClick={publish} disabled={pending || !ready} className={`${tile} bg-violet shadow-[0_8px_22px_rgba(91,63,217,0.4)]`}>
                 <ArrowUpIcon size={19} />
                 {pending || sharing.busy ? "Un instant…" : data.publishByHand ? "Me l’envoyer" : "Publier"}
@@ -299,17 +290,7 @@ export function PhoneReview({ data }: { data: ReviewData }) {
                   <DownloadIcon size={19} />
                   {sharing.busy ? "Un instant…" : "Enregistrer"}
                 </button>
-              ) : data.downloadUrl ? (
-                <a href={data.downloadUrl} download className={`${tile} bg-white/15 backdrop-blur-sm`}>
-                  <DownloadIcon size={19} />
-                  Télécharger
-                </a>
-              ) : (
-                <button type="button" disabled className={`${tile} bg-white/15 backdrop-blur-sm`}>
-                  <DownloadIcon size={19} />
-                  Télécharger
-                </button>
-              )}
+              ) : null}
               <button type="button" onClick={() => setSheet("date")} className={`${tile} bg-white/15 backdrop-blur-sm`}>
                 <CalendarIcon size={19} />
                 Prévoir
@@ -324,7 +305,7 @@ export function PhoneReview({ data }: { data: ReviewData }) {
             <PenIcon size={18} /> Modifier avec Edith
           </a>
         )}
-      </div>
+      </div>}
 
       <ReviewSheets
         sheet={sheet === "caption" ? null : sheet}
@@ -376,39 +357,16 @@ export function PhoneReview({ data }: { data: ReviewData }) {
   );
 }
 
-/** Where the montage is, said plainly: its step, how long it has been going, what it usually takes. */
-const STEPS: Record<string, string> = {
-  "en file": "Ton Reel attend son tour",
-  montage: "Je monte ton Reel",
-  effet: "Je fais l’effet image par image",
-  "2e version": "J’essaie une autre version",
-  rendu: "Je fabrique la vidéo",
-  relecture: "Je relis tout",
-  correction: "Je corrige un détail",
-};
-const ORDER = ["montage", "rendu"];
-
-function Making({ step, kind, minutes, again }: { step: string | null; kind: "render" | "montage"; minutes?: number; again: boolean }) {
-  const usual = step === "effet" ? EFFECT_MINUTES : kind === "montage" ? REDO_MINUTES : RERENDER_MINUTES;
-  const at = step ? ORDER.indexOf(step === "effet" || step === "2e version" ? "montage" : step === "relecture" || step === "correction" ? "rendu" : step) : 1;
+function Making() {
+  // While it is made, only that (Tristan, 18 November: « trop d'infos qui servent à rien, il faut juste une page montage
+  // en cours, revenez dans quelques minutes »): no steps, no minutes.
   return (
     <div className="flex flex-col items-center gap-3 text-center text-white">
       <span className="flex size-20 items-center justify-center rounded-full bg-white">
         <Mascot size={64} mood="thinking" />
       </span>
-      <span className="text-[19px] font-extrabold">{step ? (STEPS[step] ?? "J’y travaille") : again ? "Je mets la vidéo à jour" : "Je fabrique ta vidéo"}</span>
-      {/* The two steps she can picture: the montage, then the video. */}
-      <span className="flex items-center gap-2 text-[12.5px] font-bold" aria-hidden="true">
-        {["Montage", "Vidéo"].map((label, i) => (
-          <span key={label} className={`flex items-center gap-1.5 px-3 py-1 ${i < at ? "bg-white/25 text-white" : i === at ? "bg-violet text-white" : "bg-white/10 text-white/55"}`}>
-            {i < at && <CheckIcon size={13} />}
-            {label}
-          </span>
-        ))}
-      </span>
-      <span className="text-[14px] leading-snug text-white/80">
-        {minutes !== undefined && minutes > 0 ? `En cours depuis ${minutes} min, ça prend en général ${usual} minutes.` : `Ça prend en général ${usual} minutes.`} Tu peux fermer : je te préviens sur WhatsApp dès qu’il est prêt.
-      </span>
+      <span className="text-[19px] font-extrabold">Montage en cours</span>
+      <span className="text-[14px] leading-snug text-white/80">Reviens dans quelques minutes : je te préviens sur WhatsApp dès qu’il est prêt.</span>
     </div>
   );
 }
@@ -417,7 +375,7 @@ function Making({ step, kind, minutes, again }: { step: string | null; kind: "re
  * Her Reel before its first version (the link of « je te l'envoie dès qu'il est prêt », opened early):
  * where it is, and the page follows it until the video is there.
  */
-export function PhoneMaking({ title, step, minutes }: { title: string; step: string | null; minutes: number }) {
+export function PhoneMaking({ title }: { title: string; step?: string | null; minutes?: number }) {
   const router = useRouter();
   useEffect(() => {
     const timer = setInterval(() => router.refresh(), 12_000);
@@ -433,7 +391,7 @@ export function PhoneMaking({ title, step, minutes }: { title: string; step: str
         <span className="size-11" />
       </div>
       <div className="flex flex-1 items-center justify-center px-8">
-        <Making step={step} kind="montage" minutes={minutes} again={false} />
+        <Making />
       </div>
     </main>
   );
