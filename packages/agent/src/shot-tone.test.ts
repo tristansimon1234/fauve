@@ -186,6 +186,10 @@ test("her light retouch under a grade: the measure's light and warmth replace th
   assert.deepEqual(toneAdjust(adjust, null, true), { straighten: 2, contrast: 0.1, saturation: 0.1 });
   assert.deepEqual(toneAdjust(adjust, "as_filmed", false), { straighten: 2 });
   assert.deepEqual(toneAdjust(adjust, null, false), adjust);
+  // Under a look that grades her footage, its contrast and saturation alone: the guessed ones go, her light stays.
+  assert.deepEqual(toneAdjust(adjust, null, true, true), { straighten: 2 });
+  assert.deepEqual(toneAdjust(adjust, null, false, true), { exposure: 0.3, warmth: 0.2, straighten: 2 });
+  assert.equal(adjust.contrast, 0.1);
 });
 
 test("the props: her footage graded, the texts untouched, her colours as filmed when she asks", () => {

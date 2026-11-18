@@ -32,6 +32,35 @@ export function lookFilter(look: ReelLookDraw, k: number): string {
 
 const channels = (hex: string) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255);
 
+/** Where its curve bends: above KNEE its highlights are eased in, under TOE its shadows; between, the image as it is. */
+const KNEE = 0.6;
+const TOE = 0.25;
+
+/**
+ * The curve laid before a look's matrix so it never burns her whites nor blocks her blacks (18 November: under « Plans
+ * de cinéma », 1.3 % of a picture pure white against 0.04 % as filmed, a white wall and a sky gone flat): a matrix is a
+ * straight line, contrast pushes its ends past white and black and everything there becomes one flat tone, where
+ * WhatsApp's compression shows. Read on a neutral grey: the input that lands at 0.98 (its brightest channel) and the one
+ * that lands at 0 (its darkest) become the ends of a soft shoulder and toe, the mid-tones untouched. Null when the look
+ * keeps her whites and blacks within range as it is. 33 values for an feComponentTransfer table.
+ */
+export function lookHeadroom(matrix: number[]): number[] | null {
+  const rows = [0, 1, 2].map((c) => ({ gain: matrix[c * 5]! + matrix[c * 5 + 1]! + matrix[c * 5 + 2]!, offset: matrix[c * 5 + 3]! + matrix[c * 5 + 4]! }));
+  const lit = rows.filter((r) => r.gain > 1e-3);
+  if (!lit.length) return null;
+  const burns = Math.min(...lit.map((r) => (1 - r.offset) / r.gain)) < 0.999;
+  const top = burns ? Math.max(0.8, Math.min(1, ...lit.map((r) => (0.98 - r.offset) / r.gain))) : 1;
+  const bottom = Math.min(TOE / 2, Math.max(0, ...lit.map((r) => -r.offset / r.gain)));
+  if (!burns && bottom < 0.001) return null;
+  const ease = (1 - top) / (1 - KNEE) ** 2;
+  const lift = bottom / TOE ** 2;
+  return Array.from({ length: 33 }, (_, i) => {
+    const x = i / 32;
+    const y = x > KNEE ? x - ease * (x - KNEE) ** 2 : x < TOE ? x + lift * (TOE - x) ** 2 : x;
+    return Math.round(y * 10000) / 10000;
+  });
+}
+
 /**
  * The SVG filter of a look's grade: its colour matrix, then its colours slipping apart (red one way,
  * blue the other), then its highlights blooming in their colour (the bright parts, blurred, added back).
@@ -42,11 +71,19 @@ export function LookDefs({ look, k }: { look: ReelLookDraw; k: number }) {
   // Only what is brighter than 70 %, stretched back to the full range.
   const gain = 1 / 0.3;
   const luma = (w: number) => (w * gain).toFixed(4);
+  const headroom = lookHeadroom(look.matrix);
   return (
     <svg width={0} height={0} style={{ position: "absolute" }} aria-hidden>
       <defs>
         <filter id={filterId(look)} colorInterpolationFilters="sRGB" x="0" y="0" width="100%" height="100%">
-          <feColorMatrix in="SourceGraphic" type="matrix" values={look.matrix.join(" ")} result="graded" />
+          {headroom ? (
+            <feComponentTransfer in="SourceGraphic" result="eased">
+              <feFuncR type="table" tableValues={headroom.join(" ")} />
+              <feFuncG type="table" tableValues={headroom.join(" ")} />
+              <feFuncB type="table" tableValues={headroom.join(" ")} />
+            </feComponentTransfer>
+          ) : null}
+          <feColorMatrix in={headroom ? "eased" : "SourceGraphic"} type="matrix" values={look.matrix.join(" ")} result="graded" />
           {look.bleed > 0 ? (
             <>
               <feColorMatrix in="graded" type="matrix" values="1 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 1 0" result="red" />

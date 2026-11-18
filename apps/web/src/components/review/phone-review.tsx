@@ -54,6 +54,14 @@ export function PhoneReview({ data }: { data: ReviewData }) {
     const line = shareMessage(result, caption);
     if (line) (result === "failed" ? setError : setToast)(line);
   };
+  // « Enregistrer »: her phone's share sheet, where « Enregistrer la vidéo » puts it in her Photos (Tristan: « quand je
+  // télécharge il me propose pas dans photo mais dans fichier » : a link's download goes to Files on an iPhone).
+  const saveVideo = async () => {
+    setError(null);
+    const result = await sharing.share("");
+    const line = shareMessage(result, "");
+    if (line) (result === "failed" ? setError : setToast)(line);
+  };
 
   // A new version on its way: the page follows it until the video is there.
   useEffect(() => {
@@ -259,7 +267,11 @@ export function PhoneReview({ data }: { data: ReviewData }) {
         )}
 
         {data.locked ? (
-          data.downloadUrl && (
+          sharing.can && ready ? (
+            <button type="button" onClick={saveVideo} disabled={sharing.busy} className="flex h-[50px] items-center justify-center gap-2 bg-white/15 text-[15px] font-extrabold backdrop-blur-sm">
+              <DownloadIcon size={19} /> {sharing.busy ? "Un instant…" : "Enregistrer"}
+            </button>
+          ) : data.downloadUrl && (
             <a href={data.downloadUrl} download className="flex h-[50px] items-center justify-center gap-2 bg-white/15 text-[15px] font-extrabold backdrop-blur-sm">
               <DownloadIcon size={19} /> Télécharger
             </a>
@@ -276,11 +288,16 @@ export function PhoneReview({ data }: { data: ReviewData }) {
                 <ArrowUpIcon size={19} />
                 {pending || sharing.busy ? "Un instant…" : data.publishByHand ? "Me l’envoyer" : "Publier"}
               </button>
-              {/* Not connected, « Publier » already shares: this one saves it. */}
+              {/* Not connected, « Publier » already shares: this one saves it in her Photos (the share sheet, never Files). */}
               {sharing.can && ready && !needsInstagram(data) ? (
                 <button type="button" onClick={shareVideo} disabled={sharing.busy} className={`${tile} bg-white/15 backdrop-blur-sm`}>
                   <ShareIcon size={19} />
                   {sharing.busy ? "Un instant…" : "Partager"}
+                </button>
+              ) : sharing.can && ready ? (
+                <button type="button" onClick={saveVideo} disabled={sharing.busy} className={`${tile} bg-white/15 backdrop-blur-sm`}>
+                  <DownloadIcon size={19} />
+                  {sharing.busy ? "Un instant…" : "Enregistrer"}
                 </button>
               ) : data.downloadUrl ? (
                 <a href={data.downloadUrl} download className={`${tile} bg-white/15 backdrop-blur-sm`}>

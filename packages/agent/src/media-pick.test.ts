@@ -23,11 +23,12 @@ test("on WhatsApp, her médiathèque is a page behind a button; her upload link 
   assert.ok(video.label.length <= 20);
   assert.ok(replyExtrasSchema.shape.link.safeParse(video).success);
 
-  // The button under her message: the page a tool chose, else her upload link (none while her videos arrive in HD), else the one publication.
+  // The button under her message: the page a tool chose, else her upload link when Edith asked for it (even while her
+  // videos arrive in full quality: « voilà le bouton » had gone without one), else the one publication.
   assert.deepEqual(whatsappButton({ link: video, upload: "video" }, "compressed"), video);
   assert.deepEqual(whatsappButton({ upload: "video" }, "compressed"), { path: "/depot", label: "Envoyer mes fichiers", purpose: "upload" });
   assert.deepEqual(whatsappButton({ upload: "any" }, null)?.path, "/depot");
-  assert.equal(whatsappButton({ upload: "video" }, "full"), null);
+  assert.deepEqual(whatsappButton({ upload: "video" }, "full")?.path, "/depot");
   assert.deepEqual(whatsappButton({ posts: [A] }, null), { path: `/v/${A}`, label: "Voir la publication", purpose: "open_post" });
   assert.equal(whatsappButton({ posts: [A, B] }, null), null);
   assert.equal(whatsappButton({}, null), null);

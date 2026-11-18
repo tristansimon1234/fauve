@@ -5861,7 +5861,7 @@ test("a copy draws its title in a font she asks for, else in the model's", async
   assert.equal(model.copy?.title?.font, "Shadows Into Light");
 });
 
-test("a WhatsApp video's quality is measured: its picture read in its MP4 header, compressed under 3 Mb/s or 480p", async () => {
+test("a WhatsApp video's quality is measured: its picture read in its MP4 header, compressed under 3 Mb/s or 1080p", async () => {
   const { mp4Video, compressedVideo } = await import("./video-quality.ts");
   const box = (kind: string, body: Uint8Array) => {
     const out = new Uint8Array(8 + body.length);
@@ -5894,6 +5894,8 @@ test("a WhatsApp video's quality is measured: its picture read in its MP4 header
   assert.equal(compressedVideo({ bytes: 3.3e6, duration: 16, width: null, height: null }), true);
   assert.equal(compressedVideo({ bytes: 10.4e6, duration: 12.5, width: 1080, height: 1920 }), false);
   assert.equal(compressedVideo({ bytes: 10e6, duration: 10, width: 480, height: 848 }), true);
+  // His « HD » of 18 November: 720p at 3.2 Mb/s is compressed too.
+  assert.equal(compressedVideo({ bytes: 8.7e6, duration: 22, width: 720, height: 1280 }), true);
   assert.equal(compressedVideo({ bytes: null, duration: null, width: null, height: null }), null);
 });
 

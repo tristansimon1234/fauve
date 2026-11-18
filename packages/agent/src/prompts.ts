@@ -279,7 +279,7 @@ export function studioContextPrompt(ctx: StudioContextForPrompt): string {
     ...(ctx.channel === "whatsapp" && ctx.whatsappVideos
       ? [
           ctx.whatsappVideos === "full"
-            ? "Ses vidéos arrivent ici en pleine qualité (WhatsApp en HD, mesuré) : demande-les simplement ici, sans lien de dépôt ni « en tant que document », et ne parle pas de compression."
+            ? "Ses vidéos arrivent ici en pleine qualité (WhatsApp en HD, mesuré) : demande-les simplement ici, sans lien de dépôt ni « en tant que document », et ne parle pas de compression ; si elle demande le lien ou trouve la qualité mauvaise, reply_with upload."
             : "Ses vidéos arrivent ici compressées par WhatsApp (mesuré) : quand tu lui demandes des vidéos, reply_with upload (son lien de dépôt, en pleine qualité) ; le réglage HD de WhatsApp lui est expliqué une fois par le code.",
         ]
       : []),

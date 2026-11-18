@@ -46,12 +46,15 @@ export function ownPick(ids: string[], owned: Iterable<string>): string[] {
 
 /**
  * The page behind the button under Edith's WhatsApp message: the one a tool chose (her médiathèque to pick from,
- * the ideas, a publication…), else her upload link when she asked for files (full quality from her gallery, WhatsApp
- * compressing videos; none while her videos arrive in HD), else the page of the one publication she talks about.
+ * the ideas, a publication…), else her upload link when Edith asked for it (full quality from her gallery, WhatsApp
+ * compressing videos), else the page of the one publication she talks about. Her upload link always goes when Edith
+ * asked for it, whatever her videos' quality: her context only tells Edith not to ask for it by default while they
+ * arrive in full quality (`videos`, kept for the callers). On 18 November, asked « j'ai pas le lien renvoie », Edith
+ * wrote « voilà le bouton 👇 » and the button was dropped here, her 720p videos read as full quality.
  */
-export function whatsappButton(extras: Pick<ReplyExtras, "link" | "upload" | "posts">, videos: "full" | "compressed" | null): PageButton | null {
+export function whatsappButton(extras: Pick<ReplyExtras, "link" | "upload" | "posts">, _videos: "full" | "compressed" | null): PageButton | null {
   if (extras.link) return extras.link;
-  if (extras.upload && videos !== "full") return { path: "/depot", label: "Envoyer mes fichiers", purpose: "upload" };
+  if (extras.upload) return { path: "/depot", label: "Envoyer mes fichiers", purpose: "upload" };
   if (extras.posts?.length === 1) return { path: `/v/${extras.posts[0]}`, label: "Voir la publication", purpose: "open_post" };
   return null;
 }

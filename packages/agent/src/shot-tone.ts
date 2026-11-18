@@ -247,19 +247,25 @@ export function toneCrop(aspect: number | undefined, focus: { x: number; y: numb
 }
 
 /** Her retouch as the render applies it under a grade: as filmed, none of its colours; measured, its light and warmth are the measure's. */
-export function toneAdjust(adjust: Adjust | undefined, grade: ShotGrade | "as_filmed" | null, measured: boolean): Adjust | undefined {
+export function toneAdjust(adjust: Adjust | undefined, grade: ShotGrade | "as_filmed" | null, measured: boolean, lookOwns = false): Adjust | undefined {
   if (!adjust) return undefined;
   const { exposure, contrast, saturation, warmth, ...frame } = adjust;
-  const kept: Adjust = grade === "as_filmed" ? frame : measured ? { ...frame, ...(contrast ? { contrast } : {}), ...(saturation ? { saturation } : {}) } : adjust;
+  const kept: Adjust = grade === "as_filmed" ? { ...frame } : measured ? { ...frame, ...(contrast ? { contrast } : {}), ...(saturation ? { saturation } : {}) } : { ...adjust };
   void exposure;
   void warmth;
+  // A look that grades her footage sets its contrast and saturation alone: the ones guessed on each shot stacked on it
+  // (18 November: the ambiance's light, the guess and « Plans de cinéma », saturation +35 %, whites burnt).
+  if (lookOwns) {
+    delete kept.contrast;
+    delete kept.saturation;
+  }
   return Object.keys(kept).length ? kept : undefined;
 }
 
 /** A photo's retouch under its grade (as toneAdjust). */
-export function tonePhotoEdit(edit: PhotoEdit | undefined, grade: ShotGrade | "as_filmed" | null, measured: boolean): PhotoEdit | undefined {
+export function tonePhotoEdit(edit: PhotoEdit | undefined, grade: ShotGrade | "as_filmed" | null, measured: boolean, lookOwns = false): PhotoEdit | undefined {
   if (!edit) return undefined;
-  const adjust = toneAdjust(edit.adjust, grade, measured);
+  const adjust = toneAdjust(edit.adjust, grade, measured, lookOwns);
   const { adjust: _old, ...rest } = edit;
   return adjust ? { ...rest, adjust } : rest;
 }

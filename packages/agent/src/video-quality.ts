@@ -1,13 +1,15 @@
 // The quality her videos arrive in (Tristan: « le niveau de qualité d'une vidéo ne diminue pas vraiment sur WhatsApp si
 // je les envoie direct »). WhatsApp has two qualities: standard compresses a phone video to about 1.7 Mb/s, HD keeps it
-// close to the original (6 to 11 Mb/s measured on his, against 6 to 9 Mb/s sent from the app). Each video received is
-// measured (its size, length and picture, read in its MP4 header): in HD, nothing is said and no upload link is added;
-// compressed, she is told once how to set HD in WhatsApp, the upload link staying as a fallback.
+// close to the original (6 to 11 Mb/s measured on his, against 6 to 9 Mb/s sent from the app), but not always: on
+// 18 November his « HD » videos arrived in 720p at 3.0 to 3.2 Mb/s, read as full quality, and Edith asked for them on
+// WhatsApp again, without the upload link. Each video received is measured (its size, length and picture, read in its
+// MP4 header): in full quality (1080p and more, 3 Mb/s and more), nothing is said and no upload link is offered by
+// default; compressed, she is told once how to set HD in WhatsApp, and her upload link comes with a request for videos.
 
 /** Under this, a video came compressed (WhatsApp's standard quality is about 1.7 Mb/s). */
 export const COMPRESSED_MBPS = 3;
-/** A picture whose short side is under this came compressed too (480p). */
-export const COMPRESSED_SHORT_SIDE = 600;
+/** A picture whose short side is under this came compressed too: anything under 1080p (WhatsApp's 480p, and the 720p of its « HD »). */
+export const COMPRESSED_SHORT_SIDE = 1000;
 
 /** What she is told once, the first time a video of hers arrives compressed on WhatsApp. */
 export const HD_TIP =

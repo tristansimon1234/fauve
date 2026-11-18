@@ -51,8 +51,10 @@ const SPACES = /[^\S\u00a0\u202f]+/;
 export function Reel(props: ReelProps) {
   // The Reel's rhythm (its tempo; an older Reel: its ambiance), set the business's way (its titles, key words, boxes and light).
   // Her colours as filmed (finish.colour « off »): the ambiance's light on her shots goes too.
+  // A look that grades her footage is its only grade: the ambiance's light under it stacked a second contrast and
+  // saturation (18 November, saturation +35 % and whites burnt under « Plans de cinéma »).
   const themed = themeFor(props.template, props.brand.signature, props.tempo);
-  const theme = props.asFilmed ? { ...themed, grade: "" } : themed;
+  const theme = props.asFilmed || (props.look && gradesFootage(props.look)) ? { ...themed, grade: "" } : themed;
   // The studio's own fonts first, so their families are not asked of Google.
   loadCustomFonts(props.brand.customFonts);
   if (props.carousel) {

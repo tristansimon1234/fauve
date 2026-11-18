@@ -12,7 +12,7 @@ import { faceZone, layerTrack, sceneTrack, shotTrack, type FaceZone, type ShotTr
 import { DEPTH_MOVES, reliefOf } from "./depth.ts";
 import { clearKey, depthKey, groundKey, nearKey, photoKey, readKey, subjectKey, type ClearMap, type ShotReading } from "./subject.ts";
 import { LOOK_PRESETS, lookMatrix, lookStamp, planLook, type ReelLook } from "./looks.ts";
-import { colourMode, reelGrades, toneAdjust, toneFor, tonePhotoEdit, type ShotGrade } from "./shot-tone.ts";
+import { colourMode, lookGrades, reelGrades, toneAdjust, toneFor, tonePhotoEdit, type ShotGrade } from "./shot-tone.ts";
 
 // Edit plan → props of the Remotion "Reel" composition (apps/render). Everything
 // is converted to frames on the output timeline here, so the templates only
@@ -1203,6 +1203,8 @@ export function buildReelProps(plan: EditPlan, inputs: ReelInputs): ReelProps {
  */
 export function gradeReel(props: ReelProps, plan: Pick<EditPlan, "segments" | "finish" | "look" | "effect" | "skill" | "baked">): ReelProps {
   const grades = reelGrades(plan);
+  // A look that grades her footage sets its contrast and saturation alone (shot-tone.ts: toneAdjust).
+  const lookOwns = lookGrades(planLook(plan));
   const graded = (g: ShotGrade | "as_filmed" | null) => (g === "as_filmed" ? { asFilmed: true as const } : g ? { tone: g } : {});
   const sameFile = (clipId: string) => plan.segments.findIndex((x) => isClipSegment(x) && x.clip_id === clipId);
   const segments = props.segments.map((seg, i): ReelSegment => {
@@ -1210,12 +1212,12 @@ export function gradeReel(props: ReelProps, plan: Pick<EditPlan, "segments" | "f
     if (!s) return seg;
     if (seg.type === "clip" && isClipSegment(s)) {
       const { tone: _tone, asFilmed: _filmed, adjust: _adjust, ...rest } = seg;
-      const adjust = toneAdjust(s.adjust, grades[i] ?? null, Boolean(toneFor(s)));
+      const adjust = toneAdjust(s.adjust, grades[i] ?? null, Boolean(toneFor(s)), lookOwns);
       return { ...rest, ...(adjust ? { adjust } : {}), ...graded(grades[i] ?? null) };
     }
     if (seg.type === "image" && isClipSegment(s)) {
       const { tone: _tone, asFilmed: _filmed, edit: _edit, ...rest } = seg;
-      const edit = tonePhotoEdit(s.photo, grades[i] ?? null, Boolean(toneFor(s)));
+      const edit = tonePhotoEdit(s.photo, grades[i] ?? null, Boolean(toneFor(s)), lookOwns);
       return { ...rest, ...(edit ? { edit } : {}), ...graded(grades[i] ?? null) };
     }
     if ((seg.type === "motion" || seg.type === "scene") && seg.under && isMotionSegment(s) && s.over) {
@@ -1226,7 +1228,7 @@ export function gradeReel(props: ReelProps, plan: Pick<EditPlan, "segments" | "f
       const { tone: _tone, asFilmed: _filmed, ...under } = seg.under;
       if (under.type === "clip") {
         const { adjust: _adjust, ...bare } = under;
-        const adjust = toneAdjust(source.adjust, g, Boolean(toneFor(source)));
+        const adjust = toneAdjust(source.adjust, g, Boolean(toneFor(source)), lookOwns);
         return { ...seg, under: { ...bare, ...(adjust ? { adjust } : {}), ...graded(g) } };
       }
       return { ...seg, under: { ...under, ...graded(g) } };

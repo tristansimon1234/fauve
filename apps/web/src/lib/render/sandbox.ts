@@ -655,9 +655,11 @@ export async function renderReelInSandbox(job: {
     const render = async (props: ReelProps, how: RenderTry): Promise<Buffer> => {
       await sandbox.writeFiles([{ path: `${dir}/props.json`, content: JSON.stringify(props) }]);
       const bound = renderBoundSeconds(timeLeft());
+      // BT.709, said in the file: by default the video was encoded in BT.601 without saying so (18 November: « unknown »),
+      // and a phone or Instagram reading it as an HD video's BT.709 showed its colours about 7 % more saturated.
       await bash(
         sandbox,
-        `cd ${REMOTION} && rm -f "$1/out.mp4" && ${bound ? `timeout -k 10 ${bound} ` : ""}npx remotion render build Reel "$1/out.mp4" --props="$1/props.json" ${remotionFlags(how)} --codec=h264 --crf=18 --jpeg-quality=95 --pixel-format=yuv420p --enforce-audio-track --log=error`,
+        `cd ${REMOTION} && rm -f "$1/out.mp4" && ${bound ? `timeout -k 10 ${bound} ` : ""}npx remotion render build Reel "$1/out.mp4" --props="$1/props.json" ${remotionFlags(how)} --codec=h264 --crf=18 --jpeg-quality=95 --pixel-format=yuv420p --color-space=bt709 --enforce-audio-track --log=error`,
         [dir],
       ).catch((error: unknown) => {
         // 124: stopped by its bound.
