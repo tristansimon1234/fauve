@@ -1810,7 +1810,7 @@ test("mix: what is said at the level of a voice, the music under it and still he
   const graph = mixFilter(voiceOver, 12.18);
   assert.match(graph, /\[0:a\][^;]*volume=16dB,asplit=2\[key\]\[own\]/);
   assert.match(graph, /\[m\]\[key\]sidechaincompress=threshold=0\.03:ratio=1\.6/);
-  assert.match(graph, /alimiter=limit=0\.891:level=false,afade=t=out:st=12\.18:d=0\.8\[a\]$/);
+  assert.match(graph, /alimiter=limit=0\.891:level=false,afade=t=out:st=12\.18:d=0\.8,apad\[a\]$/);
   assert.doesNotMatch(mixFilter(mixGains({ speech: null, music: -15 }, false), 10), /\[0:a\]/);
   assert.doesNotMatch(mixFilter(voiceOver, null), /afade/);
 

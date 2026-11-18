@@ -114,13 +114,13 @@ export function mixFilter(
   // The sound effects (inputs 2…), added to the mix before its limiter and its fade.
   const end = sounds.length ? `[pre];${soundChains(sounds, 2)};[pre]${sounds.map((_, i) => `[x${i}]`).join("")}amix=inputs=${sounds.length + 1}:duration=first:normalize=0,` : ",";
   // The ambience of her videos under the music, both as they are.
-  if (gains.kind === "ambient") return `[0:a]${STEREO},volume=${gains.speechGain}dB[own];${music}[m];[m][own]amix=inputs=2:duration=first:normalize=0${end}${limit}${fade}[a]`;
-  if (!gains.duck) return `${music}${end}${limit}${fade}[a]`;
+  if (gains.kind === "ambient") return `[0:a]${STEREO},volume=${gains.speechGain}dB[own];${music}[m];[m][own]amix=inputs=2:duration=first:normalize=0${end}${limit}${fade},apad[a]`;
+  if (!gains.duck) return `${music}${end}${limit}${fade},apad[a]`;
   const d = gains.duck;
   return (
     `[0:a]${STEREO},volume=${gains.speechGain}dB,asplit=2[key][own];${music}[m];` +
     `[m][key]sidechaincompress=threshold=${d.threshold}:ratio=${d.ratio}:attack=${d.attack}:release=${d.release}[ducked];` +
-    `[ducked][own]amix=inputs=2:duration=first:normalize=0${end}${limit}${fade}[a]`
+    `[ducked][own]amix=inputs=2:duration=first:normalize=0${end}${limit}${fade},apad[a]`
   );
 }
 
@@ -166,7 +166,8 @@ export function soundChains(sounds: SoundInMix[], first: number): string {
 export function soundsOnlyFilter(hasAudio: boolean, duration: number, sounds: SoundInMix[], speechGain = 0): string {
   const gain = hasAudio && speechGain ? `,volume=${speechGain}dB` : "";
   const base = hasAudio ? `[0:a]${STEREO}${gain}[pre]` : `anullsrc=r=44100:cl=stereo,atrim=duration=${duration.toFixed(2)}[pre]`;
-  const limit = `alimiter=limit=${MIX_CEILING}:level=false[a]`;
+  // apad: its sound never ends before the picture (the mix stops with the video, -shortest).
+  const limit = `alimiter=limit=${MIX_CEILING}:level=false,apad[a]`;
   if (!sounds.length) return `${base};[pre]${limit}`;
   return `${base};${soundChains(sounds, 1)};[pre]${sounds.map((_, i) => `[x${i}]`).join("")}amix=inputs=${sounds.length + 1}:duration=first:normalize=0,${limit}`;
 }

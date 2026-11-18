@@ -218,6 +218,45 @@ async function bash(sandbox: Sandbox, script: string, args: string[] = []) {
   return result;
 }
 
+/** A file's size on the sandbox, in bytes (NaN when it is not there). */
+async function sizeIn(sandbox: Sandbox, path: string): Promise<number> {
+  const out = await bash(sandbox, 'stat -c %s "$1" 2>/dev/null || true', [path]);
+  return Number((await out.stdout()).trim() || Number.NaN);
+}
+
+/**
+ * A video brought back from the sandbox whole, or not at all: its bytes counted against its size there, read again once
+ * when they fall short. 18 November: a Reel came out at 14.9 s of 27.2, its last image cut in the middle, a file of
+ * about 73 MB (PNG frames, CRF 14) having lost its end on the way between the render and the mix.
+ */
+async function readWhole(sandbox: Sandbox, path: string): Promise<Buffer> {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const [size, buffer] = await Promise.all([sizeIn(sandbox, path), sandbox.readFileToBuffer({ path })]);
+    if (buffer?.length && buffer.length === size) return buffer;
+    console.warn("sandbox: file read incomplete", path, { got: buffer?.length ?? 0, size });
+  }
+  throw new Error(`file read incomplete: ${path}`);
+}
+
+/** A file sent to the sandbox whole, or not at all (readWhole): its size there checked, sent again once when short. */
+async function writeWhole(sandbox: Sandbox, path: string, content: Buffer | Uint8Array): Promise<void> {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    await sandbox.writeFiles([{ path, content: Buffer.from(content) }]);
+    const size = await sizeIn(sandbox, path);
+    if (size === content.length) return;
+    console.warn("sandbox: file write incomplete", path, { sent: content.length, size });
+  }
+  throw new Error(`file write incomplete: ${path}`);
+}
+
+/** How many frames of a video decode, and whether any failed (« Invalid », « error »): the render's own check. */
+async function decodedFrames(sandbox: Sandbox, path: string): Promise<{ frames: number; broken: boolean }> {
+  const check = await bash(sandbox, `${ROOT}/ffmpeg -hide_banner -v error -stats -i "$1" -map 0:v:0 -f null - 2>&1 | tr '\\r' '\\n' | grep -E "frame=|Invalid|rror" | tail -4 || true`, [path]);
+  const report = await check.stdout();
+  const frames = Number(/frame=\s*(\d+)/.exec(report.split("\n").filter((l) => l.includes("frame=")).at(-1) ?? "")?.[1] ?? Number.NaN);
+  return { frames, broken: /Invalid|rror/.test(report) || !Number.isFinite(frames) };
+}
+
 /**
  * Each time a persistent sandbox stops, Vercel keeps a snapshot of its disk to resume from
  * (2.5 GB for the render one, 1.6 GB for the cut-outs), by default for 30 days after its last
@@ -659,10 +698,11 @@ export async function renderReelInSandbox(job: {
       // and a phone or Instagram reading it as an HD video's BT.709 showed its colours about 7 % more saturated.
       // Its frames in PNG and the video at CRF 14 (Tristan: « je veux une qualité iso entre l'envoi et le rendu »; local
       // bench on a 4K phone-like video, docs/rendu.md « Rendu au plus près de ses fichiers »): JPEG frames and CRF 18 left
-      // smudges on flat walls and skies; same render time, about 9 Mb/s instead of 5.
+      // smudges on flat walls and skies; same render time, about 9 Mb/s instead of 5. At most 14 Mb/s: at 21 Mb/s a 27 s Reel
+      // weighed 73 MB and lost its end between the render and the mix (readWhole, writeWhole).
       await bash(
         sandbox,
-        `cd ${REMOTION} && rm -f "$1/out.mp4" && ${bound ? `timeout -k 10 ${bound} ` : ""}npx remotion render build Reel "$1/out.mp4" --props="$1/props.json" ${remotionFlags(how)} --codec=h264 --crf=14 --image-format=png --pixel-format=yuv420p --color-space=bt709 --enforce-audio-track --log=error`,
+        `cd ${REMOTION} && rm -f "$1/out.mp4" && ${bound ? `timeout -k 10 ${bound} ` : ""}npx remotion render build Reel "$1/out.mp4" --props="$1/props.json" ${remotionFlags(how)} --codec=h264 --crf=14 --encoding-max-rate=14M --encoding-buffer-size=28M --image-format=png --pixel-format=yuv420p --color-space=bt709 --enforce-audio-track --log=error`,
         [dir],
       ).catch((error: unknown) => {
         // 124: stopped by its bound.
@@ -670,15 +710,11 @@ export async function renderReelInSandbox(job: {
         throw error;
       });
       // Whole, or not sent: every frame decodes (a Reel was delivered cut at 11 s of 20, its file broken after).
-      const check = await bash(sandbox, `${ROOT}/ffmpeg -hide_banner -v error -stats -i "$1/out.mp4" -map 0:v:0 -f null - 2>&1 | tr '\\r' '\\n' | grep -E "frame=|Invalid|rror" | tail -4 || true`, [dir]);
-      const report = await check.stdout();
-      const frames = Number(/frame=\s*(\d+)/.exec(report.split("\n").filter((l) => l.includes("frame=")).at(-1) ?? "")?.[1] ?? Number.NaN);
-      if (/Invalid|rror/.test(report) || (Number.isFinite(frames) && frames < props.durationInFrames - 2)) {
+      const { frames, broken } = await decodedFrames(sandbox, `${dir}/out.mp4`);
+      if (broken || frames < props.durationInFrames - 2) {
         throw new Error(`render produced a broken file (${Number.isFinite(frames) ? `${frames} of ${props.durationInFrames} frames` : "unreadable"})`);
       }
-      const mp4 = await sandbox.readFileToBuffer({ path: `${dir}/out.mp4` });
-      if (!mp4?.length) throw new Error("render produced no file");
-      return mp4;
+      return await readWhole(sandbox, `${dir}/out.mp4`);
     };
     let local: ReelProps | null = null;
     try {
@@ -1140,8 +1176,11 @@ export async function muxAudioInSandbox(
   try {
     await bash(sandbox, 'rm -rf "$1" && mkdir -p "$1"', [dir]);
     const files = sounds.map((_, i) => `sfx_${String(i).padStart(2, "0")}.mp3`);
+    // The video whole on the sandbox (writeWhole), counted before the mix so the mix keeps every frame of it.
+    await writeWhole(sandbox, `${dir}/in.mp4`, mp4);
+    const before = await decodedFrames(sandbox, `${dir}/in.mp4`);
+    if (before.broken) throw new Error("mux: the video arrived broken");
     await sandbox.writeFiles([
-      { path: `${dir}/in.mp4`, content: mp4 },
       ...(audio ? [{ path: `${dir}/music.mp3`, content: audio }] : []),
       ...sounds.map((s, i) => ({ path: `${dir}/${files[i]}`, content: Buffer.from(s.mp3) })),
     ]);
@@ -1183,9 +1222,10 @@ export async function muxAudioInSandbox(
         [dir, mixFilter(gains, duration ? duration - MIX_FADE : null, placed, shaped), ...inputs],
       );
     }
-    const out = await sandbox.readFileToBuffer({ path: `${dir}/out.mp4` });
-    if (!out?.length) throw new Error("mux produced no file");
-    return out;
+    // Every frame kept: its sound never cuts the picture (18 November, a Reel cut at 14.9 s of 27.2), else not delivered.
+    const after = await decodedFrames(sandbox, `${dir}/out.mp4`);
+    if (after.broken || after.frames < before.frames - 2) throw new Error(`mux produced a broken file (${after.frames} of ${before.frames} frames)`);
+    return await readWhole(sandbox, `${dir}/out.mp4`);
   } finally {
     await bash(sandbox, 'rm -rf "$1"', [dir]).catch(() => {});
   }
