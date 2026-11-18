@@ -446,8 +446,10 @@ const EFFECT_WORDS: Record<StolenLook["effect"], string> = {
  * The look the copied Reel wears, as this Reel wears it (« ce qu'il a, son Reel l'a »), when the editor set
  * none: its filter's settings, designed from its words when it was read, else the preset Gemini named.
  */
-export function followedFilter(plan: { look?: ReelLook; effect?: ReelEffect }, followed: Pick<FollowedStyle, "look" | "filter_look"> | undefined): { look?: ReelLook } {
-  if (!followed || planLook(plan)) return {};
+export function followedFilter(plan: { look?: ReelLook; effect?: ReelEffect }, followed: (Pick<FollowedStyle, "look" | "filter_look"> & { dressed?: boolean }) | undefined): { look?: ReelLook } {
+  // A model Edith picked is dressed in her charter, its colours too: its own look (« Vert et crème », « Pellicule
+  // dorée ») never laid over her images (Tristan, 18 November: « les couleurs doivent respecter la DA »).
+  if (!followed || planLook(plan) || followed.dressed) return {};
   if (followed.filter_look) return { look: followed.filter_look };
   const effect = followed.look.effect;
   return isReelEffect(effect) ? { look: LOOK_PRESETS[effect] } : {};

@@ -76,13 +76,57 @@ export function namesHouseModel(text: string | null | undefined, key: string): b
 /** How many of her last Reels' models are not picked again. */
 export const HOUSE_PICK_AVOID = 3;
 
-export const HOUSE_PICK_PROMPT = `You are Edith's art director. A local business (a salon, a café, a studio, a shop, a restaurant…) has sent its footage for one Instagram Reel. Edith's Reels are never made in a neutral, safe default: each one is made in one of Edith's own models (modeles), a form with one strong idea that carries every second of the Reel (a title that decodes like a film's credits, words in the four corners, a mosaic that never settles, a giant title the passers-by walk in front of…), dressed in the business's own fonts and colours. Choose the model this Reel is made in.
+/**
+ * How much a model does (Tristan, 18 November, on « Arrive chez Indar »: « il a tendance à en faire beaucoup trop » — a
+ * plan shown « rythme calme, environ 15 s », a charter « minimaliste, jamais de glitch », and « Titre qui se décode »
+ * picked: a title scrambling, shots in slats, 21 sounds, 25 s). sobre: still or calm shots, a simple text, few effects;
+ * marque: one strong graphic idea (a frame, a typed name, a split, an apparition), at a steady pace; charge: flashes,
+ * glitches, bursts of shots, many sounds, a high energy.
+ */
+export const HOUSE_ENERGY: Record<string, "sobre" | "marque" | "charge"> = {
+  "quatre-coins": "sobre", mosaique: "sobre", pile: "sobre", "photo-dump": "sobre", table: "sobre", "ecran-partage": "sobre",
+  cadre: "sobre", "plans-fixes": "sobre", "mots-meles": "sobre", "titre-cinema": "sobre", routine: "sobre", carnet: "sobre",
+  recette: "sobre", "chef-face": "sobre", assiettes: "sobre", createur: "sobre", "mot-cle": "sobre", "petites-lumieres": "sobre",
+  "celui-la": "sobre", "mon-travail": "sobre", interrupteur: "sobre", "titre-derriere": "sobre", rallume: "sobre",
+  "carte-feutre": "marque", "court-metrage": "marque", fenetres: "marque", facade: "marque", gaufre: "marque", frappe: "marque",
+  eventail: "marque", tourne: "marque", silhouette: "marque", interface: "marque", pixel: "marque", "nom-de-ville": "marque",
+  vitraux: "marque", detourages: "marque", curseur: "marque", affiches: "marque", aplat: "marque", "vlog-ville": "marque",
+  bienvenue: "marque", "en-boutique": "marque", coulisses: "marque",
+  decode: "charge", "coups-de-fouet": "charge", nike: "charge", journee: "charge", vision: "charge", bientot: "charge",
+  nuit: "charge", raccords: "charge", aventure: "charge", depart: "charge", collage: "charge",
+};
+
+const ENERGY_RANK = { sobre: 0, marque: 1, charge: 2 } as const;
+/** Words that ask for energy (« dynamique », « qui claque »): no ceiling from a calm plan or a sober charter then. */
+const LIVELY = /(dynamique|[ée]nergi|rythmé|p[eê]chu|punchy|qui claque|nerveux|rapide|explosif|\bfun\b|festif)/i;
+/** Words of a calm Reel (her plan, her request). */
+const CALM = /\b(calme|pos[ée]|doux|douce|tranquille|lent|apais|serein|zen|sobre)/i;
+/** Words of a sober charter (her art direction): minimal, editorial, never a glitch. */
+const SOBER = /(minimal|sobre|[ée]pur[ée]|[ée]ditorial|jamais de (pub|glitch)|sans effet|pas d['’]effet|pas de glitch|simple)/i;
+
+/**
+ * The most a model may do for this Reel: « sobre » when her plan or her request says calm, « marque » when her charter is
+ * sober (« jamais de glitch »), null when nothing holds it back or she asks for energy. A model above it is never offered.
+ */
+export function energyCeiling(input: { request?: string; plan?: string; direction?: string }): "sobre" | "marque" | null {
+  const asked = `${input.request ?? ""} ${input.plan ?? ""}`;
+  if (LIVELY.test(asked)) return null;
+  if (CALM.test(asked)) return "sobre";
+  if (SOBER.test(input.direction ?? "")) return "marque";
+  return null;
+}
+
+/** Whether a model fits under a ceiling (a model not classed fits only without one). */
+export const withinEnergy = (key: string, ceiling: "sobre" | "marque" | null): boolean =>
+  !ceiling || (HOUSE_ENERGY[key] !== undefined && ENERGY_RANK[HOUSE_ENERGY[key]!] <= ENERGY_RANK[ceiling]);
+
+export const HOUSE_PICK_PROMPT = `You are Edith's art director. A local business (a salon, a café, a studio, a shop, a restaurant…) has sent its footage for one Instagram Reel. Edith's Reels are never made in a neutral, safe default: each one is made in one of Edith's own models (modeles), a form with one strong idea that carries every second of the Reel (words in the four corners, fixed cinema shots, a mosaic that never settles, a giant title the passers-by walk in front of…), dressed in the business's own fonts and colours. Choose the model this Reel is made in.
 
 How to choose
 - What each model is for (pour) and not for (pas_pour): never one whose pas_pour is her Reel.
 - Her files first: a model can only be made with the footage it needs (il_faut, and its number of files). One that needs someone walking in front of the place, someone talking to the camera, a hand raised to a wall, a fixed shot of the shop front or photos on a plain background is out unless her files have it.
 - Then her request (demande): what people must feel or do; when she names a form (a split screen, a collage, a word in big, black and white, a mosaic…), the model that is that form.
-- Then her taste (ses_gouts, when given): her moodboard and art direction, the Reels she sent to copy, the Reels she kept as models, the models of the Reels she published. Between the models her files and her request allow, the one in that spirit (its energy, its typography, what it puts forward); never against her files or her request, never the same model as one she just published.
+- What her art direction forbids (« jamais », « sans », « pas de »: a glitch, an ad's look, effects) and the rhythm of the plan she said yes to (calm, short) rule out a model as surely as her files: never a model that does what they forbid. Each model's energie (sobre: calm shots and a simple text; marque: one strong graphic idea at a steady pace; charge: flashes, glitches, bursts, many sounds): when in doubt, the soberer.\n- Then her taste (ses_gouts, when given): her moodboard and art direction, the Reels she sent to copy, the Reels she kept as models, the models of the Reels she published. Between the models her files and her request allow, the one in that spirit (its energy, its typography, what it puts forward); never against her files or her request, never the same model as one she just published.
 - Then her trade and what her footage shows: the model whose idea makes this business look its best (a mosaic for dishes or creations, fixed cinema shots for a calm place, whip pans for a lively street, a typed name for a place in the sun…).
 - When she asks you to be creative, to surprise her or to go free (« sois créatif », « surprends-moi », « fais-toi plaisir », « libre »): "none", the Reel is then created freely with every tool, never in a model.
 - When she asks for an effect or to say something (an offer, a name, a moment), a model whose idea is in its words or its effect (a title that decodes, a word you pass through, a title behind the passers-by, words that slam on each cut), never one made of images alone (a mosaic, a photo dump, fixed shots) unless she asks for that.
@@ -90,7 +134,7 @@ How to choose
 - When Edith already showed her a plan for this Reel (plan_montre: its opening, its texts, its ending), it is what she said yes to: pick only a model that can hold it, its main words in the model's text slots (textes: how many, how long) or on its ending card (fin), its shots in its cases, its mood; never one with no place for the words of a plan that has some (a mosaic, a photo dump, fixed shots without a title), never one whose form contradicts it. A detail it cannot hold (a second short text, a precise moment) is adapted, never a reason for "none"; "none" only when no model can hold its main idea.
 - When none can be made with her files, answer "none".
 
-Answer with the model's key in "key", the next best model that fits as well in "next" ("none" when no other fits), and, in "why", one short sentence in French for her (« Je l'ai fait façon « Titre qui se décode » : ton nom apparaît comme un générique de film. »).`;
+Answer with the model's key in "key", the next best model that fits as well in "next" ("none" when no other fits), and, in "why", one short sentence in French for her (« Je l'ai fait en plans fixes de cinéma : ton lieu se pose, plan après plan. »).`;
 
 export const housePickSchema = z.object({
   key: z.string().max(40),
@@ -162,6 +206,7 @@ export function housePickInput(input: {
       key: m.key,
       nom: m.name,
       ce_que_ca_fait: m.pitch,
+      ...(HOUSE_ENERGY[m.key] ? { energie: HOUSE_ENERGY[m.key] } : {}),
       ...(HOUSE_WHEN[m.key] ? { pour: HOUSE_WHEN[m.key]!.pour, pas_pour: HOUSE_WHEN[m.key]!.pas_pour } : {}),
       il_faut: m.needs,
       fichiers: input.least?.[m.key] ? [input.least[m.key], m.files[1]] : m.files,

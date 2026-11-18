@@ -736,7 +736,32 @@ export function dressSkillPlan(plan: EditPlan, skill: Pick<MontageSkill, "finish
   Object.assign(dressed, followedFilter(dressed, followed));
   if (skill.finish && dressed.look) dressed.look = { ...dressed.look, ...skill.finish };
   if (!planLook(dressed) && own) dressed.look = own;
+  // A model Edith picked keeps its sounds' idea, not their pile (« Arrive chez Indar »: 21 sounds in 25 s).
+  if (followed?.dressed && dressed.sounds?.length) dressed.sounds = tameSounds(dressed.sounds);
   return dressed;
+}
+
+/** The most sounds a Reel on a model Edith picked keeps, and the most of one sound repeated in a run. */
+export const TAME_SOUNDS = 8;
+export const TAME_RUN = 3;
+/** Two of the same sound this close (s) are one run (a shutter clicking, a glitch ticking). */
+const RUN_GAP = 0.4;
+
+/**
+ * A model's sounds kept to their idea (Tristan, 18 November: « il a tendance à en faire beaucoup trop » ; « Titre qui se
+ * décode » gave 6 shutter clicks, 3 whooshes, an impact, a rumble and 10 glitch ticks in 5 s): a run of one sound kept
+ * to its first TAME_RUN hits, then TAME_SOUNDS at most, the first ones (an opening's sounds set its tone).
+ */
+export function tameSounds<S extends { at: number; sound: string }>(sounds: S[]): S[] {
+  const sorted = [...sounds].sort((a, b) => a.at - b.at);
+  const kept: S[] = [];
+  let run = 0;
+  for (const [i, s] of sorted.entries()) {
+    const before = sorted[i - 1];
+    run = before && before.sound === s.sound && s.at - before.at <= RUN_GAP ? run + 1 : 1;
+    if (run <= TAME_RUN) kept.push(s);
+  }
+  return kept.slice(0, TAME_SOUNDS);
 }
 
 /**

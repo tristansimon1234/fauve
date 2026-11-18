@@ -4744,10 +4744,20 @@ test("a skill rendered locally is dressed as production dresses it: its model's 
   const chosen = dressSkillPlan(bare, ecranPartage, followedFrom("local", houseStyle(model)));
   assert.deepEqual(chosen.look, { ...houseFinish(model), grain: 0, vignette: 0 });
   assert.ok(chosen.fonts?.display, JSON.stringify(chosen.fonts));
-  // Picked by Edith: dressed in her charter (no lettering of the model's), the same finish.
+  // Picked by Edith: dressed in her charter, its lettering and its colours (18 November: no finish of the model's), her own
+  // look when she has one.
   const picked = dressSkillPlan(bare, ecranPartage, followedFrom("local", houseStyle(model), false, true));
   assert.equal(picked.fonts, undefined);
-  assert.deepEqual(picked.look, chosen.look);
+  assert.equal(picked.look, undefined);
+  assert.equal(dressSkillPlan(bare, ecranPartage, followedFrom("local", houseStyle(model), false, true), LOOK_PRESETS.bw).look, LOOK_PRESETS.bw);
+  // Its sounds kept to their idea: a run of one sound to three hits, eight sounds at most.
+  const { tameSounds } = await import("./skills.ts");
+  const ticks = Array.from({ length: 10 }, (_, i) => ({ at: 4.367 + i * 0.1, sound: "digital glitch tick" }));
+  const clicks = Array.from({ length: 6 }, (_, i) => ({ at: 0.2 + i * 0.167, sound: "camera shutter click" }));
+  const tamed = tameSounds([...clicks, { at: 1.2, sound: "low cinematic rumble" }, { at: 2.25, sound: "short air whoosh" }, { at: 3.867, sound: "deep dry impact" }, ...ticks]);
+  assert.ok(tamed.length <= 8);
+  assert.equal(tamed.filter((x) => x.sound === "camera shutter click").length, 3);
+  assert.ok(tamed.filter((x) => x.sound === "digital glitch tick").length <= 3);
   // Without a model followed, her own look for all her Reels, else none; the plan given is left as it was.
   assert.equal(dressSkillPlan(bare, ecranPartage, undefined, LOOK_PRESETS.bw).look, LOOK_PRESETS.bw);
   assert.equal(dressSkillPlan(bare, ecranPartage, undefined).look, undefined);

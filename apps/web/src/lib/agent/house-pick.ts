@@ -6,6 +6,7 @@ import {
   OWN_LOOK_WORDS,
   HOUSE_PICK_PROMPT,
   HOUSE_SOURCE,
+  energyCeiling,
   housePickInput,
   housePickSchema,
   houseRoom,
@@ -13,6 +14,7 @@ import {
   readHousePick,
   houseModel,
   ownRequestWords,
+  withinEnergy,
   shownPlan,
   type HousePickFile,
   type HousePickTaste,
@@ -76,7 +78,9 @@ export async function ensureEdithModel(input: { studioId: string; postId: string
   if (!files.length) return null;
   // Only a model whose skill this business plays (added to the library): the model Edith picks is the one that plays,
   // never one the editor and the motion designer would redraw by hand.
-  const playable = Object.values(MONTAGE_SKILLS).filter((s) => gate(s)).map((s) => s.key);
+  // Never a model that does more than her plan and her charter allow (« rythme calme », « jamais de glitch »): energyCeiling.
+  const ceiling = energyCeiling({ request: input.brief ?? "", plan: shownPlan(input.brief), direction: taste?.direction });
+  const playable = Object.values(MONTAGE_SKILLS).filter((s) => gate(s) && withinEnergy(s.key, ceiling)).map((s) => s.key);
   if (!playable.length) return null;
   const only = (key: string | null) => (key && playable.includes(key) ? key : null);
   // A voice over the Reel (hers, or one she asked Edith for): a model with room for its subtitles.
@@ -115,7 +119,7 @@ export async function ensureEdithModel(input: { studioId: string; postId: string
     const { error } = await db.from("posts").update({ inspiration_id: house.id, edith_pick: house.id }).eq("id", input.postId).eq("studio_id", input.studioId).is("inspiration_id", null);
     if (error) throw new Error(error.message);
     const next = only(readHouseNext(answer, files.length, avoid, SKILL_LEAST));
-    console.log("house pick", input.postId, key, next ? `(next: ${next})` : "", response.parsed_output?.why);
+    console.log("house pick", input.postId, key, next ? `(next: ${next})` : "", ceiling ? `(at most ${ceiling})` : "", response.parsed_output?.why);
     return { key, ...(next ? { next } : {}) };
   } catch (error) {
     console.warn("house model not picked, the Reel is made freely", input.postId, error);

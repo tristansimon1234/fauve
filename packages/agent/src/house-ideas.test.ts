@@ -120,3 +120,17 @@ test("the three doors of a new Reel, as WhatsApp buttons; the ideas page behind 
   assert.match(APP_GUIDES.publication, /Regarde nos idées/);
   for (const name of Object.values(IDEA_NAMES)) assert.ok(!APP_GUIDES.publication.includes(`« ${name} »`), name);
 });
+
+test("a calm plan or a sober charter never gets a loaded model (« Arrive chez Indar », 18 November)", async () => {
+  const { energyCeiling, withinEnergy, HOUSE_ENERGY } = await import("./house-pick.ts");
+  const { HOUSE_MODELS } = await import("./house-models.ts");
+  assert.deepEqual(HOUSE_MODELS.map((m) => m.key).filter((k) => !HOUSE_ENERGY[k]), []);
+  const plan = "• Style, son et durée : rythme calme, voix off de Lucie, musique douce dessous, environ 15 s";
+  const direction = "Minimaliste, éditorial, jamais de pub, de glitch ni d'IA slop.";
+  assert.equal(energyCeiling({ plan, direction }), "sobre");
+  assert.equal(energyCeiling({ direction }), "marque");
+  assert.equal(energyCeiling({ request: "un Reel énergique", direction }), null);
+  assert.equal(withinEnergy("decode", "marque"), false);
+  assert.equal(withinEnergy("decode", null), true);
+  assert.equal(withinEnergy("plans-fixes", "sobre"), true);
+});
