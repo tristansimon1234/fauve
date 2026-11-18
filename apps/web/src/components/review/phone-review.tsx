@@ -183,7 +183,7 @@ export function PhoneReview({ data }: { data: ReviewData }) {
       {ready && <PausedSign playing={watching && playing} />}
       {data.failed ? (
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-ink/80 px-8 text-center">
-          <span className="flex size-20 items-center justify-center rounded-full bg-white">
+          <span className="flex size-20 items-center justify-center rounded-full bg-white text-ink">
             <Mascot size={64} mood="sad" />
           </span>
           <span className="text-[18px] font-extrabold">La vidéo n’a pas pu être fabriquée</span>
@@ -362,7 +362,7 @@ function Making() {
   // en cours, revenez dans quelques minutes »): no steps, no minutes.
   return (
     <div className="flex flex-col items-center gap-3 text-center text-white">
-      <span className="flex size-20 items-center justify-center rounded-full bg-white">
+      <span className="flex size-20 items-center justify-center rounded-full bg-white text-ink">
         <Mascot size={64} mood="thinking" />
       </span>
       <span className="text-[19px] font-extrabold">Montage en cours</span>

@@ -591,7 +591,7 @@ function Making({ title, step, minutes }: { title: string; step: string; minutes
         <span className="size-10" />
       </div>
       <div className="flex flex-1 flex-col items-center justify-center gap-3 px-8 text-center">
-        <span className="flex size-20 items-center justify-center rounded-full bg-white">
+        <span className="flex size-20 items-center justify-center rounded-full bg-white text-ink">
           <Mascot size={64} mood="thinking" />
         </span>
         <span className="text-[19px] font-extrabold">{MAKING[step] ?? "J’y travaille"}</span>
