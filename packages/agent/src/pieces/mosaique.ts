@@ -178,6 +178,7 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
 export const mosaique: EffectPiece = {
   key: "mosaique",
   version: 1,
+  transition: true,
   name: "La mosaïque",
   how: "l'image à l'écran se coupe d'un coup en douze tirages posés à la main sur un papier gris clair, puis chacun de ses plans remplace l'image d'avant case par case dans l'ordre de lecture, de sa coupe à la suivante, chaque case posée un instant de travers puis droite : une case change toujours, ses photos restent figées, ses vidéos jouent ; puis le montage reprend, le plan suivant en plein écran.",
   needs: "une série de photos ou de vidéos serrées de même famille (ses plats, ses produits, ses créations), le sujet au centre, chacune différente de la précédente, de préférence sur un fond sombre et simple où les traits du papier se lisent.",

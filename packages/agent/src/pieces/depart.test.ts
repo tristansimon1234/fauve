@@ -47,7 +47,9 @@ test("« Disparition au passage » is offered on a still video of someone, never
       best_moments: [],
       transcript: "",
     }) as unknown as ClipAnalysis;
-  assert.deepEqual(piecesOffered([depart], pieceShots([{ media_id: "a", analysis: clip("static") }], {}), 1).map((p) => p.key), ["depart"]);
+  assert.deepEqual(piecesOffered([depart], pieceShots([{ media_id: "a", analysis: clip("static") }], {}), 1), []);
+  // A transition: offered only when her request names it.
+  assert.deepEqual(piecesOffered([depart], pieceShots([{ media_id: "a", analysis: clip("static") }], {}), 1, 5, { request: "avec la disparition au passage" }).map((p) => p.key), ["depart"]);
   assert.deepEqual(piecesOffered([depart], pieceShots([{ media_id: "a", analysis: clip("handheld") }], {}), 1), []);
   assert.deepEqual(piecesOffered([depart], pieceShots([], { p: { detection: { regions: [{ kind: "face" }], notes: "une femme devant sa boutique" } } as never }), 1), []);
 });

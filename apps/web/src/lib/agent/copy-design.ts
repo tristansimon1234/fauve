@@ -125,7 +125,7 @@ export async function designCopy(params: {
     if (!clip) return [];
     const a = clip.analysis;
     // Its best moments, then its clean shots, best first: a blurry or dark passage comes last.
-    const shots = [...a.shots].filter((s) => !s.quality.blurry && !s.quality.dark).sort((x, y) => shotScore(y, a) - shotScore(x, a));
+    const shots = [...a.shots].filter((s) => !s.quality.blurry && !s.quality.dark && !s.quality.slip).sort((x, y) => shotScore(y, a) - shotScore(x, a));
     return [{ id, photo: false, seconds: a.duration, moments: [...a.best_moments, ...shots].map((m) => ({ start: m.start, end: m.end })) }];
   });
   if (!files.length) return null;

@@ -187,7 +187,7 @@ export function skillFiles(mediaIds: string[], clips: { media_id: string; analys
     const clip = clips.find((c) => c.media_id === id);
     if (!clip) return [];
     const a = clip.analysis;
-    const shots = [...a.shots].filter((s) => !s.quality.blurry && !s.quality.dark).sort((x, y) => shotScore(y, a) - shotScore(x, a));
+    const shots = [...a.shots].filter((s) => !s.quality.blurry && !s.quality.dark && !s.quality.slip).sort((x, y) => shotScore(y, a) - shotScore(x, a));
     return [
       {
         id,
@@ -632,8 +632,11 @@ export async function skillWantsMore(studioId: string, postId: string, mediaIds:
  */
 export async function skillTooShort(studioId: string, postId: string, seconds: number): Promise<{ max: number } | null> {
   const db = supabaseAdmin();
-  const { data: post } = await db.from("posts").select("inspiration_id").eq("id", postId).eq("studio_id", studioId).maybeSingle();
+  const { data: post } = await db.from("posts").select("inspiration_id, edith_pick").eq("id", postId).eq("studio_id", studioId).maybeSingle();
   if (!post?.inspiration_id) return null;
+  // A model Edith picked herself is never a question: the montage picks one that lasts her length (ensureEdithModel).
+  // « Visite d'Indar », 18 November: asked « 9 s ou 15 s ? » without knowing 15 s meant no model, she kept 15 s.
+  if (post.inspiration_id === post.edith_pick) return null;
   const { data: inspiration } = await db.from("inspirations").select("source, external_id").eq("id", post.inspiration_id).maybeSingle();
   const gate = await skillGate(studioId);
   const skill = inspiration?.source === "house" ? gate(skillFor(inspiration.external_id as string | null)) : undefined;

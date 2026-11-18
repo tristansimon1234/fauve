@@ -2,7 +2,7 @@ import { z } from "zod";
 import { compositionBrief, composedLayers } from "./compose.ts";
 import { END_CARD_SECONDS, planTimeline } from "./motion.ts";
 import { renderDuration } from "./render.ts";
-import { hookAtStart } from "./hook.ts";
+import { hookAtStart, openingText } from "./hook.ts";
 import { snapToTempo, TEMPLATE_BPM } from "./tempo.ts";
 import { lookChoice, type ReelLook } from "./looks.ts";
 import { toneFor } from "./shot-tone.ts";
@@ -49,7 +49,7 @@ So her request and the Reel she copies come before your defaults: what they don'
 Never constrained without knowing it. When a real limit keeps you from doing exactly what she asks (45 s at most, the animations allowed, a gesture that no video shows or only out of the vertical frame, an existing song), do the closest and tell her in « rationale », with what she can do. Never ask her to write, complete or lengthen a text: the words are your job. A voice shorter than the length she asked for: the images hold the length, an ending carried by the music; with no length asked for, the Reel ends shortly after the voice.
 
 What you receive:
-- « clips »: each video cut into « shots » as the analysis read them (what happens, the subject and where it is, « sujet_a », « framing », « camera », « beauty » 1 to 5, energy, « hook_score », quality, faces); its « best_moments »; what is said (« words »); what people do (« actions », each gesture timed, « mains »: whether the hands show in the Reel's vertical frame); what the hands really do, measured frame by frame (« mains_suivies », to trust over « actions » when they differ).
+- « clips »: each video cut into « shots » as the analysis read them (what happens, the subject and where it is, « sujet_a », « framing », « camera », « beauty » 1 to 5, energy, « hook_score », quality, faces; never a « slip » shot); its « best_moments »; what is said (« words »); what people do (« actions », each gesture timed, « mains »: whether the hands show in the Reel's vertical frame); what the hands really do, measured frame by frame (« mains_suivies », to trust over « actions » when they differ).
 - « photos »: what each photo shows and its format. « openings »: the strongest moments to open on, best first (a voice over written for this Reel speaks of the first one in its first phrase). « voice »: her voice note or Edith's voice over, from « starts_at » to « ends_at », its « phrases » already on the Reel's clock.
 - « studio.facts »: what is known of the business (its site, what she said, who appears on screen). « brand »: her charter and taste. « recent_hooks »: the hooks of her latest Reels. « templates »: animations already made. « max_new_scenes »: the new animations this Reel allows. « previous_plan »: the version to correct.
 
@@ -407,6 +407,42 @@ const END_SUBTITLE_MAX = 60;
  * sentence ends, else after a comma, else between two words. « Edith le fait, envoie-lui un message sur WhatsApp. »
  * had come out as « …un message sur », WhatsApp lost.
  */
+/** Accents and case aside, for a name read in a sentence. */
+const plainName = (text: string) =>
+  text
+    .normalize("NFD")
+    .replace(/\p{M}/gu, "")
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
+    .trim();
+
+/**
+ * The ending her validated plan promised, when it names her business (« Fin : Indar, 26 boulevard Saint-Germain,
+ * réservation via le lien en bio »): her name as the card's title, her address (the part with a number) under it.
+ * « Visite d'Indar », 18 November: the plan said it, the editor kept no card (« end_card » only for an offer), and the
+ * Reel stopped on a ball. Null when the ending names neither her name nor an address (the editor decides as before).
+ */
+export function promisedEnding(plan: string | null | undefined, name: string | null | undefined): { title: string; subtitle?: string } | null {
+  const line = plan?.match(/^\s*[•·-]\s*Fin\s*:\s*(.+)$/im)?.[1]?.trim();
+  if (!line) return null;
+  const parts = line.split(/\s*[,;]\s*|\s+[–—]\s+/).map((p) => p.trim()).filter(Boolean);
+  const own = plainName(name ?? "");
+  const named = Boolean(own) && parts.some((p) => ` ${plainName(p)} `.includes(` ${own} `));
+  const address = parts.find((p) => /\d/.test(p) && /\p{L}{3,}/u.test(p) && !/%|€/.test(p));
+  if (!named && !address) return null;
+  const title = name?.trim() || parts[0]!;
+  return fitEndCard(title, address && plainName(address) !== own ? address : undefined);
+}
+
+/** Her promised ending on the plan when the editor laid none and no text of its last seconds already says her name. */
+export function withPromisedEnding<T extends Pick<EditPlan, "texts" | "end_card" | "copy">>(plan: T, ending: { title: string; subtitle?: string } | null): T {
+  if (!ending || plan.end_card || plan.copy) return plan;
+  const last = Math.max(0, ...plan.texts.map((t) => t.to));
+  const own = plainName(ending.title);
+  if (plan.texts.some((t) => t.to >= last - 0.5 && ` ${plainName(t.text)} `.includes(` ${own} `))) return plan;
+  return { ...plan, end_card: ending };
+}
+
 export function fitEndCard(title: string, subtitle?: string): { title: string; subtitle?: string } {
   const head = title.replace(/\s+/g, " ").trim();
   const below = subtitle?.replace(/\s+/g, " ").trim() ?? "";
@@ -678,7 +714,11 @@ export function normalizeEditPlan(
     readableEnding(
     clearOfAnimations(
       // The hook is read from the first image, never after a blank half second.
-      hookAtStart(tempo.texts.map((t) => ({ ...t, from: round(Math.max(0, t.from)), to: round(Math.min(t.to, textsEnd)) }))),
+      hookAtStart(
+        (plan.copy ? (x: typeof tempo.texts) => x : openingText)(
+          tempo.texts.map((t) => ({ ...t, from: round(Math.max(0, t.from)), to: round(Math.min(t.to, textsEnd)) })),
+        ),
+      ),
       animations,
       textsEnd,
       hers,

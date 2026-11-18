@@ -144,6 +144,7 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
 export const raccords: EffectPiece = {
   key: "raccords",
   version: 1,
+  transition: true,
   name: "Raccords en morceaux",
   how: "à chaque coupe sous lui, le plan suivant arrive en avance sur celui-ci, exactement là où il sera, figé sur sa première image, en morceaux sur les coups : ce qui s'y détache, détouré en trois morceaux (les bords, puis le milieu) ; sur deux ou trois coupes, d'abord son image en neuf cases carrées au milieu (une, la colonne, la croix, les neuf), sombre, le plan s'allumant sur le temps fort juste après la coupe, puis les trois morceaux, puis ce qui se détache entier, que la coupe garde à sa place ; la musique perd sa basse pendant que les morceaux arrivent ; puis le montage reprend.",
   needs: "deux à quatre plans à enchaîner, chacun avec quelque chose de net au milieu (quelqu'un, un produit, une lampe, un objet vu d'en haut), chacun d'au moins 0,8 s.",

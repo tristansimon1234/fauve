@@ -823,7 +823,16 @@ const clipShotBase = z.object({
   subject: z.string().describe("Sujet principal : groupe, équipe, client, mains, produit, plat, outil, détail…"),
   energy: z.number().int().min(1).max(5).describe("1 = calme, 5 = très dynamique"),
   hook_score: z.number().int().min(1).max(5).describe("Potentiel comme accroche des 2 premières secondes"),
-  quality: z.object({ blurry: z.boolean(), dark: z.boolean(), shaky: z.boolean() }),
+  quality: z.object({
+    blurry: z.boolean(),
+    dark: z.boolean(),
+    shaky: z.boolean(),
+    // « Visite d'Indar », 18 November: the mirror selfie in the toilets, the phone in the frame, was cut into the Reel.
+    slip: z
+      .boolean()
+      .optional()
+      .describe("Plan raté de tournage : le reflet de la personne qui filme ou son téléphone dans un miroir, une main ou un doigt devant l'objectif, le sol ou le plafond en filmant sans le vouloir"),
+  }),
   faces_visible: z.boolean(),
 });
 

@@ -130,6 +130,12 @@ export type EffectPiece = {
   spoken?: boolean;
   /** Her photos it lays (her work, what she names): what they are, in French for its filler, and how many (four at most). */
   photos?: { want: string; most: number };
+  /**
+   * Its heart is how a shot comes in at a cut (by cells, in pieces, under a blur, a whip): never offered for a Reel made
+   * freely unless her request names it (Tristan, on « Fenêtres et étiquettes » laid on a walk to a door: « l'image qui
+   * entre par case ça va pas, ça fait cheap » ; the cuts stay clean). Its model plays it whole, where it was made for it.
+   */
+  transition?: true;
 };
 
 /** The most effects of the bank one Reel plays: one charter, one music, never a patchwork. */
@@ -161,7 +167,7 @@ const PERSON = /personne|femme|homme|\bfille\b|gar[çc]on|client|cliente|[ée]qu
 export function pieceShots(clips: { media_id: string; analysis: ClipAnalysis }[], photos: Record<string, PhotoFacts>): PieceShot[] {
   const fromClips = clips.flatMap(({ media_id, analysis }) =>
     analysis.shots
-      .filter((s) => !s.quality.blurry && !s.quality.dark)
+      .filter((s) => !s.quality.blurry && !s.quality.dark && !s.quality.slip)
       .map((s): PieceShot => {
         return {
           id: media_id,
@@ -255,6 +261,7 @@ export function piecesOffered(
     });
   const scored = pieces.flatMap((piece) => {
     if ((piece.require.files ?? 1) > files) return [];
+    if (piece.transition && !named(piece)) return [];
     const need = piece.require.shot;
     const best = need ? Math.max(-1, ...shots.map((s) => carries(need, s) ?? -1)) : 3;
     if (best < 0) return [];

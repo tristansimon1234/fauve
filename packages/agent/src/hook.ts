@@ -33,7 +33,7 @@ export function shotScore(shot: Shot, analysis: ClipAnalysis): number {
   let score = shot.hook_score * 2 + (shot.beauty ?? 3) + shot.energy * 0.5;
   if (shot.framing === "close" || shot.framing === "detail") score += 0.5;
   if (shot.framing === "wide" && shot.camera === "static") score -= 1;
-  if (shot.quality.blurry || shot.quality.dark) score -= 8;
+  if (shot.quality.blurry || shot.quality.dark || shot.quality.slip) score -= 8;
   if (shot.quality.shaky) score -= 1.5;
   if (analysis.lighting === "poor") score -= 1;
   const best = analysis.best_moments.findIndex((m) => m.start < shot.end && m.end > shot.start);
@@ -94,6 +94,21 @@ export function hookAtStart<T extends { from: number; style: string }>(texts: T[
   const first = [...texts].sort((a, b) => a.from - b.from)[0];
   if (!first || first.style !== "hook" || first.from <= 0 || first.from > HOOK_LATEST) return texts;
   return texts.map((t) => (t === first ? { ...t, from: 0 } : t));
+}
+
+/** A first text that starts later than the hook but by this time is the Reel's opening line, read from its first image. */
+export const OPENING_TEXT_LATEST = 4.5;
+
+/**
+ * Words on screen from the first image (CLAUDE.md: « accroche dès la 1re seconde »): a Reel whose first text comes
+ * after the hook's moment, but within its opening seconds, has it from 0, as a hook (big, read at a glance), until where
+ * it ended. « Visite d'Indar », 18 November: 3,7 s of pavement with no word, then its first line in small caption.
+ * A text planned later (an « après » kept for its shot) stays where it is.
+ */
+export function openingText<T extends { from: number; to: number; style: string }>(texts: T[]): T[] {
+  const first = [...texts].sort((a, b) => a.from - b.from)[0];
+  if (!first || first.from <= HOOK_LATEST || first.from > OPENING_TEXT_LATEST) return texts;
+  return texts.map((t) => (t === first ? { ...t, from: 0, style: t.style === "caption" ? "hook" : t.style } : t));
 }
 
 /** Under this score, the whole voice text is rewritten once with the judge's fixes. */

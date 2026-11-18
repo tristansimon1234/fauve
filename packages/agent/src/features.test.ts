@@ -11718,6 +11718,17 @@ test("an effect of the bank is offered only when her files can carry it, the bes
   assert.deepEqual(piecesOffered([turned], upright, 1), []);
   const photos = pieceShots([], { p: { width: 1600, height: 1200, detection: { regions: [] } }, q: { width: 1200, height: 1600, detection: { regions: [] } } } as never);
   assert.deepEqual(photos.map((s) => s.wide), [true, false]);
+  // An effect whose heart is a transition (by cells, in pieces, a whip) is never offered for a Reel made freely, unless
+  // her request names it (Tristan: « l'image qui entre par case ça fait cheap »).
+  const { fenetres } = await import("./pieces/fenetres.ts");
+  const street = pieceShots(["a", "b", "c"].map((id) => ({ media_id: id, analysis: { ...(clip("wide") as object), setting: "rue devant le studio" } as never })), {});
+  assert.deepEqual(piecesOffered([fenetres], street, 3), []);
+  assert.deepEqual(piecesOffered([fenetres], street, 3, 5, { request: "avec les fenêtres et étiquettes" }).map((p) => p.key), ["fenetres"]);
+  const { EFFECT_PIECES } = await import("./piece-library.ts");
+  assert.deepEqual(
+    Object.values(EFFECT_PIECES).filter((p) => p.transition).map((p) => p.key).sort(),
+    ["collage", "coups-de-fouet", "depart", "fenetres", "mosaique", "raccords"],
+  );
 });
 
 test("an effect of the bank is not one of the editor's animations: laid beside its own, never instead of them", async () => {
@@ -11933,4 +11944,30 @@ test("an effect of the bank: its shots counted by the engine, a burst of sounds,
   const shaped = { ...plan, music_shape: { end: { at: 7 } } };
   assert.deepEqual(pieceMusicShape({ piece, fill, plan: shaped, layer, bpm: 100 }), { end: { at: 7 } });
   assert.equal(pieceMusicShape({ piece: cadre, fill, plan, layer, bpm: 100 }), undefined);
+});
+
+test("the ending her validated plan promised is on screen, and words come from the first image", async () => {
+  const { promisedEnding, withPromisedEnding } = await import("./editor.ts");
+  const { openingText } = await import("./hook.ts");
+  // « Visite d'Indar », 18 November: « Fin : Indar, 26 boulevard Saint-Germain… », no card, the Reel ended on a ball.
+  const plan = "Visite d'Indar\n\n• Accroche : les quais\n• Fin : Indar, 26 boulevard Saint-Germain, réservation via le lien en bio\n• Son : musique douce";
+  const ending = promisedEnding(plan, "Indar");
+  assert.deepEqual(ending, { title: "Indar", subtitle: "26 boulevard Saint-Germain" });
+  // An ending that names neither her nor an address is the editor's call; « 1 offert » is no address.
+  assert.equal(promisedEnding("• Fin : la salle en pleine lumière", "Indar"), null);
+  assert.equal(promisedEnding("• Fin : -20 % ce week-end", "Indar"), null);
+  assert.equal(promisedEnding("• Accroche : les quais", "Indar"), null);
+  const texts = [{ text: "1 cours acheté = 1 offert", from: 12, to: 15, style: "band" as const }];
+  assert.deepEqual(withPromisedEnding({ texts, end_card: undefined }, ending).end_card, ending);
+  // Kept as the editor laid it: its own card, or her name already written at the end.
+  assert.deepEqual(withPromisedEnding({ texts, end_card: { title: "Chez Indar" } }, ending).end_card, { title: "Chez Indar" });
+  assert.equal(withPromisedEnding({ texts: [{ text: "À bientôt chez Indar", from: 12, to: 15, style: "band" as const }], end_card: undefined }, ending).end_card, undefined);
+  // The first line at 3,7 s is read from the first image, as a hook; one planned later stays at its shot.
+  const opened = openingText([
+    { text: "ton premier cours t'attend", from: 3.7, to: 7.27, style: "caption" },
+    { text: "1 cours acheté = 1 offert", from: 12.14, to: 15, style: "band" },
+  ]);
+  assert.deepEqual(opened.map((t) => [t.from, t.to, t.style]), [[0, 7.27, "hook"], [12.14, 15, "band"]]);
+  const later = [{ text: "après", from: 6, to: 8, style: "band" }];
+  assert.deepEqual(openingText(later), later);
 });

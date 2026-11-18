@@ -127,6 +127,7 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
 export const coupsDeFouet: EffectPiece = {
   key: "coups-de-fouet",
   version: 2,
+  transition: true,
   name: "Ville en coups de fouet",
   how: "son plan large et calme arrive sur un flash blanc, son nom en capitales blanches très condensées posé immobile dans son ciel pendant que l'image avance doucement derrière ; un fouet éclair l'emporte dans le plan suivant, puis ses plans d'un temps environ s'enchaînent en flashs blancs et fouets éclair, une coupe sur deux ; puis le montage reprend.",
   needs: "un plan large et calme de sa rue, de sa façade ou de son quartier, avec du ciel au-dessus des toits (son nom s'y pose), puis des plans vivants de son quartier ou de son lieu (des passants, un vélo, un tram, sa devanture, un détail de couleur).",

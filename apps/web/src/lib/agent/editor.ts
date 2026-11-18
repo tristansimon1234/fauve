@@ -2,6 +2,9 @@ import "server-only";
 import { insertPlanVersion } from "@/lib/edit-plans";
 import { designLook } from "./look-designer";
 import {
+  promisedEnding,
+  shownPlan,
+  withPromisedEnding,
   contractLines,
   type ReelContract,
   editorClip,
@@ -850,7 +853,9 @@ export async function designEdit(params: {
     const drafted = correction && !params.fresh && params.contract?.redraw === false ? keepComposition(withWritten, base) : withWritten;
     const allowed = Math.min(MAX_FREE_SCENES, (params.maxNewScenes ?? MAX_FREE_SCENES) + replacedAnimations(drafted, params.fresh ? null : base));
     // A clip whose passages look alike shows twice at most, whatever its passages.
-    const capped = spreadRepeats(drafted, alike, files, still);
+    const spread = spreadRepeats(drafted, alike, files, still);
+    // The ending her validated plan promised (her name, her address) is on screen: a new Reel only, a correction keeps hers.
+    const capped = correction ? spread : withPromisedEnding(spread, promisedEnding(shownPlan(params.brief), studio.data?.name));
     // The effect of the bank it lays is played by the engine (next to nothing): not one of its animations.
     const offeredPieces = lending?.pieces ? [...lending.pieces.keys()] : [];
     let piecesLeft = MAX_PIECES;

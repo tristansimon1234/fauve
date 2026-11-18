@@ -149,7 +149,9 @@ test("« Images qui s'emboîtent » (effect v1): checked code; its sky read on t
       best_moments: [],
       transcript: "",
     }) as unknown as ClipAnalysis;
-  assert.deepEqual(piecesOffered([collage], pieceShots([{ media_id: "a", analysis: clip(true) }], {}), 3).map((p) => p.key), ["collage"]);
+  assert.deepEqual(piecesOffered([collage], pieceShots([{ media_id: "a", analysis: clip(true) }], {}), 3), []);
+  // A transition: offered only when her request names it (« ça fait cheap » posé d'office).
+  assert.deepEqual(piecesOffered([collage], pieceShots([{ media_id: "a", analysis: clip(true) }], {}), 3, 5, { request: "des images qui s'emboîtent" }).map((p) => p.key), ["collage"]);
   assert.deepEqual(piecesOffered([collage], pieceShots([{ media_id: "a", analysis: clip(false) }], {}), 3), []);
   assert.deepEqual(piecesOffered([collage], pieceShots([{ media_id: "a", analysis: clip(true) }], {}), 2), []);
 });

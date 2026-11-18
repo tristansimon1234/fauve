@@ -83,6 +83,7 @@ export function collageStep(beat: number): number {
 export const collage: EffectPiece = {
   key: "collage",
   version: 1,
+  transition: true,
   name: "Images qui s'emboîtent",
   how: "à chaque coupe, l'image suivante arrive d'abord en morceau sur la précédente, puis entière : sa personne détourée à sa place, ses toits sans leur ciel, ou vue dans la silhouette de la personne d'avant, une fois l'un, une fois l'autre ; un titre facultatif en capitales blanches sur une bande de sa couleur en haut ; puis le montage reprend.",
   needs: "plusieurs photos ou courtes vidéos avec un sujet net (des personnes debout, en entier ou jusqu'à la taille, ses produits bien détachés), et si possible un plan de dehors avec du ciel.",

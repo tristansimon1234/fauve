@@ -378,7 +378,10 @@ async function edithModelFirst(job: Job): Promise<void> {
   const creative = Boolean(job.redo) || asksCreation(ownRequestWords(job.brief));
   if (creative) job.free = true;
   if (!job.free || creative) {
-    const picked = await ensureEdithModel({ studioId: job.studioId, postId: job.postId, mediaIds: job.mediaIds, brief: job.brief, creative }).catch((error: unknown) => {
+    // Her contract read first (kept on the job for every step): the model picked lasts the length she fixed.
+    await withContract(job).catch((error: unknown) => console.warn("contract not read before the pick", job.postId, error));
+    const seconds = job.contract?.duration ?? null;
+    const picked = await ensureEdithModel({ studioId: job.studioId, postId: job.postId, mediaIds: job.mediaIds, brief: job.brief, creative, seconds }).catch((error: unknown) => {
       console.warn("house pick failed, the Reel is made freely", job.postId, error);
       return null;
     });

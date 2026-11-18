@@ -121,6 +121,7 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
 export const fenetres: EffectPiece = {
   key: "fenetres",
   version: 1,
+  transition: true,
   name: "Fenêtres et étiquettes",
   how: "deux petites étiquettes techniques en capitales blanches, fixes juste au-dessus du milieu (un repère de son commerce à gauche, les coordonnées de son lieu ou son quartier à droite), pendant que chacun de ses plans suivants entre par des fenêtres : il prend les 3 × 3 cases de l'image une ou deux à la fois en serpentin, ou des fenêtres s'ouvrent d'un coup sur lui avant la coupe et sautent en grandissant.",
   needs: "3 à 10 plans de son lieu, de sa rue ou de son quartier, plutôt larges (une case n'en montre qu'un morceau), et un repère vrai de son commerce (son année ou son heure d'ouverture, son adresse, une mesure de son métier) ou son quartier.",

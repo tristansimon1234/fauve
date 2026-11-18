@@ -73,8 +73,10 @@ test("« La mosaïque » is offered on three files or more with a close or detai
       transcript: "",
     }) as unknown as ClipAnalysis;
   const close = pieceShots([{ media_id: "a", analysis: clip("close") }], {});
-  assert.deepEqual(piecesOffered([mosaique], close, 3).map((p) => p.key), ["mosaique"]);
-  assert.deepEqual(piecesOffered([mosaique], pieceShots([{ media_id: "a", analysis: clip("detail") }], {}), 4).map((p) => p.key), ["mosaique"]);
+  assert.deepEqual(piecesOffered([mosaique], close, 3, 5, { request: "fais la mosaique" }).map((p) => p.key), ["mosaique"]);
+  // A transition: never offered unless her request names it.
+  assert.deepEqual(piecesOffered([mosaique], close, 3), []);
+  assert.deepEqual(piecesOffered([mosaique], pieceShots([{ media_id: "a", analysis: clip("detail") }], {}), 4, 5, { request: "fais la mosaique" }).map((p) => p.key), ["mosaique"]);
   assert.deepEqual(piecesOffered([mosaique], close, 2), []);
   assert.deepEqual(piecesOffered([mosaique], pieceShots([{ media_id: "a", analysis: clip("wide") }], {}), 5), []);
 });

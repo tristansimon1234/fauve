@@ -16,6 +16,7 @@ import {
   ownRequestWords,
   withinEnergy,
   shownPlan,
+  skillLengths,
   type HousePickFile,
   type HousePickTaste,
   type HouseRoom,
@@ -41,7 +42,15 @@ const SKILL_ROOM: Record<string, HouseRoom> = Object.fromEntries(Object.values(M
  * The model the Reel is made in: the one she chose, the one Edith picked before ("kept"), or one picked now with the
  * picker's next best (`next`, tried once if the filler refuses the first: houseFallback); null for none.
  */
-export async function ensureEdithModel(input: { studioId: string; postId: string; mediaIds?: string[]; brief?: string; creative?: boolean }): Promise<{ key: string; next?: string } | null> {
+export async function ensureEdithModel(input: {
+  studioId: string;
+  postId: string;
+  mediaIds?: string[];
+  brief?: string;
+  creative?: boolean;
+  /** The length she fixed (her contract), in seconds: only a model that lasts that long is picked. */
+  seconds?: number | null;
+}): Promise<{ key: string; next?: string } | null> {
   const db = supabaseAdmin();
   const { data: post } = await db
     .from("posts")
@@ -62,8 +71,15 @@ export async function ensureEdithModel(input: { studioId: string; postId: string
     console.log("house pick: she asks for creation, no model", input.postId);
     return null;
   }
-  // Already picked (a design that went on after recording a voice): kept.
-  if (post.inspiration_id && post.inspiration_id === post.edith_pick) return { key: "kept" };
+  // Already picked (a design that went on after recording a voice): kept, when it lasts as long as she asked; else let go
+  // and picked again among those that do (« Visite d'Indar », 18 November: « Cadre dans le cadre » lasts 9 s, she kept her
+  // 15 s, and the Reel was made with no model at all).
+  if (post.inspiration_id && post.inspiration_id === post.edith_pick) {
+    if (await lastsLongEnough(post.inspiration_id as string, input.seconds)) return { key: "kept" };
+    const { error } = await db.from("posts").update({ inspiration_id: null, edith_pick: null }).eq("id", input.postId).eq("studio_id", input.studioId);
+    if (error) return { key: "kept" };
+    console.log("house pick: Edith's earlier pick too short for her length, picked again", input.postId, input.seconds);
+  }
   // Hers: a Reel to copy, a model she chose, a form she asked for (the collage).
   if (post.inspiration_id || (post.template && post.template !== "libre")) return null;
   const mediaIds = (input.mediaIds?.length ? input.mediaIds : ((post.media_ids as string[] | null) ?? [])).slice(0, 20);
@@ -80,7 +96,10 @@ export async function ensureEdithModel(input: { studioId: string; postId: string
   // never one the editor and the motion designer would redraw by hand.
   // Never a model that does more than her plan and her charter allow (« rythme calme », « jamais de glitch »): energyCeiling.
   const ceiling = energyCeiling({ request: input.brief ?? "", plan: shownPlan(input.brief), direction: taste?.direction });
-  const playable = Object.values(MONTAGE_SKILLS).filter((s) => gate(s) && withinEnergy(s.key, ceiling)).map((s) => s.key);
+  // Never a model shorter than the length she fixed (a model is stretched a little, never past its longest: skillTooShort).
+  const playable = Object.values(MONTAGE_SKILLS)
+    .filter((s) => gate(s) && withinEnergy(s.key, ceiling) && holds(s, input.seconds))
+    .map((s) => s.key);
   if (!playable.length) return null;
   const only = (key: string | null) => (key && playable.includes(key) ? key : null);
   // A voice over the Reel (hers, or one she asked Edith for): a model with room for its subtitles.
@@ -125,6 +144,19 @@ export async function ensureEdithModel(input: { studioId: string; postId: string
     console.warn("house model not picked, the Reel is made freely", input.postId, error);
     return null;
   }
+}
+
+/** A model's skill lasts the length she fixed (one second over its longest, as skillTooShort reads it); any without one. */
+function holds(skill: (typeof MONTAGE_SKILLS)[string], seconds: number | null | undefined): boolean {
+  return !seconds || seconds <= skillLengths(skill).max + 1;
+}
+
+/** The model Edith picked before (an inspiration of hers) lasts the length she fixed. */
+async function lastsLongEnough(inspirationId: string, seconds: number | null | undefined): Promise<boolean> {
+  if (!seconds) return true;
+  const { data } = await supabaseAdmin().from("inspirations").select("source, external_id").eq("id", inspirationId).maybeSingle();
+  const skill = data?.source === HOUSE_SOURCE ? MONTAGE_SKILLS[data.external_id as string] : undefined;
+  return !skill || holds(skill, seconds);
 }
 
 /**

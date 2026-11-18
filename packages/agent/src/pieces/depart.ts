@@ -84,6 +84,7 @@ export function departCover(input: Pick<PieceTimelineInput, "frames" | "shots">)
 export const depart: EffectPiece = {
   key: "depart",
   version: 1,
+  transition: true,
   name: "Disparition au passage",
   how: "la personne debout devant son lieu, l'image qui part de près et recule en trois sauts, saccadée à 15 images par seconde ; une masse floue passe tout près devant l'objectif, de la droite vers la gauche, avec un souffle, et cache la coupe : la personne a disparu, son lieu vide tenu un instant puis qui reprend (ou le plan suivant du montage) ; puis le montage reprend.",
   needs: "une vidéo fixe de quelqu'un debout devant son lieu (sa porte, sa devanture, son comptoir), le téléphone posé, et si possible le même endroit vide juste après (la fin de la même vidéo une fois hors du cadre).",
