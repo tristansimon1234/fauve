@@ -2,7 +2,7 @@ import { addressIn } from "./geo.ts";
 import { HOUSE_MODELS, HOUSE_WHEN, houseModel } from "./house-models.ts";
 
 // « Regarde nos idées » (Tristan, 10 November: « ok » to the three doors, then « renvoie vers une page sur WhatsApp
-// c'est sûrement plus facile »): when she makes a Reel, a third door beside « Fais-moi confiance » (Edith chooses) and
+// c'est sûrement plus facile »): when she makes a Reel, a third door beside « Je te laisse faire » (Edith chooses) and
 // « Je sais ce que je veux » (her words, a Reel she likes): a few ideas of form, never the catalogue. Six to eight of
 // Edith's models, only those Tristan validated (skillGate), chosen here without any model call for her trade and the
 // files she gave for this Reel, each with its animated preview and a plain name of its own (never its internal name,
@@ -20,7 +20,7 @@ export const IDEA_PREVIEW_DIR = "house/previews";
 export const ideaPreviewPath = (key: string, ext: "mp4" | "jpg" | "hd") => `${IDEA_PREVIEW_DIR}/${key}${ext === "hd" ? "-hd.mp4" : `.${ext}`}`;
 
 /** The three doors of a new Reel, as buttons (WhatsApp's are 20 characters at most: « J'ai mon idée » there). */
-export const IDEA_DOORS = { trust: "Fais-moi confiance", know: "Je sais ce que je veux", ideas: "Regarde nos idées" } as const;
+export const IDEA_DOORS = { trust: "Je te laisse faire", know: "Je sais ce que je veux", ideas: "Regarde nos idées" } as const;
 export const WHATSAPP_KNOW_DOOR = "J’ai mon idée";
 
 /** The doors' buttons on a channel; the ideas door only when her business has enough ideas to show. */

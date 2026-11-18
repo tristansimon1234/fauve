@@ -565,7 +565,7 @@ export const toolSpecs = {
       doors: z
         .boolean()
         .optional()
-        .describe("Un nouveau Reel dont tu as les fichiers mais pas l'idée : true pose, à la place des options, les façons de le faire (« Fais-moi confiance », son idée, « Regarde nos idées »)"),
+        .describe("Un nouveau Reel dont tu as les fichiers mais pas l'idée : true pose, à la place des options, les façons de le faire (« Je te laisse faire », son idée, « Regarde nos idées »)"),
       plan: proposalSchema
         .extend({
           voix_off: z

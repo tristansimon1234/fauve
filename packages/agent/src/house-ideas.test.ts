@@ -109,11 +109,11 @@ test("her trade and her city as the rotation reads them", () => {
 });
 
 test("the three doors of a new Reel, as WhatsApp buttons; the ideas page behind a button, never named by Edith", () => {
-  assert.deepEqual(ideaDoors("whatsapp", true), ["Fais-moi confiance", "J’ai mon idée", "Regarde nos idées"]);
+  assert.deepEqual(ideaDoors("whatsapp", true), ["Je te laisse faire", "J’ai mon idée", "Regarde nos idées"]);
   assert.ok(ideaDoors("whatsapp", true).every((label) => label.length <= 20));
   assert.deepEqual(ideaDoors("app", true), [IDEA_DOORS.trust, IDEA_DOORS.know, IDEA_DOORS.ideas]);
   // Too few ideas for her: two doors.
-  assert.deepEqual(ideaDoors("whatsapp", false), ["Fais-moi confiance", "J’ai mon idée"]);
+  assert.deepEqual(ideaDoors("whatsapp", false), ["Je te laisse faire", "J’ai mon idée"]);
   assert.ok(toolSpecs.get_page_link.input.shape.page.options.includes("idees"));
   assert.ok("doors" in toolSpecs.reply_with.input.shape);
   // Her mode d'emploi says where the ideas are, never an idea's name.

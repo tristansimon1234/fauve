@@ -4,7 +4,7 @@ import { IDEA_DOORS } from "@fauve/agent";
 import { useEffect, useRef } from "react";
 import type { IdeaCard } from "@/lib/house-ideas";
 
-// « Ton idée » for a Reel on the Créer screen (Tristan, 10 November): three ways to make it. « Fais-moi confiance »
+// « Ton idée » for a Reel on the Créer screen (Tristan, 10 November): three ways to make it. « Je te laisse faire »
 // (Edith chooses, the default), « Je sais ce que je veux » (her words, or a Reel she likes), « Regarde nos idées »
 // (6 to 8 ideas of form for her trade and her files, each a looping preview, by its plain name).
 

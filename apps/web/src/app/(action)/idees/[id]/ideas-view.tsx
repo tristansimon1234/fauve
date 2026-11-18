@@ -13,7 +13,7 @@ import { launchIdea, type IdeaLaunch } from "../actions";
 // on loop (a tap pauses it), its name and « Choisir celle-ci » over it; the last screen lets Edith choose. The videos
 // are plain <video> elements (never inside a button: some phones would not play them there), loaded only near view.
 
-const TRUST_TEXT = "Fais-moi confiance";
+const TRUST_TEXT = "Je te laisse faire";
 
 export function IdeasView({ offerId, cards, files, launched }: { offerId: string; cards: IdeaCard[]; files: number; launched: boolean }) {
   const [picked, setPicked] = useState<IdeaCard | null>(null);

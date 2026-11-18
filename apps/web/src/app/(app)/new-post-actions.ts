@@ -122,7 +122,7 @@ export async function ideasFor(files: unknown): Promise<IdeasResult> {
   const extra = parsed.data.flatMap((f): IdeaFile[] => ("upload" in f ? [{ kind: f.upload.video ? "video" : "photo" }] : []));
   try {
     const offer = await offerIdeas({ studioId: member.studio.id, mediaIds, via: "app", extra });
-    if (!offer) return { ok: false, error: "Je n’ai pas assez d’idées pour ces fichiers. Fais-moi confiance, ou dis-moi ce que tu veux." };
+    if (!offer) return { ok: false, error: "Je n’ai pas assez d’idées pour ces fichiers. Touche « Je te laisse faire », ou dis-moi ce que tu veux." };
     const cards = await ideaCards(offer.keys);
     return cards.length ? { ok: true, offerId: offer.id, cards } : { ok: false, error: "Les idées ne s’affichent pas pour l’instant. Réessaie dans un instant." };
   } catch (error) {

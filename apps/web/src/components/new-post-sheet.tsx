@@ -40,7 +40,7 @@ export const NewPostHandOffContext = createContext<NewPostHandOff | null>(null);
 
 // « Nouvelle publication », in four steps (Tristan : « trop d'étapes », « écrans vides ») :
 // what to make (the type, and for a Reel a voice or just the music, on one screen), her photos and videos (her library or her phone), what she imagines or a Reel she
-// likes (for a Reel, three doors: « Fais-moi confiance », « Je sais ce que je veux », « Regarde nos idées »), then Edith's proposal: her request said back as one plan in points, with why
+// likes (for a Reel, three doors: « Je te laisse faire », « Je sais ce que je veux », « Regarde nos idées »), then Edith's proposal: her request said back as one plan in points, with why
 // (« la demande bien reformulée, claire et précise, lisible »), which she takes or changes.
 // « C'est parti »: a Reel starts at once and the screen follows it (« Je m'en occupe »);
 // a carousel, a photo or a story goes on with Edith in the chat, who writes the texts.
@@ -252,7 +252,7 @@ function Create({
   const reading: CopyState | null = copyRead ?? (sent && model === sent.id ? (sent.lines.length ? { state: "read", name: sent.name, lines: sent.lines } : { state: "reading" }) : null);
   // A Reel that could not be read copies nothing: her own style, and the sheet says what to send instead.
   const usable = model && reading?.state !== "missed" ? model : null;
-  // Her door for a Reel: « Je sais ce que je veux » by default when she sent Edith a Reel to copy, else « Fais-moi confiance ».
+  // Her door for a Reel: « Je sais ce que je veux » by default when she sent Edith a Reel to copy, else « Je te laisse faire ».
   const doorAt: Door = kind !== "reel" ? "know" : (door ?? (sent ? "know" : "trust"));
   const pickedIdea = doorAt === "ideas" && ideaPicked && ideaOffer && "offerId" in ideaOffer && ideaOffer.offerId === ideaPicked.offerId ? ideaPicked : null;
   const copying =

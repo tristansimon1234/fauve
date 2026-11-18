@@ -531,7 +531,7 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
           console.warn("ideas not offered", error);
           return null;
         });
-        if (!offer) return json({ refused: "Pas assez d'idées pour ces fichiers : propose ton plan (reply_with plan), comme pour « Fais-moi confiance »." });
+        if (!offer) return json({ refused: "Pas assez d'idées pour ces fichiers : propose ton plan (reply_with plan), comme pour « Je te laisse faire »." });
         if (ctx.waId) {
           ctx.extras.link = { path: `/idees/${offer.id}`, label: "Voir les idées", purpose: "ideas" };
           return json({ bouton: "« Voir les idées » sous ton message", idees: offer.keys.length, note: "Une phrase courte, sans lien : elle choisit sur la page et le montage part de là, je te le dirai. Ne nomme ni ne décris aucune idée." });
