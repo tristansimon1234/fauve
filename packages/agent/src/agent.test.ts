@@ -5008,9 +5008,10 @@ test("her Instagram profile at her getting started: its link, the providers' ans
   assert.equal(justHello("Bonjour, ça marche comment ?"), false);
   assert.equal(justHello(""), false);
   assert.match(WHATSAPP_WELCOME, /community manager IA/);
-  assert.match(WHATSAPP_WELCOME, /notes vocales/);
-  assert.match(WHATSAPP_WELCOME, /site ou de ton profil Instagram/);
-  assert.match(WHATSAPP_WELCOME, /ton logo, des photos ou des Reels que tu aimes/);
+  assert.match(WHATSAPP_WELCOME, /vidéo au-dessus/);
+  assert.match(WHATSAPP_WELCOME, /ton Instagram ou ton site/);
+  // Short: two sentences of welcome, one ask (Tristan: « trop long »).
+  assert.ok(WHATSAPP_WELCOME.length < 260, String(WHATSAPP_WELCOME.length));
   // The caption of the intro video: WhatsApp keeps 1 024 characters, the terms line included.
   assert.ok(WHATSAPP_WELCOME.length + 200 < 1024);
   const { INTRO_VIDEO } = await import("./onboarding.ts");

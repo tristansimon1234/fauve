@@ -37,16 +37,10 @@ export function onboardingStepOf(value: unknown): OnboardingStep {
  * at most, terms line included): one message, so the two never arrive out of order.
  */
 export const WHATSAPP_WELCOME = [
-  "Bienvenue ! Moi c’est Edith, ton community manager IA ✨ Voici tout ce qu’il faut savoir sur moi, en 20 secondes 👆",
-  [
-    "🎬 Je monte tes Reels avec tes vidéos, avec une voix off si tu veux",
-    "🖼️ Je compose tes carrousels avec tes photos",
-    "✍️ J’écris tes légendes",
-    "📲 Je te fais signe au bon moment pour poster sur Instagram et TikTok",
-    "💬 Tout se passe ici, sur WhatsApp : pas d’app à installer (sur ordi, si tu veux : edith-ai.app)",
-  ].join("\n"),
-  "Écris-moi ou envoie-moi des notes vocales, comme à quelqu’un de ton équipe.",
-  "On commence ? Envoie-moi le lien de ton site ou de ton profil Instagram, je m’inspire de ton style. Pas encore de site ni d’Instagram ? Envoie-moi ton logo, des photos ou des Reels que tu aimes, et dis-moi ce que tu fais.",
+  // Short (Tristan, 18 November: « trop long, plus court », « regarde la vidéo au-dessus pour comprendre », « je monte tes
+  // Reels mais pour ça avant j'ai besoin de ta DA, donc envoie ton Insta ou ton site »): the video says the rest.
+  "Bienvenue, moi c’est Edith, ton community manager IA ✨ Regarde la vidéo au-dessus pour comprendre comment je marche 👆",
+  "Je monte tes Reels avec tes vidéos. Pour ça, j’ai d’abord besoin de ta DA : envoie-moi ton Instagram ou ton site, je regarde.",
 ].join("\n\n");
 
 /** Edith's introduction video (apps/render/intro), served by the app: sent with the welcome, shown at the start of the getting started in the app. */
