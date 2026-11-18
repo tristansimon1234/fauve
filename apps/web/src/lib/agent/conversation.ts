@@ -17,6 +17,7 @@ import {
   reelFinishSchema,
   reelLookSchema,
   stableWindow,
+  isAlbumWrapper,
   withLatestBurst,
   type ExchangeRow,
   PLAN_BUTTONS,
@@ -70,6 +71,7 @@ export type StoredMessage = {
   reactions?: { fauve?: string; me?: string } | null;
   /** A reply WhatsApp refused to send (kept, so she can read it in the app): she never got it there. */
   undelivered?: boolean;
+  created_at?: string | null;
 };
 
 const mediaLabels: Record<string, string> = {
@@ -86,6 +88,8 @@ export function toModelHistory(rows: StoredMessage[]): Anthropic.Beta.BetaMessag
   // The messages she is answering now (after Edith's last one) are read whole, however long.
   const answering = rows.findLastIndex((r) => r.direction === "outbound") + 1;
   for (const [i, row] of rows.entries()) {
+    // The album of the photos or videos right after it, not a message of hers (inbound-album.ts).
+    if (isAlbumWrapper(rows, i)) continue;
     const role = row.direction === "inbound" ? "user" : "assistant";
     const label = row.direction === "inbound" ? mediaLabels[row.type] : undefined;
     // A voice note whose words could not be read: Edith says so instead of guessing.

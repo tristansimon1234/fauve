@@ -7,6 +7,9 @@ import { Mascot } from "@/components/mascot";
 import { whatsappLink } from "@/lib/public-env";
 import { sendDropped } from "./actions";
 
+/** « 38 Mo » */
+const mb = (bytes: number) => `${Math.round(bytes / 1e6)} Mo`;
+
 /** Pick in her gallery, watch them go up, send them to Edith; then back to WhatsApp. */
 export function DropView({ studioId }: { studioId: string }) {
   const [error, setError] = useState<string | null>(null);
@@ -85,6 +88,12 @@ export function DropView({ studioId }: { studioId: string }) {
         <FileStrip files={uploads.files} onRemove={uploads.removeFile} />
       </div>
 
+      {/* Full quality takes a while on a phone: said, so a long wait never reads as a bug. */}
+      {uploads.uploading && (
+        <p className="text-[13.5px] leading-snug text-white/75">
+          {`${mb(uploads.progress.sent)} sur ${mb(uploads.progress.total)} envoyés. En pleine qualité, ça peut prendre une ou deux minutes : garde cette page ouverte.`}
+        </p>
+      )}
       {error && <p className="text-[13.5px] leading-snug text-[#FFB4A3]">{error}</p>}
       {failed && !error && <p className="text-[13.5px] leading-snug text-[#FFB4A3]">Un fichier n’est pas passé : retire-le et réessaie.</p>}
 
@@ -94,7 +103,7 @@ export function DropView({ studioId }: { studioId: string }) {
         disabled={!uploads.ready.length || uploads.uploading || pending}
         className="mt-auto bg-violet px-5 py-3.5 text-[16px] font-extrabold text-white disabled:opacity-40"
       >
-        {uploads.uploading ? "Envoi en cours…" : pending ? "J’envoie à Edith…" : uploads.ready.length ? `Envoyer à Edith (${uploads.ready.length})` : "Envoyer à Edith"}
+        {uploads.uploading ? `Envoi en cours… ${uploads.progress.total ? Math.floor((uploads.progress.sent / uploads.progress.total) * 100) : 0} %` : pending ? "J’envoie à Edith…" : uploads.ready.length ? `Envoyer à Edith (${uploads.ready.length})` : "Envoyer à Edith"}
       </button>
     </main>
   );

@@ -28,6 +28,7 @@ export * from "./finish.ts";
 export * from "./effort.ts";
 export * from "./critic.ts";
 export * from "./emoji.ts";
+export * from "./inbound-album.ts";
 export * from "./tool-status.ts";
 export * from "./turn.ts";
 export * from "./bank.ts";

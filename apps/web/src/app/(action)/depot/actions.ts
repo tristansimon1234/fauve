@@ -77,7 +77,7 @@ export async function sendDropped(input: z.input<typeof filesSchema>): Promise<D
   // Waiting for her in WhatsApp when she taps back.
   if (open) {
     const videos = added.filter((m) => m.video).length;
-    const ack = `C’est arrivé 👍 ${filesLine(videos, added.length - videos).replace(/^./, (c) => c.toUpperCase())}, en pleine qualité. Je regarde et je reviens vers toi.`;
+    const ack = `C’est arrivé 👍 ${filesLine(videos, added.length - videos).replace(/^./, (c) => c.toUpperCase())}, en pleine qualité. Je les regarde et je reviens vers toi dans une à trois minutes.`;
     const id = await sendText(waId, ack).catch((e: unknown) => void console.warn("upload link: ack not sent", e));
     if (id) await db.from("whatsapp_messages").insert({ studio_id: studioId, channel: "whatsapp", wa_message_id: id, direction: "outbound", phone_e164: member.phone_e164, type: "text", body: ack });
   }

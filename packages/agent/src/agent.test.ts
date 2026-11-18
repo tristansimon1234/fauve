@@ -5457,6 +5457,7 @@ test("a delivery says of the editor's words only what she must know", async () =
     "Le geste du pincement n'est dans aucune de tes vidéos : filme-le 3 secondes, la main dans le cadre.",
   );
   // The engine's own notes are said whole.
+  assert.equal(deliveryWords("J'ouvre sur le quartier. La musique et la date ne sont pas dans cette version.}"), "La musique et la date ne sont pas dans cette version.");
   assert.match(deliveryWords("Je n'ai pas réussi à composer la mise en page demandée : cette version passe tes plans en plein cadre. Dis-moi « réessaie la mise en page »."), /^Je n'ai pas réussi.*réessaie la mise en page/);
   assert.equal(deliveryWords(""), "");
 });
@@ -6293,4 +6294,20 @@ test("the delivery is short: never the editor's or the filler's sentence on its 
   }
   assert.match(followed, /mets ta musique/);
   assert.doesNotMatch(copied, /mets ta musique/);
+});
+
+test("the album of a burst of photos or videos is not a message of hers (« je n'ai pas vu ton partage Instagram »)", async () => {
+  const { isAlbumWrapper } = await import("./inbound-album.ts");
+  const at = (s: number) => new Date(Date.UTC(2026, 10, 13, 19, 27, s)).toISOString();
+  const burst = [
+    { direction: "inbound" as const, type: "unsupported", created_at: at(0) },
+    { direction: "inbound" as const, type: "video", created_at: at(4) },
+    { direction: "inbound" as const, type: "video", created_at: at(5) },
+  ];
+  assert.equal(isAlbumWrapper(burst, 0), true);
+  assert.equal(isAlbumWrapper(burst, 1), false);
+  // A real share, alone or long before her files, is still said.
+  assert.equal(isAlbumWrapper([burst[0]!], 0), false);
+  assert.equal(isAlbumWrapper([burst[0]!, { direction: "inbound", type: "video", created_at: at(59) }], 0), false);
+  assert.equal(isAlbumWrapper([burst[0]!, { direction: "inbound", type: "text", created_at: at(2) }], 0), false);
 });

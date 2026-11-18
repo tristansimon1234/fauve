@@ -1045,7 +1045,8 @@ function sentencesOf(text: string): string[] {
  * aura la flemme de tout lire »). The engine's own notes (« Je n'ai pas réussi… ») are said whole.
  */
 export function deliveryWords(rationale: string | null | undefined): string {
-  const sentences = sentencesOf((rationale ?? "").trim());
+  // A brace or bracket left from its JSON (18 November: « …pas dans cette version.} » reached her) never shows.
+  const sentences = sentencesOf((rationale ?? "").replace(/[{}[\]]+/g, "").trim()).map((s) => s.trim()).filter(Boolean);
   if (!sentences.length) return "";
   if (/^je n['’]ai pas (réussi|pu)/i.test(sentences[0]!)) return sentences.join(" ");
   // After it, only a limit or what she can do (Tristan, 6 November: the filler's « J'ai ouvert sur la terrasse fleurie… »,
