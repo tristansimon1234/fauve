@@ -67,7 +67,10 @@ const CODE =
   const P0 = PASSES[pi][0], kind = frame >= endAt ? "k" : PASSES[pi][1];
   const P1 = pi + 1 < PASSES.length ? PASSES[pi + 1][0] : durationInFrames;
   const t = frame - P0;
-  const W = width, H = height, WHITE = "#fdfdfd", NAVY = "#243250";
+  const W = width, H = height, WHITE = "#fdfdfd";
+  const setting = (k, d) => { const v = texts && texts[k]; return typeof v === "string" && v ? v : d; };
+  const BLUE_LOOK = setting("couleur", "bleu") === "bleu";
+  const NAVY = BLUE_LOOK ? "#243250" : "#1a1a1a";
   const abs = (s) => ({ position: "absolute", ...s });
   const FULL = { left: 0, top: 0, width: W, height: H };
   const rnd = (s) => random("v" + s);
@@ -119,7 +122,7 @@ const CODE =
   // Two tones of blue that keep the picture's light (black #142754 to white #c8d6ef).
   const BLUE = h("svg", { width: 0, height: 0, style: { position: "absolute" } }, h("filter", { id: "vblue", colorInterpolationFilters: "sRGB" },
     h("feColorMatrix", { type: "matrix", values: "0.2126 0.7152 0.0722 0 0 0.2126 0.7152 0.0722 0 0 0.2126 0.7152 0.0722 0 0 0 0 0 1 0" }),
-    h("feComponentTransfer", null, h("feFuncR", { type: "table", tableValues: "0.078 0.278 0.667 0.784" }), h("feFuncG", { type: "table", tableValues: "0.153 0.361 0.737 0.839" }), h("feFuncB", { type: "table", tableValues: "0.329 0.533 0.867 0.937" }))));
+    h("feComponentTransfer", null, h("feFuncR", { type: "table", tableValues: BLUE_LOOK ? "0.078 0.278 0.667 0.784" : "0.08 0.3 0.72 0.88" }), h("feFuncG", { type: "table", tableValues: BLUE_LOOK ? "0.153 0.361 0.737 0.839" : "0.08 0.3 0.72 0.88" }), h("feFuncB", { type: "table", tableValues: BLUE_LOOK ? "0.329 0.533 0.867 0.937" : "0.08 0.3 0.72 0.88" }))));
   // The machine's characters and dots drawn on the picture's edges and details (its outlines, the grain of a stone, the
   // folds of a coat), widened a little so a cell reads them: sparse where it is smooth, dense where it has detail.
   const edges = (kid, dark, s) => h("div", { style: abs({ ...FULL, filter: "blur(1px) brightness(" + s + ")" + (dark ? " invert(1)" : "") }) }, h(Sketch, { invert: false, strength: 2.4 }, kid));
@@ -303,6 +306,14 @@ export const vision: MontageSkill = {
         { value: "vertical", says: "vertical plein écran" },
         { value: "horizontal", says: "son plan en largeur dans une bande 16:9 au milieu, sur le blanc des passes (les noirs en plein écran)", band: true },
         { value: "auto", says: "vertical plein écran, un plan en largeur recadré sur la personne immobile, gardée au milieu" },
+      ],
+    },
+    {
+      name: "couleur",
+      want: "la couleur de ses images passées en deux tons et de ses étiquettes",
+      choices: [
+        { value: "bleu", says: "le bleu marine de l'original" },
+        { value: "sienne", says: "en noir et gris (sa charte)", charter: true },
       ],
     },
   ],

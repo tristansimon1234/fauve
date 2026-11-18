@@ -190,7 +190,8 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const RED = "#ff2b00";
   const own = [brand.accent, brand.palette && brand.palette.secondary].find((c) => !pale(c));
   const choice = setting("couleur", "sienne");
-  const INK = choice === "blanc" ? "#ffffff" : choice === "original" ? RED : own || RED;
+  // Her charter (18 November): without a colour of hers that reads, black, white or grey, never the model's colour.
+  const INK = choice === "blanc" ? "#ffffff" : choice === "original" ? RED : own || "#ffffff";
   const CREAM = "#fff4d6";
   const EDGE = ratio(INK, CREAM) >= 3 ? CREAM : "#1d140e";
   const display = "'" + brand.displayFont + "', 'Montserrat', 'Poppins', 'Arial Black', sans-serif";

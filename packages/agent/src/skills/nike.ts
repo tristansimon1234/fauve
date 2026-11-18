@@ -39,8 +39,14 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const cur = shots.reduce((k, s, i) => (s.from <= frame ? i : k), 0);
   const display = "'" + brand.displayFont + "', sans-serif";
   const body = "'" + brand.bodyFont + "', sans-serif";
-  // The model's own colours: black and white very contrasted, its red.
-  const RED = "#f2000c";
+  // The model's own colours: black and white very contrasted, its red; her colour instead unless she asks for its red,
+  // and without a colour of hers, white words and no tint.
+  const setting = (k, d) => { const v = texts && texts[k]; return typeof v === "string" && v ? v : d; };
+  // Her charter's colour when it is a real colour (black, white and grey are hers too, but the model's colour never is:
+  // Tristan, 18 November, « les couleurs doivent respecter la DA »), else null and the neutral of the model plays.
+  const HERS = (() => { const m = /^#?([0-9a-f]{6})$/i.exec(String(brand.accent || "").trim()); if (!m) return null; const v = parseInt(m[1], 16); const r = (v >> 16) & 255, g = (v >> 8) & 255, b = v & 255; const hi = Math.max(r, g, b), lo = Math.min(r, g, b); return hi >= 90 && (hi - lo) / hi >= 0.35 ? "#" + m[1].toLowerCase() : null; })();
+  const RED = setting("couleur", "rouge") === "rouge" ? "#f2000c" : HERS || "#ffffff";
+  const TINT = RED === "#ffffff" ? null : RED;
   const BW = "grayscale(1) contrast(1.45) brightness(0.9)";
   const NEGATIVE = "grayscale(1) invert(1) contrast(1.3) brightness(1.08)";
   const box = { position: "absolute", left: 0, top: 0, width, height };
@@ -54,7 +60,7 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
     const neg = look === "negative";
     return h(React.Fragment, { key: "s" + i + look },
       h(Footage, { shot: i, style: { ...box, filter: neg ? NEGATIVE : BW }, ...(extra || {}) }),
-      look === "red" ? h(Tint, { color: RED, mode: "multiply" }) : null);
+      look === "red" && TINT ? h(Tint, { color: TINT, mode: "multiply" }) : null);
   };
 
   // 1. The opening: her first shots, the first one through the strobe (red, negative, red), then the burst: her later
@@ -163,6 +169,16 @@ export const nike: MontageSkill = {
   texts: [
     { slot: "titre", role: "hook", want: "le titre sur le noir, en capitales : 1 à 3 mots qui annoncent la série de mots qui suit (une forme comme « sept jours », « le geste », « un samedi »)", max: 18, required: true },
     { slot: "mots", role: "band", want: "4 à 6 mots ou groupes de 2 mots, séparés par des virgules, un par plan en grand : les gestes, les moments ou les lieux de son métier (une forme comme « pétrir, façonner, cuire, servir »)", max: 60, required: true },
+  ],
+  settings: [
+    {
+      name: "couleur",
+      want: "la couleur de ses mots et de ses plans teintés",
+      choices: [
+        { value: "rouge", says: "le rouge de l'original" },
+        { value: "sienne", says: "sa couleur quand elle est vive, sinon des mots blancs et des plans en noir et blanc", charter: true },
+      ],
+    },
   ],
   timeline(n, options: { end: boolean; bpm?: number }) {
     const { end } = options;

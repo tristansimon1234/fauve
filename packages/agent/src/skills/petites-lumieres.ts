@@ -97,7 +97,8 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const hers = mode === "sienne" ? vivid(brand.accent) : null;
   const css = (rgb) => "rgb(" + rgb.join(",") + ")";
   const warm = mode === "chaude";
-  const WIN = hers ? css(hers) : warm ? "#ffc56e" : "#b4201a";
+  // Her charter (18 November): without a colour of hers that reads, black, white or grey, never the model's colour.
+  const WIN = hers ? css(hers) : mode === "sienne" ? "#f6f3ec" : warm ? "#ffc56e" : "#b4201a";
   const SUN = hers ? css(hers) : warm ? "#ff8a24" : "#fe0000";
   const GLOW = hers || (warm ? [255, 176, 92] : [255, 42, 36]);
   const TUBE = hers ? css(hers.map((c) => Math.round(c + (255 - c) * 0.72))) : warm ? "#fff3df" : "#ffe1dc";

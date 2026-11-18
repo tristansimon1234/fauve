@@ -134,8 +134,12 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const luma = (c) => { const x = rgb(c); return x ? (0.2126 * x[0] + 0.7152 * x[1] + 0.0722 * x[2]) / 255 : -1; };
   const vivid = (c) => { const x = rgb(c); if (!x) return 0; const a = Math.max(x[0], x[1], x[2]); return a ? (a - Math.min(x[0], x[1], x[2])) / a : 0; };
   const accent = brand.accent;
-  const INK = luma(accent) >= 0.28 && luma(accent) <= 0.86 && vivid(accent) >= 0.45 ? accent : "#fcc83b";
-  const SECOND = luma(accent) >= 0.6 && vivid(accent) >= 0.3 ? accent : "#f7ce18";
+  // Her colour when it reads (her charter: never the original's yellow unless she asks for it).
+  const YELLOW = setting("couleur", "sienne") === "jaune";
+  // Its name on the white sticker: her colour when it reads, else black (never white on white).
+  const INK = !YELLOW && luma(accent) >= 0.28 && luma(accent) <= 0.86 && vivid(accent) >= 0.45 ? accent : YELLOW ? "#fcc83b" : "#141414";
+  // The artisan's voice apart from the other: without a colour of hers, a light grey (grey is in any charter).
+  const SECOND = !YELLOW && luma(accent) >= 0.6 && vivid(accent) >= 0.3 ? accent : YELLOW ? "#f7ce18" : "#c9c9c9";
   const STICKER = "'Paytone One', '" + brand.displayFont + "', sans-serif";
   const body = "'" + brand.bodyFont + "', 'Figtree', sans-serif";
   const keep = (s) => String(s || "").replace(/(\d) (?=\d)/g, "$1 ").replace(/ (\d+(?:er|e))\b/g, " $1");
@@ -398,6 +402,14 @@ export const enBoutique: MontageSkill = {
         { value: "vertical", says: "vertical plein écran comme l'original, ses vidéos en largeur recadrées sur leur sujet" },
         { value: "horizontal", says: "ses vidéos entières dans une bande 16:9 sur du noir, les sous-titres dessous", band: true },
         { value: "auto", says: "comme ses vidéos (vertical plein écran ; horizontal 16:9 sur du noir quand la plupart sont en largeur)" },
+      ],
+    },
+    {
+      name: "couleur",
+      want: "la couleur de ses autocollants",
+      choices: [
+        { value: "sienne", says: "sa couleur quand elle se lit, sinon son nom en noir et la seconde voix en gris clair", charter: true },
+        { value: "jaune", says: "le jaune de l'original" },
       ],
     },
   ],

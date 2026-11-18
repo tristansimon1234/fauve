@@ -91,7 +91,7 @@ test("« Le grand départ »: 6 to 9 shots from her files (her journey and her a
   assert.ok(Math.abs(slow.marks.title! / line.marks.title! - 110.9 / 92) < 0.01);
   // Her arrival at its real pace when she asks.
   assert.ok(depart.timeline(9, { end: false, settings: { arrivee: "normale" } }).shots.every((s) => s.speed === undefined));
-  assert.deepEqual(depart.settings?.map((s) => [s.name, s.choices.map((c) => c.value)]), [["format", ["vertical", "horizontal", "auto"]], ["arrivee", ["acceleree", "normale"]]]);
+  assert.deepEqual(depart.settings?.map((s) => [s.name, s.choices.map((c) => c.value)]), [["format", ["vertical", "horizontal", "auto"]], ["arrivee", ["acceleree", "normale"]], ["couleur", ["sienne", "or"]]]);
 });
 
 test("« Le grand départ »: its plan (her arrival played faster, her journey heard, its words by role), nothing cut out, followed or read", () => {
@@ -252,12 +252,13 @@ test("« Le grand départ »: her two lines small in the middle, fading in a bea
   assert.equal((fits(235)[0]!.props.innerStyle as { opacity: number }).opacity, 0);
   assert.ok(Math.abs((fits(239)[0]!.props.innerStyle as { opacity: number }).opacity - 4 / 9) < 1e-9);
   assert.equal((fits(244)[0]!.props.innerStyle as { opacity: number }).opacity, 1);
-  // 60 px, in the safe zone, centred on 45 % of the height; her dark navy does not read on grey: the gold.
+  // 60 px, in the safe zone, centred on 45 % of the height; her dark navy does not read on grey: white (her charter
+  // first, 18 November; the original's gold on her word).
   for (const t of lines) {
     const b = styleOf(t) as unknown as Box;
     assert.ok(b.left >= 140 && b.left + b.width <= 940 && b.top >= 80 && b.top + b.height <= 1440, JSON.stringify(b));
     assert.equal((t.props.innerStyle as { fontSize: number }).fontSize, 60);
-    assert.equal((t.props.innerStyle as { color: string }).color, "#cdb672");
+    assert.equal((t.props.innerStyle as { color: string }).color, "#ffffff");
   }
   assert.equal(Number(styleOf(lines[0]!).top) + Number(styleOf(lines[0]!).height), Number(styleOf(lines[1]!).top));
   assert.equal(Number(styleOf(lines[1]!).top), 864);

@@ -136,7 +136,8 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const colour = setting("couleur", "creme");
   const CREAM = "#fffcc0";
   const DEEP = "#2b2118";
-  const HERS = colour === "blanc" ? "#ffffff" : colour === "sa-couleur" && lum(brand.accent) >= 0 ? brand.accent : CREAM;
+  // Her charter (18 November): without a colour of hers that reads, black, white or grey, never the model's colour.
+  const HERS = colour === "blanc" ? "#ffffff" : colour === "sa-couleur" ? (lum(brand.accent) >= 0 ? brand.accent : "#ffffff") : CREAM;
   // Its edge: thin where its ink was chosen on its own shot's light; firmer (still tight, never a haze) where it was not
   // (a shot past the Reel's reads, a passage at another speed, her series taking her display's light).
   const edgeOf = (ink, sure) =>

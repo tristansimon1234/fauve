@@ -265,7 +265,7 @@ test("« Le lieu tapé »: its small line and her logo once the name is typed, h
   };
   assert.deepEqual(ink({}), ["#1f4e79", "#fff4d6"]);
   assert.deepEqual(ink({ accent: "#f6e7dc", palette: { secondary: "#7a2e1d" } }), ["#7a2e1d", "#fff4d6"]);
-  assert.deepEqual(ink({ accent: "#f6e7dc" }), ["#ff2b00", "#fff4d6"]);
+  assert.deepEqual(ink({ accent: "#f6e7dc" }), ["#ffffff", "#1d140e"]);
   assert.deepEqual(ink({}, { couleur: "blanc" }), ["#ffffff", "#1d140e"]);
   assert.deepEqual(ink({ accent: "#f2a65a" }), ["#f2a65a", "#1d140e"]);
   // Its code with no object named keeps its words and lights nothing (« @lumieres » left: no object followed).

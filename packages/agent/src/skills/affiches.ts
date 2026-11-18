@@ -64,7 +64,8 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const pal = brand.palette || {};
   const hers = [brand.accent, pal.secondary, pal.dark, pal.light].map(hex).filter((c, i, all) => c && all.indexOf(c) === i);
   const choice = setting("couleurs", "vives");
-  const GROUNDS = choice === "noir" ? ["#060608"] : choice === "sa-charte" && hers.length >= 2 ? hers : VIVID;
+  // Her charter (18 November): without a colour of hers that reads, black, white or grey, never the model's colour.
+  const GROUNDS = choice === "noir" ? ["#060608"] : choice === "sa-charte" ? (hers.length >= 2 ? hers : [...hers, "#141414", "#f3f1ec", "#8a8a8a"]) : VIVID;
   const groundOf = (p) => GROUNDS[((p % GROUNDS.length) + GROUNDS.length) % GROUNDS.length];
   const lin = (v) => (v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4));
   const lum = (c) => { const v = parseInt(c.slice(1), 16); return 0.2126 * lin(((v >> 16) & 255) / 255) + 0.7152 * lin(((v >> 8) & 255) / 255) + 0.0722 * lin((v & 255) / 255); };

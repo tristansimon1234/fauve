@@ -104,7 +104,8 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const lum = (v) => (0.2126 * ((v >> 16) & 255) + 0.7152 * ((v >> 8) & 255) + 0.0722 * (v & 255)) / 255;
   const dark = hex(brand.palette && brand.palette.dark);
   // (Its bordeaux a little purer than the original's #420e0f, as the ground's grain warms it back to it.)
-  const GROUND = setting("fond", "bordeaux") === "sienne" && dark !== null && lum(dark) < 0.4 ? "#" + dark.toString(16).padStart(6, "0") : "#440a0b";
+  // Her charter (18 November): without a colour of hers that reads, black, white or grey, never the model's colour.
+  const GROUND = setting("fond", "bordeaux") !== "sienne" ? "#440a0b" : dark !== null && lum(dark) < 0.4 ? "#" + dark.toString(16).padStart(6, "0") : "#141414";
   const NIGHT = "#03090d";
   const WHITE = "#ffffff";
   const RED = "#972f34";

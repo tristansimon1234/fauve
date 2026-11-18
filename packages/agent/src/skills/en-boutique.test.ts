@@ -128,7 +128,7 @@ test("« Création à quatre mains »: its plan subtitled for what is said in he
   assert.deepEqual(checkMotionCode(enBoutique.code), []);
   assert.deepEqual([subjectsDrawn(enBoutique.code), objectsDrawn(enBoutique.code), clearsDrawn(enBoutique.code), readsDrawn(enBoutique.code)], [[], [], [], []]);
   assert.ok(enBoutique.code.length < 24000);
-  assert.deepEqual(enBoutique.settings?.map((s) => [s.name, s.choices.map((c) => c.value)]), [["format", ["vertical", "horizontal", "auto"]]]);
+  assert.deepEqual(enBoutique.settings?.map((s) => [s.name, s.choices.map((c) => c.value)]), [["format", ["vertical", "horizontal", "auto"]], ["couleur", ["sienne", "jaune"]]]);
   // Its filler: its slots, their places, and that what she says in her videos is its subtitles.
   const input = skillFillInput({ skill: enBoutique, name: "Création à quatre mains", n: 16, files, business: { name: "Chez Léa" }, request: "" });
   assert.match(String(input.ses_paroles), /sous-titres/);
@@ -197,7 +197,7 @@ function shown(from: number, to: number, options: Parameters<typeof drawAt>[1] =
 }
 const sticker = (tree: Drawn, key = "title") => nodes(tree).find((n) => n.props.key === key) ?? null;
 
-test("« Création à quatre mains » writes its lines as the subtitles of two voices: groups of one to three words, the artisan's in yellow", () => {
+test("« Création à quatre mains » writes its lines as the subtitles of two voices: groups of one to three words, the artisan's in her colour (light grey without one)", () => {
   const line = enBoutique.timeline(16, { end: false });
   // Her idea from the first image, cut as a creator subtitles it, its punctuation shown, a mark set apart the French
   // way kept with its word.
@@ -216,9 +216,9 @@ test("« Création à quatre mains » writes its lines as the subtitles of two v
   // White for hers, the second colour (the original's yellow) for the artisan's, the lines beginning with « — ».
   const talk = shown(line.marks.echange!, line.marks.gestes!);
   // Four words ending on small ones: those start the next group (« Je pensais » / « à tes tomates »).
-  assert.deepEqual(talk.map((g) => [g.text, g.color]), [["Je pensais", "#ffffff"], ["à tes tomates", "#ffffff"], ["Vas-y,", "#f7ce18"], ["dis-moi !", "#f7ce18"]]);
+  assert.deepEqual(talk.map((g) => [g.text, g.color]), [["Je pensais", "#ffffff"], ["à tes tomates", "#ffffff"], ["Vas-y,", "#c9c9c9"], ["dis-moi !", "#c9c9c9"]]);
   const gestures = shown(line.marks.gestes!, line.marks.resultat!);
-  assert.deepEqual(gestures.map((g) => [g.text, g.color]), [["D'abord la sauce", "#f7ce18"], ["Pas trop de mozza", "#f7ce18"], ["Ça sent déjà bon !", "#ffffff"]]);
+  assert.deepEqual(gestures.map((g) => [g.text, g.color]), [["D'abord la sauce", "#c9c9c9"], ["Pas trop de mozza", "#c9c9c9"], ["Ça sent déjà bon !", "#ffffff"]]);
   assert.deepEqual(shown(line.marks.resultat!, f(line.duration)).map((g) => g.text), ["Et voilà la pizza", "du marché !", "Waouh !", "Je la trouve", "très bonne", "Bon appétit !"]);
   // Her colour for the artisan's lines when it reads on any picture; else the original's yellow.
   assert.equal(shown(line.marks.gestes!, line.marks.gestes! + 2, { brand: { accent: "#9be7ff" } })[0]!.color, "#9be7ff");
@@ -258,15 +258,16 @@ test("« Création à quatre mains »: its sticker pops over the artisan with a 
   assert.deepEqual(name.children.flat(Infinity).filter((c) => c && typeof c === "object").map((c) => own(c as Drawn)), ["Pizza", "du marché"]);
   const type = name.props.innerStyle as Record<string, string | number>;
   assert.equal(String(type.fontFamily).split(",")[0], "'Paytone One'");
-  assert.equal(type.color, "#fcc83b");
+  assert.equal(type.color, "#141414");
   assert.match(String(type.textShadow), /^-1px 1px 0 #141414, .* -7px 8px 0 #141414$/);
   assert.equal(type.textTransform, "uppercase");
   // Who makes it: 48 px, black capitals.
   assert.deepEqual([(texts[1]!.props.innerStyle as Record<string, number>).fontSize, (texts[1]!.props.innerStyle as Record<string, string>).color], [48, "#141414"]);
-  // Her colour for the name when it is bright and vivid enough; a dark one keeps the original's yellow.
+  // Her colour for the name when it is bright and vivid enough; a dark one: black on the white sticker (her charter
+  // first, 18 November), the original's yellow on her word.
   const coloured = (accent: string) => (nodes(sticker(drawAt(pop + 10, { brand: { accent } }))!).find((n) => n.type === "FitText")!.props.innerStyle as Record<string, string>).color;
   assert.equal(coloured("#e8417a"), "#e8417a");
-  assert.equal(coloured("#1d2a44"), "#fcc83b");
+  assert.equal(coloured("#1d2a44"), "#141414");
   // Without its line: the card alone with its name.
   assert.equal(nodes(sticker(drawAt(pop + 10, { words: { ...WORDS, avec: "" } }))!).filter((n) => n.type === "FitText").length, 1);
 });

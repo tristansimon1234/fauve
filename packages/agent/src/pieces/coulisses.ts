@@ -93,6 +93,7 @@ export function cutSounds(plan: { at: number; kind: number; load: number }[], be
 }
 
 const CODE = String.raw`function Scene({ width, height, durationInFrames, brand, shots, texts }) {
+  const setting = (k, d) => { const v = texts && texts[k]; return typeof v === "string" && v ? v : d; };
   const h = React.createElement;
   const frame = useCurrentFrame();
   const word = (k) => { const v = texts && texts[k]; return typeof v === "string" ? v.trim() : ""; };
@@ -283,7 +284,10 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
     h("div", { style: { position: "absolute", left: Math.round(head - 6), top: 3, width: 12, height: 12, background: "#ff3131", clipPath: "polygon(0 0, 100% 0, 100% 55%, 50% 100%, 0 55%)" } }));
 
   // The ground: an electric blue, squared with fine violet lines like a technical sheet, still; no gradient, grain nor shadow.
-  const ground = { backgroundColor: "#15017A", backgroundImage: "linear-gradient(#432DA9 0 2px, transparent 2px), linear-gradient(90deg, #432DA9 0 2px, transparent 2px)", backgroundSize: "33.75px 33.75px", backgroundPosition: "13px 33px" };
+  // Its ground: black squared with grey (her charter, 18 November), its electric blue on her word.
+  const blueGround = setting("fond", "noir") === "bleu";
+  const GRID = blueGround ? "#432DA9" : "#2a2a2a";
+  const ground = { backgroundColor: blueGround ? "#15017A" : "#141414", backgroundImage: "linear-gradient(" + GRID + " 0 2px, transparent 2px), linear-gradient(90deg, " + GRID + " 0 2px, transparent 2px)", backgroundSize: "33.75px 33.75px", backgroundPosition: "13px 33px" };
   return h(AbsoluteFill, { style: ground }, heading, card, label, timeline);
 }`;
 
@@ -326,6 +330,14 @@ export const coulisses: EffectPiece = {
         { value: "auto", says: "comme ses vidéos (16:9 si la plupart sont horizontales, carrée sinon)" },
         { value: "horizontal", says: "une carte 16:9, comme l'original (une vidéo verticale y est cadrée sur son sujet)", band: true },
         { value: "vertical", says: "une carte carrée de la même largeur, pour des vidéos verticales" },
+      ],
+    },
+    {
+      name: "fond",
+      want: "le fond derrière la carte",
+      choices: [
+        { value: "noir", says: "noir quadrillé de gris (sa charte)", charter: true },
+        { value: "bleu", says: "le bleu électrique quadrillé de l'original" },
       ],
     },
   ],

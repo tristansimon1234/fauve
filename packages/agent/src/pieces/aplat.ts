@@ -98,7 +98,8 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
     const s = hi === lo ? 0 : (hi - lo) / (1 - Math.abs(2 * l - 1));
     return s >= 0.5 && l >= 0.3 && l <= 0.62;
   };
-  const AP = word("couleur") !== "rouge" && vivid(brand.accent) ? String(brand.accent).toLowerCase() : "#ff0000";
+  // Her charter (18 November): without a colour of hers that reads, black, white or grey, never the model's colour.
+  const AP = word("couleur") === "rouge" ? "#ff0000" : vivid(brand.accent) ? String(brand.accent).toLowerCase() : "#141414";
   const lin = (v) => (v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4));
   const lum = (() => { const [r, g, b] = rgb(AP); return 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b); })();
   const ON = (lum + 0.05) / 0.06 > 1.05 / (lum + 0.05) ? "#170707" : "#ffffff";

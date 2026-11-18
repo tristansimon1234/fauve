@@ -238,7 +238,7 @@ test("« Ta ville racontée » (v1): her name between quotes in big red capitals
   // In her colour when it is vivid, else a film title's red; small labels beside the name that reads.
   assert.ok([name, signature, genre].every((n) => (n!.props.innerStyle as Record<string, unknown>).color === "#1f6b4f"));
   const pale = propsFor(31, 16 / 9, { brand: { ...props.brand, accent: "#f2e9dc" } });
-  assert.equal((nodes(draw(210, pale)).find((n) => n.type === "FitText")!.props.innerStyle as Record<string, unknown>).color, "#d7261e");
+  assert.equal((nodes(draw(210, pale)).find((n) => n.type === "FitText")!.props.innerStyle as Record<string, unknown>).color, "#ffffff");
   // « rouge »: the original's red, whatever her colour.
   const red = propsFor(31, 16 / 9, { texts: { ...props.texts, couleur: "rouge" } });
   assert.ok(nodes(draw(210, red)).filter((n) => n.type === "FitText").every((n) => (n.props.innerStyle as Record<string, unknown>).color === "#d7261e"));

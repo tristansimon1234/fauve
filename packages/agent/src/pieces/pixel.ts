@@ -97,10 +97,14 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
     const pixel = "'Pixelify Sans', '" + brand.displayFont + "', monospace";
     const typewriter = "'Courier Prime', '" + brand.bodyFont + "', monospace";
     const plain = "'Inter', '" + brand.bodyFont + "', 'Helvetica Neue', Arial, sans-serif";
-    const charter = setting("couleur", "menthe") === "charte" && brand.accent;
-    const FILL = charter ? brand.accent : "#d4f7e9";
-    const EDGE = charter ? brand.accentInk || "#2c4741" : "#2c4741";
-    const CREAM = "#fff8e8";
+    // Her charter (18 November): her colour when it is a real colour, else white, a black edge; its mint on her word.
+    const charter = setting("couleur", "menthe") === "charte";
+    const m_ = /^#?([0-9a-f]{6})$/i.exec(String(brand.accent || "").trim());
+    const rgb_ = m_ ? [0, 8, 16].map((k) => (parseInt(m_[1], 16) >> (16 - k)) & 255) : null;
+    const real = rgb_ && Math.max(...rgb_) >= 90 && (Math.max(...rgb_) - Math.min(...rgb_)) / Math.max(...rgb_) >= 0.35;
+    const FILL = charter ? (real ? brand.accent : "#ffffff") : "#d4f7e9";
+    const EDGE = charter ? (real ? brand.accentInk || "#141414" : "#141414") : "#2c4741";
+    const CREAM = charter ? "#ffffff" : "#fff8e8";
     const titleEdge = [[2, 0], [-2, 0], [0, 2], [0, -2], [2, 2], [-2, 2], [2, -2], [-2, -2]].map((d) => d[0] + "px " + d[1] + "px 0 " + EDGE).join(", ");
     const thin = "0 0 1px rgba(0,0,0,0.75), 0 0 3px rgba(0,0,0,0.45), 0 1px 6px rgba(0,0,0,0.3)";
     const shade = "drop-shadow(0 0 1px rgba(0,0,0,0.7)) drop-shadow(0 0 3px rgba(0,0,0,0.35))";
@@ -293,7 +297,7 @@ export const pixel: EffectPiece = {
       want: "la couleur du titre en pixels : vert d'eau comme l'original, ou la couleur principale de sa charte",
       choices: [
         { value: "menthe", says: "vert d'eau très pâle, un liseré gris-vert tout autour, comme l'original" },
-        { value: "charte", says: "la couleur principale de sa charte, un liseré qui se lit dessus" },
+        { value: "charte", says: "la couleur principale de sa charte, un liseré qui se lit dessus (du blanc et un liseré noir sans couleur à elle)", charter: true },
       ],
     },
   ],

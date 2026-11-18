@@ -49,6 +49,7 @@ export function journeeMoments(input: Pick<PieceTimelineInput, "frames" | "bpm" 
 }
 
 const CODE = String.raw`function Scene({ width, height, durationInFrames, brand, shots, texts }) {
+  const setting = (k, d) => { const v = texts && texts[k]; return typeof v === "string" && v ? v : d; };
   const h = React.createElement;
   const frame = useCurrentFrame();
   const word = (k) => { const v = texts && texts[k]; return typeof v === "string" ? v.trim() : ""; };
@@ -85,7 +86,9 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
     const hex = /^#?([0-9a-f]{6})$/i.exec(String(brand.accent || "").trim());
     const lin = (v) => { const c = v / 255; return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); };
     const lum = hex ? (() => { const n = parseInt(hex[1], 16); return 0.2126 * lin((n >> 16) & 255) + 0.7152 * lin((n >> 8) & 255) + 0.0722 * lin(n & 255); })() : -1;
-    const INK = lum >= 0.08 && lum <= 0.32 ? "#" + hex[1] : "#fa010c";
+    // Her colour when it reads; else white (her charter, 18 November), the original's red only on her word.
+    const RED = setting("couleur", "sienne") === "rouge";
+    const INK = RED ? "#fa010c" : lum >= 0.08 && lum <= 0.32 ? "#" + hex[1] : "#ffffff";
     const name = word("titre").replace(/(\d) (?=\d)/g, "$1\u00a0").toUpperCase();
     const small = word("surtitre").replace(/(\d) (?=\d)/g, "$1\u00a0");
     if (name && frame >= TITLE && frame < TITLE_TO) {
@@ -141,6 +144,16 @@ export const journee: EffectPiece = {
       want: "2 ou 3 petits mots écrits à la main au-dessus du titre, alignés sur sa première lettre, qui l'amènent (une forme comme « une journée à », « un samedi chez », « le matin au »)",
       max: 20,
       required: false,
+    },
+  ],
+  settings: [
+    {
+      name: "couleur",
+      want: "la couleur de son nom",
+      choices: [
+        { value: "sienne", says: "sa couleur quand elle se lit, sinon du blanc", charter: true },
+        { value: "rouge", says: "le rouge vif de l'original" },
+      ],
     },
   ],
   timeline({ frames, bpm, shots }) {

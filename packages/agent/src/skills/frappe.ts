@@ -91,7 +91,8 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   // Her colour for her name (a colour too pale to read on a sky falls back to a red-orange), or on her word the
   // original's red-orange.
   const pale = (c) => { const m = /^#?([0-9a-f]{6})$/i.exec(String(c || "")); if (!m) return true; const v = parseInt(m[1], 16); return (0.2126 * ((v >> 16) & 255) + 0.7152 * ((v >> 8) & 255) + 0.0722 * (v & 255)) / 255 > 0.72; };
-  const RED = setting("couleur", "sienne") !== "original" && brand.accent && !pale(brand.accent) ? brand.accent : "#ff2b00";
+  // Her charter (18 November): without a colour of hers that reads, black, white or grey, never the model's colour.
+  const RED = setting("couleur", "sienne") === "original" ? "#ff2b00" : brand.accent && !pale(brand.accent) ? brand.accent : "#ffffff";
   const display = "'" + brand.displayFont + "', 'Montserrat', 'Poppins', 'Arial Black', sans-serif";
   const body = "'" + brand.bodyFont + "', 'Inter Tight', 'Inter', sans-serif";
   const keep = (s) => String(s || "").replace(/(\d) (?=\d)/g, "$1 ");

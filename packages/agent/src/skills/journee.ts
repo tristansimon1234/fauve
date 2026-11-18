@@ -84,6 +84,9 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const frame = useCurrentFrame();
   const mark = (k, d) => { const v = Number(texts && texts[k]); return Number.isFinite(v) ? v : d; };
   const setting = (k, d) => { const v = texts && texts[k]; return typeof v === "string" && v ? v : d; };
+  // Her charter's colour when it is a real colour (black, white and grey are hers too, but the model's colour never is:
+  // Tristan, 18 November, « les couleurs doivent respecter la DA »), else null and the neutral of the model plays.
+  const HERS = (() => { const m = /^#?([0-9a-f]{6})$/i.exec(String(brand.accent || "").trim()); if (!m) return null; const v = parseInt(m[1], 16); const r = (v >> 16) & 255, g = (v >> 8) & 255, b = v & 255; const hi = Math.max(r, g, b), lo = Math.min(r, g, b); return hi >= 90 && (hi - lo) / hi >= 0.35 ? "#" + m[1].toLowerCase() : null; })();
   const clamp = { extrapolateLeft: "clamp", extrapolateRight: "clamp" };
   const n = shots.length;
   const cur = shots.reduce((k, s, i) => (s.from <= frame ? i : k), 0);
@@ -198,7 +201,7 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const hook = reelTexts.find((t) => t.role === "hook");
   const small = reelTexts.find((t) => t.role === "caption");
   const others = reelTexts.filter((t) => t !== hook && t !== small);
-  const RED = "#fa010c";
+  const RED = setting("couleur", "rouge") === "rouge" ? "#fa010c" : HERS || "#ffffff";
   const display = "'" + brand.displayFont + "', 'Bodoni Moda', 'Didot', serif";
   const body = "'" + brand.bodyFont + "', 'Inter Tight', 'Inter', sans-serif";
   const hand = "'Caveat', '" + brand.bodyFont + "', cursive";
@@ -289,6 +292,14 @@ export const journee: MontageSkill = {
         { value: "vertical", says: "vertical plein écran, ses vidéos horizontales recadrées sur leur sujet" },
         { value: "horizontal", says: "horizontal 4:3 sur du noir, comme l'original", band: true },
         { value: "auto", says: "comme ses vidéos (horizontal si elles le sont)" },
+      ],
+    },
+    {
+      name: "couleur",
+      want: "la couleur de son nom et de ses petits mots",
+      choices: [
+        { value: "rouge", says: "le rouge vif de l'original" },
+        { value: "sienne", says: "sa couleur quand elle est vive, sinon du blanc", charter: true },
       ],
     },
   ],

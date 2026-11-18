@@ -109,7 +109,8 @@ test("« Titre en autocollant » draws: nothing before its pop, then its bounce,
   assert.deepEqual(texts[0]!.children.flat(Infinity).filter((c) => c && typeof c === "object").map((c) => own(c as Drawn)), ["Pizza", "du marché"]);
   const type = texts[0]!.props.innerStyle as Record<string, string>;
   assert.equal(String(type.fontFamily).split(",")[0], "'Paytone One'");
-  assert.equal(type.color, "#fcc83b");
+  // Black on its white sticker without a colour of hers (her charter, 18 November).
+  assert.equal(type.color, "#141414");
   assert.equal((texts[1]!.props.innerStyle as Record<string, number>).fontSize, 48);
   // Her colour when it is bright and vivid enough.
   assert.equal((flatten(sticker(drawAt(60, { brand: { accent: "#e8417a" } }))!).find((n) => n.type === "FitText")!.props.innerStyle as Record<string, string>).color, "#e8417a");

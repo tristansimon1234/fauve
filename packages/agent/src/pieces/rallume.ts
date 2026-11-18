@@ -262,9 +262,11 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
     const l = (0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2]) / 255;
     return l > 0.12 && l < 0.85 ? rgb : null;
   };
-  const hers = setting("couleur", "chaude") === "sienne" ? vivid(brand.accent) : null;
-  const glowRgb = hers || [255, 176, 92];
-  const tube = hers ? "rgb(" + hers.map((c) => Math.round(c + (255 - c) * 0.72)).join(",") + ")" : "#fff3df";
+  const charter = setting("couleur", "chaude") === "sienne";
+  const hers = charter ? vivid(brand.accent) : null;
+  // Her charter (18 November): without a colour of hers that reads, black, white or grey, never the model's colour.
+  const glowRgb = hers || (charter ? [255, 252, 245] : [255, 176, 92]);
+  const tube = hers ? "rgb(" + hers.map((c) => Math.round(c + (255 - c) * 0.72)).join(",") + ")" : charter ? "#ffffff" : "#fff3df";
   const NEON = [0, 1, 0.3, 1, 0.55];
   const on = (n) => (n < 0 ? 0 : n < NEON.length ? NEON[n] : 1);
   const fit = Math.min(1, spot.h / (NH + LH));

@@ -159,10 +159,10 @@ test("« Montage sport noir et blanc » (effect v1): its word goes where no face
   assert.equal(topAt(10, [960]), 300);
   assert.equal(topAt(10, [960, 450]), 1040);
   assert.equal(topAt(10, [960, 450, 1250]), 760);
-  // Her colour on her word, when vivid and dark enough (a strong blue); a pale one stays the red.
+  // Her colour when vivid and dark enough (a strong blue); a pale one: white words (her charter, 18 November).
   const inkWith = (accent: string) => inner(nodes(sceneAt(10, { ...layer, texts: { ...layer.texts, couleur: "sienne" } }, { brand: { displayFont: "Anton", bodyFont: "Inter", accent } })).find((n) => n.type === "FitText")).color;
   assert.equal(inkWith("#1f4fd1"), "#1f4fd1");
-  assert.equal(inkWith("#f7c6d0"), "#f2000c");
+  assert.equal(inkWith("#f7c6d0"), "#ffffff");
   // Her own title face when it is condensed already.
   assert.match(String(inner(nodes(sceneAt(10, layer, { brand: { displayFont: "Anton", bodyFont: "Inter" } })).find((n) => n.type === "FitText")).fontFamily), /^'Anton'/);
   // Photos among its shots, words missing: it still draws its look, nothing breaks.

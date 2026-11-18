@@ -57,6 +57,10 @@ export function visionTimeline({ frames, bpm }: PieceTimelineInput): PieceTimeli
 
 const CODE =
   String.raw`function Scene({ width, height, durationInFrames, brand, shots, texts, track }) {
+  const setting = (k, d) => { const v = texts && texts[k]; return typeof v === "string" && v ? v : d; };
+  // Its two tones and its tags: in black and grey (her charter, 18 November), its navy blue on her word.
+  const BLUE_LOOK = setting("couleur", "gris") === "bleu";
+  const NAVY = BLUE_LOOK ? "#243250" : "#1a1a1a";
   const h = React.createElement;
   const frame = useCurrentFrame();
   const W = width;
@@ -146,7 +150,7 @@ const CODE =
   const ID = "vm" + String(React.useId ? React.useId() : "0").replace(/[^a-zA-Z0-9_-]/g, "");
   const BLUE = h("svg", { key: "blue", width: 0, height: 0, style: { position: "absolute" }, "aria-hidden": "true" }, h("filter", { id: ID, colorInterpolationFilters: "sRGB" },
     h("feColorMatrix", { type: "matrix", values: "0.2126 0.7152 0.0722 0 0 0.2126 0.7152 0.0722 0 0 0.2126 0.7152 0.0722 0 0 0 0 0 1 0" }),
-    h("feComponentTransfer", null, h("feFuncR", { type: "table", tableValues: "0.078 0.278 0.667 0.784" }), h("feFuncG", { type: "table", tableValues: "0.153 0.361 0.737 0.839" }), h("feFuncB", { type: "table", tableValues: "0.329 0.533 0.867 0.937" }))));
+    h("feComponentTransfer", null, h("feFuncR", { type: "table", tableValues: BLUE_LOOK ? "0.078 0.278 0.667 0.784" : "0.08 0.3 0.72 0.88" }), h("feFuncG", { type: "table", tableValues: BLUE_LOOK ? "0.153 0.361 0.737 0.839" : "0.08 0.3 0.72 0.88" }), h("feFuncB", { type: "table", tableValues: BLUE_LOOK ? "0.329 0.533 0.867 0.937" : "0.08 0.3 0.72 0.88" }))));
   const blued = (kids, key) => h("div", { key, style: abs({ left: 0, top: 0, width: W, height: H, filter: "url(#" + ID + ")" }) }, kids);
   // Its characters and dots drawn on the picture's edges and details (its outlines, the grain of a stone, the folds of a
   // coat), widened a little so a cell reads them: sparse where it is smooth, dense where it has detail.
@@ -167,7 +171,7 @@ const CODE =
       blue.length ? h("div", { key: "bl", style: abs({ left: 0, top: 0, width: W, height: H, clipPath: clip(blue) }) }, blued(foot({}), "b")) : null,
       dark.length ? h("div", { key: "dk", style: abs({ left: 0, top: 0, width: W, height: H, clipPath: clip(dark), background: "#07070e" }) }, dots(foot({}), "#e9ecf2", "none")) : null,
       onWhite ? stroke("#a0a0a0", 2) : null,
-      tags("#243250"));
+      tags(NAVY));
   };
   // The graph: a dot for each one seen, wires to their two nearest and to the farthest (up the frame), binary codes.
   const nodes = boxes.map((b) => ({ x: b.x + b.w / 2, y: b.y + b.h * 0.45 }));
@@ -205,7 +209,7 @@ const CODE =
       case "g": return graph(false);
       case "G": return graph(true);
       case "o": return fill("#fbfdfa", dots(h("div", { style: abs({ left: 0, top: 0, width: W, height: H, clipPath: clip(boxes) }) }, foot({})), "#26262a", "#fbfdfa"));
-      case "W": return fill(WHITE, h("div", { key: "them", style: abs({ left: 0, top: 0, width: W, height: H, clipPath: clip(boxes) }) }, foot({})), stroke("#a0a0a0", 2), tags("#243250"));
+      case "W": return fill(WHITE, h("div", { key: "them", style: abs({ left: 0, top: 0, width: W, height: H, clipPath: clip(boxes) }) }, foot({})), stroke("#a0a0a0", 2), tags(NAVY));
       default: return chars();
     }
   })();
@@ -214,7 +218,7 @@ const CODE =
   const title = word("titre");
   const titled = title
     ? h(FitText, { key: "title", style: abs({ left: 140, top: 160, width: W - 280, height: 110 }), innerStyle: { justifyContent: "flex-start", alignItems: "flex-start" } },
-        h("span", { style: { background: "#243250", color: "#ffffff", fontFamily: MONO, fontSize: 96, lineHeight: 1.05, padding: "2px 18px", letterSpacing: "0.02em", textTransform: "uppercase", whiteSpace: "nowrap" } }, title))
+        h("span", { style: { background: NAVY, color: "#ffffff", fontFamily: MONO, fontSize: 96, lineHeight: 1.05, padding: "2px 18px", letterSpacing: "0.02em", textTransform: "uppercase", whiteSpace: "nowrap" } }, title))
     : null;
   return h(AbsoluteFill, { style: { backgroundColor: "#000000", overflow: "hidden" } }, body, titled);
 }`;
@@ -253,6 +257,16 @@ export const vision: EffectPiece = {
       slot: "choses",
       shot: 0,
       want: "ce qui se répète et ne bouge pas dans ce plan, chacun dans son cadre comme les gens (« every pendant lamp », « every chair », « every mannequin », « every plant ») ; « none » quand rien ne se répète",
+    },
+  ],
+  settings: [
+    {
+      name: "couleur",
+      want: "la couleur de ses images en deux tons et de ses étiquettes",
+      choices: [
+        { value: "gris", says: "en noir et gris (sa charte)", charter: true },
+        { value: "bleu", says: "le bleu marine de l'original" },
+      ],
     },
   ],
   timeline: visionTimeline,

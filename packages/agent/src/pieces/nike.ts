@@ -46,7 +46,10 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
     return sat >= 0.5 && lum >= 0.06 && lum <= 0.5;
   };
   const own = hex(brand.accent);
-  const RED = setting("couleur", "rouge") === "sienne" && strong(own) ? "#" + own.toString(16).padStart(6, "0") : "#f2000c";
+  // Her colour when strong; without one, white words and no tint (her charter, 18 November); its red on her word.
+  const own_ = setting("couleur", "rouge");
+  const RED = own_ === "rouge" ? "#f2000c" : strong(own) ? "#" + own.toString(16).padStart(6, "0") : "#ffffff";
+  const TINT = RED === "#ffffff" ? null : RED;
 
   // Her words between commas (or slashes, dots, lines); none of them: a word each. A word lands on a cut, spread over
   // its shots when she gave fewer, one a beat when she gave more (never more words than beats).
@@ -85,7 +88,7 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const full = { position: "absolute", left: 0, top: 0, width, height };
   const film = h("div", { key: "f" + cur, style: { ...full, overflow: "hidden", isolation: "isolate" } },
     h(Footage, { shot: cur, style: { ...full, filter: look === "negative" ? NEGATIVE : BW }, ...(hold > 1 ? { hold } : {}) }),
-    look === "red" ? h(Tint, { color: RED, mode: "multiply" }) : null);
+    look === "red" && TINT ? h(Tint, { color: TINT, mode: "multiply" }) : null);
   const corners = h("div", { key: "v", style: { ...full, background: "radial-gradient(ellipse 80% 70% at 50% 46%, rgba(0,0,0,0) 50%, rgba(0,0,0,0.21) 100%)" } });
   const seed = Math.floor(frame / 2) % 97;
   const grainId = "nike-piece-grain-" + seed;

@@ -163,7 +163,9 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const hx = /^#?([0-9a-f]{6})$/i.exec(String(brand.accent || "")), rgb = hx ? [0, 2, 4].map((i) => parseInt(hx[1].slice(i, i + 2), 16)) : null;
   const deep = (t) => "rgb(" + rgb.map((v) => R(v * t)).join(",") + ")";
   const hers = setting("couleur", "bleu") === "sienne" && rgb && (0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2]) / 255 < 0.6;
-  const LINEC = hers ? [deep(1), deep(0.55)] : ["#1051c4", "#222853"], BTN = hers ? [deep(1), deep(0.6)] : ["#0450d1", "#332b7f"], ACC = hers ? [deep(0.85), deep(0.45)] : ["#0c3a83", "#181744"];
+  // Her charter (18 November): without a colour of hers that reads, black, white or grey, never the model's colour.
+  const grey = setting("couleur", "bleu") === "sienne" && !hers;
+  const LINEC = hers ? [deep(1), deep(0.55)] : grey ? ["#3a3a3a", "#1a1a1a"] : ["#1051c4", "#222853"], BTN = hers ? [deep(1), deep(0.6)] : grey ? ["#2a2a2a", "#111111"] : ["#0450d1", "#332b7f"], ACC = hers ? [deep(0.85), deep(0.45)] : grey ? ["#444444", "#1c1c1c"] : ["#0c3a83", "#181744"];
   const grad = (c) => "linear-gradient(100deg, " + c[0] + ", " + c[1] + ")";
   const keep = (s) => String(s || "").replace(/(\d) (?=\d)/g, "$1 ");
   const wordsOf = (s) => String(s || "").split(/[ \t\n]+/).filter(Boolean), letters = (s) => (typeof Intl !== "undefined" && Intl.Segmenter ? Array.from(new Intl.Segmenter("fr", { granularity: "grapheme" }).segment(String(s)), (x) => x.segment) : Array.from(String(s)));

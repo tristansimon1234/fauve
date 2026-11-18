@@ -107,7 +107,7 @@ test("« Carte au feutre » (effect v2): its ink, hers when dark enough to read 
     return hands(draw(149, props))[0]!.props.color;
   };
   assert.equal(ink("#1d4d3a"), "#1d4d3a");
-  assert.equal(ink("#f2694e"), "#b20b21");
+  assert.equal(ink("#f2694e"), "#141414");
   assert.equal(ink("#1d4d3a", "rouge"), "#b20b21");
 });
 

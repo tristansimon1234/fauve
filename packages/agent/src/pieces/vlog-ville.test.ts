@@ -107,7 +107,7 @@ test("« Ta ville racontée » (effect v1): her words one at a time, the burst o
   const bare = { ...props, brand: { ...brand, accent: "#efe6d8" }, texts: { ...layer.motion.texts, signature: "", genre: "" } };
   const alone = nodes(draw(140, bare)).filter((n) => n.type === "FitText");
   assert.equal(alone.length, 1);
-  assert.equal((alone[0]!.props.innerStyle as Record<string, unknown>).color, "#d7261e");
+  assert.equal((alone[0]!.props.innerStyle as Record<string, unknown>).color, "#ffffff");
   // « rouge », chosen as her setting: the original's red whatever her colour, through the layer's words.
   const redPlan = pieceTestPlan({ piece: vlogVille, shots, span: [1, 7.2], fill: { texts: words, objects: {}, settings: { couleur: "rouge" } }, bpm: 76 });
   const red = { ...props, texts: redPlan.layers![0]!.motion.texts };

@@ -313,7 +313,10 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
     h(FitText, { key: "x" + i, style: { position: "absolute", left: 140, width: 800, top: Math.max(90, CY - 380) + i * 110, height: 100 }, innerStyle: { fontFamily: body, fontWeight: 700, fontSize: 52, lineHeight: 1.1, color: WHITE, textAlign: "center" } }, t.text));
 
   // The ground: an electric blue, squared with fine violet lines like a technical sheet, still; no gradient, grain nor shadow.
-  const ground = { backgroundColor: "#15017A", backgroundImage: "linear-gradient(#432DA9 0 2px, transparent 2px), linear-gradient(90deg, #432DA9 0 2px, transparent 2px)", backgroundSize: "33.75px 33.75px", backgroundPosition: "13px 33px" };
+  const blueGround = setting("fond", "bleu") === "bleu";
+  const GROUND = blueGround ? "#15017A" : "#141414";
+  const GRID = blueGround ? "#432DA9" : "#2a2a2a";
+  const ground = { backgroundColor: GROUND, backgroundImage: "linear-gradient(" + GRID + " 0 2px, transparent 2px), linear-gradient(90deg, " + GRID + " 0 2px, transparent 2px)", backgroundSize: "33.75px 33.75px", backgroundPosition: "13px 33px" };
   return h(AbsoluteFill, { style: ground }, heading, cardBox, label, endLine, timeline, extra);
 }`;
 
@@ -416,6 +419,14 @@ export const coulisses: MontageSkill = {
         { value: "auto", says: "comme ses vidéos (16:9 si la plupart sont horizontales, carrée sinon)" },
         { value: "horizontal", says: "une carte 16:9, comme l'original (une vidéo verticale y est cadrée sur son sujet)", band: true },
         { value: "vertical", says: "une carte carrée de la même largeur, pour des vidéos verticales" },
+      ],
+    },
+    {
+      name: "fond",
+      want: "le fond derrière la carte et la timeline",
+      choices: [
+        { value: "bleu", says: "le bleu électrique quadrillé de violet de l'original" },
+        { value: "sienne", says: "un fond noir quadrillé de gris (sa charte ; la timeline garde les couleurs d'un logiciel de montage)", charter: true },
       ],
     },
   ],

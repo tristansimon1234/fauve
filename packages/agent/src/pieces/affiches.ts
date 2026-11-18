@@ -42,7 +42,8 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const pal = brand.palette || {};
   const hers = [brand.accent, pal.secondary, pal.dark, pal.light].map(hex).filter((c, i, all) => c && all.indexOf(c) === i);
   const choice = setting("couleurs", "vives");
-  const GROUNDS = choice === "noir" ? ["#060608"] : choice === "sa-charte" && hers.length >= 2 ? hers : VIVID;
+  // Her charter (18 November): without a colour of hers that reads, black, white or grey, never the model's colour.
+  const GROUNDS = choice === "noir" ? ["#060608"] : choice === "sa-charte" ? (hers.length >= 2 ? hers : [...hers, "#141414", "#f3f1ec", "#8a8a8a"]) : VIVID;
   const ground = GROUNDS[p % GROUNDS.length];
 
   // Its names, one a shot in order; the first, the last and one in two between them written (every one as asked).

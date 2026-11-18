@@ -80,9 +80,9 @@ test("« Recette cosy, typo pixel » (effect v1): its layer, its marks, no sound
   // Without captions, every step is her decor.
   const decor = pieceTestPlan({ piece: pixel, shots: run(3), span: [1.2, 4.5], fill: bare, bpm: 100 }).layers![0]!.motion;
   assert.deepEqual([decor.texts!.step_0_say, decor.texts!.step_1_say, decor.texts!.step_2_say], ["-1", "-1", "-1"]);
-  // Her charter's colour only when her words ask (the mint, the original's, is its default: never kept).
+  // Her charter's colour by default (18 November: never kept, it needs no saying); the original's mint kept on her word.
   assert.deepEqual(readPieceFill(pixel, { ...bareAnswer, settings: [{ name: "couleur", value: "charte" }] })!.settings, { couleur: "charte" });
-  assert.deepEqual(readPieceFill(pixel, { ...bareAnswer, settings: [{ name: "couleur", value: "menthe" }] })!.settings, {});
+  assert.deepEqual(readPieceFill(pixel, { ...bareAnswer, settings: [{ name: "couleur", value: "menthe" }] })!.settings, { couleur: "menthe" });
   // Its tiny step captions are decor, as the original's; its lines with the title short labels beside it. Its title and
   // its captions in calm areas of her shots (ClearBox), its tiny lines' ink dosed to the light under them (LightUnder).
   assert.match(pixel.code, /"data-fauve-decor": ""/);

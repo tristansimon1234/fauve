@@ -151,7 +151,8 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const lin = (s) => { const v = s / 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); };
   const own = rgb(brand.accent);
   const dark = own && 0.2126 * lin(own[0]) + 0.7152 * lin(own[1]) + 0.0722 * lin(own[2]) <= 0.12;
-  const ink = setting("encre", "sienne") === "sienne" && dark ? String(brand.accent).toLowerCase() : "#b20b21";
+  // Her charter (18 November): without a colour of hers that reads, black, white or grey, never the model's colour.
+  const ink = setting("encre", "sienne") === "rouge" ? "#b20b21" : dark ? String(brand.accent).toLowerCase() : "#141414";
 
   // Its lines written by a hand that never repeats, at the left, each across the page's width, its capitals stretched to
   // the original's height (tall and narrow): two lines on the top page; on the bottom one, the third and the name she

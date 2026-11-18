@@ -17,6 +17,7 @@ import type { EffectPiece, PieceTimelineInput } from "../pieces.ts";
 // montage's), its format setting (the montage frames her shot).
 
 const CODE = String.raw`function Scene({ width, height, durationInFrames, brand, shots, texts, track }) {
+  const setting = (k, d) => { const v = texts && texts[k]; return typeof v === "string" && v ? v : d; };
   const h = React.createElement;
   const frame = useCurrentFrame();
   const W = width;
@@ -35,7 +36,9 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const rgb = (c) => { const m = /^#?([0-9a-f]{6})$/i.exec(String(c || "").trim()); if (!m) return null; const v = parseInt(m[1], 16); return [(v >> 16) & 255, (v >> 8) & 255, v & 255]; };
   const luma = (c) => { const x = rgb(c); return x ? (0.2126 * x[0] + 0.7152 * x[1] + 0.0722 * x[2]) / 255 : -1; };
   const vivid = (c) => { const x = rgb(c); if (!x) return 0; const a = Math.max(x[0], x[1], x[2]); return a ? (a - Math.min(x[0], x[1], x[2])) / a : 0; };
-  const INK = luma(brand.accent) >= 0.28 && luma(brand.accent) <= 0.86 && vivid(brand.accent) >= 0.45 ? brand.accent : "#fcc83b";
+  // On its white sticker: her colour when it reads, else black (her charter, 18 November); its yellow on her word.
+  const YELLOW = setting("couleur", "sienne") === "jaune";
+  const INK = YELLOW ? "#fcc83b" : luma(brand.accent) >= 0.28 && luma(brand.accent) <= 0.86 && vivid(brand.accent) >= 0.45 ? brand.accent : "#141414";
   const STICKER = "'Paytone One', '" + brand.displayFont + "', sans-serif";
   const body = "'" + brand.bodyFont + "', 'Figtree', sans-serif";
 
@@ -147,6 +150,16 @@ export const enBoutique: EffectPiece = {
       want: "facultatif : la petite ligne sous le nom, qui le fait : « avec » et leurs prénoms (« avec Léa & Marco »), sinon « chez » et le nom de son commerce ; seulement des prénoms ou un nom donnés, jamais inventés",
       max: 22,
       required: false,
+    },
+  ],
+  settings: [
+    {
+      name: "couleur",
+      want: "la couleur du nom sur l'autocollant",
+      choices: [
+        { value: "sienne", says: "sa couleur quand elle se lit, sinon du noir", charter: true },
+        { value: "jaune", says: "le jaune de l'original" },
+      ],
     },
   ],
   timeline(input: PieceTimelineInput) {

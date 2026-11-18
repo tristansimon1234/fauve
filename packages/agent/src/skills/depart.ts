@@ -139,7 +139,9 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   // else a muted gold; her body font, regular; fading in over nine images a beat into her last shot, held to the end.
   const luma = (c) => { const m = /^#?([0-9a-f]{6})$/i.exec(String(c || "").trim()); if (!m) return -1; const v = parseInt(m[1], 16); return (0.2126 * ((v >> 16) & 255) + 0.7152 * ((v >> 8) & 255) + 0.0722 * (v & 255)) / 255; };
   const chroma = (c) => { const m = /^#?([0-9a-f]{6})$/i.exec(String(c || "").trim()); if (!m) return 0; const v = parseInt(m[1], 16); const r = (v >> 16) & 255, g = (v >> 8) & 255, b = v & 255; return (Math.max(r, g, b) - Math.min(r, g, b)) / 255; };
-  const INK = luma(brand.accent) >= 0.45 && chroma(brand.accent) >= 0.18 ? brand.accent : "#cdb672";
+  // Her colour when it reads, else white (her charter: the original's gold only on her word).
+  const GOLD = setting("couleur", "sienne") === "or";
+  const INK = !GOLD && luma(brand.accent) >= 0.45 && chroma(brand.accent) >= 0.18 ? brand.accent : GOLD ? "#cdb672" : "#ffffff";
   const body = "'" + brand.bodyFont + "', 'Inter Tight', sans-serif";
   const keep = (s) => String(s || "").normalize("NFC").replace(/(\d) (?=\d)/g, "$1 ");
   const hook = reelTexts.find((t) => t.role === "hook");
@@ -214,6 +216,14 @@ export const depart: MontageSkill = {
       choices: [
         { value: "acceleree", says: "deux fois plus vite que filmée, comme les foules de l'original" },
         { value: "normale", says: "à sa vitesse réelle" },
+      ],
+    },
+    {
+      name: "couleur",
+      want: "la couleur de ses mots",
+      choices: [
+        { value: "sienne", says: "sa couleur quand elle se lit, sinon du blanc", charter: true },
+        { value: "or", says: "le doré de l'original" },
       ],
     },
   ],

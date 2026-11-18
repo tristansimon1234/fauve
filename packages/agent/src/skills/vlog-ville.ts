@@ -301,7 +301,8 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   // the original's film-title red, which « rouge » keeps whatever her colour.
   const rgb = (c) => { const m = /^#?([0-9a-f]{6})$/i.exec(String(c || "").trim()); if (!m) return null; const v = parseInt(m[1], 16); return [(v >> 16) & 255, (v >> 8) & 255, v & 255]; };
   const vivid = (c) => { const p = rgb(c); if (!p) return false; const hi = Math.max(p[0], p[1], p[2]); const lo = Math.min(p[0], p[1], p[2]); const l = (0.2126 * p[0] + 0.7152 * p[1] + 0.0722 * p[2]) / 255; return hi > 0 && (hi - lo) / hi > 0.45 && l > 0.1 && l < 0.6; };
-  const RED = setting("couleur", "sienne") !== "rouge" && vivid(brand.accent) ? brand.accent : "#d7261e";
+  // Her charter (18 November): without a colour of hers that reads, black, white or grey, never the model's colour.
+  const RED = setting("couleur", "sienne") === "rouge" ? "#d7261e" : vivid(brand.accent) ? brand.accent : "#ffffff";
   const T = of(5);
   const tFrom = F(${TITLE[0]});
   const tTo = shots[T] ? shots[T].from + shots[T].durationInFrames : F(${TITLE[1]});

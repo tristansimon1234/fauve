@@ -2928,7 +2928,7 @@ test("« Éventail de bandes » (v3): full frame by default, 16:9 on black as he
   // On her word, her own dark colour for its ground and its frame (the bordeaux when she has none).
   const hers = run(0, { shots: shots(16 / 9), texts: { ...marks, fond: "sienne" }, brand: { displayFont: "Lora", bodyFont: "Jost", palette: { dark: "#1d3b2a" } } });
   assert.equal((frameBox(hers).children[0] as Drawn).props.color, "#1d3b2a");
-  assert.equal((frameBox(run(0, { shots: shots(16 / 9), texts: { ...marks, fond: "sienne" } })).children[0] as Drawn).props.color, "#440a0b");
+  assert.equal((frameBox(run(0, { shots: shots(16 / 9), texts: { ...marks, fond: "sienne" } })).children[0] as Drawn).props.color, "#141414");
   // Its own grade: nothing of its model's finish laid over everything (no grey bordeaux, no grain, no crushed blacks).
   assert.deepEqual(eventail.finish, { saturation: 0, contrast: 0, grain: 0, vignette: 0 });
   // The filler sees its object and its settings; the plan keeps a choice her words asked for.
@@ -5256,7 +5256,7 @@ test("« Coulisses façon fiche » (v2): its 16:9 card for her horizontal videos
   // Its timeline and the title of her video are decor (their type as tiny as the original's: Tristan's exception).
   assert.ok("data-fauve-decor" in keyed(wide, "timeline").props && "data-fauve-decor" in keyed(wide, "inner").props);
   // The setting: the filler sees it (the default first), the plan keeps a choice her words asked for.
-  assert.deepEqual(coulisses.settings?.map((s) => [s.name, s.choices.map((c) => c.value)]), [["format", ["auto", "horizontal", "vertical"]]]);
+  assert.deepEqual(coulisses.settings?.map((s) => [s.name, s.choices.map((c) => c.value)]), [["format", ["auto", "horizontal", "vertical"]], ["fond", ["bleu", "sienne"]]]);
   assert.deepEqual(skillSettings(coulisses, [{ name: "format", value: "auto" }]), {});
   const files = Array.from({ length: 10 }, (_, i) => ({ id: `v${i}`, photo: false, seconds: 12, aspect: 9 / 16 }));
   const input = skillFillInput({ skill: coulisses, name: "Coulisses façon fiche", n: 28, files, business: {}, request: "dans une carte carrée" });
@@ -5560,7 +5560,7 @@ test("« Recette cosy, typo pixel » (v3): its captions on their steps, its litt
   assert.deepEqual(pixelBoxes(wide, "#fff8e8").map((n) => (n.props.innerStyle as Record<string, number>).fontSize), [20, 26, 26]);
   assert.ok(pixelBoxes(wide, "#fff8e8").every((n) => Number(styleOf(n).top) + Number(styleOf(n).height) <= 608));
   // The setting: the filler sees it (the default first: vertical), the plan keeps a choice her words asked for.
-  assert.deepEqual(pixel.settings?.map((s) => [s.name, s.choices.map((c) => c.value)]), [["format", ["vertical", "horizontal", "auto"]]]);
+  assert.deepEqual(pixel.settings?.map((s) => [s.name, s.choices.map((c) => c.value)]), [["format", ["vertical", "horizontal", "auto"]], ["couleur", ["menthe", "sienne"]]]);
   assert.deepEqual(skillSettings(pixel, [{ name: "format", value: "vertical" }]), {});
   const files = Array.from({ length: 8 }, (_, i) => ({ id: `v${i}`, photo: false, seconds: 16 }));
   assert.equal(skillFillInput({ skill: pixel, name: "Recette cosy", n: 26, files, business: {}, request: "en horizontal" }).reglages?.[0]?.nom, "format");
@@ -5705,7 +5705,7 @@ test("« Titre gaufré » (v3): her front built on the black from what it is mad
   assert.deepEqual([boxAt(9 / 16, "auto").top, boxAt(9 / 16, "auto").height], [0, 1920]);
   assert.deepEqual([boxAt(9 / 16, "horizontal").top, boxAt(9 / 16, "horizontal").height], [656, 608]);
   assert.deepEqual([boxAt(16 / 9, "vertical").top, boxAt(16 / 9, "vertical").height], [0, 1920]);
-  assert.deepEqual(gaufre.settings?.map((x) => [x.name, x.choices.map((c) => c.value)]), [["format", ["vertical", "horizontal", "auto"]]]);
+  assert.deepEqual(gaufre.settings?.map((x) => [x.name, x.choices.map((c) => c.value)]), [["format", ["vertical", "horizontal", "auto"]], ["couleur", ["peche", "sienne"]]]);
   const banded = draw(270, { shots: shotsOf(16 / 9), texts: { ...marks, format: "horizontal" } });
   assert.deepEqual([styleOf(banded.children[1] as Drawn).top, styleOf(banded.children[1] as Drawn).height], [0, 1920]);
   // At the cut: no more of her video, the paper full frame in the original's peach, its fibres, no shade at its edges.
@@ -7067,7 +7067,7 @@ test("« La pièce qui se rallume » (v3): full frame by default, 16:9 on black 
   const hers = style(draw(16 / 9, 120, { couleur: "sienne" }, { accent: "#7a2e8c" }));
   assert.equal(hers.color, "rgb(218,196,223)");
   assert.match(hers.textShadow!, /rgba\(122,46,140/);
-  assert.equal(style(draw(16 / 9, 120, { couleur: "sienne" }, { accent: "#f4efe6" })).color, "#fff3df");
+  assert.equal(style(draw(16 / 9, 120, { couleur: "sienne" }, { accent: "#f4efe6" })).color, "#ffffff");
   assert.equal(style(draw(16 / 9, 120, {}, { accent: "#7a2e8c" })).color, "#fff3df");
   assert.deepEqual(rallume.settings?.map((s) => [s.name, s.choices.map((c) => c.value)]), [["format", ["vertical", "horizontal", "auto"]], ["couleur", ["chaude", "sienne"]]]);
   // Her colour is its default now (charterSettings): nothing to keep; the original's warm light, asked, is.
@@ -8628,11 +8628,11 @@ test("« Interface minimaliste » (v2): her photo in the round, her colour on he
   // No photo: her initial on her colour.
   const none = (await interfaceAt({ photo: false })).at(m.card! + 25);
   assert.ok(!drawnNodes(none).some((n) => n.type === "Footage") && drawnNodes(none).some((n) => drawnText(n) === "A" && /rgb\(181,84,58\)/.test(String(styleOf(n).background))));
-  // Her colour on her word (the blue when hers is too pale to read on the ground).
+  // Her colour (her charter); too pale to read on the ground: greys, never the original's blue (18 November).
   const hers = (await interfaceAt({ settings: { couleur: "sienne" } })).at(m.line! + 12);
   assert.ok(ifFind(hers, (n) => /rgb\(181,84,58\)/.test(String(styleOf(n).background))).length > 0);
   const pale = (await interfaceAt({ settings: { couleur: "sienne" }, brand: { accent: "#f4efe6" } })).at(m.line! + 12);
-  assert.ok(ifFind(pale, (n) => /#1051c4/.test(String(styleOf(n).background))).length > 0);
+  assert.ok(ifFind(pale, (n) => /#3a3a3a/.test(String(styleOf(n).background))).length > 0);
   assert.deepEqual(interfaceSkill.settings?.map((s) => [s.name, s.choices.map((c) => c.value)]), [["couleur", ["bleu", "sienne"]]]);
   // Her account not known: her name, without « @ ».
   const named = (await interfaceAt({ words: { ...IF_WORDS, compte: "Atelier Argile" } })).at(m.at! + 30);
@@ -9484,8 +9484,8 @@ test("« Carte au feutre » (v2): an open notebook laid over her pictures, a new
   // original's red, a hand that never repeats in Covered By Your Grace, a grease pencil's grain, stretched to their height.
   const hands = handsOf(draw(200, props));
   assert.deepEqual(hands.map((n) => [n.props.text, n.props.last, n.props.color, n.props.grain, n.props.align]), [
-    ["PUT THAT\nPHONE DOWN", 1, "#b20b21", 0.6, "left"],
-    ["& COME TO\nBURGER NIGHT", 1.3, "#b20b21", 0.6, "left"],
+    ["PUT THAT\nPHONE DOWN", 1, "#141414", 0.6, "left"],
+    ["& COME TO\nBURGER NIGHT", 1.3, "#141414", 0.6, "left"],
   ]);
   assert.ok(hands.every((n) => /^'Covered By Your Grace'/.test(String((n.props.style as Record<string, string>).fontFamily)) && !n.props.bend));
   const blocks = drawnNodes(notebook).filter((n) => n.type === "div" && /^scaleY\(/.test(String(styleOf(n).transform ?? ""))).map((n) => ({ top: Number(styleOf(n).top), stretch: Number(/scaleY\(([\d.]+)\)/.exec(String(styleOf(n).transform))![1]), slot: (drawnNodes(n).find((c) => c.type === "Handwriting")!.props.box as TdBox).h }));
@@ -9509,7 +9509,7 @@ test("« Carte au feutre » (v2): an open notebook laid over her pictures, a new
   // Her colour as its ink when it is dark enough to read on its grey paper; else, or on her word, the original's red.
   const inkOf = (brand: Record<string, string>, texts: Record<string, string> = {}) => handsOf(draw(200, { ...props, brand: { ...props.brand, ...brand }, texts: { ...props.texts, ...texts } }))[0]!.props.color;
   assert.equal(inkOf({ accent: "#1F3A5F" }), "#1f3a5f");
-  assert.equal(inkOf({ accent: "#e8b4c8" }), "#b20b21");
+  assert.equal(inkOf({ accent: "#e8b4c8" }), "#141414");
   assert.equal(inkOf({ accent: "#1F3A5F" }, { encre: "rouge" }), "#b20b21");
   // A shorter message: its lines on the top page, the name alone on the bottom one; the word before the name alone.
   const short = { ...props, reelTexts: [{ ...CARTE_TEXTS[0]!, text: "viens goûter la" }, { ...CARTE_TEXTS[1]!, text: "pizza du jeudi" }] };
@@ -10092,8 +10092,8 @@ test("« Toi sur un aplat de couleur » (v3): full frame by default, horizontal 
   const colourOf = async (accent: string, settings: Record<string, string> = {}) =>
     styleOf((await aplatDrawn(10, { accent, settings })).nodes.find((n) => n.type === "div" && styleOf(n).height === 1920 && styleOf(n).backgroundColor && styleOf(n).backgroundColor !== "#000000")!).backgroundColor;
   assert.equal(await colourOf("#e4572e"), "#e4572e");
-  assert.equal(await colourOf("#f3efe6"), "#ff0000");
-  assert.equal(await colourOf("#2f6b4f"), "#ff0000");
+  assert.equal(await colourOf("#f3efe6"), "#141414");
+  assert.equal(await colourOf("#2f6b4f"), "#141414");
   assert.equal(await colourOf("#e4572e", { couleur: "rouge" }), "#ff0000");
   assert.doesNotMatch(aplat.code, /#e30613/);
   // Her optional title on the colour of her opening, above her (she passes in front of it), until her ground comes back.
@@ -10809,7 +10809,7 @@ test("« Vision machine » (v2): its machine looks pass by pass, each at its own
 test("« Vision machine » (v2): vertical as its original, her shot in a 16:9 band on her word; her title in option; light to render", async () => {
   const { vision } = await import("./skills/vision.ts");
   // Vertical full frame; on her word her shot in a 16:9 band in the middle on the white of the passes, its blacks full frame.
-  assert.deepEqual(vision.settings?.map((s) => [s.name, s.choices.map((c) => c.value)]), [["format", ["vertical", "horizontal", "auto"]]]);
+  assert.deepEqual(vision.settings?.map((s) => [s.name, s.choices.map((c) => c.value)]), [["format", ["vertical", "horizontal", "auto"]], ["couleur", ["bleu", "sienne"]]]);
   assert.equal(vision.settings?.[0]?.choices.find((c) => c.band)?.value, "horizontal");
   const bandOf = (tree: Drawn) => drawnNodes(tree).find((n) => styleOf(n).background === "#fdfdfd" && styleOf(n).overflow === "hidden")!;
   assert.deepEqual([styleOf(bandOf(await (await visionAt(11)).tree)).top, styleOf(bandOf(await (await visionAt(11)).tree)).height], [0, 1920]);

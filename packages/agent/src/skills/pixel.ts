@@ -118,9 +118,13 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const pixel = "'" + brand.displayFont + "', monospace";
   const typewriter = "'Courier Prime', '" + brand.bodyFont + "', monospace";
   const plain = "'Inter', '" + brand.bodyFont + "', 'Helvetica Neue', Arial, sans-serif";
-  const MINT = "#d4f7e9";
-  const EDGE = "#2c4741";
-  const CREAM = "#fff8e8";
+  // Her charter's colour when it is a real colour (black, white and grey are hers too, but the model's colour never is:
+  // Tristan, 18 November, « les couleurs doivent respecter la DA »), else null and the neutral of the model plays.
+  const HERS = (() => { const m = /^#?([0-9a-f]{6})$/i.exec(String(brand.accent || "").trim()); if (!m) return null; const v = parseInt(m[1], 16); const r = (v >> 16) & 255, g = (v >> 8) & 255, b = v & 255; const hi = Math.max(r, g, b), lo = Math.min(r, g, b); return hi >= 90 && (hi - lo) / hi >= 0.35 ? "#" + m[1].toLowerCase() : null; })();
+  const ORIGINAL = setting("couleur", "menthe") === "menthe";
+  const MINT = ORIGINAL ? "#d4f7e9" : HERS || "#ffffff";
+  const EDGE = ORIGINAL ? "#2c4741" : "#141414";
+  const CREAM = ORIGINAL ? "#fff8e8" : "#ffffff";
   const e = Math.max(1, Math.round(2 * S));
   const titleEdge = [[e, 0], [-e, 0], [0, e], [0, -e], [e, e], [-e, e], [e, -e], [-e, -e]].map((d) => d[0] + "px " + d[1] + "px 0 " + EDGE).join(", ");
   const thin = "0 0 1px rgba(0,0,0,0.75), 0 0 3px rgba(0,0,0,0.45), 0 1px 6px rgba(0,0,0,0.3)";
@@ -395,6 +399,14 @@ export const pixel: MontageSkill = {
         { value: "vertical", says: "vertical plein écran comme l'original, ses vidéos en largeur recadrées sur leur geste" },
         { value: "horizontal", says: "horizontal 16:9 sur du noir, ses vidéos en largeur en entier", band: true },
         { value: "auto", says: "comme ses vidéos (vertical plein écran ; horizontal 16:9 sur du noir quand la plupart sont en largeur)" },
+      ],
+    },
+    {
+      name: "couleur",
+      want: "la couleur de son titre et de ses mots",
+      choices: [
+        { value: "menthe", says: "le vert menthe de l'original, son contour vert sombre et ses mots crème" },
+        { value: "sienne", says: "sa couleur quand elle est vive, sinon du blanc, contour noir", charter: true },
       ],
     },
   ],

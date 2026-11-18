@@ -168,7 +168,8 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   // 2. The paper, full frame from the cut: the original's peach (#f5cca4 on average), its short curly fibres in relief lit
   // from the top left, as soft as the original's (4 levels of 255 in each colour alike: the relief baked in its image, so
   // its mean stays the peach); no grain, no shade at its edges, still. An image drawn once, the same at every frame.
-  const PAPER_COLOR = "#f5cca4";
+  const PEACH = setting("couleur", "peche") === "peche";
+  const PAPER_COLOR = PEACH ? "#f5cca4" : "#ece9e3";
   const svg = (inner) => "url(\"data:image/svg+xml;charset=utf-8," + encodeURIComponent("<svg xmlns='http://www.w3.org/2000/svg' width='" + width + "' height='" + height + "'>" + inner + "</svg>") + "\")";
   const FIBRES = svg("<filter id='f' x='0' y='0' width='100%' height='100%' color-interpolation-filters='sRGB'><feTurbulence type='turbulence' baseFrequency='0.042 0.021' numOctaves='3' seed='4'/><feDiffuseLighting lighting-color='#ffffff' surfaceScale='5' diffuseConstant='1'><feDistantLight azimuth='225' elevation='45'/></feDiffuseLighting><feColorMatrix type='matrix' values='0.0848 0 0 0 0.9045  0.0848 0 0 0 0.7437  0.0848 0 0 0 0.5868  0 0 0 0 1'/></filter><rect width='100%' height='100%' filter='url(#f)'/>");
   const paper = frame >= PAPER
@@ -176,11 +177,15 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
     : null;
 
   // 3. Her name pressed in it, then inked. Its ink: dark as it comes in, drying to rust; a front 16 % of the letter, soft.
-  const FRESH = "#7d2100";
-  const RUST = "#b43c01";
-  const LINE_RUST = "#a04b20";
-  const SHADE = "#b78c64";
-  const LIT = "#ffe0b8";
+  // Her charter's colour when it is a real colour (black, white and grey are hers too, but the model's colour never is:
+  // Tristan, 18 November, « les couleurs doivent respecter la DA »), else null and the neutral of the model plays.
+  const HERS = (() => { const m = /^#?([0-9a-f]{6})$/i.exec(String(brand.accent || "").trim()); if (!m) return null; const v = parseInt(m[1], 16); const r = (v >> 16) & 255, g = (v >> 8) & 255, b = v & 255; const hi = Math.max(r, g, b), lo = Math.min(r, g, b); return hi >= 90 && (hi - lo) / hi >= 0.35 ? "#" + m[1].toLowerCase() : null; })();
+  // Her charter: a pale grey paper, its ink black drying to her colour (or to a dark grey without one).
+  const FRESH = PEACH ? "#7d2100" : "#121110";
+  const RUST = PEACH ? "#b43c01" : HERS || "#2f2e2c";
+  const LINE_RUST = PEACH ? "#a04b20" : HERS || "#3d3c39";
+  const SHADE = PEACH ? "#b78c64" : "#aeaaa3";
+  const LIT = PEACH ? "#ffe0b8" : "#fbfaf8";
   const DRY = Math.max(1, mark("dry", 64));
   const FRONT = 16;
   const rgb = (c) => [1, 3, 5].map((i) => parseInt(c.slice(i, i + 2), 16));
@@ -206,7 +211,7 @@ const CODE = String.raw`function Scene({ width, height, durationInFrames, brand,
   const rimmed = (id, r) => h("filter", { key: id, id, x: "-10%", y: "-10%", width: "120%", height: "120%" },
     h("feMorphology", { in: "SourceAlpha", operator: "erode", radius: r, result: "e" }),
     h("feComposite", { in: "SourceAlpha", in2: "e", operator: "out", result: "r" }),
-    h("feFlood", { floodColor: "#3a0f00", floodOpacity: 0.5, result: "c" }),
+    h("feFlood", { floodColor: PEACH ? "#3a0f00" : "#121110", floodOpacity: 0.5, result: "c" }),
     h("feComposite", { in: "c", in2: "r", operator: "in", result: "l" }),
     h("feMerge", null, h("feMergeNode", { in: "SourceGraphic" }), h("feMergeNode", { in: "l" })));
   const cell = { display: "inline-block", padding: "0.22em 0.16em 0.3em", margin: "-0.22em -0.16em -0.3em", WebkitBackgroundClip: "text", backgroundClip: "text", color: "transparent", WebkitTextFillColor: "transparent" };
@@ -402,6 +407,14 @@ export const gaufre: MontageSkill = {
         { value: "vertical", says: "en plein écran vertical comme l'original, sa vidéo en largeur recadrée sur son sujet" },
         { value: "horizontal", says: "sa vidéo entière dans une bande 16:9 au milieu du noir, le papier en plein écran", band: true },
         { value: "auto", says: "comme sa vidéo de devanture (en bande horizontale si elle est en largeur)" },
+      ],
+    },
+    {
+      name: "couleur",
+      want: "la couleur de son papier et de son encre",
+      choices: [
+        { value: "peche", says: "le papier pêche et l'encre rouille de l'original" },
+        { value: "sienne", says: "un papier gris très clair, son encre noire qui sèche dans sa couleur (gris foncé sans couleur à elle)", charter: true },
       ],
     },
   ],

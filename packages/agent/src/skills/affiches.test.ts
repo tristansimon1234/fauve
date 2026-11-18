@@ -257,8 +257,8 @@ test("« Tes produits en affiches »: her charter's colours or black as her word
   const grounds = (settings: Record<string, string>, brand?: Record<string, unknown>) => [30, 60, 90, 120].map((f) => ground(drawAt(f, { settings, ...(brand ? { brand } : {}) })));
   assert.deepEqual(grounds({ couleurs: "sa-charte" }), ["#b5293f", "#1d3b2a", "#2a1f1a", "#f4ebe1"]);
   assert.deepEqual(grounds({ couleurs: "noir" }), ["#060608", "#060608", "#060608", "#060608"]);
-  // Fewer than two colours of hers: the original's.
-  assert.deepEqual(grounds({ couleurs: "sa-charte" }, { accent: "#b5293f", palette: {} }), ["#fc1f10", "#0052b9", "#ff6127", "#ffa7af"]);
+  // Fewer than two colours of hers: hers, then black, off-white and grey (her charter, 18 November), never the original's.
+  assert.deepEqual(grounds({ couleurs: "sa-charte" }, { accent: "#b5293f", palette: {} }), ["#b5293f", "#141414", "#f3f1ec", "#8a8a8a"]);
   // Its title in white on a dark ground, black on a light one.
   const ink = (settings: Record<string, string>) => (fits(drawAt(0, { settings }))[0]!.props.innerStyle as Record<string, string>).color;
   assert.equal(ink({ couleurs: "noir" }), "#f7f5f2");

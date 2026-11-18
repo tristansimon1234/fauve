@@ -105,7 +105,7 @@ test("« Toi sur un aplat de couleur » (effect v1): white in her halo, then in 
   const walk = at(10);
   assert.ok(walk.some((n) => n.type === "Subject" && n.props.fill === undefined));
   assert.ok(walk.some((n) => n.type === "CastShadow" && n.props.direction === "left"));
-  assert.equal(styleOf(flat(at(10, { her, sky: 1000 }, "#5e5670"))!).backgroundColor, "#ff0000");
+  assert.equal(styleOf(flat(at(10, { her, sky: 1000 }, "#5e5670"))!).backgroundColor, "#141414");
   // Her shot rebuilt from the bottom of the frame, a straight edge rising.
   const rising = at(40).find((n) => n.type === "Footage" && /^polygon/.test(String(styleOf(n).clipPath)));
   assert.ok(rising, "her shot rising from the bottom");
