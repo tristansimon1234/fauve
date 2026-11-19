@@ -264,10 +264,11 @@ async function benchReels(asked: string[]) {
     for (const post of posts) {
       const code = pick(post, ["shortcode", "code"]);
       if (!code) continue;
-      const kind = `${pick(post, ["media_type", "product_type", "type", "__typename"]) ?? ""}`.toLowerCase();
-      const video = /video|clip|reel|2/.test(kind) || Boolean(pick(post, ["video_url", "video_versions", "play_count", "video_view_count"]));
+      // Treg's answer (19 November): productType « clips », durationSeconds, views, likes, username, url.
+      const kind = `${pick(post, ["productType", "media_type", "product_type", "type", "__typename"]) ?? ""}`.toLowerCase();
+      const video = /video|clip|reel|2/.test(kind) || Boolean(pick(post, ["durationSeconds", "video_url", "video_versions", "play_count", "video_view_count"]));
       const kept = seen.get(code) ?? {
-        link: `https://www.instagram.com/reel/${code}/`,
+        link: pick(post, ["url"]) ?? `https://www.instagram.com/reel/${code}/`,
         account: pick(post, ["username"]),
         views: Number(pick(post, ["play_count", "video_view_count", "views", "ig_play_count"]) ?? 0) || 0,
         likes: Number(pick(post, ["like_count", "likes"]) ?? 0) || 0,
