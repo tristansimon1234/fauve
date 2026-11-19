@@ -77,6 +77,8 @@ export async function POST(request: Request) {
   if (action === "prime_house") return Response.json(await primeHouse());
   if (action === "bench_trending") return Response.json(await benchTrending());
   if (action === "bench_tags") return Response.json(await benchTags((new URL(request.url).searchParams.get("tags") ?? "").split(",")));
+  // The top Reels of a few hashtags as Reels to show (Tristan: « il faut aller chercher les aesthetic videos »).
+  if (action === "bench_reels") return Response.json(await benchReels((new URL(request.url).searchParams.get("tags") ?? "").split(",")));
   if (action !== "bench") return Response.json({ error: "action=bench|refresh" }, { status: 400 });
   let costUsd = 0;
   let calls = 0;
@@ -237,6 +239,54 @@ async function benchTags(asked: string[]) {
       .sort((a, b) => b.reels - a.reels || b.views - a.views)
       .slice(0, 60)
       .map((s) => ({ title: s.title, author: s.author, reels: s.reels, views: s.views, tags: [...s.tags], example: s.example, fields: s.fields })),
+    sample: trimmed(read.find((r) => r.posts.length)?.posts[0] ?? null),
+  };
+}
+
+/**
+ * The bench of Reels to propose (Tristan, 19 November: « comment on peut rechercher des vidéos sur insta pour lui en
+ * proposer », « pilates reformer c'est souvent mauvais, il faut aller chercher les aesthetic videos »): the top posts of
+ * each hashtag (anyapi.instagram.hashtag_top_posts, one page), the videos only, their link, account, views and caption,
+ * the most viewed first. About $0.002 a hashtag, logged (kind trends, purpose reels_tags_bench).
+ */
+async function benchReels(asked: string[]) {
+  const tags = asked.map((t) => t.trim().replace(/^#/, "").toLowerCase()).filter((t) => /^[\p{L}\p{N}_]{2,40}$/u.test(t)).slice(0, 10);
+  let costUsd = 0;
+  const read = await Promise.all(
+    tags.map(async (hashtag) => {
+      const done = await tregCall("anyapi.instagram.hashtag_top_posts", { hashtag }, 0.02).catch(() => null);
+      costUsd += done?.costUsd ?? 0;
+      return { hashtag, posts: listUnder(done?.answer ?? null, ["posts", "items", "data"]) };
+    }),
+  );
+  const seen = new Map<string, { link: string; account: string | null; views: number; likes: number; caption: string; video: boolean; tags: string[] }>();
+  for (const { hashtag, posts } of read) {
+    for (const post of posts) {
+      const code = pick(post, ["shortcode", "code"]);
+      if (!code) continue;
+      const kind = `${pick(post, ["media_type", "product_type", "type", "__typename"]) ?? ""}`.toLowerCase();
+      const video = /video|clip|reel|2/.test(kind) || Boolean(pick(post, ["video_url", "video_versions", "play_count", "video_view_count"]));
+      const kept = seen.get(code) ?? {
+        link: `https://www.instagram.com/reel/${code}/`,
+        account: pick(post, ["username"]),
+        views: Number(pick(post, ["play_count", "video_view_count", "views", "ig_play_count"]) ?? 0) || 0,
+        likes: Number(pick(post, ["like_count", "likes"]) ?? 0) || 0,
+        caption: (pick(post, ["text", "caption"]) ?? "").replace(/\s+/g, " ").slice(0, 120),
+        video,
+        tags: [],
+      };
+      kept.tags.push(hashtag);
+      seen.set(code, kept);
+    }
+  }
+  await supabaseAdmin()
+    .from("cost_events")
+    .insert({ studio_id: null, kind: "trends", provider: "treg", units: tags.length, cost_eur: usdToEur(costUsd, env("USD_TO_EUR")), meta: { purpose: "reels_tags_bench", cost_usd: costUsd, tags } });
+  return {
+    cost_usd: costUsd,
+    tags: read.map((r) => ({ hashtag: r.hashtag, posts: r.posts.length })),
+    reels: [...seen.values()].filter((r) => r.video).sort((a, b) => b.views - a.views || b.likes - a.likes).slice(0, 40),
+    others: [...seen.values()].filter((r) => !r.video).length,
     sample: trimmed(read.find((r) => r.posts.length)?.posts[0] ?? null),
   };
 }
