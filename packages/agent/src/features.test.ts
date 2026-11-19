@@ -11971,3 +11971,24 @@ test("the ending her validated plan promised is on screen, and words come from t
   const later = [{ text: "après", from: 6, to: 8, style: "band" }];
   assert.deepEqual(openingText(later), later);
 });
+
+test("a new Reel's plan is written in its model: its words on screen fit the model's slots, the first Reel may be bolder", async () => {
+  const { planFitsSlots, planScreenWords, mouldNote, firstReelCeiling } = await import("./house-pick.ts");
+  // « Visite d'Indar », 19 November: two exact texts, refused by two models with one short slot.
+  const plan = "Visite d'Indar\n\n• Accroche : les quais d'automne\n• Texte 1 : « Ton premier cours t'attend, au cœur du 5e »\n• Texte 2 : « 1 cours acheté = 1 offert »\n• Fin : Indar, « 26 boulevard Saint-Germain »";
+  assert.deepEqual(planScreenWords(plan), ["Ton premier cours t'attend, au cœur du 5e", "1 cours acheté = 1 offert"]);
+  assert.equal(planFitsSlots(plan, [{ max: 24 }]), false);
+  assert.equal(planFitsSlots(plan, [{ max: 45 }, { max: 30 }]), true);
+  // A slot the engine writes itself (her coordinates) holds none of her words.
+  assert.equal(planFitsSlots(plan, [{ max: 45 }, { max: 30, fact: "coordinates" }]), false);
+  assert.equal(planFitsSlots("• Accroche : INDAR derrière les arbres\n• Texte : « Ton premier cours t'attend »", [{ max: 40 }]), true);
+  const note = mouldNote({ pitch: "Ton nom géant derrière le décor.", room: { texts: ["accroche, 40 caractères"], end: true } });
+  assert.match(note, /Ton nom géant derrière le décor\./);
+  assert.match(note, /« accroche, 40 caractères »/);
+  assert.match(note, /légende/);
+  assert.match(note, /rappelle reply_with/);
+  // A calm request keeps her to the soberest models, except on her first Reel.
+  assert.equal(firstReelCeiling("sobre", true), "marque");
+  assert.equal(firstReelCeiling("sobre", false), "sobre");
+  assert.equal(firstReelCeiling(null, true), null);
+});

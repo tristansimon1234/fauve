@@ -116,6 +116,46 @@ export function energyCeiling(input: { request?: string; plan?: string; directio
   return null;
 }
 
+/**
+ * Her first Reel decides whether she stays (Tristan, 19 November: « il y a pas l'effet wahou… sur un premier Reel créé
+ * ça fait mal »): a calm request or art direction no longer keeps it to the soberest models, one strong graphic idea
+ * (« marque ») is allowed; a ban of hers (« jamais de glitch ») still holds through the picker's prompt.
+ */
+export function firstReelCeiling(ceiling: "sobre" | "marque" | null, first: boolean): "sobre" | "marque" | null {
+  return first && ceiling === "sobre" ? "marque" : ceiling;
+}
+
+/** The words on screen a plan quotes (« … »), its ending line aside. */
+export function planScreenWords(plan: string): string[] {
+  return plan
+    .split("\n")
+    .filter((line) => !/^\s*[•·-]\s*(Fin|Le son|Son|Style)\b/i.test(line))
+    .flatMap((line) => [...line.matchAll(/«\s*([^»]+?)\s*»/g)].map((m) => m[1]!.trim()))
+    .filter(Boolean);
+}
+
+/**
+ * Whether the words a plan quotes fit a model's text slots (its slots not written by the engine, the longest words in
+ * the longest slots, a few characters of slack): a plan written before the model was picked (« Visite d'Indar »,
+ * 19 November: two exact texts and an ending, refused by « Mots aux quatre coins » then « Plans fixes de cinéma ») sent
+ * the Reel back to the free montage, the one with no soul.
+ */
+export function planFitsSlots(plan: string, slots: { max: number; fact?: string }[]): boolean {
+  const words = planScreenWords(plan).map((w) => w.length).sort((a, b) => b - a);
+  const room = slots.filter((s) => !s.fact).map((s) => s.max).sort((a, b) => b - a);
+  return words.length <= room.length && words.every((length, i) => length <= room[i]! + 5);
+}
+
+/** What Edith is told when her plan does not fit the model picked for this Reel: its form, in her words, to write the plan in. */
+export function mouldNote(input: { pitch: string; room: HouseRoom }): string {
+  const texts = input.room.texts.length ? input.room.texts.map((t) => `« ${t} »`).join(", ") : "aucun texte à l'écran";
+  return (
+    `Ton plan n'est pas encore montré : ce Reel se fera dans cette forme (ne la nomme jamais, dis ce qu'on voit) : ${input.pitch} ` +
+    `Ses textes à l'écran : ${texts} ; ${input.room.end ? "un écran de fin avec son nom" : "pas d'écran de fin (son nom peut aller dans un texte)"}. ` +
+    "Réécris ton plan dans cette forme : son accroche est ce que cette forme montre en premier, ses mots à l'écran tiennent dans ces textes (pas un de plus), ce qui n'y tient pas (une offre, une adresse) va dans la légende et ton plan le dit (« Légende : … »). Puis rappelle reply_with avec le plan entier."
+  );
+}
+
 /** Whether a model fits under a ceiling (a model not classed fits only without one). */
 export const withinEnergy = (key: string, ceiling: "sobre" | "marque" | null): boolean =>
   !ceiling || (HOUSE_ENERGY[key] !== undefined && ENERGY_RANK[HOUSE_ENERGY[key]!] <= ENERGY_RANK[ceiling]);

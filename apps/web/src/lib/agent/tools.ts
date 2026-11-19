@@ -1,5 +1,9 @@
 import "server-only";
 import { soundPageLink,
+  houseModel,
+  houseRoom,
+  mouldNote,
+  planFitsSlots,
   APP_GUIDES,
   BY_HAND_GUIDE,
   cleanCaption,
@@ -134,6 +138,8 @@ import { socialConnect } from "@/lib/social/connect";
 import { ideasPossible, offerIdeas } from "@/lib/house-ideas";
 import { addToMoodboard } from "@/lib/moodboard-add";
 import { completeFirstPost, isFirstReel } from "@/lib/onboarding";
+import { MONTAGE_SKILLS } from "@fauve/agent/skills";
+import { pickHouseModel } from "@/lib/agent/house-pick";
 import { listInspirations } from "@/lib/inspirations";
 import { freeSlots } from "@/lib/slots";
 import { checkedFiles, filmHabit } from "@/lib/file-check";
@@ -185,7 +191,44 @@ export type ToolContext = {
   exchange?: ExchangeRow[];
   /** Set by the tool loop: whether her answer has any words yet this turn (buttons laid before them answer nothing). */
   wrote?: boolean;
+  /** This turn's model for a new Reel's plan (reelPlanMould): picked once, `sent` once its form went back to Edith; null for none. */
+  mould?: { key: string; sent: boolean } | null;
 };
+
+/** Her words of this exchange (her messages), for the art director before a plan. */
+const herExchangeWords = (rows: ExchangeRow[]): string =>
+  rows
+    .filter((r) => r.direction === "inbound" && r.body?.trim())
+    .map((r) => `Elle : ${r.body!.trim()}`)
+    .join("\n")
+    .slice(-4000);
+
+/**
+ * The model a new Reel's plan is written in (« modèle d'abord »): picked once a turn on her files and her words (never
+ * on a plan already written: it would only pick a model that holds that plan), kept for the turn. `note`: the plan does
+ * not fit it, Edith writes it again in its form (once; a second plan is taken as it is). Null: no model (her files fill
+ * none, a Reel she copies, a free creation she asked for), the plan goes as before.
+ */
+async function reelPlanMould(ctx: ToolContext, plan: string): Promise<{ key: string; note?: string } | null> {
+  const rows = ctx.exchange ?? [];
+  const words = herExchangeWords(rows);
+  if (/instagram\.com\/(reel|p|tv)\/|tiktok\.com\//i.test(words) || asksCreation(words)) return null;
+  if (ctx.mould === undefined) {
+    const mediaIds = [...exchangeFiles(rows)];
+    if (!mediaIds.length) return (ctx.mould = null);
+    const seconds = Number(plan.match(/\b(\d{1,2})\s*s\b/)?.[1]) || null;
+    const first = await isFirstReel(ctx.studioId, "00000000-0000-0000-0000-000000000000").catch(() => false);
+    const picked = await pickHouseModel({ studioId: ctx.studioId, mediaIds, brief: words, seconds, first });
+    ctx.mould = picked ? { key: picked.key, sent: false } : null;
+  }
+  const mould = ctx.mould;
+  if (!mould) return null;
+  const skill = MONTAGE_SKILLS[mould.key];
+  const model = houseModel(mould.key);
+  if (!skill || !model || mould.sent || planFitsSlots(plan, skill.texts)) return { key: mould.key };
+  mould.sent = true;
+  return { key: mould.key, note: mouldNote({ pitch: model.pitch, room: houseRoom(skill) }) };
+}
 
 /**
  * Tool results as JSON. Every object with a scheduled_at also gets « quand », the
@@ -2140,6 +2183,17 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
           card = step;
           answers = undefined;
         }
+      }
+      // A new Reel's plan is written in the model it will be made in (Tristan, 19 November: « modèle d'abord, plan
+      // ensuite »): picked now on her files and her words; a plan whose words on screen do not fit it is sent back once,
+      // with the model's form, to be written again in it. The model goes with the plan (payload.house) to the montage.
+      if (kept && planVoice !== undefined) {
+        const mould = await reelPlanMould(ctx, planMessage(kept)).catch((error: unknown) => {
+          console.warn("plan mould: not picked", error);
+          return null;
+        });
+        if (mould?.note) return mould.note;
+        ctx.extras.house = mould?.key;
       }
       ctx.extras.step_card = card;
       ctx.extras.options = answers;

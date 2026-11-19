@@ -49,6 +49,8 @@ export const replyExtrasSchema = z.object({
    * this sound included, unless her own words since say otherwise (validatedPlanVoice); set by reply_with, not by the model.
    */
   plan_voice: z.boolean().optional(),
+  /** The model of Edith's that plan was written in (its key, picked before the plan: « modèle d'abord »); set by reply_with, not by the model. */
+  house: z.string().max(40).optional(),
   options: z.array(z.string().trim().min(1).max(24)).min(2).max(6).optional(),
   posts: z.array(z.uuid()).max(4).optional(),
   grid: z.boolean().optional(),

@@ -7,6 +7,7 @@ import {
   HOUSE_PICK_PROMPT,
   HOUSE_SOURCE,
   energyCeiling,
+  firstReelCeiling,
   housePickInput,
   housePickSchema,
   houseRoom,
@@ -26,6 +27,7 @@ import { MONTAGE_SKILLS } from "@fauve/agent/skills";
 import { houseInspiration } from "@/lib/house-models";
 import { skillGate } from "@/lib/skill-reviews";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { isFirstReel } from "@/lib/onboarding";
 import { anthropic, logClaudeCost } from "./run";
 
 /** The files each model coded as a montage skill wants at least: Edith picks one only when her files fill it. */
@@ -84,26 +86,58 @@ export async function ensureEdithModel(input: {
   if (post.inspiration_id || (post.template && post.template !== "libre")) return null;
   const mediaIds = (input.mediaIds?.length ? input.mediaIds : ((post.media_ids as string[] | null) ?? [])).slice(0, 20);
   if (!mediaIds.length) return null;
+  // A voice over the Reel (hers, or one she asked Edith for): a model with room for its subtitles.
+  const voice = Boolean(post.voice_media_id) || (post.voice_over as { mode?: string } | null)?.mode === "on";
+  const first = await isFirstReel(input.studioId, input.postId).catch(() => false);
+  // The model her validated plan was written in (« modèle d'abord »), when it still plays; else picked now.
+  const promised = await planModel(input.studioId, input.brief, input.seconds);
+  const picked = promised ? { key: promised } : await pickHouseModel({ studioId: input.studioId, postId: input.postId, mediaIds, brief: input.brief, seconds: input.seconds, voice, first });
+  if (!picked) return null;
+  const house = await houseInspiration(input.studioId, picked.key);
+  if (!house) return null;
+  const { error } = await db.from("posts").update({ inspiration_id: house.id, edith_pick: house.id }).eq("id", input.postId).eq("studio_id", input.studioId).is("inspiration_id", null);
+  if (error) throw new Error(error.message);
+  console.log("house pick", input.postId, picked.key, promised ? "(her plan's)" : "");
+  return { key: picked.key, ...(picked.next ? { next: picked.next } : {}) };
+}
+
+/** No post yet (her plan, before it): the queries that leave this post out leave none out. */
+const NO_POST = "00000000-0000-0000-0000-000000000000";
+
+/**
+ * One of Edith's models for her files and her request, picked by the art director (HOUSE_PICK_PROMPT), with its next best,
+ * or null (made freely). Run before her plan is written (reply_with, « modèle d'abord ») and at the montage when no plan
+ * picked one. Her first Reel may go past a calm ceiling to one strong graphic idea (firstReelCeiling).
+ */
+export async function pickHouseModel(input: {
+  studioId: string;
+  postId?: string;
+  mediaIds: string[];
+  brief?: string;
+  seconds?: number | null;
+  voice?: boolean;
+  first?: boolean;
+}): Promise<{ key: string; next?: string; why?: string } | null> {
+  const db = supabaseAdmin();
+  const postId = input.postId ?? NO_POST;
   const [files, avoid, studio, taste, gate] = await Promise.all([
-    pickFiles(mediaIds),
-    recentHouseKeys(input.studioId, input.postId),
+    pickFiles(input.mediaIds.slice(0, 20)),
+    recentHouseKeys(input.studioId, postId),
     db.from("studios").select("business_type").eq("id", input.studioId).maybeSingle(),
-    tasteOf(input.studioId, input.postId).catch(() => undefined),
+    tasteOf(input.studioId, postId).catch(() => undefined),
     skillGate(input.studioId),
   ]);
   if (!files.length) return null;
   // Only a model whose skill this business plays (added to the library): the model Edith picks is the one that plays,
   // never one the editor and the motion designer would redraw by hand.
   // Never a model that does more than her plan and her charter allow (« rythme calme », « jamais de glitch »): energyCeiling.
-  const ceiling = energyCeiling({ request: input.brief ?? "", plan: shownPlan(input.brief), direction: taste?.direction });
+  const ceiling = firstReelCeiling(energyCeiling({ request: input.brief ?? "", plan: shownPlan(input.brief), direction: taste?.direction }), Boolean(input.first));
   // Never a model shorter than the length she fixed (a model is stretched a little, never past its longest: skillTooShort).
   const playable = Object.values(MONTAGE_SKILLS)
     .filter((s) => gate(s) && withinEnergy(s.key, ceiling) && holds(s, input.seconds))
     .map((s) => s.key);
   if (!playable.length) return null;
   const only = (key: string | null) => (key && playable.includes(key) ? key : null);
-  // A voice over the Reel (hers, or one she asked Edith for): a model with room for its subtitles.
-  const voice = Boolean(post.voice_media_id) || (post.voice_over as { mode?: string } | null)?.mode === "on";
   try {
     const response = await anthropic().beta.messages.parse({
       model: CHAT_MODEL,
@@ -117,7 +151,7 @@ export async function ensureEdithModel(input: {
             request: input.brief ?? "",
             business: (studio.data?.business_type as string | null) ?? null,
             files,
-            voice,
+            voice: Boolean(input.voice),
             avoid,
             least: SKILL_LEAST,
             taste,
@@ -133,17 +167,36 @@ export async function ensureEdithModel(input: {
     const answer = response.parsed_output ? readAnswer(housePickSchema, response.parsed_output) : null;
     const key = only(readHousePick(answer, files.length, avoid, SKILL_LEAST));
     if (!key) return null;
-    const house = await houseInspiration(input.studioId, key);
-    if (!house) return null;
-    const { error } = await db.from("posts").update({ inspiration_id: house.id, edith_pick: house.id }).eq("id", input.postId).eq("studio_id", input.studioId).is("inspiration_id", null);
-    if (error) throw new Error(error.message);
     const next = only(readHouseNext(answer, files.length, avoid, SKILL_LEAST));
-    console.log("house pick", input.postId, key, next ? `(next: ${next})` : "", ceiling ? `(at most ${ceiling})` : "", response.parsed_output?.why);
-    return { key, ...(next ? { next } : {}) };
+    console.log("house pick:", key, next ? `(next: ${next})` : "", ceiling ? `(at most ${ceiling})` : "", response.parsed_output?.why);
+    return { key, ...(next ? { next } : {}), ...(response.parsed_output?.why ? { why: response.parsed_output.why } : {}) };
   } catch (error) {
     console.warn("house model not picked, the Reel is made freely", input.postId, error);
     return null;
   }
+}
+
+/**
+ * The model her validated plan was written in: the latest plan Edith showed this studio with its model (payload.house),
+ * when it is the plan of this launch (its title in her brief) and still plays here (this studio's library, her length).
+ */
+async function planModel(studioId: string, brief: string | undefined, seconds: number | null | undefined): Promise<string | null> {
+  const shown = shownPlan(brief);
+  if (!shown) return null;
+  const { data } = await supabaseAdmin()
+    .from("whatsapp_messages")
+    .select("body, payload")
+    .eq("studio_id", studioId)
+    .eq("direction", "outbound")
+    .not("payload->>house", "is", null)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const key = (data?.payload as { house?: unknown } | null)?.house;
+  const title = String(data?.body ?? "").split("\n")[0]?.trim();
+  if (typeof key !== "string" || !title || !shown.includes(title)) return null;
+  const skill = (await skillGate(studioId))(MONTAGE_SKILLS[key]);
+  return skill && holds(skill, seconds) ? key : null;
 }
 
 /** A model's skill lasts the length she fixed (one second over its longest, as skillTooShort reads it); any without one. */
