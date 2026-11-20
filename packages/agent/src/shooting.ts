@@ -201,6 +201,8 @@ function guideOf(kind: FilmKind, t: TradeWords): Guide {
 
 /** What a close-up of the work shows in her trade (« les mains et l'assiette »). */
 export const tradeDetail = (businessType: string | null | undefined): string => TRADE[businessFamily(businessType)].detail;
+/** Her place at its busiest, in the words of her trade (« le cours en plein effort »). */
+export const tradeBusy = (businessType: string | null | undefined): string => TRADE[businessFamily(businessType)].busy;
 
 /** A habit read on her latest files (fileHabit in file-check.ts): the point of the list it changes. */
 export type FilmHabit = "landscape" | "dark" | "shaky" | "mixed";

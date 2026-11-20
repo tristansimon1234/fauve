@@ -118,7 +118,7 @@ test("files verdict: what was measured on her files, most important first, with 
   assert.equal(filesVerdict([night, { ...night }]).problems.find((p) => p.key === "landscape")!.words, "tes deux vidéos sont à l'horizontale");
   // A good set: nothing to say (a blurred passage under half of a clip is not a blurred clip).
   assert.deepEqual(keys([barber]), []);
-  assert.equal(filesVerdictLine([barber]), "Ses fichiers depuis le dernier lancement (1, mesurés) : rien à redire sur leur forme.");
+  assert.match(filesVerdictLine([barber])!, /^Ses fichiers depuis le dernier lancement \(1, mesurés\) : rien à redire sur leur forme\. Ta première réponse sur eux, une fois pour ce Reel : un vrai compliment/);
 });
 
 test("files verdict: light burnt, against the light, blurred, shaky, too short, photos only, nothing measured", () => {
@@ -141,8 +141,38 @@ test("files verdict: light burnt, against the light, blurred, shaky, too short, 
   // Advice, never a refusal: the line says so, and never discards a file.
   const line = filesVerdictLine([salon, night], "studio de Pilates")!;
   assert.match(line, /10 s à filmer qui arrangeraient ça : 3 plans de 3 s qui bougent, pour ouvrir sur les pieds ou les mains/);
-  assert.match(line, /elle peut lancer avec ce qu'il y a/);
-  assert.ok(line.length < 600, line);
+  assert.match(line, /« J'en filme une » et « Fais avec ceux-là »/);
+  assert.match(line, /Rien n'est écarté/);
+  assert.ok(line.length < 700, line);
+});
+
+test("files verdict: nobody in action, and the most beautiful shot for Edith's compliment (« Visite d'Indar »)", () => {
+  // Her 7 videos of 18 November as read: a walk to the door, the reception, the curtain, the room; nobody in a class.
+  const visit = (shots: NonNullable<CheckedFile["analysis"]>["shots"]): CheckedFile => ({
+    kind: "video",
+    width: 1080,
+    height: 1920,
+    duration: 12,
+    analysis: { duration: 12, orientation: "portrait", lighting: "good", actions: [{}], shots },
+  });
+  const files = [
+    visit([{ start: 0, end: 4, energy: 2, hook_score: 2, faces_visible: false, beauty: 4, subject: "détail", description: "Le trottoir des quais sous les arbres d'automne" }]),
+    visit([
+      { start: 0, end: 4, energy: 3, hook_score: 3, faces_visible: false, beauty: 3, subject: "mains", description: "Une main pousse la porte vitrée" },
+      { start: 4, end: 8, energy: 2, hook_score: 3, faces_visible: true, beauty: 4, subject: "équipe", description: "L'accueil, une femme à son ordinateur" },
+      { start: 8, end: 12, energy: 2, hook_score: 4, faces_visible: false, beauty: 4, subject: "salle", description: "La salle des reformers en pleine lumière" },
+    ]),
+  ];
+  const v = filesVerdict(files, "studio de Pilates Reformer");
+  assert.deepEqual(v.problems.map((p) => p.key), ["no_motion"]);
+  assert.equal(v.fix, "5 à 10 s : le cours en plein effort, téléphone posé");
+  assert.deepEqual(v.best, { what: "La salle des reformers en pleine lumière", file: "ta 2e vidéo" });
+  // In a restaurant, hands at work are the action.
+  assert.deepEqual(filesVerdict(files, "restaurant").problems.map((p) => p.key), []);
+  // A class in full effort is someone in action.
+  const busy = visit([{ start: 0, end: 5, energy: 4, hook_score: 3, faces_visible: false, subject: "groupe", description: "Le cours en plein effort" }]);
+  assert.deepEqual(filesVerdict([...files, busy], "studio de Pilates").problems.map((p) => p.key), []);
+  assert.match(filesVerdictLine(files, "studio de Pilates")!, /Le plus beau : La salle des reformers en pleine lumière \(ta 2e vidéo\)\./);
 });
 
 test("her habit on her latest videos changes the shot list", () => {

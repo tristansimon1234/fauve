@@ -1,4 +1,5 @@
-import { tradeDetail, type FilmHabit } from "./shooting.ts";
+import { businessFamily } from "./post-ideas.ts";
+import { tradeBusy, tradeDetail, type FilmHabit } from "./shooting.ts";
 
 // Her files judged on their form before a Reel is designed (Tristan: « Dans quelle mesure Edith peut conseiller avant
 // la conception d'un Reel », « oui »). Nothing is asked of a model: what was already measured on each file (the clip
@@ -7,7 +8,17 @@ import { tradeDetail, type FilmHabit } from "./shooting.ts";
 // it once with her plan, as advice: she never discards a file and launches with what there is when asked.
 
 type Quality = { blurry?: boolean; dark?: boolean; shaky?: boolean };
-type AnalysedShot = { start?: number; end?: number; quality?: Quality; hook_score?: number; energy?: number; faces_visible?: boolean };
+type AnalysedShot = {
+  start?: number;
+  end?: number;
+  quality?: Quality;
+  hook_score?: number;
+  energy?: number;
+  faces_visible?: boolean;
+  description?: string;
+  subject?: string;
+  beauty?: number;
+};
 
 /** One of her files as measured: a video's analysis, a photo's reading (its light correction), its picture. */
 export type CheckedFile = {
@@ -33,6 +44,7 @@ export type CheckedFile = {
 
 export type FileProblem =
   | "no_hook"
+  | "no_motion"
   | "photos_only"
   | "one_shot"
   | "landscape"
@@ -47,7 +59,7 @@ export type FileProblem =
   | "low_res";
 
 /** Most important first: what the first second shows, then the picture, then the rest. */
-const ORDER: FileProblem[] = ["no_hook", "photos_only", "landscape", "one_shot", "dark", "backlit", "burnt", "mixed_light", "blurry", "shaky", "little", "too_short", "low_res"];
+const ORDER: FileProblem[] = ["no_hook", "photos_only", "no_motion", "landscape", "one_shot", "dark", "backlit", "burnt", "mixed_light", "blurry", "shaky", "little", "too_short", "low_res"];
 
 export type FilesVerdict = {
   /** What was measured, most important first, each in a few French words. */
@@ -56,6 +68,8 @@ export type FilesVerdict = {
   fix: string | null;
   /** How many files were measured. */
   measured: number;
+  /** Her most beautiful shot, as the analysis described it, and which file it is in: what Edith compliments. */
+  best: { what: string; file: string } | null;
 };
 
 /** A correction this strong means the file is far from right (Gemini's are ±0.05 to ±0.15 on most files). */
@@ -141,6 +155,10 @@ export function filesVerdict(files: CheckedFile[], businessType?: string | null)
     const opener = shots.some((s) => (s.hook_score ?? 0) >= 3 || s.faces_visible || (s.energy ?? 0) >= 3) || videos.some((v) => (v.analysis?.actions?.length ?? 0) > 0);
     if (!videos.length) add("photos_only", photos.length === 1 ? "une seule photo, rien ne bouge dans la 1re seconde" : "que des photos, rien ne bouge dans la 1re seconde");
     else if (shots.length && !opener) add("no_hook", "rien ne bouge assez pour la 1re seconde (aucun plan n'accroche)");
+    // Someone in action, or someone who speaks (Tristan, 19 November, on « Visite d'Indar »: « un peu sans âme »: a walk through the rooms,
+    // nobody in the middle of what the place is for): a person seen, lively. Hands count where hands are the work, not
+    // in a studio (there the hands pushed a door).
+    else if (shots.length && !videos.some((v) => v.analysis?.transcript?.trim() || v.analysis?.words?.length) && !shots.some((s) => movingPerson(s, businessType))) add("no_motion", "personne en action : on voit le lieu, jamais quelqu'un en plein mouvement");
     // One shot for a whole Reel: the same image comes back.
     const seconds = videos.reduce((s, v) => s + (durationOf(v) ?? 0), 0);
     const count = shots.length + photos.length;
@@ -165,12 +183,40 @@ export function filesVerdict(files: CheckedFile[], businessType?: string | null)
     flagged("low_res", (f) => Boolean(f.width && f.height && Math.min(f.width, f.height) < LOW_RES), "est en petite qualité", "sont en petite qualité");
   }
   problems.sort((a, b) => ORDER.indexOf(a.key) - ORDER.indexOf(b.key));
-  return { problems, fix: problems.length ? fixFor(problems[0]!.key, businessType) : null, measured: known.length };
+  return { problems, fix: problems.length ? fixFor(problems[0]!.key, businessType) : null, measured: known.length, best: bestShot(known) };
+}
+
+const PERSON = /femme|homme|personne|client|[ée]l[èe]ve|groupe|[ée]quipe|coach|prof|danseu|serveu|chef|coiffeu|barbier|esth[ée]ticienne|fleuriste|vendeu|enfant|couple/i;
+
+/** A person in a shot, lively enough to be « in action ». */
+function movingPerson(shot: AnalysedShot, businessType?: string | null): boolean {
+  // A face that holds the eye (someone at work, looking at the lens) counts even calm; on « Visite d'Indar » the
+  // receptionist at her desk and the curtain being drawn were read 2 of energy and 3 of hook.
+  if (shot.faces_visible && (shot.hook_score ?? 0) >= 4 && (shot.energy ?? 0) >= 2) return true;
+  if ((shot.energy ?? 0) < 3) return false;
+  const subject = shot.subject ?? "";
+  return Boolean(shot.faces_visible) || PERSON.test(subject) || (/mains?/i.test(subject) && businessFamily(businessType) !== "sport");
+}
+
+/** Her most beautiful shot (its beauty, then its hook), never a blurred or dark one, with the file it is in. */
+function bestShot(files: CheckedFile[]): FilesVerdict["best"] {
+  let best: { shot: AnalysedShot; file: CheckedFile } | null = null;
+  for (const file of files) {
+    for (const shot of file.kind === "video" ? (file.analysis?.shots ?? []) : []) {
+      if (!shot.description?.trim() || shot.quality?.blurry || shot.quality?.dark) continue;
+      const score = (shot.beauty ?? 0) * 10 + (shot.hook_score ?? 0);
+      const kept = best ? (best.shot.beauty ?? 0) * 10 + (best.shot.hook_score ?? 0) : -1;
+      if (score > kept) best = { shot, file };
+    }
+  }
+  return best ? { what: best.shot.description!.trim().replace(/[.\s]+$/, ""), file: nameOf(files, [best.file]).words } : null;
 }
 
 /** Ten seconds to film that would fix it, in the words of her trade. */
 function fixFor(key: FileProblem, businessType?: string | null): string | null {
   switch (key) {
+    case "no_motion":
+      return `5 à 10 s : ${tradeBusy(businessType)}, téléphone posé`;
     case "no_hook":
     case "photos_only":
     case "one_shot":
@@ -200,9 +246,17 @@ export function filesVerdictLine(files: CheckedFile[], businessType?: string | n
   const v = filesVerdict(files, businessType);
   if (!v.measured) return null;
   const head = `Ses fichiers depuis le dernier lancement (${v.measured}, mesurés)`;
-  if (!v.problems.length) return `${head} : rien à redire sur leur forme.`;
+  // Edith answers her files as a community manager would (Tristan, 19 November: « super tes vidéos, voici un retour,
+  // et là il donne des conseils »): what is most beautiful in them, then the one advice that matters most.
+  const best = v.best ? ` Le plus beau : ${v.best.what} (${v.best.file}).` : "";
+  const answer =
+    " Ta première réponse sur eux, une fois pour ce Reel : un vrai compliment sur ce qu'ils ont de plus beau, en quelques mots" +
+    (v.problems.length
+      ? ", puis le conseil le plus utile en une phrase (ce qui manque et comment le filmer), avec les boutons « J'en filme une » et « Fais avec ceux-là » ; sur « Fais avec ceux-là », la suite sans y revenir. Rien n'est écarté."
+      : ", puis la suite.");
+  if (!v.problems.length) return `${head} : rien à redire sur leur forme.${best}${answer}`;
   const words = v.problems.slice(0, 3).map((p) => p.words).join(" ; ");
-  return `${head} : ${words}.${v.fix ? ` 10 s à filmer qui arrangeraient ça : ${v.fix}.` : ""} Un avis pour un Reel, une fois ; rien n'est écarté et elle peut lancer avec ce qu'il y a.`;
+  return `${head} : ${words}.${v.fix ? ` 10 s à filmer qui arrangeraient ça : ${v.fix}.` : ""}${best}${answer}`;
 }
 
 /** Her habit on her latest files, when half of them share it: the point of a shot list it changes (filmGuide). */
